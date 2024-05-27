@@ -15,9 +15,10 @@ Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
 Ensure you have the following installed on your machine:
 
-- [Node.js](https://nodejs.org/) (v14 or higher)
-- [pnpm](https://pnpm.io/) (v6 or higher)
-- [Tauri](https://tauri.studio/) (for desktop app integration)
+- [Node.js](https://nodejs.org/)
+- [pnpm](https://pnpm.io/)
+- [Rust](https://www.rust-lang.org/)
+- [Tauri](https://tauri.app/)
 
 ### Installation
 
@@ -82,8 +83,6 @@ wealthfolio/
 ├── .github/
 │   └── workflows/
 │       └── release.yml
-├── .vscode/
-├── node_modules/
 ├── public/
 ├── src/
 │   ├── assets/
@@ -136,7 +135,7 @@ Contributions are welcome! Please follow these steps:
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the LGPL-3.0 license. See the `LICENSE` file for details.
 
 ---
 
