@@ -1,0 +1,91 @@
+@import '@fontsource/ibm-plex-mono';
+@import '@fontsource/ibm-plex-mono/200.css';
+@import '@fontsource/ibm-plex-mono/300.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+@import '@fontsource/ibm-plex-mono/700.css';
+@import '@fontsource/ibm-plex-mono/400-italic.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+ 
+@layer base {
+  :root {
+    /* --background: 45 19.05% - 91.76%; */
+    --background: 51 53.8% 97.5%;
+    --foreground: 222.2 84% 4.9%;
+
+    /* --card: 40.0 10% 93%; */
+    --card: 40 66.44% 97.02%;
+    --card-foreground: 222.2 84% 4.9%;
+/* 
+    --sidebar: 45 19.05% 91.76%; */
+ 
+    --popover: 51 53.8% 97.5%;
+    --popover-foreground: 222.2 84% 4.9%;
+ 
+    --primary: 20 3.09% 19.02%;
+    --primary-foreground: 60 9.1% 97.8%;
+    
+    --secondary: 45 19.05% 91.76%;
+    --secondary-foreground: 24 9.8% 10%;
+ 
+    --muted: 10 25% 96%; 
+    --muted-foreground: 215.4 16.3% 46.9%;
+ 
+    --accent: 40.0 10% 93%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+ 
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 24 4.42% 84%;
+    --input: 24 4.42% 84%;
+    --ring: 222.2 84% 4.9%;
+ 
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 10 0% 10%;
+    --foreground: 210 40% 98%;
+ 
+    --card: 10 0% 10%;
+    --card-foreground: 210 40% 98%;
+ 
+    --sidebar: 10 0% 10%;
+
+    --popover: 10 0% 10%;
+    --popover-foreground: 210 40% 98%;
+ 
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+ 
+    --secondary: 0 0% 30%;
+    --secondary-foreground: 210 40% 98%;
+ 
+    --muted: 0 0% 30%;
+    --muted-foreground: 215 20.2% 65.1%;
+ 
+    --accent: 0 0% 30%;
+    --accent-foreground: 210 40% 98%;
+ 
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+ 
+    --border: 0 0% 20%;
+    --input: 0 0% 30%;
+    --ring: 0 0% 20%;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
