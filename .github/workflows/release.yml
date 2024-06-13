@@ -55,6 +55,9 @@ jobs:
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: pnpm install # Change this to npm, yarn or pnpm.
 
+      - name: Install Rust x86_64 Support (macOS)
+        run: rustup target add x86_64-apple-darwin
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
 
