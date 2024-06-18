@@ -44,30 +44,6 @@ impl From<&YQuoteItem> for NewAsset {
     }
 }
 
-// impl<'a> From<&'a YQuoteItem> for NewAsset<'a> {
-//     fn from(item: &'a YQuoteItem) -> Self {
-//         NewAsset {
-//             id: &item.symbol,
-//             isin: None,
-//             name: Some(&item.long_name),
-//             asset_type: Some(&item.quote_type),
-//             symbol: &item.symbol,
-//             symbol_mapping: Some(&item.symbol),
-//             asset_class: None, // Assuming YQuoteItem does not provide asset class
-//             asset_sub_class: None, // Assuming YQuoteItem does not provide asset sub class
-//             comment: None,     // Assuming YQuoteItem does not provide a comment
-//             countries: None,   // Assuming YQuoteItem does not provide countries
-//             categories: None,  // Assuming YQuoteItem does not provide categories
-//             classes: None,     // Assuming YQuoteItem does not provide classes
-//             attributes: None,  // Assuming YQuoteItem does not provide attributes
-//             currency: "", // You need to provide a default currency or fetch it from YQuoteItem if available
-//             data_source: "YAHOO",
-//             sectors: None, // Assuming YQuoteItem does not provide sectors
-//             url: None,     // Assuming YQuoteItem does not provide a URL
-//         }
-//     }
-// }
-
 impl Default for Asset {
     fn default() -> Self {
         Asset {
@@ -111,10 +87,9 @@ pub struct YahooProvider {
 }
 
 impl YahooProvider {
-    pub fn new() -> Self {
-        YahooProvider {
-            provider: yahoo::YahooConnector::new(),
-        }
+    pub fn new() -> Result<Self, yahoo::YahooError> {
+        let provider = yahoo::YahooConnector::new()?;
+        Ok(YahooProvider { provider })
     }
 
     // pub async fn set_crumb() -> Result<(), yahoo::YahooError> {
@@ -122,7 +97,11 @@ impl YahooProvider {
         let client = Client::new();
 
         // Make the first call to extract the Crumb cookie
-        let response = client.get("https://fc.yahoo.com").send().await?;
+        let response = client
+            .get("https://fc.yahoo.com")
+            .send()
+            .await
+            .map_err(|e| YahooError::FetchFailed(e.to_string()))?;
 
         let cookie = response
             .headers()
@@ -139,9 +118,13 @@ impl YahooProvider {
             .header(header::USER_AGENT, "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
             .header(header::COOKIE, cookie)
             .send()
-            .await?;
+            .await
+            .map_err(|e| YahooError::FetchFailed(e.to_string()))?;
 
-        let crumb = request.text().await?;
+        let crumb = request
+            .text()
+            .await
+            .map_err(|e| YahooError::FetchFailed(e.to_string()))?;
 
         let crumb_data = CrumbData {
             cookie: cookie.to_string(),
@@ -206,15 +189,6 @@ impl YahooProvider {
         match asset_sub_class {
             AssetSubClass::MutualFund | AssetSubClass::Etf => {
                 let mut sector_data = Vec::new();
-                // if let Some(top_holdings) = &asset_profile.top_holdings {
-                //     for sector_weighting in &top_holdings.sector_weightings {
-                //         for (sector, weight) in &sector_weighting.other {
-                //             sector_data.push(
-                //                 json!({ "weight": weight.raw, "name": self.parse_sector(sector) }),
-                //             );
-                //         }
-                //     }
-                // }
                 if let Some(top_holdings) = &asset_profile.top_holdings {
                     for sector_weighting in &top_holdings.sector_weightings {
                         for (sector, weight_value) in &sector_weighting.other {
@@ -306,8 +280,6 @@ impl YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<yahoo::Quote>, yahoo::YahooError> {
-        let provider = yahoo::YahooConnector::new();
-
         if symbol.starts_with("$CASH-") {
             return Ok(vec![]);
         }
@@ -316,34 +288,13 @@ impl YahooProvider {
         let start_offset = start.into();
         let end_offset = end.into();
 
-        let response = provider
+        let response = self
+            .provider
             .get_quote_history(symbol, start_offset, end_offset)
             .await?;
 
         response.quotes()
     }
-
-    // pub async fn get_latest_quote(&self, symbol: &str) -> Result<yahoo::Quote, yahoo::YahooError> {
-    //     let provider: yahoo::YahooConnector = yahoo::YahooConnector::new();
-
-    //     if symbol.starts_with("$CASH-") {
-    //         // Return a default Quote for $CASH- symbols
-    //         return Ok(yahoo::Quote {
-    //             timestamp: 0, // Adjust these values as appropriate
-    //             open: 1.0,
-    //             high: 1.0,
-    //             low: 1.0,
-    //             volume: 0,
-    //             close: 1.0,
-    //             adjclose: 0.0,
-    //         });
-    //     }
-
-    //     let response = provider.get_latest_quotes(symbol, "1d").await?;
-    //     let quote = response.last_quote().unwrap();
-
-    //     Ok(quote)
-    // }
 
     pub async fn fetch_asset_profile(
         &self,
@@ -351,7 +302,6 @@ impl YahooProvider {
     ) -> Result<YahooResult, yahoo::YahooError> {
         let crumb_data = YAHOO_CRUMB.read().unwrap();
 
-        // Using `ok_or_else` for more concise error handling
         let crumb_data = crumb_data
             .as_ref()
             .ok_or_else(|| YahooError::FetchFailed("Crumb data not found".into()))?;
@@ -388,12 +338,6 @@ impl YahooProvider {
         })?;
 
         Ok(deserialized)
-
-        // println!("***** response: {:?}", response);
-        // response.json::<YahooResult>().await.map_err(|err| {
-        //     println!("JSON Deserialization Error: {}", err);
-        //     YahooError::FetchFailed(err.to_string())
-        // })
     }
 
     fn parse_asset_class(&self, quote_type: &str, short_name: &str) -> (AssetClass, AssetSubClass) {
