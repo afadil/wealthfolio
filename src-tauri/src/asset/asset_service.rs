@@ -34,7 +34,7 @@ impl From<yahoo_finance_api::Quote> for Quote {
 impl AssetService {
     pub fn new() -> Self {
         AssetService {
-            provider: YahooProvider::new(), // Initialize the provider here
+            provider: YahooProvider::new().unwrap(),
         }
     }
 
