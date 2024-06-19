@@ -158,6 +158,7 @@ impl YahooProvider {
         }
 
         let response = self.fetch_asset_profile(symbol).await?;
+
         let asset_profile =
             response
                 .quote_summary
@@ -218,7 +219,7 @@ impl YahooProvider {
 
         let new_asset = NewAsset {
             id: symbol.to_string(),
-            isin: None, // Extract from asset_profile if available
+            isin: None,
             name: Some(formatted_name),
             asset_type: Some(asset_class.to_string()), // Convert enum to String
             symbol: symbol.to_string(),
@@ -238,14 +239,13 @@ impl YahooProvider {
 
             countries,
             sectors,
-            categories: None, // Extract from asset_profile if available
-            classes: None,    // Extract from asset_profile if available
-            attributes: None, // Extract from asset_profile if available
+            categories: None,
+            classes: None,
+            attributes: None,
             url: asset_profile
                 .summary_profile
                 .as_ref()
                 .and_then(|sp| sp.website.clone()),
-            // Other fields...
         };
 
         Ok(new_asset)
@@ -316,6 +316,10 @@ impl YahooProvider {
         // Streamlining the HTTP GET request and error handling
         let response = client
             .get(&url)
+            .header(
+                "user-agent",
+                "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR 1.0.3705;)",
+            )
             .header("COOKIE", &crumb_data.cookie)
             .header("Crumb", &crumb_data.crumb)
             .send()
@@ -329,7 +333,7 @@ impl YahooProvider {
             .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
 
         // Print the raw JSON response
-        // println!("Raw JSON Response: {}", response_text);
+        println!("Raw JSON Response: {}", response_text);
 
         // Deserialize the JSON response into your struct
         let deserialized: YahooResult = serde_json::from_str(&response_text).map_err(|err| {
