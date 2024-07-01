@@ -74,7 +74,7 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Column 1 */}
           <div className="pr-16 xl:col-span-2">
-            <Accounts className="bg-background" accounts={accountsData} />
+            <Accounts className="border-none bg-transparent shadow-none" accounts={accountsData} />
           </div>
 
           {/* Column 2 */}
