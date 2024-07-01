@@ -180,7 +180,9 @@ export function Accounts({
         {isExpanded && (
           <CardContent className="pt-4">
             {accountsInCategory.map((account) => (
-              <AccountSummary key={account.id} account={account} />
+              <div className="py-4">
+                <AccountSummary key={account.id} account={account} />
+              </div>
             ))}
           </CardContent>
         )}
