@@ -1,13 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, BarChart as BarChartIcon } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Bar, ComposedChart, CartesianGrid, XAxis, YAxis, Line } from 'recharts';
 import {
   ChartContainer,

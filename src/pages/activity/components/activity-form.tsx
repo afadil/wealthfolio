@@ -7,7 +7,6 @@ import * as z from 'zod';
 
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Icons } from '@/components/icons';
-// import { AutoComplete } from '@/components/ui/autocomplete';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -242,12 +241,6 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
             )}
           />
 
-          {/* {CASH_ACTIVITY_TYPES.includes(watchedType) ? (
-            <CashActivityFields currentAccountCurrency={currentAccountCurrency} />
-          ) : (
-            <AssetActivityFields defaultAssetId={defaultValues?.assetId} />
-          )} */}
-
           {CASH_ACTIVITY_TYPES.includes(watchedType) ? (
             <CashActivityFields currentAccountCurrency={currentAccountCurrency} />
           ) : watchedType === 'DIVIDEND' ? (
@@ -281,7 +274,6 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
   const watchedType = watch('activityType');
 
   const isFeeType = watchedType === 'FEE';
-  const isDividendType = watchedType === 'DIVIDEND';
 
   return (
     <>
