@@ -14,6 +14,7 @@ import { aggregateHoldingsBySymbol } from '@/lib/portfolio-helper';
 import { FinancialHistory, Holding } from '@/lib/types';
 import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
+import { IncomeDashboard } from './components/income-dashboard';
 
 export const HoldingsPage = () => {
   const { settings } = useSettingsContext();
@@ -49,9 +50,13 @@ export const HoldingsPage = () => {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            <TabsTrigger value="dividends">Income</TabsTrigger>
           </TabsList>
           <TabsContent value="holdings" className="space-y-4">
             <HoldingsTable holdings={holdings || []} isLoading={isLoading} />
+          </TabsContent>
+          <TabsContent value="dividends" className="space-y-4">
+            <IncomeDashboard />
           </TabsContent>
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-3">

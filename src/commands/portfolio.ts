@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api';
-import { FinancialHistory, Holding } from '@/lib/types';
+import { FinancialHistory, Holding, IncomeSummary } from '@/lib/types';
 
 export const getHistorical = async (): Promise<FinancialHistory[]> => {
   try {
@@ -17,6 +17,16 @@ export const computeHoldings = async (): Promise<Holding[]> => {
     return result as Holding[];
   } catch (error) {
     console.error('Error computing holdings:', error);
+    throw error;
+  }
+};
+
+export const getIncomeSummary = async (): Promise<IncomeSummary> => {
+  try {
+    const result = await invoke('get_income_summary');
+    return result as IncomeSummary;
+  } catch (error) {
+    console.error('Error fetching income summary:', error);
     throw error;
   }
 };

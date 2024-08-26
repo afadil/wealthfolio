@@ -306,4 +306,13 @@ export interface GoalProgress {
   currency: string;
 }
 
+export interface IncomeSummary {
+  by_month: Record<string, number>;
+  by_type: Record<string, number>;
+  by_symbol: Record<string, number>;
+  total_income: number;
+  total_income_ytd: number;
+  currency: string;
+}
+
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';

@@ -5,16 +5,6 @@ use crate::models::{
 use crate::AppState;
 use tauri::State;
 
-// #[tauri::command]
-// pub fn get_activities(state: State<AppState>) -> Result<Vec<ActivityDetails>, String> {
-//     println!("Fetching activities..."); // Log message
-//     let mut conn = state.conn.lock().unwrap();
-//     let service = activity_service::ActivityService::new();
-
-//     service
-//         .get_activities_details(&mut conn)
-//         .map_err(|e| format!("Failed to fetch activities: {}", e))
-// }
 
 #[tauri::command]
 pub fn search_activities(
@@ -98,7 +88,7 @@ pub fn update_activity(
     activity: ActivityUpdate,
     state: State<AppState>,
 ) -> Result<Activity, String> {
-    println!("Updating activity..."); // Log message
+    println!("Updating activity..."); 
     let mut conn = state.conn.lock().unwrap();
     let service = activity_service::ActivityService::new();
     service
@@ -106,29 +96,10 @@ pub fn update_activity(
         .map_err(|e| format!("Failed to update activity: {}", e))
 }
 
-// #[tauri::command]
-// pub fn update_activity2(
-//     activity: String, // receive as JSON string
-//     state: State<AppState>,
-// ) -> Result<Activity, String> {
-//     println!("Updating activity... {} ", activity); // Log message
-
-//     // Parse JSON string into ActivityUpdate struct
-//     let activity: ActivityUpdate =
-//         serde_json::from_str(&activity).map_err(|e| format!("Failed to parse activity: {}", e))?;
-
-//     println!("Updating activity... {} ", activity.id); // Log message
-
-//     let mut conn = state.conn.lock().unwrap();
-//     let service = activity_service::ActivityService::new();
-//     service
-//         .update_activity(&mut *conn, activity)
-//         .map_err(|e| format!("Failed to update activity: {}", e))
-// }
 
 #[tauri::command]
 pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<usize, String> {
-    println!("Deleting activity..."); // Log message
+    println!("Deleting activity..."); 
     let mut conn = state.conn.lock().unwrap();
     let service = activity_service::ActivityService::new();
     service
