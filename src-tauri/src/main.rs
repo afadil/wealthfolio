@@ -20,7 +20,7 @@ use asset::{
     asset_service,
     assets_commands::{get_asset_data, search_ticker, synch_quotes},
 };
-use portfolio::portfolio_commands::{compute_holdings, get_historical};
+use portfolio::portfolio_commands::{compute_holdings, get_historical, get_income_summary};
 use settings::settings_commands::{get_settings, update_currency, update_settings};
 use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
 
@@ -96,6 +96,7 @@ fn main() {
             get_goals,
             update_goal_allocations,
             load_goals_allocations,
+            get_income_summary,
         ])
         .build(context)
         .expect("error while running wealthfolio application");

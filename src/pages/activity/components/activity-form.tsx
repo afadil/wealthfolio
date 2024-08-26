@@ -55,7 +55,7 @@ const activityTypes = [
   // { label: 'Other', value: 'OTHER' },
 ] as const;
 
-const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST', 'DIVIDEND'];
+const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
 
 type ActivityFormValues = z.infer<typeof newActivitySchema>;
 export interface AccountSelectOption {
@@ -242,8 +242,16 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
             )}
           />
 
+          {/* {CASH_ACTIVITY_TYPES.includes(watchedType) ? (
+            <CashActivityFields currentAccountCurrency={currentAccountCurrency} />
+          ) : (
+            <AssetActivityFields defaultAssetId={defaultValues?.assetId} />
+          )} */}
+
           {CASH_ACTIVITY_TYPES.includes(watchedType) ? (
             <CashActivityFields currentAccountCurrency={currentAccountCurrency} />
+          ) : watchedType === 'DIVIDEND' ? (
+            <DividendActivityFields defaultAssetId={defaultValues?.assetId} />
           ) : (
             <AssetActivityFields defaultAssetId={defaultValues?.assetId} />
           )}
@@ -273,6 +281,7 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
   const watchedType = watch('activityType');
 
   const isFeeType = watchedType === 'FEE';
+  const isDividendType = watchedType === 'DIVIDEND';
 
   return (
     <>
@@ -316,9 +325,6 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
   );
 };
 
-interface AssetActivityFieldsProps {
-  defaultAssetId?: string;
-}
 const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
   const { control, watch } = useFormContext();
   const watchedType = watch('activityType');
@@ -408,3 +414,48 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
     </>
   );
 };
+
+const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps) => {
+  const { control } = useFormContext();
+
+  return (
+    <>
+      <FormField
+        control={control}
+        name="assetId"
+        render={({ field }) => (
+          <FormItem className="flex flex-col">
+            <FormLabel>Symbol</FormLabel>
+            <FormControl>
+              <TickerSearchInput
+                onSelectResult={(value) => field.onChange(value)}
+                defaultValue={defaultAssetId}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={control}
+        name="quantity"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Dividend Amount</FormLabel>
+            <FormControl>
+              <Input type="number" inputMode="decimal" placeholder="Dividend Amount" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </>
+  );
+};
+
+interface AssetActivityFieldsProps {
+  defaultAssetId?: string;
+}
+interface DividendActivityFieldsProps {
+  defaultAssetId?: string;
+}
