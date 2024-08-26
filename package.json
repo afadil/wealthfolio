@@ -40,7 +40,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.436.0",
     "react": "^18.3.1",
-    "react-day-picker": "^9.0.8",
+    "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "react-router-dom": "^6.26.1",
