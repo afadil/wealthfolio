@@ -32,8 +32,8 @@ jobs:
         if: matrix.settings.platform == 'ubuntu-20.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
-       
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libsoup2.4-dev
+
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
 
