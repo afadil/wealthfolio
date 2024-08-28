@@ -37,7 +37,7 @@ function TickerSearchInput({ selectedResult, defaultValue, onSelectResult }: Sea
   const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
     queryKey: ['ticker-search', searchQuery],
     queryFn: () => searchTicker(searchQuery),
-    enabled: searchQuery?.length > 2 && selected !== searchQuery && defaultValue !== searchQuery,
+    enabled: searchQuery?.length > 1 && selected !== searchQuery && defaultValue !== searchQuery,
   });
 
   //sort by score
