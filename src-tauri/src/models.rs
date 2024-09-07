@@ -1,6 +1,5 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use diesel::sql_types::{Double, Nullable, Text};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
@@ -325,24 +324,6 @@ pub struct Holding {
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub sectors: Option<Vec<Sector>>,
-}
-
-#[derive(QueryableByName, Debug)]
-pub struct AggregatedHolding {
-    #[diesel(sql_type = Text)]
-    pub account_id: String,
-    #[diesel(sql_type = Text)]
-    pub account_name: String,
-    #[diesel(sql_type = Text)]
-    pub asset_id: String,
-    #[diesel(sql_type = Text)]
-    pub asset_name: String, // Assuming this is the field name for asset_symbol
-    #[diesel(sql_type = Nullable<Double>)]
-    pub quantity: Option<f64>,
-    #[diesel(sql_type = Double)]
-    pub book_value: f64,
-    #[diesel(sql_type = Nullable<Double>)]
-    pub average_cost: Option<f64>,
 }
 
 // FinancialSnapshot and FinancialHistory structs with serde for serialization/deserialization

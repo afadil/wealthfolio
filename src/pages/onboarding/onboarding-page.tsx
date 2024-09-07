@@ -10,11 +10,11 @@ export const OnboardingPage = () => {
 
   const renderStepIcon = (stepNumber: number) => {
     return currentStep >= stepNumber ? (
-      <div className="flex h-6 w-6  items-center justify-center rounded-full bg-green-500">
+      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
         <Icons.CheckCircle className="text-xs text-white" />
       </div>
     ) : (
-      <div className="flex h-6 w-6  items-center justify-center rounded-full bg-foreground/80">
+      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground/80">
         <span className="text-xs text-white">{stepNumber}</span>
       </div>
     );
@@ -22,7 +22,7 @@ export const OnboardingPage = () => {
 
   return (
     <section className="flex min-h-screen items-center justify-center pb-16">
-      <div className=" flex max-w-4xl flex-col space-x-6  md:flex-row md:items-center ">
+      <div className="flex max-w-4xl flex-col space-x-6 md:flex-row md:items-center">
         <div className="md:flex md:w-1/4 md:items-center md:justify-center">
           <img
             alt="Illustration"
@@ -37,7 +37,7 @@ export const OnboardingPage = () => {
           />
         </div>
         <div className="space-y-6 md:w-3/4">
-          <h1 className="mb-4 text-3xl font-bold text-gray-900 dark:text-gray-100 ">
+          <h1 className="mb-4 text-3xl font-bold text-gray-900 dark:text-gray-100">
             Welcome to Wealthfolio
           </h1>
           <p className="mb-8 text-lg text-gray-600 dark:text-gray-400">
@@ -45,22 +45,21 @@ export const OnboardingPage = () => {
             started:
           </p>
           <div className="mb-8 space-y-6 pl-2">
-            <Link to="/settings/general" className="flex items-center space-x-2">
+            <Link to="/settings/general" className="group flex items-center space-x-2">
               {renderStepIcon(1)}
               <p className="text-gray-700 dark:text-gray-300">Set your main currency</p>
+              <Icons.ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <Link to="/settings/accounts" className="flex items-center space-x-2">
-              <div className="flex h-6 w-6  items-center justify-center rounded-full bg-foreground/80">
-                <span className="text-xs text-white">2</span>
-              </div>
+            <Link to="/settings/accounts" className="group flex items-center space-x-2">
+              {renderStepIcon(2)}
               <p className="text-gray-700 dark:text-gray-300">Add your accounts</p>
+              <Icons.ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <div className="flex items-center space-x-2">
-              <div className="flex h-6 w-6  items-center justify-center rounded-full bg-foreground/80">
-                <span className="text-xs text-white">3</span>
-              </div>
+            <Link to="/activities" className="group flex items-center space-x-2">
+              {renderStepIcon(3)}
               <p className="text-gray-700 dark:text-gray-300">Add or import activities</p>
-            </div>
+              <Icons.ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </div>
           <div>
             <Button className="mt-4" asChild>

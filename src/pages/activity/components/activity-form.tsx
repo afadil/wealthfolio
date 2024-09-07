@@ -369,7 +369,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Shares</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Shares" {...field} />
+                  <Input type="number" inputMode="decimal" min="0" placeholder="Shares" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -382,7 +382,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Price</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Price" {...field} />
+                  <Input type="number" inputMode="decimal" min="0" placeholder="Price" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -395,7 +395,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Fee</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Fee" {...field} />
+                  <Input type="number" inputMode="decimal" min="0" placeholder="Fee" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
