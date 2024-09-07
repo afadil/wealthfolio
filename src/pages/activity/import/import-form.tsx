@@ -68,7 +68,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
     let unlisten: UnlistenFn | null = null;
     (async () => {
       //tauri://file-drop and tauri://file-drop-hover (and tauri://file-drop-cancelled)
-      unlisten = await listenImportFileDrop<string>((event) => {
+      unlisten = await listenImportFileDrop<string[]>((event) => {
         if (event.payload) {
           setDragging(false);
           form.setValue('file_path', event.payload[0] as string);
