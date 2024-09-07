@@ -327,24 +327,6 @@ pub struct Holding {
     pub sectors: Option<Vec<Sector>>,
 }
 
-#[derive(QueryableByName, Debug)]
-pub struct AggregatedHolding {
-    #[diesel(sql_type = Text)]
-    pub account_id: String,
-    #[diesel(sql_type = Text)]
-    pub account_name: String,
-    #[diesel(sql_type = Text)]
-    pub asset_id: String,
-    #[diesel(sql_type = Text)]
-    pub asset_name: String, // Assuming this is the field name for asset_symbol
-    #[diesel(sql_type = Nullable<Double>)]
-    pub quantity: Option<f64>,
-    #[diesel(sql_type = Double)]
-    pub book_value: f64,
-    #[diesel(sql_type = Nullable<Double>)]
-    pub average_cost: Option<f64>,
-}
-
 // FinancialSnapshot and FinancialHistory structs with serde for serialization/deserialization
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
