@@ -42,7 +42,7 @@ export const newActivitySchema = z.object({
       required_error: 'Please enter a valid fee.',
       invalid_type_error: 'Fee must be a positive number.',
     })
-    .min(0, { message: 'Fee must be a positive number.' }),
+    .min(0, { message: 'Fee must be a non-negative number.' }),
 
   isDraft: z.boolean(),
   quantity: z.coerce
@@ -50,7 +50,7 @@ export const newActivitySchema = z.object({
       required_error: 'Please enter a valid quantity.',
       invalid_type_error: 'Quantity must be a positive number.',
     })
-    .min(0, { message: 'Quantity must be a positive number.' }),
+    .positive({ message: 'Quantity must be a positive number.' }),
   assetId: z.string().min(1, { message: 'Asset ID is required' }),
   activityType: z.enum([
     'BUY',
@@ -72,6 +72,6 @@ export const newActivitySchema = z.object({
       required_error: 'Please enter a valid price.',
       invalid_type_error: 'Price must be a positive number.',
     })
-    .min(0, { message: 'Price must be a positive number.' }),
+    .positive({ message: 'Price must be a positive number.' }),
   comment: z.string().optional(),
 });
