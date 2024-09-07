@@ -188,7 +188,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
                     </>
                   ) : (
                     <>
-                      <EmptyPlaceholder.Icon name="Upload" />
+                      <EmptyPlaceholder.Icon name="Import" />
                       <EmptyPlaceholder.Title>
                         Drag and drop your CSV file here
                       </EmptyPlaceholder.Title>
@@ -212,7 +212,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
             </>
           ) : (
             <>
-              <Icons.Upload className="mr-2 h-4 w-4" />
+              <Icons.Import className="mr-2 h-4 w-4" />
               <span className="hidden sm:ml-2 sm:inline">Import activities</span>
             </>
           )}
