@@ -2,8 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { open } from '@tauri-apps/api/dialog';
-import { listen, Event, UnlistenFn } from '@tauri-apps/api/event';
 
 import { EmptyPlaceholder } from '@/components/empty-placeholder';
 
@@ -30,6 +28,8 @@ import type { Account, ActivityImport } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { checkActivitiesImport } from '@/commands/activity';
+import { listenImportFileDrop, listenImportFileDropCancelled, listenImportFileDropHover, UnlistenFn } from '@/commands/import-listener';
+import { openCsvFileDialog } from '@/commands/file';
 
 const importFormSchema = z.object({
   account_id: z.string({ required_error: 'Please select an account.' }),
@@ -50,17 +50,9 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
   const [dragging, setDragging] = useState<boolean>(false);
 
   useEffect(() => {
-    const unlistenHover = listen<string>('tauri://file-drop-hover', () => {
-      setDragging(true);
-    });
-
-    const unlistenDrop = listen<string>('tauri://file-drop', () => {
-      setDragging(false);
-    });
-
-    const unlistenCancelled = listen<string>('tauri://file-drop-cancelled', () => {
-      setDragging(false);
-    });
+    const unlistenHover = listenImportFileDropHover<string>(() => setDragging(true));
+    const unlistenDrop = listenImportFileDrop<string>(() => setDragging(false));
+    const unlistenCancelled = listenImportFileDropCancelled<string>(() => setDragging(false));
 
     return () => {
       unlistenHover;
@@ -75,7 +67,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
     let unlisten: UnlistenFn | null = null;
     (async () => {
       //tauri://file-drop and tauri://file-drop-hover (and tauri://file-drop-cancelled)
-      unlisten = await listen('tauri://file-drop', (event: Event<string[]>) => {
+      unlisten = await listenImportFileDrop<string>((event) => {
         if (event.payload) {
           setDragging(false);
           form.setValue('file_path', event.payload[0] as string);
@@ -106,7 +98,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
   });
 
   const openFilePicker = async () => {
-    let filepath = await open({ filters: [{ name: 'CSV', extensions: ['csv'] }] });
+    let filepath = await openCsvFileDialog();
     form.setValue('file_path', filepath as string);
   };
 

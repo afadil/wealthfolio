@@ -2,8 +2,8 @@ import { createContext, useState, useEffect, ReactNode, useContext } from 'react
 import { Settings, SettingsContextType } from './types';
 import { useSettings } from './useSettings';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api';
 import { toast } from '@/components/ui/use-toast';
+import { saveSettings } from '@/commands/account';
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
@@ -76,14 +76,4 @@ const applySettingsToDocument = (newSettings: Settings) => {
 
   // Color scheme must be applied to document element (`<html>`)
   document.documentElement.style.colorScheme = newSettings.theme;
-};
-
-export const saveSettings = async (settings: Settings): Promise<Settings> => {
-  try {
-    const updatedSettings = await invoke('update_settings', { settings });
-    return updatedSettings as Settings;
-  } catch (error) {
-    console.error('Error updating settings:', error);
-    throw error;
-  }
 };

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api';
 import * as z from 'zod';
-import { Account } from '@/lib/types';
+import { Account, Settings } from '@/lib/types';
 import { newAccountSchema } from '@/lib/schemas';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
@@ -44,6 +44,28 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
     await invoke('delete_account', { accountId });
   } catch (error) {
     console.error('Error deleting account:', error);
+    throw error;
+  }
+};
+
+// getSettings
+export const getSettings = async (): Promise<Settings> => {
+  try {
+    const settings = await invoke('get_settings');
+    return settings as Settings;
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    return {} as Settings;
+  }
+};
+
+// saveSettings
+export const saveSettings = async (settings: Settings): Promise<Settings> => {
+  try {
+    const updatedSettings = await invoke('update_settings', { settings });
+    return updatedSettings as Settings;
+  } catch (error) {
+    console.error('Error updating settings:', error);
     throw error;
   }
 };
