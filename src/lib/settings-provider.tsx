@@ -3,7 +3,7 @@ import { Settings, SettingsContextType } from './types';
 import { useSettings } from './useSettings';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
-import { saveSettings } from '@/commands/account';
+import { saveSettings } from '@/commands/setting';
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
