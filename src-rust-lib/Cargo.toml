@@ -1,5 +1,5 @@
 [package]
-name = "wealthfolio-app"
+name = "wealthfolio-lib"
 version = "1.0.6"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
@@ -9,12 +9,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[build-dependencies]
-tauri-build = { version = "1.5.4", features = [] }
-
 [dependencies]
-wealthfolio-lib = { path = "../src-rust-lib" }
-tauri = { version = "1.5", features = [ "updater", "dialog-open", "fs-all", "path-all", "window-start-dragging", "shell-open"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 diesel = { version = "2.2.3", features = ["sqlite", "chrono", "numeric", "returning_clauses_for_sqlite_3_35"] }
@@ -30,8 +25,3 @@ thiserror = "1.0.50"
 lazy_static = "1.4.0"
 diesel_migrations = { version = "2.1.0", features = ["sqlite" ] }
 rayon = "1.8.0"
-
-[features]
-# this feature is used for production builds or when `devPath` points to the filesystem
-# DO NOT REMOVE!!
-custom-protocol = ["tauri/custom-protocol"]

@@ -4370,6 +4370,28 @@ dependencies = [
  "tauri-build",
  "thiserror",
  "uuid",
+ "wealthfolio-lib",
+ "yahoo_finance_api",
+]
+
+[[package]]
+name = "wealthfolio-lib"
+version = "1.0.6"
+dependencies = [
+ "chrono",
+ "csv",
+ "diesel",
+ "diesel_migrations",
+ "dotenvy",
+ "lazy_static",
+ "rayon",
+ "regex",
+ "reqwest 0.11.27",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
  "yahoo_finance_api",
 ]
 

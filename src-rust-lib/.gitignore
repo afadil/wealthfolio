@@ -2,5 +2,3 @@
 # will have compiled files and executables
 /target/
 
-# default DB path
-/app.db

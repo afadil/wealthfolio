@@ -4,7 +4,6 @@
 mod account;
 mod activity;
 mod asset;
-mod db;
 mod goal;
 mod models;
 mod portfolio;
@@ -31,6 +30,8 @@ use goal::goal_commands::{
 
 use diesel::prelude::*;
 use std::sync::Mutex;
+
+use wealthfolio_lib::db;
 
 use tauri::async_runtime::spawn;
 
