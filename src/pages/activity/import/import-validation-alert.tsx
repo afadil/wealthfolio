@@ -70,7 +70,7 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
               </>
             ) : (
               <>
-                <Icons.Upload className="mr-2 h-4 w-4" />
+                <Icons.Import className="mr-2 h-4 w-4" />
                 <span className="hidden sm:ml-2 sm:inline">Confirm Import</span>
               </>
             )}

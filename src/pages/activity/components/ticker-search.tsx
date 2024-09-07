@@ -44,10 +44,13 @@ function TickerSearchInput({ selectedResult, defaultValue, onSelectResult }: Sea
   const tickers = data?.sort((a, b) => b.score - a.score);
 
   return (
-    <Command
-      shouldFilter={false}
-      className="h-auto w-full rounded-lg border border-b-0 shadow-none"
-    >
+      <Command
+          shouldFilter={false}
+          className={cn(
+              'h-auto w-full rounded-lg border shadow-none',
+              { 'border-b-0': !isLoading && !isError && !(tickers && tickers.length > 0) }
+          )}
+      >
       <CommandInput
         value={searchQuery}
         onValueChange={setSearchQuery}
