@@ -65,9 +65,9 @@ const ActivityPage = () => {
     <div className="flex flex-col p-6">
       <ApplicationHeader heading="Activity">
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" title="Import" asChild>
+          <Button variant="outline" size="sm" title="Import" asChild>
             <Link to={'/import'}>
-              <Icons.Upload className="h-4 w-4" />
+              <Icons.Import className="h-4 w-4" />
               <span className="sr-only">Import</span>
             </Link>
           </Button>
