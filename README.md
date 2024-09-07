@@ -16,6 +16,14 @@ Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
 ![Screenshot](public/screenshot.png)
 
+## Roadmap
+- [ ] Export Data
+- [ ] Support Options
+- [ ] Support Bonds
+- [ ] Monte-Carlo Portfolio Projection
+- [ ] CSV Import Profile by Account
+- [ ] Mobile App with Database File Sync
+
 ## Getting Started
 
 ### Prerequisites
@@ -144,6 +152,8 @@ Contributions are welcome! Please follow these steps:
 
 This project is licensed under the LGPL-3.0 license. See the `LICENSE` file for details.
 
+## 🌟 Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=afadil/wealthfolio&type=Timeline)](https://star-history.com/#afadil/wealthfolio&Date)
 ---
 
 Enjoy managing your wealth with **Wealthfolio**! 🚀
