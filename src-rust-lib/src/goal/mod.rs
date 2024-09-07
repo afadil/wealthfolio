@@ -1,4 +1,3 @@
-pub mod goal_commands;
 pub mod goal_repository;
 pub mod goal_service;
 
