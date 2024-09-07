@@ -9,7 +9,6 @@ import ActivityTable from './components/activity-table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Account, ActivityDetails } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
-// import { getActivities } from '@/commands/activity';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { deleteActivity } from '@/commands/activity';
 import { toast } from '@/components/ui/use-toast';
@@ -65,15 +64,15 @@ const ActivityPage = () => {
     <div className="flex flex-col p-6">
       <ApplicationHeader heading="Activity">
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" title="Import" asChild>
+          <Button size="sm" title="Import" asChild>
             <Link to={'/import'}>
-              <Icons.Import className="h-4 w-4" />
-              <span className="sr-only">Import</span>
+              <Icons.Import className="mr-2 h-4 w-4" />
+              Upload CSV
             </Link>
           </Button>
-          <Button size="sm" onClick={() => setShowEditModal(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add Activity
+            Add Manually
           </Button>
         </div>
       </ApplicationHeader>
@@ -97,7 +96,10 @@ const ActivityPage = () => {
         }
         activity={selectedActivity}
         open={showEditModal}
-        onClose={() => setShowEditModal(false)}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedActivity(null);
+        }}
       />
       <ActivityDeleteModal
         isOpen={showDeleteAlert}

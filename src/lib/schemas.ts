@@ -34,9 +34,9 @@ export const newGoalSchema = z.object({
 
 export const newActivitySchema = z.object({
   id: z.string().uuid().optional(),
-  accountId: z.string(),
+  accountId: z.string().min(1, { message: 'Account ID is required' }),
   activityDate: z.date(),
-  currency: z.string(),
+  currency: z.string().min(1, { message: 'Currency is required' }),
   fee: z.coerce
     .number({
       required_error: 'Please enter a valid fee.',
@@ -51,7 +51,7 @@ export const newActivitySchema = z.object({
       invalid_type_error: 'Quantity must be a positive number.',
     })
     .min(0, { message: 'Quantity must be a positive number.' }),
-  assetId: z.string(),
+  assetId: z.string().min(1, { message: 'Asset ID is required' }),
   activityType: z.enum([
     'BUY',
     'SELL',

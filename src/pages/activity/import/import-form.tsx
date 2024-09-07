@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { open } from '@tauri-apps/api/dialog';
 import { listen, Event, UnlistenFn } from '@tauri-apps/api/event';
+import { Link } from 'react-router-dom';
 
 import { EmptyPlaceholder } from '@/components/empty-placeholder';
 
@@ -204,19 +205,27 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              <span className="hidden sm:ml-2 sm:inline">Validating activities...</span>
-            </>
-          ) : (
-            <>
-              <Icons.Import className="mr-2 h-4 w-4" />
-              <span className="hidden sm:ml-2 sm:inline">Import activities</span>
-            </>
-          )}
-        </Button>
+        <div className="flex space-x-4">
+          <Button type="button" variant="outline" asChild>
+            <Link to="/activities">
+              {/* <Icons.ArrowLeft className="mr-2 h-4 w-4" /> */}
+              <span className="hidden sm:ml-2 sm:inline">Cancel</span>
+            </Link>
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <span className="hidden sm:ml-2 sm:inline">Validating activities...</span>
+              </>
+            ) : (
+              <>
+                <Icons.Import className="mr-2 h-4 w-4" />
+                <span className="hidden sm:ml-2 sm:inline">Import activities</span>
+              </>
+            )}
+          </Button>
+        </div>
       </form>
     </Form>
   );

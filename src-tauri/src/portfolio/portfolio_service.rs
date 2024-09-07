@@ -416,8 +416,8 @@ impl PortfolioService {
                         cumulative_cash += activity_amount * activity.unit_price - activity_fee;
                     }
                     "WITHDRAWAL" | "TRANSFER_OUT" | "CONVERSION_OUT" => {
-                        cumulative_cash -= activity_amount + activity_fee;
-                        net_deposit -= activity_amount;
+                        cumulative_cash -= activity_amount * activity.unit_price + activity_fee;
+                        net_deposit -= activity_amount * activity.unit_price;
                     }
                     "FEE" | "TAX" => {
                         cumulative_cash -= activity_fee;
