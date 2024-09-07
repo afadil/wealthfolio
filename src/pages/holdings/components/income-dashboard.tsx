@@ -35,8 +35,8 @@ export function IncomeDashboard() {
   const totalIncome = incomeSummary.total_income;
   const dividendIncome = incomeSummary.by_type['DIVIDEND'] || 0;
   const interestIncome = incomeSummary.by_type['INTEREST'] || 0;
-  const dividendPercentage = (dividendIncome / totalIncome) * 100;
-  const interestPercentage = (interestIncome / totalIncome) * 100;
+  const dividendPercentage = (dividendIncome / totalIncome) * 100 || 0;
+  const interestPercentage = (interestIncome / totalIncome) * 100 || 0;
 
   // Filter out interest and only keep dividend income for top stocks
   const topDividendStocks = Object.entries(incomeSummary.by_symbol)
