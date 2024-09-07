@@ -328,13 +328,15 @@ impl AssetService {
 
             for yahoo_quote in quotes_history {
                 let timestamp = yahoo_quote.timestamp as i64;
+                let naive_datetime = chrono::DateTime::from_timestamp(timestamp, 0)
+                    .ok_or_else(|| format!("Invalid timestamp: {}", timestamp))?
+                    .naive_utc();
+
                 let new_quote = Quote {
                     id: uuid::Uuid::new_v4().to_string(),
-                    created_at: chrono::NaiveDateTime::from_timestamp_opt(timestamp, 0)
-                        .ok_or_else(|| format!("Invalid timestamp: {}", timestamp))?,
+                    created_at: naive_datetime,
                     data_source: "YAHOO".to_string(),
-                    date: chrono::NaiveDateTime::from_timestamp_opt(timestamp, 0)
-                        .ok_or_else(|| format!("Invalid date timestamp: {}", timestamp))?,
+                    date: naive_datetime,
                     symbol: symbol.to_string(),
                     open: yahoo_quote.open,
                     high: yahoo_quote.high,

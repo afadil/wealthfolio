@@ -1,6 +1,5 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use diesel::sql_types::{Double, Nullable, Text};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
