@@ -2,13 +2,20 @@ import { invoke } from '@tauri-apps/api';
 import * as z from 'zod';
 import { Account } from '@/lib/types';
 import { newAccountSchema } from '@/lib/schemas';
+import { invokeTauri, isDesktop } from '@/commands/utils';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
 export const getAccounts = async (): Promise<Account[]> => {
   try {
-    const accounts = await invoke('get_accounts');
-    return accounts as Account[];
+    if (isDesktop()) {
+      const accounts = await invokeTauri('get_accounts');
+      return accounts as Account[];
+    } else {
+      // TODO: Implement more platform-specific logic here
+      // e.g. web standalone with localForage
+      throw new Error('Not implemented');
+    }
   } catch (error) {
     console.error('Error fetching accounts:', error);
     throw error;
