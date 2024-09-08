@@ -74,7 +74,7 @@ export function AppearanceForm() {
                 </FormControl>
                 <Icons.ChevronDown className="absolute right-3 top-2.5 h-4 w-4 opacity-50" />
               </div>
-              <FormDescription>Set your prefered font family to use.</FormDescription>
+              <FormDescription>Set your preferred font family to use.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -85,7 +85,7 @@ export function AppearanceForm() {
           render={({ field }) => (
             <FormItem className="space-y-1">
               <FormLabel>Theme</FormLabel>
-              <FormDescription>Select your prefered theme for the application.</FormDescription>
+              <FormDescription>Select your preferred theme for the application.</FormDescription>
               <FormMessage />
               <RadioGroup
                 onValueChange={field.onChange}
