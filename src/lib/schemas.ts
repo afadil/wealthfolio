@@ -34,7 +34,7 @@ export const newGoalSchema = z.object({
 
 export const newActivitySchema = z.object({
   id: z.string().uuid().optional(),
-  accountId: z.string().min(1, { message: 'Account ID is required' }),
+  accountId: z.string().min(1, { message: 'Please select an account.' }),
   activityDate: z.date(),
   currency: z.string().min(1, { message: 'Currency is required' }),
   fee: z.coerce
@@ -52,21 +52,28 @@ export const newActivitySchema = z.object({
     })
     .positive({ message: 'Quantity must be a positive number.' }),
   assetId: z.string().min(1, { message: 'Asset ID is required' }),
-  activityType: z.enum([
-    'BUY',
-    'SELL',
-    'DIVIDEND',
-    'INTEREST',
-    'DEPOSIT',
-    'WITHDRAWAL',
-    'TRANSFER_IN',
-    'TRANSFER_OUT',
-    'CONVERSION_IN',
-    'CONVERSION_OUT',
-    'FEE',
-    'TAX',
-    'SPLIT',
-  ]),
+  activityType: z.enum(
+    [
+      'BUY',
+      'SELL',
+      'DIVIDEND',
+      'INTEREST',
+      'DEPOSIT',
+      'WITHDRAWAL',
+      'TRANSFER_IN',
+      'TRANSFER_OUT',
+      'CONVERSION_IN',
+      'CONVERSION_OUT',
+      'FEE',
+      'TAX',
+      'SPLIT',
+    ],
+    {
+      errorMap: () => {
+        return { message: 'Please select an activity type.' };
+      },
+    },
+  ),
   unitPrice: z.coerce
     .number({
       required_error: 'Please enter a valid price.',

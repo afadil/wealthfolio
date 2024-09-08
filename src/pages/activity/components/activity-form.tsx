@@ -129,6 +129,8 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     form.setValue('currency', currentAccountCurrency);
     if (CASH_ACTIVITY_TYPES.includes(watchedType)) {
       form.setValue('assetId', `$CASH-${currentAccountCurrency}`);
+      form.setValue('unitPrice', 1);
+      form.setValue('fee', 0);
     }
   }, [currentAccountCurrency, watchedType]);
 
@@ -264,7 +266,6 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     </Form>
   );
 }
-
 interface CashActivityFieldsProps {
   currentAccountCurrency: string;
 }
