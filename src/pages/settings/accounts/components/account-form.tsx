@@ -50,6 +50,7 @@ const accountTypes = [
 import { worldCurrencies } from '@/lib/currencies';
 import { newAccountSchema } from '@/lib/schemas';
 import { createAccount, updateAccount } from '@/commands/account';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -119,7 +120,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-10 p-4 ">
+        <div className="grid gap-10 p-4">
           {/* add input hidden for id */}
           <input type="hidden" name="id" />
 
@@ -181,7 +182,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Currency</FormLabel>
-                  <Popover>
+                  <Popover modal={true}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
@@ -202,23 +203,25 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                         <CommandInput placeholder="Search currency..." />
                         <CommandEmpty>No currency found.</CommandEmpty>
                         <CommandGroup>
-                          {worldCurrencies.map((currency) => (
-                            <CommandItem
-                              value={currency.label}
-                              key={currency.value}
-                              onSelect={() => {
-                                form.setValue(field.name, currency.value);
-                              }}
-                            >
-                              <Icons.Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
-                                )}
-                              />
-                              {currency.label}
-                            </CommandItem>
-                          ))}
+                          <ScrollArea className="max-h-96 overflow-y-auto">
+                            {worldCurrencies.map((currency) => (
+                              <CommandItem
+                                value={currency.label}
+                                key={currency.value}
+                                onSelect={() => {
+                                  form.setValue(field.name, currency.value);
+                                }}
+                              >
+                                <Icons.Check
+                                  className={cn(
+                                    'mr-2 h-4 w-4',
+                                    currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                                  )}
+                                />
+                                {currency.label}
+                              </CommandItem>
+                            ))}
+                          </ScrollArea>
                         </CommandGroup>
                       </Command>
                     </PopoverContent>
