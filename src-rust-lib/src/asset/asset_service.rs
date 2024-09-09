@@ -304,14 +304,19 @@ impl AssetService {
 
         for asset in asset_list {
             let symbol = asset.symbol.as_str();
-
             // Get the last quote sync date for this asset
-            let last_sync_date_naive = self
-                .get_last_quote_sync_date(conn, symbol)
-                .map_err(|e| e.to_string())?
-                .unwrap_or_else(|| {
+            let last_sync_date_naive = match self.get_last_quote_sync_date(conn, symbol) {
+                Ok(date) => date.unwrap_or_else(|| {
                     chrono::Utc::now().naive_utc() - chrono::Duration::days(3 * 365)
-                }); // Default to today - 3 years
+                }),
+                Err(e) => {
+                    eprintln!(
+                        "Error getting last sync date for {}: {}. Skipping.",
+                        symbol, e
+                    );
+                    continue;
+                }
+            };
 
             // Convert NaiveDateTime to DateTime<Utc>
             let start_datetime_utc = Utc.from_utc_datetime(&last_sync_date_naive);
@@ -320,33 +325,40 @@ impl AssetService {
             let start_date: std::time::SystemTime = start_datetime_utc.into();
 
             // Fetch quotes for the asset and append them to the all_quotes_to_insert Vec
-            let quotes_history = self
+            match self
                 .provider
                 .fetch_stock_history(symbol, start_date, end_date)
                 .await
-                .map_err(|e| e.to_string())?;
-
-            for yahoo_quote in quotes_history {
-                let timestamp = yahoo_quote.timestamp as i64;
-                let naive_datetime = chrono::DateTime::from_timestamp(timestamp, 0)
-                    .ok_or_else(|| format!("Invalid timestamp: {}", timestamp))?
-                    .naive_utc();
-
-                let new_quote = Quote {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    created_at: naive_datetime,
-                    data_source: "YAHOO".to_string(),
-                    date: naive_datetime,
-                    symbol: symbol.to_string(),
-                    open: yahoo_quote.open,
-                    high: yahoo_quote.high,
-                    low: yahoo_quote.low,
-                    volume: yahoo_quote.volume as f64,
-                    close: yahoo_quote.close,
-                    adjclose: yahoo_quote.adjclose,
-                };
-
-                all_quotes_to_insert.push(new_quote);
+            {
+                Ok(quotes_history) => {
+                    for yahoo_quote in quotes_history {
+                        let timestamp = yahoo_quote.timestamp as i64;
+                        match chrono::DateTime::from_timestamp(timestamp, 0) {
+                            Some(datetime) => {
+                                let naive_datetime = datetime.naive_utc();
+                                let new_quote = Quote {
+                                    id: uuid::Uuid::new_v4().to_string(),
+                                    created_at: naive_datetime,
+                                    data_source: "YAHOO".to_string(),
+                                    date: naive_datetime,
+                                    symbol: symbol.to_string(),
+                                    open: yahoo_quote.open,
+                                    high: yahoo_quote.high,
+                                    low: yahoo_quote.low,
+                                    volume: yahoo_quote.volume as f64,
+                                    close: yahoo_quote.close,
+                                    adjclose: yahoo_quote.adjclose,
+                                };
+                                all_quotes_to_insert.push(new_quote);
+                            }
+                            None => eprintln!(
+                                "Invalid timestamp {} for {}. Skipping quote.",
+                                timestamp, symbol
+                            ),
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e),
             }
         }
 

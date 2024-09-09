@@ -129,6 +129,8 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     form.setValue('currency', currentAccountCurrency);
     if (CASH_ACTIVITY_TYPES.includes(watchedType)) {
       form.setValue('assetId', `$CASH-${currentAccountCurrency}`);
+      form.setValue('unitPrice', 1);
+      form.setValue('fee', 0);
     }
   }, [currentAccountCurrency, watchedType]);
 
@@ -142,7 +144,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-6 p-4 ">
+        <div className="grid gap-6 p-4">
           {addActivityMutation.error && (
             <AlertFeedback
               variant="error"
@@ -264,7 +266,6 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     </Form>
   );
 }
-
 interface CashActivityFieldsProps {
   currentAccountCurrency: string;
 }
@@ -369,7 +370,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Shares</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" min="0" placeholder="Shares" {...field} />
+                  <Input type="number" inputMode="decimal" placeholder="Shares" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -382,7 +383,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Price</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" min="0" placeholder="Price" {...field} />
+                  <Input type="number" inputMode="decimal" placeholder="Price" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -395,7 +396,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Fee</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" min="0" placeholder="Fee" {...field} />
+                  <Input type="number" inputMode="decimal" placeholder="Fee" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

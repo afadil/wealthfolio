@@ -1,8 +1,8 @@
 // useGlobalEventListener.ts
 import { useEffect } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
+import { listenQuotesSyncComplete, listenQuotesSyncStart } from '@/commands/quote-listener';
 
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
@@ -23,8 +23,8 @@ const useGlobalEventListener = () => {
       });
     };
     const setupListeners = async () => {
-      const unlistenSyncStart = await listen('QUOTES_SYNC_START', handleQuoteSyncStart);
-      const unlistenSyncComplete = await listen('QUOTES_SYNC_COMPLETE', handleQuotesSyncComplete);
+      const unlistenSyncStart = await listenQuotesSyncStart(handleQuoteSyncStart);
+      const unlistenSyncComplete = await listenQuotesSyncComplete(handleQuotesSyncComplete);
 
       return () => {
         unlistenSyncStart();

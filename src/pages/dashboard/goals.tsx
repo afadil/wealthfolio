@@ -36,7 +36,7 @@ export function SavingGoals({ accounts }: { accounts?: AccountTotal[] }) {
                 {goalsProgess?.map((goal: GoalProgress, index) => (
                   <Tooltip key={index}>
                     <TooltipTrigger asChild>
-                      <div className="mb-4  cursor-help items-center">
+                      <div className="mb-4 cursor-help items-center">
                         <CardDescription className="mb-2 flex items-center text-sm font-light text-muted-foreground">
                           {goal.name}
                           {goal.progress >= 100 ? (
@@ -44,7 +44,7 @@ export function SavingGoals({ accounts }: { accounts?: AccountTotal[] }) {
                           ) : null}
                         </CardDescription>
 
-                        <Progress value={goal.progress} className=" h-2 w-full" />
+                        <Progress value={goal.progress} className="h-2.5 w-full" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="space-y-2">
