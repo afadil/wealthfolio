@@ -1,5 +1,5 @@
 [package]
-name = "wealthfolio-core"
+name = "wealthfolio_core"
 version = "1.0.10"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
