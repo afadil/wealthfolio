@@ -1,13 +1,30 @@
+<div align="center">
+  <a href="https://github.com/afadil/wealthfolio">
+    <img src="public/logo.svg" alt="Logo" width="80" height="80">
+  </a>
 
+  <h3 align="center">Wealthfolio</h3>
+
+  <p align="center">
+    A Beautiful and Boring Desktop Investment Tracker
+    <br />
+    <br />
+    <a href="https://wealthfolio.app">Website</a>
+    ·
+    <a href="https://discord.gg/KFWg22au">Discord</a>
+    ·
+    <a href="https://x.com/intent/follow?screen_name=WealthfolioApp">Twitter</a>
+    ·
+    <a href="https://github.com/afadil/wealthfolio/releases">Releases</a>
+  </p>
+</div>
 <div align="center">
 
 [<img src="./public/button-buy-me-a-coffee.png" width="150" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
 
 </div>
 
-# Wealthfolio
-
-## Overview
+## Introduction
 
 **Wealthfolio App** is a Beautiful and Boring Investment Tracker, with Local Data Storage. No
 Subscriptions, No Cloud.
@@ -17,12 +34,8 @@ Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 ![Screenshot](public/screenshot.png)
 
 ## Roadmap
-- [ ] Export Data
-- [ ] Support Options
-- [ ] Support Bonds
-- [ ] Monte-Carlo Portfolio Projection
-- [ ] CSV Import Profile by Account
-- [ ] Mobile App with Database File Sync
+
+See [ROADMAP.md](./ROADMAP.md).
 
 ## Getting Started
 
@@ -153,7 +166,7 @@ Contributions are welcome! Please follow these steps:
 This project is licensed under the LGPL-3.0 license. See the `LICENSE` file for details.
 
 ## 🌟 Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=afadil/wealthfolio&type=Timeline)](https://star-history.com/#afadil/wealthfolio&Date)
----
+
+## [![Star History Chart](https://api.star-history.com/svg?repos=afadil/wealthfolio&type=Timeline)](https://star-history.com/#afadil/wealthfolio&Date)
 
 Enjoy managing your wealth with **Wealthfolio**! 🚀
