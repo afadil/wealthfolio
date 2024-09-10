@@ -4354,6 +4354,15 @@ dependencies = [
 name = "wealthfolio-app"
 version = "1.0.10"
 dependencies = [
+ "tauri",
+ "tauri-build",
+ "wealthfolio-core",
+]
+
+[[package]]
+name = "wealthfolio-core"
+version = "1.0.6"
+dependencies = [
  "chrono",
  "csv",
  "diesel",
@@ -4366,8 +4375,6 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "tauri",
- "tauri-build",
  "thiserror",
  "uuid",
  "yahoo_finance_api",
