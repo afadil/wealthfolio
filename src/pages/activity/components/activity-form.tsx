@@ -130,7 +130,9 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     if (CASH_ACTIVITY_TYPES.includes(watchedType)) {
       form.setValue('assetId', `$CASH-${currentAccountCurrency}`);
       form.setValue('unitPrice', 1);
-      form.setValue('fee', 0);
+      if (watchedType !== 'FEE') {
+        form.setValue('fee', 0);
+      }
     }
   }, [currentAccountCurrency, watchedType]);
 

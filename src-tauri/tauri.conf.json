@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "Wealthfolio",
-    "version": "1.0.10"
+    "version": "1.0.11"
   },
   "tauri": {
     "allowlist": {
