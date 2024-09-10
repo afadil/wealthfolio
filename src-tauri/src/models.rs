@@ -76,6 +76,7 @@ pub struct AccountUpdate {
     Deserialize,
     Clone,
     Debug,
+    Default,
 )]
 #[diesel(table_name = crate::schema::assets)]
 #[serde(rename_all = "camelCase")]

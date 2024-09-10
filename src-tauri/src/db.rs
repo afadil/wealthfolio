@@ -69,5 +69,5 @@ fn get_db_path() -> String {
     let database_url = database_path
         .to_str()
         .expect("Failed to convert path to string");
-    return database_url.to_string();
+    database_url.to_string()
 }
