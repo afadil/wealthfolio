@@ -119,7 +119,7 @@ impl YahooProvider {
         let asset_profiles = result
             .quotes
             .iter()
-            .map(|ticker_info| QuoteSummary::from(ticker_info)) // No need to dereference or clone
+            .map(QuoteSummary::from) // No need to dereference or clone
             .collect();
 
         Ok(asset_profiles)

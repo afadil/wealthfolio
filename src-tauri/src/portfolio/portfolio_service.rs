@@ -47,7 +47,7 @@ impl PortfolioService {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let settings_service = SettingsService::new();
         let settings = settings_service.get_settings(conn)?;
-        self.base_currency = settings.base_currency.clone();
+        self.base_currency.clone_from(&settings.base_currency);
         self.exchange_rates = self
             .asset_service
             .load_exchange_rates(conn, &settings.base_currency)?;

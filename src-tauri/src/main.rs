@@ -107,18 +107,18 @@ fn main() {
         let asset_service = asset_service::AssetService::new();
         // Synchronize history quotes
         app_handle
-            .emit_all("QUOTES_SYNC_START", {})
+            .emit_all("QUOTES_SYNC_START", ())
             .expect("Failed to emit event");
         match asset_service.initialize_and_sync_quotes().await {
             Ok(_) => {
                 app_handle
-                    .emit_all("QUOTES_SYNC_COMPLETE", {})
+                    .emit_all("QUOTES_SYNC_COMPLETE", ())
                     .expect("Failed to emit event");
             }
             Err(e) => {
                 eprintln!("Failed to sync history quotes: {}", e);
                 app_handle
-                    .emit_all("QUOTES_SYNC_ERROR", {})
+                    .emit_all("QUOTES_SYNC_ERROR", ())
                     .expect("Failed to emit event");
             }
         }
