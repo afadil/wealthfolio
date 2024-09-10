@@ -40,7 +40,7 @@ pub fn create_activity(activity: NewActivity, state: State<AppState>) -> Result<
     let result = tauri::async_runtime::block_on(async {
         let mut conn = state.conn.lock().unwrap();
         let service = activity_service::ActivityService::new();
-        service.create_activity(&mut *conn, activity).await
+        service.create_activity(&mut conn, activity).await
     });
 
     result.map_err(|e| format!("Failed to add new activity: {}", e))
@@ -61,7 +61,7 @@ pub fn check_activities_import(
         let mut conn = state.conn.lock().unwrap();
         let service = activity_service::ActivityService::new();
         service
-            .check_activities_import(&mut *conn, account_id, file_path)
+            .check_activities_import(&mut conn, account_id, file_path)
             .await
     });
 
@@ -78,7 +78,7 @@ pub fn create_activities(
     let mut conn = state.conn.lock().unwrap();
     let service = activity_service::ActivityService::new();
     service
-        .create_activities(&mut *conn, activities)
+        .create_activities(&mut conn, activities)
         .map_err(|err| format!("Failed to import activities: {}", err))
         .map(|count| count) // You can directly return the count here
 }
@@ -92,7 +92,7 @@ pub fn update_activity(
     let mut conn = state.conn.lock().unwrap();
     let service = activity_service::ActivityService::new();
     service
-        .update_activity(&mut *conn, activity)
+        .update_activity(&mut conn, activity)
         .map_err(|e| format!("Failed to update activity: {}", e))
 }
 
@@ -103,6 +103,6 @@ pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<us
     let mut conn = state.conn.lock().unwrap();
     let service = activity_service::ActivityService::new();
     service
-        .delete_activity(&mut *conn, activity_id)
+        .delete_activity(&mut conn, activity_id)
         .map_err(|e| format!("Failed to delete activity: {}", e))
 }

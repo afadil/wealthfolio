@@ -54,7 +54,6 @@ impl AssetService {
         assets::table
             .find(asset_id)
             .first::<Asset>(conn)
-            .map_err(|e| e.into())
     }
 
     pub fn get_asset_data(
@@ -256,7 +255,6 @@ impl AssetService {
                     .values(&fetched_profile)
                     .returning(Asset::as_returning())
                     .get_result(conn)
-                    .map_err(|e| e.into())
             }
             Err(e) => Err(e),
         }

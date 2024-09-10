@@ -1,6 +1,6 @@
 use std::{sync::RwLock, time::SystemTime};
 
-use crate::models::{Asset, CrumbData, NewAsset, QuoteSummary};
+use crate::models::{CrumbData, NewAsset, QuoteSummary};
 use lazy_static::lazy_static;
 use reqwest::{header, Client};
 use serde_json::json;
@@ -40,32 +40,6 @@ impl From<&YQuoteItem> for NewAsset {
             symbol: item.symbol.clone(),
             data_source: "YAHOO".to_string(),
             ..Default::default() // Use default for the rest
-        }
-    }
-}
-
-impl Default for Asset {
-    fn default() -> Self {
-        Asset {
-            id: Default::default(),
-            isin: Default::default(),
-            name: Default::default(),
-            asset_type: Default::default(),
-            symbol: Default::default(),
-            symbol_mapping: Default::default(),
-            asset_class: Default::default(),
-            asset_sub_class: Default::default(),
-            comment: Default::default(),
-            countries: Default::default(),
-            categories: Default::default(),
-            classes: Default::default(),
-            attributes: Default::default(),
-            created_at: Default::default(),
-            currency: Default::default(),
-            data_source: Default::default(),
-            updated_at: Default::default(),
-            sectors: Default::default(),
-            url: Default::default(),
         }
     }
 }
@@ -145,7 +119,7 @@ impl YahooProvider {
         let asset_profiles = result
             .quotes
             .iter()
-            .map(|ticker_info| QuoteSummary::from(ticker_info)) // No need to dereference or clone
+            .map(QuoteSummary::from) // No need to dereference or clone
             .collect();
 
         Ok(asset_profiles)

@@ -19,7 +19,7 @@ pub fn create_account(account: NewAccount, state: State<AppState>) -> Result<Acc
     let mut conn = state.conn.lock().unwrap();
     let service = account_service::AccountService::new();
     service
-        .create_account(&mut *conn, account)
+        .create_account(&mut conn, account)
         .map_err(|e| format!("Failed to add new account: {}", e))
 }
 
@@ -29,7 +29,7 @@ pub fn update_account(account: AccountUpdate, state: State<AppState>) -> Result<
     let mut conn = state.conn.lock().unwrap();
     let service = account_service::AccountService::new();
     service
-        .update_account(&mut *conn, account)
+        .update_account(&mut conn, account)
         .map_err(|e| format!("Failed to update account: {}", e))
 }
 
@@ -39,6 +39,6 @@ pub fn delete_account(account_id: String, state: State<AppState>) -> Result<usiz
     let mut conn = state.conn.lock().unwrap();
     let service = account_service::AccountService::new();
     service
-        .delete_account(&mut *conn, account_id)
+        .delete_account(&mut conn, account_id)
         .map_err(|e| format!("Failed to delete account: {}", e))
 }

@@ -19,7 +19,7 @@ pub fn create_goal(goal: NewGoal, state: State<AppState>) -> Result<Goal, String
     let mut conn = state.conn.lock().unwrap();
     let service = goal_service::GoalService::new();
     service
-        .create_goal(&mut *conn, goal)
+        .create_goal(&mut conn, goal)
         .map_err(|e| format!("Failed to add new goal: {}", e))
 }
 
@@ -29,7 +29,7 @@ pub fn update_goal(goal: Goal, state: State<AppState>) -> Result<Goal, String> {
     let mut conn = state.conn.lock().unwrap();
     let service = goal_service::GoalService::new();
     service
-        .update_goal(&mut *conn, goal)
+        .update_goal(&mut conn, goal)
         .map_err(|e| format!("Failed to update goal: {}", e))
 }
 
@@ -39,7 +39,7 @@ pub fn delete_goal(goal_id: String, state: State<AppState>) -> Result<usize, Str
     let mut conn = state.conn.lock().unwrap();
     let service = goal_service::GoalService::new();
     service
-        .delete_goal(&mut *conn, goal_id)
+        .delete_goal(&mut conn, goal_id)
         .map_err(|e| format!("Failed to delete goal: {}", e))
 }
 
@@ -52,7 +52,7 @@ pub fn update_goal_allocations(
     let mut conn = state.conn.lock().unwrap();
     let service = goal_service::GoalService::new();
     service
-        .upsert_goal_allocations(&mut *conn, allocations)
+        .upsert_goal_allocations(&mut conn, allocations)
         .map_err(|e| e.to_string())
 }
 
@@ -62,6 +62,6 @@ pub fn load_goals_allocations(state: State<AppState>) -> Result<Vec<GoalsAllocat
     let mut conn = state.conn.lock().unwrap();
     let service = goal_service::GoalService::new();
     service
-        .load_goals_allocations(&mut *conn)
+        .load_goals_allocations(&mut conn)
         .map_err(|e| e.to_string())
 }
