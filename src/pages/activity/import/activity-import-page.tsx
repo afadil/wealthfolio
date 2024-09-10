@@ -11,7 +11,7 @@ import ImportedActivitiesTable from './imported-activity-table';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createActivities } from '@/commands/activity';
 import { syncHistoryQuotes } from '@/commands/symbol';
-import { ImportHelpHoverCard } from './import-help';
+import { ImportHelpPopover } from './import-help';
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();
@@ -86,7 +86,7 @@ const ActivityImportPage = () => {
   return (
     <div className="flex flex-col p-6">
       <ApplicationHeader heading="Import Activities">
-        <ImportHelpHoverCard />
+        <ImportHelpPopover />
       </ApplicationHeader>
       <Separator className="my-6" />
       <ErrorBoundary>
