@@ -4421,7 +4421,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "tauri",
  "tauri-build",
@@ -4430,7 +4430,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio_core"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "chrono",
  "csv",

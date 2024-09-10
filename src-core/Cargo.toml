@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio_core"
-version = "1.0.10"
+version = "1.0.11"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "MIT"
