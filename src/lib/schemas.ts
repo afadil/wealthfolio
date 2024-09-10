@@ -48,9 +48,9 @@ export const newActivitySchema = z.object({
   quantity: z.coerce
     .number({
       required_error: 'Please enter a valid quantity.',
-      invalid_type_error: 'Quantity must be a positive number.',
+      invalid_type_error: 'Quantity must be a number.',
     })
-    .positive({ message: 'Quantity must be a positive number.' }),
+    .min(0, { message: 'Quantity must be a non-negative number.' }),
   assetId: z.string().min(1, { message: 'Asset ID is required' }),
   activityType: z.enum(
     [
