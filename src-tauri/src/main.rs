@@ -1,44 +1,42 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod account;
-mod activity;
-mod asset;
-mod db;
-mod goal;
-mod models;
-mod portfolio;
-mod providers;
-mod schema;
-mod settings;
-use account::account_commands::{create_account, delete_account, get_accounts, update_account};
-use activity::activity_commands::{
+mod commands;
+
+use commands::account::{create_account, delete_account, get_accounts, update_account};
+use commands::activity::{
     check_activities_import, create_activities, create_activity, delete_activity,
     search_activities, update_activity,
 };
-use asset::{
-    asset_service,
-    assets_commands::{get_asset_data, search_ticker, synch_quotes},
-};
-use portfolio::portfolio_commands::{compute_holdings, get_historical, get_income_summary};
-use settings::settings_commands::{get_settings, update_currency, update_settings};
-use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
-
-use goal::goal_commands::{
+use commands::asset::{get_asset_data, search_ticker, synch_quotes};
+use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
     update_goal_allocations,
 };
+use commands::portfolio::{compute_holdings, get_historical, get_income_summary};
+use commands::settings::{get_settings, update_currency, update_settings};
 
-use diesel::prelude::*;
+use wealthfolio_core::db;
+
+use wealthfolio_core::account;
+use wealthfolio_core::activity;
+use wealthfolio_core::asset;
+use wealthfolio_core::goal;
+use wealthfolio_core::models;
+use wealthfolio_core::portfolio;
+use wealthfolio_core::settings;
+
+use wealthfolio_core::app_state;
+
+use app_state::AppState;
+use asset::asset_service;
+
 use std::sync::Mutex;
 
 use tauri::async_runtime::spawn;
+use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-
-pub struct AppState {
-    conn: Mutex<SqliteConnection>,
-}
 
 fn main() {
     // Initialize database

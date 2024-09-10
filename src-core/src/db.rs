@@ -5,33 +5,25 @@ use diesel::sqlite::SqliteConnection;
 use diesel::{prelude::*, sql_query};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
-use tauri::api::path;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub fn init() {
+    dotenv().ok(); // Load environment variables from .env file if available
+
     if !db_file_exists() {
         create_db_file();
     }
+
     run_migrations();
 }
 
 pub fn establish_connection() -> SqliteConnection {
-    dotenv().ok(); // Load environment variables from .env file if available
-
-    // Try to get the database URL from the environment variable
-    let database_url = match env::var("DATABASE_URL") {
-        Ok(url) => url, // If DATABASE_URL is set, use it
-        Err(_) => {
-            // Fall back to your get_db_path() function when DATABASE_URL is not set
-            let db_path = get_db_path().clone(); // Get the custom database path
-            db_path // Return the custom path as the database URL
-        }
-    };
+    let db_path = get_db_path();
 
     // Establish the database connection
-    let mut conn = SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+    let mut conn = SqliteConnection::establish(&db_path)
+        .unwrap_or_else(|_| panic!("Error connecting to {}", db_path));
 
     // Enable foreign key constraint enforcement
     sql_query("PRAGMA foreign_keys = ON")
@@ -63,11 +55,16 @@ fn db_file_exists() -> bool {
 }
 
 fn get_db_path() -> String {
-    let app_data_path = path::data_dir().expect("failed to find AppData directory");
-    let database_path = app_data_path.join("com.teymz.wealthfolio/app.db");
-
-    let database_url = database_path
-        .to_str()
-        .expect("Failed to convert path to string");
-    database_url.to_string()
+    // Try to get the database URL from the environment variable
+    match env::var("DATABASE_URL") {
+        Ok(url) => url, // If DATABASE_URL is set, use it
+        Err(_) => {
+            // Fall back to ./app.db
+            Path::new(&env::current_dir().unwrap())
+                .join("app.db")
+                .to_str()
+                .unwrap()
+                .to_string()
+        }
+    }
 }
