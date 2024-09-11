@@ -68,7 +68,7 @@ export function useSettingsContext() {
 
 // Helper function to apply settings to the document
 const applySettingsToDocument = (newSettings: Settings) => {
-  document.body.classList.remove('light', 'dark');
+  document.body.classList.remove('light', 'dark', 'system');
   document.body.classList.add(newSettings.theme);
 
   document.body.classList.remove('font-mono', 'font-sans', 'font-serif');
