@@ -11,10 +11,9 @@ export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   }
 };
 
-export const syncHistoryQuotes = async (): Promise<any> => {
+export const syncHistoryQuotes = async (): Promise<void> => {
   try {
-    const result = await invoke('synch_quotes');
-    return result;
+    await invoke('synch_quotes');
   } catch (error) {
     console.error('Error syncing history quotes:', error);
     throw error;

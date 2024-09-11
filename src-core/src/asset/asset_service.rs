@@ -1,4 +1,3 @@
-use crate::db;
 use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary};
 use crate::providers::yahoo_provider::YahooProvider;
 use std::time::SystemTime;
@@ -51,9 +50,7 @@ impl AssetService {
         conn: &mut SqliteConnection,
         asset_id: &str,
     ) -> Result<Asset, diesel::result::Error> {
-        assets::table
-            .find(asset_id)
-            .first::<Asset>(conn)
+        assets::table.find(asset_id).first::<Asset>(conn)
     }
 
     pub fn get_asset_data(
@@ -369,16 +366,17 @@ impl AssetService {
         Ok(())
     }
 
-    pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
+    pub async fn initialize_and_sync_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<(), String> {
         // Initialize crumb data
         if let Err(e) = self.initialize_crumb_data().await {
             return Err(format!("Failed to initialize crumb data: {}", e));
         }
 
-        let mut conn = db::establish_connection();
-
         // Synchronize history quotes
-        if let Err(e) = self.sync_history_quotes_for_all_assets(&mut conn).await {
+        if let Err(e) = self.sync_history_quotes_for_all_assets(conn).await {
             return Err(format!("Failed to sync history quotes: {}", e));
         }
 

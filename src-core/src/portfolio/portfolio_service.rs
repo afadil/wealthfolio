@@ -75,7 +75,7 @@ impl PortfolioService {
         }
     }
 
-    pub async fn compute_holdings(
+    pub fn compute_holdings(
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
@@ -225,7 +225,7 @@ impl PortfolioService {
         Ok((accounts, activities, market_data))
     }
 
-    pub async fn calculate_historical_portfolio_values(
+    pub fn calculate_historical_portfolio_values(
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<FinancialHistory>, Box<dyn std::error::Error>> {

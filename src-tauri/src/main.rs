@@ -31,6 +31,9 @@ use wealthfolio_core::app_state;
 use app_state::AppState;
 use asset::asset_service;
 
+use dotenvy::dotenv;
+use std::env;
+use std::path::Path;
 use std::sync::Mutex;
 
 use tauri::async_runtime::spawn;
@@ -39,13 +42,8 @@ use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 
 fn main() {
-    // Initialize database
-    db::init();
+    dotenv().ok(); // Load environment variables from .env file if available
 
-    // Initialize state and connection
-    let state = AppState {
-        conn: Mutex::new(db::establish_connection()),
-    };
     let context = tauri::generate_context!();
     // Customize the menu
     let report_issue_menu_item = CustomMenuItem::new("report_issue".to_string(), "Report Issue");
@@ -68,7 +66,46 @@ fn main() {
 
             _ => {}
         })
-        .manage(state)
+        .setup(|app| {
+            let app_handle = app.handle();
+            let db_path = get_db_path(&app_handle);
+            db::init(&db_path);
+
+            // Initialize state and connection
+            let state = AppState {
+                conn: Mutex::new(db::establish_connection(&db_path)),
+                db_path: db_path.to_string(),
+            };
+            app.manage(state);
+
+            spawn(async move {
+                let asset_service = asset_service::AssetService::new();
+                app_handle
+                    .emit_all("QUOTES_SYNC_START", ())
+                    .expect("Failed to emit event");
+
+                let mut new_conn = db::establish_connection(&db_path);
+                let result = asset_service
+                    .initialize_and_sync_quotes(&mut new_conn)
+                    .await;
+
+                match result {
+                    Ok(_) => {
+                        app_handle
+                            .emit_all("QUOTES_SYNC_COMPLETE", ())
+                            .expect("Failed to emit event");
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to sync history quotes: {}", e);
+                        app_handle
+                            .emit_all("QUOTES_SYNC_ERROR", ())
+                            .expect("Failed to emit event");
+                    }
+                }
+            });
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_accounts,
             create_account,
@@ -99,30 +136,29 @@ fn main() {
         .build(context)
         .expect("error while running wealthfolio application");
 
-    let app_handle = app.app_handle();
-
-    spawn(async move {
-        let asset_service = asset_service::AssetService::new();
-        // Synchronize history quotes
-        app_handle
-            .emit_all("QUOTES_SYNC_START", ())
-            .expect("Failed to emit event");
-        match asset_service.initialize_and_sync_quotes().await {
-            Ok(_) => {
-                app_handle
-                    .emit_all("QUOTES_SYNC_COMPLETE", ())
-                    .expect("Failed to emit event");
-            }
-            Err(e) => {
-                eprintln!("Failed to sync history quotes: {}", e);
-                app_handle
-                    .emit_all("QUOTES_SYNC_ERROR", ())
-                    .expect("Failed to emit event");
-            }
-        }
-    });
-
     app.run(|_app_handle, _event| {
         // Handle various app events here if needed, otherwise do nothing
     });
+}
+
+fn get_db_path(app_handle: &tauri::AppHandle) -> String {
+    // Try to get the database URL from the environment variable
+    match env::var("DATABASE_URL") {
+        Ok(url) => url, // If DATABASE_URL is set, use it
+        Err(_) => {
+            // Fall back to app data directory
+            let app_data_dir = app_handle
+                .path_resolver()
+                .app_data_dir()
+                .expect("failed to get app data dir")
+                .to_str()
+                .expect("failed to convert path to string")
+                .to_string();
+            Path::new(&app_data_dir)
+                .join("app.db")
+                .to_str()
+                .unwrap()
+                .to_string()
+        }
+    }
 }
