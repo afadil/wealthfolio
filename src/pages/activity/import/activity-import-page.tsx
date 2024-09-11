@@ -23,6 +23,9 @@ const ActivityImportPage = () => {
 
   const syncQuotesMutation = useMutation({
     mutationFn: syncHistoryQuotes,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
+    },
   });
 
   const confirmImportMutation = useMutation({

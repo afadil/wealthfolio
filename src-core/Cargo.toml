@@ -13,7 +13,6 @@ edition = "2021"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 diesel = { version = "2.2.3", features = ["sqlite", "chrono", "numeric", "returning_clauses_for_sqlite_3_35"] }
-dotenvy = "0.15.7"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.10.0", features = ["v4"] }
 rusqlite = { version = "0.30.0", features = ["bundled"] }
