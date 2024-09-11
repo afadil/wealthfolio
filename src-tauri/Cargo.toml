@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio-app"
-version = "1.0.11"
+version = "1.0.12"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "LGPL-3.0"
@@ -14,7 +14,7 @@ tauri-build = { version = "1.5.4", features = [] }
 
 [dependencies]
 wealthfolio_core = { path = "../src-core" }
-tauri = { version = "1.5", features = [ "updater", "dialog-open", "fs-all", "path-all", "window-start-dragging", "shell-open"] }
+tauri = { version = "1.7.2", features = [ "updater", "dialog-open", "fs-all", "path-all", "window-start-dragging", "shell-open"] }
 dotenvy = "0.15.7"
 
 [features]
