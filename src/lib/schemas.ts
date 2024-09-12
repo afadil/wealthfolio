@@ -77,8 +77,8 @@ export const newActivitySchema = z.object({
   unitPrice: z.coerce
     .number({
       required_error: 'Please enter a valid price.',
-      invalid_type_error: 'Price must be a positive number.',
+      invalid_type_error: 'Price must be a non-negative number.',
     })
-    .positive({ message: 'Price must be a positive number.' }),
+    .min(0, { message: 'Price must be a non-negative number.' }),
   comment: z.string().optional(),
 });

@@ -11,7 +11,7 @@
     <br />
     <a href="https://wealthfolio.app">Website</a>
     ·
-    <a href="https://discord.gg/KFWg22au">Discord</a>
+    <a href="https://discord.gg/WDMCY6aPWK">Discord</a>
     ·
     <a href="https://x.com/intent/follow?screen_name=WealthfolioApp">Twitter</a>
     ·
@@ -108,46 +108,20 @@ Ensure you have the following installed on your machine:
 
 ```
 wealthfolio/
-├── .github/
-│   └── workflows/
-│       └── release.yml
-├── public/
-├── src/
-│   ├── assets/
-│   ├── commands/
-│   ├── components/
-│   ├── lib/
-│   ├── pages/
-│   ├── App.tsx
-│   ├── main.tsx
-│   ├── routes.tsx
-│   ├── styles.css
-│   ├── useGlobalEventListener.ts
-│   └── vite-env.d.ts
-├── src-tauri/
-│   ├── icons/
-│   ├── migrations/
-│   ├── src/
-│   ├── target/
-│   ├── .gitignore
-│   ├── build.rs
-│   ├── Cargo.lock
-│   ├── Cargo.toml
-│   ├── diesel.toml
-│   ├── tauri.conf.json
-├── .env
-├── .eslintrc.cjs
-├── .gitignore
-├── .prettierrc.cjs
-├── components.json
-├── index.html
-├── package.json
-├── pnpm-lock.yaml
-├── postcss.config.js
-├── README.md
-├── tailwind.config.js
-├── tsconfig.json
-└── vite.config.ts
+├── src/                 # Main source code for the React application
+├── src-core/            # Core backend functionality
+├── src-tauri/           # Tauri-specific code for desktop app functionality
+├── public/              # Public assets
+├── LICENSE              # License file
+├── README.md            # Project documentation
+├── ROADMAP.md           # Future plans and roadmap
+├── components.json      # Component configuration
+├── package.json         # Node.js dependencies and scripts
+├── pnpm-lock.yaml       # Lock file for pnpm
+├── postcss.config.js    # PostCSS configuration
+├── tailwind.config.js   # Tailwind CSS configuration
+├── tsconfig.json        # TypeScript configuration
+└── vite.config.ts       # Vite build tool configuration
 ```
 
 ## Contributing
