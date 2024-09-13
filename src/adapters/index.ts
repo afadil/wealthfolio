@@ -1,5 +1,6 @@
 export enum RUN_ENV {
   DESKTOP = 'desktop',
+  MOBILE = 'mobile',
   BROWSER = 'browser',
   UNSUPPORTED = 'unsupported',
 };
