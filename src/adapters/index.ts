@@ -5,7 +5,7 @@ export enum RUN_ENV {
   UNSUPPORTED = 'unsupported',
 };
 
-export const getRunEnv = () => {
+export const getRunEnv = (): RUN_ENV => {
   if (typeof window !== 'undefined' && window.__TAURI__) {
     return RUN_ENV.DESKTOP;
   }
