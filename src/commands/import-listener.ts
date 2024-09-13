@@ -1,9 +1,15 @@
-import { listen, EventCallback, UnlistenFn } from '@tauri-apps/api/event';
+import type { EventCallback, UnlistenFn } from '@/adapters';
+import { getRunEnv, RUN_ENV, listenFileDropCancelledTauri, listenFileDropHoverTauri, listenFileDropTauri } from "@/adapters";
 
 // listenImportFileDropHover
 export const listenImportFileDropHover = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   try {
-    return listen<T>('tauri://file-drop-hover', handler);
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return listenFileDropHoverTauri<T>(handler);
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error listen tauri://file-drop-hover:', error);
     throw error;
@@ -13,7 +19,12 @@ export const listenImportFileDropHover = async <T>(handler: EventCallback<T>): P
 // listenImportFileDrop
 export const listenImportFileDrop = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   try {
-    return listen<T>('tauri://file-drop', handler);
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return listenFileDropTauri<T>(handler);
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error listen tauri://file-drop:', error);
     throw error;
@@ -23,7 +34,12 @@ export const listenImportFileDrop = async <T>(handler: EventCallback<T>): Promis
 // listenImportFileDropCancelled
 export const listenImportFileDropCancelled = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   try {
-    return listen<T>('tauri://file-drop-cancelled', handler);
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return listenFileDropCancelledTauri<T>(handler);
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error listen tauri://file-drop-cancelled:', error);
     throw error;
