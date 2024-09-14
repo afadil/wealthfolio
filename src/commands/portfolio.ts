@@ -1,10 +1,14 @@
-import { invoke } from '@tauri-apps/api';
 import { FinancialHistory, Holding, IncomeSummary } from '@/lib/types';
+import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
 export const getHistorical = async (): Promise<FinancialHistory[]> => {
   try {
-    const result = await invoke('get_historical');
-    return result as FinancialHistory[];
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_historical');
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error fetching accounts:', error);
     throw error;
@@ -13,8 +17,12 @@ export const getHistorical = async (): Promise<FinancialHistory[]> => {
 
 export const computeHoldings = async (): Promise<Holding[]> => {
   try {
-    const result = await invoke('compute_holdings');
-    return result as Holding[];
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('compute_holdings');
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error computing holdings:', error);
     throw error;
@@ -23,8 +31,12 @@ export const computeHoldings = async (): Promise<Holding[]> => {
 
 export const getIncomeSummary = async (): Promise<IncomeSummary> => {
   try {
-    const result = await invoke('get_income_summary');
-    return result as IncomeSummary;
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_income_summary');
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error fetching income summary:', error);
     throw error;

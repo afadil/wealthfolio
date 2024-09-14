@@ -1,10 +1,14 @@
-import { invoke } from '@tauri-apps/api';
 import { AssetData, QuoteSummary } from '@/lib/types';
+import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   try {
-    const searchResult = await invoke('search_ticker', { query });
-    return searchResult as QuoteSummary[];
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('search_ticker', { query });
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error searching for ticker:', error);
     throw error;
@@ -13,7 +17,13 @@ export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
 
 export const syncHistoryQuotes = async (): Promise<void> => {
   try {
-    await invoke('synch_quotes');
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri('synch_quotes');
+        return;
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error syncing history quotes:', error);
     throw error;
@@ -22,8 +32,12 @@ export const syncHistoryQuotes = async (): Promise<void> => {
 
 export const getAssetData = async (assetId: string): Promise<AssetData> => {
   try {
-    const result = await invoke('get_asset_data', { assetId });
-    return result as AssetData;
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_asset_data', { assetId });
+      default:
+        throw new Error(`Unsupported`);
+    }
   } catch (error) {
     console.error('Error loading asset data:', error);
     throw error;
