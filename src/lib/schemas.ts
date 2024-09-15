@@ -35,7 +35,7 @@ export const newGoalSchema = z.object({
 export const newActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
-  activityDate: z.date(),
+  activityDate: z.union([z.date(), z.string().datetime()]).optional(),
   currency: z.string().min(1, { message: 'Currency is required' }),
   fee: z.coerce
     .number({

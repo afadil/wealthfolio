@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 
 import { debounce } from 'lodash';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatDate, formatAmount } from '@/lib/utils';
+import { formatDateTime, formatAmount } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Account, ActivityDetails, ActivitySearchResponse } from '@/lib/types';
 import { ActivityOperations } from './activity-operations';
@@ -65,9 +65,16 @@ export const ActivityTable = ({
         accessorKey: 'date',
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
-        cell: ({ row }) => (
-          <div className="min-w-[100px]">{formatDate(row.getValue('date')) || '-'}</div>
-        ),
+        cell: ({ row }) => {
+          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const formattedDate = formatDateTime(row.getValue('date'), userTimezone);
+          return (
+            <div className="ml-2 flex flex-col">
+              <span>{formattedDate.date}</span>
+              <span className="text-xs font-light">{formattedDate.time}</span>
+            </div>
+          );
+        },
       },
       {
         id: 'activityType',
@@ -109,7 +116,7 @@ export const ActivityTable = ({
             symbol = symbol.split('-')[0];
           }
           return (
-            <div className="w-3/3 flex  items-center">
+            <div className="w-3/3 flex items-center">
               <Badge className="flex min-w-[50px] items-center justify-center rounded-sm">
                 {symbol}
               </Badge>
@@ -149,7 +156,7 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const unitPrice = row.getValue('unitPrice') as number;
           const currency = (row.getValue('currency') as string) || 'USD';
-          return <div className="text-right ">{formatAmount(unitPrice, currency)}</div>;
+          return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },
       {
@@ -179,7 +186,7 @@ export const ActivityTable = ({
           const currency = (row.getValue('currency') as string) || 'USD';
 
           return (
-            <div className="pr-4 text-right ">{formatAmount(unitPrice * quantity, currency)}</div>
+            <div className="pr-4 text-right">{formatAmount(unitPrice * quantity, currency)}</div>
           );
         },
       },
