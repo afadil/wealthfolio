@@ -3,16 +3,11 @@ use crate::activity::activity_service::ActivityService;
 use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
-    Account, Activity, FinancialHistory, FinancialSnapshot, Holding, IncomeData, IncomeSummary,
-    Performance, Quote,
+    Account, AccountSummary, Activity, HistorySummary, Holding, IncomeData, IncomeSummary,
+    PortfolioHistory,
 };
 use crate::settings::SettingsService;
-use chrono::NaiveDateTime;
-use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 
-use chrono::Datelike;
-use chrono::{Duration, NaiveDate, Utc};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 
@@ -24,9 +19,6 @@ pub struct PortfolioService {
     account_service: AccountService,
     activity_service: ActivityService,
     asset_service: AssetService,
-    fx_service: CurrencyExchangeService,
-    base_currency: String,
-    pool: Pool<ConnectionManager<SqliteConnection>>,
     income_service: IncomeService,
     holdings_service: HoldingsService,
     history_service: HistoryService,
@@ -42,44 +34,23 @@ impl PortfolioService {
     pub fn new(
         pool: Pool<ConnectionManager<SqliteConnection>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut service = PortfolioService {
+        let mut conn = pool.get()?;
+        let settings_service = SettingsService::new();
+        let settings = settings_service.get_settings(&mut conn)?;
+        let base_currency = settings.base_currency;
+
+        Ok(PortfolioService {
             account_service: AccountService::new(pool.clone()),
             activity_service: ActivityService::new(pool.clone()),
             asset_service: AssetService::new(pool.clone()),
-            fx_service: CurrencyExchangeService::new(pool.clone()),
-            base_currency: String::new(),
-            pool: pool.clone(),
             income_service: IncomeService::new(
                 pool.clone(),
                 CurrencyExchangeService::new(pool.clone()),
-                String::new(),
+                base_currency.clone(),
             ),
-            holdings_service: HoldingsService::new(pool.clone(), String::new()),
-            history_service: HistoryService::new(
-                CurrencyExchangeService::new(pool.clone()),
-                String::new(),
-            ),
-        };
-        service.initialize()?;
-        Ok(service)
-    }
-
-    fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut conn = self.pool.get()?;
-        let settings_service = SettingsService::new();
-        let settings = settings_service.get_settings(&mut conn)?;
-        self.base_currency.clone_from(&settings.base_currency);
-        self.income_service = IncomeService::new(
-            self.pool.clone(),
-            CurrencyExchangeService::new(self.pool.clone()),
-            self.base_currency.clone(),
-        );
-        self.holdings_service = HoldingsService::new(self.pool.clone(), self.base_currency.clone());
-        self.history_service = HistoryService::new(
-            CurrencyExchangeService::new(self.pool.clone()),
-            self.base_currency.clone(),
-        );
-        Ok(())
+            holdings_service: HoldingsService::new(pool.clone(), base_currency.clone()),
+            history_service: HistoryService::new(pool.clone(), base_currency),
+        })
     }
 
     pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
@@ -90,26 +61,32 @@ impl PortfolioService {
 
     fn fetch_data(
         &self,
-    ) -> Result<(Vec<Account>, Vec<Activity>, Vec<Quote>), Box<dyn std::error::Error>> {
-        let accounts = self.account_service.get_accounts()?;
-        let activities = self.activity_service.get_activities()?;
-        let market_data = self.asset_service.get_history_quotes()?;
+        account_ids: Option<Vec<String>>,
+    ) -> Result<(Vec<Account>, Vec<Activity>), Box<dyn std::error::Error>> {
+        let accounts = match &account_ids {
+            Some(ids) => self.account_service.get_accounts_by_ids(ids)?,
+            None => self.account_service.get_accounts()?,
+        };
 
-        Ok((accounts, activities, market_data))
+        let activities = match &account_ids {
+            Some(ids) => self.activity_service.get_activities_by_account_ids(ids)?,
+            None => self.activity_service.get_activities()?,
+        };
+
+        Ok((accounts, activities))
     }
 
-    pub fn calculate_historical_portfolio_values(
+    pub fn calculate_historical_data(
         &self,
-    ) -> Result<Vec<FinancialHistory>, Box<dyn std::error::Error>> {
+        account_ids: Option<Vec<String>>,
+    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
         let strt_time = std::time::Instant::now();
 
-        let (accounts, activities, market_data) = self.fetch_data()?;
+        let (accounts, activities) = self.fetch_data(account_ids)?;
 
-        let results = self.history_service.calculate_historical_portfolio_values(
-            &accounts,
-            &activities,
-            &market_data,
-        );
+        let results = self
+            .history_service
+            .calculate_historical_data(&accounts, &activities)?;
 
         println!(
             "Calculating historical portfolio values took: {:?}",
@@ -125,5 +102,61 @@ impl PortfolioService {
 
     pub fn get_income_summary(&self) -> Result<IncomeSummary, diesel::result::Error> {
         self.income_service.get_income_summary()
+    }
+
+    pub async fn update_portfolio(
+        &self,
+    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+        // First, sync quotes
+        self.asset_service.initialize_and_sync_quotes().await?;
+
+        // Then, calculate historical data
+        self.calculate_historical_data(None)
+    }
+
+    pub fn get_account_history(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
+        self.history_service
+            .get_account_history(account_id)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>) // Convert PortfolioError to Box<dyn std::error::Error>
+    }
+
+    pub fn get_accounts_summary(&self) -> Result<Vec<AccountSummary>, Box<dyn std::error::Error>> {
+        let accounts = self.account_service.get_accounts()?;
+        let mut account_summaries = Vec::new();
+
+        // First, get the total portfolio value
+        let total_portfolio_value =
+            if let Ok(total_history) = self.history_service.get_latest_account_history("TOTAL") {
+                total_history.market_value
+            } else {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Total portfolio history not found",
+                )));
+            };
+
+        // Then, calculate the allocation percentage for each account
+        for account in accounts {
+            if let Ok(history) = self.history_service.get_latest_account_history(&account.id) {
+                let allocation_percentage = if total_portfolio_value > 0.0 {
+                    (history.market_value / total_portfolio_value) * 100.0
+                } else {
+                    0.0
+                };
+
+                account_summaries.push(AccountSummary {
+                    account,
+                    performance: PortfolioHistory {
+                        allocation_percentage,
+                        ..history
+                    },
+                });
+            }
+        }
+
+        Ok(account_summaries)
     }
 }
