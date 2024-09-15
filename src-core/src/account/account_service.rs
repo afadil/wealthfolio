@@ -2,62 +2,50 @@ use crate::account::AccountRepository;
 use crate::asset::asset_service::AssetService;
 use crate::models::{Account, AccountUpdate, NewAccount};
 use crate::settings::SettingsService;
-use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::Connection;
 use diesel::SqliteConnection;
 
 pub struct AccountService {
     account_repo: AccountRepository,
-    asset_service: AssetService,
+    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl AccountService {
-    pub fn new() -> Self {
+    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
         AccountService {
             account_repo: AccountRepository::new(),
-            asset_service: AssetService::new(),
+            pool,
         }
     }
 
-    pub fn get_accounts(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Account>, diesel::result::Error> {
-        self.account_repo.load_accounts(conn)
+    pub fn get_accounts(&self) -> Result<Vec<Account>, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.account_repo.load_accounts(&mut conn)
     }
 
-    //get account by id
-    pub fn get_account_by_id(
-        &self,
-        conn: &mut SqliteConnection,
-        account_id: &str,
-    ) -> Result<Account, diesel::result::Error> {
-        self.account_repo.load_account_by_id(conn, account_id)
+    pub fn get_account_by_id(&self, account_id: &str) -> Result<Account, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.account_repo.load_account_by_id(&mut conn, account_id)
     }
 
     pub fn create_account(
         &self,
-        conn: &mut SqliteConnection,
         new_account: NewAccount,
-    ) -> Result<Account, diesel::result::Error> {
-        //get base currency
+    ) -> Result<Account, Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
+        let asset_service = AssetService::new(self.pool.clone());
         let settings_service = SettingsService::new();
-        let settings = settings_service.get_settings(conn)?;
-        let base_currency = settings.base_currency.clone();
 
         conn.transaction(|conn| {
-            //if the account currency is not the same as the base currency, then create the exchange rate asset so that we can track the exchange rate
+            let settings = settings_service.get_settings(conn)?;
+            let base_currency = settings.base_currency;
+
+            // Create exchange rate asset if necessary
             if new_account.currency != base_currency {
-                // Create the $EXCHANGE_RATE asset
                 let asset_id = format!("{}{}=X", base_currency, new_account.currency);
-
-                //load the asset profile from the database or create it if not found
-                let _asset_profile = self
-                    .asset_service
-                    .get_asset_by_id(conn, &asset_id)
-                    .unwrap_or_default();
-
-                if _asset_profile.id.is_empty() {
-                    let _asset_profile = self.asset_service.create_rate_exchange_asset(
+                if asset_service.get_asset_by_id(&asset_id).is_err() {
+                    asset_service.create_rate_exchange_asset(
                         conn,
                         &base_currency,
                         &new_account.currency,
@@ -65,41 +53,34 @@ impl AccountService {
                 }
             }
 
-            // Create the $CASH-CURRENCY asset
-            let asset_id = format!("$CASH-{}", new_account.currency);
-
-            //load the asset profile from the database or create it if not found
-            let _asset_profile = self
-                .asset_service
-                .get_asset_by_id(conn, &asset_id)
-                .unwrap_or_default();
-
-            if _asset_profile.id.is_empty() {
-                let _asset_profile = self
-                    .asset_service
-                    .create_cash_asset(conn, &new_account.currency)?;
+            // Create cash ($CASH-CURRENCY) asset if necessary
+            let cash_asset_id = format!("$CASH-{}", new_account.currency);
+            if asset_service.get_asset_by_id(&cash_asset_id).is_err() {
+                asset_service.create_cash_asset(conn, &new_account.currency)?;
             }
 
-            drop(_asset_profile);
-            let account = self.account_repo.insert_new_account(conn, new_account)?;
-
-            Ok(account)
+            // Insert new account
+            self.account_repo
+                .insert_new_account(conn, new_account)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
         })
     }
 
     pub fn update_account(
         &self,
-        conn: &mut SqliteConnection,
         updated_account_data: AccountUpdate,
     ) -> Result<Account, diesel::result::Error> {
-        self.account_repo.update_account(conn, updated_account_data)
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.account_repo
+            .update_account(&mut conn, updated_account_data)
     }
 
     pub fn delete_account(
         &self,
-        conn: &mut SqliteConnection,
-        account_id_to_delete: String, // ID of the account to delete
+        account_id_to_delete: String,
     ) -> Result<usize, diesel::result::Error> {
-        self.account_repo.delete_account(conn, account_id_to_delete)
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.account_repo
+            .delete_account(&mut conn, account_id_to_delete)
     }
 }

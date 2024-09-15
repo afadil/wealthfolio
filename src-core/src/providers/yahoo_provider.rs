@@ -306,9 +306,6 @@ impl YahooProvider {
             .await
             .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
 
-        // Print the raw JSON response
-        println!("Raw JSON Response: {}", response_text);
-
         // Deserialize the JSON response into your struct
         let deserialized: YahooResult = serde_json::from_str(&response_text).map_err(|err| {
             println!("JSON Deserialization Error: {}", err);

@@ -28,6 +28,19 @@ impl ActivityRepository {
             .load::<Activity>(conn)
     }
 
+    pub fn get_income_activities(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Activity>, diesel::result::Error> {
+        activities::table
+            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .filter(accounts::is_active.eq(true))
+            .filter(activities::activity_type.eq_any(vec!["DIVIDEND", "INTEREST"]))
+            .select(activities::all_columns)
+            .order(activities::activity_date.asc())
+            .load::<Activity>(conn)
+    }
+
     pub fn get_activities(
         &self,
         conn: &mut SqliteConnection,

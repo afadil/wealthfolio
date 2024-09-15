@@ -3,7 +3,7 @@ import { AssetData, QuoteSummary } from '@/lib/types';
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   try {
-    const searchResult = await invoke('search_ticker', { query });
+    const searchResult = await invoke('search_symbol', { query });
     return searchResult as QuoteSummary[];
   } catch (error) {
     console.error('Error searching for ticker:', error);

@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::Datelike;
 use chrono::{Duration, NaiveDate, Utc};
+use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 
 pub struct PortfolioService {
@@ -20,6 +21,7 @@ pub struct PortfolioService {
     asset_service: AssetService,
     base_currency: String,
     exchange_rates: HashMap<String, f64>,
+    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 /// This module contains the implementation of the `PortfolioService` struct.
@@ -29,28 +31,29 @@ pub struct PortfolioService {
 /// and getting dates between two given dates.
 
 impl PortfolioService {
-    pub fn new(conn: &mut SqliteConnection) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        pool: Pool<ConnectionManager<SqliteConnection>>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut service = PortfolioService {
-            account_service: AccountService::new(),
-            activity_service: ActivityService::new(),
-            asset_service: AssetService::new(),
+            account_service: AccountService::new(pool.clone()),
+            activity_service: ActivityService::new(pool.clone()),
+            asset_service: AssetService::new(pool.clone()),
             base_currency: String::new(),
             exchange_rates: HashMap::new(),
+            pool: pool,
         };
-        service.initialize(conn)?;
+        service.initialize()?;
         Ok(service)
     }
 
-    fn initialize(
-        &mut self,
-        conn: &mut SqliteConnection,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
         let settings_service = SettingsService::new();
-        let settings = settings_service.get_settings(conn)?;
+        let settings = settings_service.get_settings(&mut conn)?;
         self.base_currency.clone_from(&settings.base_currency);
         self.exchange_rates = self
             .asset_service
-            .load_exchange_rates(conn, &settings.base_currency)?;
+            .load_exchange_rates(&settings.base_currency)?;
         Ok(())
     }
 
@@ -75,14 +78,11 @@ impl PortfolioService {
         }
     }
 
-    pub fn compute_holdings(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
+    pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
         let mut holdings: HashMap<String, Holding> = HashMap::new();
-        let accounts = self.account_service.get_accounts(conn)?;
-        let activities = self.activity_service.get_trading_activities(conn)?;
-        let assets = self.asset_service.get_assets(conn)?;
+        let accounts = self.account_service.get_accounts()?;
+        let activities = self.activity_service.get_trading_activities()?;
+        let assets = self.asset_service.get_assets()?;
 
         for activity in activities {
             //find asset by id
@@ -159,7 +159,7 @@ impl PortfolioService {
         // Fetch quotes for each symbol asynchronously
         let mut quotes = HashMap::new();
         for symbol in symbols {
-            match self.asset_service.get_latest_quote(conn, &symbol) {
+            match self.asset_service.get_latest_quote(&symbol) {
                 Ok(quote) => {
                     quotes.insert(symbol, quote);
                 }
@@ -215,23 +215,20 @@ impl PortfolioService {
 
     fn fetch_data(
         &self,
-        conn: &mut SqliteConnection,
     ) -> Result<(Vec<Account>, Vec<Activity>, Vec<Quote>), Box<dyn std::error::Error>> {
-        let accounts = self.account_service.get_accounts(conn)?;
-        let activities = self.activity_service.get_activities(conn)?;
-        let market_data = self.asset_service.get_history_quotes(conn)?;
-        //let assets = self.asset_service.get_assets(conn)?;
+        let accounts = self.account_service.get_accounts()?;
+        let activities = self.activity_service.get_activities()?;
+        let market_data = self.asset_service.get_history_quotes()?;
 
         Ok((accounts, activities, market_data))
     }
 
     pub fn calculate_historical_portfolio_values(
         &self,
-        conn: &mut SqliteConnection,
     ) -> Result<Vec<FinancialHistory>, Box<dyn std::error::Error>> {
         let strt_time = std::time::Instant::now();
 
-        let (accounts, activities, market_data) = self.fetch_data(conn)?;
+        let (accounts, activities, market_data) = self.fetch_data()?;
 
         // Use Rayon's par_iter to process each account in parallel
         let results: Vec<FinancialHistory> = accounts
@@ -489,13 +486,10 @@ impl PortfolioService {
         results
     }
 
-    pub fn get_income_data(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<IncomeData>, diesel::result::Error> {
+    pub fn get_income_data(&self) -> Result<Vec<IncomeData>, diesel::result::Error> {
         use crate::schema::activities;
         use diesel::prelude::*;
-
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
         activities::table
             .filter(activities::activity_type.eq_any(vec!["DIVIDEND", "INTEREST"]))
             .select((
@@ -505,7 +499,7 @@ impl PortfolioService {
                 activities::quantity * activities::unit_price,
                 activities::currency,
             ))
-            .load::<(NaiveDateTime, String, String, f64, String)>(conn)
+            .load::<(NaiveDateTime, String, String, f64, String)>(&mut conn)
             .map(|results| {
                 results
                     .into_iter()
@@ -520,11 +514,8 @@ impl PortfolioService {
             })
     }
 
-    pub fn get_income_summary(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<IncomeSummary, diesel::result::Error> {
-        let income_data = self.get_income_data(conn)?;
+    pub fn get_income_summary(&self) -> Result<IncomeSummary, diesel::result::Error> {
+        let income_data = self.get_income_data()?;
 
         let mut by_month: HashMap<String, f64> = HashMap::new();
         let mut by_type: HashMap<String, f64> = HashMap::new();

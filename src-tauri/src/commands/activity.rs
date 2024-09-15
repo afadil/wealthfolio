@@ -5,7 +5,6 @@ use crate::models::{
 use crate::AppState;
 use tauri::State;
 
-
 #[tauri::command]
 pub fn search_activities(
     page: i64,                                 // Page number, 1-based
@@ -17,12 +16,10 @@ pub fn search_activities(
     state: State<AppState>,
 ) -> Result<ActivitySearchResponse, String> {
     println!("Search activities... {}, {}", page, page_size);
-    let mut conn = state.conn.lock().unwrap();
-    let service = activity_service::ActivityService::new();
+    let service = activity_service::ActivityService::new((*state.pool).clone());
 
     service
         .search_activities(
-            &mut conn,
             page,
             page_size,
             account_id_filter,
@@ -30,17 +27,15 @@ pub fn search_activities(
             asset_id_keyword,
             sort,
         )
-        .map_err(|e| format!("Seach activities: {}", e))
+        .map_err(|e| format!("Search activities: {}", e))
 }
 
 #[tauri::command]
 pub fn create_activity(activity: NewActivity, state: State<AppState>) -> Result<Activity, String> {
     println!("Adding new activity...");
-
     let result = tauri::async_runtime::block_on(async {
-        let mut conn = state.conn.lock().unwrap();
-        let service = activity_service::ActivityService::new();
-        service.create_activity(&mut conn, activity).await
+        let service = activity_service::ActivityService::new((*state.pool).clone());
+        service.create_activity(activity).await
     });
 
     result.map_err(|e| format!("Failed to add new activity: {}", e))
@@ -58,11 +53,8 @@ pub fn check_activities_import(
     );
 
     let result = tauri::async_runtime::block_on(async {
-        let mut conn = state.conn.lock().unwrap();
-        let service = activity_service::ActivityService::new();
-        service
-            .check_activities_import(&mut conn, account_id, file_path)
-            .await
+        let service = activity_service::ActivityService::new((*state.pool).clone());
+        service.check_activities_import(account_id, file_path).await
     });
 
     result.map_err(|e| e.to_string())
@@ -73,14 +65,11 @@ pub fn create_activities(
     activities: Vec<NewActivity>,
     state: State<AppState>,
 ) -> Result<usize, String> {
-    // Return a Result with the count or an error message
     println!("Importing activities...");
-    let mut conn = state.conn.lock().unwrap();
-    let service = activity_service::ActivityService::new();
+    let service = activity_service::ActivityService::new((*state.pool).clone());
     service
-        .create_activities(&mut conn, activities)
+        .create_activities(activities)
         .map_err(|err| format!("Failed to import activities: {}", err))
-        .map(|count| count) // You can directly return the count here
 }
 
 #[tauri::command]
@@ -88,21 +77,18 @@ pub fn update_activity(
     activity: ActivityUpdate,
     state: State<AppState>,
 ) -> Result<Activity, String> {
-    println!("Updating activity..."); 
-    let mut conn = state.conn.lock().unwrap();
-    let service = activity_service::ActivityService::new();
+    println!("Updating activity...");
+    let service = activity_service::ActivityService::new((*state.pool).clone());
     service
-        .update_activity(&mut conn, activity)
+        .update_activity(activity)
         .map_err(|e| format!("Failed to update activity: {}", e))
 }
 
-
 #[tauri::command]
 pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<usize, String> {
-    println!("Deleting activity..."); 
-    let mut conn = state.conn.lock().unwrap();
-    let service = activity_service::ActivityService::new();
+    println!("Deleting activity...");
+    let service = activity_service::ActivityService::new((*state.pool).clone());
     service
-        .delete_activity(&mut conn, activity_id)
+        .delete_activity(activity_id)
         .map_err(|e| format!("Failed to delete activity: {}", e))
 }

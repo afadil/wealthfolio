@@ -10,7 +10,7 @@ import ValidationAlert from './import-validation-alert';
 import ImportedActivitiesTable from './imported-activity-table';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createActivities } from '@/commands/activity';
-import { syncHistoryQuotes } from '@/commands/symbol';
+import { syncHistoryQuotes } from '@/commands/market-data';
 import { ImportHelpPopover } from './import-help';
 
 const ActivityImportPage = () => {

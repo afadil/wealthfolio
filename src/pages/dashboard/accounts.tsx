@@ -150,7 +150,7 @@ export function Accounts({
     category: string;
     accountsInCategory: AccountTotal[];
   }) => {
-    if (!category) {
+    if (accountsInCategory.length === 1) {
       return (
         <Card>
           <CardHeader className="py-4">

@@ -1,12 +1,24 @@
 use crate::goal::goal_service;
 use crate::models::{Goal, GoalsAllocation, NewGoal};
 use crate::AppState;
+use diesel::r2d2::ConnectionManager;
+use diesel::SqliteConnection;
 use tauri::State;
+
+fn get_connection(
+    state: &State<AppState>,
+) -> Result<diesel::r2d2::PooledConnection<ConnectionManager<SqliteConnection>>, String> {
+    state
+        .pool
+        .clone()
+        .get()
+        .map_err(|e| format!("Failed to get database connection: {}", e))
+}
 
 #[tauri::command]
 pub fn get_goals(state: State<AppState>) -> Result<Vec<Goal>, String> {
-    println!("Fetching active goals..."); // Log message
-    let mut conn = state.conn.lock().unwrap();
+    println!("Fetching active goals...");
+    let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
         .get_goals(&mut conn)
@@ -15,8 +27,8 @@ pub fn get_goals(state: State<AppState>) -> Result<Vec<Goal>, String> {
 
 #[tauri::command]
 pub fn create_goal(goal: NewGoal, state: State<AppState>) -> Result<Goal, String> {
-    println!("Adding new goal..."); // Log message
-    let mut conn = state.conn.lock().unwrap();
+    println!("Adding new goal...");
+    let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
         .create_goal(&mut conn, goal)
@@ -25,8 +37,8 @@ pub fn create_goal(goal: NewGoal, state: State<AppState>) -> Result<Goal, String
 
 #[tauri::command]
 pub fn update_goal(goal: Goal, state: State<AppState>) -> Result<Goal, String> {
-    println!("Updating goal..."); // Log message
-    let mut conn = state.conn.lock().unwrap();
+    println!("Updating goal...");
+    let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
         .update_goal(&mut conn, goal)
@@ -35,8 +47,8 @@ pub fn update_goal(goal: Goal, state: State<AppState>) -> Result<Goal, String> {
 
 #[tauri::command]
 pub fn delete_goal(goal_id: String, state: State<AppState>) -> Result<usize, String> {
-    println!("Deleting goal..."); // Log message
-    let mut conn = state.conn.lock().unwrap();
+    println!("Deleting goal...");
+    let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
         .delete_goal(&mut conn, goal_id)
@@ -48,8 +60,8 @@ pub fn update_goal_allocations(
     allocations: Vec<GoalsAllocation>,
     state: State<AppState>,
 ) -> Result<usize, String> {
-    print!("Get goals allocations...");
-    let mut conn = state.conn.lock().unwrap();
+    println!("Updating goal allocations...");
+    let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
         .upsert_goal_allocations(&mut conn, allocations)
@@ -58,8 +70,8 @@ pub fn update_goal_allocations(
 
 #[tauri::command]
 pub fn load_goals_allocations(state: State<AppState>) -> Result<Vec<GoalsAllocation>, String> {
-    print!("Upserting goal allocations...");
-    let mut conn = state.conn.lock().unwrap();
+    println!("Loading goal allocations...");
+    let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
         .load_goals_allocations(&mut conn)

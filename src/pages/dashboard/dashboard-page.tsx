@@ -13,11 +13,11 @@ import { formatAccountsData } from '@/lib/portfolio-helper';
 // filter
 function DashboardSkeleton() {
   return (
-    <div className=" grid h-full gap-2 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid h-full gap-2 md:grid-cols-2 xl:grid-cols-3">
       <div className="flex h-full p-20 xl:col-span-2">
         <Skeleton className="h-full w-full" />
       </div>
-      <div className=" h-full w-full space-y-3 p-20">
+      <div className="h-full w-full space-y-3 p-20">
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
@@ -53,7 +53,7 @@ export default function DashboardPage() {
           />
           <div className="flex space-x-3 text-sm">
             <GainAmount
-              className="text-sm font-light "
+              className="text-sm font-light"
               value={todayValue?.totalGainValue || 0}
               currency={todayValue?.currency || 'USD'}
               displayCurrency={false}

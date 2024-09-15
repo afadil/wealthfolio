@@ -4,56 +4,57 @@ use crate::account::AccountService;
 use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
 use crate::models::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
+    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, IncomeData, NewActivity, Sort,
 };
 use crate::schema::activities;
 
 use csv::ReaderBuilder;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
 use uuid::Uuid;
 
 pub struct ActivityService {
     repo: ActivityRepository,
-    asset_service: AssetService,
-    account_service: AccountService,
+    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl ActivityService {
-    pub fn new() -> Self {
+    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
         ActivityService {
             repo: ActivityRepository::new(),
-            asset_service: AssetService::new(),
-            account_service: AccountService::new(),
+            pool,
         }
     }
 
-    // delete an activity
-    pub fn delete_activity(
-        &self,
-        conn: &mut SqliteConnection,
-        activity_id: String,
-    ) -> Result<usize, diesel::result::Error> {
-        self.repo.delete_activity(conn, activity_id)
-    }
-
     //load all activities
-    pub fn get_activities(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Activity>, diesel::result::Error> {
-        self.repo.get_activities(conn)
+    pub fn get_activities(&self) -> Result<Vec<Activity>, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.repo.get_activities(&mut conn)
     }
 
-    pub fn get_trading_activities(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Activity>, diesel::result::Error> {
-        self.repo.get_trading_activities(conn)
+    pub fn get_trading_activities(&self) -> Result<Vec<Activity>, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.repo.get_trading_activities(&mut conn)
+    }
+
+    pub fn get_income_data(&self) -> Result<Vec<IncomeData>, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.repo.get_income_activities(&mut conn).map(|results| {
+            results
+                .into_iter()
+                .map(|activity| IncomeData {
+                    date: activity.activity_date,
+                    income_type: activity.activity_type,
+                    symbol: activity.asset_id,
+                    amount: activity.quantity * activity.unit_price,
+                    currency: activity.currency,
+                })
+                .collect()
+        })
     }
 
     pub fn search_activities(
         &self,
-        conn: &mut SqliteConnection,
         page: i64,                                 // Page number, 1-based
         page_size: i64,                            // Number of items per page
         account_id_filter: Option<Vec<String>>,    // Optional account_id filter
@@ -61,8 +62,9 @@ impl ActivityService {
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
         sort: Option<Sort>,                        // Optional sort
     ) -> Result<ActivitySearchResponse, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
         self.repo.search_activities(
-            conn,
+            &mut conn,
             page,
             page_size,
             account_id_filter,
@@ -75,17 +77,13 @@ impl ActivityService {
     //create a new activity and fetch related the asset profile
     pub async fn create_activity(
         &self,
-        conn: &mut SqliteConnection,
         mut activity: NewActivity,
     ) -> Result<Activity, diesel::result::Error> {
-        // Clone asset_id to avoid moving it
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
         let asset_id = activity.asset_id.clone();
+        let asset_service = AssetService::new(self.pool.clone());
 
-        // fetch the asset profile from the database or create it if not found
-        let _asset_profile = self
-            .asset_service
-            .get_asset_profile(conn, &asset_id)
-            .await?;
+        let _asset_profile = asset_service.get_asset_profile(&asset_id).await?;
 
         // Adjust unit price based on activity type
         if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
@@ -95,19 +93,19 @@ impl ActivityService {
         }
 
         // Insert the new activity into the database
-        self.repo.insert_new_activity(conn, activity)
+        self.repo.insert_new_activity(&mut conn, activity)
     }
 
     // verify the activities import from csv file
     pub async fn check_activities_import(
         &self,
-        conn: &mut SqliteConnection,
         _account_id: String,
         file_path: String,
     ) -> Result<Vec<ActivityImport>, String> {
-        let account = self
-            .account_service
-            .get_account_by_id(conn, &_account_id)
+        let asset_service = AssetService::new(self.pool.clone());
+        let account_service = AccountService::new(self.pool.clone());
+        let account = account_service
+            .get_account_by_id(&_account_id)
             .map_err(|e| e.to_string())?;
 
         let file = File::open(&file_path).map_err(|e| e.to_string())?;
@@ -122,9 +120,8 @@ impl ActivityService {
             let mut activity_import: ActivityImport = result.map_err(|e| e.to_string())?;
 
             // Load the symbol profile here, now awaiting the async call
-            let symbol_profile_result = self
-                .asset_service
-                .get_asset_profile(conn, &activity_import.symbol)
+            let symbol_profile_result = asset_service
+                .get_asset_profile(&activity_import.symbol)
                 .await;
 
             // Check if symbol profile is valid
@@ -159,9 +156,9 @@ impl ActivityService {
     // create activities used after the import is verified
     pub fn create_activities(
         &self,
-        conn: &mut SqliteConnection,
         activities: Vec<NewActivity>,
     ) -> Result<usize, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
         conn.transaction(|conn| {
             let mut insert_count = 0;
             for new_activity in activities {
@@ -178,9 +175,15 @@ impl ActivityService {
     // update an activity
     pub fn update_activity(
         &self,
-        conn: &mut SqliteConnection,
         activity: ActivityUpdate,
     ) -> Result<Activity, diesel::result::Error> {
-        self.repo.update_activity(conn, activity)
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.repo.update_activity(&mut conn, activity)
+    }
+
+    // delete an activity
+    pub fn delete_activity(&self, activity_id: String) -> Result<usize, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.repo.delete_activity(&mut conn, activity_id)
     }
 }

@@ -31,7 +31,6 @@ export function IncomeDashboard() {
     return <div>Failed to load income summary: {error?.message || 'Unknown error'}</div>;
   }
 
-  console.log(incomeSummary);
   const totalIncome = incomeSummary.total_income;
   const dividendIncome = incomeSummary.by_type['DIVIDEND'] || 0;
   const interestIncome = incomeSummary.by_type['INTEREST'] || 0;
