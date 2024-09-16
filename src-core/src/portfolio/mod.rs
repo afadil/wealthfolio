@@ -1,3 +1,6 @@
-pub mod portfolio_service;
-pub mod income_service;
-pub mod holdings_service;
+mod holdings_service;
+mod income_service;
+mod portfolio_service;
+mod history_service;
+
+pub use portfolio_service::PortfolioService;
