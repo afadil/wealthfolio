@@ -1,6 +1,7 @@
 use crate::account::account_service::AccountService;
 use crate::activity::activity_service::ActivityService;
 use crate::asset::asset_service::AssetService;
+use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
     Account, Activity, FinancialHistory, FinancialSnapshot, Holding, IncomeData, IncomeSummary,
     Performance, Quote,
@@ -19,8 +20,8 @@ pub struct PortfolioService {
     account_service: AccountService,
     activity_service: ActivityService,
     asset_service: AssetService,
+    fx_service: CurrencyExchangeService,
     base_currency: String,
-    exchange_rates: HashMap<String, f64>,
     pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
@@ -38,8 +39,8 @@ impl PortfolioService {
             account_service: AccountService::new(pool.clone()),
             activity_service: ActivityService::new(pool.clone()),
             asset_service: AssetService::new(pool.clone()),
+            fx_service: CurrencyExchangeService::new(pool.clone()),
             base_currency: String::new(),
-            exchange_rates: HashMap::new(),
             pool: pool,
         };
         service.initialize()?;
@@ -51,31 +52,7 @@ impl PortfolioService {
         let settings_service = SettingsService::new();
         let settings = settings_service.get_settings(&mut conn)?;
         self.base_currency.clone_from(&settings.base_currency);
-        self.exchange_rates = self
-            .asset_service
-            .load_exchange_rates(&settings.base_currency)?;
         Ok(())
-    }
-
-    fn convert_to_base_currency(&self, amount: f64, currency: &str) -> f64 {
-        if currency == self.base_currency {
-            amount
-        } else {
-            let rate = self.get_exchange_rate(currency);
-            amount * rate
-        }
-    }
-
-    fn get_exchange_rate(&self, currency: &str) -> f64 {
-        if currency == self.base_currency {
-            1.0
-        } else {
-            let currency_key = format!("{}{}=X", self.base_currency, currency);
-            1.0 / *self
-                .exchange_rates
-                .get(&currency_key.to_string())
-                .unwrap_or(&1.0)
-        }
     }
 
     pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
@@ -141,9 +118,6 @@ impl PortfolioService {
                     holding.quantity -= activity.quantity;
                     holding.book_value -= activity.quantity * activity.unit_price + activity.fee;
                 }
-                "SPLIT" => {
-                    // TODO:: Handle the split logic here
-                }
                 _ => {}
             }
         }
@@ -178,10 +152,16 @@ impl PortfolioService {
             }
             holding.average_cost = Some(holding.book_value / holding.quantity);
             holding.market_value = holding.quantity * holding.market_price.unwrap_or(0.0);
-            holding.market_value_converted =
-                self.convert_to_base_currency(holding.market_value, &holding.currency);
-            holding.book_value_converted =
-                self.convert_to_base_currency(holding.book_value, &holding.currency);
+            holding.market_value_converted = self.fx_service.convert_currency(
+                holding.market_value,
+                &holding.currency,
+                &self.base_currency,
+            )?;
+            holding.book_value_converted = self.fx_service.convert_currency(
+                holding.book_value,
+                &holding.currency,
+                &self.base_currency,
+            )?;
 
             // Calculate performance metrics
             holding.performance.total_gain_amount = holding.market_value - holding.book_value;
@@ -190,8 +170,11 @@ impl PortfolioService {
             } else {
                 0.0
             };
-            holding.performance.total_gain_amount_converted = self
-                .convert_to_base_currency(holding.performance.total_gain_amount, &holding.currency);
+            holding.performance.total_gain_amount_converted = self.fx_service.convert_currency(
+                holding.performance.total_gain_amount,
+                &holding.currency,
+                &self.base_currency,
+            )?;
         }
 
         holdings
@@ -320,7 +303,10 @@ impl PortfolioService {
                     exchange_rate: Some(1.0), // Default exchange rate for base currency
                 });
 
-            let exchange_rate = snapshot.exchange_rate.unwrap_or(1.0);
+            let exchange_rate = self
+                .fx_service
+                .get_exchange_rate(&snapshot.currency, &self.base_currency)
+                .unwrap_or(1.0);
 
             // Convert values to base currency before aggregating
             entry.total_value += snapshot.total_value * exchange_rate;
@@ -463,7 +449,10 @@ impl PortfolioService {
                 0.0
             };
 
-            let exchange_rate = self.get_exchange_rate(currency);
+            let exchange_rate = self
+                .fx_service
+                .get_exchange_rate(currency, &self.base_currency)
+                .unwrap_or(1.0);
 
             results.push(FinancialSnapshot {
                 date: date.format("%Y-%m-%d").to_string(),
@@ -527,7 +516,10 @@ impl PortfolioService {
 
         for data in income_data {
             let month = data.date.format("%Y-%m").to_string();
-            let converted_amount = self.convert_to_base_currency(data.amount, &data.currency);
+            let converted_amount = self
+                .fx_service
+                .convert_currency(data.amount, &data.currency, &self.base_currency)
+                .unwrap_or(data.amount);
 
             *by_month.entry(month).or_insert(0.0) += converted_amount;
             *by_type.entry(data.income_type).or_insert(0.0) += converted_amount;

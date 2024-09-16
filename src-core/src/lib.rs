@@ -3,6 +3,7 @@ pub mod db;
 pub mod account;
 pub mod activity;
 pub mod asset;
+pub mod fx;
 pub mod goal;
 pub mod market_data;
 pub mod models;
