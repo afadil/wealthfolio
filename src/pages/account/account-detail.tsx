@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatAmount, formatPercent } from '@/lib/utils';
-import { FinancialSnapshot } from '@/lib/types';
+import { PortfolioHistory } from '@/lib/types';
 
 interface AccountDetailProps {
-  data?: FinancialSnapshot;
+  data?: PortfolioHistory;
   className?: string;
 }
 

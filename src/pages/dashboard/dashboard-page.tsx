@@ -3,12 +3,11 @@ import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
 import Balance from './balance';
 import { useQuery } from '@tanstack/react-query';
-import { FinancialHistory, PortfolioHistory } from '@/lib/types';
-import { getHistorical, getAccountHistory } from '@/commands/portfolio';
+import { PortfolioHistory, AccountSummary } from '@/lib/types';
+import { getAccountHistory, getAccountsSummary } from '@/commands/portfolio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accounts } from './accounts';
 import SavingGoals from './goals';
-import { formatAccountsData } from '@/lib/portfolio-helper';
 
 // filter
 function DashboardSkeleton() {
@@ -27,11 +26,6 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { data: historyData, isLoading: isHistoryLoading } = useQuery<FinancialHistory[], Error>({
-    queryKey: ['portfolio_history'],
-    queryFn: getHistorical,
-  });
-
   const { data: portfolioHistory, isLoading: isPortfolioHistoryLoading } = useQuery<
     PortfolioHistory[],
     Error
@@ -40,15 +34,16 @@ export default function DashboardPage() {
     queryFn: () => getAccountHistory('TOTAL'),
   });
 
-  if (isHistoryLoading || isPortfolioHistoryLoading) {
+  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
+    queryKey: ['accounts_summary'],
+    queryFn: getAccountsSummary,
+  });
+
+  if (isPortfolioHistoryLoading || isAccountsLoading) {
     return <DashboardSkeleton />;
   }
 
-  console.log('portfolioHistory', portfolioHistory);
-  const portfolio = historyData?.find((history) => history.account?.id === 'TOTAL');
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
-
-  const accountsData = formatAccountsData(historyData || [], portfolio?.account.currency);
 
   return (
     <div className="flex flex-col">
@@ -83,17 +78,16 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Column 1 */}
           <div className="pr-16 xl:col-span-2">
-            <Accounts className="border-none bg-transparent shadow-none" accounts={accountsData} />
+            <Accounts className="border-none bg-transparent shadow-none" accounts={accounts} />
           </div>
 
           {/* Column 2 */}
           <div className="">
-            <SavingGoals accounts={accountsData} />
+            <SavingGoals accounts={accounts} />
           </div>
           {/* Column 3 */}
         </div>
       </div>
-
       {/* Grid container */}
     </div>
   );

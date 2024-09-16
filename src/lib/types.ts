@@ -67,28 +67,6 @@ export type ActivitySearchResponse = {
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
 
-export interface AccountTotal {
-  id: string;
-  name: string;
-  group: string;
-  marketValue: number;
-  bookValue: number;
-  cashBalance: number;
-  cashBalanceConverted: number;
-  marketValueConverted: number;
-  totalValue: number;
-  totalValueConverted: number;
-  bookValueConverted: number;
-  totalGainPercent: number;
-  totalGainAmount: number;
-  totalGainAmountConverted: number;
-  dayGainPercent: number;
-  dayGainAmount: number;
-  dayGainAmountConverted: number;
-  currency: string;
-  baseCurrency: string;
-}
-
 export interface AssetProfile {
   id: string;
   isin: string | null;
@@ -140,28 +118,6 @@ export interface Tag {
   id: string;
   name: string;
   activityId: string | null;
-}
-
-export interface FinancialSnapshot {
-  date: string;
-  totalValue: number; //investment + cash
-  marketValue: number;
-  bookCost: number;
-  availableCash: number;
-  netDeposit: number;
-  currency: string;
-  baseCurrency: string;
-  totalGainValue: number;
-  totalGainPercentage: number;
-  dayGainPercentage: number;
-  dayGainValue: number;
-  allocationPercentage?: number;
-  exchangeRate?: number;
-}
-
-export interface FinancialHistory {
-  account: Account; // This can be an account or the entire portfolio.
-  history: FinancialSnapshot[];
 }
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
@@ -341,4 +297,9 @@ export interface PortfolioHistory {
   dayGainValue: number;
   allocationPercentage: number | null;
   exchangeRate: number | null;
+}
+
+export interface AccountSummary {
+  account: Account;
+  performance: PortfolioHistory;
 }

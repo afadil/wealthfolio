@@ -1,30 +1,33 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AccountTotal } from '@/lib/types';
+import { AccountSummary } from '@/lib/types';
 import { formatAmount, formatPercent } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
 
 // Helper function to calculate category summary
-const calculateCategorySummary = (accountsInCategory: AccountTotal[]) => {
+const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
   const totalMarketValue = accountsInCategory.reduce(
-    (total, account) => total + account.marketValueConverted,
+    (total, account) =>
+      total + account.performance.marketValue * (account.performance.exchangeRate || 1),
     0,
   );
   const bookValue = accountsInCategory.reduce(
-    (total, account) => total + account.bookValueConverted,
+    (total, account) =>
+      total + account.performance.bookCost * (account.performance.exchangeRate || 1),
     0,
   );
 
   const totalCashBalance = accountsInCategory.reduce(
-    (total, account) => total + account.cashBalanceConverted,
+    (total, account) =>
+      total + account.performance.availableCash * (account.performance.exchangeRate || 1),
     0,
   );
 
   return {
-    baseCurrency: accountsInCategory[0].baseCurrency,
+    baseCurrency: accountsInCategory[0].performance.baseCurrency,
     totalMarketValue,
     totalCashBalance,
     totalGainPercent: ((totalMarketValue - bookValue) / bookValue) * 100,
@@ -79,36 +82,40 @@ const Summary = ({
   );
 };
 
-const AccountSummary = ({ account }: { account: AccountTotal }) => {
-  const navigate = useNavigate();
-  const handleNavigate = () => {
-    navigate(`/accounts/${account.id}`, { state: { account: account } });
-  };
+const AccountSummaryComponent = ({ accountSummary }: { accountSummary: AccountSummary }) => {
   return (
-    <div key={account.id} className="flex w-full items-center justify-between">
+    <div key={accountSummary.account.id} className="flex w-full items-center justify-between">
       <div className="flex flex-col">
-        <span className="font-medium leading-none">{account.name}</span>
+        <span className="font-medium leading-none">{accountSummary.account.name}</span>
         <span className="text-sm text-muted-foreground">
-          {account.group ? `${account.group} - ${account.currency}` : account.currency}
+          {accountSummary.account.group
+            ? `${accountSummary.account.group} - ${accountSummary.account.currency}`
+            : accountSummary.account.currency}
         </span>
       </div>
       <div className="flex items-center">
         <div className="text-right">
           <p className="font-medium leading-none">
-            {formatAmount(account.totalValue, account.currency)}
+            {formatAmount(accountSummary.performance.totalValue, accountSummary.account.currency)}
           </p>
-          {account.totalGainAmount !== 0 && (
+          {accountSummary.performance.totalGainValue !== 0 && (
             <p
-              className={`text-sm font-light ${account.totalGainPercent > 0 ? 'text-green-500' : 'text-red-500'}`}
+              className={`text-sm font-light ${accountSummary.performance.totalGainPercentage > 0 ? 'text-green-500' : 'text-red-500'}`}
             >
-              {formatAmount(account.totalGainAmount, account.currency, false)} /
-              {formatPercent(account.totalGainPercent)}
+              {formatAmount(
+                accountSummary.performance.totalGainValue,
+                accountSummary.account.currency,
+                false,
+              )}{' '}
+              /{formatPercent(accountSummary.performance.totalGainPercentage)}
             </p>
           )}
         </div>
-        <Button variant="link" size="sm" onClick={handleNavigate} className="ml-2 p-0">
-          <Icons.ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        <Link to={`/accounts/${accountSummary.account.id}`} className="ml-2 p-0">
+          <Button variant="link" size="sm">
+            <Icons.ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </Button>
+        </Link>
       </div>
     </div>
   );
@@ -118,20 +125,20 @@ export function Accounts({
   accounts,
   className,
 }: {
-  accounts?: AccountTotal[];
+  accounts?: AccountSummary[];
   className?: string;
 }) {
   const { accountsGrouped, setAccountsGrouped } = useSettingsContext();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const groupAccountsByCategory = () => {
-    const groupedAccounts: Record<string, AccountTotal[]> = {};
-    for (const account of accounts || []) {
-      const category = account.group;
+    const groupedAccounts: Record<string, AccountSummary[]> = {};
+    for (const accountSummary of accounts || []) {
+      const category = accountSummary.account.group || 'Uncategorized';
       if (!groupedAccounts[category]) {
         groupedAccounts[category] = [];
       }
-      groupedAccounts[category].push(account);
+      groupedAccounts[category].push(accountSummary);
     }
     return groupedAccounts;
   };
@@ -148,13 +155,13 @@ export function Accounts({
     accountsInCategory,
   }: {
     category: string;
-    accountsInCategory: AccountTotal[];
+    accountsInCategory: AccountSummary[];
   }) => {
     if (accountsInCategory.length === 1) {
       return (
         <Card>
           <CardHeader className="py-4">
-            <AccountSummary account={accountsInCategory[0]} />
+            <AccountSummaryComponent accountSummary={accountsInCategory[0]} />
           </CardHeader>
         </Card>
       );
@@ -179,9 +186,12 @@ export function Accounts({
         </CardHeader>
         {isExpanded && (
           <CardContent className="pt-4">
-            {accountsInCategory.map((account) => (
+            {accountsInCategory.map((accountSummary) => (
               <div className="py-4">
-                <AccountSummary key={account.id} account={account} />
+                <AccountSummaryComponent
+                  key={accountSummary.account.id}
+                  accountSummary={accountSummary}
+                />
               </div>
             ))}
           </CardContent>
@@ -201,10 +211,10 @@ export function Accounts({
         />
       ));
     } else {
-      return accounts?.map((account) => (
-        <Card key={account.id}>
+      return accounts?.map((accountSummary) => (
+        <Card key={accountSummary.account.id}>
           <CardHeader className="py-6">
-            <AccountSummary account={account} />
+            <AccountSummaryComponent accountSummary={accountSummary} />
           </CardHeader>
         </Card>
       ));

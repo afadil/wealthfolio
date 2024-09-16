@@ -1,5 +1,11 @@
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-import { Holding, IncomeSummary, HistorySummary, PortfolioHistory } from '@/lib/types';
+import {
+  Holding,
+  IncomeSummary,
+  HistorySummary,
+  PortfolioHistory,
+  AccountSummary,
+} from '@/lib/types';
 
 export const calculate_historical_data = async (): Promise<HistorySummary[]> => {
   try {
@@ -53,6 +59,20 @@ export const getAccountHistory = async (accountId: string): Promise<PortfolioHis
     }
   } catch (error) {
     console.error('Error fetching account history:', error);
+    throw error;
+  }
+};
+
+export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_accounts_summary');
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    console.error('Error fetching active accounts summary:', error);
     throw error;
   }
 };

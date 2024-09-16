@@ -449,4 +449,19 @@ impl HistoryService {
 
         Ok(history_data)
     }
+
+    pub fn get_latest_account_history(&self, input_account_id: &str) -> Result<PortfolioHistory> {
+        use crate::schema::portfolio_history::dsl::*;
+        use diesel::prelude::*;
+
+        let conn = &mut self.pool.get().unwrap();
+
+        let latest_history: PortfolioHistory = portfolio_history
+            .filter(account_id.eq(input_account_id))
+            .order(date.desc())
+            .first(conn)
+            .map_err(|e| PortfolioError::DatabaseError(e))?;
+
+        Ok(latest_history)
+    }
 }

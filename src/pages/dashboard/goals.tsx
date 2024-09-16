@@ -2,13 +2,13 @@ import { getGoals, getGoalsAllocation } from '@/commands/goal';
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { calculateGoalProgress } from '@/lib/portfolio-helper';
-import { AccountTotal, Goal, GoalAllocation, GoalProgress } from '@/lib/types';
+import { AccountSummary, Goal, GoalAllocation, GoalProgress } from '@/lib/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useQuery } from '@tanstack/react-query';
 import { formatAmount, formatPercent } from '@/lib/utils';
 import { Icons } from '@/components/icons';
 
-export function SavingGoals({ accounts }: { accounts?: AccountTotal[] }) {
+export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
   const { data: goals } = useQuery<Goal[], Error>({
     queryKey: ['goals'],
     queryFn: getGoals,

@@ -488,25 +488,6 @@ pub struct IncomeSummary {
     pub currency: String,
 }
 
-// FinancialSnapshot and FinancialHistory structs with serde for serialization/deserialization
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct FinancialSnapshot {
-    pub date: String,
-    pub total_value: f64,
-    pub market_value: f64,
-    pub book_cost: f64,
-    pub available_cash: f64,
-    pub net_deposit: f64,
-    pub currency: String,
-    pub base_currency: String,
-    pub total_gain_value: f64,
-    pub total_gain_percentage: f64,
-    pub day_gain_percentage: f64,
-    pub day_gain_value: f64,
-    pub allocation_percentage: Option<f64>,
-    pub exchange_rate: Option<f64>,
-}
 #[derive(Queryable, Selectable, Insertable, Associations, Debug, Clone, Serialize, Deserialize)]
 #[diesel(belongs_to(Account, foreign_key = account_id))]
 #[diesel(table_name = crate::schema::portfolio_history)]
@@ -537,4 +518,10 @@ pub struct HistorySummary {
     pub start_date: String,
     pub end_date: String,
     pub entries_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccountSummary {
+    pub account: Account,
+    pub performance: PortfolioHistory,
 }
