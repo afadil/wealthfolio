@@ -52,7 +52,6 @@ impl HistoryService {
                     .collect();
 
                 if account_activities.is_empty() {
-                    println!("No activities for account {}", account.id);
                     return HistorySummary {
                         id: Some(account.id.clone()),
                         start_date: "".to_string(),
@@ -78,12 +77,6 @@ impl HistoryService {
                     market_data,
                     account_start_date,
                     end_date,
-                );
-
-                println!(
-                    "Calculated {} historical entries for account {}",
-                    new_history.len(),
-                    account.id
                 );
 
                 if !new_history.is_empty() {
@@ -127,7 +120,6 @@ impl HistoryService {
         }
 
         // Save total portfolio history
-        println!("Saving total portfolio history");
         if let Err(e) = self.save_historical_data(&total_history.lock().unwrap()) {
             println!("Error saving total portfolio history: {:?}", e);
             return Err(e);

@@ -23,10 +23,7 @@ export const HoldingsPage = () => {
     queryFn: computeHoldings,
   });
 
-  const { data: historyData } = useQuery<FinancialHistory[], Error>({
-    queryKey: ['portfolio_history'],
-    queryFn: getHistorical,
-  });
+  const historyData = [];
 
   const portfolio = historyData?.find((history) => history.account?.id === 'TOTAL');
   const todayValue = portfolio?.history[portfolio?.history.length - 1];

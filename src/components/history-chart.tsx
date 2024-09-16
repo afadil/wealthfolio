@@ -85,9 +85,9 @@ export function HistoryChart({
             </defs>
             {/* @ts-ignore */}
             <Tooltip content={<CustomTooltip />} />
-            {interval != 'ALL' && interval != '1Y' ? (
-              <YAxis hide={true} type="number" domain={['auto', 'auto']} />
-            ) : undefined}
+            {interval !== 'ALL' && interval !== '1Y' && (
+              <YAxis hide type="number" domain={['auto', 'auto']} />
+            )}
             <Area
               isAnimationActive={true}
               animationDuration={300}

@@ -15,7 +15,6 @@ pub struct HoldingsService {
     asset_service: AssetService,
     fx_service: CurrencyExchangeService,
     base_currency: String,
-    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl HoldingsService {
@@ -26,7 +25,6 @@ impl HoldingsService {
             asset_service: AssetService::new(pool.clone()),
             fx_service: CurrencyExchangeService::new(pool.clone()),
             base_currency,
-            pool,
         }
     }
 
