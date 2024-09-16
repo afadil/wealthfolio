@@ -16,6 +16,8 @@ use chrono::{Duration, NaiveDate, Utc};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 
+use crate::portfolio::income_service::IncomeService;
+
 pub struct PortfolioService {
     account_service: AccountService,
     activity_service: ActivityService,
@@ -23,6 +25,7 @@ pub struct PortfolioService {
     fx_service: CurrencyExchangeService,
     base_currency: String,
     pool: Pool<ConnectionManager<SqliteConnection>>,
+    income_service: IncomeService,
 }
 
 /// This module contains the implementation of the `PortfolioService` struct.
@@ -41,7 +44,12 @@ impl PortfolioService {
             asset_service: AssetService::new(pool.clone()),
             fx_service: CurrencyExchangeService::new(pool.clone()),
             base_currency: String::new(),
-            pool: pool,
+            pool: pool.clone(),
+            income_service: IncomeService::new(
+                pool.clone(),
+                CurrencyExchangeService::new(pool.clone()),
+                String::new(),
+            ),
         };
         service.initialize()?;
         Ok(service)
@@ -52,6 +60,11 @@ impl PortfolioService {
         let settings_service = SettingsService::new();
         let settings = settings_service.get_settings(&mut conn)?;
         self.base_currency.clone_from(&settings.base_currency);
+        self.income_service = IncomeService::new(
+            self.pool.clone(),
+            CurrencyExchangeService::new(self.pool.clone()),
+            self.base_currency.clone(),
+        );
         Ok(())
     }
 
@@ -476,68 +489,10 @@ impl PortfolioService {
     }
 
     pub fn get_income_data(&self) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        use crate::schema::activities;
-        use diesel::prelude::*;
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        activities::table
-            .filter(activities::activity_type.eq_any(vec!["DIVIDEND", "INTEREST"]))
-            .select((
-                activities::activity_date,
-                activities::activity_type,
-                activities::asset_id,
-                activities::quantity * activities::unit_price,
-                activities::currency,
-            ))
-            .load::<(NaiveDateTime, String, String, f64, String)>(&mut conn)
-            .map(|results| {
-                results
-                    .into_iter()
-                    .map(|(date, income_type, symbol, amount, currency)| IncomeData {
-                        date,
-                        income_type,
-                        symbol,
-                        amount,
-                        currency,
-                    })
-                    .collect()
-            })
+        self.income_service.get_income_data()
     }
 
     pub fn get_income_summary(&self) -> Result<IncomeSummary, diesel::result::Error> {
-        let income_data = self.get_income_data()?;
-
-        let mut by_month: HashMap<String, f64> = HashMap::new();
-        let mut by_type: HashMap<String, f64> = HashMap::new();
-        let mut by_symbol: HashMap<String, f64> = HashMap::new();
-        let mut total_income = 0.0;
-        let mut total_income_ytd = 0.0;
-
-        let current_year = chrono::Local::now().year();
-
-        for data in income_data {
-            let month = data.date.format("%Y-%m").to_string();
-            let converted_amount = self
-                .fx_service
-                .convert_currency(data.amount, &data.currency, &self.base_currency)
-                .unwrap_or(data.amount);
-
-            *by_month.entry(month).or_insert(0.0) += converted_amount;
-            *by_type.entry(data.income_type).or_insert(0.0) += converted_amount;
-            *by_symbol.entry(data.symbol).or_insert(0.0) += converted_amount;
-            total_income += converted_amount;
-
-            if data.date.year() == current_year {
-                total_income_ytd += converted_amount;
-            }
-        }
-
-        Ok(IncomeSummary {
-            by_month,
-            by_type,
-            by_symbol,
-            total_income,
-            total_income_ytd,
-            currency: self.base_currency.clone(),
-        })
+        self.income_service.get_income_summary()
     }
 }
