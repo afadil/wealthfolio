@@ -3,8 +3,8 @@ import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
 import Balance from './balance';
 import { useQuery } from '@tanstack/react-query';
-import { FinancialHistory } from '@/lib/types';
-import { getHistorical } from '@/commands/portfolio';
+import { FinancialHistory, PortfolioHistory } from '@/lib/types';
+import { getHistorical, getAccountHistory } from '@/commands/portfolio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accounts } from './accounts';
 import SavingGoals from './goals';
@@ -27,17 +27,26 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { data: historyData, isLoading } = useQuery<FinancialHistory[], Error>({
+  const { data: historyData, isLoading: isHistoryLoading } = useQuery<FinancialHistory[], Error>({
     queryKey: ['portfolio_history'],
     queryFn: getHistorical,
   });
 
-  if (isLoading) {
+  const { data: portfolioHistory, isLoading: isPortfolioHistoryLoading } = useQuery<
+    PortfolioHistory[],
+    Error
+  >({
+    queryKey: ['account_history', 'TOTAL'],
+    queryFn: () => getAccountHistory('TOTAL'),
+  });
+
+  if (isHistoryLoading || isPortfolioHistoryLoading) {
     return <DashboardSkeleton />;
   }
 
+  console.log('portfolioHistory', portfolioHistory);
   const portfolio = historyData?.find((history) => history.account?.id === 'TOTAL');
-  const todayValue = portfolio?.history[portfolio?.history.length - 1];
+  const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const accountsData = formatAccountsData(historyData || [], portfolio?.account.currency);
 
@@ -67,7 +76,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <HistoryChart data={portfolio?.history || []} height={240} />
+      <HistoryChart data={portfolioHistory || []} height={240} />
 
       <div className="mx-auto w-full bg-gradient-to-b from-custom-green to-background px-12 pt-20 dark:from-custom-green-dark">
         {/* Responsive grid */}

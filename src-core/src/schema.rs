@@ -58,10 +58,50 @@ diesel::table! {
 }
 
 diesel::table! {
+    goals (id) {
+        id -> Text,
+        title -> Text,
+        description -> Nullable<Text>,
+        target_amount -> Double,
+        is_achieved -> Bool,
+    }
+}
+
+diesel::table! {
+    goals_allocation (id) {
+        id -> Text,
+        percent_allocation -> Integer,
+        goal_id -> Text,
+        account_id -> Text,
+    }
+}
+
+diesel::table! {
     platforms (id) {
         id -> Text,
         name -> Nullable<Text>,
         url -> Text,
+    }
+}
+
+diesel::table! {
+    portfolio_history (id) {
+        id -> Text,
+        account_id -> Text,
+        date -> Text,
+        total_value -> Double,
+        market_value -> Double,
+        book_cost -> Double,
+        available_cash -> Double,
+        net_deposit -> Double,
+        currency -> Text,
+        base_currency -> Text,
+        total_gain_value -> Double,
+        total_gain_percentage -> Double,
+        day_gain_percentage -> Double,
+        day_gain_value -> Double,
+        allocation_percentage -> Double,
+        exchange_rate -> Double,
     }
 }
 
@@ -90,33 +130,21 @@ diesel::table! {
     }
 }
 
-diesel::table! {
-    goals (id) {
-        id -> Text,
-        title -> Text,
-        description -> Nullable<Text>,
-        target_amount -> Double,
-        is_achieved -> Bool,
-    }
-}
-
-diesel::table! {
-    goals_allocation (id) {
-        id -> Text,
-        percent_allocation -> Integer,
-        goal_id -> Text,
-        account_id -> Text,
-    }
-}
-
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
-diesel::joinable!(quotes -> assets (symbol));
+diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
+diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    accounts, activities, assets, platforms, quotes, settings,
+    accounts,
+    activities,
+    assets,
+    goals,
+    goals_allocation,
+    platforms,
+    portfolio_history,
+    quotes,
+    settings,
 );
-
-diesel::allow_tables_to_appear_in_same_query!(goals, goals_allocation);

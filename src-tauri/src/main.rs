@@ -14,7 +14,9 @@ use commands::goal::{
 };
 
 use commands::market_data::{get_asset_data, search_symbol, synch_quotes};
-use commands::portfolio::{compute_holdings, get_historical, get_income_summary};
+use commands::portfolio::{
+    calculate_historical_data, compute_holdings, get_account_history, get_income_summary,
+};
 use commands::settings::{get_settings, update_currency, update_settings};
 
 use wealthfolio_core::db;
@@ -87,7 +89,7 @@ fn main() {
             search_symbol,
             check_activities_import,
             create_activities,
-            get_historical,
+            calculate_historical_data,
             compute_holdings,
             get_asset_data,
             synch_quotes,
@@ -101,6 +103,7 @@ fn main() {
             update_goal_allocations,
             load_goals_allocations,
             get_income_summary,
+            get_account_history,
         ])
         .build(context)
         .expect("error while running wealthfolio application");
@@ -130,23 +133,23 @@ fn handle_menu_event(event: tauri::WindowMenuEvent) {
 
 fn spawn_quote_sync(app_handle: tauri::AppHandle, pool: Arc<DbPool>) {
     spawn(async move {
-        let asset_service = asset::asset_service::AssetService::new((*pool).clone());
+        let portfolio_service = portfolio::PortfolioService::new((*pool).clone())
+            .expect("Failed to create PortfolioService");
+
         app_handle
-            .emit_all("QUOTES_SYNC_START", ())
+            .emit_all("PORTFOLIO_UPDATE_START", ())
             .expect("Failed to emit event");
 
-        let result = asset_service.initialize_and_sync_quotes().await;
-
-        match result {
+        match portfolio_service.update_portfolio().await {
             Ok(_) => {
                 app_handle
-                    .emit_all("QUOTES_SYNC_COMPLETE", ())
+                    .emit_all("PORTFOLIO_UPDATE_COMPLETE", ())
                     .expect("Failed to emit event");
             }
             Err(e) => {
-                eprintln!("Failed to sync history quotes: {}", e);
+                eprintln!("Failed to update portfolio: {}", e);
                 app_handle
-                    .emit_all("QUOTES_SYNC_ERROR", ())
+                    .emit_all("PORTFOLIO_UPDATE_ERROR", ())
                     .expect("Failed to emit event");
             }
         }

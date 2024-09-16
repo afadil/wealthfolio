@@ -316,3 +316,29 @@ export interface IncomeSummary {
 }
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
+
+export interface HistorySummary {
+  id?: string;
+  startDate: string;
+  endDate: string;
+  entriesCount: number;
+}
+
+export interface PortfolioHistory {
+  id: string;
+  accountId: string;
+  date: string;
+  totalValue: number;
+  marketValue: number;
+  bookCost: number;
+  availableCash: number;
+  netDeposit: number;
+  currency: string;
+  baseCurrency: string;
+  totalGainValue: number;
+  totalGainPercentage: number;
+  dayGainPercentage: number;
+  dayGainValue: number;
+  allocationPercentage: number | null;
+  exchangeRate: number | null;
+}
