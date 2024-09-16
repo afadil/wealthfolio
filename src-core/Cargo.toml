@@ -24,3 +24,4 @@ thiserror = "1.0.63"
 lazy_static = "1.5.0"
 diesel_migrations = { version = "2.2.0", features = ["sqlite" ] }
 rayon = "1.10.0"
+tracing = "0.1.40"

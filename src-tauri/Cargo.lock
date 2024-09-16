@@ -4460,6 +4460,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tracing",
  "uuid",
  "yahoo_finance_api",
 ]

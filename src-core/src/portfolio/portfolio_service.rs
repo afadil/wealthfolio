@@ -83,7 +83,9 @@ impl PortfolioService {
     }
 
     pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
-        self.holdings_service.compute_holdings()
+        self.holdings_service
+            .compute_holdings()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 
     fn fetch_data(

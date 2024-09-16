@@ -1,11 +1,13 @@
 use crate::account::account_service::AccountService;
 use crate::activity::activity_service::ActivityService;
 use crate::asset::asset_service::AssetService;
+use crate::error::{PortfolioError, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Holding, Performance};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::collections::{HashMap, HashSet};
+use tracing::{info, warn};
 
 pub struct HoldingsService {
     account_service: AccountService,
@@ -28,27 +30,23 @@ impl HoldingsService {
         }
     }
 
-    pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
+    pub fn compute_holdings(&self) -> Result<Vec<Holding>> {
+        info!("Computing holdings");
         let mut holdings: HashMap<String, Holding> = HashMap::new();
         let accounts = self.account_service.get_accounts()?;
         let activities = self.activity_service.get_trading_activities()?;
         let assets = self.asset_service.get_assets()?;
 
         for activity in activities {
-            //find asset by id
-            let asset = match assets.iter().find(|a| a.id == activity.asset_id) {
-                Some(found_asset) => found_asset,
-                None => {
-                    println!("Asset not found for id: {}", activity.asset_id);
-                    continue; // Skip this iteration if the asset is not found
-                }
-            };
+            let asset = assets
+                .iter()
+                .find(|a| a.id == activity.asset_id)
+                .ok_or_else(|| PortfolioError::AssetNotFoundError(activity.asset_id.clone()))?;
 
-            //find account by id
             let account = accounts
                 .iter()
                 .find(|a| a.id == activity.account_id)
-                .unwrap();
+                .ok_or_else(|| PortfolioError::InvalidDataError("Account not found".to_string()))?;
 
             let key = format!("{}-{}", activity.account_id, activity.asset_id);
             let holding = holdings.entry(key.clone()).or_insert_with(|| Holding {
@@ -58,13 +56,13 @@ impl HoldingsService {
                 holding_type: asset.asset_type.clone().unwrap_or_default(),
                 quantity: 0.0,
                 currency: activity.currency.clone(),
-                base_currency: "CAD".to_string(),
-                market_price: None,          // You need to provide market price
-                average_cost: None,          // Will be calculated
-                market_value: 0.0,           // Will be calculated
-                book_value: 0.0,             // Will be calculated
-                market_value_converted: 0.0, // Will be calculated
-                book_value_converted: 0.0,   // Will be calculated
+                base_currency: self.base_currency.clone(),
+                market_price: None,
+                average_cost: None,
+                market_value: 0.0,
+                book_value: 0.0,
+                market_value_converted: 0.0,
+                book_value_converted: 0.0,
                 performance: Performance {
                     total_gain_percent: 0.0,
                     total_gain_amount: 0.0,
@@ -91,7 +89,7 @@ impl HoldingsService {
                     holding.quantity -= activity.quantity;
                     holding.book_value -= activity.quantity * activity.unit_price + activity.fee;
                 }
-                _ => {}
+                _ => warn!("Unhandled activity type: {}", activity.activity_type),
             }
         }
 
@@ -111,7 +109,7 @@ impl HoldingsService {
                     quotes.insert(symbol, quote);
                 }
                 Err(e) => {
-                    println!("Error fetching quote for symbol {}: {}", symbol, e);
+                    warn!("Error fetching quote for symbol {}: {}", symbol, e);
                     // Handle the error as per your logic, e.g., continue, return an error, etc.
                 }
             }
@@ -120,21 +118,19 @@ impl HoldingsService {
         // Post-processing for each holding
         for holding in holdings.values_mut() {
             if let Some(quote) = quotes.get(&holding.symbol) {
-                //prinln!("Quote: {:?}", quote);
-                holding.market_price = Some(quote.close); // Assuming you want to use the 'close' value as market price
+                holding.market_price = Some(quote.close);
             }
             holding.average_cost = Some(holding.book_value / holding.quantity);
             holding.market_value = holding.quantity * holding.market_price.unwrap_or(0.0);
-            holding.market_value_converted = self.fx_service.convert_currency(
-                holding.market_value,
-                &holding.currency,
-                &self.base_currency,
-            )?;
-            holding.book_value_converted = self.fx_service.convert_currency(
-                holding.book_value,
-                &holding.currency,
-                &self.base_currency,
-            )?;
+            holding.market_value_converted = self
+                .fx_service
+                .convert_currency(holding.market_value, &holding.currency, &self.base_currency)
+                .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
+
+            holding.book_value_converted = self
+                .fx_service
+                .convert_currency(holding.book_value, &holding.currency, &self.base_currency)
+                .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
 
             // Calculate performance metrics
             holding.performance.total_gain_amount = holding.market_value - holding.book_value;
@@ -143,17 +139,19 @@ impl HoldingsService {
             } else {
                 0.0
             };
-            holding.performance.total_gain_amount_converted = self.fx_service.convert_currency(
-                holding.performance.total_gain_amount,
-                &holding.currency,
-                &self.base_currency,
-            )?;
+            holding.performance.total_gain_amount_converted = self
+                .fx_service
+                .convert_currency(
+                    holding.performance.total_gain_amount,
+                    &holding.currency,
+                    &self.base_currency,
+                )
+                .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
         }
 
-        holdings
+        Ok(holdings
             .into_values()
             .filter(|holding| holding.quantity > 0.0)
-            .map(Ok)
-            .collect::<Result<Vec<_>, _>>()
+            .collect())
     }
 }
