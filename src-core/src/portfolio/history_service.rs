@@ -261,14 +261,14 @@ impl HistoryService {
             }
 
             // Update market value based on quotes
-            let (updated_market_value, day_gain_value) =
+            let (updated_market_value, day_gain_value, opening_market_value) =
                 self.calculate_holdings_value(&holdings, quotes, date, &mut last_available_quotes);
 
             let market_value = updated_market_value;
             let total_value = cumulative_cash + market_value;
 
-            let day_gain_percentage = if market_value != 0.0 {
-                (day_gain_value / market_value) * 100.0
+            let day_gain_percentage = if opening_market_value != 0.0 {
+                (day_gain_value / opening_market_value) * 100.0
             } else {
                 0.0
             };
@@ -421,9 +421,10 @@ impl HistoryService {
         quotes: &[Quote],
         date: NaiveDate,
         last_available_quotes: &mut HashMap<String, Quote>,
-    ) -> (f64, f64) {
+    ) -> (f64, f64, f64) {
         let mut holdings_value = 0.0;
         let mut day_gain_value = 0.0;
+        let mut opening_market_value = 0.0;
 
         for (asset_id, &quantity) in holdings {
             // Find the quote for the specific asset and date
@@ -435,14 +436,12 @@ impl HistoryService {
 
             if let Some(quote) = quote {
                 let holding_value = quantity * quote.close;
-                let day_gain = if quote.open != 0.0 {
-                    quantity * (quote.close - quote.open)
-                } else {
-                    0.0
-                };
+                let opening_value = quantity * quote.open;
+                let day_gain = quantity * (quote.close - quote.open);
 
                 holdings_value += holding_value;
                 day_gain_value += day_gain;
+                opening_market_value += opening_value;
 
                 // Update the last available quote for the asset
                 last_available_quotes.insert(asset_id.clone(), quote);
@@ -451,7 +450,7 @@ impl HistoryService {
             }
         }
 
-        (holdings_value, day_gain_value)
+        (holdings_value, day_gain_value, opening_market_value)
     }
 
     fn get_last_portfolio_history(
