@@ -1,4 +1,4 @@
-FROM node:22
+FROM node:latest
 
 RUN npm i -g pnpm
 
