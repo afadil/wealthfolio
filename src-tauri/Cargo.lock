@@ -4453,6 +4453,7 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "lazy_static",
+ "r2d2",
  "rayon",
  "regex",
  "reqwest 0.12.7",
@@ -4460,7 +4461,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tracing",
  "uuid",
  "yahoo_finance_api",
 ]

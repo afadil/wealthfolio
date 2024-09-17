@@ -15,6 +15,7 @@ CREATE TABLE portfolio_history (
     day_gain_value NUMERIC NOT NULL DEFAULT 0,
     allocation_percentage NUMERIC NOT NULL DEFAULT 0,
     exchange_rate NUMERIC NOT NULL DEFAULT 0,
+    holdings TEXT,
     UNIQUE(account_id, date)
 );
 CREATE INDEX idx_portfolio_history_account_date ON portfolio_history(account_id, date);

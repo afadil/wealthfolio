@@ -488,8 +488,7 @@ pub struct IncomeSummary {
     pub currency: String,
 }
 
-#[derive(Queryable, Selectable, Insertable, Associations, Debug, Clone, Serialize, Deserialize)]
-#[diesel(belongs_to(Account, foreign_key = account_id))]
+#[derive(Debug, Clone, Queryable, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::portfolio_history)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioHistory {
@@ -509,6 +508,7 @@ pub struct PortfolioHistory {
     pub day_gain_value: f64,
     pub allocation_percentage: f64,
     pub exchange_rate: f64,
+    pub holdings: Option<String>, // Holdings JSON
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -521,6 +521,7 @@ pub struct HistorySummary {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountSummary {
     pub account: Account,
     pub performance: PortfolioHistory,

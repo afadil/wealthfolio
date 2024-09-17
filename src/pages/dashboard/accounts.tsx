@@ -166,10 +166,10 @@ export function Accounts({
         </Card>
       );
     }
-
+    console.log('accountsInCategory', accountsInCategory);
     const categorySummary = calculateCategorySummary(accountsInCategory);
     const isExpanded = expandedCategories[category];
-
+    console.log('categorySummary', categorySummary);
     return (
       <Card>
         <CardHeader className="border-b">

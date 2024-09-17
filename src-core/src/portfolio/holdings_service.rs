@@ -7,7 +7,6 @@ use crate::models::{Holding, Performance};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::collections::{HashMap, HashSet};
-use tracing::{info, warn};
 
 pub struct HoldingsService {
     account_service: AccountService,
@@ -29,7 +28,7 @@ impl HoldingsService {
     }
 
     pub fn compute_holdings(&self) -> Result<Vec<Holding>> {
-        info!("Computing holdings");
+        println!("Computing holdings");
         let mut holdings: HashMap<String, Holding> = HashMap::new();
         let accounts = self.account_service.get_accounts()?;
         let activities = self.activity_service.get_trading_activities()?;
@@ -87,7 +86,7 @@ impl HoldingsService {
                     holding.quantity -= activity.quantity;
                     holding.book_value -= activity.quantity * activity.unit_price + activity.fee;
                 }
-                _ => warn!("Unhandled activity type: {}", activity.activity_type),
+                _ => println!("Unhandled activity type: {}", activity.activity_type),
             }
         }
 
@@ -107,8 +106,7 @@ impl HoldingsService {
                     quotes.insert(symbol, quote);
                 }
                 Err(e) => {
-                    warn!("Error fetching quote for symbol {}: {}", symbol, e);
-                    // Handle the error as per your logic, e.g., continue, return an error, etc.
+                    eprintln!("Error fetching quote for symbol {}: {}", symbol, e);
                 }
             }
         }

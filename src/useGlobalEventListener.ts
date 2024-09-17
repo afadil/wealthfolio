@@ -17,9 +17,9 @@ const useGlobalEventListener = () => {
     };
 
     const handleQuotesSyncComplete = () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['account_history', 'TOTAL'] });
+      queryClient.invalidateQueries({ queryKey: ['account_history'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts_summary'] });
       toast({
         title: 'Portfolio Update Complete',
         description: 'Your portfolio has been refreshed with the latest market data.',

@@ -1,4 +1,4 @@
-use diesel::r2d2;
+use r2d2;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,6 +13,8 @@ pub enum PortfolioError {
     AssetNotFoundError(String),
     #[error("Invalid data: {0}")]
     InvalidDataError(String),
+    #[error("Parse error: {0}")]
+    ParseError(String),
 }
 
 impl From<r2d2::Error> for PortfolioError {
