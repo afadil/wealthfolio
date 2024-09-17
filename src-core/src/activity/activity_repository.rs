@@ -192,4 +192,18 @@ impl ActivityRepository {
     ) -> Result<usize, diesel::result::Error> {
         diesel::delete(activities::table.filter(activities::id.eq(activity_id))).execute(conn)
     }
+
+    pub fn get_activities_by_account_ids(
+        &self,
+        conn: &mut SqliteConnection,
+        account_ids: &[String],
+    ) -> Result<Vec<Activity>, diesel::result::Error> {
+        activities::table
+            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .filter(accounts::is_active.eq(true))
+            .filter(activities::account_id.eq_any(account_ids))
+            .select(activities::all_columns)
+            .order(activities::activity_date.asc())
+            .load::<Activity>(conn)
+    }
 }

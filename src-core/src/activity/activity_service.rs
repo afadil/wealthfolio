@@ -186,4 +186,9 @@ impl ActivityService {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         self.repo.delete_activity(&mut conn, activity_id)
     }
+
+    pub fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.repo.get_activities_by_account_ids(&mut conn, account_ids)
+    }
 }

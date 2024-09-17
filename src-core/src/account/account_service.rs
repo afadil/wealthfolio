@@ -83,4 +83,13 @@ impl AccountService {
         self.account_repo
             .delete_account(&mut conn, account_id_to_delete)
     }
+
+    pub fn get_accounts_by_ids(
+        &self,
+        account_ids: &[String],
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        self.account_repo
+            .load_accounts_by_ids(&mut conn, account_ids)
+    }
 }

@@ -7,11 +7,13 @@ import {
   AccountSummary,
 } from '@/lib/types';
 
-export const calculate_historical_data = async (): Promise<HistorySummary[]> => {
+export const calculate_historical_data = async (
+  accountIds?: string[],
+): Promise<HistorySummary[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('calculate_historical_data');
+        return invokeTauri('calculate_historical_data', { accountIds });
       default:
         throw new Error(`Unsupported`);
     }
@@ -73,22 +75,6 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
     }
   } catch (error) {
     console.error('Error fetching active accounts summary:', error);
-    throw error;
-  }
-};
-
-export const calculateHistoricalDataForAccounts = async (
-  accountIds: string[],
-): Promise<HistorySummary[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('calculate_accounts_historical_data', { accountIds });
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    console.error('Error calculating historical data for specific accounts:', error);
     throw error;
   }
 };

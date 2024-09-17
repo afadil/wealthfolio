@@ -53,7 +53,6 @@ const AccountPage = () => {
         headingPrefix={account?.group || account?.currency}
         displayBack={true}
       />
-      New
       <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
         <Card className="col-span-1 md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">

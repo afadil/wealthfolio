@@ -458,10 +458,6 @@ impl HistoryService {
         // If no exact match, search for the latest quote in previous dates
         let found_quote = (1..=30) // Search up to 30 days back
             .find_map(|days_back| {
-                println!(
-                    "***Searching {} back {} days for quote on {}",
-                    asset_id, days_back, date
-                );
                 let search_date = date - Duration::days(days_back);
                 quotes.get(&(asset_id.to_string(), search_date))
             });
