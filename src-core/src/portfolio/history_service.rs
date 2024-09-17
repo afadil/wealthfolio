@@ -1,5 +1,6 @@
 use crate::error::{PortfolioError, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
+use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Account, Activity, HistorySummary, PortfolioHistory, Quote};
 use chrono::{Duration, NaiveDate, Utc};
 
@@ -12,21 +13,19 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 pub struct HistoryService {
-    fx_service: CurrencyExchangeService,
-    base_currency: String,
     pool: Pool<ConnectionManager<SqliteConnection>>,
+    base_currency: String,
+    market_data_service: MarketDataService,
+    fx_service: CurrencyExchangeService,
 }
 
 impl HistoryService {
-    pub fn new(
-        pool: Pool<ConnectionManager<SqliteConnection>>,
-        fx_service: CurrencyExchangeService,
-        base_currency: String,
-    ) -> Self {
+    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
         Self {
-            fx_service,
+            pool: pool.clone(),
             base_currency,
-            pool,
+            market_data_service: MarketDataService::new(pool.clone()),
+            fx_service: CurrencyExchangeService::new(pool.clone()),
         }
     }
 
@@ -63,13 +62,15 @@ impl HistoryService {
         &self,
         accounts: &[Account],
         activities: &[Activity],
-        market_data: &[Quote],
     ) -> Result<Vec<HistorySummary>> {
         println!("Starting calculate_historical_data");
         let end_date = Utc::now().naive_utc().date();
 
         let all_histories = Arc::new(Mutex::new(Vec::new()));
         let total_history = Arc::new(Mutex::new(Vec::new()));
+
+        let quotes = self.market_data_service.load_quotes();
+        println!("Loaded {} quotes", quotes.len());
 
         let mut summaries: Vec<HistorySummary> = accounts
             .par_iter()
@@ -104,7 +105,7 @@ impl HistoryService {
                 let new_history = self.calculate_historical_value(
                     &account.id,
                     &account_activities,
-                    market_data,
+                    &quotes,
                     account_start_date,
                     end_date,
                 );
@@ -186,7 +187,7 @@ impl HistoryService {
         &self,
         account_id: &str,
         activities: &[Activity],
-        quotes: &[Quote],
+        quotes: &HashMap<(String, NaiveDate), Quote>,
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Vec<PortfolioHistory> {
@@ -207,8 +208,6 @@ impl HistoryService {
             .and_then(|json_str| serde_json::from_str(json_str).ok())
             .unwrap_or_default();
 
-        let mut last_available_quotes: HashMap<String, Quote> = HashMap::new();
-
         // If there's a last history entry, start from the day after
         let actual_start_date = last_history
             .as_ref()
@@ -216,6 +215,8 @@ impl HistoryService {
             .unwrap_or(start_date);
 
         let all_dates = Self::get_dates_between(actual_start_date, end_date);
+
+        // Load all quotes for the date range and assets
 
         let mut results = Vec::new();
 
@@ -261,7 +262,7 @@ impl HistoryService {
 
             // Update market value based on quotes
             let (updated_market_value, day_gain_value, opening_market_value) =
-                self.calculate_holdings_value(&holdings, quotes, date, &mut last_available_quotes);
+                self.calculate_holdings_value(&holdings, &quotes, date);
 
             let market_value = updated_market_value;
             let total_value = cumulative_cash + market_value;
@@ -414,21 +415,15 @@ impl HistoryService {
     fn calculate_holdings_value(
         &self,
         holdings: &HashMap<String, f64>,
-        quotes: &[Quote],
+        quotes: &HashMap<(String, NaiveDate), Quote>,
         date: NaiveDate,
-        last_available_quotes: &mut HashMap<String, Quote>,
     ) -> (f64, f64, f64) {
         let mut holdings_value = 0.0;
         let mut day_gain_value = 0.0;
         let mut opening_market_value = 0.0;
 
         for (asset_id, &quantity) in holdings {
-            // Find the quote for the specific asset and date
-            let quote = quotes
-                .iter()
-                .find(|q| q.date.date() == date && q.symbol == *asset_id)
-                .or_else(|| last_available_quotes.get(asset_id))
-                .cloned();
+            let quote = self.get_latest_available_quote(quotes, asset_id, date);
 
             if let Some(quote) = quote {
                 let holding_value = quantity * quote.close;
@@ -438,15 +433,39 @@ impl HistoryService {
                 holdings_value += holding_value;
                 day_gain_value += day_gain;
                 opening_market_value += opening_value;
-
-                // Update the last available quote for the asset
-                last_available_quotes.insert(asset_id.clone(), quote);
             } else {
-                println!("No quote available for asset {} on date {}", asset_id, date);
+                println!(
+                    "No quote available for symbol {} on or before date {}",
+                    asset_id, date
+                );
             }
         }
 
         (holdings_value, day_gain_value, opening_market_value)
+    }
+
+    fn get_latest_available_quote<'a>(
+        &self,
+        quotes: &'a HashMap<(String, NaiveDate), Quote>,
+        asset_id: &str,
+        date: NaiveDate,
+    ) -> Option<&'a Quote> {
+        // First, check for an exact date match
+        if let Some(quote) = quotes.get(&(asset_id.to_string(), date)) {
+            return Some(quote);
+        }
+
+        // If no exact match, search for the latest quote in previous dates
+        let found_quote = (1..=30) // Search up to 30 days back
+            .find_map(|days_back| {
+                println!(
+                    "***Searching {} back {} days for quote on {}",
+                    asset_id, days_back, date
+                );
+                let search_date = date - Duration::days(days_back);
+                quotes.get(&(asset_id.to_string(), search_date))
+            });
+        found_quote
     }
 
     fn get_last_portfolio_history(

@@ -1,10 +1,11 @@
 use crate::models::{Asset, NewAsset, Quote, QuoteSummary};
 use crate::providers::yahoo_provider::YahooProvider;
 use crate::schema::{activities, quotes};
-use chrono::{Duration, NaiveDateTime, TimeZone, Utc};
+use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
+use std::collections::HashMap;
 use std::time::SystemTime;
 use uuid::Uuid;
 
@@ -40,6 +41,61 @@ impl MarketDataService {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         quotes::table.load::<Quote>(&mut conn)
     }
+
+    pub fn load_quotes(&self) -> HashMap<(String, NaiveDate), Quote> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        let quotes_result: QueryResult<Vec<Quote>> = quotes::table.load::<Quote>(&mut conn);
+
+        match quotes_result {
+            Ok(quotes) => quotes
+                .into_iter()
+                .map(|quote| {
+                    let quote_date = quote.date.date();
+                    ((quote.symbol.clone(), quote_date), quote)
+                })
+                .collect(),
+            Err(e) => {
+                eprintln!("Error loading quotes: {}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    // pub fn load_quotes(
+    //     &self,
+    //     asset_ids: &HashSet<String>,
+    //     start_date: NaiveDate,
+    //     end_date: NaiveDate,
+    // ) -> HashMap<(String, NaiveDate), Quote> {
+    //     let start_datetime = NaiveDateTime::new(
+    //         start_date,
+    //         chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+    //     );
+    //     let end_datetime = NaiveDateTime::new(
+    //         end_date,
+    //         chrono::NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
+    //     );
+
+    //     let mut conn = self.pool.get().expect("Couldn't get db connection");
+    //     let quotes_result: QueryResult<Vec<Quote>> = quotes::table
+    //         .filter(quotes::symbol.eq_any(asset_ids))
+    //         .filter(quotes::date.between(start_datetime, end_datetime))
+    //         .load::<Quote>(&mut conn);
+
+    //     match quotes_result {
+    //         Ok(quotes) => quotes
+    //             .into_iter()
+    //             .map(|quote| {
+    //                 let quote_date = quote.date.date();
+    //                 ((quote.symbol.clone(), quote_date), quote)
+    //             })
+    //             .collect(),
+    //         Err(e) => {
+    //             eprintln!("Error loading quotes: {}", e);
+    //             HashMap::new()
+    //         }
+    //     }
+    // }
 
     pub async fn initialize_crumb_data(&self) -> Result<(), String> {
         self.provider.set_crumb().await.map_err(|e| {
