@@ -96,6 +96,41 @@ impl PortfolioService {
         Ok(results)
     }
 
+    pub fn calculate_accounts_historical_data(
+        &self,
+        account_ids: Vec<String>,
+    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+        let strt_time = std::time::Instant::now();
+
+        let (all_accounts, all_activities) = self.fetch_data()?;
+
+        // Filter accounts and activities based on the provided account_ids
+        let accounts: Vec<_> = all_accounts
+            .into_iter()
+            .filter(|account| {
+                account_ids.contains(&account.id) || account_ids.contains(&"TOTAL".to_string())
+            })
+            .collect();
+        let activities: Vec<_> = all_activities
+            .into_iter()
+            .filter(|activity| {
+                account_ids.contains(&activity.account_id)
+                    || account_ids.contains(&"TOTAL".to_string())
+            })
+            .collect();
+
+        let results = self
+            .history_service
+            .calculate_historical_data(&accounts, &activities)?;
+
+        println!(
+            "Calculating historical portfolio values for specific accounts took: {:?}",
+            std::time::Instant::now() - strt_time
+        );
+
+        Ok(results)
+    }
+
     pub fn get_income_data(&self) -> Result<Vec<IncomeData>, diesel::result::Error> {
         self.income_service.get_income_data()
     }
