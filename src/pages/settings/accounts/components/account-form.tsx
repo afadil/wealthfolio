@@ -41,6 +41,8 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 
+import { calculate_historical_data } from '@/commands/portfolio';
+
 const accountTypes = [
   { label: 'Securities', value: 'SECURITIES' },
   { label: 'Cash', value: 'CASH' },
@@ -62,13 +64,32 @@ interface AccountFormlProps {
 export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountFormlProps) {
   const queryClient = useQueryClient();
 
-  const addAccountMutation = useMutation({
+  const calculateHistoricalDataMutation = useMutation({
+    mutationFn: calculate_historical_data,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast({
+        title: 'Account updated successfully.',
+        description: 'Historical data is being recalculated.',
+        className: 'bg-green-500 text-white border-none',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Failed to recalculate historical data.',
+        description: 'Please try refreshing the page or relaunching the app.',
+        className: 'bg-yellow-500 text-white border-none',
+      });
+    },
+  });
+
+  const createAccountMutation = useMutation({
     mutationFn: createAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries();
       toast({
-        title: 'Account added successfully.',
-        description: 'Start adding or importing this account activities.',
+        title: 'Account created successfully.',
+        description: 'Historical data is being calculated.',
         className: 'bg-green-500 text-white border-none',
       });
       onSuccess();
@@ -76,22 +97,24 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     onError: () => {
       toast({
         title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem adding this account.',
+        description: 'There was a problem creating this account.',
         className: 'bg-red-500 text-white border-none',
       });
     },
   });
+
   const updateAccountMutation = useMutation({
     mutationFn: updateAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      toast({
-        title: 'Account updated successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
       onSuccess();
+      calculateHistoricalDataMutation.mutate([]);
+    },
+    onError: () => {
+      toast({
+        title: 'Uh oh! Something went wrong.',
+        description: 'There was a problem updating this account.',
+        className: 'bg-red-500 text-white border-none',
+      });
     },
   });
 
@@ -105,7 +128,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     if (id) {
       return updateAccountMutation.mutate({ id, ...rest });
     }
-    return addAccountMutation.mutate(data);
+    return createAccountMutation.mutate(rest);
   }
 
   return (

@@ -29,8 +29,14 @@ import type { Account, ActivityImport } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { checkActivitiesImport } from '@/commands/activity';
-import { listenImportFileDrop, listenImportFileDropCancelled, listenImportFileDropHover, UnlistenFn } from '@/commands/import-listener';
+import {
+  listenImportFileDrop,
+  listenImportFileDropCancelled,
+  listenImportFileDropHover,
+  UnlistenFn,
+} from '@/commands/import-listener';
 import { openCsvFileDialog } from '@/commands/file';
+import { QueryKeys } from '@/lib/query-keys';
 
 const importFormSchema = z.object({
   account_id: z.string({ required_error: 'Please select an account.' }),
@@ -45,7 +51,7 @@ type ActivityImportFormProps = {
 
 export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormProps) => {
   const { data: accounts } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
   const [dragging, setDragging] = useState<boolean>(false);

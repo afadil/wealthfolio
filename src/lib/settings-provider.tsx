@@ -18,9 +18,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     onSuccess: (updatedSettings) => {
       setSettings(updatedSettings);
       applySettingsToDocument(updatedSettings);
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
+      queryClient.invalidateQueries();
       toast({
         title: 'Settings updated successfully.',
         className: 'bg-green-500 text-white border-none',

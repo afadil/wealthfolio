@@ -36,6 +36,7 @@ import {
 import { toast } from '@/components/ui/use-toast';
 
 import { cn } from '@/lib/utils';
+import { QueryKeys } from '@/lib/query-keys';
 
 import { newActivitySchema } from '@/lib/schemas';
 import { createActivity, updateActivity } from '@/commands/activity';
@@ -75,9 +76,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
   const addActivityMutation = useMutation({
     mutationFn: createActivity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries();
       toast({
         title: 'Activity added successfully.',
         className: 'bg-green-500 text-white border-none',
@@ -96,9 +95,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
   const updateActivityMutation = useMutation({
     mutationFn: updateActivity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries();
       toast({
         title: 'Activity updated successfully.',
         className: 'bg-green-500 text-white border-none',
@@ -234,7 +231,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={field.value}
+                      selected={field.value ? new Date(field.value) : undefined}
                       onSelect={field.onChange}
                       disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
                       initialFocus

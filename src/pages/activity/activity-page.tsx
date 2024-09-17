@@ -12,6 +12,7 @@ import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { deleteActivity } from '@/commands/activity';
 import { toast } from '@/components/ui/use-toast';
+import { QueryKeys } from '@/lib/query-keys';
 
 const ActivityPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
@@ -21,16 +22,14 @@ const ActivityPage = () => {
   const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
   const deleteActivityMutation = useMutation({
     mutationFn: deleteActivity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
+      queryClient.invalidateQueries();
       toast({
         title: 'Account updated successfully.',
         className: 'bg-green-500 text-white border-none',

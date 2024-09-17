@@ -8,6 +8,7 @@ import { getAccountHistory, getAccountsSummary } from '@/commands/portfolio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accounts } from './accounts';
 import SavingGoals from './goals';
+import { QueryKeys } from '@/lib/query-keys';
 
 // filter
 function DashboardSkeleton() {
@@ -30,13 +31,13 @@ export default function DashboardPage() {
     PortfolioHistory[],
     Error
   >({
-    queryKey: ['account_history', 'TOTAL'],
+    queryKey: QueryKeys.accountHistory('TOTAL'),
     queryFn: () => getAccountHistory('TOTAL'),
   });
 
   console.log('portfolioHistory', portfolioHistory);
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
-    queryKey: ['accounts_summary'],
+    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
     queryFn: getAccountsSummary,
   });
 

@@ -17,9 +17,7 @@ const useGlobalEventListener = () => {
     };
 
     const handleQuotesSyncComplete = () => {
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['account_history'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts_summary'] });
+      queryClient.invalidateQueries();
       toast({
         title: 'Portfolio Update Complete',
         description: 'Your portfolio has been refreshed with the latest market data.',
@@ -41,7 +39,7 @@ const useGlobalEventListener = () => {
     });
   }, [queryClient]);
 
-  return null; // Assuming this hook doesn't need to return anything
+  return null;
 };
 
 export default useGlobalEventListener;

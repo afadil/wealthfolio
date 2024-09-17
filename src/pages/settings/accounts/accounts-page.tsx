@@ -11,12 +11,13 @@ import { deleteAccount, getAccounts } from '@/commands/account';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
+import { QueryKeys } from '@/lib/query-keys';
 
 const SettingsAccountsPage = () => {
   const queryClient = useQueryClient();
 
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
@@ -31,9 +32,7 @@ const SettingsAccountsPage = () => {
   const deleteAccountMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
+      queryClient.invalidateQueries();
       toast({
         title: 'Account deleted successfully.',
         className: 'bg-green-500 text-white border-none',
@@ -77,7 +76,7 @@ const SettingsAccountsPage = () => {
           </Button>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8 ">
+        <div className="mx-auto w-full pt-8">
           {accounts?.length ? (
             <div className="divide-y divide-border rounded-md border">
               {accounts.map((account: Account) => (

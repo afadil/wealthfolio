@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createActivities } from '@/commands/activity';
 import { syncHistoryQuotes } from '@/commands/market-data';
 import { ImportHelpPopover } from './import-help';
+import { QueryKeys } from '@/lib/query-keys';
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ const ActivityImportPage = () => {
   const syncQuotesMutation = useMutation({
     mutationFn: syncHistoryQuotes,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_HISTORY] });
     },
   });
 
@@ -33,9 +34,7 @@ const ActivityImportPage = () => {
     onSuccess: () => {
       setError(null);
       setWarning(0);
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries();
       syncQuotesMutation.mutate();
       toast({
         title: 'Activities imported successfully',

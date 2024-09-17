@@ -13,17 +13,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import GoalsAllocations from './components/goal-allocations';
 import { useAccounts } from '@/pages/account/useAccounts';
+import { QueryKeys } from '@/lib/query-keys';
 
 const SettingsGoalsPage = () => {
   const queryClient = useQueryClient();
 
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
-    queryKey: ['goals'],
+    queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
   });
 
   const { data: allocations } = useQuery<GoalAllocation[], Error>({
-    queryKey: ['goals_allocations'],
+    queryKey: [QueryKeys.GOALS_ALLOCATIONS],
     queryFn: getGoalsAllocation,
   });
 
@@ -40,8 +41,8 @@ const SettingsGoalsPage = () => {
   const deleteGoalMutation = useMutation({
     mutationFn: deleteGoal,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      queryClient.invalidateQueries({ queryKey: ['goals_allocations'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS_ALLOCATIONS] });
       setVisibleModal(false);
       toast({
         title: 'Goal deleted successfully.',
@@ -62,8 +63,8 @@ const SettingsGoalsPage = () => {
   const saveAllocationsMutation = useMutation({
     mutationFn: updateGoalsAllocations,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      queryClient.invalidateQueries({ queryKey: ['goals_allocations'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS_ALLOCATIONS] });
       toast({
         title: 'Allocation saved successfully.',
         className: 'bg-green-500 text-white border-none',
@@ -94,7 +95,7 @@ const SettingsGoalsPage = () => {
           </Button>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8 ">
+        <div className="mx-auto w-full pt-8">
           {goals?.length ? (
             <>
               <h3 className="p-2 text-xl font-bold">Goals</h3>

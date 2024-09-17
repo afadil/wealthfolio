@@ -28,6 +28,7 @@ import { toast } from '@/components/ui/use-toast';
 
 import { newGoalSchema } from '@/lib/schemas';
 import { createGoal, updateGoal } from '@/commands/goal';
+import { QueryKeys } from '@/lib/query-keys';
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
@@ -42,7 +43,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
   const addGoalMutation = useMutation({
     mutationFn: createGoal,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS] });
       toast({
         title: 'Goal added successfully.',
         description: 'Start adding or importing this goal activities.',
@@ -61,7 +62,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
   const updateGoalMutation = useMutation({
     mutationFn: updateGoal,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS] });
       toast({
         title: 'Goal updated successfully.',
         className: 'bg-green-500 text-white border-none',
@@ -93,7 +94,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-10 p-4 ">
+        <div className="grid gap-10 p-4">
           {/* add input hidden for id */}
           <input type="hidden" name="id" />
 

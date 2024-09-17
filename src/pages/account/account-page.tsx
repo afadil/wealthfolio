@@ -14,12 +14,13 @@ import AccountHoldings from './account-holdings';
 import { useQuery } from '@tanstack/react-query';
 import { Holding, PortfolioHistory, AccountSummary } from '@/lib/types';
 import { computeHoldings, getAccountHistory, getAccountsSummary } from '@/commands/portfolio';
+import { QueryKeys } from '@/lib/query-keys';
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
 
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
-    queryKey: ['accounts_summary'],
+    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
     queryFn: getAccountsSummary,
   });
 
@@ -29,13 +30,13 @@ const AccountPage = () => {
     PortfolioHistory[],
     Error
   >({
-    queryKey: ['account_history', id],
+    queryKey: QueryKeys.accountHistory(id),
     queryFn: () => getAccountHistory(id),
     enabled: !!id,
   });
 
   const { data: holdings, isLoading: isLoadingHoldings } = useQuery<Holding[], Error>({
-    queryKey: ['holdings'],
+    queryKey: [QueryKeys.HOLDINGS],
     queryFn: computeHoldings,
   });
 

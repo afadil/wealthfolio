@@ -12,6 +12,7 @@ import {
 import { getIncomeSummary } from '@/commands/portfolio';
 import type { IncomeSummary } from '@/lib/types';
 import { formatAmount } from '@/lib/utils';
+import { QueryKeys } from '@/lib/query-keys';
 
 export function IncomeDashboard() {
   const {
@@ -19,7 +20,7 @@ export function IncomeDashboard() {
     isLoading,
     error,
   } = useQuery<IncomeSummary, Error>({
-    queryKey: ['incomeSummary'],
+    queryKey: [QueryKeys.INCOME_SUMMARY],
     queryFn: getIncomeSummary,
   });
 
