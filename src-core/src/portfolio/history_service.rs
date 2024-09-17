@@ -139,8 +139,9 @@ impl HistoryService {
 
         let account_histories = all_histories.lock().unwrap();
 
-        // Calculate total portfolio history
-        *total_history.lock().unwrap() = self.calculate_total_portfolio_history(&account_histories);
+        // Calculate total portfolio history for all accounts
+        *total_history.lock().unwrap() =
+            self.calculate_total_portfolio_history_for_all_accounts()?;
 
         // Save all historical data
         for history in account_histories.iter() {
@@ -181,6 +182,89 @@ impl HistoryService {
         // Add the total summary to the summaries array
         summaries.push(total_summary);
         Ok(summaries)
+    }
+
+    // New method to calculate total portfolio history for all accounts
+    fn calculate_total_portfolio_history_for_all_accounts(&self) -> Result<Vec<PortfolioHistory>> {
+        use crate::schema::accounts::dsl as accounts_dsl;
+        use crate::schema::portfolio_history::dsl::*;
+        let conn = &mut self.pool.get().map_err(PortfolioError::from)?;
+
+        // Get active account IDs
+        let active_account_ids: Vec<String> = accounts_dsl::accounts
+            .filter(accounts_dsl::is_active.eq(true))
+            .select(accounts_dsl::id)
+            .load::<String>(conn)?;
+
+        let all_histories: Vec<PortfolioHistory> = portfolio_history
+            .filter(account_id.ne("TOTAL"))
+            .filter(account_id.eq_any(active_account_ids))
+            .order(date.asc())
+            .load::<PortfolioHistory>(conn)?;
+
+        let grouped_histories: HashMap<String, Vec<PortfolioHistory>> = all_histories
+            .into_iter()
+            .fold(HashMap::new(), |mut acc, history| {
+                acc.entry(history.date.clone()).or_default().push(history);
+                acc
+            });
+
+        let mut total_history: Vec<PortfolioHistory> = grouped_histories
+            .into_iter()
+            .map(|(history_date, histories)| {
+                let mut total = PortfolioHistory {
+                    id: Uuid::new_v4().to_string(),
+                    account_id: "TOTAL".to_string(),
+                    date: history_date,
+                    total_value: 0.0,
+                    market_value: 0.0,
+                    book_cost: 0.0,
+                    available_cash: 0.0,
+                    net_deposit: 0.0,
+                    currency: self.base_currency.clone(),
+                    base_currency: self.base_currency.clone(),
+                    total_gain_value: 0.0,
+                    total_gain_percentage: 0.0,
+                    day_gain_percentage: 0.0,
+                    day_gain_value: 0.0,
+                    allocation_percentage: 100.0,
+                    exchange_rate: 1.0,
+                    holdings: Some("{}".to_string()),
+                };
+
+                for history in histories {
+                    let currency_exchange_rate = self
+                        .fx_service
+                        .get_exchange_rate(&history.currency, &self.base_currency)
+                        .unwrap_or(1.0);
+
+                    total.total_value += history.total_value * currency_exchange_rate;
+                    total.market_value += history.market_value * currency_exchange_rate;
+                    total.book_cost += history.book_cost * currency_exchange_rate;
+                    total.available_cash += history.available_cash * currency_exchange_rate;
+                    total.net_deposit += history.net_deposit * currency_exchange_rate;
+                    total.day_gain_value += history.day_gain_value * currency_exchange_rate;
+                }
+
+                // Recalculate percentages
+                total.total_gain_value = total.total_value - total.net_deposit;
+                total.total_gain_percentage = if total.net_deposit != 0.0 {
+                    (total.total_gain_value / total.net_deposit) * 100.0
+                } else {
+                    0.0
+                };
+                total.day_gain_percentage = if total.market_value != 0.0 {
+                    (total.day_gain_value / total.market_value) * 100.0
+                } else {
+                    0.0
+                };
+
+                total
+            })
+            .collect();
+
+        total_history.sort_by(|a, b| a.date.cmp(&b.date));
+        Ok(total_history)
     }
 
     fn calculate_historical_value(
@@ -307,72 +391,6 @@ impl HistoryService {
         }
 
         results
-    }
-
-    fn calculate_total_portfolio_history(
-        &self,
-        account_histories: &[Vec<PortfolioHistory>],
-    ) -> Vec<PortfolioHistory> {
-        let mut total_history = HashMap::new();
-
-        for history in account_histories {
-            for snapshot in history {
-                let entry = total_history
-                    .entry(snapshot.date.clone())
-                    .or_insert_with(|| PortfolioHistory {
-                        id: Uuid::new_v4().to_string(),
-                        account_id: "TOTAL".to_string(),
-                        date: snapshot.date.clone(),
-                        total_value: 0.0,
-                        market_value: 0.0,
-                        book_cost: 0.0,
-                        available_cash: 0.0,
-                        net_deposit: 0.0,
-                        currency: self.base_currency.clone(),
-                        base_currency: self.base_currency.clone(),
-                        total_gain_value: 0.0,
-                        total_gain_percentage: 0.0,
-                        day_gain_percentage: 0.0,
-                        day_gain_value: 0.0,
-                        allocation_percentage: 0.0,
-                        exchange_rate: 1.0,
-                        holdings: Some("{}".to_string()),
-                    });
-
-                let exchange_rate = self
-                    .fx_service
-                    .get_exchange_rate(&snapshot.currency, &self.base_currency)
-                    .unwrap_or(1.0);
-
-                entry.total_value += snapshot.total_value * exchange_rate;
-                entry.market_value += snapshot.market_value * exchange_rate;
-                entry.book_cost += snapshot.book_cost * exchange_rate;
-                entry.available_cash += snapshot.available_cash * exchange_rate;
-                entry.net_deposit += snapshot.net_deposit * exchange_rate;
-                entry.day_gain_value += snapshot.day_gain_value * exchange_rate;
-            }
-        }
-
-        let mut total_history: Vec<_> = total_history.into_values().collect();
-        total_history.sort_by(|a, b| a.date.cmp(&b.date));
-
-        // Recalculate percentages for total portfolio
-        for record in &mut total_history {
-            record.total_gain_value = record.total_value - record.net_deposit;
-            record.total_gain_percentage = if record.net_deposit != 0.0 {
-                (record.total_gain_value / record.net_deposit) * 100.0
-            } else {
-                0.0
-            };
-            record.day_gain_percentage = if record.market_value != 0.0 {
-                (record.day_gain_value / record.market_value) * 100.0
-            } else {
-                0.0
-            };
-            record.allocation_percentage = 100.0; // The total portfolio always represents 100% of itself
-        }
-
-        total_history
     }
 
     fn save_historical_data(&self, history_data: &[PortfolioHistory]) -> Result<()> {
