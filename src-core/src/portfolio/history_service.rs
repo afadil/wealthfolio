@@ -92,7 +92,8 @@ impl HistoryService {
                 let last_date = self.get_last_historical_date(&account.id).unwrap_or(None);
 
                 let account_start_date =
-                    last_date.map(|d| d + Duration::days(1)).unwrap_or_else(|| {
+                    last_date.map(|d| d - Duration::days(2)).unwrap_or_else(|| {
+                        // -2 for more freshness of towo last days
                         account_activities
                             .iter()
                             .map(|a| a.activity_date.date())
@@ -198,8 +199,6 @@ impl HistoryService {
         let mut cumulative_cash = last_history.as_ref().map_or(0.0, |h| h.available_cash);
         let mut net_deposit = last_history.as_ref().map_or(0.0, |h| h.net_deposit);
         let mut book_cost = last_history.as_ref().map_or(0.0, |h| h.book_cost);
-        // let mut total_value = last_history.as_ref().map_or(0.0, |h| h.total_value);
-        //let mut market_value = last_history.as_ref().map_or(0.0, |h| h.market_value);
 
         // Initialize holdings based on the last history
         let mut holdings: HashMap<String, f64> = last_history
@@ -238,7 +237,7 @@ impl HistoryService {
                     "SELL" => {
                         let sell_profit = activity_amount - activity_fee;
                         cumulative_cash += sell_profit;
-                        book_cost -= activity_amount;
+                        book_cost -= activity_amount + activity_fee;
                         *holdings.entry(activity.asset_id.clone()).or_insert(0.0) -=
                             activity.quantity;
                     }
@@ -273,9 +272,9 @@ impl HistoryService {
                 0.0
             };
 
-            let total_gain_value = total_value - net_deposit;
-            let total_gain_percentage = if net_deposit != 0.0 {
-                (total_gain_value / net_deposit) * 100.0
+            let total_gain_value = total_value - book_cost;
+            let total_gain_percentage = if book_cost != 0.0 {
+                (total_gain_value / book_cost) * 100.0
             } else {
                 0.0
             };
@@ -300,11 +299,7 @@ impl HistoryService {
                 total_gain_percentage,
                 day_gain_percentage,
                 day_gain_value,
-                allocation_percentage: if total_value != 0.0 {
-                    (market_value / total_value) * 100.0
-                } else {
-                    0.0
-                },
+                allocation_percentage: 0.0, // This will be calculated later in calculate_total_portfolio_history
                 exchange_rate,
                 holdings: Some(serde_json::to_string(&holdings).unwrap_or_default()),
             });
@@ -373,6 +368,7 @@ impl HistoryService {
             } else {
                 0.0
             };
+            record.allocation_percentage = 100.0; // The total portfolio always represents 100% of itself
         }
 
         total_history

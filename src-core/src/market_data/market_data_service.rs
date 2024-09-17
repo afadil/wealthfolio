@@ -83,7 +83,10 @@ impl MarketDataService {
                 .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
                 .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
 
-            let start_date: SystemTime = Utc.from_utc_datetime(&last_sync_date).into();
+            // Ensure to synchronize the last 2 days data for freshness
+            let start_date: SystemTime = Utc
+                .from_utc_datetime(&(last_sync_date - Duration::days(2)))
+                .into();
 
             match self
                 .provider
