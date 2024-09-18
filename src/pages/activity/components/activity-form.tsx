@@ -40,6 +40,7 @@ import { QueryKeys } from '@/lib/query-keys';
 
 import { newActivitySchema } from '@/lib/schemas';
 import { createActivity, updateActivity } from '@/commands/activity';
+import { calculate_historical_data } from '@/commands/portfolio';
 import TickerSearchInput from './ticker-search';
 
 const activityTypes = [
@@ -48,7 +49,6 @@ const activityTypes = [
   { label: 'Deposit', value: 'DEPOSIT' },
   { label: 'Withdrawal', value: 'WITHDRAWAL' },
   { label: 'Dividend', value: 'DIVIDEND' },
-  // { label: 'Split', value: 'SPLIT' },
   // { label: 'Transfer', value: 'TRANSFER' },
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
@@ -73,15 +73,35 @@ interface ActivityFormProps {
 export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: ActivityFormProps) {
   const queryClient = useQueryClient();
 
-  const addActivityMutation = useMutation({
-    mutationFn: createActivity,
+  const calculateHistoricalDataMutation = useMutation({
+    mutationFn: calculate_historical_data,
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: QueryKeys.accountHistory('TOTAL') });
+
       toast({
-        title: 'Activity added successfully.',
+        title: 'Activities updated successfully.',
+        description: 'Portfolio data is being recalculated.',
         className: 'bg-green-500 text-white border-none',
       });
+    },
+    onError: () => {
+      queryClient.invalidateQueries();
+      toast({
+        title: 'Failed to recalculate portfolio data.',
+        description: 'Please try refreshing the page or relaunching the app.',
+        className: 'bg-yellow-500 text-white border-none',
+      });
+    },
+  });
+
+  const addActivityMutation = useMutation({
+    mutationFn: createActivity,
+    onSuccess: (activity) => {
       onSuccess();
+      calculateHistoricalDataMutation.mutate({
+        accountIds: [activity.accountId ?? ''],
+        forceFullCalculation: true,
+      });
     },
     onError: (_error) => {
       toast({
@@ -94,13 +114,19 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
 
   const updateActivityMutation = useMutation({
     mutationFn: updateActivity,
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toast({
-        title: 'Activity updated successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
+    onSuccess: (activity) => {
       onSuccess();
+      if (activity.accountId) {
+        calculateHistoricalDataMutation.mutate({
+          accountIds: [activity.accountId],
+          forceFullCalculation: true,
+        });
+      } else {
+        calculateHistoricalDataMutation.mutate({
+          accountIds: undefined,
+          forceFullCalculation: true,
+        });
+      }
     },
   });
 

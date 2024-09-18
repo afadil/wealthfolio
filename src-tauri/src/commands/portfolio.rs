@@ -8,14 +8,15 @@ use tauri::State;
 pub async fn calculate_historical_data(
     state: State<'_, AppState>,
     account_ids: Option<Vec<String>>,
+    force_full_calculation: bool,
 ) -> Result<Vec<HistorySummary>, String> {
-    println!("Fetching portfolio historical...");
+    println!("Calculate portfolio historical...");
 
     let service = PortfolioService::new((*state.pool).clone())
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
 
     service
-        .calculate_historical_data(account_ids)
+        .calculate_historical_data(account_ids, force_full_calculation)
         .map_err(|e| format!("Failed to calculate historical data: {}", e))
 }
 

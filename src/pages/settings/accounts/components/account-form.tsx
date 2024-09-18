@@ -107,7 +107,10 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     mutationFn: updateAccount,
     onSuccess: (updatedAccount) => {
       onSuccess();
-      calculateHistoricalDataMutation.mutate([updatedAccount.id]);
+      calculateHistoricalDataMutation.mutate({
+        accountIds: [updatedAccount.id ?? ''],
+        forceFullCalculation: true,
+      });
     },
     onError: () => {
       toast({

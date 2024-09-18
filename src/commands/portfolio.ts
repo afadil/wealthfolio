@@ -7,13 +7,14 @@ import {
   AccountSummary,
 } from '@/lib/types';
 
-export const calculate_historical_data = async (
-  accountIds?: string[],
-): Promise<HistorySummary[]> => {
+export const calculate_historical_data = async (params: {
+  accountIds?: string[];
+  forceFullCalculation: boolean;
+}): Promise<HistorySummary[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('calculate_historical_data', { accountIds });
+        return invokeTauri('calculate_historical_data', params);
       default:
         throw new Error(`Unsupported`);
     }

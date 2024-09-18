@@ -79,14 +79,18 @@ impl PortfolioService {
     pub fn calculate_historical_data(
         &self,
         account_ids: Option<Vec<String>>,
+        force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+        println!("Starting calculate_historical_data with account_ids: {:?}, force_full_calculation: {:?}", account_ids, force_full_calculation);
         let strt_time = std::time::Instant::now();
 
         let (accounts, activities) = self.fetch_data(account_ids)?;
 
-        let results = self
-            .history_service
-            .calculate_historical_data(&accounts, &activities)?;
+        let results = self.history_service.calculate_historical_data(
+            &accounts,
+            &activities,
+            force_full_calculation,
+        )?;
 
         println!(
             "Calculating historical portfolio values took: {:?}",
@@ -111,7 +115,7 @@ impl PortfolioService {
         self.asset_service.initialize_and_sync_quotes().await?;
 
         // Then, calculate historical data
-        self.calculate_historical_data(None)
+        self.calculate_historical_data(None, false)
     }
 
     pub fn get_account_history(

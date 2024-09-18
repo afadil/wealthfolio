@@ -35,13 +35,11 @@ export default function DashboardPage() {
     queryFn: () => getAccountHistory('TOTAL'),
   });
 
-  console.log('portfolioHistory', portfolioHistory);
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
     queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
     queryFn: getAccountsSummary,
   });
 
-  console.log('accounts', accounts);
   if (isPortfolioHistoryLoading || isAccountsLoading) {
     return <DashboardSkeleton />;
   }

@@ -62,15 +62,14 @@ impl HistoryService {
         &self,
         accounts: &[Account],
         activities: &[Activity],
+        force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>> {
-        println!("Starting calculate_historical_data");
         let end_date = Utc::now().naive_utc().date();
 
         let all_histories = Arc::new(Mutex::new(Vec::new()));
         let total_history = Arc::new(Mutex::new(Vec::new()));
 
         let quotes = self.market_data_service.load_quotes();
-        println!("Loaded {} quotes", quotes.len());
 
         let mut summaries: Vec<HistorySummary> = accounts
             .par_iter()
@@ -90,17 +89,24 @@ impl HistoryService {
                     };
                 }
 
-                let last_date = self.get_last_historical_date(&account.id).unwrap_or(None);
-
-                let account_start_date =
-                    last_date.map(|d| d - Duration::days(2)).unwrap_or_else(|| {
-                        // -2 for more freshness of towo last days
-                        account_activities
-                            .iter()
-                            .map(|a| a.activity_date.date())
-                            .min()
-                            .unwrap_or_else(|| Utc::now().naive_utc().date())
-                    });
+                let account_start_date = if force_full_calculation {
+                    account_activities
+                        .iter()
+                        .map(|a| a.activity_date.date())
+                        .min()
+                        .unwrap_or_else(|| Utc::now().naive_utc().date())
+                } else {
+                    self.get_last_historical_date(&account.id)
+                        .unwrap_or(None)
+                        .map(|d| d - Duration::days(2))
+                        .unwrap_or_else(|| {
+                            account_activities
+                                .iter()
+                                .map(|a| a.activity_date.date())
+                                .min()
+                                .unwrap_or_else(|| Utc::now().naive_utc().date())
+                        })
+                };
 
                 let new_history = self.calculate_historical_value(
                     &account.id,
@@ -108,6 +114,7 @@ impl HistoryService {
                     &quotes,
                     account_start_date,
                     end_date,
+                    force_full_calculation,
                 );
 
                 if !new_history.is_empty() {
@@ -189,6 +196,8 @@ impl HistoryService {
         use crate::schema::accounts::dsl as accounts_dsl;
         use crate::schema::portfolio_history::dsl::*;
         let conn = &mut self.pool.get().map_err(PortfolioError::from)?;
+
+        println!("Calculating total portfolio history for all accounts");
 
         // Get active account IDs
         let active_account_ids: Vec<String> = accounts_dsl::accounts
@@ -274,10 +283,19 @@ impl HistoryService {
         quotes: &HashMap<(String, NaiveDate), Quote>,
         start_date: NaiveDate,
         end_date: NaiveDate,
+        force_full_calculation: bool,
     ) -> Vec<PortfolioHistory> {
-        let last_history = self.get_last_portfolio_history(account_id).unwrap_or(None);
+        println!(
+            "Calculating historical value for account: {} from {} to {} with force {}",
+            account_id, start_date, end_date, force_full_calculation
+        );
+        let last_history = if force_full_calculation {
+            None
+        } else {
+            self.get_last_portfolio_history(account_id).unwrap_or(None)
+        };
 
-        // Initialize values from the last PortfolioHistory
+        // Initialize values from the last PortfolioHistory or use default values
         let mut currency = last_history
             .as_ref()
             .map_or(self.base_currency.as_str(), |h| &h.currency);
@@ -285,18 +303,24 @@ impl HistoryService {
         let mut net_deposit = last_history.as_ref().map_or(0.0, |h| h.net_deposit);
         let mut book_cost = last_history.as_ref().map_or(0.0, |h| h.book_cost);
 
-        // Initialize holdings based on the last history
+        // Initialize holdings based on the last history or use an empty HashMap
         let mut holdings: HashMap<String, f64> = last_history
             .as_ref()
             .and_then(|h| h.holdings.as_ref())
             .and_then(|json_str| serde_json::from_str(json_str).ok())
             .unwrap_or_default();
 
-        // If there's a last history entry, start from the day after
-        let actual_start_date = last_history
-            .as_ref()
-            .map(|h| NaiveDate::parse_from_str(&h.date, "%Y-%m-%d").unwrap() + Duration::days(1))
-            .unwrap_or(start_date);
+        // If there's a last history entry and we're not forcing full calculation, start from the day after
+        let actual_start_date = if force_full_calculation {
+            start_date
+        } else {
+            last_history
+                .as_ref()
+                .map(|h| {
+                    NaiveDate::parse_from_str(&h.date, "%Y-%m-%d").unwrap() + Duration::days(1)
+                })
+                .unwrap_or(start_date)
+        };
 
         let all_dates = Self::get_dates_between(actual_start_date, end_date);
 
