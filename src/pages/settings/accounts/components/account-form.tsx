@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 
-import { calculate_historical_data } from '@/commands/portfolio';
+import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 
 const accountTypes = [
   { label: 'Securities', value: 'SECURITIES' },
@@ -64,33 +64,17 @@ interface AccountFormlProps {
 export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountFormlProps) {
   const queryClient = useQueryClient();
 
-  const calculateHistoricalDataMutation = useMutation({
-    mutationFn: calculate_historical_data,
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toast({
-        title: 'Account updated successfully.',
-        description: 'Portfolio data is being recalculated.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-    onError: () => {
-      toast({
-        title: 'Failed to recalculate portfolio data.',
-        description: 'Please try refreshing the page or relaunching the app.',
-        className: 'bg-yellow-500 text-white border-none',
-      });
-    },
+  const calculateHistoryMutation = useCalculateHistoryMutation({
+    successTitle: 'Account updated successfully.',
   });
 
   const createAccountMutation = useMutation({
     mutationFn: createAccount,
-    onSuccess: () => {
+    onSuccess: (createdAccount) => {
       queryClient.invalidateQueries();
-      toast({
-        title: 'Account created successfully.',
-        description: 'Historical data is being calculated.',
-        className: 'bg-green-500 text-white border-none',
+      calculateHistoryMutation.mutate({
+        accountIds: [createdAccount.id],
+        forceFullCalculation: true,
       });
       onSuccess();
     },
@@ -106,11 +90,12 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
   const updateAccountMutation = useMutation({
     mutationFn: updateAccount,
     onSuccess: (updatedAccount) => {
-      onSuccess();
-      calculateHistoricalDataMutation.mutate({
-        accountIds: [updatedAccount.id ?? ''],
+      queryClient.invalidateQueries();
+      calculateHistoryMutation.mutate({
+        accountIds: [updatedAccount.id],
         forceFullCalculation: true,
       });
+      onSuccess();
     },
     onError: () => {
       toast({

@@ -189,8 +189,14 @@ impl ActivityRepository {
         &self,
         conn: &mut SqliteConnection,
         activity_id: String,
-    ) -> Result<usize, diesel::result::Error> {
-        diesel::delete(activities::table.filter(activities::id.eq(activity_id))).execute(conn)
+    ) -> Result<Activity, diesel::result::Error> {
+        let activity = activities::table
+            .filter(activities::id.eq(&activity_id))
+            .first::<Activity>(conn)?;
+
+        diesel::delete(activities::table.filter(activities::id.eq(activity_id))).execute(conn)?;
+
+        Ok(activity)
     }
 
     pub fn get_activities_by_account_ids(

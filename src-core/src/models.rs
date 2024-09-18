@@ -511,7 +511,7 @@ pub struct PortfolioHistory {
     pub holdings: Option<String>, // Holdings JSON
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct HistorySummary {
     pub id: Option<String>,

@@ -5,7 +5,7 @@ use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::SystemTime;
 use uuid::Uuid;
 
@@ -53,10 +53,10 @@ impl MarketDataService {
                     let quote_date = quote.date.date();
                     ((quote.symbol.clone(), quote_date), quote)
                 })
-                .collect(),
+                .collect(), // This will now create a HashMap
             Err(e) => {
                 eprintln!("Error loading quotes: {}", e);
-                HashMap::new()
+                HashMap::new() // Return an empty HashMap
             }
         }
     }
@@ -139,9 +139,9 @@ impl MarketDataService {
                 .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
                 .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
 
-            // Ensure to synchronize the last 2 days data for freshness
+            // Ensure to synchronize the last day data for freshness
             let start_date: SystemTime = Utc
-                .from_utc_datetime(&(last_sync_date - Duration::days(2)))
+                .from_utc_datetime(&(last_sync_date - Duration::days(1)))
                 .into();
 
             match self

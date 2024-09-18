@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { useEffect } from 'react';
 import { useForm, useFormContext } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 
 import { AlertFeedback } from '@/components/alert-feedback';
@@ -33,14 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
 
 import { cn } from '@/lib/utils';
-import { QueryKeys } from '@/lib/query-keys';
 
 import { newActivitySchema } from '@/lib/schemas';
-import { createActivity, updateActivity } from '@/commands/activity';
-import { calculate_historical_data } from '@/commands/portfolio';
+import { useActivityMutations } from '../hooks/useActivityMutations';
 import TickerSearchInput from './ticker-search';
 
 const activityTypes = [
@@ -71,77 +67,16 @@ interface ActivityFormProps {
 }
 
 export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: ActivityFormProps) {
-  const queryClient = useQueryClient();
-
-  const calculateHistoricalDataMutation = useMutation({
-    mutationFn: calculate_historical_data,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QueryKeys.accountHistory('TOTAL') });
-
-      toast({
-        title: 'Activities updated successfully.',
-        description: 'Portfolio data is being recalculated.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-    onError: () => {
-      queryClient.invalidateQueries();
-      toast({
-        title: 'Failed to recalculate portfolio data.',
-        description: 'Please try refreshing the page or relaunching the app.',
-        className: 'bg-yellow-500 text-white border-none',
-      });
-    },
-  });
-
-  const addActivityMutation = useMutation({
-    mutationFn: createActivity,
-    onSuccess: (activity) => {
-      onSuccess();
-      calculateHistoricalDataMutation.mutate({
-        accountIds: [activity.accountId ?? ''],
-        forceFullCalculation: true,
-      });
-    },
-    onError: (_error) => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem adding this activity.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
-
-  const updateActivityMutation = useMutation({
-    mutationFn: updateActivity,
-    onSuccess: (activity) => {
-      onSuccess();
-      if (activity.accountId) {
-        calculateHistoricalDataMutation.mutate({
-          accountIds: [activity.accountId],
-          forceFullCalculation: true,
-        });
-      } else {
-        calculateHistoricalDataMutation.mutate({
-          accountIds: undefined,
-          forceFullCalculation: true,
-        });
-      }
-    },
-  });
+  const { submitActivity, addActivityMutation } = useActivityMutations();
 
   const form = useForm<ActivityFormValues>({
     resolver: zodResolver(newActivitySchema),
     defaultValues,
   });
 
-  function onSubmit(data: ActivityFormValues) {
-    const { id, ...rest } = data;
-
-    if (id) {
-      return updateActivityMutation.mutate({ id, ...rest });
-    }
-    addActivityMutation.mutate(rest);
+  async function onSubmit(data: ActivityFormValues) {
+    await submitActivity(data);
+    onSuccess();
   }
 
   const watchedType = form.watch('activityType');

@@ -4,13 +4,14 @@ use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Account, Activity, HistorySummary, PortfolioHistory, Quote};
 use chrono::{Duration, NaiveDate, Utc};
 
+use dashmap::DashMap;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+
 use diesel::SqliteConnection;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use uuid::Uuid;
+use std::sync::Arc;
 
 pub struct HistoryService {
     pool: Pool<ConnectionManager<SqliteConnection>>,
@@ -23,9 +24,9 @@ impl HistoryService {
     pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
         Self {
             pool: pool.clone(),
-            base_currency,
+            base_currency: base_currency.clone(),
             market_data_service: MarketDataService::new(pool.clone()),
-            fx_service: CurrencyExchangeService::new(pool.clone()),
+            fx_service: CurrencyExchangeService::new(pool),
         }
     }
 
@@ -33,12 +34,12 @@ impl HistoryService {
         use crate::schema::portfolio_history::dsl::*;
         use diesel::prelude::*;
 
-        let conn = &mut self.pool.get().map_err(PortfolioError::from)?;
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
 
         let history_data: Vec<PortfolioHistory> = portfolio_history
             .filter(account_id.eq(input_account_id))
             .order(date.asc())
-            .load::<PortfolioHistory>(conn)?;
+            .load::<PortfolioHistory>(db_connection)?;
 
         Ok(history_data)
     }
@@ -47,12 +48,12 @@ impl HistoryService {
         use crate::schema::portfolio_history::dsl::*;
         use diesel::prelude::*;
 
-        let conn = &mut self.pool.get().map_err(PortfolioError::from)?;
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
 
         let latest_history: PortfolioHistory = portfolio_history
             .filter(account_id.eq(input_account_id))
             .order(date.desc())
-            .first(conn)
+            .first(db_connection)
             .map_err(|e| PortfolioError::DatabaseError(e))?;
 
         Ok(latest_history)
@@ -65,13 +66,10 @@ impl HistoryService {
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>> {
         let end_date = Utc::now().naive_utc().date();
+        let quotes = Arc::new(self.market_data_service.load_quotes());
 
-        let all_histories = Arc::new(Mutex::new(Vec::new()));
-        let total_history = Arc::new(Mutex::new(Vec::new()));
-
-        let quotes = self.market_data_service.load_quotes();
-
-        let mut summaries: Vec<HistorySummary> = accounts
+        // Process accounts in parallel and collect results
+        let summaries_and_histories: Vec<(HistorySummary, Vec<PortfolioHistory>)> = accounts
             .par_iter()
             .map(|account| {
                 let account_activities: Vec<_> = activities
@@ -81,12 +79,15 @@ impl HistoryService {
                     .collect();
 
                 if account_activities.is_empty() {
-                    return HistorySummary {
-                        id: Some(account.id.clone()),
-                        start_date: "".to_string(),
-                        end_date: "".to_string(),
-                        entries_count: 0,
-                    };
+                    return (
+                        HistorySummary {
+                            id: Some(account.id.clone()),
+                            start_date: "".to_string(),
+                            end_date: "".to_string(),
+                            entries_count: 0,
+                        },
+                        Vec::new(),
+                    );
                 }
 
                 let account_start_date = if force_full_calculation {
@@ -98,7 +99,7 @@ impl HistoryService {
                 } else {
                     self.get_last_historical_date(&account.id)
                         .unwrap_or(None)
-                        .map(|d| d - Duration::days(2))
+                        .map(|d| d - Duration::days(1))
                         .unwrap_or_else(|| {
                             account_activities
                                 .iter()
@@ -117,76 +118,56 @@ impl HistoryService {
                     force_full_calculation,
                 );
 
-                if !new_history.is_empty() {
-                    all_histories.lock().unwrap().push(new_history.clone());
-                }
-
-                HistorySummary {
+                let summary = HistorySummary {
                     id: Some(account.id.clone()),
                     start_date: new_history
                         .first()
-                        .map(|h| {
-                            NaiveDate::parse_from_str(&h.date, "%Y-%m-%d")
-                                .unwrap()
-                                .to_string()
-                        })
+                        .map(|h| h.date.clone())
                         .unwrap_or_default(),
                     end_date: new_history
                         .last()
-                        .map(|h| {
-                            NaiveDate::parse_from_str(&h.date, "%Y-%m-%d")
-                                .unwrap()
-                                .to_string()
-                        })
+                        .map(|h| h.date.clone())
                         .unwrap_or_default(),
                     entries_count: new_history.len(),
-                }
+                };
+
+                (summary, new_history)
             })
             .collect();
 
-        let account_histories = all_histories.lock().unwrap();
+        // Extract summaries and flatten histories
+        let mut summaries: Vec<HistorySummary> = summaries_and_histories
+            .iter()
+            .map(|(summary, _)| (*summary).clone())
+            .collect();
+        let account_histories: Vec<PortfolioHistory> = summaries_and_histories
+            .into_iter()
+            .flat_map(|(_, histories)| histories)
+            .collect();
 
-        // Calculate total portfolio history for all accounts
-        *total_history.lock().unwrap() =
-            self.calculate_total_portfolio_history_for_all_accounts()?;
+        // Save account histories
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
+        self.save_historical_data(&account_histories, db_connection)?;
 
-        // Save all historical data
-        for history in account_histories.iter() {
-            if let Err(e) = self.save_historical_data(history) {
-                println!("Error saving account history: {:?}", e);
-                return Err(e);
-            }
-        }
+        // Calculate total portfolio history
+        let total_history = self.calculate_total_portfolio_history_for_all_accounts()?;
 
-        // Save total portfolio history
-        if let Err(e) = self.save_historical_data(&total_history.lock().unwrap()) {
-            println!("Error saving total portfolio history: {:?}", e);
-            return Err(e);
-        }
+        // Save total history separately
+        self.save_historical_data(&total_history, db_connection)?;
 
-        let total_summary = {
-            let total_history_guard = total_history.lock().expect("Failed to lock total_history");
-            let parse_date = |h: &PortfolioHistory| -> String {
-                NaiveDate::parse_from_str(&h.date, "%Y-%m-%d")
-                    .map(|date| date.to_string())
-                    .unwrap_or_default()
-            };
-
-            HistorySummary {
-                id: Some("TOTAL".to_string()),
-                start_date: total_history_guard
-                    .first()
-                    .map(parse_date)
-                    .unwrap_or_default(),
-                end_date: total_history_guard
-                    .last()
-                    .map(parse_date)
-                    .unwrap_or_default(),
-                entries_count: total_history_guard.len(),
-            }
+        let total_summary = HistorySummary {
+            id: Some("TOTAL".to_string()),
+            start_date: total_history
+                .first()
+                .map(|h| h.date.clone())
+                .unwrap_or_default(),
+            end_date: total_history
+                .last()
+                .map(|h| h.date.clone())
+                .unwrap_or_default(),
+            entries_count: total_history.len(),
         };
 
-        // Add the total summary to the summaries array
         summaries.push(total_summary);
         Ok(summaries)
     }
@@ -195,21 +176,19 @@ impl HistoryService {
     fn calculate_total_portfolio_history_for_all_accounts(&self) -> Result<Vec<PortfolioHistory>> {
         use crate::schema::accounts::dsl as accounts_dsl;
         use crate::schema::portfolio_history::dsl::*;
-        let conn = &mut self.pool.get().map_err(PortfolioError::from)?;
-
-        println!("Calculating total portfolio history for all accounts");
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
 
         // Get active account IDs
         let active_account_ids: Vec<String> = accounts_dsl::accounts
             .filter(accounts_dsl::is_active.eq(true))
             .select(accounts_dsl::id)
-            .load::<String>(conn)?;
+            .load::<String>(db_connection)?;
 
         let all_histories: Vec<PortfolioHistory> = portfolio_history
             .filter(account_id.ne("TOTAL"))
             .filter(account_id.eq_any(active_account_ids))
             .order(date.asc())
-            .load::<PortfolioHistory>(conn)?;
+            .load::<PortfolioHistory>(db_connection)?;
 
         let grouped_histories: HashMap<String, Vec<PortfolioHistory>> = all_histories
             .into_iter()
@@ -222,7 +201,7 @@ impl HistoryService {
             .into_iter()
             .map(|(history_date, histories)| {
                 let mut total = PortfolioHistory {
-                    id: Uuid::new_v4().to_string(),
+                    id: format!("TOTAL_{}", history_date),
                     account_id: "TOTAL".to_string(),
                     date: history_date,
                     total_value: 0.0,
@@ -285,6 +264,11 @@ impl HistoryService {
         end_date: NaiveDate,
         force_full_calculation: bool,
     ) -> Vec<PortfolioHistory> {
+        let max_history_days = 36500; // For example, 100 years
+        let today = Utc::now().naive_utc().date();
+        let start_date = start_date.max(today - Duration::days(max_history_days));
+        let end_date = end_date.min(today);
+
         println!(
             "Calculating historical value for account: {} from {} to {} with force {}",
             account_id, start_date, end_date, force_full_calculation
@@ -298,7 +282,8 @@ impl HistoryService {
         // Initialize values from the last PortfolioHistory or use default values
         let mut currency = last_history
             .as_ref()
-            .map_or(self.base_currency.as_str(), |h| &h.currency);
+            .map_or(self.base_currency.as_str(), |h| &h.currency)
+            .to_string();
         let mut cumulative_cash = last_history.as_ref().map_or(0.0, |h| h.available_cash);
         let mut net_deposit = last_history.as_ref().map_or(0.0, |h| h.net_deposit);
         let mut book_cost = last_history.as_ref().map_or(0.0, |h| h.book_cost);
@@ -322,109 +307,130 @@ impl HistoryService {
                 .unwrap_or(start_date)
         };
 
-        let all_dates = Self::get_dates_between(actual_start_date, end_date);
+        let all_dates = Self::get_days_between(actual_start_date, end_date);
 
-        // Load all quotes for the date range and assets
+        let quote_cache: DashMap<(String, NaiveDate), Option<&Quote>> = DashMap::new();
 
-        let mut results = Vec::new();
-
-        for date in all_dates {
-            // Process activities for the current date
-            for activity in activities.iter().filter(|a| a.activity_date.date() == date) {
-                currency = &activity.currency;
-                let activity_amount = activity.quantity * activity.unit_price;
-                let activity_fee = activity.fee;
-
-                match activity.activity_type.as_str() {
-                    "BUY" => {
-                        let buy_cost = activity_amount + activity_fee;
-                        cumulative_cash -= buy_cost;
-                        book_cost += buy_cost;
-                        *holdings.entry(activity.asset_id.clone()).or_insert(0.0) +=
-                            activity.quantity;
-                    }
-                    "SELL" => {
-                        let sell_profit = activity_amount - activity_fee;
-                        cumulative_cash += sell_profit;
-                        book_cost -= activity_amount + activity_fee;
-                        *holdings.entry(activity.asset_id.clone()).or_insert(0.0) -=
-                            activity.quantity;
-                    }
-                    "DEPOSIT" | "TRANSFER_IN" | "CONVERSION_IN" => {
-                        cumulative_cash += activity_amount - activity_fee;
-                        net_deposit += activity_amount;
-                    }
-                    "DIVIDEND" | "INTEREST" => {
-                        cumulative_cash += activity_amount - activity_fee;
-                    }
-                    "WITHDRAWAL" | "TRANSFER_OUT" | "CONVERSION_OUT" => {
-                        cumulative_cash -= activity_amount + activity_fee;
-                        net_deposit -= activity_amount;
-                    }
-                    "FEE" | "TAX" => {
-                        cumulative_cash -= activity_fee;
-                    }
-                    _ => {}
+        let results: Vec<PortfolioHistory> = all_dates
+            .iter()
+            .map(|&date| {
+                // Process activities for the current date
+                for activity in activities.iter().filter(|a| a.activity_date.date() == date) {
+                    self.process_activity(
+                        activity,
+                        &mut holdings,
+                        &mut cumulative_cash,
+                        &mut net_deposit,
+                        &mut book_cost,
+                        &mut currency,
+                    );
                 }
-            }
 
-            // Update market value based on quotes
-            let (updated_market_value, day_gain_value, opening_market_value) =
-                self.calculate_holdings_value(&holdings, &quotes, date);
+                // Update market value based on quotes
+                let (updated_market_value, day_gain_value, opening_market_value) =
+                    self.calculate_holdings_value(&holdings, quotes, date, &quote_cache);
 
-            let market_value = updated_market_value;
-            let total_value = cumulative_cash + market_value;
+                let market_value = updated_market_value;
+                let total_value = cumulative_cash + market_value;
 
-            let day_gain_percentage = if opening_market_value != 0.0 {
-                (day_gain_value / opening_market_value) * 100.0
-            } else {
-                0.0
-            };
+                let day_gain_percentage = if opening_market_value != 0.0 {
+                    (day_gain_value / opening_market_value) * 100.0
+                } else {
+                    0.0
+                };
 
-            let total_gain_value = total_value - book_cost;
-            let total_gain_percentage = if book_cost != 0.0 {
-                (total_gain_value / book_cost) * 100.0
-            } else {
-                0.0
-            };
+                let total_gain_value = total_value - book_cost;
+                let total_gain_percentage = if book_cost != 0.0 {
+                    (total_gain_value / book_cost) * 100.0
+                } else {
+                    0.0
+                };
 
-            let exchange_rate = self
-                .fx_service
-                .get_exchange_rate(currency, &self.base_currency)
-                .unwrap_or(1.0);
+                let exchange_rate = self
+                    .fx_service
+                    .get_exchange_rate(&currency, &self.base_currency)
+                    .unwrap_or(1.0);
 
-            results.push(PortfolioHistory {
-                id: Uuid::new_v4().to_string(),
-                account_id: account_id.to_string(),
-                date: date.format("%Y-%m-%d").to_string(),
-                total_value,
-                market_value,
-                book_cost,
-                available_cash: cumulative_cash,
-                net_deposit,
-                currency: currency.to_string(),
-                base_currency: self.base_currency.to_string(),
-                total_gain_value,
-                total_gain_percentage,
-                day_gain_percentage,
-                day_gain_value,
-                allocation_percentage: 0.0, // This will be calculated later in calculate_total_portfolio_history
-                exchange_rate,
-                holdings: Some(serde_json::to_string(&holdings).unwrap_or_default()),
-            });
-        }
+                PortfolioHistory {
+                    id: format!("{}_{}", account_id, date.format("%Y-%m-%d")),
+                    account_id: account_id.to_string(),
+                    date: date.format("%Y-%m-%d").to_string(),
+                    total_value,
+                    market_value,
+                    book_cost,
+                    available_cash: cumulative_cash,
+                    net_deposit,
+                    currency: currency.clone(),
+                    base_currency: self.base_currency.to_string(),
+                    total_gain_value,
+                    total_gain_percentage,
+                    day_gain_percentage,
+                    day_gain_value,
+                    allocation_percentage: 0.0, // This will be calculated later in calculate_total_portfolio_history
+                    exchange_rate,
+                    holdings: Some(serde_json::to_string(&holdings).unwrap_or_default()),
+                }
+            })
+            .collect();
 
         results
     }
 
-    fn save_historical_data(&self, history_data: &[PortfolioHistory]) -> Result<()> {
-        use crate::schema::portfolio_history::dsl::*;
-        let conn = &mut self.pool.get().map_err(PortfolioError::from)?; // Use the From trait to convert r2d2::Error to PortfolioError
+    fn process_activity(
+        &self,
+        activity: &Activity,
+        holdings: &mut HashMap<String, f64>,
+        cumulative_cash: &mut f64,
+        net_deposit: &mut f64,
+        book_cost: &mut f64,
+        currency: &mut String,
+    ) {
+        let activity_amount = activity.quantity * activity.unit_price;
+        let activity_fee = activity.fee;
 
-        let values: Vec<_> = history_data
-            .iter()
-            .map(|record| {
-                (
+        match activity.activity_type.as_str() {
+            "BUY" => {
+                let buy_cost = activity_amount + activity_fee;
+                *cumulative_cash -= buy_cost;
+                *book_cost += buy_cost;
+                *holdings.entry(activity.asset_id.clone()).or_insert(0.0) += activity.quantity;
+            }
+            "SELL" => {
+                let sell_profit = activity_amount - activity_fee;
+                *cumulative_cash += sell_profit;
+                *book_cost -= activity_amount + activity_fee;
+                *holdings.entry(activity.asset_id.clone()).or_insert(0.0) -= activity.quantity;
+            }
+            "DEPOSIT" | "TRANSFER_IN" | "CONVERSION_IN" => {
+                *cumulative_cash += activity_amount - activity_fee;
+                *net_deposit += activity_amount;
+            }
+            "DIVIDEND" | "INTEREST" => {
+                *cumulative_cash += activity_amount - activity_fee;
+            }
+            "WITHDRAWAL" | "TRANSFER_OUT" | "CONVERSION_OUT" => {
+                *cumulative_cash -= activity_amount + activity_fee;
+                *net_deposit -= activity_amount;
+            }
+            "FEE" | "TAX" => {
+                *cumulative_cash -= activity_fee;
+            }
+            _ => {}
+        }
+
+        *currency = activity.currency.clone();
+    }
+
+    fn save_historical_data(
+        &self,
+        history_data: &[PortfolioHistory],
+        db_connection: &mut SqliteConnection,
+    ) -> Result<()> {
+        use crate::schema::portfolio_history::dsl::*;
+
+        for record in history_data {
+            diesel::insert_into(portfolio_history)
+                .values((
                     id.eq(&record.id),
                     account_id.eq(&record.account_id),
                     date.eq(&record.date),
@@ -442,32 +448,46 @@ impl HistoryService {
                     allocation_percentage.eq(record.allocation_percentage),
                     exchange_rate.eq(record.exchange_rate),
                     holdings.eq(&record.holdings),
-                )
-            })
-            .collect();
-
-        diesel::replace_into(portfolio_history)
-            .values(&values)
-            .execute(conn)
-            .map_err(PortfolioError::from)?; // Use the From trait to convert diesel::result::Error to PortfolioError
+                ))
+                .on_conflict(id)
+                .do_update()
+                .set((
+                    total_value.eq(record.total_value),
+                    market_value.eq(record.market_value),
+                    book_cost.eq(record.book_cost),
+                    available_cash.eq(record.available_cash),
+                    net_deposit.eq(record.net_deposit),
+                    currency.eq(&record.currency),
+                    base_currency.eq(&record.base_currency),
+                    total_gain_value.eq(record.total_gain_value),
+                    total_gain_percentage.eq(record.total_gain_percentage),
+                    day_gain_percentage.eq(record.day_gain_percentage),
+                    day_gain_value.eq(record.day_gain_value),
+                    allocation_percentage.eq(record.allocation_percentage),
+                    exchange_rate.eq(record.exchange_rate),
+                    holdings.eq(&record.holdings),
+                ))
+                .execute(db_connection)
+                .map_err(PortfolioError::from)?;
+        }
 
         Ok(())
     }
 
-    fn calculate_holdings_value(
+    fn calculate_holdings_value<'a>(
         &self,
         holdings: &HashMap<String, f64>,
-        quotes: &HashMap<(String, NaiveDate), Quote>,
+        quotes: &'a HashMap<(String, NaiveDate), Quote>,
         date: NaiveDate,
+        quote_cache: &DashMap<(String, NaiveDate), Option<&'a Quote>>,
     ) -> (f64, f64, f64) {
         let mut holdings_value = 0.0;
         let mut day_gain_value = 0.0;
         let mut opening_market_value = 0.0;
 
         for (asset_id, &quantity) in holdings {
-            let quote = self.get_latest_available_quote(quotes, asset_id, date);
-
-            if let Some(quote) = quote {
+            if let Some(quote) = self.get_last_available_quote(asset_id, date, quotes, quote_cache)
+            {
                 let holding_value = quantity * quote.close;
                 let opening_value = quantity * quote.open;
                 let day_gain = quantity * (quote.close - quote.open);
@@ -477,7 +497,7 @@ impl HistoryService {
                 opening_market_value += opening_value;
             } else {
                 println!(
-                    "No quote available for symbol {} on or before date {}",
+                    "Warning: No quote found for asset {} on date {}",
                     asset_id, date
                 );
             }
@@ -486,24 +506,24 @@ impl HistoryService {
         (holdings_value, day_gain_value, opening_market_value)
     }
 
-    fn get_latest_available_quote<'a>(
+    fn get_last_available_quote<'a>(
         &self,
-        quotes: &'a HashMap<(String, NaiveDate), Quote>,
         asset_id: &str,
         date: NaiveDate,
+        quotes: &'a HashMap<(String, NaiveDate), Quote>,
+        quote_cache: &DashMap<(String, NaiveDate), Option<&'a Quote>>,
     ) -> Option<&'a Quote> {
-        // First, check for an exact date match
-        if let Some(quote) = quotes.get(&(asset_id.to_string(), date)) {
-            return Some(quote);
-        }
-
-        // If no exact match, search for the latest quote in previous dates
-        let found_quote = (1..=30) // Search up to 30 days back
-            .find_map(|days_back| {
-                let search_date = date - Duration::days(days_back);
-                quotes.get(&(asset_id.to_string(), search_date))
-            });
-        found_quote
+        quote_cache
+            .entry((asset_id.to_string(), date))
+            .or_insert_with(|| {
+                quotes.get(&(asset_id.to_string(), date)).or_else(|| {
+                    (1..=30).find_map(|days_back| {
+                        let lookup_date = date - chrono::Duration::days(days_back);
+                        quotes.get(&(asset_id.to_string(), lookup_date))
+                    })
+                })
+            })
+            .clone()
     }
 
     fn get_last_portfolio_history(
@@ -512,11 +532,11 @@ impl HistoryService {
     ) -> Result<Option<PortfolioHistory>> {
         use crate::schema::portfolio_history::dsl::*;
 
-        let conn = &mut self.pool.get().map_err(PortfolioError::from)?;
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
         let last_history_opt = portfolio_history
             .filter(account_id.eq(some_account_id))
             .order(date.desc())
-            .first::<PortfolioHistory>(conn)
+            .first::<PortfolioHistory>(db_connection)
             .optional()
             .map_err(PortfolioError::from)?;
 
@@ -527,23 +547,29 @@ impl HistoryService {
         }
     }
 
-    fn get_dates_between(start_date: NaiveDate, end_date: NaiveDate) -> Vec<NaiveDate> {
-        (0..=(end_date - start_date).num_days())
-            .map(|days| start_date + Duration::days(days))
-            .collect()
+    fn get_days_between(start: NaiveDate, end: NaiveDate) -> Vec<NaiveDate> {
+        let mut days = Vec::new();
+        let mut current = start;
+
+        while current <= end {
+            days.push(current);
+            current += Duration::days(1);
+        }
+
+        days
     }
 
     fn get_last_historical_date(&self, some_account_id: &str) -> Result<Option<NaiveDate>> {
         use crate::schema::portfolio_history::dsl::*;
-        let conn = &mut self.pool.get().map_err(PortfolioError::from)?; // Use the From trait to convert r2d2::Error to PortfolioError
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
 
         let last_date_opt = portfolio_history
             .filter(account_id.eq(some_account_id))
             .select(date)
             .order(date.desc())
-            .first::<String>(conn)
+            .first::<String>(db_connection)
             .optional()
-            .map_err(PortfolioError::from)?; // Use the From trait to convert diesel::result::Error to PortfolioError
+            .map_err(PortfolioError::from)?;
 
         if let Some(last_date_str) = last_date_opt {
             NaiveDate::parse_from_str(&last_date_str, "%Y-%m-%d")

@@ -85,7 +85,7 @@ pub fn update_activity(
 }
 
 #[tauri::command]
-pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<usize, String> {
+pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<Activity, String> {
     println!("Deleting activity...");
     let service = activity_service::ActivityService::new((*state.pool).clone());
     service
