@@ -79,3 +79,17 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
     throw error;
   }
 };
+
+export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('recalculate_portfolio');
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    console.error('Error recalculating portfolio:', error);
+    throw error;
+  }
+};

@@ -71,3 +71,18 @@ pub async fn get_accounts_summary(
         .get_accounts_summary()
         .map_err(|e| format!("Failed to fetch active accounts performance: {}", e))
 }
+
+#[tauri::command]
+pub async fn recalculate_portfolio(
+    state: State<'_, AppState>,
+) -> Result<Vec<HistorySummary>, String> {
+    println!("Recalculating portfolio...");
+
+    let service = PortfolioService::new((*state.pool).clone())
+        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+
+    service
+        .update_portfolio()
+        .await
+        .map_err(|e| format!("Failed to recalculate portfolio: {}", e))
+}

@@ -90,15 +90,15 @@ export const columns: ColumnDef<ActivityImport>[] = [
       return (
         <div className="flex items-center">
           {isValid === 'true' ? (
-            <Icons.CheckCircle className="h-4 w-4 text-green-500" />
+            <Icons.CheckCircle className="h-4 w-4 text-success" />
           ) : (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Icons.XCircle className="h-4 w-4 cursor-help text-red-400" />
+                  <Icons.XCircle className="h-4 w-4 cursor-help text-destructive" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="text-red-400">{error}</p>
+                  <p className="text-destructive">{error}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -171,11 +171,12 @@ export const columns: ColumnDef<ActivityImport>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => {
       return (
-        <div className="flex items-center">
+        <div className="w-3/3 flex items-center">
           <Badge className="flex min-w-[50px] items-center justify-center rounded-sm">
             {row.getValue('symbol')}
           </Badge>
-          <span className="ml-2">{row.getValue('symbolName')}</span>
+
+          <span className="ml-2 text-xs">{row.getValue('symbolName')}</span>
         </div>
       );
     },

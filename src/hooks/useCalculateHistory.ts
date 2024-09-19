@@ -21,11 +21,10 @@ export function useCalculateHistoryMutation({
         title: successTitle,
         description:
           'Your portfolio data has been recalculated and updated with the latest information.',
-        className: 'bg-[#cbd492] border-none',
+        variant: 'success',
       });
     },
-    onError: (e) => {
-      console.error(e);
+    onError: () => {
       queryClient.invalidateQueries();
       toast({
         title: errorTitle,

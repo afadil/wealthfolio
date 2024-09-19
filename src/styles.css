@@ -83,7 +83,8 @@
     --accent: 0 0% 30%;
     --accent-foreground: var(--foreground);
  
-    --destructive: 0 62.8% 30.6%;
+  
+    --destructuve: 0 84 64
     --destructive-foreground: var(--foreground);
  
     --success: 68 43% 74%;

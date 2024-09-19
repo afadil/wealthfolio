@@ -26,7 +26,7 @@ export function useSettingsMutation(
       });
       if (currentSettings?.baseCurrency !== updatedSettings.baseCurrency) {
         calculateHistoryMutation.mutate({
-          accountIds: [],
+          accountIds: undefined,
           forceFullCalculation: true,
         });
       }
