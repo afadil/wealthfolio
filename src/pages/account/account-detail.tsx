@@ -39,12 +39,12 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
     {
       label: "Today's return",
       value: `${formatAmount(dayGainValue, currency)} (${formatPercent(dayGainPercentage)})`,
-      color: dayGainValue < 0 ? 'text-red-500' : 'text-green-500',
+      color: dayGainValue < 0 ? 'text-red-400' : 'text-green-500',
     },
     {
       label: 'Total return',
       value: `${formatAmount(totalGainValue, currency)} (${formatPercent(totalGainPercentage)})`,
-      color: totalGainPercentage < 0 ? 'text-red-500' : 'text-green-500',
+      color: totalGainPercentage < 0 ? 'text-red-400' : 'text-green-500',
     },
   ];
 

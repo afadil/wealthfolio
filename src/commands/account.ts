@@ -24,7 +24,7 @@ export const createAccount = async (account: NewAccount): Promise<Account> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('create_account', { account });
+        return invokeTauri('create_account', { accountD: account });
       default:
         throw new Error(`Unsupported`);
     }

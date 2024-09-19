@@ -98,7 +98,7 @@ const SymbolCard: React.FC<{
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-md">
           <p className="pt-3 text-xl font-bold">{formatAmount(marketPrice, currency)}</p>
-          <p className={`text-sm ${ganAmount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+          <p className={`text-sm ${ganAmount > 0 ? 'text-green-500' : 'text-red-400'}`}>
             {formatAmount(ganAmount, currency)} ({formatPercent(percentage)}){' '}
             {intervalDescriptions[interval]}
           </p>

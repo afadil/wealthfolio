@@ -58,14 +58,14 @@ export default function DashboardPage() {
           />
           <div className="flex space-x-3 text-sm">
             <GainAmount
-              className="text-sm font-light"
+              className="text-md font-light"
               value={todayValue?.totalGainValue || 0}
               currency={todayValue?.currency || 'USD'}
               displayCurrency={false}
             ></GainAmount>
             <div className="my-1 border-r border-gray-300 pr-2" />
             <GainPercent
-              className="text-sm font-light"
+              className="text-md font-light"
               value={todayValue?.totalGainPercentage || 0}
             ></GainPercent>
           </div>

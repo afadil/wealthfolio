@@ -6,22 +6,17 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ActivityEditModal } from './components/activity-edit-modal';
 import ActivityTable from './components/activity-table';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Account, ActivityDetails } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
-import { deleteActivity } from '@/commands/activity';
-import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
-import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { useActivityMutations } from './hooks/useActivityMutations';
 
 const ActivityPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<any>();
-
-  const queryClient = useQueryClient();
 
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],

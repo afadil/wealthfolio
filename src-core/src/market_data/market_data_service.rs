@@ -5,7 +5,7 @@ use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::time::SystemTime;
 use uuid::Uuid;
 

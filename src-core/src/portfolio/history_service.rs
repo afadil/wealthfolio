@@ -269,10 +269,6 @@ impl HistoryService {
         let start_date = start_date.max(today - Duration::days(max_history_days));
         let end_date = end_date.min(today);
 
-        println!(
-            "Calculating historical value for account: {} from {} to {} with force {}",
-            account_id, start_date, end_date, force_full_calculation
-        );
         let last_history = if force_full_calculation {
             None
         } else {

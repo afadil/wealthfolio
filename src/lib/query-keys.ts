@@ -16,6 +16,9 @@ export const QueryKeys = {
   GOALS: 'goals',
   GOALS_ALLOCATIONS: 'goals_allocations',
 
+  // Settings related keys
+  SETTINGS: 'settings',
+
   // Helper function to create account-specific keys
   accountHistory: (id: string) => ['account_history', id],
 } as const;

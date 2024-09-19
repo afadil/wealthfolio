@@ -21,7 +21,7 @@ export function useCalculateHistoryMutation({
         title: successTitle,
         description:
           'Your portfolio data has been recalculated and updated with the latest information.',
-        className: 'bg-[#cbd492] text-white border-none',
+        className: 'bg-[#cbd492] border-none',
       });
     },
     onError: (e) => {
@@ -29,8 +29,8 @@ export function useCalculateHistoryMutation({
       queryClient.invalidateQueries();
       toast({
         title: errorTitle,
-        description: 'Please try refreshing the page or relaunching the app.',
-        className: 'bg-yellow-500 text-white border-none',
+        description: 'Please try again or report an issue if the problem persists.',
+        variant: 'destructive',
       });
     },
   });

@@ -95,10 +95,10 @@ export const columns: ColumnDef<ActivityImport>[] = [
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Icons.XCircle className="h-4 w-4 cursor-help text-red-500" />
+                  <Icons.XCircle className="h-4 w-4 cursor-help text-red-400" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="text-red-500">{error}</p>
+                  <p className="text-red-400">{error}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

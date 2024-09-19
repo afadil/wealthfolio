@@ -58,6 +58,11 @@ module.exports = {
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar))',
         },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+          background: 'hsl(var(--success-background))',
+        },
         'custom-green': '#E7EBCC',
         'custom-green-dark': '#606448',
       },

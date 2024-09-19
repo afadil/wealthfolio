@@ -23,9 +23,9 @@ export function useActivityMutations() {
     },
     onError: () => {
       toast({
-        title: 'Uh oh! Something went wrong.',
-        description: `There was a problem ${action} this activity.`,
-        className: 'bg-red-500 text-white border-none',
+        title: `Uh oh! Something went wrong ${action} this activity.`,
+        description: 'Please try again or report an issue if the problem persists.',
+        variant: 'destructive',
       });
     },
   });

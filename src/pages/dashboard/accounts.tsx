@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { GainPercent } from '@/components/gain-percent';
+import { GainAmount } from '@/components/gain-amount';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSummary } from '@/lib/types';
 import { formatAmount, formatPercent } from '@/lib/utils';
@@ -67,11 +69,16 @@ const Summary = ({
         <div className="flex flex-col items-end">
           <span className="font-medium leading-none">{formatAmount(value, currency)}</span>
           {gain !== 0 && (
-            <span
-              className={`text-sm font-light ${gainPercent > 0 ? 'text-green-500' : 'text-red-500'}`}
-            >
-              {formatAmount(gain, currency, false)} / {formatPercent(gainPercent)}
-            </span>
+            <div className="flex items-center space-x-2">
+              <GainAmount
+                className="text-sm font-light"
+                value={gain || 0}
+                currency={currency || 'USD'}
+                displayCurrency={false}
+              />
+              <div className="mx-1 h-3 border-r border-gray-300" />
+              <GainPercent className="text-sm font-light" value={gainPercent || 0} />
+            </div>
           )}
         </div>
         <Icons.ChevronDown
@@ -99,16 +106,19 @@ const AccountSummaryComponent = ({ accountSummary }: { accountSummary: AccountSu
             {formatAmount(accountSummary.performance.totalValue, accountSummary.account.currency)}
           </p>
           {accountSummary.performance.totalGainValue !== 0 && (
-            <p
-              className={`text-sm font-light ${accountSummary.performance.totalGainPercentage > 0 ? 'text-green-500' : 'text-red-500'}`}
-            >
-              {formatAmount(
-                accountSummary.performance.totalGainValue,
-                accountSummary.account.currency,
-                false,
-              )}{' '}
-              /{formatPercent(accountSummary.performance.totalGainPercentage)}
-            </p>
+            <div className="flex items-center space-x-2">
+              <GainAmount
+                className="text-sm font-light"
+                value={accountSummary.performance.totalGainValue || 0}
+                currency={accountSummary.account.currency || 'USD'}
+                displayCurrency={false}
+              />
+              <div className="mx-1 h-3 border-r border-gray-300" />
+              <GainPercent
+                className="text-sm font-light"
+                value={accountSummary.performance.totalGainPercentage || 0}
+              />
+            </div>
           )}
         </div>
         <Link to={`/accounts/${accountSummary.account.id}`} className="ml-2 p-0">

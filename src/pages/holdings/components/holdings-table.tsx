@@ -180,8 +180,8 @@ export const columns: ColumnDef<Holding>[] = [
             performance?.totalGainPercent === 0
               ? 'text-base'
               : performance?.totalGainPercent > 0
-              ? 'text-green-500'
-              : 'text-red-500'
+                ? 'text-green-500'
+                : 'text-red-400'
           } `}
         >
           <div className="flex items-center">

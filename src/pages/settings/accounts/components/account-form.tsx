@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -39,9 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
 
-import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
+import { useAccountMutations } from './useAccountMutations';
 
 const accountTypes = [
   { label: 'Securities', value: 'SECURITIES' },
@@ -51,7 +49,6 @@ const accountTypes = [
 
 import { worldCurrencies } from '@/lib/currencies';
 import { newAccountSchema } from '@/lib/schemas';
-import { createAccount, updateAccount } from '@/commands/account';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
@@ -62,49 +59,7 @@ interface AccountFormlProps {
 }
 
 export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountFormlProps) {
-  const queryClient = useQueryClient();
-
-  const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Account updated successfully.',
-  });
-
-  const createAccountMutation = useMutation({
-    mutationFn: createAccount,
-    onSuccess: (createdAccount) => {
-      queryClient.invalidateQueries();
-      calculateHistoryMutation.mutate({
-        accountIds: [createdAccount.id],
-        forceFullCalculation: true,
-      });
-      onSuccess();
-    },
-    onError: () => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem creating this account.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
-
-  const updateAccountMutation = useMutation({
-    mutationFn: updateAccount,
-    onSuccess: (updatedAccount) => {
-      queryClient.invalidateQueries();
-      calculateHistoryMutation.mutate({
-        accountIds: [updatedAccount.id],
-        forceFullCalculation: true,
-      });
-      onSuccess();
-    },
-    onError: () => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem updating this account.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
+  const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
   const form = useForm<NewAccount>({
     resolver: zodResolver(newAccountSchema),
@@ -132,7 +87,6 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
         </DialogHeader>
 
         <div className="grid gap-10 p-4">
-          {/* add input hidden for id */}
           <input type="hidden" name="id" />
 
           <FormField
