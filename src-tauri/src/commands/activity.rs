@@ -42,6 +42,20 @@ pub fn create_activity(activity: NewActivity, state: State<AppState>) -> Result<
 }
 
 #[tauri::command]
+pub fn update_activity(
+    activity: ActivityUpdate,
+    state: State<AppState>,
+) -> Result<Activity, String> {
+    println!("Updating activity...");
+    let result = tauri::async_runtime::block_on(async {
+        let service = activity_service::ActivityService::new((*state.pool).clone());
+        service.update_activity(activity).await
+    });
+
+    result.map_err(|e| format!("Failed to update activity: {}", e))
+}
+
+#[tauri::command]
 pub fn check_activities_import(
     account_id: String,
     file_path: String,
@@ -70,18 +84,6 @@ pub fn create_activities(
     service
         .create_activities(activities)
         .map_err(|err| format!("Failed to import activities: {}", err))
-}
-
-#[tauri::command]
-pub fn update_activity(
-    activity: ActivityUpdate,
-    state: State<AppState>,
-) -> Result<Activity, String> {
-    println!("Updating activity...");
-    let service = activity_service::ActivityService::new((*state.pool).clone());
-    service
-        .update_activity(activity)
-        .map_err(|e| format!("Failed to update activity: {}", e))
 }
 
 #[tauri::command]

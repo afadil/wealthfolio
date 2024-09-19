@@ -185,24 +185,56 @@ impl AssetService {
     }
 
     pub async fn get_asset_profile(&self, asset_id: &str) -> Result<Asset, diesel::result::Error> {
+        println!("Getting asset profile for asset_id: {}", asset_id);
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         use crate::schema::assets::dsl::*;
 
         match assets.find(asset_id).first::<Asset>(&mut conn) {
-            Ok(existing_profile) => Ok(existing_profile),
+            Ok(existing_profile) => {
+                println!("Found existing profile for asset_id: {}", asset_id);
+                Ok(existing_profile)
+            }
             Err(diesel::NotFound) => {
+                println!("Asset profile not found in database for asset_id: {}. Fetching from market data service.", asset_id);
                 let fetched_profile = self
                     .market_data_service
                     .fetch_symbol_summary(asset_id)
                     .await
-                    .map_err(|_e| diesel::result::Error::NotFound)?;
+                    .map_err(|e| {
+                        println!(
+                            "Failed to fetch symbol summary for asset_id: {}. Error: {:?}",
+                            asset_id, e
+                        );
+                        diesel::result::Error::NotFound
+                    })?;
 
-                diesel::insert_into(assets)
+                println!("Inserting new asset profile for asset_id: {}", asset_id);
+                let inserted_asset = diesel::insert_into(assets)
                     .values(&fetched_profile)
                     .returning(Asset::as_returning())
-                    .get_result(&mut conn)
+                    .get_result(&mut conn)?;
+
+                // Sync history quotes for the newly inserted asset
+                self.market_data_service
+                    .sync_history_quotes_for_all_assets(&[inserted_asset.clone()])
+                    .await
+                    .map_err(|e| {
+                        println!(
+                            "Failed to sync history quotes for asset_id: {}. Error: {:?}",
+                            asset_id, e
+                        );
+                        diesel::result::Error::NotFound
+                    })?;
+
+                Ok(inserted_asset)
             }
-            Err(e) => Err(e),
+            Err(e) => {
+                println!(
+                    "Error while getting asset profile for asset_id: {}. Error: {:?}",
+                    asset_id, e
+                );
+                Err(e)
+            }
         }
     }
 

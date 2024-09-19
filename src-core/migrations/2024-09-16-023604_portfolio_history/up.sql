@@ -20,19 +20,13 @@ CREATE TABLE portfolio_history (
 );
 CREATE INDEX idx_portfolio_history_account_date ON portfolio_history(account_id, date);
 
--- Update goals table
-ALTER TABLE goals RENAME TO goals_old;
-
-CREATE TABLE goals (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
-    "target_amount" NUMERIC NOT NULL,
-    "is_achieved" BOOLEAN NOT NULL DEFAULT false
-);
-INSERT INTO goals (id, title, description, target_amount, is_achieved)
-SELECT id, title, description, CAST(target_amount AS NUMERIC), is_achieved
-FROM goals_old;
-
-DROP TABLE goals_old;
+-- change goals table column types
+ALTER TABLE "goals" ADD COLUMN "target_amount_new" NUMERIC NOT NULL DEFAULT 0;
+UPDATE "goals" SET "target_amount_new" = "target_amount";
+ALTER TABLE "goals" DROP COLUMN "target_amount";
+ALTER TABLE "goals" RENAME COLUMN "target_amount_new" TO "target_amount";
+ALTER TABLE "goals" ADD COLUMN "is_achieved_new" BOOLEAN NOT NULL DEFAULT false;
+UPDATE "goals" SET "is_achieved_new" = COALESCE("is_achieved", false);
+ALTER TABLE "goals" DROP COLUMN "is_achieved";
+ALTER TABLE "goals" RENAME COLUMN "is_achieved_new" TO "is_achieved";
 

@@ -201,9 +201,26 @@ impl MarketDataService {
     }
 
     pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, String> {
+        self.initialize_crumb_data().await?;
         self.provider
             .fetch_quote_summary(symbol)
             .await
             .map_err(|e| e.to_string())
+    }
+
+    pub fn get_asset_currencies(&self, asset_ids: Vec<String>) -> HashMap<String, String> {
+        use crate::schema::assets::dsl::*;
+
+        let db_connection = &mut self.pool.get().expect("Couldn't get db connection");
+
+        assets
+            .filter(id.eq_any(asset_ids))
+            .select((id, currency))
+            .load::<(String, String)>(db_connection)
+            .map(|results| results.into_iter().collect::<HashMap<_, _>>())
+            .unwrap_or_else(|e| {
+                eprintln!("Error fetching asset currencies: {}", e);
+                HashMap::new()
+            })
     }
 }

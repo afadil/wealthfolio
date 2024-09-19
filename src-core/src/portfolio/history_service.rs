@@ -275,11 +275,11 @@ impl HistoryService {
             self.get_last_portfolio_history(account_id).unwrap_or(None)
         };
 
+        let account_currency = self
+            .get_account_currency(account_id)
+            .unwrap_or(self.base_currency.clone());
+
         // Initialize values from the last PortfolioHistory or use default values
-        let mut currency = last_history
-            .as_ref()
-            .map_or(self.base_currency.as_str(), |h| &h.currency)
-            .to_string();
         let mut cumulative_cash = last_history.as_ref().map_or(0.0, |h| h.available_cash);
         let mut net_deposit = last_history.as_ref().map_or(0.0, |h| h.net_deposit);
         let mut book_cost = last_history.as_ref().map_or(0.0, |h| h.book_cost);
@@ -318,13 +318,19 @@ impl HistoryService {
                         &mut cumulative_cash,
                         &mut net_deposit,
                         &mut book_cost,
-                        &mut currency,
+                        &account_currency,
                     );
                 }
 
                 // Update market value based on quotes
-                let (updated_market_value, day_gain_value, opening_market_value) =
-                    self.calculate_holdings_value(&holdings, quotes, date, &quote_cache);
+                let (updated_market_value, day_gain_value, opening_market_value) = self
+                    .calculate_holdings_value(
+                        &holdings,
+                        quotes,
+                        date,
+                        &quote_cache,
+                        &account_currency,
+                    );
 
                 let market_value = updated_market_value;
                 let total_value = cumulative_cash + market_value;
@@ -344,7 +350,7 @@ impl HistoryService {
 
                 let exchange_rate = self
                     .fx_service
-                    .get_exchange_rate(&currency, &self.base_currency)
+                    .get_exchange_rate(&account_currency, &self.base_currency)
                     .unwrap_or(1.0);
 
                 PortfolioHistory {
@@ -356,13 +362,13 @@ impl HistoryService {
                     book_cost,
                     available_cash: cumulative_cash,
                     net_deposit,
-                    currency: currency.clone(),
+                    currency: account_currency.clone(),
                     base_currency: self.base_currency.to_string(),
                     total_gain_value,
                     total_gain_percentage,
                     day_gain_percentage,
                     day_gain_value,
-                    allocation_percentage: 0.0, // This will be calculated later in calculate_total_portfolio_history
+                    allocation_percentage: 0.0,
                     exchange_rate,
                     holdings: Some(serde_json::to_string(&holdings).unwrap_or_default()),
                 }
@@ -379,10 +385,15 @@ impl HistoryService {
         cumulative_cash: &mut f64,
         net_deposit: &mut f64,
         book_cost: &mut f64,
-        currency: &mut String,
+        account_currency: &str,
     ) {
-        let activity_amount = activity.quantity * activity.unit_price;
-        let activity_fee = activity.fee;
+        let exchange_rate = self
+            .fx_service
+            .get_exchange_rate(&activity.currency, account_currency)
+            .unwrap_or(1.0);
+
+        let activity_amount = activity.quantity * activity.unit_price * exchange_rate;
+        let activity_fee = activity.fee * exchange_rate;
 
         match activity.activity_type.as_str() {
             "BUY" => {
@@ -413,8 +424,6 @@ impl HistoryService {
             }
             _ => {}
         }
-
-        *currency = activity.currency.clone();
     }
 
     fn save_historical_data(
@@ -476,17 +485,38 @@ impl HistoryService {
         quotes: &'a HashMap<(String, NaiveDate), Quote>,
         date: NaiveDate,
         quote_cache: &DashMap<(String, NaiveDate), Option<&'a Quote>>,
+        account_currency: &str,
     ) -> (f64, f64, f64) {
         let mut holdings_value = 0.0;
         let mut day_gain_value = 0.0;
         let mut opening_market_value = 0.0;
 
+        // Fetch all asset currencies at once
+        let asset_currencies = self
+            .market_data_service
+            .get_asset_currencies(holdings.keys().cloned().collect());
+
         for (asset_id, &quantity) in holdings {
             if let Some(quote) = self.get_last_available_quote(asset_id, date, quotes, quote_cache)
             {
-                let holding_value = quantity * quote.close;
-                let opening_value = quantity * quote.open;
-                let day_gain = quantity * (quote.close - quote.open);
+                // Use the pre-fetched asset currency
+                let asset_currency = asset_currencies
+                    .get(asset_id)
+                    .map(String::as_str)
+                    .unwrap_or(account_currency);
+
+                let exchange_rate = self
+                    .fx_service
+                    .get_exchange_rate(asset_currency, account_currency)
+                    .unwrap_or(1.0);
+
+                println!("asset_currency: {}", asset_currency);
+                println!("account_currency: {}", account_currency);
+                println!("exchange_rate: {}", exchange_rate);
+
+                let holding_value = quantity * quote.close * exchange_rate;
+                let opening_value = quantity * quote.open * exchange_rate;
+                let day_gain = quantity * (quote.close - quote.open) * exchange_rate;
 
                 holdings_value += holding_value;
                 day_gain_value += day_gain;
@@ -498,6 +528,8 @@ impl HistoryService {
                 );
             }
         }
+
+        println!("holdings_value: {} {}", date, holdings_value);
 
         (holdings_value, day_gain_value, opening_market_value)
     }
@@ -574,5 +606,17 @@ impl HistoryService {
         } else {
             Ok(None)
         }
+    }
+
+    // Add this new method to get account currency
+    fn get_account_currency(&self, account_id: &str) -> Result<String> {
+        use crate::schema::accounts::dsl::*;
+        let db_connection = &mut self.pool.get().map_err(PortfolioError::from)?;
+
+        accounts
+            .filter(id.eq(account_id))
+            .select(currency)
+            .first::<String>(db_connection)
+            .map_err(PortfolioError::from)
     }
 }

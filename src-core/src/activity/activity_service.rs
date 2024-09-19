@@ -83,7 +83,12 @@ impl ActivityService {
         let asset_id = activity.asset_id.clone();
         let asset_service = AssetService::new(self.pool.clone());
 
-        let _asset_profile = asset_service.get_asset_profile(&asset_id).await?;
+        let asset_profile = asset_service.get_asset_profile(&asset_id).await?;
+
+        // Update activity currency if asset_profile.currency is available
+        if !asset_profile.currency.is_empty() {
+            activity.currency = asset_profile.currency;
+        }
 
         // Adjust unit price based on activity type
         if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
@@ -94,6 +99,32 @@ impl ActivityService {
 
         // Insert the new activity into the database
         self.repo.insert_new_activity(&mut conn, activity)
+    }
+
+    // update an activity
+    pub async fn update_activity(
+        &self,
+        mut activity: ActivityUpdate,
+    ) -> Result<Activity, diesel::result::Error> {
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+        let asset_service = AssetService::new(self.pool.clone());
+
+        let asset_profile = asset_service.get_asset_profile(&activity.asset_id).await?;
+
+        // Update activity currency if asset_profile.currency is available
+        if !asset_profile.currency.is_empty() {
+            activity.currency = asset_profile.currency;
+        }
+
+        // Adjust unit price based on activity type
+        if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
+            .contains(&activity.activity_type.as_str())
+        {
+            activity.unit_price = 1.0;
+        }
+
+        // Update the activity in the database
+        self.repo.update_activity(&mut conn, activity)
     }
 
     // verify the activities import from csv file
@@ -170,15 +201,6 @@ impl ActivityService {
 
             Ok(insert_count)
         })
-    }
-
-    // update an activity
-    pub fn update_activity(
-        &self,
-        activity: ActivityUpdate,
-    ) -> Result<Activity, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        self.repo.update_activity(&mut conn, activity)
     }
 
     // delete an activity

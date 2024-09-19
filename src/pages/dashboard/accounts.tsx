@@ -6,7 +6,7 @@ import { GainPercent } from '@/components/gain-percent';
 import { GainAmount } from '@/components/gain-amount';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSummary } from '@/lib/types';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
 
 // Helper function to calculate category summary
@@ -105,7 +105,7 @@ const AccountSummaryComponent = ({ accountSummary }: { accountSummary: AccountSu
           <p className="font-medium leading-none">
             {formatAmount(accountSummary.performance.totalValue, accountSummary.account.currency)}
           </p>
-          {accountSummary.performance.totalGainValue !== 0 && (
+          {accountSummary.performance.totalGainPercentage !== 0 && (
             <div className="flex items-center space-x-2">
               <GainAmount
                 className="text-sm font-light"
@@ -143,14 +143,20 @@ export function Accounts({
 
   const groupAccountsByCategory = () => {
     const groupedAccounts: Record<string, AccountSummary[]> = {};
+    const ungroupedAccounts: AccountSummary[] = [];
+
     for (const accountSummary of accounts || []) {
-      const category = accountSummary.account.group || 'Uncategorized';
-      if (!groupedAccounts[category]) {
-        groupedAccounts[category] = [];
+      const category = accountSummary.account.group;
+      if (category) {
+        if (!groupedAccounts[category]) {
+          groupedAccounts[category] = [];
+        }
+        groupedAccounts[category].push(accountSummary);
+      } else {
+        ungroupedAccounts.push(accountSummary);
       }
-      groupedAccounts[category].push(accountSummary);
     }
-    return groupedAccounts;
+    return { groupedAccounts, ungroupedAccounts };
   };
 
   const toggleCategory = (category: string) => {
@@ -167,19 +173,8 @@ export function Accounts({
     category: string;
     accountsInCategory: AccountSummary[];
   }) => {
-    if (accountsInCategory.length === 1) {
-      return (
-        <Card>
-          <CardHeader className="py-4">
-            <AccountSummaryComponent accountSummary={accountsInCategory[0]} />
-          </CardHeader>
-        </Card>
-      );
-    }
-    console.log('accountsInCategory', accountsInCategory);
     const categorySummary = calculateCategorySummary(accountsInCategory);
     const isExpanded = expandedCategories[category];
-    console.log('categorySummary', categorySummary);
     return (
       <Card>
         <CardHeader className="border-b">
@@ -197,11 +192,8 @@ export function Accounts({
         {isExpanded && (
           <CardContent className="pt-4">
             {accountsInCategory.map((accountSummary) => (
-              <div className="py-4">
-                <AccountSummaryComponent
-                  key={accountSummary.account.id}
-                  accountSummary={accountSummary}
-                />
+              <div key={accountSummary.account.id} className="py-4">
+                <AccountSummaryComponent accountSummary={accountSummary} />
               </div>
             ))}
           </CardContent>
@@ -212,14 +204,25 @@ export function Accounts({
 
   const renderAccounts = () => {
     if (accountsGrouped) {
-      const groupedAccounts = groupAccountsByCategory();
-      return Object.entries(groupedAccounts).map(([category, accountsInCategory]) => (
-        <CategorySummary
-          key={category}
-          category={category}
-          accountsInCategory={accountsInCategory}
-        />
-      ));
+      const { groupedAccounts, ungroupedAccounts } = groupAccountsByCategory();
+      return (
+        <>
+          {Object.entries(groupedAccounts).map(([category, accountsInCategory]) => (
+            <CategorySummary
+              key={category}
+              category={category}
+              accountsInCategory={accountsInCategory}
+            />
+          ))}
+          {ungroupedAccounts.map((accountSummary) => (
+            <Card key={accountSummary.account.id}>
+              <CardHeader className="py-6">
+                <AccountSummaryComponent accountSummary={accountSummary} />
+              </CardHeader>
+            </Card>
+          ))}
+        </>
+      );
     } else {
       return accounts?.map((accountSummary) => (
         <Card key={accountSummary.account.id}>
