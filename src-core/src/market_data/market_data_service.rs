@@ -7,7 +7,6 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use uuid::Uuid;
 
 pub struct MarketDataService {
     provider: YahooProvider,
@@ -27,6 +26,14 @@ impl MarketDataService {
             .search_ticker(query)
             .await
             .map_err(|e| e.to_string())
+    }
+
+    pub async fn initialize_crumb_data(&self) -> Result<(), String> {
+        self.provider.set_crumb().await.map_err(|e| {
+            let error_message = format!("Failed to initialize crumb data: {}", e);
+            eprintln!("{}", &error_message);
+            error_message
+        })
     }
 
     pub fn get_latest_quote(&self, symbol: &str) -> QueryResult<Quote> {
@@ -53,20 +60,41 @@ impl MarketDataService {
                     let quote_date = quote.date.date();
                     ((quote.symbol.clone(), quote_date), quote)
                 })
-                .collect(), // This will now create a HashMap
+                .collect(),
             Err(e) => {
                 eprintln!("Error loading quotes: {}", e);
-                HashMap::new() // Return an empty HashMap
+                HashMap::new()
             }
         }
     }
 
-    pub async fn initialize_crumb_data(&self) -> Result<(), String> {
-        self.provider.set_crumb().await.map_err(|e| {
-            let error_message = format!("Failed to initialize crumb data: {}", e);
-            eprintln!("{}", &error_message);
-            error_message
-        })
+    pub async fn sync_quotes(&self, asset_list: &[Asset]) -> Result<(), String> {
+        println!("Syncing history quotes for all assets...");
+        let end_date = SystemTime::now();
+        let mut all_quotes_to_insert = Vec::new();
+
+        for asset in asset_list {
+            let symbol = asset.symbol.as_str();
+            let last_sync_date = self
+                .get_last_quote_sync_date(symbol)
+                .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
+                .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
+
+            let start_date: SystemTime = Utc
+                .from_utc_datetime(&(last_sync_date - Duration::days(1)))
+                .into();
+
+            match self
+                .provider
+                .fetch_stock_history(symbol, start_date, end_date)
+                .await
+            {
+                Ok(quotes) => all_quotes_to_insert.extend(quotes),
+                Err(e) => eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e),
+            }
+        }
+
+        self.insert_quotes(&all_quotes_to_insert)
     }
 
     fn get_last_quote_sync_date(
@@ -87,69 +115,6 @@ impl MarketDataService {
             })
     }
 
-    pub async fn sync_history_quotes_for_all_assets(
-        &self,
-        asset_list: &[Asset],
-    ) -> Result<(), String> {
-        println!("Syncing history quotes for all assets...");
-
-        let end_date = SystemTime::now();
-        let mut all_quotes_to_insert = Vec::new();
-
-        for asset in asset_list {
-            let symbol = asset.symbol.as_str();
-            let last_sync_date = self
-                .get_last_quote_sync_date(symbol)
-                .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
-                .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
-
-            // Ensure to synchronize the last day data for freshness
-            let start_date: SystemTime = Utc
-                .from_utc_datetime(&(last_sync_date - Duration::days(1)))
-                .into();
-
-            match self
-                .provider
-                .fetch_stock_history(symbol, start_date, end_date)
-                .await
-            {
-                Ok(quotes_history) => {
-                    for yahoo_quote in quotes_history {
-                        if let Some(new_quote) = self.create_quote_from_yahoo(yahoo_quote, symbol) {
-                            all_quotes_to_insert.push(new_quote);
-                        }
-                    }
-                }
-                Err(e) => eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e),
-            }
-        }
-
-        self.insert_quotes(&all_quotes_to_insert)
-    }
-
-    fn create_quote_from_yahoo(
-        &self,
-        yahoo_quote: yahoo_finance_api::Quote,
-        symbol: &str,
-    ) -> Option<Quote> {
-        chrono::DateTime::from_timestamp(yahoo_quote.timestamp as i64, 0).map(|datetime| {
-            let naive_datetime = datetime.naive_utc();
-            Quote {
-                id: Uuid::new_v4().to_string(),
-                created_at: naive_datetime,
-                data_source: "YAHOO".to_string(),
-                date: naive_datetime,
-                symbol: symbol.to_string(),
-                open: yahoo_quote.open,
-                high: yahoo_quote.high,
-                low: yahoo_quote.low,
-                volume: yahoo_quote.volume as f64,
-                close: yahoo_quote.close,
-                adjclose: yahoo_quote.adjclose,
-            }
-        })
-    }
-
     fn insert_quotes(&self, quotes: &[Quote]) -> Result<(), String> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         diesel::replace_into(quotes::table)
@@ -159,9 +124,15 @@ impl MarketDataService {
         Ok(())
     }
 
-    pub async fn initialize_and_sync_quotes(&self, asset_list: &[Asset]) -> Result<(), String> {
+    pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
+        use crate::schema::assets::dsl::*;
         self.initialize_crumb_data().await?;
-        self.sync_history_quotes_for_all_assets(asset_list).await
+        let conn = &mut self.pool.get().map_err(|e| e.to_string())?;
+        let asset_list: Vec<Asset> = assets
+            .load::<Asset>(conn)
+            .map_err(|e| format!("Failed to load assets: {}", e))?;
+
+        self.sync_quotes(&asset_list).await
     }
 
     pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, String> {

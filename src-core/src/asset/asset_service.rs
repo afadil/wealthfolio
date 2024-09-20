@@ -216,7 +216,7 @@ impl AssetService {
 
                 // Sync history quotes for the newly inserted asset
                 self.market_data_service
-                    .sync_history_quotes_for_all_assets(&[inserted_asset.clone()])
+                    .sync_quotes(&[inserted_asset.clone()])
                     .await
                     .map_err(|e| {
                         println!(
@@ -238,17 +238,17 @@ impl AssetService {
         }
     }
 
-    pub async fn sync_history_quotes_for_all_assets(&self) -> Result<(), String> {
-        let asset_list = self.get_assets().map_err(|e| e.to_string())?;
-        self.market_data_service
-            .sync_history_quotes_for_all_assets(&asset_list)
-            .await
-    }
+    // pub async fn sync_history_quotes_for_all_assets(&self) -> Result<(), String> {
+    //     let asset_list = self.get_assets().map_err(|e| e.to_string())?;
+    //     self.market_data_service
+    //         .sync_history_quotes_for_all_assets(&asset_list)
+    //         .await
+    // }
 
-    pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
-        let asset_list = self.get_assets().map_err(|e| e.to_string())?;
-        self.market_data_service
-            .initialize_and_sync_quotes(&asset_list)
-            .await
-    }
+    // pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
+    //     let asset_list = self.get_assets().map_err(|e| e.to_string())?;
+    //     self.market_data_service
+    //         .initialize_and_sync_quotes(&asset_list)
+    //         .await
+    // }
 }

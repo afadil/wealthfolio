@@ -1,14 +1,14 @@
 use std::{sync::RwLock, time::SystemTime};
 
-use crate::models::{CrumbData, NewAsset, QuoteSummary};
+use super::models::{AssetClass, AssetSubClass, PriceDetail, YahooResult};
+use crate::models::{CrumbData, NewAsset, Quote as ModelQuote, QuoteSummary};
+use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use reqwest::{header, Client};
 use serde_json::json;
 use thiserror::Error;
 use yahoo::{YQuoteItem, YahooError};
 use yahoo_finance_api as yahoo;
-
-use super::models::{AssetClass, AssetSubClass, PriceDetail, YahooResult};
 
 impl From<&YQuoteItem> for QuoteSummary {
     fn from(item: &YQuoteItem) -> Self {
@@ -33,8 +33,8 @@ impl From<&YQuoteItem> for QuoteSummary {
 impl From<&YQuoteItem> for NewAsset {
     fn from(item: &YQuoteItem) -> Self {
         NewAsset {
-            id: item.symbol.clone(), // Assuming the symbol is used as the id
-            isin: None,              // Map the rest of the fields accordingly
+            id: item.symbol.clone(),
+            isin: None, // TODO: Implement isin
             name: Some(item.long_name.clone()),
             asset_type: Some(item.quote_type.clone()),
             symbol: item.symbol.clone(),
@@ -64,6 +64,26 @@ impl YahooProvider {
     pub fn new() -> Result<Self, yahoo::YahooError> {
         let provider = yahoo::YahooConnector::new()?;
         Ok(YahooProvider { provider })
+    }
+
+    fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
+        let date = DateTime::<Utc>::from_timestamp(yahoo_quote.timestamp as i64, 0)
+            .unwrap_or_default()
+            .naive_utc();
+
+        ModelQuote {
+            id: format!("{}_{}", date.format("%Y%m%d"), symbol),
+            created_at: chrono::Utc::now().naive_utc(),
+            data_source: "YAHOO".to_string(),
+            date,
+            symbol: symbol,
+            open: yahoo_quote.open,
+            high: yahoo_quote.high,
+            low: yahoo_quote.low,
+            volume: yahoo_quote.volume as f64,
+            close: yahoo_quote.close,
+            adjclose: yahoo_quote.adjclose,
+        }
     }
 
     // pub async fn set_crumb() -> Result<(), yahoo::YahooError> {
@@ -253,12 +273,11 @@ impl YahooProvider {
         symbol: &str,
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<yahoo::Quote>, yahoo::YahooError> {
+    ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
         if symbol.starts_with("$CASH-") {
             return Ok(vec![]);
         }
 
-        // Convert SystemTime to OffsetDateTime as required by get_quote_history
         let start_offset = start.into();
         let end_offset = end.into();
 
@@ -267,7 +286,14 @@ impl YahooProvider {
             .get_quote_history(symbol, start_offset, end_offset)
             .await?;
 
-        response.quotes()
+        // Use the new method to convert quotes
+        let quotes = response
+            .quotes()?
+            .into_iter()
+            .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
+            .collect();
+
+        Ok(quotes)
     }
 
     pub async fn fetch_asset_profile(

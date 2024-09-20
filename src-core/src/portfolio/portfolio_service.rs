@@ -1,7 +1,7 @@
 use crate::account::account_service::AccountService;
 use crate::activity::activity_service::ActivityService;
-use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
+use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{
     Account, AccountSummary, Activity, HistorySummary, Holding, IncomeData, IncomeSummary,
     PortfolioHistory,
@@ -11,6 +11,8 @@ use crate::settings::SettingsService;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 
+use std::sync::Arc;
+
 use crate::portfolio::history_service::HistoryService;
 use crate::portfolio::holdings_service::HoldingsService;
 use crate::portfolio::income_service::IncomeService;
@@ -18,7 +20,7 @@ use crate::portfolio::income_service::IncomeService;
 pub struct PortfolioService {
     account_service: AccountService,
     activity_service: ActivityService,
-    asset_service: AssetService,
+    market_data_service: Arc<MarketDataService>,
     income_service: IncomeService,
     holdings_service: HoldingsService,
     history_service: HistoryService,
@@ -39,10 +41,12 @@ impl PortfolioService {
         let settings = settings_service.get_settings(&mut conn)?;
         let base_currency = settings.base_currency;
 
+        let market_data_service = Arc::new(MarketDataService::new(pool.clone()));
+
         Ok(PortfolioService {
             account_service: AccountService::new(pool.clone()),
             activity_service: ActivityService::new(pool.clone()),
-            asset_service: AssetService::new(pool.clone()),
+            market_data_service: market_data_service.clone(),
             income_service: IncomeService::new(
                 pool.clone(),
                 CurrencyExchangeService::new(pool.clone()),
@@ -116,7 +120,9 @@ impl PortfolioService {
         &self,
     ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
         // First, sync quotes
-        self.asset_service.initialize_and_sync_quotes().await?;
+        self.market_data_service
+            .initialize_and_sync_quotes()
+            .await?;
 
         // Then, calculate historical data
         self.calculate_historical_data(None, false)

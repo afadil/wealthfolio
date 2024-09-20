@@ -1,68 +1,112 @@
-use crate::models::Quote;
-use crate::schema::quotes;
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 pub struct CurrencyExchangeService {
-    exchange_rates: Arc<Mutex<HashMap<String, f64>>>,
     pool: Pool<ConnectionManager<SqliteConnection>>,
-    is_loading: Arc<AtomicBool>,
+    exchange_rates: Arc<RwLock<HashMap<String, (f64, NaiveDateTime)>>>,
 }
 
 impl CurrencyExchangeService {
     pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
         Self {
-            exchange_rates: Arc::new(Mutex::new(HashMap::new())),
             pool,
-            is_loading: Arc::new(AtomicBool::new(false)),
+            exchange_rates: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    fn load_exchange_rates(
+    pub fn get_latest_exchange_rate(
         &self,
         from_currency: &str,
         to_currency: &str,
     ) -> Result<f64, Box<dyn std::error::Error>> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        let direct_symbol = format!("{}{}=X", from_currency, to_currency);
+        if from_currency == to_currency {
+            return Ok(1.0);
+        }
+
+        let symbol = format!("{}{}=X", from_currency, to_currency);
         let inverse_symbol = format!("{}{}=X", to_currency, from_currency);
 
-        let latest_quote: Option<Quote> = quotes::table
-            .filter(
-                quotes::symbol
-                    .eq(&direct_symbol)
-                    .or(quotes::symbol.eq(&inverse_symbol)),
-            )
-            .order(quotes::date.desc())
-            .first(&mut *conn)
-            .optional()?;
-
-        if let Some(quote) = latest_quote {
-            let rate = if quote.symbol == direct_symbol {
-                quote.close
-            } else {
-                1.0 / quote.close
-            };
-
-            let mut exchange_rates = self
-                .exchange_rates
-                .lock()
-                .map_err(|_| "Failed to acquire lock")?;
-            exchange_rates.insert(direct_symbol.clone(), rate);
-            exchange_rates.insert(inverse_symbol, 1.0 / rate);
-
-            Ok(rate)
-        } else {
-            Err(format!(
-                "No exchange rate found for {} to {}",
-                from_currency, to_currency
-            )
-            .into())
+        // Check cache first
+        {
+            let cache = self.exchange_rates.read().map_err(|_| "RwLock poisoned")?;
+            if let Some(&(rate, _)) = cache.get(&symbol) {
+                return Ok(rate);
+            }
+            if let Some(&(rate, _)) = cache.get(&inverse_symbol) {
+                return Ok(1.0 / rate);
+            }
         }
+
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+        // Try to get the direct rate
+        if let Some((rate, date)) = self.get_latest_rate_from_db(&mut conn, &symbol)? {
+            self.cache_rate(&symbol, rate, date)?;
+            return Ok(rate);
+        }
+
+        // If not found, try the inverse rate
+        if let Some((rate, date)) = self.get_latest_rate_from_db(&mut conn, &inverse_symbol)? {
+            let inverse_rate = 1.0 / rate;
+            self.cache_rate(&symbol, inverse_rate, date)?;
+            return Ok(inverse_rate);
+        }
+
+        // If still not found, try USD conversion
+        let (from_usd, from_date) = self.get_latest_usd_rate(&mut conn, from_currency)?;
+        let (to_usd, to_date) = self.get_latest_usd_rate(&mut conn, to_currency)?;
+
+        let rate = from_usd / to_usd;
+        let date = from_date.max(to_date);
+        self.cache_rate(&symbol, rate, date)?;
+        Ok(rate)
+    }
+
+    fn get_latest_rate_from_db(
+        &self,
+        conn: &mut SqliteConnection,
+        fx_symbol: &str,
+    ) -> Result<Option<(f64, NaiveDateTime)>, diesel::result::Error> {
+        use crate::schema::quotes::dsl::*;
+
+        quotes
+            .filter(symbol.eq(fx_symbol))
+            .order(date.desc())
+            .select((close, date))
+            .first(conn)
+            .optional()
+    }
+
+    fn get_latest_usd_rate(
+        &self,
+        conn: &mut SqliteConnection,
+        currency: &str,
+    ) -> Result<(f64, NaiveDateTime), Box<dyn std::error::Error>> {
+        if currency == "USD" {
+            return Ok((1.0, chrono::Utc::now().naive_utc()));
+        }
+
+        let symbol = format!("{}USD=X", currency);
+        self.get_latest_rate_from_db(conn, &symbol)?
+            .ok_or_else(|| format!("No USD rate found for {}", currency).into())
+    }
+
+    fn cache_rate(
+        &self,
+        symbol: &str,
+        rate: f64,
+        date: NaiveDateTime,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut cache = self.exchange_rates.write().map_err(|_| "RwLock poisoned")?;
+        cache.insert(symbol.to_string(), (rate, date));
+        Ok(())
     }
 
     pub fn convert_currency(
@@ -75,47 +119,7 @@ impl CurrencyExchangeService {
             return Ok(amount);
         }
 
-        let rate = self.load_exchange_rates(from_currency, to_currency)?;
+        let rate = self.get_latest_exchange_rate(from_currency, to_currency)?;
         Ok(amount * rate)
-    }
-
-    pub fn get_exchange_rate(
-        &self,
-        from_currency: &str,
-        to_currency: &str,
-    ) -> Result<f64, Box<dyn std::error::Error>> {
-        if from_currency == to_currency {
-            return Ok(1.0);
-        }
-
-        let direct_key = format!("{}{}=X", from_currency, to_currency);
-        let inverse_key = format!("{}{}=X", to_currency, from_currency);
-
-        {
-            let exchange_rates = self
-                .exchange_rates
-                .lock()
-                .map_err(|_| "Failed to acquire lock")?;
-            if let Some(&rate) = exchange_rates.get(&direct_key) {
-                return Ok(rate);
-            } else if let Some(&rate) = exchange_rates.get(&inverse_key) {
-                return Ok(1.0 / rate);
-            }
-        }
-
-        // Use atomic flag to prevent multiple threads from loading the same rate simultaneously
-        if self
-            .is_loading
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
-        {
-            let result = self.load_exchange_rates(from_currency, to_currency);
-            self.is_loading.store(false, Ordering::Release);
-            result
-        } else {
-            // Another thread is loading, wait and retry
-            std::thread::yield_now();
-            self.get_exchange_rate(from_currency, to_currency)
-        }
     }
 }

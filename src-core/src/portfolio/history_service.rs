@@ -223,7 +223,7 @@ impl HistoryService {
                 for history in histories {
                     let currency_exchange_rate = self
                         .fx_service
-                        .get_exchange_rate(&history.currency, &self.base_currency)
+                        .get_latest_exchange_rate(&history.currency, &self.base_currency)
                         .unwrap_or(1.0);
 
                     total.total_value += history.total_value * currency_exchange_rate;
@@ -350,7 +350,7 @@ impl HistoryService {
 
                 let exchange_rate = self
                     .fx_service
-                    .get_exchange_rate(&account_currency, &self.base_currency)
+                    .get_latest_exchange_rate(&account_currency, &self.base_currency)
                     .unwrap_or(1.0);
 
                 PortfolioHistory {
@@ -390,7 +390,7 @@ impl HistoryService {
         // Get echange rate if activity currency is different of account currency
         let exchange_rate = self
             .fx_service
-            .get_exchange_rate(&activity.currency, account_currency)
+            .get_latest_exchange_rate(&activity.currency, account_currency)
             .unwrap_or(1.0);
 
         println!(
@@ -512,7 +512,7 @@ impl HistoryService {
 
                 let exchange_rate = self
                     .fx_service
-                    .get_exchange_rate(asset_currency, account_currency)
+                    .get_latest_exchange_rate(asset_currency, account_currency)
                     .unwrap_or(1.0);
 
                 let holding_value = quantity * quote.close * exchange_rate;

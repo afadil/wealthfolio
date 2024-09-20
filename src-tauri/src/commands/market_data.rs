@@ -28,6 +28,6 @@ pub fn get_asset_data(asset_id: String, state: State<AppState>) -> Result<AssetP
 #[tauri::command]
 pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
     println!("Synching quotes history");
-    let service = AssetService::new((*state.pool).clone());
+    let service = MarketDataService::new((*state.pool).clone());
     service.initialize_and_sync_quotes().await
 }

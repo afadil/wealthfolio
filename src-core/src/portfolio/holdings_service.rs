@@ -121,7 +121,6 @@ impl HoldingsService {
 
         // Post-processing for each holding
         for holding in holdings.values_mut() {
-            println!("Post-processing holding: {}", holding.symbol);
             if let Some(quote) = quotes.get(&holding.symbol) {
                 holding.market_price = Some(quote.close);
 
@@ -141,7 +140,7 @@ impl HoldingsService {
             // Get exchange rate for the holding's currency to base currency
             let exchange_rate = match self
                 .fx_service
-                .get_exchange_rate(&holding.currency, &self.base_currency)
+                .get_latest_exchange_rate(&holding.currency, &self.base_currency)
             {
                 Ok(rate) => rate,
                 Err(e) => {
