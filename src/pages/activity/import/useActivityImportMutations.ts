@@ -5,8 +5,8 @@ import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { toast } from '@/components/ui/use-toast';
 
 export function useActivityImportMutations(
-  onSuccess: (activities: ActivityImport[]) => void,
-  onError: (error: string) => void,
+  onSuccess?: (activities: ActivityImport[]) => void,
+  onError?: (error: string) => void,
 ) {
   const calculateHistoryMutation = useCalculateHistoryMutation({
     successTitle: 'Account updated successfully.',

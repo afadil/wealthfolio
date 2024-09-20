@@ -3,12 +3,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useNavigate } from 'react-router-dom';
+import { GainAmount } from '@/components/gain-amount';
+import { GainPercent } from '@/components/gain-percent';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
+import { useNavigate } from 'react-router-dom';
 
 export const HoldingsTable = ({
   holdings,
@@ -175,26 +177,13 @@ export const columns: ColumnDef<Holding>[] = [
       const currency = row.getValue('currency') as string;
 
       return (
-        <div
-          className={`ml-2 flex flex-col items-end pr-4 text-right ${
-            performance?.totalGainPercent === 0
-              ? 'text-base'
-              : performance?.totalGainPercent > 0
-                ? 'text-green-500'
-                : 'text-red-400'
-          } `}
-        >
-          <div className="flex items-center">
-            {performance?.totalGainPercent > 0 ? (
-              <Icons.ArrowUp className="h-3 w-3" />
-            ) : (
-              <Icons.ArrowDown className="h-3 w-3" />
-            )}
-            {formatPercent(Math.abs(performance?.totalGainPercent))}
-          </div>
-          <span className="text-xs font-light">
-            {formatAmount(performance?.totalGainAmount, currency)}
-          </span>
+        <div>
+          <GainAmount
+            className="text-sm"
+            value={performance?.totalGainAmount}
+            currency={currency}
+          ></GainAmount>
+          <GainPercent className="text-sm" value={performance?.totalGainPercent}></GainPercent>
         </div>
       );
     },

@@ -395,7 +395,7 @@ impl YahooProvider {
             "realestate" => "Real Estate".to_string(),
             "technology" => "Technology".to_string(),
             "utilities" => "Utilities".to_string(),
-            _ => "UNKNOWN".to_string(),
+            _ => a_string.to_string(),
         }
     }
 }

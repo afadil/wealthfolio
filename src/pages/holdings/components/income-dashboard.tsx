@@ -9,6 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { Icons } from '@/components/icons';
 import { getIncomeSummary } from '@/commands/portfolio';
 import type { IncomeSummary } from '@/lib/types';
 import { formatAmount } from '@/lib/utils';
@@ -124,72 +125,86 @@ export function IncomeDashboard() {
               <CardDescription>Last 12 months</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer
-                config={{
-                  income: {
-                    label: 'Monthly Income',
-                    color: 'hsl(var(--chart-1))',
-                  },
-                  cumulative: {
-                    label: 'Cumulative Income',
-                    color: 'hsl(var(--chart-5))',
-                  },
-                }}
-              >
-                <ComposedChart
-                  data={monthlyIncomeData.map(([month, income], index) => ({
-                    month,
-                    income,
-                    cumulative: monthlyIncomeData
-                      .slice(0, index + 1)
-                      .reduce((sum, [, value]) => sum + value, 0),
-                  }))}
+              {monthlyIncomeData.length === 0 ? (
+                <div className="-mt-14 flex h-[300px] flex-col items-center justify-center text-center">
+                  <Icons.Activity className="mb-2 h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No income history available</p>
+                </div>
+              ) : (
+                <ChartContainer
+                  config={{
+                    income: {
+                      label: 'Monthly Income',
+                      color: 'hsl(var(--chart-1))',
+                    },
+                    cumulative: {
+                      label: 'Cumulative Income',
+                      color: 'hsl(var(--chart-5))',
+                    },
+                  }}
                 >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                    tickFormatter={(value) => value.slice(5)} // Show only MM part of YYYY-MM
-                  />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="income"
-                    fill="var(--color-income)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="cumulative"
-                    stroke="var(--color-cumulative)"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </ComposedChart>
-              </ChartContainer>
+                  <ComposedChart
+                    data={monthlyIncomeData.map(([month, income], index) => ({
+                      month,
+                      income,
+                      cumulative: monthlyIncomeData
+                        .slice(0, index + 1)
+                        .reduce((sum, [, value]) => sum + value, 0),
+                    }))}
+                  >
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      tickMargin={10}
+                      axisLine={false}
+                      tickFormatter={(value) => value.slice(5)} // Show only MM part of YYYY-MM
+                    />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar
+                      yAxisId="left"
+                      dataKey="income"
+                      fill="var(--color-income)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="cumulative"
+                      stroke="var(--color-cumulative)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ChartContainer>
+              )}
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">Top 10 Dividend Sources</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {topDividendStocks.map(([symbol, income], index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="font-medium">{symbol}</div>
-                    <div className="font-medium text-green-600">
-                      {formatAmount(income, incomeSummary.currency)}
+            <CardContent className="h-full">
+              {topDividendStocks.length === 0 ? (
+                <div className="-mt-14 flex h-full min-h-64 flex-col items-center justify-center text-center">
+                  <Icons.DollarSign className="mb-2 h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No dividend income recorded</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {topDividendStocks.map(([symbol, income], index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="font-medium">{symbol}</div>
+                      <div className="font-medium text-green-600">
+                        {formatAmount(income, incomeSummary.currency)}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

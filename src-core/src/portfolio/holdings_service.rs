@@ -34,6 +34,13 @@ impl HoldingsService {
         let activities = self.activity_service.get_trading_activities()?;
         let assets = self.asset_service.get_assets()?;
 
+        println!(
+            "Found {} accounts, {} activities, and {} assets",
+            accounts.len(),
+            activities.len(),
+            assets.len()
+        );
+
         for activity in activities {
             let asset = assets
                 .iter()
@@ -46,6 +53,7 @@ impl HoldingsService {
                 .ok_or_else(|| PortfolioError::InvalidDataError("Account not found".to_string()))?;
 
             let key = format!("{}-{}", activity.account_id, activity.asset_id);
+
             let holding = holdings.entry(key.clone()).or_insert_with(|| Holding {
                 id: key,
                 symbol: activity.asset_id.clone(),
@@ -103,7 +111,7 @@ impl HoldingsService {
         for symbol in symbols {
             match self.asset_service.get_latest_quote(&symbol) {
                 Ok(quote) => {
-                    quotes.insert(symbol, quote);
+                    quotes.insert(symbol.clone(), quote);
                 }
                 Err(e) => {
                     eprintln!("Error fetching quote for symbol {}: {}", symbol, e);
@@ -113,20 +121,40 @@ impl HoldingsService {
 
         // Post-processing for each holding
         for holding in holdings.values_mut() {
+            println!("Post-processing holding: {}", holding.symbol);
             if let Some(quote) = quotes.get(&holding.symbol) {
                 holding.market_price = Some(quote.close);
+
+                // Calculate day gain using quote open and close prices
+                let opening_value = holding.quantity * quote.open;
+                let closing_value = holding.quantity * quote.close;
+                holding.performance.day_gain_amount = Some(closing_value - opening_value);
+                holding.performance.day_gain_percent = Some(if opening_value != 0.0 {
+                    (closing_value - opening_value) / opening_value * 100.0
+                } else {
+                    0.0
+                });
             }
             holding.average_cost = Some(holding.book_value / holding.quantity);
             holding.market_value = holding.quantity * holding.market_price.unwrap_or(0.0);
-            holding.market_value_converted = self
-                .fx_service
-                .convert_currency(holding.market_value, &holding.currency, &self.base_currency)
-                .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
 
-            holding.book_value_converted = self
+            // Get exchange rate for the holding's currency to base currency
+            let exchange_rate = match self
                 .fx_service
-                .convert_currency(holding.book_value, &holding.currency, &self.base_currency)
-                .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
+                .get_exchange_rate(&holding.currency, &self.base_currency)
+            {
+                Ok(rate) => rate,
+                Err(e) => {
+                    eprintln!(
+                        "Error getting exchange rate for {} to {}: {}. Using 1 as default.",
+                        holding.currency, self.base_currency, e
+                    );
+                    1.0
+                }
+            };
+
+            holding.market_value_converted = holding.market_value * exchange_rate;
+            holding.book_value_converted = holding.book_value * exchange_rate;
 
             // Calculate performance metrics
             holding.performance.total_gain_amount = holding.market_value - holding.book_value;
@@ -135,16 +163,17 @@ impl HoldingsService {
             } else {
                 0.0
             };
-            holding.performance.total_gain_amount_converted = self
-                .fx_service
-                .convert_currency(
-                    holding.performance.total_gain_amount,
-                    &holding.currency,
-                    &self.base_currency,
-                )
-                .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
+            holding.performance.total_gain_amount_converted =
+                holding.performance.total_gain_amount * exchange_rate;
+
+            // Convert day gain to base currency
+            if let Some(day_gain_amount) = holding.performance.day_gain_amount {
+                holding.performance.day_gain_amount_converted =
+                    Some(day_gain_amount * exchange_rate);
+            }
         }
 
+        println!("Computed {} holdings", holdings.len());
         Ok(holdings
             .into_values()
             .filter(|holding| holding.quantity > 0.0)

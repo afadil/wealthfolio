@@ -54,9 +54,13 @@ impl PortfolioService {
     }
 
     pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
-        self.holdings_service
-            .compute_holdings()
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+        match self.holdings_service.compute_holdings() {
+            Ok(holdings) => Ok(holdings),
+            Err(e) => {
+                eprintln!("Error computing holdings: {}", e);
+                Err(Box::new(e) as Box<dyn std::error::Error>)
+            }
+        }
     }
 
     fn fetch_data(

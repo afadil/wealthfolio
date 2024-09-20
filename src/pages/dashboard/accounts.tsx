@@ -73,7 +73,7 @@ const Summary = ({
               <GainAmount
                 className="text-sm font-light"
                 value={gain || 0}
-                currency={currency || 'USD'}
+                currency={currency}
                 displayCurrency={false}
               />
               <div className="mx-1 h-3 border-r border-gray-300" />

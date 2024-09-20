@@ -341,9 +341,9 @@ impl HistoryService {
                     0.0
                 };
 
-                let total_gain_value = total_value - book_cost;
-                let total_gain_percentage = if book_cost != 0.0 {
-                    (total_gain_value / book_cost) * 100.0
+                let total_gain_value = total_value - net_deposit;
+                let total_gain_percentage = if net_deposit != 0.0 {
+                    (total_gain_value / net_deposit) * 100.0
                 } else {
                     0.0
                 };
@@ -387,11 +387,16 @@ impl HistoryService {
         book_cost: &mut f64,
         account_currency: &str,
     ) {
+        // Get echange rate if activity currency is different of account currency
         let exchange_rate = self
             .fx_service
             .get_exchange_rate(&activity.currency, account_currency)
             .unwrap_or(1.0);
 
+        println!(
+            "Exchange rate for {} to {}: {}",
+            activity.currency, account_currency, exchange_rate
+        );
         let activity_amount = activity.quantity * activity.unit_price * exchange_rate;
         let activity_fee = activity.fee * exchange_rate;
 
@@ -510,10 +515,6 @@ impl HistoryService {
                     .get_exchange_rate(asset_currency, account_currency)
                     .unwrap_or(1.0);
 
-                println!("asset_currency: {}", asset_currency);
-                println!("account_currency: {}", account_currency);
-                println!("exchange_rate: {}", exchange_rate);
-
                 let holding_value = quantity * quote.close * exchange_rate;
                 let opening_value = quantity * quote.open * exchange_rate;
                 let day_gain = quantity * (quote.close - quote.open) * exchange_rate;
@@ -528,8 +529,6 @@ impl HistoryService {
                 );
             }
         }
-
-        println!("holdings_value: {} {}", date, holdings_value);
 
         (holdings_value, day_gain_value, opening_market_value)
     }
