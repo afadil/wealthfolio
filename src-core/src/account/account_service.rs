@@ -41,17 +41,12 @@ impl AccountService {
             let settings = settings_service.get_settings(conn)?;
             let base_currency = settings.base_currency;
 
-            // Create exchange rate asset if necessary
-            if new_account.currency != base_currency {
-                let asset_id = format!("{}{}=X", base_currency, new_account.currency);
-                if asset_service.get_asset_by_id(&asset_id).is_err() {
-                    asset_service.create_rate_exchange_asset(
-                        conn,
-                        &base_currency,
-                        &new_account.currency,
-                    )?;
-                }
-            }
+            // Create exchange rate assets if necessary
+            asset_service.create_exchange_rate_symbols(
+                conn,
+                &base_currency,
+                &new_account.currency,
+            )?;
 
             // Create cash ($CASH-CURRENCY) asset if necessary
             let cash_asset_id = format!("$CASH-{}", new_account.currency);

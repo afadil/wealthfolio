@@ -82,23 +82,34 @@ impl ActivityService {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         let asset_id = activity.asset_id.clone();
         let asset_service = AssetService::new(self.pool.clone());
-
+        let account_service = AccountService::new(self.pool.clone());
         let asset_profile = asset_service.get_asset_profile(&asset_id).await?;
+        let account = account_service.get_account_by_id(&activity.account_id)?;
 
-        // Update activity currency if asset_profile.currency is available
-        if !asset_profile.currency.is_empty() {
-            activity.currency = asset_profile.currency;
-        }
+        conn.transaction(|conn| {
+            // Update activity currency if asset_profile.currency is available
+            if !asset_profile.currency.is_empty() {
+                activity.currency = asset_profile.currency.clone();
+            }
+            // Adjust unit price based on activity type
+            if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
+                .contains(&activity.activity_type.as_str())
+            {
+                activity.unit_price = 1.0;
+            }
 
-        // Adjust unit price based on activity type
-        if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
-            .contains(&activity.activity_type.as_str())
-        {
-            activity.unit_price = 1.0;
-        }
+            // Insert the new activity into the database
+            let inserted_activity = self.repo.insert_new_activity(conn, activity)?;
 
-        // Insert the new activity into the database
-        self.repo.insert_new_activity(&mut conn, activity)
+            // Create currency symbols if asset currency is different from account currency
+            if asset_profile.currency != account.currency {
+                asset_service
+                    .create_exchange_rate_symbols(conn, &asset_profile.currency, &account.currency)
+                    .map_err(|e| diesel::result::Error::RollbackTransaction)?;
+            }
+
+            Ok(inserted_activity)
+        })
     }
 
     // update an activity
@@ -108,23 +119,34 @@ impl ActivityService {
     ) -> Result<Activity, diesel::result::Error> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         let asset_service = AssetService::new(self.pool.clone());
-
+        let account_service = AccountService::new(self.pool.clone());
         let asset_profile = asset_service.get_asset_profile(&activity.asset_id).await?;
+        let account = account_service.get_account_by_id(&activity.account_id)?;
 
-        // Update activity currency if asset_profile.currency is available
-        if !asset_profile.currency.is_empty() {
-            activity.currency = asset_profile.currency;
-        }
+        conn.transaction(|conn| {
+            // Update activity currency if asset_profile.currency is available
+            if !asset_profile.currency.is_empty() {
+                activity.currency = asset_profile.currency.clone();
+            }
+            // Adjust unit price based on activity type
+            if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
+                .contains(&activity.activity_type.as_str())
+            {
+                activity.unit_price = 1.0;
+            }
 
-        // Adjust unit price based on activity type
-        if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
-            .contains(&activity.activity_type.as_str())
-        {
-            activity.unit_price = 1.0;
-        }
+            // Update the activity in the database
+            let updated_activity = self.repo.update_activity(conn, activity)?;
 
-        // Update the activity in the database
-        self.repo.update_activity(&mut conn, activity)
+            // Create currency symbols if asset currency is different from account currency
+            if asset_profile.currency != account.currency {
+                asset_service
+                    .create_exchange_rate_symbols(conn, &asset_profile.currency, &account.currency)
+                    .map_err(|e| diesel::result::Error::RollbackTransaction)?;
+            }
+
+            Ok(updated_activity)
+        })
     }
 
     // verify the activities import from csv file

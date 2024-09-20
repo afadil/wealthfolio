@@ -4,7 +4,6 @@ use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-use std::collections::HashMap;
 
 pub struct AssetService {
     market_data_service: MarketDataService,
@@ -78,29 +77,50 @@ impl AssetService {
             .load::<Asset>(&mut conn)
     }
 
-    pub fn load_exchange_rates(
+    pub fn create_exchange_rate_symbols(
         &self,
-        base_currency: &str,
-    ) -> Result<HashMap<String, f64>, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        use crate::schema::quotes::dsl::{date, quotes, symbol};
-
-        let mut exchange_rates = HashMap::new();
-        let currency_assets = self.load_currency_assets(base_currency)?;
-
-        for asset in currency_assets {
-            let latest_quote = quotes
-                .filter(symbol.eq(&asset.symbol))
-                .order(date.desc())
-                .first::<Quote>(&mut conn)
-                .ok();
-
-            if let Some(quote) = latest_quote {
-                exchange_rates.insert(asset.symbol, quote.close);
-            }
+        conn: &mut SqliteConnection,
+        from_currency: &str,
+        to_currency: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut symbols = Vec::new();
+        if from_currency != to_currency {
+            symbols.push(format!("{}{}=X", from_currency, to_currency));
+            symbols.push(format!("{}{}=X", to_currency, from_currency));
+        }
+        if from_currency != "USD" {
+            symbols.push(format!("{}USD=X", from_currency));
         }
 
-        Ok(exchange_rates)
+        let new_assets: Vec<NewAsset> = symbols
+            .iter()
+            .filter(|symbol| self.get_asset_by_id(symbol).is_err())
+            .map(|symbol| NewAsset {
+                id: symbol.to_string(),
+                isin: None,
+                name: None,
+                asset_type: Some("Currency".to_string()),
+                symbol: symbol.to_string(),
+                symbol_mapping: None,
+                asset_class: Some("".to_string()),
+                asset_sub_class: Some("".to_string()),
+                comment: None,
+                countries: None,
+                categories: None,
+                classes: None,
+                attributes: None,
+                currency: to_currency.to_string(),
+                data_source: "MANUAL".to_string(),
+                sectors: None,
+                url: None,
+            })
+            .collect();
+
+        diesel::replace_into(assets::table)
+            .values(&new_assets)
+            .execute(conn)?;
+
+        Ok(())
     }
 
     pub fn create_cash_asset(
