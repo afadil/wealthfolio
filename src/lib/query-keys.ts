@@ -18,6 +18,7 @@ export const QueryKeys = {
 
   // Settings related keys
   SETTINGS: 'settings',
+  EXCHANGE_RATES: 'exchangeRates',
 
   // Helper function to create account-specific keys
   accountHistory: (id: string) => ['account_history', id],

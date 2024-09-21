@@ -48,6 +48,7 @@ import {
   XCircle,
   type LucideIcon,
   LucideProps,
+  Pencil,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -84,6 +85,7 @@ export const Icons = {
   ChevronsLeft: ChevronsLeft,
   ChevronsRight: ChevronsRight,
   Plus: Plus,
+  Pencil: Pencil,
   PlusCircle: PlusCircle,
   Spinner: Loader2,
   Loader: Loader,

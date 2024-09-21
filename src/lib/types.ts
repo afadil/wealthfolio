@@ -303,3 +303,11 @@ export interface AccountSummary {
   account: Account;
   performance: PortfolioHistory;
 }
+
+export interface ExchangeRate {
+  id: number;
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  source: 'MANUAL' | 'YAHOO';
+}
