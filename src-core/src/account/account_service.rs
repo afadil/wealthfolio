@@ -29,12 +29,12 @@ impl AccountService {
         self.account_repo.load_account_by_id(&mut conn, account_id)
     }
 
-    pub fn create_account(
+    pub async fn create_account(
         &self,
         new_account: NewAccount,
     ) -> Result<Account, Box<dyn std::error::Error>> {
         let mut conn = self.pool.get()?;
-        let asset_service = AssetService::new(self.pool.clone());
+        let asset_service = AssetService::new(self.pool.clone()).await;
         let settings_service = SettingsService::new();
 
         conn.transaction(|conn| {

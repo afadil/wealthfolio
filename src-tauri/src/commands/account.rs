@@ -13,11 +13,15 @@ pub fn get_accounts(state: State<AppState>) -> Result<Vec<Account>, String> {
 }
 
 #[tauri::command]
-pub fn create_account(account: NewAccount, state: State<AppState>) -> Result<Account, String> {
+pub async fn create_account(
+    account: NewAccount,
+    state: State<'_, AppState>,
+) -> Result<Account, String> {
     println!("Adding new account...");
     let service = AccountService::new((*state.pool).clone());
     service
         .create_account(account)
+        .await
         .map_err(|e| format!("Failed to add new account: {}", e))
 }
 

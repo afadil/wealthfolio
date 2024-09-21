@@ -13,6 +13,7 @@ pub async fn calculate_historical_data(
     println!("Calculate portfolio historical...");
 
     let service = PortfolioService::new((*state.pool).clone())
+        .await
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
 
     service
@@ -25,22 +26,12 @@ pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>
     println!("Compute holdings...");
 
     let service = PortfolioService::new((*state.pool).clone())
+        .await
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
 
     service
         .compute_holdings()
         .map_err(|e| format!("Failed to fetch activities: {}", e))
-}
-
-#[tauri::command]
-pub async fn get_income_summary(state: State<'_, AppState>) -> Result<IncomeSummary, String> {
-    println!("Fetching income summary...");
-    let service = PortfolioService::new((*state.pool).clone())
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
-
-    service
-        .get_income_summary()
-        .map_err(|e| format!("Failed to fetch income summary: {}", e))
 }
 
 #[tauri::command]
@@ -51,6 +42,7 @@ pub async fn get_account_history(
     println!("Fetching account history for account ID: {}", account_id);
 
     let service = PortfolioService::new((*state.pool).clone())
+        .await
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
 
     service
@@ -65,6 +57,7 @@ pub async fn get_accounts_summary(
     println!("Fetching active accounts performance...");
 
     let service = PortfolioService::new((*state.pool).clone())
+        .await
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
 
     service
@@ -79,10 +72,23 @@ pub async fn recalculate_portfolio(
     println!("Recalculating portfolio...");
 
     let service = PortfolioService::new((*state.pool).clone())
+        .await
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
 
     service
         .update_portfolio()
         .await
         .map_err(|e| format!("Failed to recalculate portfolio: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_income_summary(state: State<'_, AppState>) -> Result<IncomeSummary, String> {
+    println!("Fetching income summary...");
+    let service = PortfolioService::new((*state.pool).clone())
+        .await
+        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+
+    service
+        .get_income_summary()
+        .map_err(|e| format!("Failed to fetch income summary: {}", e))
 }

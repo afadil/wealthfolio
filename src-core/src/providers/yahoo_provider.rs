@@ -61,9 +61,11 @@ pub struct YahooProvider {
 }
 
 impl YahooProvider {
-    pub fn new() -> Result<Self, yahoo::YahooError> {
+    pub async fn new() -> Result<Self, yahoo::YahooError> {
         let provider = yahoo::YahooConnector::new()?;
-        Ok(YahooProvider { provider })
+        let yahoo_provider = YahooProvider { provider };
+        yahoo_provider.set_crumb().await?;
+        Ok(yahoo_provider)
     }
 
     fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
@@ -86,8 +88,7 @@ impl YahooProvider {
         }
     }
 
-    // pub async fn set_crumb() -> Result<(), yahoo::YahooError> {
-    pub async fn set_crumb(&self) -> Result<(), yahoo::YahooError> {
+    async fn set_crumb(&self) -> Result<(), yahoo::YahooError> {
         let client = Client::new();
 
         // Make the first call to extract the Crumb cookie
@@ -300,11 +301,13 @@ impl YahooProvider {
         &self,
         symbol: &str,
     ) -> Result<YahooResult, yahoo::YahooError> {
-        let crumb_data = YAHOO_CRUMB.read().unwrap();
-
-        let crumb_data = crumb_data
-            .as_ref()
-            .ok_or_else(|| YahooError::FetchFailed("Crumb data not found".into()))?;
+        let crumb_data = {
+            let guard = YAHOO_CRUMB.read().unwrap();
+            guard
+                .as_ref()
+                .ok_or_else(|| YahooError::FetchFailed("Crumb data not found".into()))?
+                .clone()
+        };
 
         let url = format!(
             "https://query1.finance.yahoo.com/v10/finance/quoteSummary/{}?modules=price,summaryProfile,topHoldings&crumb={}",

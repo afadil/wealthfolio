@@ -26,14 +26,8 @@ pub struct PortfolioService {
     history_service: HistoryService,
 }
 
-/// This module contains the implementation of the `PortfolioService` struct.
-/// The `PortfolioService` struct provides methods for fetching and aggregating holdings,
-/// computing holdings, calculating historical portfolio values, and aggregating account history.
-/// It also includes helper methods for converting currency, fetching exchange rates,
-/// and getting dates between two given dates.
-
 impl PortfolioService {
-    pub fn new(
+    pub async fn new(
         pool: Pool<ConnectionManager<SqliteConnection>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut conn = pool.get()?;
@@ -41,7 +35,7 @@ impl PortfolioService {
         let settings = settings_service.get_settings(&mut conn)?;
         let base_currency = settings.base_currency;
 
-        let market_data_service = Arc::new(MarketDataService::new(pool.clone()));
+        let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await);
 
         Ok(PortfolioService {
             account_service: AccountService::new(pool.clone()),
@@ -52,8 +46,8 @@ impl PortfolioService {
                 CurrencyExchangeService::new(pool.clone()),
                 base_currency.clone(),
             ),
-            holdings_service: HoldingsService::new(pool.clone(), base_currency.clone()),
-            history_service: HistoryService::new(pool.clone(), base_currency),
+            holdings_service: HoldingsService::new(pool.clone(), base_currency.clone()).await,
+            history_service: HistoryService::new(pool.clone(), base_currency, market_data_service),
         })
     }
 
@@ -89,9 +83,6 @@ impl PortfolioService {
         account_ids: Option<Vec<String>>,
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
-        println!("Starting calculate_historical_data with account_ids: {:?}, force_full_calculation: {:?}", account_ids, force_full_calculation);
-        let strt_time = std::time::Instant::now();
-
         let (accounts, activities) = self.fetch_data(account_ids)?;
 
         let results = self.history_service.calculate_historical_data(
@@ -99,11 +90,6 @@ impl PortfolioService {
             &activities,
             force_full_calculation,
         )?;
-
-        println!(
-            "Calculating historical portfolio values took: {:?}",
-            std::time::Instant::now() - strt_time
-        );
 
         Ok(results)
     }

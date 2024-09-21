@@ -137,6 +137,7 @@ fn handle_menu_event(event: tauri::WindowMenuEvent) {
 fn spawn_quote_sync(app_handle: tauri::AppHandle, pool: Arc<DbPool>) {
     spawn(async move {
         let portfolio_service = portfolio::PortfolioService::new((*pool).clone())
+            .await
             .expect("Failed to create PortfolioService");
 
         app_handle

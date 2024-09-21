@@ -4,9 +4,9 @@ use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-
+use std::sync::Arc;
 pub struct AssetService {
-    market_data_service: MarketDataService,
+    market_data_service: Arc<MarketDataService>,
     pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
@@ -29,10 +29,11 @@ impl From<yahoo_finance_api::Quote> for Quote {
 }
 
 impl AssetService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
-        AssetService {
-            market_data_service: MarketDataService::new(pool.clone()),
+    pub async fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
+        let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await);
+        Self {
             pool,
+            market_data_service,
         }
     }
 
@@ -200,22 +201,20 @@ impl AssetService {
         self.market_data_service.search_symbol(query).await
     }
 
-    pub async fn initialize_crumb_data(&self) -> Result<(), String> {
-        self.market_data_service.initialize_crumb_data().await
-    }
-
-    pub async fn get_asset_profile(&self, asset_id: &str) -> Result<Asset, diesel::result::Error> {
-        println!("Getting asset profile for asset_id: {}", asset_id);
+    pub async fn get_asset_profile(
+        &self,
+        asset_id: &str,
+        sync: Option<bool>,
+    ) -> Result<Asset, diesel::result::Error> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         use crate::schema::assets::dsl::*;
 
+        let should_sync = sync.unwrap_or(true);
+
         match assets.find(asset_id).first::<Asset>(&mut conn) {
-            Ok(existing_profile) => {
-                println!("Found existing profile for asset_id: {}", asset_id);
-                Ok(existing_profile)
-            }
+            Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
-                println!("Asset profile not found in database for asset_id: {}. Fetching from market data service.", asset_id);
+                // symbol not found in database. Fetching from market data service.
                 let fetched_profile = self
                     .market_data_service
                     .fetch_symbol_summary(asset_id)
@@ -228,23 +227,22 @@ impl AssetService {
                         diesel::result::Error::NotFound
                     })?;
 
-                println!("Inserting new asset profile for asset_id: {}", asset_id);
                 let inserted_asset = diesel::insert_into(assets)
                     .values(&fetched_profile)
                     .returning(Asset::as_returning())
                     .get_result(&mut conn)?;
 
-                // Sync history quotes for the newly inserted asset
-                self.market_data_service
-                    .sync_quotes(&[inserted_asset.clone()])
-                    .await
-                    .map_err(|e| {
-                        println!(
-                            "Failed to sync history quotes for asset_id: {}. Error: {:?}",
-                            asset_id, e
-                        );
-                        diesel::result::Error::NotFound
-                    })?;
+                if should_sync {
+                    self.sync_symbol_quotes(&[inserted_asset.symbol.clone()])
+                        .await
+                        .map_err(|e| {
+                            println!(
+                                "Failed to sync quotes for asset_id: {}. Error: {:?}",
+                                asset_id, e
+                            );
+                            diesel::result::Error::NotFound
+                        })?;
+                }
 
                 Ok(inserted_asset)
             }
@@ -258,17 +256,7 @@ impl AssetService {
         }
     }
 
-    // pub async fn sync_history_quotes_for_all_assets(&self) -> Result<(), String> {
-    //     let asset_list = self.get_assets().map_err(|e| e.to_string())?;
-    //     self.market_data_service
-    //         .sync_history_quotes_for_all_assets(&asset_list)
-    //         .await
-    // }
-
-    // pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
-    //     let asset_list = self.get_assets().map_err(|e| e.to_string())?;
-    //     self.market_data_service
-    //         .initialize_and_sync_quotes(&asset_list)
-    //         .await
-    // }
+    pub async fn sync_symbol_quotes(&self, symbols: &[String]) -> Result<(), String> {
+        self.market_data_service.sync_quotes(symbols).await
+    }
 }

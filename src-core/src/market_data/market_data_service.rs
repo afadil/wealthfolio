@@ -14,9 +14,11 @@ pub struct MarketDataService {
 }
 
 impl MarketDataService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
+    pub async fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
         MarketDataService {
-            provider: YahooProvider::new().expect("Failed to initialize YahooProvider"),
+            provider: YahooProvider::new()
+                .await
+                .expect("Failed to initialize YahooProvider"),
             pool,
         }
     }
@@ -28,13 +30,13 @@ impl MarketDataService {
             .map_err(|e| e.to_string())
     }
 
-    pub async fn initialize_crumb_data(&self) -> Result<(), String> {
-        self.provider.set_crumb().await.map_err(|e| {
-            let error_message = format!("Failed to initialize crumb data: {}", e);
-            eprintln!("{}", &error_message);
-            error_message
-        })
-    }
+    // pub async fn initialize_provider(&self) -> Result<(), String> {
+    //     self.provider.set_crumb().await.map_err(|e| {
+    //         let error_message = format!("Failed to initialize crumb data: {}", e);
+    //         eprintln!("{}", &error_message);
+    //         error_message
+    //     })
+    // }
 
     pub fn get_latest_quote(&self, symbol: &str) -> QueryResult<Quote> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
@@ -68,13 +70,12 @@ impl MarketDataService {
         }
     }
 
-    pub async fn sync_quotes(&self, asset_list: &[Asset]) -> Result<(), String> {
+    pub async fn sync_quotes(&self, symbols: &[String]) -> Result<(), String> {
         println!("Syncing history quotes for all assets...");
         let end_date = SystemTime::now();
         let mut all_quotes_to_insert = Vec::new();
 
-        for asset in asset_list {
-            let symbol = asset.symbol.as_str();
+        for symbol in symbols {
             let last_sync_date = self
                 .get_last_quote_sync_date(symbol)
                 .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
@@ -126,17 +127,22 @@ impl MarketDataService {
 
     pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
         use crate::schema::assets::dsl::*;
-        self.initialize_crumb_data().await?;
+        // self.initialize_provider().await?;
         let conn = &mut self.pool.get().map_err(|e| e.to_string())?;
         let asset_list: Vec<Asset> = assets
             .load::<Asset>(conn)
             .map_err(|e| format!("Failed to load assets: {}", e))?;
 
-        self.sync_quotes(&asset_list).await
+        self.sync_quotes(
+            &asset_list
+                .iter()
+                .map(|asset| asset.symbol.clone())
+                .collect::<Vec<String>>(),
+        )
+        .await
     }
-
+    //self.initialize_provider().await?;
     pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, String> {
-        self.initialize_crumb_data().await?;
         self.provider
             .fetch_quote_summary(symbol)
             .await

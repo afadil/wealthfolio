@@ -11,8 +11,7 @@ pub async fn search_symbol(
     state: State<'_, AppState>,
 ) -> Result<Vec<QuoteSummary>, String> {
     println!("Searching for ticker symbol: {}", query);
-    let service = MarketDataService::new((*state.pool).clone());
-
+    let service = MarketDataService::new((*state.pool).clone()).await;
     service
         .search_symbol(&query)
         .await
@@ -20,14 +19,20 @@ pub async fn search_symbol(
 }
 
 #[tauri::command]
-pub fn get_asset_data(asset_id: String, state: State<AppState>) -> Result<AssetProfile, String> {
-    let service = AssetService::new((*state.pool).clone());
+pub async fn get_asset_data(
+    asset_id: String,
+    state: State<'_, AppState>,
+) -> Result<AssetProfile, String> {
+    let service = AssetService::new((*state.pool).clone()).await;
     service.get_asset_data(&asset_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
     println!("Synching quotes history");
-    let service = MarketDataService::new((*state.pool).clone());
-    service.initialize_and_sync_quotes().await
+    let service = MarketDataService::new((*state.pool).clone()).await;
+    service
+        .initialize_and_sync_quotes()
+        .await
+        .map_err(|e| e.to_string())
 }

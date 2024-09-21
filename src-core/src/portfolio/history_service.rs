@@ -16,16 +16,20 @@ use std::sync::Arc;
 pub struct HistoryService {
     pool: Pool<ConnectionManager<SqliteConnection>>,
     base_currency: String,
-    market_data_service: MarketDataService,
+    market_data_service: Arc<MarketDataService>,
     fx_service: CurrencyExchangeService,
 }
 
 impl HistoryService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
+    pub fn new(
+        pool: Pool<ConnectionManager<SqliteConnection>>,
+        base_currency: String,
+        market_data_service: Arc<MarketDataService>,
+    ) -> Self {
         Self {
             pool: pool.clone(),
-            base_currency: base_currency.clone(),
-            market_data_service: MarketDataService::new(pool.clone()),
+            base_currency,
+            market_data_service,
             fx_service: CurrencyExchangeService::new(pool),
         }
     }
@@ -393,10 +397,6 @@ impl HistoryService {
             .get_latest_exchange_rate(&activity.currency, account_currency)
             .unwrap_or(1.0);
 
-        println!(
-            "Exchange rate for {} to {}: {}",
-            activity.currency, account_currency, exchange_rate
-        );
         let activity_amount = activity.quantity * activity.unit_price * exchange_rate;
         let activity_fee = activity.fee * exchange_rate;
 

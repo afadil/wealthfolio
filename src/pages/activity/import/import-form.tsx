@@ -115,7 +115,6 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
   }`;
 
   const isLoading = checkImportMutation.isPending;
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 lg:max-w-4xl">

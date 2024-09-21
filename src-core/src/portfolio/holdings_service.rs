@@ -17,18 +17,21 @@ pub struct HoldingsService {
 }
 
 impl HoldingsService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
+    pub async fn new(
+        pool: Pool<ConnectionManager<SqliteConnection>>,
+        base_currency: String,
+    ) -> Self {
         HoldingsService {
             account_service: AccountService::new(pool.clone()),
             activity_service: ActivityService::new(pool.clone()),
-            asset_service: AssetService::new(pool.clone()),
+            asset_service: AssetService::new(pool.clone()).await,
             fx_service: CurrencyExchangeService::new(pool.clone()),
             base_currency,
         }
     }
-
     pub fn compute_holdings(&self) -> Result<Vec<Holding>> {
-        println!("Computing holdings");
+        let start_time = std::time::Instant::now();
+
         let mut holdings: HashMap<String, Holding> = HashMap::new();
         let accounts = self.account_service.get_accounts()?;
         let activities = self.activity_service.get_trading_activities()?;
@@ -172,7 +175,9 @@ impl HoldingsService {
             }
         }
 
-        println!("Computed {} holdings", holdings.len());
+        let duration = start_time.elapsed();
+        println!("Computed {} holdings in {:?}", holdings.len(), duration);
+
         Ok(holdings
             .into_values()
             .filter(|holding| holding.quantity > 0.0)

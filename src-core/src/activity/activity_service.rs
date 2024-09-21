@@ -11,7 +11,6 @@ use crate::schema::activities;
 use csv::ReaderBuilder;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use std::time::Duration;
 
 use uuid::Uuid;
 
@@ -83,7 +82,7 @@ impl ActivityService {
     ) -> Result<Activity, diesel::result::Error> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         let asset_id = activity.asset_id.clone();
-        let asset_service = AssetService::new(self.pool.clone());
+        let asset_service = AssetService::new(self.pool.clone()).await;
         let account_service = AccountService::new(self.pool.clone());
         let asset_profile = asset_service
             .get_asset_profile(&asset_id, Some(true))
@@ -122,7 +121,7 @@ impl ActivityService {
         mut activity: ActivityUpdate,
     ) -> Result<Activity, diesel::result::Error> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
-        let asset_service = AssetService::new(self.pool.clone());
+        let asset_service = AssetService::new(self.pool.clone()).await;
         let account_service = AccountService::new(self.pool.clone());
         let asset_profile = asset_service
             .get_asset_profile(&activity.asset_id, Some(true))
@@ -161,17 +160,11 @@ impl ActivityService {
         _account_id: String,
         file_path: String,
     ) -> Result<Vec<ActivityImport>, String> {
-        use std::time::Instant;
-        let start = Instant::now();
-
-        let asset_service = AssetService::new(self.pool.clone());
+        let asset_service = AssetService::new(self.pool.clone()).await;
         let account_service = AccountService::new(self.pool.clone());
         let account = account_service
             .get_account_by_id(&_account_id)
             .map_err(|e| e.to_string())?;
-
-        println!("Account retrieval took: {:?}", start.elapsed());
-        let file_open_start = Instant::now();
 
         let file = File::open(&file_path).map_err(|e| e.to_string())?;
         let mut rdr = ReaderBuilder::new()
@@ -181,26 +174,14 @@ impl ActivityService {
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
         let mut symbols_to_sync: Vec<String> = Vec::new();
 
-        println!(
-            "File opening and reader setup took: {:?}",
-            file_open_start.elapsed()
-        );
-        let processing_start = Instant::now();
-
         for (line_number, result) in rdr.deserialize().enumerate() {
             let line_number = line_number + 1; // Adjust for human-readable line number
             let mut activity_import: ActivityImport = result.map_err(|e| e.to_string())?;
 
-            let symbol_profile_start = Instant::now();
             // Load the symbol profile here, now awaiting the async call
             let symbol_profile_result = asset_service
                 .get_asset_profile(&activity_import.symbol, Some(false))
                 .await;
-            println!(
-                "Symbol profile retrieval for {} took: {:?}",
-                activity_import.symbol,
-                symbol_profile_start.elapsed()
-            );
 
             // Check if symbol profile is valid
             let (is_valid, error) = match symbol_profile_result {
@@ -229,23 +210,11 @@ impl ActivityService {
             activities_with_status.push(activity_import);
         }
 
-        println!(
-            "Processing all activities took: {:?}",
-            processing_start.elapsed()
-        );
-
         // Sync quotes for all valid symbols
         if !symbols_to_sync.is_empty() {
-            let sync_start = Instant::now();
             asset_service.sync_symbol_quotes(&symbols_to_sync).await?;
-            println!(
-                "Syncing quotes for {} symbols took: {:?}",
-                symbols_to_sync.len(),
-                sync_start.elapsed()
-            );
         }
 
-        println!("Total function duration: {:?}", start.elapsed());
         Ok(activities_with_status)
     }
 
