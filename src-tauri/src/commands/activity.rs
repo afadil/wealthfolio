@@ -56,22 +56,21 @@ pub fn update_activity(
 }
 
 #[tauri::command]
-pub fn check_activities_import(
+pub async fn check_activities_import(
     account_id: String,
     file_path: String,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<Vec<ActivityImport>, String> {
     println!(
         "Checking activities import...: {}, {}",
         account_id, file_path
     );
 
-    let result = tauri::async_runtime::block_on(async {
-        let service = activity_service::ActivityService::new((*state.pool).clone());
-        service.check_activities_import(account_id, file_path).await
-    });
-
-    result.map_err(|e| e.to_string())
+    let service = activity_service::ActivityService::new((*state.pool).clone());
+    service
+        .check_activities_import(account_id, file_path)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
