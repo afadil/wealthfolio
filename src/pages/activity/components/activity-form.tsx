@@ -67,7 +67,7 @@ interface ActivityFormProps {
 }
 
 export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: ActivityFormProps) {
-  const { submitActivity, addActivityMutation } = useActivityMutations();
+  const { addActivityMutation, updateActivityMutation } = useActivityMutations(onSuccess);
 
   const form = useForm<ActivityFormValues>({
     resolver: zodResolver(newActivitySchema),
@@ -75,10 +75,14 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
   });
 
   async function onSubmit(data: ActivityFormValues) {
-    await submitActivity(data);
-    onSuccess();
+    const { id, ...rest } = data;
+    if (id) {
+      return await updateActivityMutation.mutateAsync({ id, ...rest });
+    }
+    return await addActivityMutation.mutateAsync(rest);
   }
 
+  const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
   const watchedType = form.watch('activityType');
   const currentAccountCurrency =
     accounts.find((account) => account.value === form.watch('accountId'))?.currency || 'USD';
@@ -213,10 +217,16 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
         </div>
         <DialogFooter>
           <DialogTrigger asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" disabled={isLoading}>
+              Cancel
+            </Button>
           </DialogTrigger>
-          <Button type="submit">
-            <Icons.Plus className="h-4 w-4" />
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Plus className="h-4 w-4" />
+            )}
             <span className="hidden sm:ml-2 sm:inline">
               {defaultValues?.id ? 'Update Activity' : 'Add Activity'}
             </span>

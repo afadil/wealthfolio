@@ -7,7 +7,7 @@ import * as z from 'zod';
 
 type ActivityFormValues = z.infer<typeof newActivitySchema>;
 
-export function useActivityMutations() {
+export function useActivityMutations(onSuccess?: () => void) {
   const queryClient = useQueryClient();
   const calculateHistoryMutation = useCalculateHistoryMutation({
     successTitle: 'Activity updated successfully.',
@@ -20,6 +20,7 @@ export function useActivityMutations() {
         accountIds: activity.accountId ? [activity.accountId] : undefined,
         forceFullCalculation: true,
       });
+      if (onSuccess) onSuccess();
     },
     onError: () => {
       toast({
