@@ -526,3 +526,13 @@ pub struct AccountSummary {
     pub account: Account,
     pub performance: PortfolioHistory,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeRate {
+    pub id: String,
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+    pub source: String,
+}

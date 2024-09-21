@@ -305,9 +305,9 @@ export interface AccountSummary {
 }
 
 export interface ExchangeRate {
-  id: number;
+  id: string;
   fromCurrency: string;
   toCurrency: string;
   rate: number;
-  source: 'MANUAL' | 'YAHOO';
+  source: string;
 }
