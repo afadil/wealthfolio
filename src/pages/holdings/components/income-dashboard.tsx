@@ -198,7 +198,7 @@ export function IncomeDashboard() {
                   {topDividendStocks.map(([symbol, income], index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="font-medium">{symbol}</div>
-                      <div className="font-medium text-green-600">
+                      <div className="text-success">
                         {formatAmount(income, incomeSummary.currency)}
                       </div>
                     </div>

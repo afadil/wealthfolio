@@ -80,7 +80,16 @@ const AccountPage = () => {
             <div className="w-full p-0">
               <div className="flex w-full flex-col">
                 {isLoadingAccountHistory ? (
-                  <Skeleton className="h-96" />
+                  <div className="space-y-2 p-4">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
                 ) : (
                   <HistoryChart data={accountHistory || []} />
                 )}
