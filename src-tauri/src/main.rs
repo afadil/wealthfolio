@@ -19,8 +19,7 @@ use commands::portfolio::{
     get_income_summary, recalculate_portfolio,
 };
 use commands::settings::{
-    get_exchange_rate_symbols, get_latest_quote, get_settings, update_currency,
-    update_exchange_rate, update_settings,
+    get_exchange_rates, get_settings, update_currency, update_exchange_rate, update_settings,
 };
 
 use wealthfolio_core::db;
@@ -100,8 +99,7 @@ fn main() {
             get_settings,
             update_settings,
             update_currency,
-            get_latest_quote,
-            get_exchange_rate_symbols,
+            get_exchange_rates,
             update_exchange_rate,
             create_goal,
             update_goal,

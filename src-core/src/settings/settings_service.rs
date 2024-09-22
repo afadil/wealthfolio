@@ -114,4 +114,22 @@ impl SettingsService {
             .first(conn)
             .optional()
     }
+
+    pub fn get_exchange_rates(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<ExchangeRate>, diesel::result::Error> {
+        // Get exchange rate symbols
+        let mut exchange_rates = self.get_exchange_rate_symbols(conn)?;
+
+        // For each exchange rate, get the latest quote
+        for rate in &mut exchange_rates {
+            let fx_symbol = format!("{}{}=X", rate.from_currency, rate.to_currency);
+            if let Some(quote) = self.get_latest_quote(conn, &fx_symbol)? {
+                rate.rate = quote.close;
+            }
+        }
+
+        Ok(exchange_rates)
+    }
 }

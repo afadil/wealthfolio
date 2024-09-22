@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import { ExchangeRate } from '@/lib/types';
 import {
-  getExchangeRateSymbols,
+  getExchangeRates,
   updateExchangeRate as updateExchangeRateApi,
 } from '@/commands/exchange-rates';
 import { QueryKeys } from '@/lib/query-keys';
@@ -14,21 +14,15 @@ export function useExchangeRates() {
     successTitle: 'Exchange rate updated and calculation triggered successfully.',
   });
 
-  const { data: exchangeRateSymbols, isLoading: isLoadingSymbols } = useQuery<
-    ExchangeRate[],
-    Error
-  >({
-    queryKey: [QueryKeys.EXCHANGE_RATE_SYMBOLS],
-    queryFn: getExchangeRateSymbols,
+  const { data: exchangeRates, isLoading: isLoadingRates } = useQuery<ExchangeRate[], Error>({
+    queryKey: [QueryKeys.EXCHANGE_RATES],
+    queryFn: getExchangeRates,
   });
 
   const updateExchangeRateMutation = useMutation({
     mutationFn: updateExchangeRateApi,
     onSuccess: (updatedRate) => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATE_SYMBOLS] });
-      queryClient.invalidateQueries({
-        queryKey: [QueryKeys.QUOTE, `${updatedRate.fromCurrency}${updatedRate.toCurrency}=X`],
-      });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
       toast({
         title: 'Exchange rate updated successfully',
         description: `${updatedRate.fromCurrency}/${updatedRate.toCurrency} rate updated to ${updatedRate.rate}`,
@@ -54,8 +48,8 @@ export function useExchangeRates() {
   };
 
   return {
-    exchangeRateSymbols,
-    isLoadingSymbols,
+    exchangeRates,
+    isLoadingRates,
     updateExchangeRate,
   };
 }

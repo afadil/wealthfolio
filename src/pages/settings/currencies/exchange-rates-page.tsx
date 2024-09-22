@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { SettingsHeader } from '../header';
 
 export default function ExchangeRatesPage() {
-  const { exchangeRateSymbols, isLoadingSymbols, updateExchangeRate } = useExchangeRates();
+  const { exchangeRates, isLoadingRates, updateExchangeRate } = useExchangeRates();
 
   const columns: ColumnDef<ExchangeRate>[] = [
     {
@@ -38,14 +38,14 @@ export default function ExchangeRatesPage() {
         text="Manage and view exchange rates for different currencies."
       />
       <Separator />
-      {isLoadingSymbols ? (
+      {isLoadingRates ? (
         <div className="space-y-2">
           {[...Array(5)].map((_, index) => (
             <Skeleton key={index} className="h-10 w-full" />
           ))}
         </div>
       ) : (
-        <DataTable columns={columns} data={exchangeRateSymbols || []} />
+        <DataTable columns={columns} data={exchangeRates || []} />
       )}
     </div>
   );

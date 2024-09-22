@@ -64,22 +64,32 @@ pub fn update_exchange_rate(
         .map_err(|e| format!("Failed to update exchange rate: {}", e))
 }
 
-#[tauri::command]
-pub fn get_exchange_rate_symbols(state: State<AppState>) -> Result<Vec<ExchangeRate>, String> {
-    println!("Fetching exchange rate symbols...");
-    let mut conn = get_connection(&state)?;
-    let service = settings_service::SettingsService::new();
-    service
-        .get_exchange_rate_symbols(&mut conn)
-        .map_err(|e| format!("Failed to load exchange rate symbols: {}", e))
-}
+// #[tauri::command]
+// pub fn get_exchange_rate_symbols(state: State<AppState>) -> Result<Vec<ExchangeRate>, String> {
+//     println!("Fetching exchange rate symbols...");
+//     let mut conn = get_connection(&state)?;
+//     let service = settings_service::SettingsService::new();
+//     service
+//         .get_exchange_rate_symbols(&mut conn)
+//         .map_err(|e| format!("Failed to load exchange rate symbols: {}", e))
+// }
+
+// #[tauri::command]
+// pub fn get_latest_quote(state: State<AppState>, symbol: String) -> Result<Option<Quote>, String> {
+//     println!("Fetching latest quote for symbol: {}", symbol);
+//     let mut conn = get_connection(&state)?;
+//     let service = settings_service::SettingsService::new();
+//     service
+//         .get_latest_quote(&mut conn, &symbol)
+//         .map_err(|e| format!("Failed to load latest quote: {}", e))
+// }
 
 #[tauri::command]
-pub fn get_latest_quote(state: State<AppState>, symbol: String) -> Result<Option<Quote>, String> {
-    println!("Fetching latest quote for symbol: {}", symbol);
+pub fn get_exchange_rates(state: State<AppState>) -> Result<Vec<ExchangeRate>, String> {
+    println!("Fetching exchange rates...");
     let mut conn = get_connection(&state)?;
     let service = settings_service::SettingsService::new();
     service
-        .get_latest_quote(&mut conn, &symbol)
-        .map_err(|e| format!("Failed to load latest quote: {}", e))
+        .get_exchange_rates(&mut conn)
+        .map_err(|e| format!("Failed to load exchange rates: {}", e))
 }

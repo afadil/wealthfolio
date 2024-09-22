@@ -1,8 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ExchangeRate, Quote } from '@/lib/types';
-import { getLatestQuote } from '@/commands/exchange-rates';
-import { QueryKeys } from '@/lib/query-keys';
+import { ExchangeRate } from '@/lib/types';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,13 +14,6 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedRate, setEditedRate] = useState(rate.rate.toString());
   const isManual = rate.source === 'MANUAL';
-
-  const { data: quote, isLoading } = useQuery<Quote | null, Error>({
-    queryKey: [QueryKeys.QUOTE, `${rate.fromCurrency}${rate.toCurrency}=X`],
-    queryFn: () => getLatestQuote(`${rate.fromCurrency}${rate.toCurrency}=X`),
-  });
-
-  console.log('++++quote', quote);
 
   const handleEdit = () => {
     if (!isManual) {
@@ -58,12 +48,6 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
     setIsEditing(false);
   };
 
-  if (isLoading) {
-    return <Icons.Spinner className="h-4 w-4 animate-spin" />;
-  }
-
-  const displayRate = quote ? Math.max(quote.open, quote.close).toFixed(4) : '-';
-
   return (
     <div className="flex items-center space-x-2">
       <div className="w-24">
@@ -74,7 +58,7 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
             className="w-full"
           />
         ) : (
-          <span>{displayRate}</span>
+          <span>{rate.rate ? rate.rate.toFixed(4) : '-'}</span>
         )}
       </div>
       {isManual && (
