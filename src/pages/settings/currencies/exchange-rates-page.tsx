@@ -7,17 +7,34 @@ import { RateCell } from './rate-cell';
 import { Separator } from '@/components/ui/separator';
 import { SettingsHeader } from '../header';
 
+type ExtendedExchangeRate = ExchangeRate & {
+  fromCurrencyName: string;
+  toCurrencyName: string;
+};
+
 export default function ExchangeRatesPage() {
   const { exchangeRates, isLoadingRates, updateExchangeRate } = useExchangeRates();
 
-  const columns: ColumnDef<ExchangeRate>[] = [
+  const columns: ColumnDef<ExtendedExchangeRate>[] = [
     {
       accessorKey: 'fromCurrency',
       header: 'From',
+      cell: ({ row }) => (
+        <div>
+          <div>{row.original.fromCurrency}</div>
+          <div className="text-xs text-muted-foreground">{row.original.fromCurrencyName}</div>
+        </div>
+      ),
     },
     {
       accessorKey: 'toCurrency',
       header: 'To',
+      cell: ({ row }) => (
+        <div>
+          <div>{row.original.toCurrency}</div>
+          <div className="text-xs text-muted-foreground">{row.original.toCurrencyName}</div>
+        </div>
+      ),
     },
     {
       accessorKey: 'source',

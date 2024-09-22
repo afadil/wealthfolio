@@ -7,6 +7,7 @@ import {
 } from '@/commands/exchange-rates';
 import { QueryKeys } from '@/lib/query-keys';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
+import { worldCurrencies } from '@/lib/currencies';
 
 export function useExchangeRates() {
   const queryClient = useQueryClient();
@@ -14,9 +15,21 @@ export function useExchangeRates() {
     successTitle: 'Exchange rate updated and calculation triggered successfully.',
   });
 
+  const getCurrencyName = (code: string) => {
+    const currency = worldCurrencies.find((c) => c.value === code);
+    return currency ? currency.label.split(' (')[0] : code;
+  };
+
   const { data: exchangeRates, isLoading: isLoadingRates } = useQuery<ExchangeRate[], Error>({
     queryKey: [QueryKeys.EXCHANGE_RATES],
-    queryFn: getExchangeRates,
+    queryFn: async () => {
+      const rates = await getExchangeRates();
+      return rates.map((rate) => ({
+        ...rate,
+        fromCurrencyName: getCurrencyName(rate.fromCurrency),
+        toCurrencyName: getCurrencyName(rate.toCurrency),
+      }));
+    },
   });
 
   const updateExchangeRateMutation = useMutation({
