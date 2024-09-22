@@ -7,15 +7,10 @@ import { RateCell } from './rate-cell';
 import { Separator } from '@/components/ui/separator';
 import { SettingsHeader } from '../header';
 
-type ExtendedExchangeRate = ExchangeRate & {
-  fromCurrencyName: string;
-  toCurrencyName: string;
-};
-
 export default function ExchangeRatesPage() {
   const { exchangeRates, isLoadingRates, updateExchangeRate } = useExchangeRates();
 
-  const columns: ColumnDef<ExtendedExchangeRate>[] = [
+  const columns: ColumnDef<ExchangeRate>[] = [
     {
       accessorKey: 'fromCurrency',
       header: 'From',

@@ -1,3 +1,5 @@
+use crate::fx::fx_repository::FxRepository;
+use crate::models::{ExchangeRate, Quote};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -67,6 +69,43 @@ impl CurrencyExchangeService {
         let date = from_date.max(to_date);
         self.cache_rate(&symbol, rate, date)?;
         Ok(rate)
+    }
+
+    pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>, Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
+        let mut exchange_rates = FxRepository::get_exchange_rates(&mut conn)?;
+
+        for rate in &mut exchange_rates {
+            let fx_symbol = format!("{}{}=X", rate.from_currency, rate.to_currency);
+            if let Some(quote) = self.get_latest_quote(&fx_symbol)? {
+                rate.rate = quote.close;
+                rate.source = quote.data_source;
+            }
+        }
+
+        Ok(exchange_rates)
+    }
+
+    pub fn update_exchange_rate(
+        &self,
+        rate: &ExchangeRate,
+    ) -> Result<ExchangeRate, Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
+        Ok(FxRepository::update_exchange_rate(&mut conn, rate)?)
+    }
+
+    fn get_latest_quote(
+        &self,
+        fx_symbol: &str,
+    ) -> Result<Option<Quote>, Box<dyn std::error::Error>> {
+        use crate::schema::quotes::dsl::*;
+        let mut conn = self.pool.get()?;
+
+        Ok(quotes
+            .filter(symbol.eq(fx_symbol))
+            .order(date.desc())
+            .first(&mut conn)
+            .optional()?)
     }
 
     fn get_latest_rate_from_db(

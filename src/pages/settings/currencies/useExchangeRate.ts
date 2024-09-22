@@ -24,11 +24,25 @@ export function useExchangeRates() {
     queryKey: [QueryKeys.EXCHANGE_RATES],
     queryFn: async () => {
       const rates = await getExchangeRates();
-      return rates.map((rate) => ({
+      const processedRates = rates.map((rate) => ({
         ...rate,
         fromCurrencyName: getCurrencyName(rate.fromCurrency),
         toCurrencyName: getCurrencyName(rate.toCurrency),
       }));
+
+      // For manual rates, keep only from->to and filter out the reverse
+      return processedRates.filter((rate) => {
+        if (rate.source === 'MANUAL') {
+          const reverseManualRate = processedRates.find(
+            (r) =>
+              r.fromCurrency === rate.toCurrency &&
+              r.toCurrency === rate.fromCurrency &&
+              r.source === 'MANUAL',
+          );
+          return !reverseManualRate || rate.fromCurrency < rate.toCurrency;
+        }
+        return true; // Keep all non-manual rates
+      });
     },
   });
 

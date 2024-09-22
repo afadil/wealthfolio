@@ -31,6 +31,7 @@ use wealthfolio_core::asset;
 use wealthfolio_core::goal;
 use wealthfolio_core::market_data;
 
+use wealthfolio_core::fx;
 use wealthfolio_core::portfolio;
 use wealthfolio_core::settings;
 

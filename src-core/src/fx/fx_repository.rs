@@ -1,75 +1,53 @@
-use crate::models::{ExchangeRate, NewExchangeRate};
-use crate::schema::exchange_rates;
-use chrono::Utc;
+use crate::models::{Asset, ExchangeRate};
+use crate::schema::assets;
+
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use uuid::Uuid;
 
 pub struct FxRepository;
 
 impl FxRepository {
-    pub fn create(
-        conn: &mut SqliteConnection,
-        new_rate: NewExchangeRate,
-    ) -> QueryResult<ExchangeRate> {
-        let id = new_rate.id.unwrap_or_else(|| Uuid::new_v4().to_string());
-        let now = Utc::now().naive_utc();
+    pub fn get_exchange_rates(conn: &mut SqliteConnection) -> QueryResult<Vec<ExchangeRate>> {
+        use crate::schema::assets::dsl as assets_dsl;
 
-        let rate = ExchangeRate {
-            id,
-            from_currency: new_rate.from_currency,
-            to_currency: new_rate.to_currency,
-            rate: new_rate.rate,
-            source: new_rate.source,
-            created_at: now,
-            updated_at: now,
+        let asset_rates: Vec<Asset> = assets_dsl::assets
+            .filter(assets_dsl::asset_type.eq("Currency"))
+            .load::<Asset>(conn)?;
+
+        Ok(asset_rates
+            .into_iter()
+            .map(|asset| {
+                let symbol_parts: Vec<&str> = asset.symbol.split('=').collect();
+                ExchangeRate {
+                    id: asset.id,
+                    from_currency: symbol_parts[0][..3].to_string(),
+                    to_currency: symbol_parts[0][3..].to_string(),
+                    rate: 0.0,
+                    source: asset.data_source,
+                }
+            })
+            .collect())
+    }
+
+    pub fn update_exchange_rate(
+        conn: &mut SqliteConnection,
+        rate: &ExchangeRate,
+    ) -> QueryResult<ExchangeRate> {
+        let asset = Asset {
+            id: rate.id.clone(),
+            symbol: format!("{}{}=X", rate.from_currency, rate.to_currency),
+            name: Some(rate.rate.to_string()),
+            asset_type: Some("Currency".to_string()),
+            data_source: rate.source.clone(),
+            currency: rate.to_currency.clone(),
+            updated_at: chrono::Utc::now().naive_utc(),
+            ..Default::default()
         };
 
-        diesel::insert_into(exchange_rates::table)
-            .values(&rate)
+        diesel::update(assets::table.find(&asset.id))
+            .set(&asset)
             .execute(conn)?;
 
-        Ok(rate)
-    }
-
-    pub fn read(conn: &mut SqliteConnection, id: &str) -> QueryResult<ExchangeRate> {
-        exchange_rates::table.find(id).first(conn)
-    }
-
-    pub fn read_by_currencies(
-        conn: &mut SqliteConnection,
-        from: &str,
-        to: &str,
-    ) -> QueryResult<ExchangeRate> {
-        exchange_rates::table
-            .filter(exchange_rates::from_currency.eq(from))
-            .filter(exchange_rates::to_currency.eq(to))
-            .first(conn)
-    }
-
-    pub fn update(
-        conn: &mut SqliteConnection,
-        id: &str,
-        updated_rate: NewExchangeRate,
-    ) -> QueryResult<ExchangeRate> {
-        let now = Utc::now().naive_utc();
-
-        diesel::update(exchange_rates::table.find(id))
-            .set((
-                exchange_rates::from_currency.eq(updated_rate.from_currency),
-                exchange_rates::to_currency.eq(updated_rate.to_currency),
-                exchange_rates::rate.eq(updated_rate.rate),
-                exchange_rates::source.eq(updated_rate.source),
-                exchange_rates::updated_at.eq(now),
-            ))
-            .get_result(conn)
-    }
-
-    pub fn delete(conn: &mut SqliteConnection, id: &str) -> QueryResult<usize> {
-        diesel::delete(exchange_rates::table.find(id)).execute(conn)
-    }
-
-    pub fn list_all(conn: &mut SqliteConnection) -> QueryResult<Vec<ExchangeRate>> {
-        exchange_rates::table.load::<ExchangeRate>(conn)
+        Ok(rate.clone())
     }
 }
