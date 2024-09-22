@@ -310,4 +310,5 @@ export interface ExchangeRate {
   toCurrency: string;
   rate: number;
   source: string;
+  isLoading?: boolean;
 }

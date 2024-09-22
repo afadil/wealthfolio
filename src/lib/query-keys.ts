@@ -20,6 +20,10 @@ export const QueryKeys = {
   SETTINGS: 'settings',
   EXCHANGE_RATES: 'exchangeRates',
 
+  // New keys for exchange rates
+  EXCHANGE_RATE_SYMBOLS: 'exchange_rate_symbols',
+  QUOTE: 'quote',
+
   // Helper function to create account-specific keys
   accountHistory: (id: string) => ['account_history', id],
 } as const;

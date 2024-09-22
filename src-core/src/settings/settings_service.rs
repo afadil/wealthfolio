@@ -1,6 +1,6 @@
 // settings_service.rs
 
-use crate::models::{Asset, ExchangeRate, NewSettings, Settings};
+use crate::models::{Asset, ExchangeRate, NewSettings, Quote, Settings};
 use crate::schema::assets::dsl::*;
 use crate::schema::settings::dsl::*;
 use diesel::prelude::*;
@@ -54,28 +54,6 @@ impl SettingsService {
         Ok(())
     }
 
-    pub fn get_exchange_rates(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<ExchangeRate>, diesel::result::Error> {
-        let asset_rates: Vec<Asset> = assets
-            .filter(asset_type.eq("Currency"))
-            .load::<Asset>(conn)?;
-        Ok(asset_rates
-            .into_iter()
-            .map(|asset| {
-                let symbol_parts: Vec<&str> = asset.symbol.split('=').collect();
-                ExchangeRate {
-                    id: asset.id,
-                    from_currency: symbol_parts[0][..3].to_string(),
-                    to_currency: symbol_parts[0][3..].to_string(),
-                    rate: asset.name.unwrap_or_default().parse().unwrap_or(1.0),
-                    source: asset.data_source,
-                }
-            })
-            .collect())
-    }
-
     pub fn update_exchange_rate(
         &self,
         conn: &mut SqliteConnection,
@@ -97,5 +75,43 @@ impl SettingsService {
             .execute(conn)?;
 
         Ok(rate.clone())
+    }
+
+    pub fn get_exchange_rate_symbols(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<ExchangeRate>, diesel::result::Error> {
+        use crate::schema::assets::dsl as assets_dsl;
+
+        let asset_rates: Vec<Asset> = assets_dsl::assets
+            .filter(assets_dsl::asset_type.eq("Currency"))
+            .load::<Asset>(conn)?;
+
+        Ok(asset_rates
+            .into_iter()
+            .map(|asset| {
+                let symbol_parts: Vec<&str> = asset.symbol.split('=').collect();
+                ExchangeRate {
+                    id: asset.id,
+                    from_currency: symbol_parts[0][..3].to_string(),
+                    to_currency: symbol_parts[0][3..].to_string(),
+                    rate: 0.0,
+                    source: asset.data_source,
+                }
+            })
+            .collect())
+    }
+
+    pub fn get_latest_quote(
+        &self,
+        conn: &mut SqliteConnection,
+        fx_symbol: &str,
+    ) -> Result<Option<Quote>, diesel::result::Error> {
+        use crate::schema::quotes::dsl::*;
+        quotes
+            .filter(symbol.eq(fx_symbol))
+            .order(date.desc())
+            .first(conn)
+            .optional()
     }
 }

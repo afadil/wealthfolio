@@ -30,14 +30,6 @@ impl MarketDataService {
             .map_err(|e| e.to_string())
     }
 
-    // pub async fn initialize_provider(&self) -> Result<(), String> {
-    //     self.provider.set_crumb().await.map_err(|e| {
-    //         let error_message = format!("Failed to initialize crumb data: {}", e);
-    //         eprintln!("{}", &error_message);
-    //         error_message
-    //     })
-    // }
-
     pub fn get_latest_quote(&self, symbol: &str) -> QueryResult<Quote> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         quotes::table
