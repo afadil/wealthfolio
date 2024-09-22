@@ -68,6 +68,13 @@ impl YahooProvider {
         Ok(yahoo_provider)
     }
 
+    pub async fn get_latest_quote(&self, symbol: &str) -> Result<yahoo::Quote, yahoo::YahooError> {
+        let response = self.provider.get_latest_quotes(symbol, "1d").await?;
+        response
+            .last_quote()
+            .map_err(|_| yahoo::YahooError::EmptyDataSet)
+    }
+
     fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
         let date = DateTime::<Utc>::from_timestamp(yahoo_quote.timestamp as i64, 0)
             .unwrap_or_default()
@@ -146,7 +153,7 @@ impl YahooProvider {
         Ok(asset_profiles)
     }
 
-    pub async fn fetch_quote_summary(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+    pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
         // Handle the cash asset case
         if let Some(currency) = symbol.strip_prefix("$CASH-") {
             return Ok(self.create_cash_asset(symbol, currency));

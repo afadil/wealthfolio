@@ -4,7 +4,7 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub fn get_accounts(state: State<AppState>) -> Result<Vec<Account>, String> {
+pub async fn get_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, String> {
     println!("Fetching active accounts...");
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = AccountService::new((*state.pool).clone(), base_currency);
@@ -28,7 +28,10 @@ pub async fn create_account(
 }
 
 #[tauri::command]
-pub fn update_account(account: AccountUpdate, state: State<AppState>) -> Result<Account, String> {
+pub async fn update_account(
+    account: AccountUpdate,
+    state: State<'_, AppState>,
+) -> Result<Account, String> {
     println!("Updating account...");
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = AccountService::new((*state.pool).clone(), base_currency);
@@ -38,7 +41,10 @@ pub fn update_account(account: AccountUpdate, state: State<AppState>) -> Result<
 }
 
 #[tauri::command]
-pub fn delete_account(account_id: String, state: State<AppState>) -> Result<usize, String> {
+pub async fn delete_account(
+    account_id: String,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
     println!("Deleting account...");
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = AccountService::new((*state.pool).clone(), base_currency);

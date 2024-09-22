@@ -1,6 +1,6 @@
-use crate::models::{Asset, NewAsset, Quote, QuoteSummary};
+use crate::models::{Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
 use crate::providers::yahoo_provider::YahooProvider;
-use crate::schema::{activities, quotes};
+use crate::schema::{activities, exchange_rates, quotes};
 use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -119,8 +119,8 @@ impl MarketDataService {
 
     pub async fn initialize_and_sync_quotes(&self) -> Result<(), String> {
         use crate::schema::assets::dsl::*;
-        // self.initialize_provider().await?;
         let conn = &mut self.pool.get().map_err(|e| e.to_string())?;
+        self.sync_exchange_rates().await?;
         let asset_list: Vec<Asset> = assets
             .load::<Asset>(conn)
             .map_err(|e| format!("Failed to load assets: {}", e))?;
@@ -131,12 +131,14 @@ impl MarketDataService {
                 .map(|asset| asset.symbol.clone())
                 .collect::<Vec<String>>(),
         )
-        .await
+        .await?;
+
+        Ok(())
     }
     //self.initialize_provider().await?;
     pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, String> {
         self.provider
-            .fetch_quote_summary(symbol)
+            .fetch_symbol_summary(symbol)
             .await
             .map_err(|e| e.to_string())
     }
@@ -155,5 +157,98 @@ impl MarketDataService {
                 eprintln!("Error fetching asset currencies: {}", e);
                 HashMap::new()
             })
+    }
+
+    pub async fn sync_exchange_rates(&self) -> Result<(), String> {
+        println!("Syncing exchange rates...");
+        let mut conn = self.pool.get().expect("Couldn't get db connection");
+
+        // Load existing exchange rates
+        let existing_rates: Vec<ExchangeRate> = exchange_rates::table
+            .load::<ExchangeRate>(&mut conn)
+            .map_err(|e| format!("Failed to load existing exchange rates: {}", e))?;
+
+        let mut updated_rates = Vec::new();
+
+        for rate in existing_rates {
+            match self
+                .fetch_exchange_rate(&rate.from_currency, &rate.to_currency)
+                .await
+            {
+                Ok(new_rate) => {
+                    if new_rate > 0.0 {
+                        updated_rates.push(ExchangeRate {
+                            id: rate.id,
+                            from_currency: rate.from_currency,
+                            to_currency: rate.to_currency,
+                            rate: new_rate,
+                            source: "YAHOO".to_string(),
+                            created_at: rate.created_at,
+                            updated_at: Utc::now().naive_utc(),
+                        });
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Failed to fetch rate for {}-{}: {}. Skipping update.",
+                        rate.from_currency, rate.to_currency, e
+                    );
+                }
+            }
+        }
+
+        // Update rates in the database
+        diesel::replace_into(exchange_rates::table)
+            .values(&updated_rates)
+            .execute(&mut conn)
+            .map_err(|e| format!("Failed to update exchange rates: {}", e))?;
+
+        Ok(())
+    }
+
+    async fn fetch_exchange_rate(&self, from: &str, to: &str) -> Result<f64, String> {
+        // Try direct conversion
+        let symbol = format!("{}{}=X", from, to);
+        if let Ok(quote) = self.provider.get_latest_quote(&symbol).await {
+            return Ok(quote.close);
+        }
+
+        // Try reverse conversion
+        let reverse_symbol = format!("{}{}=X", to, from);
+        if let Ok(quote) = self.provider.get_latest_quote(&reverse_symbol).await {
+            return Ok(1.0 / quote.close);
+        }
+
+        // Try conversion through USD
+        let from_usd_symbol = if from != "USD" {
+            format!("{}USD=X", from)
+        } else {
+            "".to_string()
+        };
+
+        let to_usd_symbol = if to != "USD" {
+            format!("{}USD=X", to)
+        } else {
+            "".to_string()
+        };
+        let from_usd = if !from_usd_symbol.is_empty() {
+            match self.provider.get_latest_quote(&from_usd_symbol).await {
+                Ok(quote) => quote.close,
+                Err(_) => return Ok(-1.0),
+            }
+        } else {
+            -1.0
+        };
+
+        let to_usd = if !to_usd_symbol.is_empty() {
+            match self.provider.get_latest_quote(&to_usd_symbol).await {
+                Ok(quote) => quote.close,
+                Err(_) => return Ok(-1.0),
+            }
+        } else {
+            1.0
+        };
+
+        Ok(from_usd / to_usd)
     }
 }

@@ -22,7 +22,8 @@ pub async fn calculate_historical_data(
 
     service
         .calculate_historical_data(account_ids, force_full_calculation)
-        .map_err(|e| format!("Failed to calculate historical data: {}", e))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -32,7 +33,9 @@ pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>
 
     service
         .compute_holdings()
-        .map_err(|e| format!("Failed to fetch activities: {}", e))
+        .await
+        .map_err(|e| e.to_string())
+        .map(|vec| Ok(vec))?
 }
 
 #[tauri::command]

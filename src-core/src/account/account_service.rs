@@ -1,6 +1,6 @@
 use crate::account::AccountRepository;
 use crate::fx::fx_service::CurrencyExchangeService;
-use crate::models::{Account, AccountUpdate, ExchangeRate, NewAccount};
+use crate::models::{Account, AccountUpdate, NewAccount};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::Connection;
 use diesel::SqliteConnection;
@@ -44,16 +44,8 @@ impl AccountService {
         conn.transaction(|conn| {
             if new_account.currency != base_currency {
                 let fx_service = CurrencyExchangeService::new(self.pool.clone());
-                let exchange_rate = ExchangeRate {
-                    id: format!("{}{}=X", base_currency, new_account.currency),
-                    created_at: chrono::Utc::now().naive_utc(),
-                    updated_at: chrono::Utc::now().naive_utc(),
-                    from_currency: base_currency.clone(),
-                    to_currency: new_account.currency.clone(),
-                    source: "MANUAL".to_string(),
-                    rate: 1.0, // Default rate, should be updated with actual rate
-                };
-                fx_service.upsert_exchange_rate(conn, exchange_rate)?;
+                fx_service
+                    .add_exchange_rate(base_currency.clone(), new_account.currency.clone())?;
             }
 
             // Insert new account

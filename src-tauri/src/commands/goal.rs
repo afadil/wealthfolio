@@ -16,7 +16,7 @@ fn get_connection(
 }
 
 #[tauri::command]
-pub fn get_goals(state: State<AppState>) -> Result<Vec<Goal>, String> {
+pub async fn get_goals(state: State<'_, AppState>) -> Result<Vec<Goal>, String> {
     println!("Fetching active goals...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
@@ -26,7 +26,7 @@ pub fn get_goals(state: State<AppState>) -> Result<Vec<Goal>, String> {
 }
 
 #[tauri::command]
-pub fn create_goal(goal: NewGoal, state: State<AppState>) -> Result<Goal, String> {
+pub async fn create_goal(goal: NewGoal, state: State<'_, AppState>) -> Result<Goal, String> {
     println!("Adding new goal...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
@@ -36,7 +36,7 @@ pub fn create_goal(goal: NewGoal, state: State<AppState>) -> Result<Goal, String
 }
 
 #[tauri::command]
-pub fn update_goal(goal: Goal, state: State<AppState>) -> Result<Goal, String> {
+pub async fn update_goal(goal: Goal, state: State<'_, AppState>) -> Result<Goal, String> {
     println!("Updating goal...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
@@ -46,7 +46,7 @@ pub fn update_goal(goal: Goal, state: State<AppState>) -> Result<Goal, String> {
 }
 
 #[tauri::command]
-pub fn delete_goal(goal_id: String, state: State<AppState>) -> Result<usize, String> {
+pub async fn delete_goal(goal_id: String, state: State<'_, AppState>) -> Result<usize, String> {
     println!("Deleting goal...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
@@ -56,9 +56,9 @@ pub fn delete_goal(goal_id: String, state: State<AppState>) -> Result<usize, Str
 }
 
 #[tauri::command]
-pub fn update_goal_allocations(
+pub async fn update_goal_allocations(
     allocations: Vec<GoalsAllocation>,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<usize, String> {
     println!("Updating goal allocations...");
     let mut conn = get_connection(&state)?;
@@ -69,7 +69,9 @@ pub fn update_goal_allocations(
 }
 
 #[tauri::command]
-pub fn load_goals_allocations(state: State<AppState>) -> Result<Vec<GoalsAllocation>, String> {
+pub async fn load_goals_allocations(
+    state: State<'_, AppState>,
+) -> Result<Vec<GoalsAllocation>, String> {
     println!("Loading goal allocations...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();

@@ -17,7 +17,7 @@ fn get_connection(
 }
 
 #[tauri::command]
-pub fn get_settings(state: State<AppState>) -> Result<Settings, String> {
+pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
     println!("Fetching active settings...");
     let mut conn = get_connection(&state)?;
     let service = settings_service::SettingsService::new();
@@ -27,7 +27,10 @@ pub fn get_settings(state: State<AppState>) -> Result<Settings, String> {
 }
 
 #[tauri::command]
-pub fn update_settings(settings: Settings, state: State<AppState>) -> Result<Settings, String> {
+pub async fn update_settings(
+    settings: Settings,
+    state: State<'_, AppState>,
+) -> Result<Settings, String> {
     println!("Updating settings..."); // Log message
     let mut conn = get_connection(&state)?;
     let service = settings_service::SettingsService::new();
@@ -42,33 +45,10 @@ pub fn update_settings(settings: Settings, state: State<AppState>) -> Result<Set
         .map_err(|e| format!("Failed to load settings: {}", e))
 }
 
-// #[tauri::command]
-// pub async fn update_base_currency(
-//     state: tauri::State<'_, AppState>,
-//     new_currency: String,
-// ) -> Result<Settings, String> {
-//     let pool = &state.pool;
-//     let mut conn = pool.get().map_err(|e| e.to_string())?;
-
-//     let settings_service = settings_service::SettingsService::new();
-//     settings_service
-//         .update_base_currency(&mut conn, &new_currency)
-//         .map_err(|e| e.to_string())?;
-
-//     // Update the app state
-//     let mut base_currency = state.base_currency.write().map_err(|e| e.to_string())?;
-//     *base_currency = new_currency;
-
-//     // Return the updated settings
-//     settings_service
-//         .get_settings(&mut conn)
-//         .map_err(|e| format!("Failed to load updated settings: {}", e))
-// }
-
 #[tauri::command]
-pub fn update_exchange_rate(
+pub async fn update_exchange_rate(
     rate: ExchangeRate,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<ExchangeRate, String> {
     println!("Updating exchange rate...");
     let fx_service = CurrencyExchangeService::new((*state.pool).clone());
@@ -78,7 +58,7 @@ pub fn update_exchange_rate(
 }
 
 #[tauri::command]
-pub fn get_exchange_rates(state: State<AppState>) -> Result<Vec<ExchangeRate>, String> {
+pub async fn get_exchange_rates(state: State<'_, AppState>) -> Result<Vec<ExchangeRate>, String> {
     println!("Fetching exchange rates...");
     let fx_service = CurrencyExchangeService::new((*state.pool).clone());
     fx_service

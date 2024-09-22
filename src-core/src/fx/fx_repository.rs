@@ -19,6 +19,13 @@ impl FxRepository {
         exchange_rates::table.find(id).first(conn).optional()
     }
 
+    pub fn get_exchange_rate_by_id(
+        conn: &mut SqliteConnection,
+        id: &str,
+    ) -> QueryResult<Option<ExchangeRate>> {
+        exchange_rates::table.find(id).first(conn).optional()
+    }
+
     pub fn upsert_exchange_rate(
         conn: &mut SqliteConnection,
         new_rate: ExchangeRate,

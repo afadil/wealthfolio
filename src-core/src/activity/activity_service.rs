@@ -3,6 +3,7 @@ use std::fs::File;
 use crate::account::AccountService;
 use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
+use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
     Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, IncomeData, NewActivity, Sort,
 };
@@ -81,8 +82,8 @@ impl ActivityService {
     pub async fn create_activity(
         &self,
         mut activity: NewActivity,
-    ) -> Result<Activity, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
+    ) -> Result<Activity, Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
         let asset_id = activity.asset_id.clone();
         let asset_service = AssetService::new(self.pool.clone()).await;
         let account_service = AccountService::new(self.pool.clone(), self.base_currency.clone());
@@ -103,15 +104,15 @@ impl ActivityService {
                 activity.unit_price = 1.0;
             }
 
+            // Create exchange rate if asset currency is different from account currency
+            if activity.currency != account.currency {
+                let fx_service = CurrencyExchangeService::new(self.pool.clone());
+                fx_service
+                    .add_exchange_rate(account.currency.clone(), activity.currency.clone())?;
+            }
+
             // Insert the new activity into the database
             let inserted_activity = self.repo.insert_new_activity(conn, activity)?;
-
-            // Create currency symbols if asset currency is different from account currency
-            if asset_profile.currency != account.currency {
-                asset_service
-                    .create_exchange_rate_symbols(conn, &asset_profile.currency, &account.currency)
-                    .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
-            }
 
             Ok(inserted_activity)
         })
@@ -121,8 +122,8 @@ impl ActivityService {
     pub async fn update_activity(
         &self,
         mut activity: ActivityUpdate,
-    ) -> Result<Activity, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
+    ) -> Result<Activity, Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
         let asset_service = AssetService::new(self.pool.clone()).await;
         let account_service = AccountService::new(self.pool.clone(), self.base_currency.clone());
         let asset_profile = asset_service
@@ -142,15 +143,15 @@ impl ActivityService {
                 activity.unit_price = 1.0;
             }
 
+            // Create exchange rate if asset currency is different from account currency
+            if activity.currency != account.currency {
+                let fx_service = CurrencyExchangeService::new(self.pool.clone());
+                fx_service
+                    .add_exchange_rate(account.currency.clone(), activity.currency.clone())?;
+            }
+
             // Update the activity in the database
             let updated_activity = self.repo.update_activity(conn, activity)?;
-
-            // Create currency symbols if asset currency is different from account currency
-            if asset_profile.currency != account.currency {
-                asset_service
-                    .create_exchange_rate_symbols(conn, &asset_profile.currency, &account.currency)
-                    .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
-            }
 
             Ok(updated_activity)
         })

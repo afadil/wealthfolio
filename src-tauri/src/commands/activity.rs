@@ -6,14 +6,14 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub fn search_activities(
+pub async fn search_activities(
     page: i64,                                 // Page number, 1-based
     page_size: i64,                            // Number of items per page
     account_id_filter: Option<Vec<String>>,    // Optional account_id filter
     activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
     asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
     sort: Option<Sort>,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<ActivitySearchResponse, String> {
     println!("Search activities... {}, {}", page, page_size);
     let base_currency = state.base_currency.read().unwrap().clone();
@@ -32,30 +32,31 @@ pub fn search_activities(
 }
 
 #[tauri::command]
-pub fn create_activity(activity: NewActivity, state: State<AppState>) -> Result<Activity, String> {
+pub async fn create_activity(
+    activity: NewActivity,
+    state: State<'_, AppState>,
+) -> Result<Activity, String> {
     println!("Adding new activity...");
     let base_currency = state.base_currency.read().unwrap().clone();
-    let result = tauri::async_runtime::block_on(async {
-        let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
-        service.create_activity(activity).await
-    });
-
-    result.map_err(|e| format!("Failed to add new activity: {}", e))
+    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    service
+        .create_activity(activity)
+        .await
+        .map_err(|e| format!("Failed to add new activity: {}", e))
 }
 
 #[tauri::command]
-pub fn update_activity(
+pub async fn update_activity(
     activity: ActivityUpdate,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<Activity, String> {
     println!("Updating activity...");
     let base_currency = state.base_currency.read().unwrap().clone();
-    let result = tauri::async_runtime::block_on(async {
-        let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
-        service.update_activity(activity).await
-    });
-
-    result.map_err(|e| format!("Failed to update activity: {}", e))
+    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    service
+        .update_activity(activity)
+        .await
+        .map_err(|e| format!("Failed to update activity: {}", e))
 }
 
 #[tauri::command]
@@ -77,9 +78,9 @@ pub async fn check_activities_import(
 }
 
 #[tauri::command]
-pub fn create_activities(
+pub async fn create_activities(
     activities: Vec<NewActivity>,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<usize, String> {
     println!("Importing activities...");
     let base_currency = state.base_currency.read().unwrap().clone();
@@ -90,7 +91,10 @@ pub fn create_activities(
 }
 
 #[tauri::command]
-pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<Activity, String> {
+pub async fn delete_activity(
+    activity_id: String,
+    state: State<'_, AppState>,
+) -> Result<Activity, String> {
     println!("Deleting activity...");
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);

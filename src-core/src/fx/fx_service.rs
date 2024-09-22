@@ -122,21 +122,40 @@ impl CurrencyExchangeService {
     }
 
     fn fetch_yahoo_rate(&self, from: &str, to: &str) -> Result<f64, Box<dyn std::error::Error>> {
+        println!("Fetching Yahoo rate for {} to {}", from, to);
+
         let direct_id = format!("{}{}=X", from, to);
+        println!("Attempting direct conversion with ID: {}", direct_id);
         if let Ok(rate) = self.fetch_rate_from_yahoo(&direct_id) {
+            println!("Direct conversion successful. Rate: {}", rate);
             return Ok(rate);
         }
 
         let inverse_id = format!("{}{}=X", to, from);
+        println!("Attempting inverse conversion with ID: {}", inverse_id);
         if let Ok(rate) = self.fetch_rate_from_yahoo(&inverse_id) {
-            return Ok(1.0 / rate);
+            let inverse_rate = 1.0 / rate;
+            println!("Inverse conversion successful. Rate: {}", inverse_rate);
+            return Ok(inverse_rate);
         }
 
         // If both direct and inverse fail, try USD conversion
-        let from_usd = self.fetch_rate_from_yahoo(&format!("USD{}=X", from))?;
-        let to_usd = self.fetch_rate_from_yahoo(&format!("USD{}=X", to))?;
+        println!("Direct and inverse conversions failed. Attempting USD conversion.");
+        let from_usd_id = format!("USD{}=X", from);
+        let to_usd_id = format!("USD{}=X", to);
 
-        Ok(from_usd / to_usd)
+        println!("Fetching USD to {} rate", from);
+        let from_usd = self.fetch_rate_from_yahoo(&from_usd_id)?;
+        println!("USD to {} rate: {}", from, from_usd);
+
+        println!("Fetching USD to {} rate", to);
+        let to_usd = self.fetch_rate_from_yahoo(&to_usd_id)?;
+        println!("USD to {} rate: {}", to, to_usd);
+
+        let final_rate = from_usd / to_usd;
+        println!("Final conversion rate: {}", final_rate);
+
+        Ok(final_rate)
     }
 
     fn fetch_rate_from_yahoo(&self, symbol: &str) -> Result<f64, Box<dyn std::error::Error>> {
@@ -172,5 +191,41 @@ impl CurrencyExchangeService {
         let updated_rate = FxRepository::upsert_exchange_rate(conn, new_rate)?;
         self.cache_rate(&updated_rate.id, updated_rate.rate)?;
         Ok(updated_rate)
+    }
+
+    pub fn add_exchange_rate(
+        &self,
+        from: String,
+        to: String,
+    ) -> Result<ExchangeRate, Box<dyn std::error::Error>> {
+        let mut conn = self.pool.get()?;
+
+        // Check for direct conversion
+        let direct_id = format!("{}{}=X", from, to);
+        if let Some(existing_rate) = FxRepository::get_exchange_rate_by_id(&mut conn, &direct_id)? {
+            return Ok(existing_rate);
+        }
+
+        // Check for inverse conversion
+        let inverse_id = format!("{}{}=X", to, from);
+        if let Some(existing_rate) = FxRepository::get_exchange_rate_by_id(&mut conn, &inverse_id)?
+        {
+            return Ok(existing_rate);
+        }
+
+        // If neither direct nor inverse rate exists, create a new rate
+        let exchange_rate = ExchangeRate {
+            id: direct_id,
+            from_currency: from,
+            to_currency: to,
+            rate: 1.0, // Default rate, should be updated with actual rate
+            source: "MANUAL".to_string(),
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let result = self.upsert_exchange_rate(&mut conn, exchange_rate)?;
+        self.cache_rate(&result.id, result.rate)?;
+        Ok(result)
     }
 }

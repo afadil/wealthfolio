@@ -49,21 +49,19 @@ impl PortfolioService {
         })
     }
 
-    pub fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
-        match self.holdings_service.compute_holdings() {
-            Ok(holdings) => Ok(holdings),
-            Err(e) => {
-                eprintln!("Error computing holdings: {}", e);
-                Err(Box::new(e) as Box<dyn std::error::Error>)
-            }
-        }
+    pub async fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
+        self.holdings_service
+            .compute_holdings()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 
-    pub fn calculate_historical_data(
+    pub async fn calculate_historical_data(
         &self,
         account_ids: Option<Vec<String>>,
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+        // First, sync quotes
+        self.market_data_service.sync_exchange_rates().await?;
         let accounts = match &account_ids {
             Some(ids) => self.account_service.get_accounts_by_ids(ids)?,
             None => self.account_service.get_accounts()?,
@@ -100,7 +98,7 @@ impl PortfolioService {
             .await?;
 
         // Then, calculate historical data
-        self.calculate_historical_data(None, false)
+        self.calculate_historical_data(None, false).await
     }
 
     pub fn get_account_history(
