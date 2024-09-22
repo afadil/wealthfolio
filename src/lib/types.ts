@@ -223,7 +223,6 @@ export interface AssetData {
 }
 
 export interface Settings {
-  id: number;
   theme: string;
   font: string;
   baseCurrency: string;

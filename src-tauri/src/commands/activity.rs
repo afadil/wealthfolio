@@ -16,7 +16,8 @@ pub fn search_activities(
     state: State<AppState>,
 ) -> Result<ActivitySearchResponse, String> {
     println!("Search activities... {}, {}", page, page_size);
-    let service = activity_service::ActivityService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
 
     service
         .search_activities(
@@ -33,8 +34,9 @@ pub fn search_activities(
 #[tauri::command]
 pub fn create_activity(activity: NewActivity, state: State<AppState>) -> Result<Activity, String> {
     println!("Adding new activity...");
+    let base_currency = state.base_currency.read().unwrap().clone();
     let result = tauri::async_runtime::block_on(async {
-        let service = activity_service::ActivityService::new((*state.pool).clone());
+        let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
         service.create_activity(activity).await
     });
 
@@ -47,8 +49,9 @@ pub fn update_activity(
     state: State<AppState>,
 ) -> Result<Activity, String> {
     println!("Updating activity...");
+    let base_currency = state.base_currency.read().unwrap().clone();
     let result = tauri::async_runtime::block_on(async {
-        let service = activity_service::ActivityService::new((*state.pool).clone());
+        let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
         service.update_activity(activity).await
     });
 
@@ -65,8 +68,8 @@ pub async fn check_activities_import(
         "Checking activities import...: {}, {}",
         account_id, file_path
     );
-
-    let service = activity_service::ActivityService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
     service
         .check_activities_import(account_id, file_path)
         .await
@@ -79,7 +82,8 @@ pub fn create_activities(
     state: State<AppState>,
 ) -> Result<usize, String> {
     println!("Importing activities...");
-    let service = activity_service::ActivityService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
     service
         .create_activities(activities)
         .map_err(|err| format!("Failed to import activities: {}", err))
@@ -88,7 +92,8 @@ pub fn create_activities(
 #[tauri::command]
 pub fn delete_activity(activity_id: String, state: State<AppState>) -> Result<Activity, String> {
     println!("Deleting activity...");
-    let service = activity_service::ActivityService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
     service
         .delete_activity(activity_id)
         .map_err(|e| format!("Failed to delete activity: {}", e))

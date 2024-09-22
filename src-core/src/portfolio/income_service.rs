@@ -54,6 +54,7 @@ impl IncomeService {
 
     pub fn get_income_summary(&self) -> Result<IncomeSummary, diesel::result::Error> {
         let income_data = self.get_income_data()?;
+        let base_currency = self.base_currency.clone();
 
         let mut by_month: HashMap<String, f64> = HashMap::new();
         let mut by_type: HashMap<String, f64> = HashMap::new();
@@ -67,7 +68,7 @@ impl IncomeService {
             let month = data.date.format("%Y-%m").to_string();
             let converted_amount = self
                 .fx_service
-                .convert_currency(data.amount, &data.currency, &self.base_currency)
+                .convert_currency(data.amount, &data.currency, &base_currency)
                 .unwrap_or(data.amount);
 
             *by_month.entry(month).or_insert(0.0) += converted_amount;
@@ -86,7 +87,7 @@ impl IncomeService {
             by_symbol,
             total_income,
             total_income_ytd,
-            currency: self.base_currency.clone(),
+            currency: base_currency,
         })
     }
 }

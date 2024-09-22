@@ -45,7 +45,6 @@ export function GeneralSettingForm() {
 
   function onSubmit(data: GeneralSettingFormValues) {
     const updatedSettings = {
-      id: settings?.id || 1,
       theme: settings?.theme || 'light',
       font: settings?.font || 'font-mono',
       ...data,

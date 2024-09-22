@@ -4,6 +4,13 @@ use crate::AppState;
 
 use tauri::State;
 
+async fn create_portfolio_service(state: &State<'_, AppState>) -> Result<PortfolioService, String> {
+    let base_currency = state.base_currency.read().unwrap().clone();
+    PortfolioService::new((*state.pool).clone(), base_currency)
+        .await
+        .map_err(|e| format!("Failed to create PortfolioService: {}", e))
+}
+
 #[tauri::command]
 pub async fn calculate_historical_data(
     state: State<'_, AppState>,
@@ -11,10 +18,7 @@ pub async fn calculate_historical_data(
     force_full_calculation: bool,
 ) -> Result<Vec<HistorySummary>, String> {
     println!("Calculate portfolio historical...");
-
-    let service = PortfolioService::new((*state.pool).clone())
-        .await
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+    let service = create_portfolio_service(&state).await?;
 
     service
         .calculate_historical_data(account_ids, force_full_calculation)
@@ -24,10 +28,7 @@ pub async fn calculate_historical_data(
 #[tauri::command]
 pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>, String> {
     println!("Compute holdings...");
-
-    let service = PortfolioService::new((*state.pool).clone())
-        .await
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+    let service = create_portfolio_service(&state).await?;
 
     service
         .compute_holdings()
@@ -40,10 +41,7 @@ pub async fn get_account_history(
     account_id: String,
 ) -> Result<Vec<PortfolioHistory>, String> {
     println!("Fetching account history for account ID: {}", account_id);
-
-    let service = PortfolioService::new((*state.pool).clone())
-        .await
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+    let service = create_portfolio_service(&state).await?;
 
     service
         .get_account_history(&account_id)
@@ -55,10 +53,7 @@ pub async fn get_accounts_summary(
     state: State<'_, AppState>,
 ) -> Result<Vec<AccountSummary>, String> {
     println!("Fetching active accounts performance...");
-
-    let service = PortfolioService::new((*state.pool).clone())
-        .await
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+    let service = create_portfolio_service(&state).await?;
 
     service
         .get_accounts_summary()
@@ -70,10 +65,7 @@ pub async fn recalculate_portfolio(
     state: State<'_, AppState>,
 ) -> Result<Vec<HistorySummary>, String> {
     println!("Recalculating portfolio...");
-
-    let service = PortfolioService::new((*state.pool).clone())
-        .await
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+    let service = create_portfolio_service(&state).await?;
 
     service
         .update_portfolio()
@@ -84,9 +76,7 @@ pub async fn recalculate_portfolio(
 #[tauri::command]
 pub async fn get_income_summary(state: State<'_, AppState>) -> Result<IncomeSummary, String> {
     println!("Fetching income summary...");
-    let service = PortfolioService::new((*state.pool).clone())
-        .await
-        .map_err(|e| format!("Failed to create PortfolioService: {}", e))?;
+    let service = create_portfolio_service(&state).await?;
 
     service
         .get_income_summary()

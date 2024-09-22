@@ -3,10 +3,8 @@ use crate::activity::activity_service::ActivityService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{
-    Account, AccountSummary, Activity, HistorySummary, Holding, IncomeData, IncomeSummary,
-    PortfolioHistory,
+    AccountSummary, HistorySummary, Holding, IncomeData, IncomeSummary, PortfolioHistory,
 };
-use crate::settings::SettingsService;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
@@ -29,17 +27,13 @@ pub struct PortfolioService {
 impl PortfolioService {
     pub async fn new(
         pool: Pool<ConnectionManager<SqliteConnection>>,
+        base_currency: String,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut conn = pool.get()?;
-        let settings_service = SettingsService::new();
-        let settings = settings_service.get_settings(&mut conn)?;
-        let base_currency = settings.base_currency;
-
         let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await);
 
         Ok(PortfolioService {
-            account_service: AccountService::new(pool.clone()),
-            activity_service: ActivityService::new(pool.clone()),
+            account_service: AccountService::new(pool.clone(), base_currency.clone()),
+            activity_service: ActivityService::new(pool.clone(), base_currency.clone()),
             market_data_service: market_data_service.clone(),
             income_service: IncomeService::new(
                 pool.clone(),
@@ -47,7 +41,11 @@ impl PortfolioService {
                 base_currency.clone(),
             ),
             holdings_service: HoldingsService::new(pool.clone(), base_currency.clone()).await,
-            history_service: HistoryService::new(pool.clone(), base_currency, market_data_service),
+            history_service: HistoryService::new(
+                pool.clone(),
+                base_currency.clone(),
+                market_data_service,
+            ),
         })
     }
 
@@ -61,10 +59,11 @@ impl PortfolioService {
         }
     }
 
-    fn fetch_data(
+    pub fn calculate_historical_data(
         &self,
         account_ids: Option<Vec<String>>,
-    ) -> Result<(Vec<Account>, Vec<Activity>), Box<dyn std::error::Error>> {
+        force_full_calculation: bool,
+    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
         let accounts = match &account_ids {
             Some(ids) => self.account_service.get_accounts_by_ids(ids)?,
             None => self.account_service.get_accounts()?,
@@ -74,16 +73,6 @@ impl PortfolioService {
             Some(ids) => self.activity_service.get_activities_by_account_ids(ids)?,
             None => self.activity_service.get_activities()?,
         };
-
-        Ok((accounts, activities))
-    }
-
-    pub fn calculate_historical_data(
-        &self,
-        account_ids: Option<Vec<String>>,
-        force_full_calculation: bool,
-    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
-        let (accounts, activities) = self.fetch_data(account_ids)?;
 
         let results = self.history_service.calculate_historical_data(
             &accounts,

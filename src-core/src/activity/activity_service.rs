@@ -17,13 +17,15 @@ use uuid::Uuid;
 pub struct ActivityService {
     repo: ActivityRepository,
     pool: Pool<ConnectionManager<SqliteConnection>>,
+    base_currency: String,
 }
 
 impl ActivityService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
+    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
         ActivityService {
             repo: ActivityRepository::new(),
             pool,
+            base_currency,
         }
     }
 
@@ -83,7 +85,7 @@ impl ActivityService {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         let asset_id = activity.asset_id.clone();
         let asset_service = AssetService::new(self.pool.clone()).await;
-        let account_service = AccountService::new(self.pool.clone());
+        let account_service = AccountService::new(self.pool.clone(), self.base_currency.clone());
         let asset_profile = asset_service
             .get_asset_profile(&asset_id, Some(true))
             .await?;
@@ -122,7 +124,7 @@ impl ActivityService {
     ) -> Result<Activity, diesel::result::Error> {
         let mut conn = self.pool.get().expect("Couldn't get db connection");
         let asset_service = AssetService::new(self.pool.clone()).await;
-        let account_service = AccountService::new(self.pool.clone());
+        let account_service = AccountService::new(self.pool.clone(), self.base_currency.clone());
         let asset_profile = asset_service
             .get_asset_profile(&activity.asset_id, Some(true))
             .await?;
@@ -161,7 +163,7 @@ impl ActivityService {
         file_path: String,
     ) -> Result<Vec<ActivityImport>, String> {
         let asset_service = AssetService::new(self.pool.clone()).await;
-        let account_service = AccountService::new(self.pool.clone());
+        let account_service = AccountService::new(self.pool.clone(), self.base_currency.clone());
         let account = account_service
             .get_account_by_id(&_account_id)
             .map_err(|e| e.to_string())?;

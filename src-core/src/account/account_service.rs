@@ -1,7 +1,6 @@
 use crate::account::AccountRepository;
-use crate::asset::asset_service::AssetService;
-use crate::models::{Account, AccountUpdate, NewAccount};
-use crate::settings::SettingsService;
+use crate::fx::fx_service::CurrencyExchangeService;
+use crate::models::{Account, AccountUpdate, ExchangeRate, NewAccount};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::Connection;
 use diesel::SqliteConnection;
@@ -9,13 +8,15 @@ use diesel::SqliteConnection;
 pub struct AccountService {
     account_repo: AccountRepository,
     pool: Pool<ConnectionManager<SqliteConnection>>,
+    base_currency: String,
 }
 
 impl AccountService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
+    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
         AccountService {
             account_repo: AccountRepository::new(),
             pool,
+            base_currency,
         }
     }
 
@@ -34,24 +35,25 @@ impl AccountService {
         new_account: NewAccount,
     ) -> Result<Account, Box<dyn std::error::Error>> {
         let mut conn = self.pool.get()?;
-        let asset_service = AssetService::new(self.pool.clone()).await;
-        let settings_service = SettingsService::new();
+        let base_currency = self.base_currency.clone();
 
+        println!(
+            "Creating account..., base_currency: {}, new_account.currency: {}",
+            base_currency, new_account.currency
+        );
         conn.transaction(|conn| {
-            let settings = settings_service.get_settings(conn)?;
-            let base_currency = settings.base_currency;
-
-            // Create exchange rate assets if necessary
-            asset_service.create_exchange_rate_symbols(
-                conn,
-                &base_currency,
-                &new_account.currency,
-            )?;
-
-            // Create cash ($CASH-CURRENCY) asset if necessary
-            let cash_asset_id = format!("$CASH-{}", new_account.currency);
-            if asset_service.get_asset_by_id(&cash_asset_id).is_err() {
-                asset_service.create_cash_asset(conn, &new_account.currency)?;
+            if new_account.currency != base_currency {
+                let fx_service = CurrencyExchangeService::new(self.pool.clone());
+                let exchange_rate = ExchangeRate {
+                    id: format!("{}{}=X", base_currency, new_account.currency),
+                    created_at: chrono::Utc::now().naive_utc(),
+                    updated_at: chrono::Utc::now().naive_utc(),
+                    from_currency: base_currency.clone(),
+                    to_currency: new_account.currency.clone(),
+                    source: "MANUAL".to_string(),
+                    rate: 1.0, // Default rate, should be updated with actual rate
+                };
+                fx_service.upsert_exchange_rate(conn, exchange_rate)?;
             }
 
             // Insert new account

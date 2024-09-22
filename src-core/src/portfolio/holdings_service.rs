@@ -22,8 +22,8 @@ impl HoldingsService {
         base_currency: String,
     ) -> Self {
         HoldingsService {
-            account_service: AccountService::new(pool.clone()),
-            activity_service: ActivityService::new(pool.clone()),
+            account_service: AccountService::new(pool.clone(), base_currency.clone()),
+            activity_service: ActivityService::new(pool.clone(), base_currency.clone()),
             asset_service: AssetService::new(pool.clone()).await,
             fx_service: CurrencyExchangeService::new(pool.clone()),
             base_currency,
@@ -143,13 +143,15 @@ impl HoldingsService {
             // Get exchange rate for the holding's currency to base currency
             let exchange_rate = match self
                 .fx_service
-                .get_latest_exchange_rate(&holding.currency, &self.base_currency)
+                .get_latest_exchange_rate(&holding.currency, &self.base_currency.clone())
             {
                 Ok(rate) => rate,
                 Err(e) => {
                     eprintln!(
                         "Error getting exchange rate for {} to {}: {}. Using 1 as default.",
-                        holding.currency, self.base_currency, e
+                        holding.currency,
+                        self.base_currency.clone(),
+                        e
                     );
                     1.0
                 }

@@ -18,9 +18,7 @@ use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
     get_income_summary, recalculate_portfolio,
 };
-use commands::settings::{
-    get_exchange_rates, get_settings, update_currency, update_exchange_rate, update_settings,
-};
+use commands::settings::{get_exchange_rates, get_settings, update_exchange_rate, update_settings};
 
 use wealthfolio_core::db;
 use wealthfolio_core::models;
@@ -38,7 +36,7 @@ use wealthfolio_core::settings;
 use dotenvy::dotenv;
 use std::env;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
@@ -50,6 +48,7 @@ type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 // AppState
 struct AppState {
     pool: Arc<DbPool>,
+    base_currency: Arc<RwLock<String>>,
 }
 
 fn main() {
@@ -73,8 +72,18 @@ fn main() {
                 .expect("Failed to create database connection pool");
             let pool = Arc::new(pool);
 
+            // Get initial base_currency from settings
+            let mut conn = pool.get().expect("Failed to get database connection");
+            let settings_service = settings::SettingsService::new();
+            let base_currency = settings_service
+                .get_base_currency(&mut conn)
+                .unwrap_or_else(|_| "USD".to_string());
+
             // Initialize state
-            let state = AppState { pool: pool.clone() };
+            let state = AppState {
+                pool: pool.clone(),
+                base_currency: Arc::new(RwLock::new(base_currency)),
+            };
             app.manage(state);
 
             spawn_quote_sync(app_handle, pool);
@@ -99,7 +108,6 @@ fn main() {
             synch_quotes,
             get_settings,
             update_settings,
-            update_currency,
             get_exchange_rates,
             update_exchange_rate,
             create_goal,
@@ -141,7 +149,12 @@ fn handle_menu_event(event: tauri::WindowMenuEvent) {
 
 fn spawn_quote_sync(app_handle: tauri::AppHandle, pool: Arc<DbPool>) {
     spawn(async move {
-        let portfolio_service = portfolio::PortfolioService::new((*pool).clone())
+        let base_currency = {
+            let state = app_handle.state::<AppState>();
+            let currency = state.base_currency.read().unwrap().clone();
+            currency
+        };
+        let portfolio_service = portfolio::PortfolioService::new((*pool).clone(), base_currency)
             .await
             .expect("Failed to create PortfolioService");
 

@@ -393,22 +393,19 @@ pub struct Sort {
 }
 
 #[derive(Queryable, Insertable, Serialize, Deserialize, Debug)]
-#[diesel(table_name= crate::schema::settings)]
+#[diesel(table_name= crate::schema::app_settings)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSetting {
+    pub setting_key: String,
+    pub setting_value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    pub id: i32,
     pub theme: String,
     pub font: String,
     pub base_currency: String,
-}
-
-#[derive(Insertable, Serialize, AsChangeset, Deserialize, Debug)]
-#[diesel(table_name= crate::schema::settings)]
-#[serde(rename_all = "camelCase")]
-pub struct NewSettings<'a> {
-    pub theme: &'a str,
-    pub font: &'a str,
-    pub base_currency: &'a str,
 }
 
 #[derive(
@@ -527,10 +524,25 @@ pub struct AccountSummary {
     pub performance: PortfolioHistory,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(
+    Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Debug, Clone,
+)]
+#[diesel(table_name = crate::schema::exchange_rates)]
 #[serde(rename_all = "camelCase")]
 pub struct ExchangeRate {
     pub id: String,
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+    pub source: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
+#[diesel(table_name = crate::schema::exchange_rates)]
+#[serde(rename_all = "camelCase")]
+pub struct NewExchangeRate {
     pub from_currency: String,
     pub to_currency: String,
     pub rate: f64,

@@ -6,7 +6,8 @@ use tauri::State;
 #[tauri::command]
 pub fn get_accounts(state: State<AppState>) -> Result<Vec<Account>, String> {
     println!("Fetching active accounts...");
-    let service = AccountService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = AccountService::new((*state.pool).clone(), base_currency);
     service
         .get_accounts()
         .map_err(|e| format!("Failed to load accounts: {}", e))
@@ -18,7 +19,8 @@ pub async fn create_account(
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
     println!("Adding new account...");
-    let service = AccountService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = AccountService::new((*state.pool).clone(), base_currency);
     service
         .create_account(account)
         .await
@@ -28,7 +30,8 @@ pub async fn create_account(
 #[tauri::command]
 pub fn update_account(account: AccountUpdate, state: State<AppState>) -> Result<Account, String> {
     println!("Updating account...");
-    let service = AccountService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = AccountService::new((*state.pool).clone(), base_currency);
     service
         .update_account(account)
         .map_err(|e| format!("Failed to update account: {}", e))
@@ -37,7 +40,8 @@ pub fn update_account(account: AccountUpdate, state: State<AppState>) -> Result<
 #[tauri::command]
 pub fn delete_account(account_id: String, state: State<AppState>) -> Result<usize, String> {
     println!("Deleting account...");
-    let service = AccountService::new((*state.pool).clone());
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = AccountService::new((*state.pool).clone(), base_currency);
     service
         .delete_account(account_id)
         .map_err(|e| format!("Failed to delete account: {}", e))

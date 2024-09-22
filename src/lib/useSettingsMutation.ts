@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
-import { saveSettings } from '@/commands/setting';
+import { saveSettings } from '@/commands/settings';
 import { Settings } from './types';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { QueryKeys } from './query-keys';
@@ -31,7 +31,8 @@ export function useSettingsMutation(
         });
       }
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Error updating settings:', error);
       toast({
         title: 'Uh oh! Something went wrong.',
         description: 'There was a problem updating your settings.',

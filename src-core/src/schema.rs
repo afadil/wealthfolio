@@ -58,6 +58,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    exchange_rates (id) {
+        id -> Text,
+        from_currency -> Text,
+        to_currency -> Text,
+        rate -> Double,
+        source -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     goals (id) {
         id -> Text,
         title -> Text,
@@ -88,7 +100,7 @@ diesel::table! {
     portfolio_history (id) {
         id -> Text,
         account_id -> Text,
-        date -> Text,
+        date -> Date,
         total_value -> Double,
         market_value -> Double,
         book_cost -> Double,
@@ -123,11 +135,9 @@ diesel::table! {
 }
 
 diesel::table! {
-    settings (id) {
-        id -> Integer,
-        theme -> Text,
-        font -> Text,
-        base_currency -> Text,
+    app_settings (setting_key) {
+        setting_key -> Text,
+        setting_value -> Text,
     }
 }
 
@@ -142,10 +152,11 @@ diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
     assets,
+    exchange_rates,
     goals,
     goals_allocation,
     platforms,
     portfolio_history,
     quotes,
-    settings,
+    app_settings,
 );
