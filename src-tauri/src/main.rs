@@ -46,6 +46,7 @@ use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 
 // AppState
+#[derive(Clone)]
 struct AppState {
     pool: Arc<DbPool>,
     base_currency: Arc<RwLock<String>>,
@@ -84,9 +85,9 @@ fn main() {
                 pool: pool.clone(),
                 base_currency: Arc::new(RwLock::new(base_currency)),
             };
-            app.manage(state);
+            app.manage(state.clone());
 
-            spawn_quote_sync(app_handle, pool);
+            spawn_quote_sync(app_handle, state);
 
             Ok(())
         })
@@ -147,16 +148,16 @@ fn handle_menu_event(event: tauri::WindowMenuEvent) {
     }
 }
 
-fn spawn_quote_sync(app_handle: tauri::AppHandle, pool: Arc<DbPool>) {
+fn spawn_quote_sync(app_handle: tauri::AppHandle, state: AppState) {
     spawn(async move {
         let base_currency = {
-            let state = app_handle.state::<AppState>();
             let currency = state.base_currency.read().unwrap().clone();
             currency
         };
-        let portfolio_service = portfolio::PortfolioService::new((*pool).clone(), base_currency)
-            .await
-            .expect("Failed to create PortfolioService");
+        let portfolio_service =
+            portfolio::PortfolioService::new((*state.pool).clone(), base_currency)
+                .await
+                .expect("Failed to create PortfolioService");
 
         app_handle
             .emit_all("PORTFOLIO_UPDATE_START", ())
