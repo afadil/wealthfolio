@@ -3,7 +3,7 @@ export enum RUN_ENV {
   MOBILE = 'mobile',
   BROWSER = 'browser',
   UNSUPPORTED = 'unsupported',
-};
+}
 
 export const getRunEnv = (): RUN_ENV => {
   if (typeof window !== 'undefined' && window.__TAURI__) {
@@ -13,12 +13,9 @@ export const getRunEnv = (): RUN_ENV => {
     return RUN_ENV.BROWSER;
   }
   return RUN_ENV.UNSUPPORTED;
-}
+};
 
-export type {
-  EventCallback,
-  UnlistenFn,
-} from './tauri';
+export type { EventCallback, UnlistenFn } from './tauri';
 
 export {
   invokeTauri,
@@ -28,4 +25,5 @@ export {
   listenFileDropCancelledTauri,
   listenQuotesSyncStartTauri,
   listenQuotesSyncCompleteTauri,
+  listenQuotesSyncErrorTauri,
 } from './tauri';

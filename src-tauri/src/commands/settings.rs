@@ -51,17 +51,25 @@ pub async fn update_exchange_rate(
     state: State<'_, AppState>,
 ) -> Result<ExchangeRate, String> {
     println!("Updating exchange rate...");
-    let fx_service = CurrencyExchangeService::new((*state.pool).clone());
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let fx_service = CurrencyExchangeService::new();
     fx_service
-        .update_exchange_rate(&rate)
+        .update_exchange_rate(&mut conn, &rate)
         .map_err(|e| format!("Failed to update exchange rate: {}", e))
 }
 
 #[tauri::command]
 pub async fn get_exchange_rates(state: State<'_, AppState>) -> Result<Vec<ExchangeRate>, String> {
     println!("Fetching exchange rates...");
-    let fx_service = CurrencyExchangeService::new((*state.pool).clone());
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let fx_service = CurrencyExchangeService::new();
     fx_service
-        .get_exchange_rates()
+        .get_exchange_rates(&mut conn)
         .map_err(|e| format!("Failed to load exchange rates: {}", e))
 }

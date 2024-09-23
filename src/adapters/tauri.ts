@@ -40,3 +40,9 @@ export const listenQuotesSyncCompleteTauri = async <T>(
 ): Promise<UnlistenFn> => {
   return listen<T>('PORTFOLIO_UPDATE_COMPLETE', handler);
 };
+
+export const listenQuotesSyncErrorTauri = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return listen<T>('PORTFOLIO_UPDATE_ERROR', handler);
+};

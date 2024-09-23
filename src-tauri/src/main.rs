@@ -69,6 +69,7 @@ fn main() {
             // Create connection pool
             let manager = ConnectionManager::<SqliteConnection>::new(&db_path);
             let pool = r2d2::Pool::builder()
+                .max_size(5)
                 .build(manager)
                 .expect("Failed to create database connection pool");
             let pool = Arc::new(pool);
@@ -154,26 +155,37 @@ fn spawn_quote_sync(app_handle: tauri::AppHandle, state: AppState) {
             let currency = state.base_currency.read().unwrap().clone();
             currency
         };
-        let portfolio_service =
-            portfolio::PortfolioService::new((*state.pool).clone(), base_currency)
-                .await
-                .expect("Failed to create PortfolioService");
+        let portfolio_service = match portfolio::PortfolioService::new(base_currency).await {
+            Ok(service) => service,
+            Err(e) => {
+                eprintln!("Failed to create PortfolioService: {}", e);
+                if let Err(emit_err) = app_handle.emit_all(
+                    "PORTFOLIO_SERVICE_ERROR",
+                    "Failed to initialize PortfolioService",
+                ) {
+                    eprintln!("Failed to emit PORTFOLIO_SERVICE_ERROR event: {}", emit_err);
+                }
+                return;
+            }
+        };
 
         app_handle
             .emit_all("PORTFOLIO_UPDATE_START", ())
             .expect("Failed to emit event");
 
-        match portfolio_service.update_portfolio().await {
+        let mut conn = state.pool.get().expect("Failed to get database connection");
+
+        match portfolio_service.update_portfolio(&mut conn).await {
             Ok(_) => {
-                app_handle
-                    .emit_all("PORTFOLIO_UPDATE_COMPLETE", ())
-                    .expect("Failed to emit event");
+                if let Err(e) = app_handle.emit_all("PORTFOLIO_UPDATE_COMPLETE", ()) {
+                    eprintln!("Failed to emit PORTFOLIO_UPDATE_COMPLETE event: {}", e);
+                }
             }
             Err(e) => {
                 eprintln!("Failed to update portfolio: {}", e);
-                app_handle
-                    .emit_all("PORTFOLIO_UPDATE_ERROR", ())
-                    .expect("Failed to emit event");
+                if let Err(e) = app_handle.emit_all("PORTFOLIO_UPDATE_ERROR", &e.to_string()) {
+                    eprintln!("Failed to emit PORTFOLIO_UPDATE_ERROR event: {}", e);
+                }
             }
         }
     });

@@ -2,32 +2,26 @@ use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{IncomeData, IncomeSummary};
 use chrono::{Datelike, NaiveDateTime};
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::SqliteConnection;
 use std::collections::HashMap;
 
 pub struct IncomeService {
     fx_service: CurrencyExchangeService,
     base_currency: String,
-    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl IncomeService {
-    pub fn new(
-        pool: Pool<ConnectionManager<SqliteConnection>>,
-        fx_service: CurrencyExchangeService,
-        base_currency: String,
-    ) -> Self {
+    pub fn new(fx_service: CurrencyExchangeService, base_currency: String) -> Self {
         IncomeService {
             fx_service,
             base_currency,
-            pool,
         }
     }
 
-    pub fn get_income_data(&self) -> Result<Vec<IncomeData>, diesel::result::Error> {
+    pub fn get_income_data(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<IncomeData>, diesel::result::Error> {
         use crate::schema::activities;
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
         activities::table
             .filter(activities::activity_type.eq_any(vec!["DIVIDEND", "INTEREST"]))
             .select((
@@ -37,7 +31,7 @@ impl IncomeService {
                 activities::quantity * activities::unit_price,
                 activities::currency,
             ))
-            .load::<(NaiveDateTime, String, String, f64, String)>(&mut conn)
+            .load::<(NaiveDateTime, String, String, f64, String)>(conn)
             .map(|results| {
                 results
                     .into_iter()
@@ -52,8 +46,11 @@ impl IncomeService {
             })
     }
 
-    pub fn get_income_summary(&self) -> Result<IncomeSummary, diesel::result::Error> {
-        let income_data = self.get_income_data()?;
+    pub fn get_income_summary(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<IncomeSummary, diesel::result::Error> {
+        let income_data = self.get_income_data(conn)?;
         let base_currency = self.base_currency.clone();
 
         let mut by_month: HashMap<String, f64> = HashMap::new();
