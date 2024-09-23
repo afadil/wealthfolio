@@ -207,6 +207,11 @@ impl MarketDataService {
     }
 
     async fn fetch_exchange_rate(&self, from: &str, to: &str) -> Result<f64, String> {
+        // Handle GBP and GBp case like manually
+        if from.to_lowercase() == to.to_lowercase() {
+            return Ok(-1.0);
+        }
+
         // Try direct conversion
         let symbol = format!("{}{}=X", from, to);
         if let Ok(quote) = self.provider.get_latest_quote(&symbol).await {
