@@ -165,6 +165,7 @@ impl ActivityService {
     ) -> Result<Vec<ActivityImport>, String> {
         let asset_service = AssetService::new(self.pool.clone()).await;
         let account_service = AccountService::new(self.pool.clone(), self.base_currency.clone());
+        let fx_service = CurrencyExchangeService::new(self.pool.clone());
         let account = account_service
             .get_account_by_id(&_account_id)
             .map_err(|e| e.to_string())?;
@@ -191,6 +192,24 @@ impl ActivityService {
                 Ok(profile) => {
                     activity_import.symbol_name = profile.name;
                     symbols_to_sync.push(activity_import.symbol.clone());
+
+                    // Add exchange rate if the activity currency is different from the account currency
+                    let currency = &activity_import.currency;
+                    if currency != &account.currency {
+                        match fx_service
+                            .add_exchange_rate(account.currency.clone(), currency.clone())
+                        {
+                            Ok(_) => (),
+                            Err(e) => {
+                                let error_msg = format!(
+                                    "Failed to add exchange rate for {}/{}. Error: {}. Line: {}",
+                                    &account.currency, currency, e, line_number
+                                );
+                                return Err(error_msg);
+                            }
+                        }
+                    }
+
                     (Some("true".to_string()), None)
                 }
                 Err(_) => {

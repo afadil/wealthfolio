@@ -14,6 +14,7 @@ import { getIncomeSummary } from '@/commands/portfolio';
 import type { IncomeSummary } from '@/lib/types';
 import { formatAmount } from '@/lib/utils';
 import { QueryKeys } from '@/lib/query-keys';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function IncomeDashboard() {
   const {
@@ -26,7 +27,7 @@ export function IncomeDashboard() {
   });
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <IncomeDashboardSkeleton />;
   }
 
   if (error || !incomeSummary) {
@@ -205,6 +206,55 @@ export function IncomeDashboard() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function IncomeDashboardSkeleton() {
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <main className="flex-1 space-y-6 px-4 py-6 md:px-6">
+        <div className="grid gap-6 md:grid-cols-3">
+          {[...Array(3)].map((_, index) => (
+            <Card key={index}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[150px]" />
+                <Skeleton className="mt-2 h-4 w-[100px]" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-[150px]" />
+              <Skeleton className="h-4 w-[100px]" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[300px] w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-[200px]" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[...Array(10)].map((_, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-[100px]" />
+                    <Skeleton className="h-4 w-[80px]" />
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>

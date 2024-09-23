@@ -208,8 +208,11 @@ impl MarketDataService {
 
     async fn fetch_exchange_rate(&self, from: &str, to: &str) -> Result<f64, String> {
         // Handle GBP and GBp case like manually
-        if from.to_lowercase() == to.to_lowercase() {
+        if from != from.to_uppercase() || to != to.to_uppercase() {
             return Ok(-1.0);
+        }
+        if from == to {
+            return Ok(1.0);
         }
 
         // Try direct conversion

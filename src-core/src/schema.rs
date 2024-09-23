@@ -34,6 +34,13 @@ diesel::table! {
 }
 
 diesel::table! {
+    app_settings (setting_key) {
+        setting_key -> Text,
+        setting_value -> Text,
+    }
+}
+
+diesel::table! {
     assets (id) {
         id -> Text,
         isin -> Nullable<Text>,
@@ -134,13 +141,6 @@ diesel::table! {
     }
 }
 
-diesel::table! {
-    app_settings (setting_key) {
-        setting_key -> Text,
-        setting_value -> Text,
-    }
-}
-
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
@@ -151,6 +151,7 @@ diesel::joinable!(quotes -> assets (symbol));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
+    app_settings,
     assets,
     exchange_rates,
     goals,
@@ -158,5 +159,4 @@ diesel::allow_tables_to_appear_in_same_query!(
     platforms,
     portfolio_history,
     quotes,
-    app_settings,
 );
