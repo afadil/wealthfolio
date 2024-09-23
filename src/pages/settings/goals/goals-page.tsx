@@ -7,23 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import type { Goal, GoalAllocation } from '@/lib/types';
 import { SettingsHeader } from '../header';
-import { deleteGoal, getGoals, getGoalsAllocation, updateGoalsAllocations } from '@/commands/goal';
+import { getGoals, getGoalsAllocation } from '@/commands/goal';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/components/ui/use-toast';
+import { useQuery } from '@tanstack/react-query';
 import GoalsAllocations from './components/goal-allocations';
 import { useAccounts } from '@/pages/account/useAccounts';
+import { QueryKeys } from '@/lib/query-keys';
+import { useGoalMutations } from './useGoalMutations';
 
 const SettingsGoalsPage = () => {
-  const queryClient = useQueryClient();
-
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
-    queryKey: ['goals'],
+    queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
   });
 
   const { data: allocations } = useQuery<GoalAllocation[], Error>({
-    queryKey: ['goals_allocations'],
+    queryKey: [QueryKeys.GOALS_ALLOCATIONS],
     queryFn: getGoalsAllocation,
   });
 
@@ -32,23 +31,12 @@ const SettingsGoalsPage = () => {
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<any>(null);
 
+  const { deleteGoalMutation, saveAllocationsMutation } = useGoalMutations();
+
   const handleAddGoal = () => {
     setSelectedGoal(null);
     setVisibleModal(true);
   };
-
-  const deleteGoalMutation = useMutation({
-    mutationFn: deleteGoal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      queryClient.invalidateQueries({ queryKey: ['goals_allocations'] });
-      setVisibleModal(false);
-      toast({
-        title: 'Goal deleted successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-  });
 
   const handleEditGoal = (goal: Goal) => {
     setSelectedGoal(goal);
@@ -58,18 +46,6 @@ const SettingsGoalsPage = () => {
   const handleDeleteGoal = (goal: Goal) => {
     deleteGoalMutation.mutate(goal.id);
   };
-
-  const saveAllocationsMutation = useMutation({
-    mutationFn: updateGoalsAllocations,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      queryClient.invalidateQueries({ queryKey: ['goals_allocations'] });
-      toast({
-        title: 'Allocation saved successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-  });
 
   const handleAddAllocation = (allocationData: GoalAllocation[]) => {
     saveAllocationsMutation.mutate(allocationData);
@@ -94,7 +70,7 @@ const SettingsGoalsPage = () => {
           </Button>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8 ">
+        <div className="mx-auto w-full pt-8">
           {goals?.length ? (
             <>
               <h3 className="p-2 text-xl font-bold">Goals</h3>

@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { useEffect } from 'react';
 import { useForm, useFormContext } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 
 import { AlertFeedback } from '@/components/alert-feedback';
@@ -33,12 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
 
 import { cn } from '@/lib/utils';
 
 import { newActivitySchema } from '@/lib/schemas';
-import { createActivity, updateActivity } from '@/commands/activity';
+import { useActivityMutations } from '../hooks/useActivityMutations';
 import TickerSearchInput from './ticker-search';
 
 const activityTypes = [
@@ -47,7 +45,6 @@ const activityTypes = [
   { label: 'Deposit', value: 'DEPOSIT' },
   { label: 'Withdrawal', value: 'WITHDRAWAL' },
   { label: 'Dividend', value: 'DIVIDEND' },
-  // { label: 'Split', value: 'SPLIT' },
   // { label: 'Transfer', value: 'TRANSFER' },
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
@@ -70,57 +67,22 @@ interface ActivityFormProps {
 }
 
 export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: ActivityFormProps) {
-  const queryClient = useQueryClient();
-
-  const addActivityMutation = useMutation({
-    mutationFn: createActivity,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      toast({
-        title: 'Activity added successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-      onSuccess();
-    },
-    onError: (_error) => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem adding this activity.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
-
-  const updateActivityMutation = useMutation({
-    mutationFn: updateActivity,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      toast({
-        title: 'Activity updated successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-      onSuccess();
-    },
-  });
+  const { addActivityMutation, updateActivityMutation } = useActivityMutations(onSuccess);
 
   const form = useForm<ActivityFormValues>({
     resolver: zodResolver(newActivitySchema),
     defaultValues,
   });
 
-  function onSubmit(data: ActivityFormValues) {
+  async function onSubmit(data: ActivityFormValues) {
     const { id, ...rest } = data;
-
     if (id) {
-      return updateActivityMutation.mutate({ id, ...rest });
+      return await updateActivityMutation.mutateAsync({ id, ...rest });
     }
-    addActivityMutation.mutate(rest);
+    return await addActivityMutation.mutateAsync(rest);
   }
 
+  const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
   const watchedType = form.watch('activityType');
   const currentAccountCurrency =
     accounts.find((account) => account.value === form.watch('accountId'))?.currency || 'USD';
@@ -234,7 +196,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={field.value}
+                      selected={field.value ? new Date(field.value) : undefined}
                       onSelect={field.onChange}
                       disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
                       initialFocus
@@ -255,10 +217,16 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
         </div>
         <DialogFooter>
           <DialogTrigger asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" disabled={isLoading}>
+              Cancel
+            </Button>
           </DialogTrigger>
-          <Button type="submit">
-            <Icons.Plus className="h-4 w-4" />
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Plus className="h-4 w-4" />
+            )}
             <span className="hidden sm:ml-2 sm:inline">
               {defaultValues?.id ? 'Update Activity' : 'Add Activity'}
             </span>

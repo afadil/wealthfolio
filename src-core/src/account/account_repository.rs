@@ -67,4 +67,16 @@ impl AccountRepository {
 
         diesel::delete(accounts.filter(id.eq(account_id))).execute(conn)
     }
+
+    pub fn load_accounts_by_ids(
+        &self,
+        conn: &mut SqliteConnection,
+        account_ids: &[String],
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        accounts
+            .filter(id.eq_any(account_ids))
+            .filter(is_active.eq(true))
+            .order(created_at.desc())
+            .load::<Account>(conn)
+    }
 }

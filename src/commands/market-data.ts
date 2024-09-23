@@ -5,7 +5,7 @@ export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('search_ticker', { query });
+        return invokeTauri('search_symbol', { query });
       default:
         throw new Error(`Unsupported`);
     }

@@ -8,28 +8,30 @@ import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
 import { PortfolioComposition } from './components/portfolio-composition';
 import { SectorsChart } from './components/sectors-chart';
-import { computeHoldings, getHistorical } from '@/commands/portfolio';
+import { computeHoldings } from '@/commands/portfolio';
 import { useQuery } from '@tanstack/react-query';
 import { aggregateHoldingsBySymbol } from '@/lib/portfolio-helper';
-import { FinancialHistory, Holding } from '@/lib/types';
+import { Holding } from '@/lib/types';
 import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { IncomeDashboard } from './components/income-dashboard';
+import { QueryKeys } from '@/lib/query-keys';
+import { PortfolioHistory } from '@/lib/types';
+import { getAccountHistory } from '@/commands/portfolio';
 
 export const HoldingsPage = () => {
   const { settings } = useSettingsContext();
   const { data, isLoading } = useQuery<Holding[], Error>({
-    queryKey: ['holdings'],
+    queryKey: [QueryKeys.HOLDINGS],
     queryFn: computeHoldings,
   });
 
-  const { data: historyData } = useQuery<FinancialHistory[], Error>({
-    queryKey: ['portfolio_history'],
-    queryFn: getHistorical,
+  const { data: portfolioHistory } = useQuery<PortfolioHistory[], Error>({
+    queryKey: QueryKeys.accountHistory('TOTAL'),
+    queryFn: () => getAccountHistory('TOTAL'),
   });
 
-  const portfolio = historyData?.find((history) => history.account?.id === 'TOTAL');
-  const todayValue = portfolio?.history[portfolio?.history.length - 1];
+  const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const holdings = useMemo(() => {
     return aggregateHoldingsBySymbol(data || []);

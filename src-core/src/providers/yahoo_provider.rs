@@ -1,14 +1,14 @@
 use std::{sync::RwLock, time::SystemTime};
 
-use crate::models::{CrumbData, NewAsset, QuoteSummary};
+use super::models::{AssetClass, AssetSubClass, PriceDetail, YahooResult};
+use crate::models::{CrumbData, NewAsset, Quote as ModelQuote, QuoteSummary};
+use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use reqwest::{header, Client};
 use serde_json::json;
 use thiserror::Error;
 use yahoo::{YQuoteItem, YahooError};
 use yahoo_finance_api as yahoo;
-
-use super::models::{AssetClass, AssetSubClass, PriceDetail, YahooResult};
 
 impl From<&YQuoteItem> for QuoteSummary {
     fn from(item: &YQuoteItem) -> Self {
@@ -33,8 +33,8 @@ impl From<&YQuoteItem> for QuoteSummary {
 impl From<&YQuoteItem> for NewAsset {
     fn from(item: &YQuoteItem) -> Self {
         NewAsset {
-            id: item.symbol.clone(), // Assuming the symbol is used as the id
-            isin: None,              // Map the rest of the fields accordingly
+            id: item.symbol.clone(),
+            isin: None, // TODO: Implement isin
             name: Some(item.long_name.clone()),
             asset_type: Some(item.quote_type.clone()),
             symbol: item.symbol.clone(),
@@ -61,13 +61,41 @@ pub struct YahooProvider {
 }
 
 impl YahooProvider {
-    pub fn new() -> Result<Self, yahoo::YahooError> {
+    pub async fn new() -> Result<Self, yahoo::YahooError> {
         let provider = yahoo::YahooConnector::new()?;
-        Ok(YahooProvider { provider })
+        let yahoo_provider = YahooProvider { provider };
+        yahoo_provider.set_crumb().await?;
+        Ok(yahoo_provider)
     }
 
-    // pub async fn set_crumb() -> Result<(), yahoo::YahooError> {
-    pub async fn set_crumb(&self) -> Result<(), yahoo::YahooError> {
+    pub async fn get_latest_quote(&self, symbol: &str) -> Result<yahoo::Quote, yahoo::YahooError> {
+        let response = self.provider.get_latest_quotes(symbol, "1d").await?;
+        response
+            .last_quote()
+            .map_err(|_| yahoo::YahooError::EmptyDataSet)
+    }
+
+    fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
+        let date = DateTime::<Utc>::from_timestamp(yahoo_quote.timestamp as i64, 0)
+            .unwrap_or_default()
+            .naive_utc();
+
+        ModelQuote {
+            id: format!("{}_{}", date.format("%Y%m%d"), symbol),
+            created_at: chrono::Utc::now().naive_utc(),
+            data_source: "YAHOO".to_string(),
+            date,
+            symbol: symbol,
+            open: yahoo_quote.open,
+            high: yahoo_quote.high,
+            low: yahoo_quote.low,
+            volume: yahoo_quote.volume as f64,
+            close: yahoo_quote.close,
+            adjclose: yahoo_quote.adjclose,
+        }
+    }
+
+    async fn set_crumb(&self) -> Result<(), yahoo::YahooError> {
         let client = Client::new();
 
         // Make the first call to extract the Crumb cookie
@@ -125,7 +153,7 @@ impl YahooProvider {
         Ok(asset_profiles)
     }
 
-    pub async fn fetch_quote_summary(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+    pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
         // Handle the cash asset case
         if let Some(currency) = symbol.strip_prefix("$CASH-") {
             return Ok(self.create_cash_asset(symbol, currency));
@@ -253,12 +281,11 @@ impl YahooProvider {
         symbol: &str,
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<yahoo::Quote>, yahoo::YahooError> {
+    ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
         if symbol.starts_with("$CASH-") {
             return Ok(vec![]);
         }
 
-        // Convert SystemTime to OffsetDateTime as required by get_quote_history
         let start_offset = start.into();
         let end_offset = end.into();
 
@@ -267,18 +294,27 @@ impl YahooProvider {
             .get_quote_history(symbol, start_offset, end_offset)
             .await?;
 
-        response.quotes()
+        // Use the new method to convert quotes
+        let quotes = response
+            .quotes()?
+            .into_iter()
+            .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
+            .collect();
+
+        Ok(quotes)
     }
 
     pub async fn fetch_asset_profile(
         &self,
         symbol: &str,
     ) -> Result<YahooResult, yahoo::YahooError> {
-        let crumb_data = YAHOO_CRUMB.read().unwrap();
-
-        let crumb_data = crumb_data
-            .as_ref()
-            .ok_or_else(|| YahooError::FetchFailed("Crumb data not found".into()))?;
+        let crumb_data = {
+            let guard = YAHOO_CRUMB.read().unwrap();
+            guard
+                .as_ref()
+                .ok_or_else(|| YahooError::FetchFailed("Crumb data not found".into()))?
+                .clone()
+        };
 
         let url = format!(
             "https://query1.finance.yahoo.com/v10/finance/quoteSummary/{}?modules=price,summaryProfile,topHoldings&crumb={}",
@@ -305,9 +341,6 @@ impl YahooProvider {
             .text()
             .await
             .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
-
-        // Print the raw JSON response
-        println!("Raw JSON Response: {}", response_text);
 
         // Deserialize the JSON response into your struct
         let deserialized: YahooResult = serde_json::from_str(&response_text).map_err(|err| {
@@ -398,7 +431,7 @@ impl YahooProvider {
             "realestate" => "Real Estate".to_string(),
             "technology" => "Technology".to_string(),
             "utilities" => "Utilities".to_string(),
-            _ => "UNKNOWN".to_string(),
+            _ => a_string.to_string(),
         }
     }
 }

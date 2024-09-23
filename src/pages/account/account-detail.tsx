@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatAmount, formatPercent } from '@/lib/utils';
-import { FinancialSnapshot } from '@/lib/types';
+import { PortfolioHistory } from '@/lib/types';
 
 interface AccountDetailProps {
-  data?: FinancialSnapshot;
+  data?: PortfolioHistory;
   className?: string;
 }
 
@@ -39,12 +39,12 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
     {
       label: "Today's return",
       value: `${formatAmount(dayGainValue, currency)} (${formatPercent(dayGainPercentage)})`,
-      color: dayGainValue < 0 ? 'text-red-500' : 'text-green-500',
+      color: dayGainValue < 0 ? 'text-red-400' : 'text-success',
     },
     {
       label: 'Total return',
       value: `${formatAmount(totalGainValue, currency)} (${formatPercent(totalGainPercentage)})`,
-      color: totalGainPercentage < 0 ? 'text-red-500' : 'text-green-500',
+      color: totalGainPercentage < 0 ? 'text-red-400' : 'text-success',
     },
   ];
 

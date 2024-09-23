@@ -9,9 +9,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { Icons } from '@/components/icons';
 import { getIncomeSummary } from '@/commands/portfolio';
 import type { IncomeSummary } from '@/lib/types';
 import { formatAmount } from '@/lib/utils';
+import { QueryKeys } from '@/lib/query-keys';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function IncomeDashboard() {
   const {
@@ -19,19 +22,18 @@ export function IncomeDashboard() {
     isLoading,
     error,
   } = useQuery<IncomeSummary, Error>({
-    queryKey: ['incomeSummary'],
+    queryKey: [QueryKeys.INCOME_SUMMARY],
     queryFn: getIncomeSummary,
   });
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <IncomeDashboardSkeleton />;
   }
 
   if (error || !incomeSummary) {
     return <div>Failed to load income summary: {error?.message || 'Unknown error'}</div>;
   }
 
-  console.log(incomeSummary);
   const totalIncome = incomeSummary.total_income;
   const dividendIncome = incomeSummary.by_type['DIVIDEND'] || 0;
   const interestIncome = incomeSummary.by_type['INTEREST'] || 0;
@@ -124,69 +126,132 @@ export function IncomeDashboard() {
               <CardDescription>Last 12 months</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer
-                config={{
-                  income: {
-                    label: 'Monthly Income',
-                    color: 'hsl(var(--chart-1))',
-                  },
-                  cumulative: {
-                    label: 'Cumulative Income',
-                    color: 'hsl(var(--chart-5))',
-                  },
-                }}
-              >
-                <ComposedChart
-                  data={monthlyIncomeData.map(([month, income], index) => ({
-                    month,
-                    income,
-                    cumulative: monthlyIncomeData
-                      .slice(0, index + 1)
-                      .reduce((sum, [, value]) => sum + value, 0),
-                  }))}
+              {monthlyIncomeData.length === 0 ? (
+                <div className="-mt-14 flex h-[300px] flex-col items-center justify-center text-center">
+                  <Icons.Activity className="mb-2 h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No income history available</p>
+                </div>
+              ) : (
+                <ChartContainer
+                  config={{
+                    income: {
+                      label: 'Monthly Income',
+                      color: 'hsl(var(--chart-1))',
+                    },
+                    cumulative: {
+                      label: 'Cumulative Income',
+                      color: 'hsl(var(--chart-5))',
+                    },
+                  }}
                 >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                    tickFormatter={(value) => value.slice(5)} // Show only MM part of YYYY-MM
-                  />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="income"
-                    fill="var(--color-income)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="cumulative"
-                    stroke="var(--color-cumulative)"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </ComposedChart>
-              </ChartContainer>
+                  <ComposedChart
+                    data={monthlyIncomeData.map(([month, income], index) => ({
+                      month,
+                      income,
+                      cumulative: monthlyIncomeData
+                        .slice(0, index + 1)
+                        .reduce((sum, [, value]) => sum + value, 0),
+                    }))}
+                  >
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      tickMargin={10}
+                      axisLine={false}
+                      tickFormatter={(value) => value.slice(5)} // Show only MM part of YYYY-MM
+                    />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar
+                      yAxisId="left"
+                      dataKey="income"
+                      fill="var(--color-income)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="cumulative"
+                      stroke="var(--color-cumulative)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ChartContainer>
+              )}
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">Top 10 Dividend Sources</CardTitle>
             </CardHeader>
+            <CardContent className="h-full">
+              {topDividendStocks.length === 0 ? (
+                <div className="-mt-14 flex h-full min-h-64 flex-col items-center justify-center text-center">
+                  <Icons.DollarSign className="mb-2 h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No dividend income recorded</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {topDividendStocks.map(([symbol, income], index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="font-medium">{symbol}</div>
+                      <div className="text-success">
+                        {formatAmount(income, incomeSummary.currency)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function IncomeDashboardSkeleton() {
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <main className="flex-1 space-y-6 px-4 py-6 md:px-6">
+        <div className="grid gap-6 md:grid-cols-3">
+          {[...Array(3)].map((_, index) => (
+            <Card key={index}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[150px]" />
+                <Skeleton className="mt-2 h-4 w-[100px]" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-[150px]" />
+              <Skeleton className="h-4 w-[100px]" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[300px] w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-[200px]" />
+            </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {topDividendStocks.map(([symbol, income], index) => (
+                {[...Array(10)].map((_, index) => (
                   <div key={index} className="flex items-center justify-between">
-                    <div className="font-medium">{symbol}</div>
-                    <div className="font-medium text-green-600">
-                      {formatAmount(income, incomeSummary.currency)}
-                    </div>
+                    <Skeleton className="h-4 w-[100px]" />
+                    <Skeleton className="h-4 w-[80px]" />
                   </div>
                 ))}
               </div>

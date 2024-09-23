@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -24,10 +23,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { toast } from '@/components/ui/use-toast';
 
 import { newGoalSchema } from '@/lib/schemas';
-import { createGoal, updateGoal } from '@/commands/goal';
+import { useGoalMutations } from '@/pages/settings/goals/useGoalMutations';
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
@@ -37,38 +35,7 @@ interface GoalFormlProps {
 }
 
 export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps) {
-  const queryClient = useQueryClient();
-
-  const addGoalMutation = useMutation({
-    mutationFn: createGoal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      toast({
-        title: 'Goal added successfully.',
-        description: 'Start adding or importing this goal activities.',
-        className: 'bg-green-500 text-white border-none',
-      });
-      onSuccess();
-    },
-    onError: () => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem adding this goal.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
-  const updateGoalMutation = useMutation({
-    mutationFn: updateGoal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      toast({
-        title: 'Goal updated successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-      onSuccess();
-    },
-  });
+  const { addGoalMutation, updateGoalMutation } = useGoalMutations();
 
   const form = useForm<NewGoal>({
     resolver: zodResolver(newGoalSchema),
@@ -78,9 +45,9 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
   function onSubmit(data: NewGoal) {
     const { id, ...rest } = data;
     if (id) {
-      return updateGoalMutation.mutate({ id, ...rest });
+      return updateGoalMutation.mutate({ id, ...rest }, { onSuccess });
     }
-    return addGoalMutation.mutate(data);
+    return addGoalMutation.mutate(data, { onSuccess });
   }
 
   return (
@@ -93,7 +60,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-10 p-4 ">
+        <div className="grid gap-10 p-4">
           {/* add input hidden for id */}
           <input type="hidden" name="id" />
 
@@ -136,40 +103,6 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
               </FormItem>
             )}
           />
-          {/* <FormField
-            control={form.control}
-            name="deadline"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Target Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={'outline'}
-                        className={cn(
-                          'w-[240px] pl-3 text-left font-normal',
-                          !field.value && 'text-muted-foreground',
-                        )}
-                      >
-                        {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                        <Icons.Calendar className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </FormItem>
-            )}
-          /> */}
           {defaultValues?.id ? (
             <FormField
               control={form.control}

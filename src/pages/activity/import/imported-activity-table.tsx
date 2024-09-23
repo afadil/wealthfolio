@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Account, ActivityImport } from '@/lib/types';
-import { formatAmount, toPascalCase } from '@/lib/utils';
+import { formatAmount, formatDateTime, toPascalCase } from '@/lib/utils';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 
 export const ImportedActivitiesTable = ({
-                                          activities,
-                                        }: {
+  activities,
+}: {
   accounts: Account[];
   activities: ActivityImport[];
   editModalVisible: boolean;
@@ -20,16 +20,16 @@ export const ImportedActivitiesTable = ({
   const activitiesType = useMemo(() => {
     const uniqueTypesSet = new Set();
     return activities.reduce(
-        (result, activity) => {
-          //@ts-ignore
-          const type = activity?.activityType;
-          if (type && !uniqueTypesSet.has(type)) {
-            uniqueTypesSet.add(type);
-            result.push({ label: toPascalCase(type), value: type });
-          }
-          return result;
-        },
-        [] as Array<{ label: string; value: string }>,
+      (result, activity) => {
+        //@ts-ignore
+        const type = activity?.activityType;
+        if (type && !uniqueTypesSet.has(type)) {
+          uniqueTypesSet.add(type);
+          result.push({ label: toPascalCase(type), value: type });
+        }
+        return result;
+      },
+      [] as Array<{ label: string; value: string }>,
     );
   }, [activities]);
 
@@ -57,40 +57,25 @@ export const ImportedActivitiesTable = ({
   ];
 
   return (
-      <div className="pt-4">
-        <DataTable
-            data={activities}
-            columns={columns}
-            searchBy="symbol"
-            filters={filters}
-            defaultSorting={defaultSorting}
-            defaultColumnVisibility={{
-              symbolName: false,
-              accountName: false,
-              lineNumber: false,
-              error: false,
-            }}
-        />
-      </div>
+    <div className="pt-4">
+      <DataTable
+        data={activities}
+        columns={columns}
+        searchBy="symbol"
+        filters={filters}
+        defaultSorting={defaultSorting}
+        defaultColumnVisibility={{
+          symbolName: false,
+          accountName: false,
+          lineNumber: false,
+          error: false,
+        }}
+      />
+    </div>
   );
 };
 
 export default ImportedActivitiesTable;
-
-// Update formatDate function to accept a timezone argument
-export const formatDate = (date: string | Date, timezone?: string) => {
-  if (!date) return '-';
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    timeZone: timezone || 'UTC', // Default to UTC if timezone is not provided
-  };
-  return new Intl.DateTimeFormat('en-US', options).format(new Date(date));
-};
 
 export const columns: ColumnDef<ActivityImport>[] = [
   {
@@ -103,23 +88,23 @@ export const columns: ColumnDef<ActivityImport>[] = [
       const lineNumber = row.getValue('lineNumber') as number;
 
       return (
-          <div className="flex items-center">
-            {isValid === 'true' ? (
-                <Icons.CheckCircle className="h-4 w-4 text-green-500" />
-            ) : (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.XCircle className="h-4 w-4 cursor-help text-red-500" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-red-500">{error}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-            )}
-            <div className="pl-2 text-gray-400">{lineNumber}</div>
-          </div>
+        <div className="flex items-center">
+          {isValid === 'true' ? (
+            <Icons.CheckCircle className="h-4 w-4 text-success" />
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Icons.XCircle className="h-4 w-4 cursor-help text-destructive" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-destructive">{error}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <div className="pl-2 text-gray-400">{lineNumber}</div>
+        </div>
       );
     },
     filterFn: (row, id, value: string) => {
@@ -137,8 +122,14 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'date',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
     cell: ({ row }) => {
-      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone; // Get user timezone
-      return <div>{formatDate(row.getValue('date'), userTimezone) || '-'}</div>;
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const formattedDate = formatDateTime(row.getValue('date'), userTimezone);
+      return (
+        <div className="ml-2 flex flex-col">
+          <span>{formattedDate.date}</span>
+          <span className="text-xs font-light">{formattedDate.time}</span>
+        </div>
+      );
     },
   },
   {
@@ -149,9 +140,9 @@ export const columns: ColumnDef<ActivityImport>[] = [
       const type = row.getValue('activityType') as string;
       const badgeVariant = type === 'BUY' ? 'success' : 'error';
       return (
-          <div className="flex items-center">
-            <Badge variant={badgeVariant}>{type}</Badge>
-          </div>
+        <div className="flex items-center">
+          <Badge variant={badgeVariant}>{type}</Badge>
+        </div>
       );
     },
     filterFn: (row, id, value: string) => {
@@ -180,12 +171,13 @@ export const columns: ColumnDef<ActivityImport>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => {
       return (
-          <div className="flex items-center">
-            <Badge className="flex min-w-[50px] items-center justify-center rounded-sm">
-              {row.getValue('symbol')}
-            </Badge>
-            <span className="ml-2">{row.getValue('symbolName')}</span>
-          </div>
+        <div className="w-3/3 flex items-center">
+          <Badge className="flex min-w-[50px] items-center justify-center rounded-sm">
+            {row.getValue('symbol')}
+          </Badge>
+
+          <span className="ml-2 text-xs">{row.getValue('symbolName')}</span>
+        </div>
       );
     },
     sortingFn: (rowA, rowB, id) => {
@@ -201,7 +193,7 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'quantity',
     enableHiding: false,
     header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
     ),
     cell: ({ row }) => <div className="text-right">{row.getValue('quantity')}</div>,
   },
@@ -211,11 +203,11 @@ export const columns: ColumnDef<ActivityImport>[] = [
     enableHiding: false,
     enableSorting: false,
     header: ({ column }) => (
-        <DataTableColumnHeader
-            className="justify-end text-right"
-            column={column}
-            title="Unit Price"
-        />
+      <DataTableColumnHeader
+        className="justify-end text-right"
+        column={column}
+        title="Unit Price"
+      />
     ),
     cell: ({ row }) => {
       const unitPrice = row.getValue('unitPrice') as number;
@@ -229,7 +221,7 @@ export const columns: ColumnDef<ActivityImport>[] = [
     enableHiding: false,
     enableSorting: false,
     header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
     ),
     cell: ({ row }) => {
       const fee = row.getValue('fee') as number;
@@ -241,7 +233,7 @@ export const columns: ColumnDef<ActivityImport>[] = [
     id: 'value',
     accessorKey: 'value',
     header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Value" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Value" />
     ),
     cell: ({ row }) => {
       const unitPrice = row.getValue('unitPrice') as number;
@@ -263,10 +255,10 @@ export const columns: ColumnDef<ActivityImport>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
     cell: ({ row }) => {
       return (
-          <div className="ml-2 flex flex-col">
-            <span>{row.getValue('accountName')}</span>
-            <span className="text-xs font-light">{row.getValue('currency')}</span>
-          </div>
+        <div className="ml-2 flex flex-col">
+          <span>{row.getValue('accountName')}</span>
+          <span className="text-xs font-light">{row.getValue('currency')}</span>
+        </div>
       );
     },
   },
@@ -277,4 +269,3 @@ export const columns: ColumnDef<ActivityImport>[] = [
     },
   },
 ];
-

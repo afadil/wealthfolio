@@ -74,7 +74,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
   return (
     <>
       <div className="relative overflow-x-auto rounded-md border">
-        <table className="min-w-full table-auto ">
+        <table className="min-w-full table-auto">
           <thead>
             <tr>
               <th className="sticky left-0 z-10 bg-muted px-4 py-2 text-sm font-normal">
@@ -93,8 +93,8 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
               {accounts.map((account) => (
                 <td
                   key={account.id}
-                  className={` border-l border-t px-4 py-2 text-right text-xs text-muted-foreground ${
-                    totalAllocations[account.id] > 100 ? 'text-red-500' : ''
+                  className={`border-l border-t px-4 py-2 text-right text-xs text-muted-foreground ${
+                    totalAllocations[account.id] > 100 ? 'text-red-400' : ''
                   }`}
                 >
                   {totalAllocations[account.id]}%
@@ -120,7 +120,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
                   return (
                     <td key={account.id} className="border-r px-1 py-0">
                       <Input
-                        className="m-0 h-full w-full rounded-none border-none  px-2 text-right text-xs"
+                        className="m-0 h-full w-full rounded-none border-none px-2 text-right text-xs"
                         value={existingAllocation ? existingAllocation.percentAllocation : ''}
                         onChange={(e) =>
                           handleAllocationChange(goal.id, account.id, Number(e.target.value))

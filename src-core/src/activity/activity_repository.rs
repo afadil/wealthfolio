@@ -28,6 +28,19 @@ impl ActivityRepository {
             .load::<Activity>(conn)
     }
 
+    pub fn get_income_activities(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Activity>, diesel::result::Error> {
+        activities::table
+            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .filter(accounts::is_active.eq(true))
+            .filter(activities::activity_type.eq_any(vec!["DIVIDEND", "INTEREST"]))
+            .select(activities::all_columns)
+            .order(activities::activity_date.asc())
+            .load::<Activity>(conn)
+    }
+
     pub fn get_activities(
         &self,
         conn: &mut SqliteConnection,
@@ -176,7 +189,27 @@ impl ActivityRepository {
         &self,
         conn: &mut SqliteConnection,
         activity_id: String,
-    ) -> Result<usize, diesel::result::Error> {
-        diesel::delete(activities::table.filter(activities::id.eq(activity_id))).execute(conn)
+    ) -> Result<Activity, diesel::result::Error> {
+        let activity = activities::table
+            .filter(activities::id.eq(&activity_id))
+            .first::<Activity>(conn)?;
+
+        diesel::delete(activities::table.filter(activities::id.eq(activity_id))).execute(conn)?;
+
+        Ok(activity)
+    }
+
+    pub fn get_activities_by_account_ids(
+        &self,
+        conn: &mut SqliteConnection,
+        account_ids: &[String],
+    ) -> Result<Vec<Activity>, diesel::result::Error> {
+        activities::table
+            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .filter(accounts::is_active.eq(true))
+            .filter(activities::account_id.eq_any(account_ids))
+            .select(activities::all_columns)
+            .order(activities::activity_date.asc())
+            .load::<Activity>(conn)
     }
 }

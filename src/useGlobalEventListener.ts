@@ -10,16 +10,18 @@ const useGlobalEventListener = () => {
   useEffect(() => {
     const handleQuoteSyncStart = () => {
       toast({
-        title: 'Syncing quotes...',
-        description: 'Please wait while we sync your quotes',
+        title: 'Updating Market Data',
+        description: 'Fetching the latest market prices. This may take a moment.',
+        duration: 5000,
       });
     };
 
     const handleQuotesSyncComplete = () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries();
       toast({
-        title: 'Quotes synced successfully',
+        title: 'Portfolio Update Complete',
+        description: 'Your portfolio has been refreshed with the latest market data.',
+        duration: 5000,
       });
     };
     const setupListeners = async () => {
@@ -37,7 +39,7 @@ const useGlobalEventListener = () => {
     });
   }, [queryClient]);
 
-  return null; // Assuming this hook doesn't need to return anything
+  return null;
 };
 
 export default useGlobalEventListener;

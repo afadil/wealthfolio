@@ -10,16 +10,16 @@ const alertVariants = cva(
       variant: {
         default: 'bg-background text-foreground',
         destructive:
-          'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+          'border-destructive/50 text-destructive bg-destructive/20 dark:border-destructive [&>svg]:text-destructive',
 
         error:
-          'border-red-500/50 text-red-700 dark:border-red-500 [&>svg]:text-red-700 bg-red-50 dark:bg-red-950 ',
+          'border-destructive/50 text-destructive bg-destructive/20 dark:border-destructive [&>svg]:text-destructive',
 
         success:
-          'border-green-500/50 text-green-700 dark:border-green-500 [&>svg]:text-green-700 bg-green-50 dark:bg-green-950 ',
+          'success group border-success-background bg-success-background/40 text-success-foreground dark:bg-success',
 
         warning:
-          'border-yellow-500/50 text-yellow-700 dark:border-yellow-500 [&>svg]:text-yellow-700 bg-yellow-50 dark:bg-yellow-950 ',
+          'border-yellow-500/50 bg-yellow-50 text-yellow-800 dark:border-yellow-500 dark:bg-yellow-900/50 dark:text-yellow-300 [&>svg]:text-yellow-600 dark:text-yellow-400',
       },
     },
     defaultVariants: {

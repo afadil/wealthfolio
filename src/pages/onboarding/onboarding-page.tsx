@@ -61,14 +61,16 @@ export const OnboardingPage = () => {
               <Icons.ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
-          <div>
-            <Button className="mt-4" asChild>
-              <Link to="/settings/general">
-                Let's get started
-                <Icons.ArrowRight className="ml-2 h-4 w-4 text-white" />
-              </Link>
-            </Button>
-          </div>
+          {currentStep === 0 && (
+            <div>
+              <Button className="mt-4" asChild>
+                <Link to="/settings/general">
+                  Let's get started
+                  <Icons.ArrowRight className="ml-2 h-4 w-4 text-white" />
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </section>

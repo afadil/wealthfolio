@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Command as CommandPrimitive } from 'cmdk';
 import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
-import { searchTicker } from '@/commands/symbol';
+import { searchTicker } from '@/commands/market-data';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { QuoteSummary } from '@/lib/types';
@@ -44,13 +44,12 @@ function TickerSearchInput({ selectedResult, defaultValue, onSelectResult }: Sea
   const tickers = data?.sort((a, b) => b.score - a.score);
 
   return (
-      <Command
-          shouldFilter={false}
-          className={cn(
-              'h-auto w-full rounded-lg border shadow-none',
-              { 'border-b-0': !isLoading && !isError && !(tickers && tickers.length > 0) }
-          )}
-      >
+    <Command
+      shouldFilter={false}
+      className={cn('h-auto w-full rounded-lg border shadow-none', {
+        'border-b-0': !isLoading && !isError && !(tickers && tickers.length > 0),
+      })}
+    >
       <CommandInput
         value={searchQuery}
         onValueChange={setSearchQuery}

@@ -41,6 +41,10 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
+    --success: 122 57% 38%;
+    --success-foreground: var(--foreground);
+    --success-background: 67 43% 56%;
+
     --border: 24 4.42% 84%;
     --input: 24 4.42% 84%;
     --ring: 222.2 84% 4.9%;
@@ -57,31 +61,35 @@
  
   .dark {
     --background: 10 0% 10%;
-    --foreground: 210 40% 98%;
+    --foreground: 141 7% 94%;
  
     --card: 10 0% 10%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: var(--foreground);
  
     --sidebar: 10 0% 10%;
 
     --popover: 10 0% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: var(--foreground);
  
-    --primary: 210 40% 98%;
+    --primary: var(--foreground);
     --primary-foreground: 222.2 47.4% 11.2%;
  
     --secondary: 0 0% 30%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: var(--foreground);
  
     --muted: 0 0% 30%;
     --muted-foreground: 215 20.2% 65.1%;
  
     --accent: 0 0% 30%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: var(--foreground);
  
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+  
+    --destructuve: 0 84 64
+    --destructive-foreground: var(--foreground);
  
+    --success: 68 43% 74%;
+    --success-foreground: var(--background);
+
     --border: 0 0% 20%;
     --input: 0 0% 30%;
     --ring: 0 0% 20%;

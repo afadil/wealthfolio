@@ -34,6 +34,13 @@ diesel::table! {
 }
 
 diesel::table! {
+    app_settings (setting_key) {
+        setting_key -> Text,
+        setting_value -> Text,
+    }
+}
+
+diesel::table! {
     assets (id) {
         id -> Text,
         isin -> Nullable<Text>,
@@ -58,35 +65,14 @@ diesel::table! {
 }
 
 diesel::table! {
-    platforms (id) {
+    exchange_rates (id) {
         id -> Text,
-        name -> Nullable<Text>,
-        url -> Text,
-    }
-}
-
-diesel::table! {
-    quotes (id) {
-        id -> Text,
+        from_currency -> Text,
+        to_currency -> Text,
+        rate -> Double,
+        source -> Text,
         created_at -> Timestamp,
-        data_source -> Text,
-        date -> Timestamp,
-        symbol -> Text,
-        open -> Double,
-        high -> Double,
-        low -> Double,
-        volume -> Double,
-        close -> Double,
-        adjclose -> Double,
-    }
-}
-
-diesel::table! {
-    settings (id) {
-        id -> Integer,
-        theme -> Text,
-        font -> Text,
-        base_currency -> Text,
+        updated_at -> Timestamp,
     }
 }
 
@@ -109,14 +95,68 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    platforms (id) {
+        id -> Text,
+        name -> Nullable<Text>,
+        url -> Text,
+    }
+}
+
+diesel::table! {
+    portfolio_history (id) {
+        id -> Text,
+        account_id -> Text,
+        date -> Date,
+        total_value -> Double,
+        market_value -> Double,
+        book_cost -> Double,
+        available_cash -> Double,
+        net_deposit -> Double,
+        currency -> Text,
+        base_currency -> Text,
+        total_gain_value -> Double,
+        total_gain_percentage -> Double,
+        day_gain_percentage -> Double,
+        day_gain_value -> Double,
+        allocation_percentage -> Double,
+        exchange_rate -> Double,
+        holdings -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    quotes (id) {
+        id -> Text,
+        created_at -> Timestamp,
+        data_source -> Text,
+        date -> Timestamp,
+        symbol -> Text,
+        open -> Double,
+        high -> Double,
+        low -> Double,
+        volume -> Double,
+        close -> Double,
+        adjclose -> Double,
+    }
+}
+
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
-diesel::joinable!(quotes -> assets (symbol));
+diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
+diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    accounts, activities, assets, platforms, quotes, settings,
+    accounts,
+    activities,
+    app_settings,
+    assets,
+    exchange_rates,
+    goals,
+    goals_allocation,
+    platforms,
+    portfolio_history,
+    quotes,
 );
-
-diesel::allow_tables_to_appear_in_same_query!(goals, goals_allocation);

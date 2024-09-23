@@ -17,6 +17,34 @@ export function formatDate(input: string | number): string {
   return format(date, 'MMM d, yyyy');
 }
 
+export const formatDateTime = (date: string | Date, timezone?: string) => {
+  if (!date) return { date: '-', time: '-' };
+
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: timezone || 'UTC',
+  };
+
+  const timeOptions: Intl.DateTimeFormatOptions = {
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    timeZone: timezone || 'UTC',
+  };
+
+  const dateFormatter = new Intl.DateTimeFormat('en-US', dateOptions);
+  const timeFormatter = new Intl.DateTimeFormat('en-US', timeOptions);
+
+  const dateObj = new Date(date);
+
+  return {
+    date: dateFormatter.format(dateObj),
+    time: timeFormatter.format(dateObj),
+  };
+};
+
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
   return new Intl.NumberFormat('en-US', {
     style: displayCurrency ? 'currency' : undefined,

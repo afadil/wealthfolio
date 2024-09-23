@@ -88,12 +88,11 @@ export const updateActivity = async (activity: NewActivity): Promise<Activity> =
 };
 
 // deleteActivity
-export const deleteActivity = async (activityId: string): Promise<void> => {
+export const deleteActivity = async (activityId: string): Promise<Activity> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        await invokeTauri('delete_activity', { activityId });
-        return;
+        return invokeTauri('delete_activity', { activityId });
       default:
         throw new Error(`Unsupported`);
     }

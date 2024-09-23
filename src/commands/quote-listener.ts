@@ -1,5 +1,10 @@
 import type { EventCallback, UnlistenFn } from '@/adapters';
-import { getRunEnv, RUN_ENV, listenQuotesSyncStartTauri, listenQuotesSyncCompleteTauri } from "@/adapters";
+import {
+  getRunEnv,
+  RUN_ENV,
+  listenQuotesSyncStartTauri,
+  listenQuotesSyncCompleteTauri,
+} from '@/adapters';
 
 // listenQuotesSyncStart
 export const listenQuotesSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
@@ -11,13 +16,15 @@ export const listenQuotesSyncStart = async <T>(handler: EventCallback<T>): Promi
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error listen QUOTES_SYNC_START:', error);
+    console.error('Error listen PORTFOLIO_UPDATE_START:', error);
     throw error;
   }
 };
 
 // listenQuotesSyncComplete
-export const listenQuotesSyncComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenQuotesSyncComplete = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -26,7 +33,7 @@ export const listenQuotesSyncComplete = async <T>(handler: EventCallback<T>): Pr
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error listen QUOTES_SYNC_COMPLETE:', error);
+    console.error('Error listen PORTFOLIO_UPDATE_COMPLETE:', error);
     throw error;
   }
 };

@@ -1,7 +1,6 @@
 import { Settings } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
-// getSettings
 export const getSettings = async (): Promise<Settings> => {
   try {
     switch (getRunEnv()) {
@@ -16,7 +15,6 @@ export const getSettings = async (): Promise<Settings> => {
   }
 };
 
-// saveSettings
 export const saveSettings = async (settings: Settings): Promise<Settings> => {
   try {
     switch (getRunEnv()) {

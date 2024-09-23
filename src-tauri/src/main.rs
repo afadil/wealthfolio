@@ -8,101 +8,85 @@ use commands::activity::{
     check_activities_import, create_activities, create_activity, delete_activity,
     search_activities, update_activity,
 };
-use commands::asset::{get_asset_data, search_ticker, synch_quotes};
 use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
     update_goal_allocations,
 };
-use commands::portfolio::{compute_holdings, get_historical, get_income_summary};
-use commands::settings::{get_settings, update_currency, update_settings};
+
+use commands::market_data::{get_asset_data, search_symbol, synch_quotes};
+use commands::portfolio::{
+    calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
+    get_income_summary, recalculate_portfolio,
+};
+use commands::settings::{get_exchange_rates, get_settings, update_exchange_rate, update_settings};
 
 use wealthfolio_core::db;
+use wealthfolio_core::models;
 
 use wealthfolio_core::account;
 use wealthfolio_core::activity;
 use wealthfolio_core::asset;
 use wealthfolio_core::goal;
-use wealthfolio_core::models;
+use wealthfolio_core::market_data;
+
+use wealthfolio_core::fx;
 use wealthfolio_core::portfolio;
 use wealthfolio_core::settings;
-
-use wealthfolio_core::app_state;
-
-use app_state::AppState;
-use asset::asset_service;
 
 use dotenvy::dotenv;
 use std::env;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, RwLock};
 
+use diesel::r2d2::{self, ConnectionManager};
+use diesel::SqliteConnection;
 use tauri::async_runtime::spawn;
 use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+
+// AppState
+struct AppState {
+    pool: Arc<DbPool>,
+    base_currency: Arc<RwLock<String>>,
+}
 
 fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
     let context = tauri::generate_context!();
-    // Customize the menu
-    let report_issue_menu_item = CustomMenuItem::new("report_issue".to_string(), "Report Issue");
-    let menu = tauri::Menu::os_default(&context.package_info().name).add_submenu(Submenu::new(
-        "Help",
-        Menu::new().add_item(report_issue_menu_item),
-    ));
+    let menu = create_menu(&context);
 
-    // Clone the AppHandle
     let app = tauri::Builder::default()
         .menu(menu)
-        .on_menu_event(|event| match event.menu_item_id() {
-            "report_issue" => {
-                dialog::message(
-                    Some(event.window()),
-                    "Contact Support",
-                    "If you encounter any issues, please email us at wealthfolio@teymz.com",
-                );
-            }
-
-            _ => {}
-        })
+        .on_menu_event(handle_menu_event)
         .setup(|app| {
             let app_handle = app.handle();
             let db_path = get_db_path(&app_handle);
             db::init(&db_path);
 
-            // Initialize state and connection
+            // Create connection pool
+            let manager = ConnectionManager::<SqliteConnection>::new(&db_path);
+            let pool = r2d2::Pool::builder()
+                .build(manager)
+                .expect("Failed to create database connection pool");
+            let pool = Arc::new(pool);
+
+            // Get initial base_currency from settings
+            let mut conn = pool.get().expect("Failed to get database connection");
+            let settings_service = settings::SettingsService::new();
+            let base_currency = settings_service
+                .get_base_currency(&mut conn)
+                .unwrap_or_else(|_| "USD".to_string());
+
+            // Initialize state
             let state = AppState {
-                conn: Mutex::new(db::establish_connection(&db_path)),
-                db_path: db_path.to_string(),
+                pool: pool.clone(),
+                base_currency: Arc::new(RwLock::new(base_currency)),
             };
             app.manage(state);
 
-            spawn(async move {
-                let asset_service = asset_service::AssetService::new();
-                app_handle
-                    .emit_all("QUOTES_SYNC_START", ())
-                    .expect("Failed to emit event");
-
-                let mut new_conn = db::establish_connection(&db_path);
-                let result = asset_service
-                    .initialize_and_sync_quotes(&mut new_conn)
-                    .await;
-
-                match result {
-                    Ok(_) => {
-                        app_handle
-                            .emit_all("QUOTES_SYNC_COMPLETE", ())
-                            .expect("Failed to emit event");
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to sync history quotes: {}", e);
-                        app_handle
-                            .emit_all("QUOTES_SYNC_ERROR", ())
-                            .expect("Failed to emit event");
-                    }
-                }
-            });
+            spawn_quote_sync(app_handle, pool);
 
             Ok(())
         })
@@ -115,16 +99,17 @@ fn main() {
             create_activity,
             update_activity,
             delete_activity,
-            search_ticker,
+            search_symbol,
             check_activities_import,
             create_activities,
-            get_historical,
+            calculate_historical_data,
             compute_holdings,
             get_asset_data,
             synch_quotes,
             get_settings,
             update_settings,
-            update_currency,
+            get_exchange_rates,
+            update_exchange_rate,
             create_goal,
             update_goal,
             delete_goal,
@@ -132,12 +117,64 @@ fn main() {
             update_goal_allocations,
             load_goals_allocations,
             get_income_summary,
+            get_account_history,
+            get_accounts_summary,
+            recalculate_portfolio,
         ])
         .build(context)
         .expect("error while running wealthfolio application");
 
     app.run(|_app_handle, _event| {
         // Handle various app events here if needed, otherwise do nothing
+    });
+}
+
+fn create_menu(context: &tauri::Context<tauri::utils::assets::EmbeddedAssets>) -> Menu {
+    let report_issue_menu_item = CustomMenuItem::new("report_issue".to_string(), "Report Issue");
+    tauri::Menu::os_default(&context.package_info().name).add_submenu(Submenu::new(
+        "Help",
+        Menu::new().add_item(report_issue_menu_item),
+    ))
+}
+
+fn handle_menu_event(event: tauri::WindowMenuEvent) {
+    if event.menu_item_id() == "report_issue" {
+        dialog::message(
+            Some(&event.window()),
+            "Contact Support",
+            "If you encounter any issues, please email us at wealthfolio@teymz.com",
+        );
+    }
+}
+
+fn spawn_quote_sync(app_handle: tauri::AppHandle, pool: Arc<DbPool>) {
+    spawn(async move {
+        let base_currency = {
+            let state = app_handle.state::<AppState>();
+            let currency = state.base_currency.read().unwrap().clone();
+            currency
+        };
+        let portfolio_service = portfolio::PortfolioService::new((*pool).clone(), base_currency)
+            .await
+            .expect("Failed to create PortfolioService");
+
+        app_handle
+            .emit_all("PORTFOLIO_UPDATE_START", ())
+            .expect("Failed to emit event");
+
+        match portfolio_service.update_portfolio().await {
+            Ok(_) => {
+                app_handle
+                    .emit_all("PORTFOLIO_UPDATE_COMPLETE", ())
+                    .expect("Failed to emit event");
+            }
+            Err(e) => {
+                eprintln!("Failed to update portfolio: {}", e);
+                app_handle
+                    .emit_all("PORTFOLIO_UPDATE_ERROR", ())
+                    .expect("Failed to emit event");
+            }
+        }
     });
 }
 

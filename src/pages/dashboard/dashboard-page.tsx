@@ -3,21 +3,21 @@ import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
 import Balance from './balance';
 import { useQuery } from '@tanstack/react-query';
-import { FinancialHistory } from '@/lib/types';
-import { getHistorical } from '@/commands/portfolio';
+import { PortfolioHistory, AccountSummary } from '@/lib/types';
+import { getAccountHistory, getAccountsSummary } from '@/commands/portfolio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accounts } from './accounts';
 import SavingGoals from './goals';
-import { formatAccountsData } from '@/lib/portfolio-helper';
+import { QueryKeys } from '@/lib/query-keys';
 
 // filter
 function DashboardSkeleton() {
   return (
-    <div className=" grid h-full gap-2 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid h-full gap-2 md:grid-cols-2 xl:grid-cols-3">
       <div className="flex h-full p-20 xl:col-span-2">
         <Skeleton className="h-full w-full" />
       </div>
-      <div className=" h-full w-full space-y-3 p-20">
+      <div className="h-full w-full space-y-3 p-20">
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
@@ -27,19 +27,24 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { data: historyData, isLoading } = useQuery<FinancialHistory[], Error>({
-    queryKey: ['portfolio_history'],
-    queryFn: getHistorical,
+  const { data: portfolioHistory, isLoading: isPortfolioHistoryLoading } = useQuery<
+    PortfolioHistory[],
+    Error
+  >({
+    queryKey: QueryKeys.accountHistory('TOTAL'),
+    queryFn: () => getAccountHistory('TOTAL'),
   });
 
-  if (isLoading) {
+  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
+    queryFn: getAccountsSummary,
+  });
+
+  if (isPortfolioHistoryLoading || isAccountsLoading) {
     return <DashboardSkeleton />;
   }
 
-  const portfolio = historyData?.find((history) => history.account?.id === 'TOTAL');
-  const todayValue = portfolio?.history[portfolio?.history.length - 1];
-
-  const accountsData = formatAccountsData(historyData || [], portfolio?.account.currency);
+  const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   return (
     <div className="flex flex-col">
@@ -53,38 +58,37 @@ export default function DashboardPage() {
           />
           <div className="flex space-x-3 text-sm">
             <GainAmount
-              className="text-sm font-light "
+              className="text-md font-light"
               value={todayValue?.totalGainValue || 0}
               currency={todayValue?.currency || 'USD'}
               displayCurrency={false}
             ></GainAmount>
             <div className="my-1 border-r border-gray-300 pr-2" />
             <GainPercent
-              className="text-sm font-light"
+              className="text-md font-light"
               value={todayValue?.totalGainPercentage || 0}
             ></GainPercent>
           </div>
         </div>
       </div>
 
-      <HistoryChart data={portfolio?.history || []} height={240} />
+      <HistoryChart data={portfolioHistory || []} height={240} />
 
       <div className="mx-auto w-full bg-gradient-to-b from-custom-green to-background px-12 pt-20 dark:from-custom-green-dark">
         {/* Responsive grid */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Column 1 */}
           <div className="pr-16 xl:col-span-2">
-            <Accounts className="border-none bg-transparent shadow-none" accounts={accountsData} />
+            <Accounts className="border-none bg-transparent shadow-none" accounts={accounts} />
           </div>
 
           {/* Column 2 */}
           <div className="">
-            <SavingGoals accounts={accountsData} />
+            <SavingGoals accounts={accounts} />
           </div>
           {/* Column 3 */}
         </div>
       </div>
-
       {/* Grid container */}
     </div>
   );

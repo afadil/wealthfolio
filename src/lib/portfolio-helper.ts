@@ -1,13 +1,6 @@
 // import type { Account, Asset } from '@/generated/client';
 
-import {
-  AccountTotal,
-  FinancialHistory,
-  Goal,
-  GoalAllocation,
-  GoalProgress,
-  Holding,
-} from './types';
+import { AccountSummary, Goal, GoalAllocation, GoalProgress, Holding } from './types';
 
 export function aggregateHoldingsBySymbol(holdings: Holding[]): Holding[] {
   const aggregated: Record<string, Holding> = {};
@@ -54,43 +47,21 @@ export function aggregateHoldingsBySymbol(holdings: Holding[]): Holding[] {
   return result;
 }
 
-export const formatAccountsData = (
-  data: FinancialHistory[],
-  baseCurrency: String = 'USD',
-): AccountTotal[] | undefined => {
-  return data
-    ?.filter((history) => history.account?.id !== 'TOTAL')
-    .map((history) => {
-      const todayValue = history.history[history.history.length - 1];
-      return {
-        id: history.account?.id || '',
-        name: history.account?.name || '',
-        group: history.account?.group || '',
-        currency: history.account?.currency || '',
-        marketValue: todayValue?.marketValue || 0,
-        cashBalance: todayValue?.availableCash || 0,
-        totalGainAmount: todayValue?.totalGainValue || 0,
-        totalGainPercent: todayValue?.totalGainPercentage || 0,
-        totalValue: todayValue?.marketValue + todayValue?.availableCash,
-        totalValueConverted:
-          (todayValue?.marketValue + todayValue?.availableCash) * (todayValue?.exchangeRate || 1),
-        marketValueConverted: todayValue?.marketValue * (todayValue?.exchangeRate || 1) || 0,
-        cashBalanceConverted: todayValue?.availableCash * (todayValue?.exchangeRate || 1) || 0,
-        bookValueConverted: todayValue?.bookCost * (todayValue?.exchangeRate || 1) || 0,
-        baseCurrency: baseCurrency,
-      } as AccountTotal;
-    });
-};
-
 export function calculateGoalProgress(
-  accounts: AccountTotal[],
+  accounts: AccountSummary[],
   goals: Goal[],
   allocations: GoalAllocation[],
 ): GoalProgress[] {
+  // Extract base currency from the first account's performance, or default to 'USD'
+  const baseCurrency = accounts[0]?.performance?.baseCurrency || 'USD';
+
   // Create a map of accountId to marketValue for quick lookup
   const accountValueMap = new Map<string, number>();
   accounts.forEach((account) => {
-    accountValueMap.set(account.id, account.totalValueConverted);
+    accountValueMap.set(
+      account.account.id,
+      account?.performance?.totalValue * (account?.performance?.exchangeRate || 1),
+    );
   });
 
   // Sort goals by targetValue
@@ -112,7 +83,7 @@ export function calculateGoalProgress(
       targetValue: goal.targetAmount,
       currentValue: totalAllocatedValue,
       progress: progress,
-      currency: accounts[0]?.baseCurrency || 'USD',
+      currency: baseCurrency,
     };
   });
 }

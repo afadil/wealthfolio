@@ -5,7 +5,7 @@ import { useLocation, useParams } from 'react-router-dom';
 import SymbolCard from './symbol-card';
 import SymbolHoldingCard from './symbol-holding';
 import { AssetData, Holding } from '@/lib/types';
-import { getAssetData } from '@/commands/symbol';
+import { getAssetData } from '@/commands/market-data';
 import { useQuery } from '@tanstack/react-query';
 
 export const AssetProfilePage = () => {

@@ -10,9 +10,9 @@ export function GainPercent({ value, className, ...props }: GainPercentProps) {
   return (
     <div
       className={cn(
-        'flex flex-col items-end text-right',
+        'amount flex flex-col items-end text-right',
         className,
-        value === 0 ? 'text-foreground' : value > 0 ? 'text-green-500' : 'text-red-500',
+        value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-red-400',
       )}
       {...props}
     >

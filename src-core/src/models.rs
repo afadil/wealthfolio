@@ -191,7 +191,15 @@ pub struct NewActivity {
 }
 
 #[derive(
-    Queryable, Identifiable, Insertable, Associations, Serialize, AsChangeset, Deserialize, Debug,
+    Queryable,
+    Identifiable,
+    Insertable,
+    Associations,
+    Serialize,
+    AsChangeset,
+    Deserialize,
+    Debug,
+    Clone,
 )]
 #[diesel(belongs_to(Asset, foreign_key = symbol))]
 #[diesel(table_name= crate::schema::quotes)]
@@ -237,15 +245,15 @@ pub struct ActivityDetails {
     pub account_id: String,
     pub asset_id: String,
     pub activity_type: String,
-    pub date: chrono::NaiveDateTime,
+    pub date: String,
     pub quantity: f64,
     pub unit_price: f64,
     pub currency: String,
     pub fee: f64,
     pub is_draft: bool,
     pub comment: Option<String>,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
     pub account_name: String,
     pub account_currency: String,
     pub asset_symbol: String,
@@ -327,31 +335,11 @@ pub struct Holding {
     pub sectors: Option<Vec<Sector>>,
 }
 
-// FinancialSnapshot and FinancialHistory structs with serde for serialization/deserialization
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct FinancialSnapshot {
-    pub date: String,
-    pub total_value: f64,
-    pub market_value: f64,
-    pub book_cost: f64,
-    pub available_cash: f64,
-    pub net_deposit: f64,
-    pub currency: String,
-    pub base_currency: String,
-    pub total_gain_value: f64,
-    pub total_gain_percentage: f64,
-    pub day_gain_percentage: f64,
-    pub day_gain_value: f64,
-    pub allocation_percentage: Option<f64>,
-    pub exchange_rate: Option<f64>,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FinancialHistory {
-    pub account: Account, // Define Account struct accordingly
-    pub history: Vec<FinancialSnapshot>,
+    pub account: Account,
+    pub history: Vec<PortfolioHistory>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -405,22 +393,19 @@ pub struct Sort {
 }
 
 #[derive(Queryable, Insertable, Serialize, Deserialize, Debug)]
-#[diesel(table_name= crate::schema::settings)]
+#[diesel(table_name= crate::schema::app_settings)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSetting {
+    pub setting_key: String,
+    pub setting_value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    pub id: i32,
     pub theme: String,
     pub font: String,
     pub base_currency: String,
-}
-
-#[derive(Insertable, Serialize, AsChangeset, Deserialize, Debug)]
-#[diesel(table_name= crate::schema::settings)]
-#[serde(rename_all = "camelCase")]
-pub struct NewSettings<'a> {
-    pub theme: &'a str,
-    pub font: &'a str,
-    pub base_currency: &'a str,
 }
 
 #[derive(
@@ -498,4 +483,68 @@ pub struct IncomeSummary {
     pub total_income: f64,
     pub total_income_ytd: f64,
     pub currency: String,
+}
+
+#[derive(Debug, Clone, Queryable, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = crate::schema::portfolio_history)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioHistory {
+    pub id: String,
+    pub account_id: String,
+    pub date: String,
+    pub total_value: f64,
+    pub market_value: f64,
+    pub book_cost: f64,
+    pub available_cash: f64,
+    pub net_deposit: f64,
+    pub currency: String,
+    pub base_currency: String,
+    pub total_gain_value: f64,
+    pub total_gain_percentage: f64,
+    pub day_gain_percentage: f64,
+    pub day_gain_value: f64,
+    pub allocation_percentage: f64,
+    pub exchange_rate: f64,
+    pub holdings: Option<String>, // Holdings JSON
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HistorySummary {
+    pub id: Option<String>,
+    pub start_date: String,
+    pub end_date: String,
+    pub entries_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountSummary {
+    pub account: Account,
+    pub performance: PortfolioHistory,
+}
+
+#[derive(
+    Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Debug, Clone,
+)]
+#[diesel(table_name = crate::schema::exchange_rates)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeRate {
+    pub id: String,
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+    pub source: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
+#[diesel(table_name = crate::schema::exchange_rates)]
+#[serde(rename_all = "camelCase")]
+pub struct NewExchangeRate {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+    pub source: String,
 }
