@@ -4,7 +4,6 @@ use crate::asset::asset_service::AssetService;
 use crate::error::{PortfolioError, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Holding, Performance};
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::collections::{HashMap, HashSet};
 
@@ -17,25 +16,25 @@ pub struct HoldingsService {
 }
 
 impl HoldingsService {
-    pub async fn new(
-        pool: Pool<ConnectionManager<SqliteConnection>>,
-        base_currency: String,
-    ) -> Self {
+    pub async fn new(base_currency: String) -> Self {
         HoldingsService {
-            account_service: AccountService::new(pool.clone(), base_currency.clone()),
-            activity_service: ActivityService::new(pool.clone(), base_currency.clone()),
-            asset_service: AssetService::new(pool.clone()).await,
-            fx_service: CurrencyExchangeService::new(pool.clone()),
+            account_service: AccountService::new(base_currency.clone()),
+            activity_service: ActivityService::new(base_currency.clone()),
+            asset_service: AssetService::new().await,
+            fx_service: CurrencyExchangeService::new(),
             base_currency,
         }
     }
-    pub fn compute_holdings(&self) -> Result<Vec<Holding>> {
-        let start_time = std::time::Instant::now();
 
+    pub fn compute_holdings(&self, conn: &mut SqliteConnection) -> Result<Vec<Holding>> {
+        let start_time = std::time::Instant::now();
         let mut holdings: HashMap<String, Holding> = HashMap::new();
-        let accounts = self.account_service.get_accounts()?;
-        let activities = self.activity_service.get_trading_activities()?;
-        let assets = self.asset_service.get_assets()?;
+        let accounts = self.account_service.get_accounts(conn)?;
+        let activities = self.activity_service.get_trading_activities(conn)?;
+        let assets = self.asset_service.get_assets(conn)?;
+        self.fx_service
+            .initialize(conn)
+            .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
 
         println!(
             "Found {} accounts, {} activities, and {} assets",
@@ -112,7 +111,7 @@ impl HoldingsService {
         // Fetch quotes for each symbol asynchronously
         let mut quotes = HashMap::new();
         for symbol in symbols {
-            match self.asset_service.get_latest_quote(&symbol) {
+            match self.asset_service.get_latest_quote(conn, &symbol) {
                 Ok(quote) => {
                     quotes.insert(symbol.clone(), quote);
                 }

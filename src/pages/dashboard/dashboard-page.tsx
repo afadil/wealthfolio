@@ -27,17 +27,17 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
+  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
+    queryFn: getAccountsSummary,
+  });
+
   const { data: portfolioHistory, isLoading: isPortfolioHistoryLoading } = useQuery<
     PortfolioHistory[],
     Error
   >({
     queryKey: QueryKeys.accountHistory('TOTAL'),
     queryFn: () => getAccountHistory('TOTAL'),
-  });
-
-  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
-    queryFn: getAccountsSummary,
   });
 
   if (isPortfolioHistoryLoading || isAccountsLoading) {

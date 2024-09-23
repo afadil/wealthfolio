@@ -6,7 +6,7 @@ use tauri::State;
 
 async fn create_portfolio_service(state: &State<'_, AppState>) -> Result<PortfolioService, String> {
     let base_currency = state.base_currency.read().unwrap().clone();
-    PortfolioService::new((*state.pool).clone(), base_currency)
+    PortfolioService::new(base_currency)
         .await
         .map_err(|e| format!("Failed to create PortfolioService: {}", e))
 }
@@ -19,23 +19,33 @@ pub async fn calculate_historical_data(
 ) -> Result<Vec<HistorySummary>, String> {
     println!("Calculate portfolio historical...");
     let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .calculate_historical_data(account_ids, force_full_calculation)
+        .calculate_historical_data(&mut conn, account_ids, force_full_calculation)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>, String> {
+    use std::time::Instant;
     println!("Compute holdings...");
-    let service = create_portfolio_service(&state).await?;
+    let start = Instant::now();
 
-    service
-        .compute_holdings()
+    let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
+
+    let result = service
+        .compute_holdings(&mut conn)
         .await
         .map_err(|e| e.to_string())
-        .map(|vec| Ok(vec))?
+        .map(|vec| Ok(vec))?;
+
+    let duration = start.elapsed();
+    println!("Compute holdings completed in: {:?}", duration);
+
+    result
 }
 
 #[tauri::command]
@@ -45,9 +55,10 @@ pub async fn get_account_history(
 ) -> Result<Vec<PortfolioHistory>, String> {
     println!("Fetching account history for account ID: {}", account_id);
     let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .get_account_history(&account_id)
+        .get_account_history(&mut conn, &account_id)
         .map_err(|e| format!("Failed to fetch account history: {}", e))
 }
 
@@ -57,9 +68,10 @@ pub async fn get_accounts_summary(
 ) -> Result<Vec<AccountSummary>, String> {
     println!("Fetching active accounts performance...");
     let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .get_accounts_summary()
+        .get_accounts_summary(&mut conn)
         .map_err(|e| format!("Failed to fetch active accounts performance: {}", e))
 }
 
@@ -69,9 +81,10 @@ pub async fn recalculate_portfolio(
 ) -> Result<Vec<HistorySummary>, String> {
     println!("Recalculating portfolio...");
     let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .update_portfolio()
+        .update_portfolio(&mut conn)
         .await
         .map_err(|e| format!("Failed to recalculate portfolio: {}", e))
 }
@@ -80,8 +93,9 @@ pub async fn recalculate_portfolio(
 pub async fn get_income_summary(state: State<'_, AppState>) -> Result<IncomeSummary, String> {
     println!("Fetching income summary...");
     let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .get_income_summary()
+        .get_income_summary(&mut conn)
         .map_err(|e| format!("Failed to fetch income summary: {}", e))
 }

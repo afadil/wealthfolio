@@ -24,8 +24,9 @@ export function useCalculateHistoryMutation({
         variant: 'success',
       });
     },
-    onError: () => {
+    onError: (error) => {
       queryClient.invalidateQueries();
+      console.error(error);
       toast({
         title: errorTitle,
         description: 'Please try again or report an issue if the problem persists.',

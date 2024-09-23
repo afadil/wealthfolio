@@ -7,9 +7,13 @@ use tauri::State;
 pub async fn get_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, String> {
     println!("Fetching active accounts...");
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = AccountService::new((*state.pool).clone(), base_currency);
+    let service = AccountService::new(base_currency);
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     service
-        .get_accounts()
+        .get_accounts(&mut conn)
         .map_err(|e| format!("Failed to load accounts: {}", e))
 }
 
@@ -19,10 +23,14 @@ pub async fn create_account(
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
     println!("Adding new account...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = AccountService::new((*state.pool).clone(), base_currency);
+    let service = AccountService::new(base_currency);
     service
-        .create_account(account)
+        .create_account(&mut conn, account)
         .await
         .map_err(|e| format!("Failed to add new account: {}", e))
 }
@@ -33,10 +41,14 @@ pub async fn update_account(
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
     println!("Updating account...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = AccountService::new((*state.pool).clone(), base_currency);
+    let service = AccountService::new(base_currency);
     service
-        .update_account(account)
+        .update_account(&mut conn, account)
         .map_err(|e| format!("Failed to update account: {}", e))
 }
 
@@ -47,8 +59,12 @@ pub async fn delete_account(
 ) -> Result<usize, String> {
     println!("Deleting account...");
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = AccountService::new((*state.pool).clone(), base_currency);
+    let service = AccountService::new(base_currency);
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     service
-        .delete_account(account_id)
+        .delete_account(&mut conn, account_id)
         .map_err(|e| format!("Failed to delete account: {}", e))
 }

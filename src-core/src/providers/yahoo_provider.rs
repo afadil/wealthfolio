@@ -64,7 +64,7 @@ impl YahooProvider {
     pub async fn new() -> Result<Self, yahoo::YahooError> {
         let provider = yahoo::YahooConnector::new()?;
         let yahoo_provider = YahooProvider { provider };
-        yahoo_provider.set_crumb().await?;
+
         Ok(yahoo_provider)
     }
 
@@ -154,6 +154,7 @@ impl YahooProvider {
     }
 
     pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+        self.set_crumb().await?;
         // Handle the cash asset case
         if let Some(currency) = symbol.strip_prefix("$CASH-") {
             return Ok(self.create_cash_asset(symbol, currency));

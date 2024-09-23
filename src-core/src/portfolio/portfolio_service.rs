@@ -6,8 +6,7 @@ use crate::models::{
     AccountSummary, HistorySummary, Holding, IncomeData, IncomeSummary, PortfolioHistory,
 };
 
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::SqliteConnection;
+use diesel::prelude::*;
 
 use std::sync::Arc;
 
@@ -25,109 +24,137 @@ pub struct PortfolioService {
 }
 
 impl PortfolioService {
-    pub async fn new(
-        pool: Pool<ConnectionManager<SqliteConnection>>,
-        base_currency: String,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await);
+    pub async fn new(base_currency: String) -> Result<Self, Box<dyn std::error::Error>> {
+        let market_data_service = Arc::new(MarketDataService::new().await);
 
         Ok(PortfolioService {
-            account_service: AccountService::new(pool.clone(), base_currency.clone()),
-            activity_service: ActivityService::new(pool.clone(), base_currency.clone()),
+            account_service: AccountService::new(base_currency.clone()),
+            activity_service: ActivityService::new(base_currency.clone()),
             market_data_service: market_data_service.clone(),
             income_service: IncomeService::new(
-                pool.clone(),
-                CurrencyExchangeService::new(pool.clone()),
+                CurrencyExchangeService::new(),
                 base_currency.clone(),
             ),
-            holdings_service: HoldingsService::new(pool.clone(), base_currency.clone()).await,
-            history_service: HistoryService::new(
-                pool.clone(),
-                base_currency.clone(),
-                market_data_service,
-            ),
+            holdings_service: HoldingsService::new(base_currency.clone()).await,
+            history_service: HistoryService::new(base_currency.clone(), market_data_service),
         })
     }
 
-    pub async fn compute_holdings(&self) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
+    pub async fn compute_holdings(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
         self.holdings_service
-            .compute_holdings()
+            .compute_holdings(conn)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 
     pub async fn calculate_historical_data(
         &self,
+        conn: &mut SqliteConnection,
         account_ids: Option<Vec<String>>,
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
         // First, sync quotes
-        self.market_data_service.sync_exchange_rates().await?;
+        self.market_data_service.sync_exchange_rates(conn).await?;
+
         let accounts = match &account_ids {
-            Some(ids) => self.account_service.get_accounts_by_ids(ids)?,
-            None => self.account_service.get_accounts()?,
+            Some(ids) => self.account_service.get_accounts_by_ids(conn, ids)?,
+            None => self.account_service.get_accounts(conn)?,
         };
 
         let activities = match &account_ids {
-            Some(ids) => self.activity_service.get_activities_by_account_ids(ids)?,
-            None => self.activity_service.get_activities()?,
+            Some(ids) => self
+                .activity_service
+                .get_activities_by_account_ids(conn, ids)?,
+            None => self.activity_service.get_activities(conn)?,
         };
 
-        let results = self.history_service.calculate_historical_data(
-            &accounts,
-            &activities,
-            force_full_calculation,
-        )?;
+        let results = conn.transaction(|conn| {
+            self.history_service.calculate_historical_data(
+                conn,
+                &accounts,
+                &activities,
+                force_full_calculation,
+            )
+        })?;
 
         Ok(results)
     }
 
-    pub fn get_income_data(&self) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        self.income_service.get_income_data()
+    pub fn get_income_data(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<IncomeData>, diesel::result::Error> {
+        self.income_service.get_income_data(conn)
     }
 
-    pub fn get_income_summary(&self) -> Result<IncomeSummary, diesel::result::Error> {
-        self.income_service.get_income_summary()
+    pub fn get_income_summary(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<IncomeSummary, diesel::result::Error> {
+        self.income_service.get_income_summary(conn)
     }
 
     pub async fn update_portfolio(
         &self,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+        use std::time::Instant;
+        let start = Instant::now();
+
         // First, sync quotes
+        println!("initialize_and_sync_quotes");
         self.market_data_service
-            .initialize_and_sync_quotes()
+            .initialize_and_sync_quotes(conn)
             .await?;
 
         // Then, calculate historical data
-        self.calculate_historical_data(None, false).await
+        println!("calculate_historical_data");
+        let result = self.calculate_historical_data(conn, None, false).await;
+
+        let duration = start.elapsed();
+        println!("update_portfolio completed in: {:?}", duration);
+
+        result
     }
 
     pub fn get_account_history(
         &self,
+        conn: &mut SqliteConnection,
         account_id: &str,
     ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
         self.history_service
-            .get_account_history(account_id)
+            .get_account_history(conn, account_id)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>) // Convert PortfolioError to Box<dyn std::error::Error>
     }
 
-    pub fn get_accounts_summary(&self) -> Result<Vec<AccountSummary>, Box<dyn std::error::Error>> {
-        let accounts = self.account_service.get_accounts()?;
+    pub fn get_accounts_summary(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<AccountSummary>, Box<dyn std::error::Error>> {
+        let accounts = self.account_service.get_accounts(conn)?;
         let mut account_summaries = Vec::new();
 
         // First, get the total portfolio value
-        let total_portfolio_value =
-            if let Ok(total_history) = self.history_service.get_latest_account_history("TOTAL") {
-                total_history.market_value
-            } else {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Total portfolio history not found",
-                )));
-            };
+        let total_portfolio_value = if let Ok(total_history) = self
+            .history_service
+            .get_latest_account_history(conn, "TOTAL")
+        {
+            total_history.market_value
+        } else {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Total portfolio history not found",
+            )));
+        };
 
         // Then, calculate the allocation percentage for each account
         for account in accounts {
-            if let Ok(history) = self.history_service.get_latest_account_history(&account.id) {
+            if let Ok(history) = self
+                .history_service
+                .get_latest_account_history(conn, &account.id)
+            {
                 let allocation_percentage = if total_portfolio_value > 0.0 {
                     (history.market_value / total_portfolio_value) * 100.0
                 } else {

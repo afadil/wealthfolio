@@ -2,12 +2,10 @@ use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary};
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::sync::Arc;
 pub struct AssetService {
     market_data_service: Arc<MarketDataService>,
-    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl From<yahoo_finance_api::Quote> for Quote {
@@ -29,35 +27,41 @@ impl From<yahoo_finance_api::Quote> for Quote {
 }
 
 impl AssetService {
-    pub async fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
-        let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await);
+    pub async fn new() -> Self {
+        let market_data_service = Arc::new(MarketDataService::new().await);
         Self {
-            pool,
             market_data_service,
         }
     }
 
-    pub fn get_assets(&self) -> Result<Vec<Asset>, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        assets::table.load::<Asset>(&mut conn)
+    pub fn get_assets(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Asset>, diesel::result::Error> {
+        assets::table.load::<Asset>(conn)
     }
 
-    pub fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        assets::table.find(asset_id).first::<Asset>(&mut conn)
+    pub fn get_asset_by_id(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_id: &str,
+    ) -> Result<Asset, diesel::result::Error> {
+        assets::table.find(asset_id).first::<Asset>(conn)
     }
 
-    pub fn get_asset_data(&self, asset_id: &str) -> Result<AssetProfile, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-
+    pub fn get_asset_data(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_id: &str,
+    ) -> Result<AssetProfile, diesel::result::Error> {
         let asset = assets::table
             .filter(assets::id.eq(asset_id))
-            .first::<Asset>(&mut conn)?;
+            .first::<Asset>(conn)?;
 
         let quote_history = quotes::table
             .filter(quotes::symbol.eq(&asset.symbol))
             .order(quotes::date.desc())
-            .load::<Quote>(&mut conn)?;
+            .load::<Quote>(conn)?;
 
         Ok(AssetProfile {
             asset,
@@ -67,15 +71,15 @@ impl AssetService {
 
     pub fn load_currency_assets(
         &self,
+        conn: &mut SqliteConnection,
         base_currency: &str,
     ) -> Result<Vec<Asset>, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
         use crate::schema::assets::dsl::*;
 
         assets
             .filter(asset_type.eq("Currency"))
             .filter(symbol.like(format!("{}%", base_currency)))
-            .load::<Asset>(&mut conn)
+            .load::<Asset>(conn)
     }
 
     pub fn create_exchange_rate_symbols(
@@ -95,7 +99,7 @@ impl AssetService {
 
         let new_assets: Vec<NewAsset> = symbols
             .iter()
-            .filter(|symbol| self.get_asset_by_id(symbol).is_err())
+            .filter(|symbol| self.get_asset_by_id(conn, symbol).is_err())
             .map(|symbol| NewAsset {
                 id: symbol.to_string(),
                 isin: None,
@@ -189,12 +193,20 @@ impl AssetService {
             .get_result::<Asset>(conn)
     }
 
-    pub fn get_latest_quote(&self, symbol_query: &str) -> QueryResult<Quote> {
-        self.market_data_service.get_latest_quote(symbol_query)
+    pub fn get_latest_quote(
+        &self,
+        conn: &mut SqliteConnection,
+        symbol_query: &str,
+    ) -> QueryResult<Quote> {
+        self.market_data_service
+            .get_latest_quote(conn, symbol_query)
     }
 
-    pub fn get_history_quotes(&self) -> Result<Vec<Quote>, diesel::result::Error> {
-        self.market_data_service.get_history_quotes()
+    pub fn get_history_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Quote>, diesel::result::Error> {
+        self.market_data_service.get_history_quotes(conn)
     }
 
     pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, String> {
@@ -203,15 +215,15 @@ impl AssetService {
 
     pub async fn get_asset_profile(
         &self,
+        conn: &mut SqliteConnection,
         asset_id: &str,
         sync: Option<bool>,
     ) -> Result<Asset, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
         use crate::schema::assets::dsl::*;
 
         let should_sync = sync.unwrap_or(true);
 
-        match assets.find(asset_id).first::<Asset>(&mut conn) {
+        match assets.find(asset_id).first::<Asset>(conn) {
             Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
                 // symbol not found in database. Fetching from market data service.
@@ -230,10 +242,10 @@ impl AssetService {
                 let inserted_asset = diesel::insert_into(assets)
                     .values(&fetched_profile)
                     .returning(Asset::as_returning())
-                    .get_result(&mut conn)?;
+                    .get_result(conn)?;
 
                 if should_sync {
-                    self.sync_symbol_quotes(&[inserted_asset.symbol.clone()])
+                    self.sync_symbol_quotes(conn, &[inserted_asset.symbol.clone()])
                         .await
                         .map_err(|e| {
                             println!(
@@ -256,7 +268,11 @@ impl AssetService {
         }
     }
 
-    pub async fn sync_symbol_quotes(&self, symbols: &[String]) -> Result<(), String> {
-        self.market_data_service.sync_quotes(symbols).await
+    pub async fn sync_symbol_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        symbols: &[String],
+    ) -> Result<(), String> {
+        self.market_data_service.sync_quotes(conn, symbols).await
     }
 }

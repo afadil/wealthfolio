@@ -6,12 +6,10 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub async fn search_symbol(
-    query: String,
-    state: State<'_, AppState>,
-) -> Result<Vec<QuoteSummary>, String> {
+pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
     println!("Searching for ticker symbol: {}", query);
-    let service = MarketDataService::new((*state.pool).clone()).await;
+    let service = MarketDataService::new().await;
+
     service
         .search_symbol(&query)
         .await
@@ -23,16 +21,26 @@ pub async fn get_asset_data(
     asset_id: String,
     state: State<'_, AppState>,
 ) -> Result<AssetProfile, String> {
-    let service = AssetService::new((*state.pool).clone()).await;
-    service.get_asset_data(&asset_id).map_err(|e| e.to_string())
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = AssetService::new().await;
+    service
+        .get_asset_data(&mut conn, &asset_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
     println!("Synching quotes history");
-    let service = MarketDataService::new((*state.pool).clone()).await;
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = MarketDataService::new().await;
     service
-        .initialize_and_sync_quotes()
+        .initialize_and_sync_quotes(&mut conn)
         .await
         .map_err(|e| e.to_string())
 }

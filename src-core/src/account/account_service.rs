@@ -1,40 +1,42 @@
 use crate::account::AccountRepository;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Account, AccountUpdate, NewAccount};
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::Connection;
 use diesel::SqliteConnection;
 
 pub struct AccountService {
     account_repo: AccountRepository,
-    pool: Pool<ConnectionManager<SqliteConnection>>,
     base_currency: String,
 }
 
 impl AccountService {
-    pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>, base_currency: String) -> Self {
+    pub fn new(base_currency: String) -> Self {
         AccountService {
             account_repo: AccountRepository::new(),
-            pool,
             base_currency,
         }
     }
 
-    pub fn get_accounts(&self) -> Result<Vec<Account>, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        self.account_repo.load_accounts(&mut conn)
+    pub fn get_accounts(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        self.account_repo.load_accounts(conn)
     }
 
-    pub fn get_account_by_id(&self, account_id: &str) -> Result<Account, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        self.account_repo.load_account_by_id(&mut conn, account_id)
+    pub fn get_account_by_id(
+        &self,
+        conn: &mut SqliteConnection,
+        account_id: &str,
+    ) -> Result<Account, diesel::result::Error> {
+        self.account_repo.load_account_by_id(conn, account_id)
     }
 
     pub async fn create_account(
         &self,
+        conn: &mut SqliteConnection,
         new_account: NewAccount,
     ) -> Result<Account, Box<dyn std::error::Error>> {
-        let mut conn = self.pool.get()?;
         let base_currency = self.base_currency.clone();
 
         println!(
@@ -43,9 +45,12 @@ impl AccountService {
         );
         conn.transaction(|conn| {
             if new_account.currency != base_currency {
-                let fx_service = CurrencyExchangeService::new(self.pool.clone());
-                fx_service
-                    .add_exchange_rate(base_currency.clone(), new_account.currency.clone())?;
+                let fx_service = CurrencyExchangeService::new();
+                fx_service.add_exchange_rate(
+                    conn,
+                    base_currency.clone(),
+                    new_account.currency.clone(),
+                )?;
             }
 
             // Insert new account
@@ -57,28 +62,25 @@ impl AccountService {
 
     pub fn update_account(
         &self,
+        conn: &mut SqliteConnection,
         updated_account_data: AccountUpdate,
     ) -> Result<Account, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        self.account_repo
-            .update_account(&mut conn, updated_account_data)
+        self.account_repo.update_account(conn, updated_account_data)
     }
 
     pub fn delete_account(
         &self,
+        conn: &mut SqliteConnection,
         account_id_to_delete: String,
     ) -> Result<usize, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        self.account_repo
-            .delete_account(&mut conn, account_id_to_delete)
+        self.account_repo.delete_account(conn, account_id_to_delete)
     }
 
     pub fn get_accounts_by_ids(
         &self,
+        conn: &mut SqliteConnection,
         account_ids: &[String],
     ) -> Result<Vec<Account>, diesel::result::Error> {
-        let mut conn = self.pool.get().expect("Couldn't get db connection");
-        self.account_repo
-            .load_accounts_by_ids(&mut conn, account_ids)
+        self.account_repo.load_accounts_by_ids(conn, account_ids)
     }
 }

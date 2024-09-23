@@ -16,11 +16,16 @@ pub async fn search_activities(
     state: State<'_, AppState>,
 ) -> Result<ActivitySearchResponse, String> {
     println!("Search activities... {}, {}", page, page_size);
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    let service = activity_service::ActivityService::new(base_currency);
 
     service
         .search_activities(
+            &mut conn,
             page,
             page_size,
             account_id_filter,
@@ -37,10 +42,14 @@ pub async fn create_activity(
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
     println!("Adding new activity...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    let service = activity_service::ActivityService::new(base_currency);
     service
-        .create_activity(activity)
+        .create_activity(&mut conn, activity)
         .await
         .map_err(|e| format!("Failed to add new activity: {}", e))
 }
@@ -51,10 +60,14 @@ pub async fn update_activity(
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
     println!("Updating activity...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    let service = activity_service::ActivityService::new(base_currency);
     service
-        .update_activity(activity)
+        .update_activity(&mut conn, activity)
         .await
         .map_err(|e| format!("Failed to update activity: {}", e))
 }
@@ -69,10 +82,14 @@ pub async fn check_activities_import(
         "Checking activities import...: {}, {}",
         account_id, file_path
     );
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    let service = activity_service::ActivityService::new(base_currency);
     service
-        .check_activities_import(account_id, file_path)
+        .check_activities_import(&mut conn, account_id, file_path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -83,10 +100,14 @@ pub async fn create_activities(
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
     println!("Importing activities...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    let service = activity_service::ActivityService::new(base_currency);
     service
-        .create_activities(activities)
+        .create_activities(&mut conn, activities)
         .map_err(|err| format!("Failed to import activities: {}", err))
 }
 
@@ -96,9 +117,13 @@ pub async fn delete_activity(
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
     println!("Deleting activity...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new((*state.pool).clone(), base_currency);
+    let service = activity_service::ActivityService::new(base_currency);
     service
-        .delete_activity(activity_id)
+        .delete_activity(&mut conn, activity_id)
         .map_err(|e| format!("Failed to delete activity: {}", e))
 }
