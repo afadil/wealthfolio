@@ -105,11 +105,12 @@ Ensure you have the following installed on your machine:
 - **Tailwind CSS**: Utility-first CSS framework for styling.
 - **Radix UI/Shadcn**: Accessible UI components.
 - **Recharts**: Charting library built with React.
-
-### Backend / APIs
-
 - **React Query**: Data-fetching library for React.
 - **Zod**: TypeScript-first schema declaration and validation library.
+
+### Backend
+
+-  **Tauri**: Framework for building tiny, secure, and fast desktop applications.
 
 ### Development Tools
 
@@ -117,7 +118,7 @@ Ensure you have the following installed on your machine:
 - **TypeScript**: Typed superset of JavaScript.
 - **ESLint**: Pluggable linting utility for JavaScript and JSX.
 - **Prettier**: Code formatter.
-- **Tauri**: Framework for building tiny, secure, and fast desktop applications.
+
 
 ## Folder Structure
 
