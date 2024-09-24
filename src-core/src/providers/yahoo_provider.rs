@@ -173,16 +173,20 @@ impl YahooProvider {
 
         let (asset_class, asset_sub_class) = self.parse_asset_class(
             asset_profile.price.as_ref().map_or("", |p| &p.quote_type),
-            asset_profile.price.as_ref().map_or("", |p| &p.short_name),
+            asset_profile
+                .price
+                .as_ref()
+                .and_then(|p| p.short_name.as_deref())
+                .unwrap_or(""),
         );
 
         let formatted_name = asset_profile.price.as_ref().map_or_else(
             || symbol.to_string(),
             |price| {
                 self.format_name(
-                    Some(&price.long_name),
+                    price.long_name.as_deref(),
                     &price.quote_type,
-                    Some(&price.short_name),
+                    price.short_name.as_deref(),
                     &price.symbol,
                 )
             },
@@ -283,6 +287,15 @@ impl YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
+        use chrono::{DateTime, Utc};
+        let start_date: DateTime<Utc> = start.into();
+        let end_date: DateTime<Utc> = end.into();
+        println!(
+            "Fetching history for {} from {} to {}",
+            symbol,
+            start_date.format("%Y-%m-%d %H:%M:%S"),
+            end_date.format("%Y-%m-%d %H:%M:%S")
+        );
         if symbol.starts_with("$CASH-") {
             return Ok(vec![]);
         }
@@ -294,6 +307,8 @@ impl YahooProvider {
             .provider
             .get_quote_history(symbol, start_offset, end_offset)
             .await?;
+
+        println!("Response: {}", response.quotes().unwrap().len());
 
         // Use the new method to convert quotes
         let quotes = response
