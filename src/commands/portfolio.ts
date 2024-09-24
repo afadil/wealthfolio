@@ -38,7 +38,7 @@ export const computeHoldings = async (): Promise<Holding[]> => {
   }
 };
 
-export const getIncomeSummary = async (): Promise<IncomeSummary> => {
+export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

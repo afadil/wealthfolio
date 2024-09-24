@@ -22,10 +22,10 @@ export function useActivityMutations(onSuccess?: () => void) {
       });
       if (onSuccess) onSuccess();
     },
-    onError: () => {
+    onError: (error: string) => {
       toast({
         title: `Uh oh! Something went wrong ${action} this activity.`,
-        description: 'Please try again or report an issue if the problem persists.',
+        description: `Please try again or report an issue if the problem persists. Error: ${error}`,
         variant: 'destructive',
       });
     },

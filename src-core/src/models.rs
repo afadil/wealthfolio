@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -466,22 +465,31 @@ pub struct GoalsAllocation {
     pub percent_allocation: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, QueryableByName)]
+#[serde(rename_all = "camelCase")]
+#[diesel(table_name = crate::schema::activities)]
 pub struct IncomeData {
-    pub date: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub date: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub income_type: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol: String,
-    pub amount: f64,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
+    #[diesel(sql_type = diesel::sql_types::Double)]
+    pub amount: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IncomeSummary {
+    pub period: String,
     pub by_month: HashMap<String, f64>,
     pub by_type: HashMap<String, f64>,
     pub by_symbol: HashMap<String, f64>,
+    pub by_currency: HashMap<String, f64>,
     pub total_income: f64,
-    pub total_income_ytd: f64,
     pub currency: String,
 }
 

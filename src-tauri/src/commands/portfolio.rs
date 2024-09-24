@@ -90,7 +90,7 @@ pub async fn recalculate_portfolio(
 }
 
 #[tauri::command]
-pub async fn get_income_summary(state: State<'_, AppState>) -> Result<IncomeSummary, String> {
+pub async fn get_income_summary(state: State<'_, AppState>) -> Result<Vec<IncomeSummary>, String> {
     println!("Fetching income summary...");
     let service = create_portfolio_service(&state).await?;
     let mut conn = state.pool.get().map_err(|e| e.to_string())?;

@@ -287,15 +287,6 @@ impl YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
-        use chrono::{DateTime, Utc};
-        let start_date: DateTime<Utc> = start.into();
-        let end_date: DateTime<Utc> = end.into();
-        println!(
-            "Fetching history for {} from {} to {}",
-            symbol,
-            start_date.format("%Y-%m-%d %H:%M:%S"),
-            end_date.format("%Y-%m-%d %H:%M:%S")
-        );
         if symbol.starts_with("$CASH-") {
             return Ok(vec![]);
         }
@@ -307,8 +298,6 @@ impl YahooProvider {
             .provider
             .get_quote_history(symbol, start_offset, end_offset)
             .await?;
-
-        println!("Response: {}", response.quotes().unwrap().len());
 
         // Use the new method to convert quotes
         let quotes = response

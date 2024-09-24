@@ -262,11 +262,12 @@ export interface GoalProgress {
 }
 
 export interface IncomeSummary {
-  by_month: Record<string, number>;
-  by_type: Record<string, number>;
-  by_symbol: Record<string, number>;
-  total_income: number;
-  total_income_ytd: number;
+  period: string;
+  byMonth: Record<string, number>;
+  byType: Record<string, number>;
+  bySymbol: Record<string, number>;
+  byCurrency: Record<string, number>;
+  totalIncome: number;
   currency: string;
 }
 
