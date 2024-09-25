@@ -21,8 +21,6 @@ impl IncomeService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        println!("Executing get_aggregated_income_data");
-
         let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
              a.asset_id as symbol,
@@ -33,8 +31,6 @@ impl IncomeService {
              LEFT JOIN assets ast ON a.asset_id = ast.id
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              GROUP BY date, a.activity_type, a.asset_id, ast.name, a.currency";
-
-        println!("SQL Query: {}", query);
 
         let result = diesel::sql_query(query).load::<IncomeData>(conn);
 

@@ -222,7 +222,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-blue-200 bg-blue-100 dark:border-blue-500/20 dark:bg-blue-400/80 dark:bg-opacity-50">
+          <Card className="border-indigo-200 bg-indigo-100 dark:border-indigo-300/30 dark:bg-indigo-300/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Monthly Average</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -235,7 +235,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-purple-200 bg-purple-100 dark:border-purple-500/20 dark:bg-purple-400/80 dark:bg-opacity-50">
+          <Card className="border-purple-200 bg-purple-100 dark:border-purple-300/30 dark:bg-purple-300/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Income Sources</CardTitle>
               <PieChartIcon className="h-4 w-4 text-muted-foreground" />
@@ -260,7 +260,7 @@ export default function IncomePage() {
                         <span className="text-xs">{source.name}</span>
                         <span className="text-xs text-muted-foreground">{source.amount}</span>
                       </div>
-                      <div className="relative h-4 w-full rounded-full bg-purple-200">
+                      <div className="relative h-4 w-full rounded-full bg-purple-200 dark:bg-purple-300/30">
                         <div
                           className="flex h-4 items-center justify-center rounded-full bg-primary text-xs text-background"
                           style={{ width: `${source.percentage}%` }}

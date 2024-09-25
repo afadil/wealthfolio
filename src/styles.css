@@ -80,11 +80,10 @@
     --secondary-foreground: var(--foreground);
  
     --muted: 0 0% 30%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 90 1% 76%;
  
     --accent: 0 0% 30%;
     --accent-foreground: var(--foreground);
- 
   
     --destructuve: 0 84 64
     --destructive-foreground: var(--foreground);
