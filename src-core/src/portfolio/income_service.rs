@@ -1,8 +1,8 @@
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{IncomeData, IncomeSummary};
-use chrono::Datelike;
+use chrono::{Datelike, NaiveDate, Utc};
 use diesel::prelude::*;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 pub struct IncomeService {
     fx_service: CurrencyExchangeService,
@@ -34,6 +34,14 @@ impl IncomeService {
         .load::<IncomeData>(conn)
     }
 
+    fn calculate_yoy_growth(current: f64, previous: f64) -> f64 {
+        if previous > 0.0 {
+            ((current - previous) / previous) * 100.0
+        } else {
+            0.0
+        }
+    }
+
     pub fn get_income_summary(
         &self,
         conn: &mut SqliteConnection,
@@ -41,63 +49,67 @@ impl IncomeService {
         let income_data = self.get_aggregated_income_data(conn)?;
 
         let base_currency = self.base_currency.clone();
-        let current_year = chrono::Utc::now().year().to_string();
+        let current_date = Utc::now().naive_utc().date();
+        let current_year = current_date.year();
+        let last_year = current_year - 1;
+        let two_years_ago = current_year - 2;
 
-        let mut by_month_total: HashMap<String, f64> = HashMap::new();
-        let mut by_type_total: HashMap<String, f64> = HashMap::new();
-        let mut by_symbol_total: HashMap<String, f64> = HashMap::new();
-        let mut by_currency_total: HashMap<String, f64> = HashMap::new();
-        let mut total_income = 0.0;
+        let mut total_summary = IncomeSummary::new("TOTAL", base_currency.clone());
+        let mut ytd_summary = IncomeSummary::new("YTD", base_currency.clone());
+        let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
+        let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
-        let mut by_month_ytd: HashMap<String, f64> = HashMap::new();
-        let mut by_type_ytd: HashMap<String, f64> = HashMap::new();
-        let mut by_symbol_ytd: HashMap<String, f64> = HashMap::new();
-        let mut by_currency_ytd: HashMap<String, f64> = HashMap::new();
-        let mut total_income_ytd = 0.0;
+        let mut ytd_months = HashSet::new();
+        let mut last_year_months = HashSet::new();
+        let mut two_years_ago_months = HashSet::new();
 
         for data in income_data {
+            let date = NaiveDate::parse_from_str(&format!("{}-01", data.date), "%Y-%m-%d").unwrap();
             let converted_amount = self
                 .fx_service
                 .convert_currency(data.amount, &data.currency, &base_currency)
                 .unwrap_or(data.amount);
 
-            *by_month_total.entry(data.date.to_string()).or_insert(0.0) += converted_amount;
-            *by_type_total.entry(data.income_type.clone()).or_insert(0.0) += converted_amount;
-            *by_symbol_total.entry(data.symbol.clone()).or_insert(0.0) += converted_amount;
-            *by_currency_total
-                .entry(data.currency.clone())
-                .or_insert(0.0) += data.amount; // Use original amount for by_currency_total
-            total_income += converted_amount;
+            total_summary.add_income(&data, converted_amount);
 
-            // Aggregate YTD data if the year matches the current year
-            if data.date.starts_with(&current_year) {
-                *by_month_ytd.entry(data.date.to_string()).or_insert(0.0) += converted_amount;
-                *by_type_ytd.entry(data.income_type.clone()).or_insert(0.0) += converted_amount;
-                *by_symbol_ytd.entry(data.symbol.clone()).or_insert(0.0) += converted_amount;
-                *by_currency_ytd.entry(data.currency.clone()).or_insert(0.0) += data.amount; // Use original amount for by_currency_ytd
-                total_income_ytd += converted_amount;
+            if date.year() == current_year {
+                ytd_summary.add_income(&data, converted_amount);
+                ytd_months.insert(date.format("%Y-%m").to_string());
+            } else if date.year() == last_year {
+                last_year_summary.add_income(&data, converted_amount);
+                last_year_months.insert(date.format("%Y-%m").to_string());
+            } else if date.year() == two_years_ago {
+                two_years_ago_summary.add_income(&data, converted_amount);
+                two_years_ago_months.insert(date.format("%Y-%m").to_string());
             }
         }
 
+        total_summary.calculate_monthly_average(None);
+        ytd_summary.calculate_monthly_average(Some(ytd_months.len() as f64));
+        last_year_summary.calculate_monthly_average(Some(last_year_months.len() as f64));
+        two_years_ago_summary.calculate_monthly_average(Some(two_years_ago_months.len() as f64));
+
+        // Calculate Year-over-Year Growth
+        let ytd_yoy_growth =
+            Self::calculate_yoy_growth(ytd_summary.total_income, last_year_summary.total_income);
+        let last_year_yoy_growth = Self::calculate_yoy_growth(
+            last_year_summary.total_income,
+            two_years_ago_summary.total_income,
+        );
+
+        ytd_summary.yoy_growth = Some(ytd_yoy_growth);
+        last_year_summary.yoy_growth = Some(last_year_yoy_growth);
+
+        // Two years ago YoY growth can't be calculated without data from three years ago
+        two_years_ago_summary.yoy_growth = None;
+
         Ok(vec![
-            IncomeSummary {
-                period: "TOTAL".to_string(),
-                by_month: by_month_total,
-                by_type: by_type_total,
-                by_symbol: by_symbol_total,
-                by_currency: by_currency_total,
-                total_income,
-                currency: base_currency.clone(),
-            },
-            IncomeSummary {
-                period: "YTD".to_string(),
-                by_month: by_month_ytd,
-                by_type: by_type_ytd,
-                by_symbol: by_symbol_ytd,
-                by_currency: by_currency_ytd,
-                total_income: total_income_ytd,
-                currency: base_currency,
-            },
+            total_summary,
+            ytd_summary,
+            last_year_summary,
+            two_years_ago_summary,
         ])
     }
+
+    // Helper function to calculate YoY growth
 }

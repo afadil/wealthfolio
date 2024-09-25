@@ -269,6 +269,8 @@ export interface IncomeSummary {
   byCurrency: Record<string, number>;
   totalIncome: number;
   currency: string;
+  monthlyAverage: number;
+  yoyGrowth: number | null; // Changed from optional to nullable
 }
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';

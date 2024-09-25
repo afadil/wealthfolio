@@ -491,6 +491,39 @@ pub struct IncomeSummary {
     pub by_currency: HashMap<String, f64>,
     pub total_income: f64,
     pub currency: String,
+    pub monthly_average: f64,
+    pub yoy_growth: Option<f64>,
+}
+
+impl IncomeSummary {
+    pub fn new(period: &str, currency: String) -> Self {
+        IncomeSummary {
+            period: period.to_string(),
+            by_month: HashMap::new(),
+            by_type: HashMap::new(),
+            by_symbol: HashMap::new(),
+            by_currency: HashMap::new(),
+            total_income: 0.0,
+            currency,
+            monthly_average: 0.0,
+            yoy_growth: None,
+        }
+    }
+
+    pub fn add_income(&mut self, data: &IncomeData, converted_amount: f64) {
+        *self.by_month.entry(data.date.to_string()).or_insert(0.0) += converted_amount;
+        *self.by_type.entry(data.income_type.clone()).or_insert(0.0) += converted_amount;
+        *self.by_symbol.entry(data.symbol.clone()).or_insert(0.0) += converted_amount;
+        *self.by_currency.entry(data.currency.clone()).or_insert(0.0) += data.amount;
+        self.total_income += converted_amount;
+    }
+
+    pub fn calculate_monthly_average(&mut self, num_months: Option<f64>) {
+        let months = num_months.unwrap_or_else(|| self.by_month.len() as f64);
+        if months > 0.0 {
+            self.monthly_average = self.total_income / months;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Queryable, Insertable, Serialize, Deserialize)]
