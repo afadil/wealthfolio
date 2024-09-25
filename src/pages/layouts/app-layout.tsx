@@ -20,6 +20,11 @@ const navigation: NavigationProps = {
       href: '/holdings',
     },
     {
+      icon: <Icons.Income className="h-5 w-5" />,
+      title: 'Income',
+      href: '/income',
+    },
+    {
       icon: <Icons.Activity className="h-5 w-5" />,
       title: 'Activities',
       href: '/activities',
@@ -56,7 +61,7 @@ const AppLayout = () => {
   return (
     <div className="flex min-h-screen rounded-xl border bg-background">
       <SidebarNav navigation={navigation} />
-      <div className="relative flex h-screen w-full overflow-hidden ">
+      <div className="relative flex h-screen w-full overflow-hidden">
         <main className="flex flex-1 flex-col">
           <div className="flex-1 overflow-y-auto">
             <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>

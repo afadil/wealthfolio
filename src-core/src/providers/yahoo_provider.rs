@@ -173,16 +173,20 @@ impl YahooProvider {
 
         let (asset_class, asset_sub_class) = self.parse_asset_class(
             asset_profile.price.as_ref().map_or("", |p| &p.quote_type),
-            asset_profile.price.as_ref().map_or("", |p| &p.short_name),
+            asset_profile
+                .price
+                .as_ref()
+                .and_then(|p| p.short_name.as_deref())
+                .unwrap_or(""),
         );
 
         let formatted_name = asset_profile.price.as_ref().map_or_else(
             || symbol.to_string(),
             |price| {
                 self.format_name(
-                    Some(&price.long_name),
+                    price.long_name.as_deref(),
                     &price.quote_type,
-                    Some(&price.short_name),
+                    price.short_name.as_deref(),
                     &price.symbol,
                 )
             },

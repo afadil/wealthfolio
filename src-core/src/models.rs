@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -466,23 +465,70 @@ pub struct GoalsAllocation {
     pub percent_allocation: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, QueryableByName)]
+#[serde(rename_all = "camelCase")]
+#[diesel(table_name = crate::schema::activities)]
 pub struct IncomeData {
-    pub date: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub date: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub income_type: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol: String,
-    pub amount: f64,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub symbol_name: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
+    #[diesel(sql_type = diesel::sql_types::Double)]
+    pub amount: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IncomeSummary {
+    pub period: String,
     pub by_month: HashMap<String, f64>,
     pub by_type: HashMap<String, f64>,
     pub by_symbol: HashMap<String, f64>,
+    pub by_currency: HashMap<String, f64>,
     pub total_income: f64,
-    pub total_income_ytd: f64,
     pub currency: String,
+    pub monthly_average: f64,
+    pub yoy_growth: Option<f64>,
+}
+
+impl IncomeSummary {
+    pub fn new(period: &str, currency: String) -> Self {
+        IncomeSummary {
+            period: period.to_string(),
+            by_month: HashMap::new(),
+            by_type: HashMap::new(),
+            by_symbol: HashMap::new(),
+            by_currency: HashMap::new(),
+            total_income: 0.0,
+            currency,
+            monthly_average: 0.0,
+            yoy_growth: None,
+        }
+    }
+
+    pub fn add_income(&mut self, data: &IncomeData, converted_amount: f64) {
+        *self.by_month.entry(data.date.to_string()).or_insert(0.0) += converted_amount;
+        *self.by_type.entry(data.income_type.clone()).or_insert(0.0) += converted_amount;
+        *self
+            .by_symbol
+            .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
+            .or_insert(0.0) += converted_amount;
+        *self.by_currency.entry(data.currency.clone()).or_insert(0.0) += data.amount;
+        self.total_income += converted_amount;
+    }
+
+    pub fn calculate_monthly_average(&mut self, num_months: Option<f64>) {
+        let months = num_months.unwrap_or_else(|| self.by_month.len() as f64);
+        if months > 0.0 {
+            self.monthly_average = self.total_income / months;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Queryable, Insertable, Serialize, Deserialize)]

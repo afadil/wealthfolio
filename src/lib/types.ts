@@ -262,12 +262,15 @@ export interface GoalProgress {
 }
 
 export interface IncomeSummary {
-  by_month: Record<string, number>;
-  by_type: Record<string, number>;
-  by_symbol: Record<string, number>;
-  total_income: number;
-  total_income_ytd: number;
+  period: string;
+  byMonth: Record<string, number>;
+  byType: Record<string, number>;
+  bySymbol: Record<string, number>;
+  byCurrency: Record<string, number>;
+  totalIncome: number;
   currency: string;
+  monthlyAverage: number;
+  yoyGrowth: number | null; // Changed from optional to nullable
 }
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';

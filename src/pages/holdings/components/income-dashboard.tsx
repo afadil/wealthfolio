@@ -18,10 +18,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function IncomeDashboard() {
   const {
-    data: incomeSummary,
+    data: incomeData,
     isLoading,
     error,
-  } = useQuery<IncomeSummary, Error>({
+  } = useQuery<IncomeSummary[], Error>({
     queryKey: [QueryKeys.INCOME_SUMMARY],
     queryFn: getIncomeSummary,
   });
@@ -30,25 +30,31 @@ export function IncomeDashboard() {
     return <IncomeDashboardSkeleton />;
   }
 
-  if (error || !incomeSummary) {
+  if (error || !incomeData) {
     return <div>Failed to load income summary: {error?.message || 'Unknown error'}</div>;
   }
 
-  const totalIncome = incomeSummary.total_income;
-  const dividendIncome = incomeSummary.by_type['DIVIDEND'] || 0;
-  const interestIncome = incomeSummary.by_type['INTEREST'] || 0;
+  // Extract TOTAL and YTD summaries
+  const totalSummary = incomeData.find((summary) => summary.period === 'TOTAL');
+  const ytdSummary = incomeData.find((summary) => summary.period === 'YTD');
+
+  if (!totalSummary || !ytdSummary) {
+    return <div>Income summary data is incomplete.</div>;
+  }
+
+  const { totalIncome, currency } = totalSummary;
+  const dividendIncome = totalSummary.byType['DIVIDEND'] || 0;
+  const interestIncome = totalSummary.byType['INTEREST'] || 0;
   const dividendPercentage = (dividendIncome / totalIncome) * 100 || 0;
   const interestPercentage = (interestIncome / totalIncome) * 100 || 0;
 
   // Filter out interest and only keep dividend income for top stocks
-  const topDividendStocks = Object.entries(incomeSummary.by_symbol)
-    .filter(([symbol, income]) => {
-      return income > 0 && !symbol.startsWith('$CASH');
-    })
+  const topDividendStocks = Object.entries(totalSummary.bySymbol)
+    .filter(([symbol, income]) => income > 0 && !symbol.startsWith('$CASH'))
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10);
 
-  const monthlyIncomeData = Object.entries(incomeSummary.by_month)
+  const monthlyIncomeData = Object.entries(totalSummary.byMonth)
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-12);
 
@@ -62,9 +68,7 @@ export function IncomeDashboard() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {formatAmount(totalIncome, incomeSummary.currency)}
-              </div>
+              <div className="text-2xl font-bold">{formatAmount(totalIncome, currency)}</div>
               <p className="text-xs text-muted-foreground">All time total</p>
             </CardContent>
           </Card>
@@ -75,7 +79,7 @@ export function IncomeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatAmount(incomeSummary.total_income_ytd, incomeSummary.currency)}
+                {formatAmount(ytdSummary.totalIncome, currency)}
               </div>
               <p className="text-xs text-muted-foreground">Year-to-date total</p>
             </CardContent>
@@ -90,12 +94,12 @@ export function IncomeDashboard() {
                 {[
                   {
                     name: 'Dividends',
-                    amount: formatAmount(dividendIncome, incomeSummary.currency),
+                    amount: formatAmount(dividendIncome, currency),
                     percentage: dividendPercentage,
                   },
                   {
                     name: 'Interest',
-                    amount: formatAmount(interestIncome, incomeSummary.currency),
+                    amount: formatAmount(interestIncome, currency),
                     percentage: interestPercentage,
                   },
                 ].map((source, index) => (
@@ -199,9 +203,7 @@ export function IncomeDashboard() {
                   {topDividendStocks.map(([symbol, income], index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="font-medium">{symbol}</div>
-                      <div className="text-success">
-                        {formatAmount(income, incomeSummary.currency)}
-                      </div>
+                      <div className="text-success">{formatAmount(income, currency)}</div>
                     </div>
                   ))}
                 </div>

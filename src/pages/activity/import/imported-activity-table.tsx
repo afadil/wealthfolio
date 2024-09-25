@@ -138,7 +138,15 @@ export const columns: ColumnDef<ActivityImport>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
     cell: ({ row }) => {
       const type = row.getValue('activityType') as string;
-      const badgeVariant = type === 'BUY' ? 'success' : 'error';
+      const badgeVariant =
+        type === 'BUY' ||
+        type === 'DEPOSIT' ||
+        type === 'DIVIDEND' ||
+        type === 'INTEREST' ||
+        type === 'CONVERSION_IN' ||
+        type === 'TRANSFER_IN'
+          ? 'success'
+          : 'error';
       return (
         <div className="flex items-center">
           <Badge variant={badgeVariant}>{type}</Badge>

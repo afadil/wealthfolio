@@ -5,7 +5,7 @@ use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, IncomeData, NewActivity, Sort,
+    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
 };
 use crate::schema::activities;
 
@@ -42,22 +42,11 @@ impl ActivityService {
         self.repo.get_trading_activities(conn)
     }
 
-    pub fn get_income_data(
+    pub fn get_income_activities(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        self.repo.get_income_activities(conn).map(|results| {
-            results
-                .into_iter()
-                .map(|activity| IncomeData {
-                    date: activity.activity_date,
-                    income_type: activity.activity_type,
-                    symbol: activity.asset_id,
-                    amount: activity.quantity * activity.unit_price,
-                    currency: activity.currency,
-                })
-                .collect()
-        })
+    ) -> Result<Vec<Activity>, diesel::result::Error> {
+        self.repo.get_income_activities(conn)
     }
 
     pub fn search_activities(
@@ -104,7 +93,7 @@ impl ActivityService {
             if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
                 .contains(&activity.activity_type.as_str())
             {
-                activity.unit_price = 1.0;
+                activity.quantity = 1.0;
             }
 
             // Create exchange rate if asset currency is different from account currency
@@ -114,6 +103,7 @@ impl ActivityService {
                     conn,
                     account.currency.clone(),
                     activity.currency.clone(),
+                    None,
                 )?;
             }
 
@@ -146,7 +136,7 @@ impl ActivityService {
             if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
                 .contains(&activity.activity_type.as_str())
             {
-                activity.unit_price = 1.0;
+                activity.quantity = 1.0;
             }
 
             // Create exchange rate if asset currency is different from account currency
@@ -156,6 +146,7 @@ impl ActivityService {
                     conn,
                     account.currency.clone(),
                     activity.currency.clone(),
+                    None,
                 )?;
             }
 
@@ -210,6 +201,7 @@ impl ActivityService {
                             conn,
                             account.currency.clone(),
                             currency.clone(),
+                            None,
                         ) {
                             Ok(_) => (),
                             Err(e) => {

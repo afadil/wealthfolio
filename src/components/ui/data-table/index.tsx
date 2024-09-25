@@ -14,6 +14,7 @@ import {
 } from '@tanstack/react-table';
 import * as React from 'react';
 
+import { Icons } from '@/components/icons';
 import {
   Table,
   TableBody,
@@ -116,7 +117,10 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  <div className="flex flex-col items-center justify-center">
+                    <Icons.FileText className="mb-2 h-10 w-10 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No results found.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}

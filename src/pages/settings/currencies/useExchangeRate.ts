@@ -4,6 +4,8 @@ import { ExchangeRate } from '@/lib/types';
 import {
   getExchangeRates,
   updateExchangeRate as updateExchangeRateApi,
+  addExchangeRate as addExchangeRateApi,
+  deleteExchangeRate as deleteExchangeRateApi,
 } from '@/commands/exchange-rates';
 import { QueryKeys } from '@/lib/query-keys';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
@@ -12,7 +14,7 @@ import { worldCurrencies } from '@/lib/currencies';
 export function useExchangeRates() {
   const queryClient = useQueryClient();
   const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Exchange rate updated and calculation triggered successfully.',
+    successTitle: 'Exchange rates updated successfully.',
   });
 
   const getCurrencyName = (code: string) => {
@@ -48,13 +50,8 @@ export function useExchangeRates() {
 
   const updateExchangeRateMutation = useMutation({
     mutationFn: updateExchangeRateApi,
-    onSuccess: (updatedRate) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-      toast({
-        title: 'Exchange rate updated successfully',
-        description: `${updatedRate.fromCurrency}/${updatedRate.toCurrency} rate updated to ${updatedRate.rate}`,
-        variant: 'success',
-      });
 
       calculateHistoryMutation.mutate({
         accountIds: undefined,
@@ -70,13 +67,59 @@ export function useExchangeRates() {
     },
   });
 
+  const addExchangeRateMutation = useMutation({
+    mutationFn: addExchangeRateApi,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
+      calculateHistoryMutation.mutate({
+        accountIds: undefined,
+        forceFullCalculation: true,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error adding exchange rate',
+        description: `There was a problem adding the exchange rate: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteExchangeRateMutation = useMutation({
+    mutationFn: deleteExchangeRateApi,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
+      calculateHistoryMutation.mutate({
+        accountIds: undefined,
+        forceFullCalculation: true,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error deleting exchange rate',
+        description: `There was a problem deleting the exchange rate: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const updateExchangeRate = (rate: ExchangeRate) => {
     updateExchangeRateMutation.mutate(rate);
+  };
+
+  const addExchangeRate = (rate: Omit<ExchangeRate, 'id'>) => {
+    addExchangeRateMutation.mutate(rate);
+  };
+
+  const deleteExchangeRate = (rateId: string) => {
+    deleteExchangeRateMutation.mutate(rateId);
   };
 
   return {
     exchangeRates,
     isLoadingRates,
     updateExchangeRate,
+    addExchangeRate,
+    deleteExchangeRate,
   };
 }

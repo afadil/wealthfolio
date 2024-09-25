@@ -91,7 +91,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     form.setValue('currency', currentAccountCurrency);
     if (CASH_ACTIVITY_TYPES.includes(watchedType)) {
       form.setValue('assetId', `$CASH-${currentAccountCurrency}`);
-      form.setValue('unitPrice', 1);
+      form.setValue('quantity', 1);
       if (watchedType !== 'FEE') {
         form.setValue('fee', 0);
       }
@@ -116,7 +116,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
                 defaultValues?.id ? 'Error updating this activity' : 'Error adding this activity'
               }
             >
-              {addActivityMutation.error.message}
+              {addActivityMutation.error}
             </AlertFeedback>
           )}
           <input type="hidden" name="id" />
@@ -272,7 +272,7 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
       ) : (
         <FormField
           control={control}
-          name="quantity"
+          name="unitPrice"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Amount</FormLabel>
@@ -401,7 +401,7 @@ const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps)
       />
       <FormField
         control={control}
-        name="quantity"
+        name="unitPrice"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Dividend Amount</FormLabel>

@@ -24,6 +24,13 @@ impl AccountService {
         self.account_repo.load_accounts(conn)
     }
 
+    pub fn get_active_accounts(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        self.account_repo.load_active_accounts(conn)
+    }
+
     pub fn get_account_by_id(
         &self,
         conn: &mut SqliteConnection,
@@ -50,6 +57,7 @@ impl AccountService {
                     conn,
                     base_currency.clone(),
                     new_account.currency.clone(),
+                    None,
                 )?;
             }
 

@@ -150,7 +150,7 @@ export const ActivityTable = ({
           <DataTableColumnHeader
             className="justify-end text-right"
             column={column}
-            title="Unit Price"
+            title="Price/Amount"
           />
         ),
         cell: ({ row }) => {

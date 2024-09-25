@@ -2,9 +2,7 @@ use crate::account::account_service::AccountService;
 use crate::activity::activity_service::ActivityService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
-use crate::models::{
-    AccountSummary, HistorySummary, Holding, IncomeData, IncomeSummary, PortfolioHistory,
-};
+use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
 
 use diesel::prelude::*;
 
@@ -60,7 +58,7 @@ impl PortfolioService {
 
         let accounts = match &account_ids {
             Some(ids) => self.account_service.get_accounts_by_ids(conn, ids)?,
-            None => self.account_service.get_accounts(conn)?,
+            None => self.account_service.get_active_accounts(conn)?,
         };
 
         let activities = match &account_ids {
@@ -82,17 +80,10 @@ impl PortfolioService {
         Ok(results)
     }
 
-    pub fn get_income_data(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        self.income_service.get_income_data(conn)
-    }
-
     pub fn get_income_summary(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<IncomeSummary, diesel::result::Error> {
+    ) -> Result<Vec<IncomeSummary>, diesel::result::Error> {
         self.income_service.get_income_summary(conn)
     }
 
@@ -104,7 +95,6 @@ impl PortfolioService {
         let start = Instant::now();
 
         // First, sync quotes
-        println!("initialize_and_sync_quotes");
         self.market_data_service
             .initialize_and_sync_quotes(conn)
             .await?;
@@ -133,7 +123,7 @@ impl PortfolioService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<AccountSummary>, Box<dyn std::error::Error>> {
-        let accounts = self.account_service.get_accounts(conn)?;
+        let accounts = self.account_service.get_active_accounts(conn)?;
         let mut account_summaries = Vec::new();
 
         // First, get the total portfolio value

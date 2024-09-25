@@ -42,7 +42,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               <nav
                 data-tauri-drag-region="true"
                 aria-label="Sidebar"
-                className="flex flex-shrink-0 flex-col space-y-3 p-2 "
+                className="flex flex-shrink-0 flex-col space-y-3 p-2"
               >
                 <div
                   data-tauri-drag-region="true"
