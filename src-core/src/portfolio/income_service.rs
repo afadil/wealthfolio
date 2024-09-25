@@ -21,17 +21,24 @@ impl IncomeService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        diesel::sql_query(
-            "SELECT strftime('%Y-%m', activity_date) as date,
-             activity_type as income_type,
-             asset_id as symbol,
-             currency,
-             SUM(quantity * unit_price) as amount
-             FROM activities
-             WHERE activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
-             GROUP BY date, activity_type, asset_id, currency",
-        )
-        .load::<IncomeData>(conn)
+        println!("Executing get_aggregated_income_data");
+
+        let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
+             a.activity_type as income_type,
+             a.asset_id as symbol,
+             COALESCE(ast.name, 'Unknown') as symbol_name,
+             a.currency,
+             SUM(a.quantity * a.unit_price) as amount
+             FROM activities a
+             LEFT JOIN assets ast ON a.asset_id = ast.id
+             WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
+             GROUP BY date, a.activity_type, a.asset_id, ast.name, a.currency";
+
+        println!("SQL Query: {}", query);
+
+        let result = diesel::sql_query(query).load::<IncomeData>(conn);
+
+        result
     }
 
     fn calculate_yoy_growth(current: f64, previous: f64) -> f64 {

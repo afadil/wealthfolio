@@ -4,6 +4,7 @@ import { createActivity, updateActivity, deleteActivity } from '@/commands/activ
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { newActivitySchema } from '@/lib/schemas';
 import * as z from 'zod';
+import { QueryKeys } from '@/lib/query-keys';
 
 type ActivityFormValues = z.infer<typeof newActivitySchema>;
 
@@ -15,7 +16,7 @@ export function useActivityMutations(onSuccess?: () => void) {
 
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
       calculateHistoryMutation.mutate({
         accountIds: activity.accountId ? [activity.accountId] : undefined,
         forceFullCalculation: true,

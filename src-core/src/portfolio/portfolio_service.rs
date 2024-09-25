@@ -58,7 +58,7 @@ impl PortfolioService {
 
         let accounts = match &account_ids {
             Some(ids) => self.account_service.get_accounts_by_ids(conn, ids)?,
-            None => self.account_service.get_accounts(conn)?,
+            None => self.account_service.get_active_accounts(conn)?,
         };
 
         let activities = match &account_ids {
@@ -123,7 +123,7 @@ impl PortfolioService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<AccountSummary>, Box<dyn std::error::Error>> {
-        let accounts = self.account_service.get_accounts(conn)?;
+        let accounts = self.account_service.get_active_accounts(conn)?;
         let mut account_summaries = Vec::new();
 
         // First, get the total portfolio value

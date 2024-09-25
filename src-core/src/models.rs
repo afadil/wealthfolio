@@ -476,6 +476,8 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
+    pub symbol_name: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
     #[diesel(sql_type = diesel::sql_types::Double)]
     pub amount: f64,
@@ -513,7 +515,10 @@ impl IncomeSummary {
     pub fn add_income(&mut self, data: &IncomeData, converted_amount: f64) {
         *self.by_month.entry(data.date.to_string()).or_insert(0.0) += converted_amount;
         *self.by_type.entry(data.income_type.clone()).or_insert(0.0) += converted_amount;
-        *self.by_symbol.entry(data.symbol.clone()).or_insert(0.0) += converted_amount;
+        *self
+            .by_symbol
+            .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
+            .or_insert(0.0) += converted_amount;
         *self.by_currency.entry(data.currency.clone()).or_insert(0.0) += data.amount;
         self.total_income += converted_amount;
     }

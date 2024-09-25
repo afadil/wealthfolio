@@ -77,7 +77,12 @@ pub async fn add_exchange_rate(
     let mut conn = get_connection(&state)?;
     let fx_service = CurrencyExchangeService::new();
     fx_service
-        .add_exchange_rate(&mut conn, new_rate.from_currency, new_rate.to_currency)
+        .add_exchange_rate(
+            &mut conn,
+            new_rate.from_currency,
+            new_rate.to_currency,
+            Some(new_rate.rate),
+        )
         .map_err(|e| format!("Failed to add exchange rate: {}", e))
 }
 

@@ -123,6 +123,7 @@ impl CurrencyExchangeService {
         conn: &mut SqliteConnection,
         from: String,
         to: String,
+        rate: Option<f64>,
     ) -> Result<ExchangeRate, Box<dyn std::error::Error>> {
         // Check for direct conversion
         let direct_id = format!("{}{}=X", from, to);
@@ -141,7 +142,7 @@ impl CurrencyExchangeService {
             id: direct_id,
             from_currency: from,
             to_currency: to,
-            rate: 1.0, // Default rate, should be updated with actual rate
+            rate: rate.unwrap_or(1.0),
             source: "MANUAL".to_string(),
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),

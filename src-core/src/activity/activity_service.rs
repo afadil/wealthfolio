@@ -93,7 +93,7 @@ impl ActivityService {
             if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
                 .contains(&activity.activity_type.as_str())
             {
-                activity.unit_price = 1.0;
+                activity.quantity = 1.0;
             }
 
             // Create exchange rate if asset currency is different from account currency
@@ -103,6 +103,7 @@ impl ActivityService {
                     conn,
                     account.currency.clone(),
                     activity.currency.clone(),
+                    None,
                 )?;
             }
 
@@ -135,7 +136,7 @@ impl ActivityService {
             if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
                 .contains(&activity.activity_type.as_str())
             {
-                activity.unit_price = 1.0;
+                activity.quantity = 1.0;
             }
 
             // Create exchange rate if asset currency is different from account currency
@@ -145,6 +146,7 @@ impl ActivityService {
                     conn,
                     account.currency.clone(),
                     activity.currency.clone(),
+                    None,
                 )?;
             }
 
@@ -199,6 +201,7 @@ impl ActivityService {
                             conn,
                             account.currency.clone(),
                             currency.clone(),
+                            None,
                         ) {
                             Ok(_) => (),
                             Err(e) => {

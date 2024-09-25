@@ -26,6 +26,16 @@ impl AccountRepository {
         accounts.order(is_active.desc()).load::<Account>(conn)
     }
 
+    pub fn load_active_accounts(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        accounts
+            .filter(is_active.eq(true))
+            .order(name.asc())
+            .load::<Account>(conn)
+    }
+
     pub fn insert_new_account(
         &self,
         conn: &mut SqliteConnection,

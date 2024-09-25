@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,13 +25,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@/components/ui/command';
+import { Command, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -64,6 +59,105 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
     });
   };
 
+  const renderCurrencyField = (fieldName: 'fromCurrency' | 'toCurrency') => {
+    const [searchValue, setSearchValue] = useState('');
+
+    const handleSearchChange = (value: string) => {
+      setSearchValue(value);
+      const matchingCurrency = worldCurrencies.find(
+        (currency) =>
+          currency.label.toLowerCase().includes(value.toLowerCase()) ||
+          currency.value.includes(value),
+      );
+      if (!matchingCurrency && value) {
+        form.setValue(fieldName, value.toUpperCase());
+      }
+    };
+
+    return (
+      <FormField
+        control={form.control}
+        name={fieldName}
+        render={({ field }) => (
+          <FormItem className="flex flex-col">
+            <FormLabel>{fieldName === 'fromCurrency' ? 'From Currency' : 'To Currency'}</FormLabel>
+            <Popover modal={true}>
+              <PopoverTrigger asChild>
+                <FormControl>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn('justify-between', !field.value && 'text-muted-foreground')}
+                  >
+                    {field.value
+                      ? worldCurrencies.find((currency) => currency.value === field.value)?.label ||
+                        field.value
+                      : 'Select currency'}
+                    <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </FormControl>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Search currency..."
+                    onValueChange={handleSearchChange}
+                  />
+                  <CommandGroup>
+                    <ScrollArea className="max-h-96 overflow-y-auto">
+                      {searchValue && (
+                        <CommandItem
+                          value={searchValue}
+                          key={searchValue}
+                          onSelect={() => {
+                            form.setValue(fieldName, searchValue);
+                          }}
+                        >
+                          <Icons.Plus
+                            className={cn(
+                              'mr-2 h-4 w-4',
+                              searchValue === field.value ? 'opacity-100' : 'opacity-0',
+                            )}
+                          />
+                          <span className="font-semibold italic">Custom ({searchValue})</span>
+                        </CommandItem>
+                      )}
+
+                      {worldCurrencies
+                        .filter(
+                          (currency) =>
+                            currency.label.toLowerCase().includes(searchValue.toLowerCase()) ||
+                            currency.value.includes(searchValue),
+                        )
+                        .map((currency) => (
+                          <CommandItem
+                            value={currency.label}
+                            key={currency.value}
+                            onSelect={() => {
+                              form.setValue(fieldName, currency.value);
+                            }}
+                          >
+                            <Icons.Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                              )}
+                            />
+                            {currency.label}
+                          </CommandItem>
+                        ))}
+                    </ScrollArea>
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    );
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
@@ -73,115 +167,8 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
         </DialogHeader>
 
         <div className="grid gap-10 p-4">
-          <FormField
-            control={form.control}
-            name="fromCurrency"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>From Currency</FormLabel>
-                <Popover modal={true}>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className={cn('justify-between', !field.value && 'text-muted-foreground')}
-                      >
-                        {field.value
-                          ? worldCurrencies.find((currency) => currency.value === field.value)
-                              ?.label
-                          : 'Select currency'}
-                        <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0">
-                    <Command>
-                      <CommandInput placeholder="Search currency..." />
-                      <CommandEmpty>No currency found.</CommandEmpty>
-                      <CommandGroup>
-                        <ScrollArea className="max-h-96 overflow-y-auto">
-                          {worldCurrencies.map((currency) => (
-                            <CommandItem
-                              value={currency.label}
-                              key={currency.value}
-                              onSelect={() => {
-                                form.setValue(field.name, currency.value);
-                              }}
-                            >
-                              <Icons.Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
-                                )}
-                              />
-                              {currency.label}
-                            </CommandItem>
-                          ))}
-                        </ScrollArea>
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="toCurrency"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>To Currency</FormLabel>
-                <Popover modal={true}>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className={cn('justify-between', !field.value && 'text-muted-foreground')}
-                      >
-                        {field.value
-                          ? worldCurrencies.find((currency) => currency.value === field.value)
-                              ?.label
-                          : 'Select currency'}
-                        <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0">
-                    <Command>
-                      <CommandInput placeholder="Search currency..." />
-                      <CommandEmpty>No currency found.</CommandEmpty>
-                      <CommandGroup>
-                        <ScrollArea className="max-h-96 overflow-y-auto">
-                          {worldCurrencies.map((currency) => (
-                            <CommandItem
-                              value={currency.label}
-                              key={currency.value}
-                              onSelect={() => {
-                                form.setValue(field.name, currency.value);
-                              }}
-                            >
-                              <Icons.Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
-                                )}
-                              />
-                              {currency.label}
-                            </CommandItem>
-                          ))}
-                        </ScrollArea>
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {renderCurrencyField('fromCurrency')}
+          {renderCurrencyField('toCurrency')}
 
           <FormField
             control={form.control}

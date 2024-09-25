@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { GainPercent } from '@/components/gain-percent';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
+import { Badge } from '@/components/ui/badge';
 
 const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [
   { code: 'TOTAL', label: 'All Time' },
@@ -101,7 +102,7 @@ export default function IncomePage() {
   const interestPercentage = totalIncome > 0 ? (interestIncome / totalIncome) * 100 : 0;
 
   const topDividendStocks = Object.entries(periodSummary.bySymbol)
-    .filter(([symbol, income]) => income > 0 && !symbol.startsWith('$CASH'))
+    .filter(([symbol, income]) => income > 0 && !symbol.startsWith('[$CASH-'))
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10);
 
@@ -161,7 +162,7 @@ export default function IncomePage() {
       </ApplicationHeader>
       <div className="space-y-6">
         <div className="grid gap-6 md:grid-cols-3">
-          <Card>
+          <Card className="border-success-background/30 bg-success-background/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {selectedPeriod === 'TOTAL'
@@ -221,7 +222,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-blue-200 bg-blue-100 dark:border-blue-500/20 dark:bg-blue-400/80 dark:bg-opacity-50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Monthly Average</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -234,7 +235,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-purple-200 bg-purple-100 dark:border-purple-500/20 dark:bg-purple-400/80 dark:bg-opacity-50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Income Sources</CardTitle>
               <PieChartIcon className="h-4 w-4 text-muted-foreground" />
@@ -259,7 +260,7 @@ export default function IncomePage() {
                         <span className="text-xs">{source.name}</span>
                         <span className="text-xs text-muted-foreground">{source.amount}</span>
                       </div>
-                      <div className="relative h-4 w-full rounded-full bg-secondary">
+                      <div className="relative h-4 w-full rounded-full bg-purple-200">
                         <div
                           className="flex h-4 items-center justify-center rounded-full bg-primary text-xs text-background"
                           style={{ width: `${source.percentage}%` }}
@@ -339,7 +340,8 @@ export default function IncomePage() {
                       yAxisId="left"
                       dataKey="income"
                       fill="var(--color-income)"
-                      radius={[4, 4, 0, 0]}
+                      radius={[8, 8, 0, 0]}
+                      barSize={25}
                     />
                     <Line
                       yAxisId="right"
@@ -379,7 +381,14 @@ export default function IncomePage() {
                 <div className="space-y-4">
                   {topDividendStocks.map(([symbol, income], index) => (
                     <div key={index} className="flex items-center justify-between">
-                      <div className="text-sm">{symbol}</div>
+                      <div className="flex items-center">
+                        <Badge className="mr-2 flex min-w-[55px] items-center justify-center rounded-sm bg-secondary text-xs text-foreground">
+                          {symbol.match(/\[(.*?)\]/)?.[1] || symbol}
+                        </Badge>
+                        <span className="mr-16 text-xs text-muted-foreground">
+                          {symbol.replace(/\[.*?\]-/, '').trim()}
+                        </span>
+                      </div>
                       <div className="text-sm text-success">{formatAmount(income, currency)}</div>
                     </div>
                   ))}

@@ -38,94 +38,79 @@ const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
   };
 };
 
-const Summary = ({
-  title,
-  description,
-  value,
-  gain,
-  gainPercent,
-  currency,
-  isExpanded,
+const AccountSummaryComponent = ({
+  accountSummary,
+  isGroup = false,
+  isExpanded = false,
   onToggle,
 }: {
-  title: string;
-  description?: string;
-  value: number;
-  gain: number;
-  gainPercent: number;
-  currency: string;
-  isExpanded: boolean;
-  onToggle: () => void;
+  accountSummary:
+    | AccountSummary
+    | { account: { id: string; name: string; group?: string; currency: string }; performance: any };
+  isGroup?: boolean;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }) => {
   return (
-    <div className="flex w-full cursor-pointer items-center justify-between" onClick={onToggle}>
-      <div className="flex flex-col">
-        <div className="flex items-center">
-          <span className="font-medium leading-none">{title}</span>
-        </div>
-        <span className="text-sm text-muted-foreground">{description}</span>
-      </div>
-      <div className="ml-2 flex items-start justify-between">
-        <div className="flex flex-col items-end">
-          <span className="font-medium leading-none">{formatAmount(value, currency)}</span>
-          {gain !== 0 && (
-            <div className="flex items-center space-x-2">
-              <GainAmount
-                className="text-sm font-light"
-                value={gain || 0}
-                currency={currency}
-                displayCurrency={false}
-              />
-              <div className="mx-1 h-3 border-r border-gray-300" />
-              <GainPercent className="text-sm font-light" value={gainPercent || 0} />
-            </div>
-          )}
-        </div>
-        <Icons.ChevronDown
-          className={`ml-2 h-5 w-5 transition-transform ${isExpanded ? 'rotate-180 transform' : ''}`}
-        />
-      </div>
-    </div>
-  );
-};
-
-const AccountSummaryComponent = ({ accountSummary }: { accountSummary: AccountSummary }) => {
-  return (
-    <div key={accountSummary.account.id} className="flex w-full items-center justify-between">
+    <div
+      key={isGroup ? accountSummary.account.group : accountSummary.account.id}
+      className="flex w-full items-center justify-between"
+      onClick={isGroup ? onToggle : undefined}
+    >
       <div className="flex flex-col">
         <span className="font-medium leading-none">{accountSummary.account.name}</span>
         <span className="text-sm text-muted-foreground">
-          {accountSummary.account.group
-            ? `${accountSummary.account.group} - ${accountSummary.account.currency}`
-            : accountSummary.account.currency}
+          {isGroup
+            ? `${accountSummary.performance.numberOfAccounts} accounts`
+            : accountSummary.account.group
+              ? `${accountSummary.account.group} - ${accountSummary.account.currency}`
+              : accountSummary.account.currency}
         </span>
       </div>
       <div className="flex items-center">
-        <div className="text-right">
+        <div className="flex flex-col items-end">
           <p className="font-medium leading-none">
-            {formatAmount(accountSummary.performance.totalValue, accountSummary.account.currency)}
+            {formatAmount(
+              accountSummary.performance.totalValue ||
+                accountSummary.performance.totalMarketValue +
+                  accountSummary.performance.totalCashBalance,
+              accountSummary.account.currency,
+            )}
           </p>
-          {accountSummary.performance.totalGainPercentage !== 0 && (
+          {(accountSummary.performance.totalGainPercentage !== 0 ||
+            accountSummary.performance.totalGainPercent !== 0) && (
             <div className="flex items-center space-x-2">
               <GainAmount
                 className="text-sm font-light"
-                value={accountSummary.performance.totalGainValue || 0}
+                value={
+                  accountSummary.performance.totalGainValue ||
+                  accountSummary.performance.totalGainAmount ||
+                  0
+                }
                 currency={accountSummary.account.currency || 'USD'}
                 displayCurrency={false}
               />
               <div className="mx-1 h-3 border-r border-gray-300" />
               <GainPercent
                 className="text-sm font-light"
-                value={accountSummary.performance.totalGainPercentage || 0}
+                value={
+                  accountSummary.performance.totalGainPercentage ||
+                  accountSummary.performance.totalGainPercent ||
+                  0
+                }
               />
             </div>
           )}
         </div>
-        <Link to={`/accounts/${accountSummary.account.id}`} className="ml-2 p-0">
-          <Button variant="link" size="sm">
+        {isGroup ? (
+          <Icons.ChevronDown
+            className={`ml-2 h-5 w-5 transition-transform ${isExpanded ? 'rotate-180 transform' : ''}`}
+          />
+        ) : (
+          <Link to={`/accounts/${accountSummary.account.id}`} className="ml-2 p-0">
             <Icons.ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </Button>
-        </Link>
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -178,13 +163,12 @@ export function Accounts({
     return (
       <Card>
         <CardHeader className="border-b">
-          <Summary
-            title={category}
-            description={`${categorySummary.numberOfAccounts} accounts`}
-            value={categorySummary.totalMarketValue + categorySummary.totalCashBalance}
-            gain={categorySummary.totalGainAmount}
-            gainPercent={categorySummary.totalGainPercent}
-            currency={categorySummary.baseCurrency}
+          <AccountSummaryComponent
+            accountSummary={{
+              account: { id: category, name: category, currency: categorySummary.baseCurrency },
+              performance: categorySummary,
+            }}
+            isGroup={true}
             isExpanded={isExpanded}
             onToggle={() => toggleCategory(category)}
           />

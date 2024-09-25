@@ -14,7 +14,7 @@ import { worldCurrencies } from '@/lib/currencies';
 export function useExchangeRates() {
   const queryClient = useQueryClient();
   const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Exchange rate updated and calculation triggered successfully.',
+    successTitle: 'Exchange rates updated successfully.',
   });
 
   const getCurrencyName = (code: string) => {
@@ -50,13 +50,8 @@ export function useExchangeRates() {
 
   const updateExchangeRateMutation = useMutation({
     mutationFn: updateExchangeRateApi,
-    onSuccess: (updatedRate) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-      toast({
-        title: 'Exchange rate updated successfully',
-        description: `${updatedRate.fromCurrency}/${updatedRate.toCurrency} rate updated to ${updatedRate.rate}`,
-        variant: 'success',
-      });
 
       calculateHistoryMutation.mutate({
         accountIds: undefined,
@@ -74,13 +69,8 @@ export function useExchangeRates() {
 
   const addExchangeRateMutation = useMutation({
     mutationFn: addExchangeRateApi,
-    onSuccess: (newRate) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-      toast({
-        title: 'Exchange rate added successfully',
-        description: `New rate for ${newRate.fromCurrency}/${newRate.toCurrency} added`,
-        variant: 'success',
-      });
       calculateHistoryMutation.mutate({
         accountIds: undefined,
         forceFullCalculation: true,
@@ -99,10 +89,6 @@ export function useExchangeRates() {
     mutationFn: deleteExchangeRateApi,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-      toast({
-        title: 'Exchange rate deleted successfully',
-        variant: 'success',
-      });
       calculateHistoryMutation.mutate({
         accountIds: undefined,
         forceFullCalculation: true,

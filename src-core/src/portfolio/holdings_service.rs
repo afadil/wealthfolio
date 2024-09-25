@@ -29,7 +29,7 @@ impl HoldingsService {
     pub fn compute_holdings(&self, conn: &mut SqliteConnection) -> Result<Vec<Holding>> {
         let start_time = std::time::Instant::now();
         let mut holdings: HashMap<String, Holding> = HashMap::new();
-        let accounts = self.account_service.get_accounts(conn)?;
+        let accounts = self.account_service.get_active_accounts(conn)?;
         let activities = self.activity_service.get_trading_activities(conn)?;
         let assets = self.asset_service.get_assets(conn)?;
         self.fx_service
