@@ -4,6 +4,7 @@ import { ApplicationShell } from '@/components/shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Icons } from '@/components/icons';
+import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
@@ -66,10 +67,11 @@ export const HoldingsPage = () => {
                   {holdings && holdings.length > 0 ? (
                     <ClassesChart assets={holdings} cash={todayValue?.availableCash || 0} />
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-6">
-                      <Icons.PieChart className="h-12 w-12 text-muted-foreground" />
-                      <p className="mt-2 text-sm text-muted-foreground">No data available</p>
-                    </div>
+                    <EmptyPlaceholder
+                      icon={<Icons.PieChart className="h-10 w-10" />}
+                      title="No class data"
+                      description="There is no class data available for your holdings."
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -85,12 +87,11 @@ export const HoldingsPage = () => {
                       baseCurrency={settings?.baseCurrency || 'USD'}
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-6">
-                      <Icons.DollarSign className="h-12 w-12 text-muted-foreground" />
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        No currency data available
-                      </p>
-                    </div>
+                    <EmptyPlaceholder
+                      icon={<Icons.DollarSign className="h-10 w-10" />}
+                      title="No currency data"
+                      description="There is no currency data available for your holdings."
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -102,10 +103,11 @@ export const HoldingsPage = () => {
                   {holdings && holdings.length > 0 ? (
                     <SectorsChart assets={holdings} />
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-6">
-                      <Icons.PieChart className="h-12 w-12 text-muted-foreground" />
-                      <p className="mt-2 text-sm text-muted-foreground">No sector data available</p>
-                    </div>
+                    <EmptyPlaceholder
+                      icon={<Icons.PieChart className="h-10 w-10" />}
+                      title="No sector data"
+                      description="There is no sector data available for your holdings."
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -118,10 +120,11 @@ export const HoldingsPage = () => {
                 {holdings && holdings.length > 0 ? (
                   <PortfolioComposition assets={holdings} />
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-6">
-                    <Icons.BarChart className="h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">No holdings data available</p>
-                  </div>
+                  <EmptyPlaceholder
+                    icon={<Icons.BarChart className="h-10 w-10" />}
+                    title="No holdings data"
+                    description="There is no holdings data available for your portfolio."
+                  />
                 )}
               </CardContent>
             </Card>

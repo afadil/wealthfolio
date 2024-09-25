@@ -1,5 +1,6 @@
 use crate::fx::fx_repository::FxRepository;
 use crate::models::ExchangeRate;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -149,5 +150,32 @@ impl CurrencyExchangeService {
         let result = self.upsert_exchange_rate(conn, exchange_rate)?;
         // self.cache_rate(&result.id, result.rate)?;
         Ok(result)
+    }
+
+    pub fn delete_exchange_rate(
+        &self,
+        conn: &mut PooledConnection<ConnectionManager<SqliteConnection>>,
+        rate_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Delete the exchange rate from the database
+        FxRepository::delete_exchange_rate(conn, rate_id)?;
+
+        // Remove the rate from the cache
+        let mut cache = self.exchange_rates.write().map_err(|_| "RwLock poisoned")?;
+        cache.remove(rate_id);
+
+        // If it's a manual rate, also remove the inverse rate from the cache
+        if rate_id.ends_with("=X") {
+            let parts: Vec<&str> = rate_id.split('=').collect();
+            if parts.len() == 2 {
+                let currencies = parts[0];
+                if currencies.len() == 6 {
+                    let inverse_id = format!("{}{}=X", &currencies[3..], &currencies[..3]);
+                    cache.remove(&inverse_id);
+                }
+            }
+        }
+
+        Ok(())
     }
 }

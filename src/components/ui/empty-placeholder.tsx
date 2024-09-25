@@ -20,7 +20,7 @@ export function EmptyPlaceholder({
   return (
     <div
       className={cn(
-        'flex min-h-[400px] flex-col items-center justify-center rounded-md p-8 text-center animate-in fade-in-50',
+        'flex flex-col items-center justify-center rounded-md p-8 text-center animate-in fade-in-50',
         className,
       )}
       {...props}

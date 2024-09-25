@@ -4,6 +4,8 @@ import { ExchangeRate } from '@/lib/types';
 import {
   getExchangeRates,
   updateExchangeRate as updateExchangeRateApi,
+  addExchangeRate as addExchangeRateApi,
+  deleteExchangeRate as deleteExchangeRateApi,
 } from '@/commands/exchange-rates';
 import { QueryKeys } from '@/lib/query-keys';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
@@ -70,13 +72,68 @@ export function useExchangeRates() {
     },
   });
 
+  const addExchangeRateMutation = useMutation({
+    mutationFn: addExchangeRateApi,
+    onSuccess: (newRate) => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
+      toast({
+        title: 'Exchange rate added successfully',
+        description: `New rate for ${newRate.fromCurrency}/${newRate.toCurrency} added`,
+        variant: 'success',
+      });
+      calculateHistoryMutation.mutate({
+        accountIds: undefined,
+        forceFullCalculation: true,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error adding exchange rate',
+        description: `There was a problem adding the exchange rate: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteExchangeRateMutation = useMutation({
+    mutationFn: deleteExchangeRateApi,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
+      toast({
+        title: 'Exchange rate deleted successfully',
+        variant: 'success',
+      });
+      calculateHistoryMutation.mutate({
+        accountIds: undefined,
+        forceFullCalculation: true,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error deleting exchange rate',
+        description: `There was a problem deleting the exchange rate: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const updateExchangeRate = (rate: ExchangeRate) => {
     updateExchangeRateMutation.mutate(rate);
+  };
+
+  const addExchangeRate = (rate: Omit<ExchangeRate, 'id'>) => {
+    addExchangeRateMutation.mutate(rate);
+  };
+
+  const deleteExchangeRate = (rateId: string) => {
+    deleteExchangeRateMutation.mutate(rateId);
   };
 
   return {
     exchangeRates,
     isLoadingRates,
     updateExchangeRate,
+    addExchangeRate,
+    deleteExchangeRate,
   };
 }

@@ -1,6 +1,7 @@
 use crate::models::ExchangeRate;
 use crate::schema::exchange_rates;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::sqlite::SqliteConnection;
 
 pub struct FxRepository;
@@ -53,6 +54,17 @@ impl FxRepository {
                 exchange_rates::updated_at.eq(chrono::Utc::now().naive_utc()),
             ))
             .get_result(conn)
+    }
+
+    pub fn delete_exchange_rate(
+        conn: &mut PooledConnection<ConnectionManager<SqliteConnection>>,
+        rate_id: &str,
+    ) -> Result<(), diesel::result::Error> {
+        use crate::schema::exchange_rates::dsl::*;
+
+        diesel::delete(exchange_rates.filter(id.eq(rate_id)))
+            .execute(conn)
+            .map(|_| ())
     }
 
     // pub fn get_supported_currencies(conn: &mut SqliteConnection) -> QueryResult<Vec<String>> {

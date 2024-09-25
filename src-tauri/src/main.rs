@@ -18,7 +18,10 @@ use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
     get_income_summary, recalculate_portfolio,
 };
-use commands::settings::{get_exchange_rates, get_settings, update_exchange_rate, update_settings};
+use commands::settings::{
+    add_exchange_rate, delete_exchange_rate, get_exchange_rates, get_settings,
+    update_exchange_rate, update_settings,
+};
 
 use wealthfolio_core::db;
 use wealthfolio_core::models;
@@ -112,6 +115,8 @@ fn main() {
             update_settings,
             get_exchange_rates,
             update_exchange_rate,
+            add_exchange_rate,
+            delete_exchange_rate,
             create_goal,
             update_goal,
             delete_goal,

@@ -1,5 +1,5 @@
 use crate::fx::fx_service::CurrencyExchangeService;
-use crate::models::{ExchangeRate, Settings};
+use crate::models::{ExchangeRate, NewExchangeRate, Settings};
 use crate::settings::settings_service;
 use crate::AppState;
 use diesel::r2d2::ConnectionManager;
@@ -31,7 +31,7 @@ pub async fn update_settings(
     settings: Settings,
     state: State<'_, AppState>,
 ) -> Result<Settings, String> {
-    println!("Updating settings..."); // Log message
+    println!("Updating settings...");
     let mut conn = get_connection(&state)?;
     let service = settings_service::SettingsService::new();
     service
@@ -51,10 +51,7 @@ pub async fn update_exchange_rate(
     state: State<'_, AppState>,
 ) -> Result<ExchangeRate, String> {
     println!("Updating exchange rate...");
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let mut conn = get_connection(&state)?;
     let fx_service = CurrencyExchangeService::new();
     fx_service
         .update_exchange_rate(&mut conn, &rate)
@@ -64,12 +61,35 @@ pub async fn update_exchange_rate(
 #[tauri::command]
 pub async fn get_exchange_rates(state: State<'_, AppState>) -> Result<Vec<ExchangeRate>, String> {
     println!("Fetching exchange rates...");
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let mut conn = get_connection(&state)?;
     let fx_service = CurrencyExchangeService::new();
     fx_service
         .get_exchange_rates(&mut conn)
         .map_err(|e| format!("Failed to load exchange rates: {}", e))
+}
+
+#[tauri::command]
+pub async fn add_exchange_rate(
+    new_rate: NewExchangeRate,
+    state: State<'_, AppState>,
+) -> Result<ExchangeRate, String> {
+    println!("Adding new exchange rate...");
+    let mut conn = get_connection(&state)?;
+    let fx_service = CurrencyExchangeService::new();
+    fx_service
+        .add_exchange_rate(&mut conn, new_rate.from_currency, new_rate.to_currency)
+        .map_err(|e| format!("Failed to add exchange rate: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_exchange_rate(
+    rate_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("Deleting exchange rate...");
+    let mut conn = get_connection(&state)?;
+    let fx_service = CurrencyExchangeService::new();
+    fx_service
+        .delete_exchange_rate(&mut conn, &rate_id)
+        .map_err(|e| format!("Failed to delete exchange rate: {}", e))
 }

@@ -28,3 +28,31 @@ export const updateExchangeRate = async (updatedRate: ExchangeRate): Promise<Exc
     throw error;
   }
 };
+
+export const addExchangeRate = async (newRate: Omit<ExchangeRate, 'id'>): Promise<ExchangeRate> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('add_exchange_rate', { newRate });
+      default:
+        throw new Error('Unsupported environment');
+    }
+  } catch (error) {
+    console.error('Error adding exchange rate:', error);
+    throw error;
+  }
+};
+
+export const deleteExchangeRate = async (rateId: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('delete_exchange_rate', { rateId });
+      default:
+        throw new Error('Unsupported environment');
+    }
+  } catch (error) {
+    console.error('Error deleting exchange rate:', error);
+    throw error;
+  }
+};
