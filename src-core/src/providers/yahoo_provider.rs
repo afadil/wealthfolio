@@ -2,6 +2,7 @@ use std::{sync::RwLock, time::SystemTime};
 
 use super::models::{AssetClass, AssetSubClass, PriceDetail, YahooResult};
 use crate::models::{CrumbData, NewAsset, Quote as ModelQuote, QuoteSummary};
+use crate::providers::market_data_provider::{MarketDataError, MarketDataProvider};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use reqwest::{header, Client};
@@ -68,11 +69,12 @@ impl YahooProvider {
         Ok(yahoo_provider)
     }
 
-    pub async fn get_latest_quote(&self, symbol: &str) -> Result<yahoo::Quote, yahoo::YahooError> {
+    pub async fn get_latest_quote(&self, symbol: &str) -> Result<ModelQuote, yahoo::YahooError> {
         let response = self.provider.get_latest_quotes(symbol, "1d").await?;
-        response
+        let yahoo_quote = response
             .last_quote()
-            .map_err(|_| yahoo::YahooError::EmptyDataSet)
+            .map_err(|_| yahoo::YahooError::EmptyDataSet)?;
+        Ok(self.yahoo_quote_to_model_quote(symbol.to_string(), yahoo_quote))
     }
 
     fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
@@ -153,7 +155,7 @@ impl YahooProvider {
         Ok(asset_profiles)
     }
 
-    pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
         self.set_crumb().await?;
         // Handle the cash asset case
         if let Some(currency) = symbol.strip_prefix("$CASH-") {
@@ -281,7 +283,7 @@ impl YahooProvider {
     }
 
     /// Fetch historic quotes between start and end date
-    pub async fn fetch_stock_history(
+    pub async fn get_stock_history(
         &self,
         symbol: &str,
         start: SystemTime,
@@ -438,5 +440,39 @@ impl YahooProvider {
             "utilities" => "Utilities".to_string(),
             _ => a_string.to_string(),
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl MarketDataProvider for YahooProvider {
+    async fn get_latest_quote(&self, symbol: &str) -> Result<ModelQuote, MarketDataError> {
+        self.get_latest_quote(symbol)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+    async fn get_stock_history(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        self.get_stock_history(symbol, start, end)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        self.search_ticker(query)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+    async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, MarketDataError> {
+        self.get_symbol_profile(symbol)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+    async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError> {
+        self.get_exchange_rate(from, to)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
 }
