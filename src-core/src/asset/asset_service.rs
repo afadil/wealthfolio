@@ -1,9 +1,10 @@
 use crate::market_data::market_data_service::MarketDataService;
-use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary};
+use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary, UpdateAssetProfile};
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use std::sync::Arc;
+
 pub struct AssetService {
     market_data_service: Arc<MarketDataService>,
 }
@@ -54,19 +55,46 @@ impl AssetService {
         conn: &mut SqliteConnection,
         asset_id: &str,
     ) -> Result<AssetProfile, diesel::result::Error> {
+        println!("Fetching asset data for asset_id: {}", asset_id);
+
         let asset = assets::table
             .filter(assets::id.eq(asset_id))
             .first::<Asset>(conn)?;
+
+        println!("Found asset: {:?}", asset);
 
         let quote_history = quotes::table
             .filter(quotes::symbol.eq(&asset.symbol))
             .order(quotes::date.desc())
             .load::<Quote>(conn)?;
 
-        Ok(AssetProfile {
+        println!("Loaded {} quotes for asset", quote_history.len());
+
+        let asset_profile = AssetProfile {
             asset,
             quote_history,
-        })
+        };
+
+        println!("Returning AssetProfile");
+
+        Ok(asset_profile)
+    }
+
+    pub fn update_asset_profile(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_id: &str,
+        payload: UpdateAssetProfile,
+    ) -> Result<(), diesel::result::Error> {
+        diesel::update(assets::table.filter(assets::id.eq(asset_id)))
+            .set((
+                assets::sectors.eq(&payload.sectors),
+                assets::countries.eq(&payload.countries),
+                assets::comment.eq(payload.comment),
+                assets::asset_sub_class.eq(&payload.asset_sub_class),
+            ))
+            .execute(conn)?;
+        Ok(())
     }
 
     pub fn load_currency_assets(

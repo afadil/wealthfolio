@@ -1,7 +1,7 @@
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface ApplicationHeaderProps {
   heading: string;
@@ -10,6 +10,7 @@ interface ApplicationHeaderProps {
   className?: string;
   children?: React.ReactNode;
   displayBack?: boolean;
+  backUrl?: string;
 }
 
 export function ApplicationHeader({
@@ -19,15 +20,24 @@ export function ApplicationHeader({
   className,
   children,
   displayBack,
+  backUrl,
 }: ApplicationHeaderProps) {
   const navigate = useNavigate();
   return (
     <div className={cn('flex w-full items-center justify-between px-2', className)}>
-      <div className=" flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {displayBack ? (
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <Icons.ArrowLeft />
-          </Button>
+          backUrl ? (
+            <Link to={backUrl}>
+              <Button variant="ghost" size="icon">
+                <Icons.ArrowLeft />
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <Icons.ArrowLeft />
+            </Button>
+          )
         ) : null}
         <div data-tauri-drag-region="true" className="draggable flex items-center space-x-4">
           {headingPrefix && (

@@ -13,7 +13,7 @@ use commands::goal::{
     update_goal_allocations,
 };
 
-use commands::market_data::{get_asset_data, search_symbol, synch_quotes};
+use commands::market_data::{get_asset_data, search_symbol, synch_quotes, update_asset_profile};
 use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
     get_income_summary, recalculate_portfolio,
@@ -117,6 +117,7 @@ fn main() {
             update_exchange_rate,
             add_exchange_rate,
             delete_exchange_rate,
+            update_asset_profile,
             create_goal,
             update_goal,
             delete_goal,

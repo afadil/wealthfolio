@@ -43,3 +43,24 @@ export const getAssetData = async (assetId: string): Promise<AssetData> => {
     throw error;
   }
 };
+
+export const updateAssetProfile = async (payload: {
+  symbol: string;
+  sectors: string;
+  countries: string;
+  comment: string;
+  assetSubClass: string;
+}): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri('update_asset_profile', { id: payload.symbol, payload });
+        return;
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    console.error('Error updating asset profile:', error);
+    throw error;
+  }
+};
