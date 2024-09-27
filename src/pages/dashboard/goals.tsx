@@ -41,7 +41,7 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
                           <CardDescription className="mb-2 flex items-center text-sm font-light text-muted-foreground">
                             {goal.name}
                             {goal.progress >= 100 ? (
-                              <Icons.CheckCircle className="ml-1 h-4 w-4 text-green-500" />
+                              <Icons.CheckCircle className="ml-1 h-4 w-4 text-success" />
                             ) : null}
                           </CardDescription>
 

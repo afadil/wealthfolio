@@ -141,7 +141,6 @@ impl MarketDataService {
 
         Ok(())
     }
-    //self.initialize_provider().await?;
     pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, String> {
         self.provider
             .fetch_symbol_summary(symbol)

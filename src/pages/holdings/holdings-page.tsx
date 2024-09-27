@@ -19,8 +19,13 @@ import { useSettingsContext } from '@/lib/settings-provider';
 import { QueryKeys } from '@/lib/query-keys';
 import { PortfolioHistory } from '@/lib/types';
 import { getAccountHistory } from '@/commands/portfolio';
+import { useLocation } from 'react-router-dom';
 
 export const HoldingsPage = () => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const defaultTab = queryParams.get('tab') || 'overview';
+
   const { settings } = useSettingsContext();
   const { data, isLoading } = useQuery<Holding[], Error>({
     queryKey: [QueryKeys.HOLDINGS],
@@ -49,7 +54,7 @@ export const HoldingsPage = () => {
         </div>
       </ApplicationHeader>
       <div className="">
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue={defaultTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
