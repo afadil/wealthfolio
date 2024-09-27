@@ -1,7 +1,7 @@
 use crate::asset::asset_service::AssetService;
 use crate::market_data::market_data_service::MarketDataService;
 
-use crate::models::{AssetProfile, QuoteSummary};
+use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
 use crate::AppState;
 use tauri::State;
 
@@ -28,6 +28,22 @@ pub async fn get_asset_data(
     let service = AssetService::new().await;
     service
         .get_asset_data(&mut conn, &asset_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_asset_profile(
+    id: String,
+    payload: UpdateAssetProfile,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = AssetService::new().await;
+    service
+        .update_asset_profile(&mut conn, &id, payload)
         .map_err(|e| e.to_string())
 }
 

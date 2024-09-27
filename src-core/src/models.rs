@@ -123,6 +123,16 @@ pub struct NewAsset {
     pub url: Option<String>,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAssetProfile {
+    pub symbol: String,
+    pub sectors: Option<String>,
+    pub countries: Option<String>,
+    pub comment: String,
+    pub asset_sub_class: Option<String>,
+}
+
 #[derive(
     Queryable,
     Selectable,

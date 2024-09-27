@@ -73,15 +73,22 @@ export const columns: ColumnDef<Holding>[] = [
     accessorKey: 'symbol',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => {
+      const navigate = useNavigate();
       let symbol = row.getValue('symbol') as string;
       const symbolName = row.getValue('symbolName') as string;
       symbol = symbol.split('.')[0];
       if (symbol.startsWith('$CASH')) {
         symbol = symbol.split('-')[0];
       }
+      const handleNavigate = () => {
+        navigate(`/holdings/${symbol}`, { state: { holding: row.original } });
+      };
       return (
         <div className="flex items-center">
-          <Badge className="flex min-w-[50px] items-center justify-center rounded-sm">
+          <Badge
+            className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
+            onClick={handleNavigate}
+          >
             {symbol}
           </Badge>
 

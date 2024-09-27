@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Icons } from '@/components/icons';
+import { Link } from 'react-router-dom';
 
 const fetchSize = 25;
 
@@ -110,16 +111,18 @@ export const ActivityTable = ({
         accessorKey: 'assetSymbol',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
         cell: ({ row }) => {
-          let symbol = row.getValue('assetSymbol') as string;
-          symbol = symbol.split('.')[0];
+          let ogSymbol = row.getValue('assetSymbol') as string;
+          let symbol = ogSymbol.split('.')[0];
           if (symbol.startsWith('$CASH')) {
             symbol = symbol.split('-')[0];
           }
           return (
             <div className="w-3/3 flex items-center">
-              <Badge className="flex min-w-[50px] items-center justify-center rounded-sm">
-                {symbol}
-              </Badge>
+              <Link to={`/holdings/${ogSymbol}`}>
+                <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
+                  {symbol}
+                </Badge>
+              </Link>
 
               <span className="ml-2 text-xs">{row.getValue('assetName')}</span>
             </div>
