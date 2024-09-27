@@ -1,5 +1,6 @@
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary, UpdateAssetProfile};
+use crate::providers::market_data_provider::MarketDataError;
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
@@ -61,21 +62,15 @@ impl AssetService {
             .filter(assets::id.eq(asset_id))
             .first::<Asset>(conn)?;
 
-        println!("Found asset: {:?}", asset);
-
         let quote_history = quotes::table
             .filter(quotes::symbol.eq(&asset.symbol))
             .order(quotes::date.desc())
             .load::<Quote>(conn)?;
 
-        println!("Loaded {} quotes for asset", quote_history.len());
-
         let asset_profile = AssetProfile {
             asset,
             quote_history,
         };
-
-        println!("Returning AssetProfile");
 
         Ok(asset_profile)
     }
@@ -237,7 +232,7 @@ impl AssetService {
         self.market_data_service.get_history_quotes(conn)
     }
 
-    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, String> {
+    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
         self.market_data_service.search_symbol(query).await
     }
 
@@ -257,7 +252,7 @@ impl AssetService {
                 // symbol not found in database. Fetching from market data service.
                 let fetched_profile = self
                     .market_data_service
-                    .fetch_symbol_summary(asset_id)
+                    .get_symbol_profile(asset_id)
                     .await
                     .map_err(|e| {
                         println!(

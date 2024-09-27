@@ -1,30 +1,27 @@
 use crate::models::{Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
-use crate::providers::yahoo_provider::YahooProvider;
+use crate::providers::market_data_factory::{MarketDataFactory, DEFAULT_PROVIDER};
+use crate::providers::market_data_provider::{MarketDataError, MarketDataProvider};
 use crate::schema::{activities, exchange_rates, quotes};
 use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 pub struct MarketDataService {
-    provider: YahooProvider,
+    provider: Arc<dyn MarketDataProvider>,
 }
 
 impl MarketDataService {
     pub async fn new() -> Self {
         MarketDataService {
-            provider: YahooProvider::new()
-                .await
-                .expect("Failed to initialize YahooProvider"),
+            provider: MarketDataFactory::get_provider(Some(DEFAULT_PROVIDER)).await,
         }
     }
 
-    pub async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>, String> {
-        self.provider
-            .search_ticker(query)
-            .await
-            .map_err(|e| e.to_string())
+    pub async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        self.provider.search_ticker(query).await
     }
 
     pub fn get_latest_quote(
@@ -84,7 +81,7 @@ impl MarketDataService {
 
             match self
                 .provider
-                .fetch_stock_history(symbol, start_date, end_date)
+                .get_stock_history(symbol, start_date, end_date)
                 .await
             {
                 Ok(quotes) => all_quotes_to_insert.extend(quotes),
@@ -141,9 +138,9 @@ impl MarketDataService {
 
         Ok(())
     }
-    pub async fn fetch_symbol_summary(&self, symbol: &str) -> Result<NewAsset, String> {
+    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, String> {
         self.provider
-            .fetch_symbol_summary(symbol)
+            .get_symbol_profile(symbol)
             .await
             .map_err(|e| e.to_string())
     }
@@ -178,7 +175,7 @@ impl MarketDataService {
 
         for rate in existing_rates {
             match self
-                .fetch_exchange_rate(&rate.from_currency, &rate.to_currency)
+                .get_exchange_rate(&rate.from_currency, &rate.to_currency)
                 .await
             {
                 Ok(new_rate) => {
@@ -212,8 +209,8 @@ impl MarketDataService {
         Ok(())
     }
 
-    async fn fetch_exchange_rate(&self, from: &str, to: &str) -> Result<f64, String> {
-        // Handle GBP and GBp case like manually
+    async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, String> {
+        // Handle GBP and GBp case manually
         if from != from.to_uppercase() || to != to.to_uppercase() {
             return Ok(-1.0);
         }
