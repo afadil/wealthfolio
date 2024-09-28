@@ -2,7 +2,6 @@ use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{IncomeData, IncomeSummary};
 use chrono::{Datelike, NaiveDate, Utc};
 use diesel::prelude::*;
-use std::collections::HashSet;
 
 pub struct IncomeService {
     fx_service: CurrencyExchangeService,
@@ -56,15 +55,12 @@ impl IncomeService {
         let current_year = current_date.year();
         let last_year = current_year - 1;
         let two_years_ago = current_year - 2;
+        let current_month = current_date.month();
 
         let mut total_summary = IncomeSummary::new("TOTAL", base_currency.clone());
         let mut ytd_summary = IncomeSummary::new("YTD", base_currency.clone());
         let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
-
-        let mut ytd_months = HashSet::new();
-        let mut last_year_months = HashSet::new();
-        let mut two_years_ago_months = HashSet::new();
 
         for data in income_data {
             let date = NaiveDate::parse_from_str(&format!("{}-01", data.date), "%Y-%m-%d").unwrap();
@@ -77,20 +73,18 @@ impl IncomeService {
 
             if date.year() == current_year {
                 ytd_summary.add_income(&data, converted_amount);
-                ytd_months.insert(date.format("%Y-%m").to_string());
             } else if date.year() == last_year {
                 last_year_summary.add_income(&data, converted_amount);
-                last_year_months.insert(date.format("%Y-%m").to_string());
             } else if date.year() == two_years_ago {
                 two_years_ago_summary.add_income(&data, converted_amount);
-                two_years_ago_months.insert(date.format("%Y-%m").to_string());
             }
         }
 
+        
         total_summary.calculate_monthly_average(None);
-        ytd_summary.calculate_monthly_average(Some(ytd_months.len() as f64));
-        last_year_summary.calculate_monthly_average(Some(last_year_months.len() as f64));
-        two_years_ago_summary.calculate_monthly_average(Some(two_years_ago_months.len() as f64));
+        ytd_summary.calculate_monthly_average(Some(current_month as u32));
+        last_year_summary.calculate_monthly_average(Some(12 as u32));
+        two_years_ago_summary.calculate_monthly_average(Some(12 as u32));
 
         // Calculate Year-over-Year Growth
         let ytd_yoy_growth =
