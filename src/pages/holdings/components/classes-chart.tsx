@@ -11,7 +11,7 @@ function getClassesData(assets: Holding[], cash: number) {
         asset.assetSubClass === 'Cryptocurrency' ? 'Crypto' : asset.assetSubClass || 'Others'; // Use 'Others' as the default type if not provided
 
       const current = acc[assetType] || 0;
-      acc[assetType] = current + asset.marketValue;
+      acc[assetType] = Number(current) + Number(asset.marketValueConverted);
       return acc;
     },
     cash > 0 ? { Cash: cash } : ({} as Record<string, number>),

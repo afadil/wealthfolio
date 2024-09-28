@@ -83,23 +83,30 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
     const data: {
-      [symbol: string]: { name: string; marketValue: number; bookBalue: number; gain: number };
+      [symbol: string]: {
+        name: string;
+        marketValueConverted: number;
+        bookBalueConverted: number;
+        gain: number;
+      };
     } = {};
 
     assets.forEach((asset) => {
       if (asset.symbol) {
         const symbol = asset.symbol;
         if (data[symbol]) {
-          data[symbol].marketValue += asset.marketValue;
-          data[symbol].bookBalue += asset.bookValue;
+          data[symbol].marketValueConverted += Number(asset.marketValueConverted);
+          data[symbol].bookBalueConverted += Number(asset.bookValueConverted);
           data[symbol].gain =
-            (data[symbol].marketValue - data[symbol].bookBalue) / data[symbol].bookBalue;
+            (data[symbol].marketValueConverted - data[symbol].bookBalueConverted) /
+            data[symbol].bookBalueConverted;
         } else {
           data[symbol] = {
             name: symbol,
-            marketValue: asset.marketValue,
-            bookBalue: asset.bookValue,
-            gain: (asset.marketValue - asset.bookValue) / asset.bookValue,
+            marketValueConverted: Number(asset.marketValueConverted),
+            bookBalueConverted: Number(asset.bookValueConverted),
+            gain:
+              (asset.marketValueConverted - asset.bookValueConverted) / asset.bookValueConverted,
           };
         }
       }
@@ -109,7 +116,7 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
     const dataArray = Object.values(data);
 
     // Sort the array by marketValue in descending order
-    dataArray.sort((a, b) => b.marketValue - a.marketValue);
+    dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
     // Keep only the top 10 entries
     const topHolding = dataArray; //.slice(0, 25);
@@ -123,7 +130,7 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
         width={400}
         height={200}
         data={data}
-        dataKey="marketValue"
+        dataKey="marketValueConverted"
         animationDuration={100}
         content={<CustomizedContent theme={settings?.theme || 'light'} />}
       />

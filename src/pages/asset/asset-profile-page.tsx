@@ -16,7 +16,6 @@ import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 
 import { computeHoldings } from '@/commands/portfolio';
-import { aggregateHoldingsBySymbol } from '@/lib/portfolio-helper';
 import { QueryKeys } from '@/lib/query-keys';
 
 type Sector = {
@@ -46,7 +45,7 @@ export const AssetProfilePage = () => {
 
   // Memoized aggregated holdings
   const aggregatedHoldings = useMemo(() => {
-    return aggregateHoldingsBySymbol(allHoldings || []);
+    return allHoldings?.filter((holding) => holding.account?.id === 'TOTAL') || [];
   }, [allHoldings]);
 
   // Find the specific holding for the current symbol
