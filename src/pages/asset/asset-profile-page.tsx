@@ -164,6 +164,7 @@ export const AssetProfilePage = () => {
           {isEditing ? (
             <InputTags
               value={sectors.map((s) => `${s.name}:${s.weight}%`)}
+              placeholder="sector:weight"
               // @ts-ignore
               onChange={(values: string[]) =>
                 setSectors(
@@ -191,6 +192,7 @@ export const AssetProfilePage = () => {
           <Separator orientation="vertical" />
           {isEditing ? (
             <InputTags
+              placeholder="country:weight"
               value={countries.map((c) => `${c.code}:${c.weight}%`)}
               // @ts-ignore
               onChange={(values: string[]) =>
@@ -240,6 +242,7 @@ export const AssetProfilePage = () => {
             <textarea
               className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
               value={comment}
+              placeholder="Symbol/Company description"
               rows={6}
               onChange={(e) => setComment(e.target.value)}
             />
