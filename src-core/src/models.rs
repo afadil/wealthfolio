@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
 #[diesel(table_name= crate::schema::platforms)]
 #[serde(rename_all = "camelCase")]
@@ -476,6 +477,15 @@ pub struct GoalsAllocation {
 }
 
 #[derive(Debug, Serialize, QueryableByName)]
+#[diesel(table_name = crate::schema::activities)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct MinDate {
+    pub activity_date: chrono::NaiveDateTime,
+}
+
+
+#[derive(Debug, Serialize, QueryableByName)]
 #[serde(rename_all = "camelCase")]
 #[diesel(table_name = crate::schema::activities)]
 pub struct IncomeData {
@@ -492,6 +502,7 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Double)]
     pub amount: f64,
 }
+
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

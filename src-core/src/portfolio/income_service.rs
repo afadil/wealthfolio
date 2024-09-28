@@ -1,6 +1,6 @@
 use crate::fx::fx_service::CurrencyExchangeService;
-use crate::models::{IncomeData, IncomeSummary};
-use chrono::{Datelike, NaiveDate, Utc};
+use crate::models::{IncomeData, IncomeSummary,MinDate};
+use chrono::{Datelike, NaiveDate, Utc, NaiveDateTime};
 use diesel::prelude::*;
 
 pub struct IncomeService {
@@ -36,6 +36,18 @@ impl IncomeService {
         result
     }
 
+    fn get_first_transaction_date(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<NaiveDateTime, diesel::result::Error> {
+        let query = "SELECT min(activity_date) as activity_date
+        FROM activities a
+        LIMIT 1";
+        
+        let result = diesel::sql_query(query).load::<MinDate>(conn);
+        result.and_then(|r| Ok(r[0].activity_date))
+    }
+
     fn calculate_yoy_growth(current: f64, previous: f64) -> f64 {
         if previous > 0.0 {
             ((current - previous) / previous) * 100.0
@@ -56,6 +68,22 @@ impl IncomeService {
         let last_year = current_year - 1;
         let two_years_ago = current_year - 2;
         let current_month = current_date.month();
+
+        let oldest_date = self.get_first_transaction_date(conn)?;
+        println!("Income computed since {}" , oldest_date);
+        let mut months_since_first_transaction:i32 = (current_date.year() - oldest_date.year()) * 12 ;
+        months_since_first_transaction = months_since_first_transaction + current_date.month() as i32 - oldest_date.month() as i32;
+        
+        let mut months_in_last_year:i32 = 12;
+        if oldest_date.year() >= current_year - 1 {
+            months_in_last_year = 13 - oldest_date.month() as i32
+        }
+        
+        let mut months_two_years_ago:i32 = 12;
+        if oldest_date.year() >= current_year - 2 {
+            months_two_years_ago = 13 - oldest_date.month() as i32
+        }
+        
 
         let mut total_summary = IncomeSummary::new("TOTAL", base_currency.clone());
         let mut ytd_summary = IncomeSummary::new("YTD", base_currency.clone());
@@ -81,10 +109,10 @@ impl IncomeService {
         }
 
         
-        total_summary.calculate_monthly_average(None);
+        total_summary.calculate_monthly_average(Some(months_since_first_transaction as u32));
         ytd_summary.calculate_monthly_average(Some(current_month as u32));
-        last_year_summary.calculate_monthly_average(Some(12 as u32));
-        two_years_ago_summary.calculate_monthly_average(Some(12 as u32));
+        last_year_summary.calculate_monthly_average(Some(months_in_last_year as u32));
+        two_years_ago_summary.calculate_monthly_average(Some(months_two_years_ago as u32));
 
         // Calculate Year-over-Year Growth
         let ytd_yoy_growth =
