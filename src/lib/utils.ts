@@ -44,7 +44,6 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
     time: timeFormatter.format(dateObj),
   };
 };
-
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
   return new Intl.NumberFormat('en-US', {
     style: displayCurrency ? 'currency' : undefined,
@@ -54,13 +53,26 @@ export function formatAmount(amount: number, currency: string, displayCurrency =
   }).format(amount);
 }
 
-export function formatPercent(value: number) {
-  // return new Intl.NumberFormat('en-US', {
-  //   style: 'percent',
-  //   maximumFractionDigits: 2,
-  // }).format(value);
+export function formatPercent(value: number | null | undefined) {
+  if (value == null) return '-';
+  try {
+    if (isNaN(value)) {
+      throw new Error('Invalid number');
+    }
+    return `${Number(value).toFixed(2)}%`;
+  } catch (error) {
+    console.error('Error formatting percent', value, error);
+    return String(value);
+  }
+}
 
-  return `${value.toFixed(2)}%`;
+export function formatStockQuantity(quantity: string | number) {
+  const numQuantity = parseFloat(String(quantity));
+  if (Number.isInteger(numQuantity)) {
+    return numQuantity.toString();
+  } else {
+    return numQuantity.toFixed(6);
+  }
 }
 
 export function toPascalCase(input: string) {

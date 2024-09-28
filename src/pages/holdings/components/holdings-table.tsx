@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount, formatStockQuantity } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
@@ -58,8 +58,9 @@ export const HoldingsTable = ({
         columns={columns}
         searchBy="symbol"
         filters={filters}
-        defaultColumnVisibility={{ currency: false, symbolName: false }}
+        defaultColumnVisibility={{ currency: false, symbolName: false, holdingType: false }}
         defaultSorting={[{ id: 'symbol', desc: false }]}
+        scrollable={true}
       />
     </div>
   );
@@ -74,14 +75,14 @@ export const columns: ColumnDef<Holding>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => {
       const navigate = useNavigate();
-      let symbol = row.getValue('symbol') as string;
+      let ogSymbol = row.getValue('symbol') as string;
       const symbolName = row.getValue('symbolName') as string;
-      symbol = symbol.split('.')[0];
+      let symbol = ogSymbol.split('.')[0];
       if (symbol.startsWith('$CASH')) {
         symbol = symbol.split('-')[0];
       }
       const handleNavigate = () => {
-        navigate(`/holdings/${symbol}`, { state: { holding: row.original } });
+        navigate(`/holdings/${ogSymbol}`, { state: { holding: row.original } });
       };
       return (
         <div className="flex items-center">
@@ -123,7 +124,41 @@ export const columns: ColumnDef<Holding>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
     ),
-    cell: ({ row }) => <div className="text-right">{row.getValue('quantity')}</div>,
+    cell: ({ row }) => {
+      return <div className="text-right">{formatStockQuantity(row.getValue('quantity'))}</div>;
+    },
+  },
+  {
+    id: 'marketPrice',
+    accessorKey: 'marketPrice',
+    enableHiding: false,
+    enableSorting: false,
+    header: ({ column }) => (
+      <DataTableColumnHeader
+        className="justify-end text-right"
+        column={column}
+        title="Market Price"
+      />
+    ),
+    cell: ({ row }) => {
+      const marketPrice = row.getValue('marketPrice') as number;
+      const currency = row.getValue('currency') as string;
+      return <div className="text-right">{formatAmount(marketPrice, currency)}</div>;
+    },
+  },
+  {
+    id: 'bookValue',
+    accessorKey: 'bookValue',
+    enableHiding: false,
+    header: ({ column }) => (
+      <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
+    ),
+    cell: ({ row }) => {
+      const bookValue = row.getValue('bookValue') as number;
+      const currency = row.getValue('currency') as string;
+
+      return <div className="pr-4 text-right">{formatAmount(bookValue, currency)}</div>;
+    },
   },
   {
     id: 'marketValue',
@@ -150,41 +185,20 @@ export const columns: ColumnDef<Holding>[] = [
       );
     },
   },
-  {
-    id: 'marketPrice',
-    accessorKey: 'marketPrice',
-    enableHiding: false,
-    enableSorting: false,
-    header: ({ column }) => (
-      <DataTableColumnHeader
-        className="justify-end text-right"
-        column={column}
-        title="Market Price"
-      />
-    ),
-    cell: ({ row }) => {
-      const marketPrice = row.getValue('marketPrice') as number;
-      const currency = row.getValue('currency') as string;
-      return <div className="text-right">{formatAmount(marketPrice, currency)}</div>;
-    },
-  },
+
   {
     id: 'performance',
     accessorKey: 'performance',
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader
-        className="justify-end text-right"
-        column={column}
-        title="Performance"
-      />
+      <DataTableColumnHeader className="justify-end" column={column} title="Performance" />
     ),
     cell: ({ row }) => {
       const performance = row.getValue('performance') as any;
       const currency = row.getValue('currency') as string;
 
       return (
-        <div>
+        <div className="pr-4">
           <GainAmount
             className="text-sm"
             value={performance?.totalGainAmount}
@@ -207,16 +221,16 @@ export const columns: ColumnDef<Holding>[] = [
   {
     id: 'holdingType',
     accessorKey: 'holdingType',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-    cell: ({ row }) => <div>{row.getValue('holdingType')}</div>,
-    filterFn: (row, id, value: string) => {
-      return value.includes(row.getValue(id));
-    },
-    sortingFn: (rowA, rowB, id) => {
-      const typeA = rowA.getValue(id) as any;
-      const typeB = rowB.getValue(id) as any;
-      return typeA.localeCompare(typeB);
-    },
+    // header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+    // cell: ({ row }) => <div>{row.getValue('holdingType')}</div>,
+    // filterFn: (row, id, value: string) => {
+    //   return value.includes(row.getValue(id));
+    // },
+    // sortingFn: (rowA, rowB, id) => {
+    //   const typeA = rowA.getValue(id) as any;
+    //   const typeB = rowB.getValue(id) as any;
+    //   return typeA.localeCompare(typeB);
+    // },
   },
   {
     id: 'currency',
@@ -224,6 +238,7 @@ export const columns: ColumnDef<Holding>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
     cell: ({ row }) => <div>{row.getValue('currency')}</div>,
   },
+
   {
     id: 'actions',
     cell: ({ row }) => {

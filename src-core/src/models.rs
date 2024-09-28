@@ -1,3 +1,4 @@
+use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -283,7 +284,7 @@ pub struct ActivitySearchResponse {
     pub meta: ActivitySearchResponseMeta,
 }
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityImport {
     pub id: Option<String>,
@@ -304,18 +305,31 @@ pub struct ActivityImport {
     pub line_number: Option<i32>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Performance {
-    pub total_gain_percent: f64,
-    pub total_gain_amount: f64,
-    pub total_gain_amount_converted: f64,
-    pub day_gain_percent: Option<f64>,
-    pub day_gain_amount: Option<f64>,
-    pub day_gain_amount_converted: Option<f64>,
+    pub total_gain_percent: BigDecimal,
+    pub total_gain_amount: BigDecimal,
+    pub total_gain_amount_converted: BigDecimal,
+    pub day_gain_percent: Option<BigDecimal>,
+    pub day_gain_amount: Option<BigDecimal>,
+    pub day_gain_amount_converted: Option<BigDecimal>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+impl Default for Performance {
+    fn default() -> Self {
+        Performance {
+            total_gain_percent: BigDecimal::from(0),
+            total_gain_amount: BigDecimal::from(0),
+            total_gain_amount_converted: BigDecimal::from(0),
+            day_gain_percent: Some(BigDecimal::from(0)),
+            day_gain_amount: Some(BigDecimal::from(0)),
+            day_gain_amount_converted: Some(BigDecimal::from(0)),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Sector {
     pub name: String,
@@ -329,20 +343,21 @@ pub struct Holding {
     pub symbol: String,
     pub symbol_name: Option<String>,
     pub holding_type: String,
-    pub quantity: f64,
+    pub quantity: BigDecimal,
     pub currency: String,
     pub base_currency: String,
-    pub market_price: Option<f64>,
-    pub average_cost: Option<f64>,
-    pub market_value: f64,
-    pub book_value: f64,
-    pub market_value_converted: f64,
-    pub book_value_converted: f64,
+    pub market_price: Option<BigDecimal>,
+    pub average_cost: Option<BigDecimal>,
+    pub market_value: BigDecimal,
+    pub book_value: BigDecimal,
+    pub market_value_converted: BigDecimal,
+    pub book_value_converted: BigDecimal,
     pub performance: Performance,
     pub account: Option<Account>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub sectors: Option<Vec<Sector>>,
+    pub portfolio_percent: Option<BigDecimal>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

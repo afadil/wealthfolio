@@ -35,6 +35,7 @@ interface DataTableProps<TData, TValue> {
   defaultSorting?: SortingState;
   data: TData[];
   manualPagination?: boolean;
+  scrollable?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -45,6 +46,7 @@ export function DataTable<TData, TValue>({
   manualPagination = false,
   defaultColumnVisibility,
   defaultSorting,
+  scrollable = false,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
@@ -86,7 +88,7 @@ export function DataTable<TData, TValue>({
   return (
     <div className="space-y-4">
       <DataTableToolbar table={table} searchBy={searchBy} filters={filters} />
-      <div className="rounded-md border">
+      <div className={`rounded-md border ${scrollable ? 'h-[700px] overflow-y-auto' : ''}`}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

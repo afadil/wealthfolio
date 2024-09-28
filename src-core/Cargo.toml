@@ -27,3 +27,4 @@ rayon = "1.10.0"
 r2d2 = "0.8.10"
 dashmap = "6.1.0"
 async-trait = "0.1.83"
+bigdecimal = { version = "0.4.5", features = ["serde"] }
