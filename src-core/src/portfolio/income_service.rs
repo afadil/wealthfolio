@@ -28,7 +28,9 @@ impl IncomeService {
              SUM(a.quantity * a.unit_price) as amount
              FROM activities a
              LEFT JOIN assets ast ON a.asset_id = ast.id
+             INNER JOIN accounts acc ON a.account_id = acc.id
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
+             AND acc.is_active = 1
              GROUP BY date, a.activity_type, a.asset_id, ast.name, a.currency";
 
         let result = diesel::sql_query(query).load::<IncomeData>(conn);

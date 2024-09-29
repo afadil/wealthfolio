@@ -72,7 +72,6 @@ export default function IncomePage() {
     queryFn: getIncomeSummary,
   });
 
-  console.log(incomeData);
   if (isLoading) {
     return <IncomeDashboardSkeleton />;
   }

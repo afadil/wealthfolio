@@ -4,7 +4,11 @@ import { useMemo, useState } from 'react';
 
 function getCurrencyData(assets: Holding[], cash: number, baseCurrency: string) {
   if (!assets) return cash > 0 ? [{ name: baseCurrency, value: cash }] : [];
-  const totalAssets = [...assets, { currency: baseCurrency, marketValueConverted: cash }];
+  const totalAssets = [...assets];
+  if (cash > 0) {
+    // @ts-ignore
+    totalAssets.push({ symbol: 'CASH', currency: baseCurrency, marketValueConverted: cash });
+  }
   const currencies = totalAssets.reduce(
     (acc, asset) => {
       const currency = asset.currency || baseCurrency;

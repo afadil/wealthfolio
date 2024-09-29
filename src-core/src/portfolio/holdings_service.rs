@@ -30,7 +30,6 @@ impl HoldingsService {
     }
 
     pub fn compute_holdings(&self, conn: &mut SqliteConnection) -> Result<Vec<Holding>> {
-        let start_time = std::time::Instant::now();
         let mut holdings: HashMap<String, Holding> = HashMap::new();
         let accounts = self.account_service.get_active_accounts(conn)?;
         let activities = self.activity_service.get_trading_activities(conn)?;
@@ -38,13 +37,6 @@ impl HoldingsService {
         self.fx_service
             .initialize(conn)
             .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
-
-        println!(
-            "Found {} accounts, {} activities, and {} assets",
-            accounts.len(),
-            activities.len(),
-            assets.len()
-        );
 
         for activity in activities {
             let asset = assets
@@ -179,18 +171,22 @@ impl HoldingsService {
                 None
             };
 
-            // Get exchange rate for the holding's currency to base currency
+            let account_currency = holding
+                .account
+                .as_ref()
+                .map(|a| &a.currency)
+                .unwrap_or(&self.base_currency);
+
+            // Get exchange rate from holding's currency to account currency, then to base currency
             let exchange_rate = match self
                 .fx_service
-                .get_latest_exchange_rate(&holding.currency, &self.base_currency.clone())
+                .get_latest_exchange_rate(&holding.currency, &account_currency)
             {
                 Ok(rate) => BigDecimal::from_f64(rate).unwrap(),
                 Err(e) => {
                     eprintln!(
                         "Error getting exchange rate for {} to {}: {}. Using 1 as default.",
-                        holding.currency,
-                        self.base_currency.clone(),
-                        e
+                        holding.currency, account_currency, e
                     );
                     BigDecimal::from_f64(1.0).unwrap()
                 }
@@ -231,7 +227,7 @@ impl HoldingsService {
                 symbol_name: holding.symbol_name.clone(),
                 holding_type: holding.holding_type.clone(),
                 quantity: BigDecimal::from(0),
-                currency: holding.currency.clone(), // Use the original currency
+                currency: holding.currency.clone(),
                 base_currency: self.base_currency.clone(),
                 market_price: None,
                 average_cost: None,

@@ -1,4 +1,5 @@
 use bigdecimal::BigDecimal;
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -587,7 +588,8 @@ pub struct PortfolioHistory {
     pub day_gain_value: f64,
     pub allocation_percentage: f64,
     pub exchange_rate: f64,
-    pub holdings: Option<String>, // Holdings JSON
+    pub holdings: Option<String>,
+    pub calculated_at: NaiveDateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
