@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -353,7 +354,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Price</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Price" {...field} />
+                  <CurrencyInput placeholder="Price" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
