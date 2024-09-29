@@ -108,6 +108,7 @@ const AccountPage = () => {
                       onClick={() => updatePortfolioMutation.mutate()}
                       variant="outline"
                       size="sm"
+                      className="rounded-full"
                       disabled={updatePortfolioMutation.isPending}
                     >
                       {updatePortfolioMutation.isPending ? (
