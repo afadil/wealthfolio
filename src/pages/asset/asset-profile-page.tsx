@@ -81,6 +81,7 @@ export const AssetProfilePage = () => {
     marketPrice: quote?.adjclose ?? 0,
     totalGainAmount: holding?.performance?.totalGainAmount ?? 0,
     totalGainPercent: holding?.performance?.totalGainPercent ?? 0,
+    calculatedAt: holding?.calculatedAt,
   };
 
   if (!symbol || !holding) return null;

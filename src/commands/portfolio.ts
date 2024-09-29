@@ -7,7 +7,7 @@ import {
   AccountSummary,
 } from '@/lib/types';
 
-export const calculate_historical_data = async (params: {
+export const calculateHistoricalData = async (params: {
   accountIds?: string[];
   forceFullCalculation: boolean;
 }): Promise<HistorySummary[]> => {
@@ -20,6 +20,20 @@ export const calculate_historical_data = async (params: {
     }
   } catch (error) {
     console.error('Error calculating historical data:', error);
+    throw error;
+  }
+};
+
+export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('recalculate_portfolio');
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    console.error('Error recalculating portfolio:', error);
     throw error;
   }
 };
@@ -76,20 +90,6 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
     }
   } catch (error) {
     console.error('Error fetching active accounts summary:', error);
-    throw error;
-  }
-};
-
-export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('recalculate_portfolio');
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    console.error('Error recalculating portfolio:', error);
     throw error;
   }
 };

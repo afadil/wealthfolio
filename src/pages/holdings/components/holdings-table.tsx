@@ -50,7 +50,6 @@ export const HoldingsTable = ({
       options: assetsTypes,
     },
   ];
-
   return (
     <div className="pt-6">
       <DataTable

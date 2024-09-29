@@ -299,6 +299,7 @@ export interface PortfolioHistory {
   dayGainValue: number;
   allocationPercentage: number | null;
   exchangeRate: number | null;
+  calculatedAt: string;
 }
 
 export interface AccountSummary {
