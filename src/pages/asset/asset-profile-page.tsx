@@ -16,7 +16,6 @@ import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 
 import { computeHoldings } from '@/commands/portfolio';
-import { aggregateHoldingsBySymbol } from '@/lib/portfolio-helper';
 import { QueryKeys } from '@/lib/query-keys';
 
 type Sector = {
@@ -46,7 +45,7 @@ export const AssetProfilePage = () => {
 
   // Memoized aggregated holdings
   const aggregatedHoldings = useMemo(() => {
-    return aggregateHoldingsBySymbol(allHoldings || []);
+    return allHoldings?.filter((holding) => holding.account?.id === 'TOTAL') || [];
   }, [allHoldings]);
 
   // Find the specific holding for the current symbol
@@ -82,6 +81,7 @@ export const AssetProfilePage = () => {
     marketPrice: quote?.adjclose ?? 0,
     totalGainAmount: holding?.performance?.totalGainAmount ?? 0,
     totalGainPercent: holding?.performance?.totalGainPercent ?? 0,
+    calculatedAt: holding?.calculatedAt,
   };
 
   if (!symbol || !holding) return null;
@@ -164,6 +164,7 @@ export const AssetProfilePage = () => {
           {isEditing ? (
             <InputTags
               value={sectors.map((s) => `${s.name}:${s.weight}%`)}
+              placeholder="sector:weight"
               // @ts-ignore
               onChange={(values: string[]) =>
                 setSectors(
@@ -191,6 +192,7 @@ export const AssetProfilePage = () => {
           <Separator orientation="vertical" />
           {isEditing ? (
             <InputTags
+              placeholder="country:weight"
               value={countries.map((c) => `${c.code}:${c.weight}%`)}
               // @ts-ignore
               onChange={(values: string[]) =>
@@ -240,6 +242,7 @@ export const AssetProfilePage = () => {
             <textarea
               className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
               value={comment}
+              placeholder="Symbol/Company description"
               rows={6}
               onChange={(e) => setComment(e.target.value)}
             />

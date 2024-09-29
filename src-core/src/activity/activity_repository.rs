@@ -5,6 +5,7 @@ use crate::{
     },
     schema::{accounts, activities, assets},
 };
+use chrono::NaiveDate;
 use diesel::prelude::*;
 use uuid::Uuid;
 
@@ -211,5 +212,26 @@ impl ActivityRepository {
             .select(activities::all_columns)
             .order(activities::activity_date.asc())
             .load::<Activity>(conn)
+    }
+
+    pub fn get_first_activity_date(
+        &self,
+        conn: &mut SqliteConnection,
+        account_ids: Option<&[String]>,
+    ) -> Result<Option<NaiveDate>, diesel::result::Error> {
+        let mut query = activities::table
+            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .filter(accounts::is_active.eq(true))
+            .into_boxed();
+
+        if let Some(ids) = account_ids {
+            query = query.filter(activities::account_id.eq_any(ids));
+        }
+
+        query
+            .select(diesel::dsl::min(diesel::dsl::date(
+                activities::activity_date,
+            )))
+            .first::<Option<NaiveDate>>(conn)
     }
 }

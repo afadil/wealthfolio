@@ -122,6 +122,7 @@ diesel::table! {
         allocation_percentage -> Double,
         exchange_rate -> Double,
         holdings -> Nullable<Text>,
+        calculated_at -> Timestamp,
     }
 }
 

@@ -2,7 +2,7 @@ import React from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatAmount, formatPercent, formatStockQuantity } from '@/lib/utils';
 
 interface HoldingData {
   numShares: number;
@@ -57,7 +57,7 @@ const SymbolHoldingCard: React.FC<SymbolHoldingProps> = ({ holdingData, classNam
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between pb-0">
-        <CardTitle className="text-lg font-bold">{`${numShares} shares`}</CardTitle>
+        <CardTitle className="text-lg font-bold">{`${formatStockQuantity(numShares)} shares`}</CardTitle>
         <div className="text-2xl font-extrabold">{formatAmount(marketValue, currency)}</div>
       </CardHeader>
 

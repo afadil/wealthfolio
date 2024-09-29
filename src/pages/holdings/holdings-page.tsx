@@ -12,7 +12,6 @@ import { PortfolioComposition } from './components/portfolio-composition';
 import { SectorsChart } from './components/sectors-chart';
 import { computeHoldings } from '@/commands/portfolio';
 import { useQuery } from '@tanstack/react-query';
-import { aggregateHoldingsBySymbol } from '@/lib/portfolio-helper';
 import { Holding } from '@/lib/types';
 import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
@@ -40,7 +39,7 @@ export const HoldingsPage = () => {
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const holdings = useMemo(() => {
-    return aggregateHoldingsBySymbol(data || []);
+    return data?.filter((holding) => holding.account?.id === 'TOTAL') || [];
   }, [data]);
 
   return (
@@ -87,7 +86,7 @@ export const HoldingsPage = () => {
                 <CardContent className="p-0">
                   {holdings && holdings.length > 0 ? (
                     <HoldingCurrencyChart
-                      assets={holdings}
+                      holdings={holdings}
                       cash={todayValue?.availableCash || 0}
                       baseCurrency={settings?.baseCurrency || 'USD'}
                     />

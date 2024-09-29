@@ -1,17 +1,8 @@
 import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
-import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
 const COLORS = ['#1f2937', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb'];
-
-
 
 function getSectorsData(assets: Holding[]) {
   if (!assets) return [];
@@ -21,7 +12,8 @@ function getSectorsData(assets: Holding[]) {
       assetSectors.forEach((sector) => {
         const current = acc[sector.name] || 0;
         //@ts-ignore
-        acc[sector.name] = current + asset.marketValue * sector.weight;
+        acc[sector.name] =
+          Number(current) + Number(asset.marketValueConverted) * Number(sector.weight);
       });
       return acc;
     },

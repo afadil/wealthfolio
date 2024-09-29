@@ -42,6 +42,7 @@ import {
   Import,
   PieChart,
   BarChart,
+  RefreshCcw,
   Users,
   ListCollapse,
   Wallet,
@@ -52,6 +53,7 @@ import {
   type LucideIcon,
   LucideProps,
   Pencil,
+  Info,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -75,7 +77,9 @@ export const Icons = {
   Ungroup: Ungroup,
   Close: X,
   Eye: Eye,
+  Info: Info,
   EyeOff: EyeOff,
+  Refresh: RefreshCcw,
   PanelLeftOpen: PanelLeftOpen,
   Download: Download,
   Activity2: Activity,
