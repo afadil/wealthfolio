@@ -106,6 +106,7 @@ export default function DashboardPage() {
                 onClick={handleRecalculate}
                 variant="outline"
                 size="sm"
+                className="rounded-full"
                 disabled={updatePortfolioMutation.isPending}
               >
                 {updatePortfolioMutation.isPending ? (
