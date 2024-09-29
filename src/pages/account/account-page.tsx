@@ -1,4 +1,3 @@
-import React from 'react';
 import { format } from 'date-fns';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
