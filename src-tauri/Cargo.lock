@@ -4278,7 +4278,7 @@ checksum = "c62a0a307cb4a311d3a07867860911ca130c3494e8c2719593806c08bc5d0484"
 
 [[package]]
 name = "wealthfolio-app"
-version = "1.0.16"
+version = "1.0.17"
 dependencies = [
  "diesel",
  "dotenvy",

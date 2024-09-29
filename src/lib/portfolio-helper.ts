@@ -1,4 +1,4 @@
-import { AccountSummary, Goal, GoalAllocation, GoalProgress, Holding } from './types';
+import { AccountSummary, Goal, GoalAllocation, GoalProgress } from './types';
 
 export function calculateGoalProgress(
   accounts: AccountSummary[],
