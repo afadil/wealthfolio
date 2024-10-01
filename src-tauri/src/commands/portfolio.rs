@@ -29,10 +29,6 @@ pub async fn calculate_historical_data(
 
 #[tauri::command]
 pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>, String> {
-    use std::time::Instant;
-    println!("Compute holdings...");
-    let start = Instant::now();
-
     let service = create_portfolio_service(&state).await?;
     let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
@@ -41,9 +37,6 @@ pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>
         .await
         .map_err(|e| e.to_string())
         .map(|vec| Ok(vec))?;
-
-    let duration = start.elapsed();
-    println!("Compute holdings completed in: {:?}", duration);
 
     result
 }

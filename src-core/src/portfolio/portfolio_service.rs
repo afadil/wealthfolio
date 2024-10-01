@@ -103,7 +103,10 @@ impl PortfolioService {
         let result = self.calculate_historical_data(conn, None, false).await;
 
         let duration = start.elapsed();
-        println!("update_portfolio completed in: {:?}", duration);
+        println!(
+            "update_portfolio completed in: {:?} seconds",
+            duration.as_secs_f64()
+        );
 
         result
     }
