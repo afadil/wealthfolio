@@ -111,6 +111,21 @@ impl HoldingsService {
                             (&holding.book_value - &sell_ratio * &old_book_value).round(6);
                     }
                 }
+                "SPLIT" => {
+                    // For stock splits, adjust the quantity and recalculate the average cost
+                    let split_ratio = unit_price; // Split ratio is stored in the unit_price field
+                    if split_ratio != BigDecimal::from(0) {
+                        holding.quantity = (&holding.quantity * &split_ratio).round(6);
+                        // The book value remains the same, but we need to adjust the average cost
+                        if let Some(avg_cost) = holding.average_cost.as_mut() {
+                            *avg_cost = (avg_cost.clone() / &split_ratio).round(6);
+                        }
+                    } else {
+                        return Err(PortfolioError::InvalidDataError(
+                            "Invalid split ratio".to_string(),
+                        ));
+                    }
+                }
                 _ => println!("Unhandled activity type: {}", activity.activity_type),
             }
         }

@@ -44,6 +44,7 @@ const activityTypes = [
   { label: 'Dividend', value: 'DIVIDEND' },
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
+  { label: 'Split', value: 'SPLIT' },
 ] as const;
 
 const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
@@ -291,15 +292,15 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
       {isSplitType ? (
         <FormField
           control={control}
-          name="quantity"
+          name="unitPrice"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Split Multiple</FormLabel>
+              <FormLabel>Split Ratio</FormLabel>
               <FormControl>
                 <Input
                   type="number"
                   inputMode="decimal"
-                  placeholder="Ex. 4 for 4:1 split, 0.5 for 1:2 split"
+                  placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split"
                   {...field}
                 />
               </FormControl>

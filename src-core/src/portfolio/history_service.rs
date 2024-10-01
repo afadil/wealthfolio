@@ -339,6 +339,28 @@ impl HistoryService {
         Ok(total_history)
     }
 
+    fn calculate_cumulative_split_factors(
+        &self,
+        activities: &[Activity],
+        end_date: NaiveDate,
+    ) -> HashMap<String, BigDecimal> {
+        let mut cumulative_split_factors: HashMap<String, BigDecimal> = HashMap::new();
+
+        for activity in activities
+            .iter()
+            .filter(|a| a.activity_date.date() <= end_date)
+        {
+            if activity.activity_type == "SPLIT" {
+                let split_ratio = BigDecimal::from_str(&activity.unit_price.to_string()).unwrap();
+                *cumulative_split_factors
+                    .entry(activity.asset_id.clone())
+                    .or_insert(BigDecimal::from(1)) *= split_ratio;
+            }
+        }
+
+        cumulative_split_factors
+    }
+
     fn calculate_historical_value(
         &self,
         account_id: &str,
@@ -399,6 +421,9 @@ impl HistoryService {
 
         let quote_cache: DashMap<(String, NaiveDate), Option<&Quote>> = DashMap::new();
 
+        let cumulative_split_factors =
+            self.calculate_cumulative_split_factors(activities, end_date);
+
         let results: Vec<PortfolioHistory> = all_dates
             .iter()
             .map(|&date| {
@@ -411,6 +436,7 @@ impl HistoryService {
                         &mut net_deposit,
                         &mut book_cost,
                         &account_currency,
+                        &cumulative_split_factors,
                     );
                 }
 
@@ -487,6 +513,7 @@ impl HistoryService {
         net_deposit: &mut BigDecimal,
         book_cost: &mut BigDecimal,
         account_currency: &str,
+        cumulative_split_factors: &HashMap<String, BigDecimal>,
     ) {
         // Get exchange rate if activity currency is different from account currency
         let exchange_rate = BigDecimal::from_str(
@@ -498,31 +525,42 @@ impl HistoryService {
         )
         .unwrap();
 
-        let activity_amount = BigDecimal::from_str(&activity.quantity.to_string()).unwrap()
-            * BigDecimal::from_str(&activity.unit_price.to_string()).unwrap()
-            * &exchange_rate;
         let activity_fee =
             BigDecimal::from_str(&activity.fee.to_string()).unwrap() * &exchange_rate;
 
+        let activity_amount = BigDecimal::from_str(&activity.quantity.to_string()).unwrap()
+            * BigDecimal::from_str(&activity.unit_price.to_string()).unwrap()
+            * &exchange_rate;
+
         match activity.activity_type.as_str() {
-            "BUY" => {
-                let buy_cost = &activity_amount + &activity_fee;
-                *cumulative_cash -= &buy_cost;
-                *book_cost += &buy_cost;
-                *holdings
-                    .entry(activity.asset_id.clone())
-                    .or_insert(BigDecimal::from(0)) +=
-                    BigDecimal::from_str(&activity.quantity.to_string()).unwrap();
+            "BUY" | "SELL" => {
+                let quantity = BigDecimal::from_str(&activity.quantity.to_string()).unwrap();
+                let price = BigDecimal::from_str(&activity.unit_price.to_string()).unwrap();
+                let amount = &quantity * &price * &exchange_rate;
+
+                let split_factor = cumulative_split_factors
+                    .get(&activity.asset_id)
+                    .cloned()
+                    .unwrap_or_else(|| BigDecimal::from(1));
+
+                if activity.activity_type == "BUY" {
+                    let buy_cost = &amount + &activity_fee;
+                    *cumulative_cash -= &buy_cost;
+                    *book_cost += &buy_cost;
+                    *holdings
+                        .entry(activity.asset_id.clone())
+                        .or_insert(BigDecimal::from(0)) += &quantity * &split_factor;
+                } else {
+                    // SELL
+                    let sell_profit = &amount - &activity_fee;
+                    *cumulative_cash += &sell_profit;
+                    *book_cost -= &amount;
+                    *holdings
+                        .entry(activity.asset_id.clone())
+                        .or_insert(BigDecimal::from(0)) -= &quantity * &split_factor;
+                }
             }
-            "SELL" => {
-                let sell_profit = &activity_amount - &activity_fee;
-                *cumulative_cash += &sell_profit;
-                *book_cost -= &activity_amount + &activity_fee;
-                *holdings
-                    .entry(activity.asset_id.clone())
-                    .or_insert(BigDecimal::from(0)) -=
-                    BigDecimal::from_str(&activity.quantity.to_string()).unwrap();
-            }
+
             "DEPOSIT" | "TRANSFER_IN" | "CONVERSION_IN" => {
                 *cumulative_cash += &activity_amount - &activity_fee;
                 *net_deposit += &activity_amount;
@@ -626,6 +664,7 @@ impl HistoryService {
                 )
                 .unwrap();
 
+                // No need to adjust quantity here, as it's already adjusted in process_activity
                 let holding_value = quantity
                     * BigDecimal::from_str(&quote.close.to_string()).unwrap()
                     * &exchange_rate;
