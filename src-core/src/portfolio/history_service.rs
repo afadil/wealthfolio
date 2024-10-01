@@ -10,6 +10,7 @@ use diesel::prelude::*;
 use diesel::SqliteConnection;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::default::Default;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -17,6 +18,17 @@ pub struct HistoryService {
     base_currency: String,
     market_data_service: Arc<MarketDataService>,
     fx_service: CurrencyExchangeService,
+}
+
+impl Default for HistorySummary {
+    fn default() -> Self {
+        HistorySummary {
+            id: None,
+            start_date: String::new(),
+            end_date: String::new(),
+            entries_count: 0,
+        }
+    }
 }
 
 impl HistoryService {
@@ -48,14 +60,12 @@ impl HistoryService {
         input_account_id: &str,
     ) -> Result<Vec<PortfolioHistory>> {
         use crate::schema::portfolio_history::dsl::*;
-        use diesel::prelude::*;
 
-        let history_data: Vec<PortfolioHistory> = portfolio_history
+        portfolio_history
             .filter(account_id.eq(input_account_id))
             .order(date.asc())
-            .load::<PortfolioHistory>(conn)?;
-
-        Ok(history_data)
+            .load::<PortfolioHistory>(conn)
+            .map_err(PortfolioError::from)
     }
 
     pub fn get_latest_account_history(
@@ -64,15 +74,12 @@ impl HistoryService {
         input_account_id: &str,
     ) -> Result<PortfolioHistory> {
         use crate::schema::portfolio_history::dsl::*;
-        use diesel::prelude::*;
 
-        let latest_history: PortfolioHistory = portfolio_history
+        portfolio_history
             .filter(account_id.eq(input_account_id))
             .order(date.desc())
             .first(conn)
-            .map_err(|e| PortfolioError::DatabaseError(e))?;
-
-        Ok(latest_history)
+            .map_err(|e| PortfolioError::DatabaseError(e))
     }
 
     pub fn calculate_historical_data(
@@ -82,66 +89,147 @@ impl HistoryService {
         activities: &[Activity],
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>> {
-        self.fx_service
-            .initialize(conn)
-            .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
+        self.initialize_fx_service(conn)?;
 
+        //Preload data
         let end_date = Utc::now().naive_utc().date();
         let quotes = Arc::new(self.market_data_service.load_quotes(conn));
+        let account_activities = self.group_activities_by_account(activities);
+        let last_historical_dates =
+            self.get_last_historical_dates(conn, accounts, force_full_calculation)?;
+        let account_currencies = self.get_account_currencies(conn, accounts)?;
+        let asset_currencies = self.get_asset_currencies(conn, activities);
+        let last_histories = self.get_last_histories(conn, accounts, force_full_calculation)?;
 
-        // Preload all necessary data
-        let account_activities: HashMap<String, Vec<Activity>> =
-            activities
-                .iter()
-                .cloned()
-                .fold(HashMap::new(), |mut acc, activity| {
-                    acc.entry(activity.account_id.clone())
-                        .or_default()
-                        .push(activity);
-                    acc
-                });
+        //Calculate history
+        let summaries_and_histories = self.calculate_account_histories(
+            accounts,
+            &account_activities,
+            &quotes,
+            end_date,
+            &account_currencies,
+            &asset_currencies,
+            &last_historical_dates,
+            &last_histories,
+            force_full_calculation,
+        );
 
-        let last_historical_dates: HashMap<String, Option<NaiveDate>> = accounts
+        let mut summaries: Vec<HistorySummary> = summaries_and_histories
             .iter()
-            .map(|account| {
-                let last_date = self
-                    .get_last_historical_date(conn, &account.id)
-                    .unwrap_or(None);
-                (account.id.clone(), last_date)
-            })
+            .map(|(summary, _)| summary.clone())
             .collect();
 
-        let account_currencies: HashMap<String, String> = accounts
+        let account_histories: Vec<PortfolioHistory> = summaries_and_histories
+            .into_iter()
+            .flat_map(|(_, histories)| histories)
+            .collect();
+
+        self.save_historical_data(&account_histories, conn)?;
+
+        let total_history = self.calculate_total_portfolio_history(conn)?;
+        self.save_historical_data(&total_history, conn)?;
+
+        let total_summary = self.create_total_summary(&total_history);
+        summaries.push(total_summary);
+
+        Ok(summaries)
+    }
+
+    fn initialize_fx_service(&self, conn: &mut SqliteConnection) -> Result<()> {
+        self.fx_service
+            .initialize(conn)
+            .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))
+    }
+
+    fn group_activities_by_account(
+        &self,
+        activities: &[Activity],
+    ) -> HashMap<String, Vec<Activity>> {
+        activities.iter().fold(HashMap::new(), |mut acc, activity| {
+            acc.entry(activity.account_id.clone())
+                .or_default()
+                .push(activity.clone());
+            acc
+        })
+    }
+
+    fn get_last_historical_dates(
+        &self,
+        conn: &mut SqliteConnection,
+        accounts: &[Account],
+        force_full_calculation: bool,
+    ) -> Result<HashMap<String, Option<NaiveDate>>> {
+        accounts
+            .iter()
+            .map(|account| {
+                let last_date = if force_full_calculation {
+                    None
+                } else {
+                    self.get_last_historical_date(conn, &account.id)?
+                };
+                Ok((account.id.clone(), last_date))
+            })
+            .collect()
+    }
+
+    fn get_account_currencies(
+        &self,
+        conn: &mut SqliteConnection,
+        accounts: &[Account],
+    ) -> Result<HashMap<String, String>> {
+        accounts
             .iter()
             .map(|account| {
                 let currency = self
                     .get_account_currency(conn, &account.id)
                     .unwrap_or(self.base_currency.clone());
-                (account.id.clone(), currency)
+                Ok((account.id.clone(), currency))
             })
-            .collect();
+            .collect()
+    }
 
-        // Load asset currencies
+    fn get_asset_currencies(
+        &self,
+        conn: &mut SqliteConnection,
+        activities: &[Activity],
+    ) -> HashMap<String, String> {
         let asset_ids: Vec<String> = activities.iter().map(|a| a.asset_id.clone()).collect();
-        let asset_currencies = self
-            .market_data_service
-            .get_asset_currencies(conn, asset_ids);
+        self.market_data_service
+            .get_asset_currencies(conn, asset_ids)
+    }
 
-        // Process accounts in parallel and collect results
-        let last_histories: HashMap<String, Option<PortfolioHistory>> = accounts
+    fn get_last_histories(
+        &self,
+        conn: &mut SqliteConnection,
+        accounts: &[Account],
+        force_full_calculation: bool,
+    ) -> Result<HashMap<String, Option<PortfolioHistory>>> {
+        accounts
             .iter()
             .map(|account| {
                 let last_history = if force_full_calculation {
                     None
                 } else {
-                    self.get_last_portfolio_history(conn, &account.id)
-                        .unwrap_or(None)
+                    self.get_last_portfolio_history(conn, &account.id)?
                 };
-                (account.id.clone(), last_history)
+                Ok((account.id.clone(), last_history))
             })
-            .collect();
+            .collect()
+    }
 
-        let summaries_and_histories: Vec<(HistorySummary, Vec<PortfolioHistory>)> = accounts
+    fn calculate_account_histories(
+        &self,
+        accounts: &[Account],
+        account_activities: &HashMap<String, Vec<Activity>>,
+        quotes: &Arc<HashMap<(String, NaiveDate), Quote>>,
+        end_date: NaiveDate,
+        account_currencies: &HashMap<String, String>,
+        asset_currencies: &HashMap<String, String>,
+        last_historical_dates: &HashMap<String, Option<NaiveDate>>,
+        last_histories: &HashMap<String, Option<PortfolioHistory>>,
+        force_full_calculation: bool,
+    ) -> Vec<(HistorySummary, Vec<PortfolioHistory>)> {
+        accounts
             .par_iter()
             .map(|account| {
                 let account_activities = account_activities
@@ -150,37 +238,17 @@ impl HistoryService {
                     .unwrap_or_default();
 
                 if account_activities.is_empty() {
-                    return (
-                        HistorySummary {
-                            id: Some(account.id.clone()),
-                            start_date: "".to_string(),
-                            end_date: "".to_string(),
-                            entries_count: 0,
-                        },
-                        Vec::new(),
-                    );
+                    return self.create_empty_summary_and_history(&account.id);
                 }
 
-                let account_start_date = if force_full_calculation {
-                    account_activities
-                        .iter()
-                        .map(|a| a.activity_date.date())
-                        .min()
-                        .unwrap_or_else(|| Utc::now().naive_utc().date())
-                } else {
+                let account_start_date = self.determine_start_date(
+                    &account_activities,
                     last_historical_dates
                         .get(&account.id)
                         .cloned()
-                        .unwrap_or(None)
-                        .map(|d| d - Duration::days(1))
-                        .unwrap_or_else(|| {
-                            account_activities
-                                .iter()
-                                .map(|a| a.activity_date.date())
-                                .min()
-                                .unwrap_or_else(|| Utc::now().naive_utc().date())
-                        })
-                };
+                        .unwrap_or(None),
+                    force_full_calculation,
+                );
 
                 let account_currency = account_currencies
                     .get(&account.id)
@@ -192,69 +260,66 @@ impl HistoryService {
                 let new_history = self.calculate_historical_value(
                     &account.id,
                     &account_activities,
-                    &quotes,
+                    quotes,
                     account_start_date,
                     end_date,
                     account_currency,
-                    &asset_currencies,
+                    asset_currencies,
                     last_history,
                     force_full_calculation,
                 );
 
-                let summary = HistorySummary {
-                    id: Some(account.id.clone()),
-                    start_date: new_history
-                        .first()
-                        .map(|h| h.date.clone())
-                        .unwrap_or_default(),
-                    end_date: new_history
-                        .last()
-                        .map(|h| h.date.clone())
-                        .unwrap_or_default(),
-                    entries_count: new_history.len(),
-                };
+                let summary = self.create_summary(&account.id, &new_history);
 
                 (summary, new_history)
             })
-            .collect();
-
-        // Extract summaries and flatten histories
-        let mut summaries: Vec<HistorySummary> = summaries_and_histories
-            .iter()
-            .map(|(summary, _)| (*summary).clone())
-            .collect();
-        let account_histories: Vec<PortfolioHistory> = summaries_and_histories
-            .into_iter()
-            .flat_map(|(_, histories)| histories)
-            .collect();
-
-        // Save account histories
-        self.save_historical_data(&account_histories, conn)?;
-
-        // Calculate total portfolio history
-        let total_history = self.calculate_total_portfolio_history_for_all_accounts(conn)?;
-
-        // Save total history separately
-        self.save_historical_data(&total_history, conn)?;
-
-        let total_summary = HistorySummary {
-            id: Some("TOTAL".to_string()),
-            start_date: total_history
-                .first()
-                .map(|h| h.date.clone())
-                .unwrap_or_default(),
-            end_date: total_history
-                .last()
-                .map(|h| h.date.clone())
-                .unwrap_or_default(),
-            entries_count: total_history.len(),
-        };
-
-        summaries.push(total_summary);
-        Ok(summaries)
+            .collect()
     }
 
-    fn calculate_total_portfolio_history_for_all_accounts(
+    fn create_empty_summary_and_history(
+        &self,
+        account_id: &str,
+    ) -> (HistorySummary, Vec<PortfolioHistory>) {
+        let mut summary = HistorySummary::default();
+        summary.id = Some(account_id.to_string());
+        (summary, Vec::new())
+    }
+
+    fn determine_start_date(
+        &self,
+        account_activities: &[Activity],
+        last_historical_date: Option<NaiveDate>,
+        force_full_calculation: bool,
+    ) -> NaiveDate {
+        if force_full_calculation {
+            account_activities
+                .iter()
+                .map(|a| a.activity_date.date())
+                .min()
+                .unwrap_or_else(|| Utc::now().naive_utc().date())
+        } else {
+            last_historical_date
+                .map(|d| d - Duration::days(1))
+                .unwrap_or_else(|| {
+                    account_activities
+                        .iter()
+                        .map(|a| a.activity_date.date())
+                        .min()
+                        .unwrap_or_else(|| Utc::now().naive_utc().date())
+                })
+        }
+    }
+
+    fn create_summary(&self, account_id: &str, history: &[PortfolioHistory]) -> HistorySummary {
+        HistorySummary {
+            id: Some(account_id.to_string()),
+            start_date: history.first().map(|h| h.date.clone()).unwrap_or_default(),
+            end_date: history.last().map(|h| h.date.clone()).unwrap_or_default(),
+            entries_count: history.len(),
+        }
+    }
+
+    fn calculate_total_portfolio_history(
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<PortfolioHistory>> {
@@ -775,5 +840,22 @@ impl HistoryService {
             .select(currency)
             .first::<String>(conn)
             .map_err(PortfolioError::from)
+    }
+
+    // Add this method to the HistoryService impl block
+
+    fn create_total_summary(&self, total_history: &[PortfolioHistory]) -> HistorySummary {
+        HistorySummary {
+            id: Some("TOTAL".to_string()),
+            start_date: total_history
+                .first()
+                .map(|h| h.date.clone())
+                .unwrap_or_default(),
+            end_date: total_history
+                .last()
+                .map(|h| h.date.clone())
+                .unwrap_or_default(),
+            entries_count: total_history.len(),
+        }
     }
 }
