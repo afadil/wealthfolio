@@ -65,7 +65,18 @@ impl IncomeService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<IncomeSummary>, diesel::result::Error> {
-        let income_data = self.get_aggregated_income_data(conn)?;
+        println!("Getting income summary...");
+        let income_data = match self.get_aggregated_income_data(conn) {
+            Ok(data) => data,
+            Err(e) => {
+                println!("Error getting aggregated income data: {:?}", e);
+                return Err(e);
+            }
+        };
+
+        if income_data.is_empty() {
+            return Ok(Vec::new());
+        }
 
         let base_currency = self.base_currency.clone();
         let current_date = Utc::now().naive_utc().date();
@@ -74,7 +85,13 @@ impl IncomeService {
         let two_years_ago = current_year - 2;
         let current_month = current_date.month();
 
-        let oldest_date = self.get_first_transaction_date(conn)?;
+        let oldest_date = match self.get_first_transaction_date(conn) {
+            Ok(date) => date,
+            Err(e) => {
+                println!("Error getting first transaction date: {:?}", e);
+                return Err(e);
+            }
+        };
         println!("Income computed since {}", oldest_date);
         let mut months_since_first_transaction: i32 =
             (current_date.year() - oldest_date.year()) * 12;
@@ -98,11 +115,24 @@ impl IncomeService {
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
         for data in income_data {
-            let date = NaiveDate::parse_from_str(&format!("{}-01", data.date), "%Y-%m-%d").unwrap();
-            let converted_amount = self
-                .fx_service
-                .convert_currency(data.amount, &data.currency, &base_currency)
-                .unwrap_or(data.amount);
+            let date = match NaiveDate::parse_from_str(&format!("{}-01", data.date), "%Y-%m-%d") {
+                Ok(d) => d,
+                Err(e) => {
+                    println!("Error parsing date {}: {:?}", data.date, e);
+                    continue;
+                }
+            };
+            let converted_amount =
+                match self
+                    .fx_service
+                    .convert_currency(data.amount, &data.currency, &base_currency)
+                {
+                    Ok(amount) => amount,
+                    Err(e) => {
+                        println!("Error converting currency: {:?}", e);
+                        data.amount
+                    }
+                };
 
             total_summary.add_income(&data, converted_amount);
 
@@ -134,6 +164,7 @@ impl IncomeService {
         // Two years ago YoY growth can't be calculated without data from three years ago
         two_years_ago_summary.yoy_growth = None;
 
+        println!("Income summary calculation completed successfully");
         Ok(vec![
             total_summary,
             ytd_summary,
