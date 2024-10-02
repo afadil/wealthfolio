@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -263,7 +264,7 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
             <FormItem>
               <FormLabel>Fee</FormLabel>
               <FormControl>
-                <Input type="number" inputMode="decimal" placeholder="Fee" {...field} />
+                <CurrencyInput placeholder="Fee" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -277,7 +278,7 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
             <FormItem>
               <FormLabel>Amount</FormLabel>
               <FormControl>
-                <Input type="number" inputMode="decimal" placeholder="Amount" {...field} />
+                <CurrencyInput placeholder="Amount" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -353,7 +354,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Price</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Price" {...field} />
+                  <CurrencyInput placeholder="Price" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -366,7 +367,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Fee</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Fee" {...field} />
+                  <CurrencyInput placeholder="Fee" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -406,7 +407,7 @@ const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps)
           <FormItem>
             <FormLabel>Dividend Amount</FormLabel>
             <FormControl>
-              <Input type="number" inputMode="decimal" placeholder="Dividend Amount" {...field} />
+              <CurrencyInput placeholder="Dividend Amount" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>

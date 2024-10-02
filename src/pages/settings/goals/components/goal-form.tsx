@@ -97,7 +97,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
               <FormItem>
                 <FormLabel>Target amount</FormLabel>
                 <FormControl>
-                  <Input type="number" inputMode="decimal" placeholder="Target amount" {...field} />
+                  <CurrencyInput placeholder="Target amount" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
