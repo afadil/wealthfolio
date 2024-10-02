@@ -37,6 +37,7 @@
       "active": true,
       "targets": "all",
       "identifier": "com.teymz.wealthfolio",
+      "copyright": "2024 Teymz Inc.",
       "category": "Finance",
       "macOS": {
         "entitlements": "entitlements.plist"
