@@ -85,12 +85,24 @@ export default function IncomePage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <EmptyPlaceholder
-        className="mx-auto max-w-[420px]"
-        icon={<Icons.DollarSign className="h-10 w-10" />}
-        title="No income data available"
-        description="There is no income data for the selected period. Try selecting a different time range or check back later."
-      />
+      <ApplicationShell className="p-6">
+        <ApplicationHeader heading="Investment Income">
+          <div className="flex items-center space-x-2">
+            <IncomePeriodSelector
+              selectedPeriod={selectedPeriod}
+              onPeriodSelect={setSelectedPeriod}
+            />
+          </div>
+        </ApplicationHeader>
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+          <EmptyPlaceholder
+            className="mx-auto flex max-w-[420px] items-center justify-center"
+            icon={<Icons.DollarSign className="h-10 w-10" />}
+            title="No income data available"
+            description="There is no income data for the selected period. Try selecting a different time range or check back later."
+          />
+        </div>
+      </ApplicationShell>
     );
   }
 
@@ -291,7 +303,7 @@ export default function IncomePage() {
             <CardContent>
               {monthlyIncomeData.length === 0 ? (
                 <EmptyPlaceholder
-                  className="mx-auto max-w-[420px]"
+                  className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
                   icon={<Icons.Activity className="h-10 w-10" />}
                   title="No income history available"
                   description="There is no income history for the selected period. Try selecting a different time range or check back later."
@@ -371,7 +383,7 @@ export default function IncomePage() {
             <CardContent className="h-full">
               {topDividendStocks.length === 0 ? (
                 <EmptyPlaceholder
-                  className="mx-auto max-w-[420px]"
+                  className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
                   icon={<Icons.DollarSign className="h-10 w-10" />}
                   title="No dividend income recorded"
                   description="There are no dividend sources for the selected period. Try selecting a different time range or check back later."
