@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format } from 'date-fns';
 import { useEffect } from 'react';
 import { useForm, useFormContext } from 'react-hook-form';
 import * as z from 'zod';
@@ -7,7 +6,6 @@ import * as z from 'zod';
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import {
   DialogDescription,
   DialogFooter,
@@ -25,7 +23,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -34,11 +31,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { cn } from '@/lib/utils';
-
 import { newActivitySchema } from '@/lib/schemas';
 import { useActivityMutations } from '../hooks/useActivityMutations';
 import TickerSearchInput from './ticker-search';
+import DatePickerInput from '@/components/ui/data-picker-input';
 
 const activityTypes = [
   { label: 'Buy', value: 'BUY' },
@@ -46,10 +42,8 @@ const activityTypes = [
   { label: 'Deposit', value: 'DEPOSIT' },
   { label: 'Withdrawal', value: 'WITHDRAWAL' },
   { label: 'Dividend', value: 'DIVIDEND' },
-  // { label: 'Transfer', value: 'TRANSFER' },
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
-  // { label: 'Other', value: 'OTHER' },
 ] as const;
 
 const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
@@ -179,31 +173,12 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={'outline'}
-                        className={cn(
-                          'w-[240px] pl-3 text-left font-normal',
-                          !field.value && 'text-muted-foreground',
-                        )}
-                      >
-                        {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                        <Icons.Calendar className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value ? new Date(field.value) : undefined}
-                      onSelect={field.onChange}
-                      disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePickerInput
+                  onChange={(date) => field.onChange(date)}
+                  value={field.value}
+                  disabled={field.disabled}
+                />
+                <FormMessage />
               </FormItem>
             )}
           />
