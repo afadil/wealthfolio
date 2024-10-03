@@ -108,6 +108,15 @@ impl PortfolioService {
         result
     }
 
+    pub fn get_all_accounts_history(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
+        self.history_service
+            .get_all_accounts_history(conn)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    }
+
     pub fn get_account_history(
         &self,
         conn: &mut SqliteConnection,

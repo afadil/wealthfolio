@@ -66,6 +66,20 @@ export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   }
 };
 
+export const getAccountsHistory = async (): Promise<PortfolioHistory[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_accounts_history');
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    console.error('Error fetching accounts history:', error);
+    throw error;
+  }
+};
+
 export const getAccountHistory = async (accountId: string): Promise<PortfolioHistory[]> => {
   try {
     switch (getRunEnv()) {

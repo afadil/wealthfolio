@@ -1,7 +1,7 @@
 import { getAccounts } from '@/commands/account';
 import { getActivities } from '@/commands/activity';
 import { getGoals } from '@/commands/goal';
-import { getAccountHistory } from '@/commands/portfolio';
+import { getAccountsHistory } from '@/commands/portfolio';
 import JSZip from 'jszip';
 import {
   Account,
@@ -38,8 +38,8 @@ export function useExportData() {
     enabled: false,
   });
   const { refetch: fetchPortfolioHistory } = useQuery<PortfolioHistory[], Error>({
-    queryKey: QueryKeys.accountHistory('TOTAL'),
-    queryFn: () => getAccountHistory('TOTAL'),
+    queryKey: [QueryKeys.ALL_ACCOUNTS_HISTORY],
+    queryFn: getAccountsHistory,
     enabled: false,
   });
 

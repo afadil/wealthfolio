@@ -28,6 +28,20 @@ impl HistoryService {
         }
     }
 
+    pub fn get_all_accounts_history(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<PortfolioHistory>> {
+        use crate::schema::portfolio_history::dsl::*;
+    
+        let result = portfolio_history
+            // .filter(account_id.ne("TOTAL"))
+            .load::<PortfolioHistory>(conn)
+            .map_err(PortfolioError::from)?; // Convert diesel::result::Error to PortfolioError
+    
+        Ok(result)
+    }
+
     pub fn get_account_history(
         &self,
         conn: &mut SqliteConnection,
