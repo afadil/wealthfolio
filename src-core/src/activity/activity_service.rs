@@ -95,6 +95,7 @@ impl ActivityService {
             {
                 activity.quantity = 1.0;
             }
+            // For HOLDING type, we don't need to adjust anything as quantity and unit_price are provided
 
             // Create exchange rate if asset currency is different from account currency
             if activity.currency != account.currency {
@@ -138,6 +139,7 @@ impl ActivityService {
             {
                 activity.quantity = 1.0;
             }
+            // For HOLDING type, we don't need to adjust anything as quantity and unit_price are provided
 
             // Create exchange rate if asset currency is different from account currency
             if activity.currency != account.currency {

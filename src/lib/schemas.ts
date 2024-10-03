@@ -67,6 +67,7 @@ export const newActivitySchema = z.object({
       'FEE',
       'TAX',
       'SPLIT',
+      'HOLDING',
     ],
     {
       errorMap: () => {

@@ -625,7 +625,26 @@ impl HistoryService {
                         .or_insert(BigDecimal::from(0)) -= &quantity * &split_factor;
                 }
             }
+            "HOLDING" => {
+                let quantity = BigDecimal::from_str(&activity.quantity.to_string()).unwrap();
+                let price = BigDecimal::from_str(&activity.unit_price.to_string()).unwrap();
+                let amount = &quantity * &price * &exchange_rate;
 
+                let split_factor = cumulative_split_factors
+                    .get(&activity.asset_id)
+                    .cloned()
+                    .unwrap_or_else(|| BigDecimal::from(1));
+
+                // Update holdings
+                *holdings
+                    .entry(activity.asset_id.clone())
+                    .or_insert(BigDecimal::from(0)) = &quantity * &split_factor;
+
+                // Update book cost
+                *book_cost += &amount;
+
+                // Note: We don't update cumulative_cash or net_deposit for HOLDING activities
+            }
             "DEPOSIT" | "TRANSFER_IN" | "CONVERSION_IN" => {
                 *cumulative_cash += &activity_amount - &activity_fee;
                 *net_deposit += &activity_amount;
