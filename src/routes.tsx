@@ -17,6 +17,7 @@ import OnboardingPage from './pages/onboarding/onboarding-page';
 import SettingsGoalsPage from './pages/settings/goals/goals-page';
 import ExchangeRatesPage from './pages/settings/currencies/exchange-rates-page';
 import IncomePage from '@/pages/income/income-page';
+import ExportPage from './pages/settings/exports/exports-page';
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -40,6 +41,7 @@ export function AppRoutes() {
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="exchange-rates" element={<ExchangeRatesPage />} />
+            <Route path="exports" element={<ExportPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />
         </Route>
