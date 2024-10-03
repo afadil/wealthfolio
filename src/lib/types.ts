@@ -316,3 +316,7 @@ export interface IncomeSummary {
 }
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
+
+export type ExportContentType = 'accounts' | 'activities' | 'goals' | 'portfolio-history' | 'all';
+
+export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';

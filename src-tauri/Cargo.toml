@@ -14,7 +14,7 @@ tauri-build = { version = "1.5.4", features = [] }
 
 [dependencies]
 wealthfolio_core = { path = "../src-core" }
-tauri = { version = "1.7.2", features = [ "updater", "dialog-open", "fs-all", "path-all", "window-start-dragging", "shell-open"] }
+tauri = { version = "1.7.2", features = [ "dialog-save", "updater", "dialog-open", "fs-all", "path-all", "window-start-dragging", "shell-open"] }
 dotenvy = "0.15.7"
 
 [features]
