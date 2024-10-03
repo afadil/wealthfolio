@@ -3,7 +3,7 @@ use crate::activity::activity_service::ActivityService;
 use crate::asset::asset_service::AssetService;
 use crate::error::{PortfolioError, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
-use crate::models::{Account, Activity, Asset, Holding, Performance, Quote, Sector};
+use crate::models::{Account, Activity, Asset, Holding, Performance, Quote};
 use bigdecimal::BigDecimal;
 use diesel::SqliteConnection;
 use std::collections::{HashMap, HashSet};
