@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 
 import { newGoalSchema } from '@/lib/schemas';
 import { useGoalMutations } from '@/pages/settings/goals/useGoalMutations';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
