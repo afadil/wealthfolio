@@ -1,19 +1,20 @@
 import { getAccounts } from '@/commands/account';
 import { getActivities } from '@/commands/activity';
 import { getGoals } from '@/commands/goal';
-import { getHistorical } from '@/commands/portfolio';
+import { getAccountHistory } from '@/commands/portfolio';
 import JSZip from 'jszip';
 import {
   Account,
   ActivityDetails,
   ExportContentType,
   ExportedFileFormat,
-  FinancialHistory,
+  PortfolioHistory,
   Goal,
 } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
 import { writeBinaryFile, BaseDirectory } from '@tauri-apps/api/fs';
 import { save } from '@tauri-apps/api/dialog';
+import { QueryKeys } from './query-keys';
 
 interface ExportParms {
   format: ExportedFileFormat;
@@ -22,23 +23,23 @@ interface ExportParms {
 
 export function useExportData() {
   const { refetch: fetchAccounts } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
     enabled: false,
   });
   const { refetch: fetchActivities } = useQuery<ActivityDetails[], Error>({
-    queryKey: ['activities'],
+    queryKey: [QueryKeys.ACTIVITIES],
     queryFn: getActivities,
     enabled: false,
   });
   const { refetch: fetchGoals } = useQuery<Goal[], Error>({
-    queryKey: ['goals'],
+    queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
     enabled: false,
   });
-  const { refetch: fetchPortfolioHistory } = useQuery<FinancialHistory[], Error>({
-    queryKey: ['portfolio_history'],
-    queryFn: getHistorical,
+  const { refetch: fetchPortfolioHistory } = useQuery<PortfolioHistory[], Error>({
+    queryKey: QueryKeys.accountHistory('TOTAL'),
+    queryFn: () => getAccountHistory('TOTAL'),
     enabled: false,
   });
 

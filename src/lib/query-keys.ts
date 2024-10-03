@@ -6,6 +6,7 @@ export const QueryKeys = {
 
   // Activity related keys
   ACTIVITY_DATA: 'activity-data',
+  ACTIVITIES: 'activities',
 
   // Portfolio related keys
   PORTFOLIO_HISTORY: 'portfolio_history',
