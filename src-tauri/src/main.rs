@@ -6,7 +6,7 @@ mod commands;
 use commands::account::{create_account, delete_account, get_accounts, update_account};
 use commands::activity::{
     check_activities_import, create_activities, create_activity, delete_activity,
-    search_activities, update_activity,
+    search_activities, update_activity, get_activities,
 };
 use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
@@ -101,6 +101,7 @@ fn main() {
             update_account,
             delete_account,
             search_activities,
+            get_activities,
             create_activity,
             update_activity,
             delete_activity,

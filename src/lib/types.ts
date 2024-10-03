@@ -318,6 +318,6 @@ export interface ExchangeRate {
   isLoading?: boolean;
 }
 
-export type ExportContentType = 'accounts' | 'activities' | 'goals' | 'portfolio-history' | 'all';
+export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-history';
 
 export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';

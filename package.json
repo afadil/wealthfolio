@@ -39,7 +39,6 @@
     "cmdk": "^0.2.1",
     "date-fns": "^3.6.0",
     "file-saver": "^2.0.5",
-    "jszip": "^3.10.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.436.0",
     "react": "^18.3.1",

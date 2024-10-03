@@ -2,11 +2,10 @@ import { getAccounts } from '@/commands/account';
 import { getActivities } from '@/commands/activity';
 import { getGoals } from '@/commands/goal';
 import { getAccountsHistory } from '@/commands/portfolio';
-import JSZip from 'jszip';
 import {
   Account,
   ActivityDetails,
-  ExportContentType,
+  ExportDataType,
   ExportedFileFormat,
   PortfolioHistory,
   Goal,
@@ -18,7 +17,7 @@ import { QueryKeys } from './query-keys';
 
 interface ExportParms {
   format: ExportedFileFormat;
-  data: ExportContentType;
+  data: ExportDataType;
 }
 
 export function useExportData() {
@@ -89,22 +88,6 @@ export function useExportData() {
             haveDownloaded = await downloadFileFromContent(
               portfolioHistoryData,
               'portfolio-history.' + format.toLowerCase(),
-            );
-            break;
-          }
-          case 'all': {
-            const accounts = await fetchAndConvertData(fetchAccounts, format);
-            const activities = await fetchAndConvertData(fetchActivities, format);
-            const goals = await fetchAndConvertData(fetchGoals, format);
-            const portfolioHistory = await fetchAndConvertData(fetchPortfolioHistory, format);
-            const zip = new JSZip();
-            zip.file('accounts.' + format.toLowerCase(), accounts);
-            zip.file('activities.' + format.toLowerCase(), activities);
-            zip.file('goals.' + format.toLowerCase(), goals);
-            zip.file('portfolio-history.' + format.toLowerCase(), portfolioHistory);
-            haveDownloaded = await downloadFileFromContent(
-              await zip.generateAsync({ type: 'blob' }),
-              'data.zip',
             );
             break;
           }

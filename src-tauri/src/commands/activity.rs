@@ -6,6 +6,22 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
+pub async fn get_activities(state: State<'_, AppState>) -> Result<Vec<Activity>, String> {
+    println!("Fetching all activities...");
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let base_currency = state.base_currency.read().unwrap().clone();
+    let service = activity_service::ActivityService::new(base_currency);
+
+    service
+        .get_activities(&mut conn)
+        .map_err(|e| format!("Failed to fetch activities: {}", e))
+}
+
+
+#[tauri::command]
 pub async fn search_activities(
     page: i64,                                 // Page number, 1-based
     page_size: i64,                            // Number of items per page
