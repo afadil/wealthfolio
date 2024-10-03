@@ -42,7 +42,6 @@ export function AppearanceForm() {
 
   function onSubmit(data: AppearanceFormValues) {
     const updatedSettings = {
-      id: settings?.id || 1,
       baseCurrency: settings?.baseCurrency || 'USD',
       ...data,
     };

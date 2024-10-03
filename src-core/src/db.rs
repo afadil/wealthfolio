@@ -8,7 +8,7 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub fn init(db_path: &str) {
-    if !db_file_exists(db_path) {
+    if !Path::new(db_path).exists() {
         create_db_file(db_path);
     }
 
@@ -41,9 +41,4 @@ fn create_db_file(db_path: &str) {
     }
 
     fs::File::create(db_path).unwrap();
-}
-
-fn db_file_exists(db_path: &str) -> bool {
-    println!("db_path: {}", db_path);
-    Path::new(db_path).exists()
 }

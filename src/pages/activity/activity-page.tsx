@@ -6,37 +6,24 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ActivityEditModal } from './components/activity-edit-modal';
 import ActivityTable from './components/activity-table';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Account, ActivityDetails } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
-import { deleteActivity } from '@/commands/activity';
-import { toast } from '@/components/ui/use-toast';
+import { QueryKeys } from '@/lib/query-keys';
+import { useActivityMutations } from './hooks/useActivityMutations';
 
 const ActivityPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<any>();
 
-  const queryClient = useQueryClient();
-
   const { data: accounts } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
-  const deleteActivityMutation = useMutation({
-    mutationFn: deleteActivity,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      toast({
-        title: 'Account updated successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-  });
+  const { deleteActivityMutation } = useActivityMutations();
 
   const handleEdit = useCallback(
     (activity?: ActivityDetails) => {
@@ -54,8 +41,8 @@ const ActivityPage = () => {
     [showDeleteAlert],
   );
 
-  const handleDeleteConfirm = () => {
-    deleteActivityMutation.mutate(selectedActivity.id);
+  const handleDeleteConfirm = async () => {
+    await deleteActivityMutation.mutateAsync(selectedActivity.id);
     setShowDeleteAlert(false);
     setSelectedActivity(null);
   };

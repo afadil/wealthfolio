@@ -27,10 +27,16 @@ import {
 
 import type { Account, ActivityImport } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { checkActivitiesImport } from '@/commands/activity';
-import { listenImportFileDrop, listenImportFileDropCancelled, listenImportFileDropHover, UnlistenFn } from '@/commands/import-listener';
+import { useQuery } from '@tanstack/react-query';
+import {
+  listenImportFileDrop,
+  listenImportFileDropCancelled,
+  listenImportFileDropHover,
+  UnlistenFn,
+} from '@/commands/import-listener';
 import { openCsvFileDialog } from '@/commands/file';
+import { QueryKeys } from '@/lib/query-keys';
+import { useActivityImportMutations } from './useActivityImportMutations';
 
 const importFormSchema = z.object({
   account_id: z.string({ required_error: 'Please select an account.' }),
@@ -44,10 +50,12 @@ type ActivityImportFormProps = {
 };
 
 export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormProps) => {
+  const { checkImportMutation } = useActivityImportMutations(onSuccess, onError);
   const { data: accounts } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
+
   const [dragging, setDragging] = useState<boolean>(false);
 
   useEffect(() => {
@@ -84,16 +92,6 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
     };
   }, []);
 
-  const checkImportMutation = useMutation({
-    mutationFn: checkActivitiesImport,
-    onSuccess: (data) => {
-      onSuccess(data);
-    },
-    onError: (error: any) => {
-      onError(error);
-    },
-  });
-
   const form = useForm<ImportFormInputs>({
     resolver: zodResolver(importFormSchema),
   });
@@ -117,7 +115,6 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
   }`;
 
   const isLoading = checkImportMutation.isPending;
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 lg:max-w-4xl">
@@ -186,7 +183,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
                         Drag and drop your CSV file here
                       </EmptyPlaceholder.Title>
                       <EmptyPlaceholder.Description>
-                        Or click the button below to choose a file.
+                        Or click here to choose a file.
                       </EmptyPlaceholder.Description>
                     </>
                   )}

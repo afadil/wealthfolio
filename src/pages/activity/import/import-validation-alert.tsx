@@ -33,6 +33,9 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
                 Please review them in the table below and either correct or remove these entries to
                 proceed with the import.
               </p>
+              <p className="pt-1 text-sm font-normal">
+                Hover over the error icon on each line for more details about the specific issue.
+              </p>
             </AlertTitle>
           </div>
         </div>
@@ -59,7 +62,7 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
           </div>
         </div>
         <div className="mt-2 flex justify-start">
-          <Button variant="outline" className="mr-2" disabled={isConfirming} onClick={onCancel}>
+          <Button variant="secondary" className="mr-2" disabled={isConfirming} onClick={onCancel}>
             Cancel
           </Button>
           <Button onClick={onConfirm} disabled={isConfirming}>

@@ -20,7 +20,22 @@
 </div>
 <div align="center">
 
-[<img src="./public/button-buy-me-a-coffee.png" width="150" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
+[<img src="./public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
+
+</div>
+
+<div align="center">
+<a href="https://news.ycombinator.com/item?id=41465735">
+  <img
+    alt="Featured on Hacker News"
+    src="https://hackerbadge.now.sh/api?id=41465735"
+    style="width: 250px; height: 55px;" width="250" height="55"
+  />
+</a>
+  <a href="https://www.producthunt.com/posts/wealthfolio?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_souce=badge-wealthfolio" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=461640&amp;theme=light" alt="Wealthfolio - A boring, Local first, desktop Investment Tracking app | Product Hunt" class="h-[55px] w-[250px]" width="250" height="55"></a>
+
+  <a href="https://trendshift.io/repositories/11701" target="_blank">
+  <img src="https://trendshift.io/api/badge/repositories/11701" alt="afadil%2Fwealthfolio | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 </div>
 
@@ -90,11 +105,12 @@ Ensure you have the following installed on your machine:
 - **Tailwind CSS**: Utility-first CSS framework for styling.
 - **Radix UI/Shadcn**: Accessible UI components.
 - **Recharts**: Charting library built with React.
-
-### Backend / APIs
-
 - **React Query**: Data-fetching library for React.
 - **Zod**: TypeScript-first schema declaration and validation library.
+
+### Backend
+
+-  **Tauri**: Framework for building tiny, secure, and fast desktop applications.
 
 ### Development Tools
 
@@ -102,7 +118,7 @@ Ensure you have the following installed on your machine:
 - **TypeScript**: Typed superset of JavaScript.
 - **ESLint**: Pluggable linting utility for JavaScript and JSX.
 - **Prettier**: Code formatter.
-- **Tauri**: Framework for building tiny, secure, and fast desktop applications.
+
 
 ## Folder Structure
 

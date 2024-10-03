@@ -1,39 +1,16 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { Settings, SettingsContextType } from './types';
 import { useSettings } from './useSettings';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/components/ui/use-toast';
-import { saveSettings } from '@/commands/setting';
+import { useSettingsMutation } from './useSettingsMutation';
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient();
   const { data, isLoading, isError } = useSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
 
-  const updateMutation = useMutation({
-    mutationFn: saveSettings,
-    onSuccess: (updatedSettings) => {
-      setSettings(updatedSettings);
-      applySettingsToDocument(updatedSettings);
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      toast({
-        title: 'Settings updated successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-    onError: () => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem updating your settings.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
+  const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument, settings);
 
   const updateSettings = (newSettings: Settings) => {
     updateMutation.mutate(newSettings);

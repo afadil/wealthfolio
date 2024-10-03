@@ -2,7 +2,11 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
-import { listenQuotesSyncComplete, listenQuotesSyncStart } from '@/commands/quote-listener';
+import {
+  listenQuotesSyncComplete,
+  listenQuotesSyncStart,
+  listenQuotesSyncError,
+} from '@/commands/quote-listener';
 
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
@@ -10,25 +14,40 @@ const useGlobalEventListener = () => {
   useEffect(() => {
     const handleQuoteSyncStart = () => {
       toast({
-        title: 'Syncing quotes...',
-        description: 'Please wait while we sync your quotes',
+        title: 'Updating Market Data',
+        description: 'Fetching the latest market prices. This may take a moment.',
+        duration: 5000,
       });
     };
 
     const handleQuotesSyncComplete = () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries();
       toast({
-        title: 'Quotes synced successfully',
+        title: 'Portfolio Update Complete',
+        description: 'Your portfolio has been refreshed with the latest market data.',
+        duration: 5000,
+      });
+    };
+
+    const handleQuotesSyncError = (error: string) => {
+      toast({
+        title: 'Portfolio Update Error',
+        description: error,
+        duration: 5000,
+        variant: 'destructive',
       });
     };
     const setupListeners = async () => {
       const unlistenSyncStart = await listenQuotesSyncStart(handleQuoteSyncStart);
       const unlistenSyncComplete = await listenQuotesSyncComplete(handleQuotesSyncComplete);
+      const unlistenSyncError = await listenQuotesSyncError((event) => {
+        handleQuotesSyncError(event.payload as string);
+      });
 
       return () => {
         unlistenSyncStart();
         unlistenSyncComplete();
+        unlistenSyncError();
       };
     };
 
@@ -37,7 +56,7 @@ const useGlobalEventListener = () => {
     });
   }, [queryClient]);
 
-  return null; // Assuming this hook doesn't need to return anything
+  return null;
 };
 
 export default useGlobalEventListener;

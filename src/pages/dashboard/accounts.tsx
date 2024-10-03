@@ -1,30 +1,35 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { GainPercent } from '@/components/gain-percent';
+import { GainAmount } from '@/components/gain-amount';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AccountTotal } from '@/lib/types';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { AccountSummary } from '@/lib/types';
+import { formatAmount } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
 
 // Helper function to calculate category summary
-const calculateCategorySummary = (accountsInCategory: AccountTotal[]) => {
+const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
   const totalMarketValue = accountsInCategory.reduce(
-    (total, account) => total + account.marketValueConverted,
+    (total, account) =>
+      total + account.performance.marketValue * (account.performance.exchangeRate || 1),
     0,
   );
   const bookValue = accountsInCategory.reduce(
-    (total, account) => total + account.bookValueConverted,
+    (total, account) =>
+      total + account.performance.bookCost * (account.performance.exchangeRate || 1),
     0,
   );
 
   const totalCashBalance = accountsInCategory.reduce(
-    (total, account) => total + account.cashBalanceConverted,
+    (total, account) =>
+      total + account.performance.availableCash * (account.performance.exchangeRate || 1),
     0,
   );
 
   return {
-    baseCurrency: accountsInCategory[0].baseCurrency,
+    baseCurrency: accountsInCategory[0].performance.baseCurrency,
     totalMarketValue,
     totalCashBalance,
     totalGainPercent: ((totalMarketValue - bookValue) / bookValue) * 100,
@@ -33,82 +38,79 @@ const calculateCategorySummary = (accountsInCategory: AccountTotal[]) => {
   };
 };
 
-const Summary = ({
-  title,
-  description,
-  value,
-  gain,
-  gainPercent,
-  currency,
-  isExpanded,
+const AccountSummaryComponent = ({
+  accountSummary,
+  isGroup = false,
+  isExpanded = false,
   onToggle,
 }: {
-  title: string;
-  description?: string;
-  value: number;
-  gain: number;
-  gainPercent: number;
-  currency: string;
-  isExpanded: boolean;
-  onToggle: () => void;
+  accountSummary:
+    | AccountSummary
+    | { account: { id: string; name: string; group?: string; currency: string }; performance: any };
+  isGroup?: boolean;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }) => {
   return (
-    <div className="flex w-full cursor-pointer items-center justify-between" onClick={onToggle}>
+    <div
+      key={isGroup ? accountSummary.account.group : accountSummary.account.id}
+      className="flex w-full items-center justify-between"
+      onClick={isGroup ? onToggle : undefined}
+    >
       <div className="flex flex-col">
-        <div className="flex items-center">
-          <span className="font-medium leading-none">{title}</span>
-        </div>
-        <span className="text-sm text-muted-foreground">{description}</span>
-      </div>
-      <div className="ml-2 flex items-start justify-between">
-        <div className="flex flex-col items-end">
-          <span className="font-medium leading-none">{formatAmount(value, currency)}</span>
-          {gain !== 0 && (
-            <span
-              className={`text-sm font-light ${gainPercent > 0 ? 'text-green-500' : 'text-red-500'}`}
-            >
-              {formatAmount(gain, currency, false)} / {formatPercent(gainPercent)}
-            </span>
-          )}
-        </div>
-        <Icons.ChevronDown
-          className={`ml-2 h-5 w-5 transition-transform ${isExpanded ? 'rotate-180 transform' : ''}`}
-        />
-      </div>
-    </div>
-  );
-};
-
-const AccountSummary = ({ account }: { account: AccountTotal }) => {
-  const navigate = useNavigate();
-  const handleNavigate = () => {
-    navigate(`/accounts/${account.id}`, { state: { account: account } });
-  };
-  return (
-    <div key={account.id} className="flex w-full items-center justify-between">
-      <div className="flex flex-col">
-        <span className="font-medium leading-none">{account.name}</span>
+        <span className="font-medium leading-none">{accountSummary.account.name}</span>
         <span className="text-sm text-muted-foreground">
-          {account.group ? `${account.group} - ${account.currency}` : account.currency}
+          {isGroup
+            ? `${accountSummary.performance.numberOfAccounts} accounts`
+            : accountSummary.account.group
+              ? `${accountSummary.account.group} - ${accountSummary.account.currency}`
+              : accountSummary.account.currency}
         </span>
       </div>
       <div className="flex items-center">
-        <div className="text-right">
+        <div className="flex flex-col items-end">
           <p className="font-medium leading-none">
-            {formatAmount(account.totalValue, account.currency)}
+            {formatAmount(
+              accountSummary.performance.totalValue ||
+                accountSummary.performance.totalMarketValue +
+                  accountSummary.performance.totalCashBalance,
+              accountSummary.account.currency,
+            )}
           </p>
-          {account.totalGainAmount !== 0 && (
-            <p
-              className={`text-sm font-light ${account.totalGainPercent > 0 ? 'text-green-500' : 'text-red-500'}`}
-            >
-              {formatAmount(account.totalGainAmount, account.currency, false)} /
-              {formatPercent(account.totalGainPercent)}
-            </p>
+          {(accountSummary.performance.totalGainPercentage !== 0 ||
+            accountSummary.performance.totalGainPercent !== 0) && (
+            <div className="flex items-center space-x-2">
+              <GainAmount
+                className="text-sm font-light"
+                value={
+                  accountSummary.performance.totalGainValue ||
+                  accountSummary.performance.totalGainAmount ||
+                  0
+                }
+                currency={accountSummary.account.currency || 'USD'}
+                displayCurrency={false}
+              />
+              <div className="mx-1 h-3 border-r border-gray-300" />
+              <GainPercent
+                className="text-sm font-light"
+                value={
+                  accountSummary.performance.totalGainPercentage ||
+                  accountSummary.performance.totalGainPercent ||
+                  0
+                }
+              />
+            </div>
           )}
         </div>
-        <Button variant="link" size="sm" onClick={handleNavigate} className="ml-2 p-0">
-          <Icons.ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        {isGroup ? (
+          <Icons.ChevronDown
+            className={`ml-2 h-5 w-5 transition-transform ${isExpanded ? 'rotate-180 transform' : ''}`}
+          />
+        ) : (
+          <Link to={`/accounts/${accountSummary.account.id}`} className="ml-2 p-0">
+            <Icons.ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -118,22 +120,28 @@ export function Accounts({
   accounts,
   className,
 }: {
-  accounts?: AccountTotal[];
+  accounts?: AccountSummary[];
   className?: string;
 }) {
   const { accountsGrouped, setAccountsGrouped } = useSettingsContext();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const groupAccountsByCategory = () => {
-    const groupedAccounts: Record<string, AccountTotal[]> = {};
-    for (const account of accounts || []) {
-      const category = account.group;
-      if (!groupedAccounts[category]) {
-        groupedAccounts[category] = [];
+    const groupedAccounts: Record<string, AccountSummary[]> = {};
+    const ungroupedAccounts: AccountSummary[] = [];
+
+    for (const accountSummary of accounts || []) {
+      const category = accountSummary.account.group;
+      if (category) {
+        if (!groupedAccounts[category]) {
+          groupedAccounts[category] = [];
+        }
+        groupedAccounts[category].push(accountSummary);
+      } else {
+        ungroupedAccounts.push(accountSummary);
       }
-      groupedAccounts[category].push(account);
     }
-    return groupedAccounts;
+    return { groupedAccounts, ungroupedAccounts };
   };
 
   const toggleCategory = (category: string) => {
@@ -148,40 +156,28 @@ export function Accounts({
     accountsInCategory,
   }: {
     category: string;
-    accountsInCategory: AccountTotal[];
+    accountsInCategory: AccountSummary[];
   }) => {
-    if (!category) {
-      return (
-        <Card>
-          <CardHeader className="py-4">
-            <AccountSummary account={accountsInCategory[0]} />
-          </CardHeader>
-        </Card>
-      );
-    }
-
     const categorySummary = calculateCategorySummary(accountsInCategory);
     const isExpanded = expandedCategories[category];
-
     return (
       <Card>
         <CardHeader className="border-b">
-          <Summary
-            title={category}
-            description={`${categorySummary.numberOfAccounts} accounts`}
-            value={categorySummary.totalMarketValue + categorySummary.totalCashBalance}
-            gain={categorySummary.totalGainAmount}
-            gainPercent={categorySummary.totalGainPercent}
-            currency={categorySummary.baseCurrency}
+          <AccountSummaryComponent
+            accountSummary={{
+              account: { id: category, name: category, currency: categorySummary.baseCurrency },
+              performance: categorySummary,
+            }}
+            isGroup={true}
             isExpanded={isExpanded}
             onToggle={() => toggleCategory(category)}
           />
         </CardHeader>
         {isExpanded && (
           <CardContent className="pt-4">
-            {accountsInCategory.map((account) => (
-              <div className="py-4">
-                <AccountSummary key={account.id} account={account} />
+            {accountsInCategory.map((accountSummary) => (
+              <div key={accountSummary.account.id} className="py-4">
+                <AccountSummaryComponent accountSummary={accountSummary} />
               </div>
             ))}
           </CardContent>
@@ -192,19 +188,30 @@ export function Accounts({
 
   const renderAccounts = () => {
     if (accountsGrouped) {
-      const groupedAccounts = groupAccountsByCategory();
-      return Object.entries(groupedAccounts).map(([category, accountsInCategory]) => (
-        <CategorySummary
-          key={category}
-          category={category}
-          accountsInCategory={accountsInCategory}
-        />
-      ));
+      const { groupedAccounts, ungroupedAccounts } = groupAccountsByCategory();
+      return (
+        <>
+          {Object.entries(groupedAccounts).map(([category, accountsInCategory]) => (
+            <CategorySummary
+              key={category}
+              category={category}
+              accountsInCategory={accountsInCategory}
+            />
+          ))}
+          {ungroupedAccounts.map((accountSummary) => (
+            <Card key={accountSummary.account.id}>
+              <CardHeader className="py-6">
+                <AccountSummaryComponent accountSummary={accountSummary} />
+              </CardHeader>
+            </Card>
+          ))}
+        </>
+      );
     } else {
-      return accounts?.map((account) => (
-        <Card key={account.id}>
+      return accounts?.map((accountSummary) => (
+        <Card key={accountSummary.account.id}>
           <CardHeader className="py-6">
-            <AccountSummary account={account} />
+            <AccountSummaryComponent accountSummary={accountSummary} />
           </CardHeader>
         </Card>
       ));

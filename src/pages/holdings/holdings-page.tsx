@@ -3,33 +3,36 @@ import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Icons } from '@/components/icons';
+import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
 import { PortfolioComposition } from './components/portfolio-composition';
 import { SectorsChart } from './components/sectors-chart';
-import { computeHoldings, getHistorical } from '@/commands/portfolio';
+import { computeHoldings } from '@/commands/portfolio';
 import { useQuery } from '@tanstack/react-query';
 import { aggregateHoldingsBySymbol } from '@/lib/portfolio-helper';
-import { FinancialHistory, Holding } from '@/lib/types';
+import { Holding } from '@/lib/types';
 import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
-import { IncomeDashboard } from './components/income-dashboard';
+import { QueryKeys } from '@/lib/query-keys';
+import { PortfolioHistory } from '@/lib/types';
+import { getAccountHistory } from '@/commands/portfolio';
 
 export const HoldingsPage = () => {
   const { settings } = useSettingsContext();
   const { data, isLoading } = useQuery<Holding[], Error>({
-    queryKey: ['holdings'],
+    queryKey: [QueryKeys.HOLDINGS],
     queryFn: computeHoldings,
   });
 
-  const { data: historyData } = useQuery<FinancialHistory[], Error>({
-    queryKey: ['portfolio_history'],
-    queryFn: getHistorical,
+  const { data: portfolioHistory } = useQuery<PortfolioHistory[], Error>({
+    queryKey: QueryKeys.accountHistory('TOTAL'),
+    queryFn: () => getAccountHistory('TOTAL'),
   });
 
-  const portfolio = historyData?.find((history) => history.account?.id === 'TOTAL');
-  const todayValue = portfolio?.history[portfolio?.history.length - 1];
+  const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const holdings = useMemo(() => {
     return aggregateHoldingsBySymbol(data || []);
@@ -50,13 +53,9 @@ export const HoldingsPage = () => {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
-            <TabsTrigger value="dividends">Income</TabsTrigger>
           </TabsList>
           <TabsContent value="holdings" className="space-y-4">
             <HoldingsTable holdings={holdings || []} isLoading={isLoading} />
-          </TabsContent>
-          <TabsContent value="dividends" className="space-y-4">
-            <IncomeDashboard />
           </TabsContent>
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-3">
@@ -65,7 +64,15 @@ export const HoldingsPage = () => {
                   <CardTitle className="text-md font-medium">By Class</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-scroll p-0">
-                  <ClassesChart assets={holdings || []} cash={todayValue?.availableCash || 0} />
+                  {holdings && holdings.length > 0 ? (
+                    <ClassesChart assets={holdings} cash={todayValue?.availableCash || 0} />
+                  ) : (
+                    <EmptyPlaceholder
+                      icon={<Icons.PieChart className="h-10 w-10" />}
+                      title="No class data"
+                      description="There is no class data available for your holdings."
+                    />
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -73,11 +80,19 @@ export const HoldingsPage = () => {
                   <CardTitle className="text-md font-medium">By Currency</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <HoldingCurrencyChart
-                    assets={holdings || []}
-                    cash={todayValue?.availableCash || 0}
-                    baseCurrency={settings?.baseCurrency || 'USD'}
-                  />
+                  {holdings && holdings.length > 0 ? (
+                    <HoldingCurrencyChart
+                      assets={holdings}
+                      cash={todayValue?.availableCash || 0}
+                      baseCurrency={settings?.baseCurrency || 'USD'}
+                    />
+                  ) : (
+                    <EmptyPlaceholder
+                      icon={<Icons.DollarSign className="h-10 w-10" />}
+                      title="No currency data"
+                      description="There is no currency data available for your holdings."
+                    />
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -85,7 +100,15 @@ export const HoldingsPage = () => {
                   <CardTitle className="text-md font-medium">By Sector</CardTitle>
                 </CardHeader>
                 <CardContent className="w-full">
-                  <SectorsChart assets={holdings || []} />
+                  {holdings && holdings.length > 0 ? (
+                    <SectorsChart assets={holdings} />
+                  ) : (
+                    <EmptyPlaceholder
+                      icon={<Icons.PieChart className="h-10 w-10" />}
+                      title="No sector data"
+                      description="There is no sector data available for your holdings."
+                    />
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -94,7 +117,15 @@ export const HoldingsPage = () => {
                 <CardTitle className="text-md font-medium">Holding</CardTitle>
               </CardHeader>
               <CardContent className="pl-2">
-                <PortfolioComposition assets={holdings || []} />
+                {holdings && holdings.length > 0 ? (
+                  <PortfolioComposition assets={holdings} />
+                ) : (
+                  <EmptyPlaceholder
+                    icon={<Icons.BarChart className="h-10 w-10" />}
+                    title="No holdings data"
+                    description="There is no holdings data available for your portfolio."
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>

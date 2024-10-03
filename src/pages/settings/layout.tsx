@@ -16,6 +16,10 @@ const sidebarNavItems = [
     href: 'goals',
   },
   {
+    title: 'Exchange Rates',
+    href: 'exchange-rates',
+  },
+  {
     title: 'Appearance',
     href: 'appearance',
   },

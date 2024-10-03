@@ -7,16 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import type { Account } from '@/lib/types';
 import { SettingsHeader } from '../header';
-import { deleteAccount, getAccounts } from '@/commands/account';
+import { getAccounts } from '@/commands/account';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/components/ui/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { QueryKeys } from '@/lib/query-keys';
+import { useAccountMutations } from './components/useAccountMutations';
 
 const SettingsAccountsPage = () => {
-  const queryClient = useQueryClient();
-
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
@@ -28,26 +27,7 @@ const SettingsAccountsPage = () => {
     setVisibleModal(true);
   };
 
-  const deleteAccountMutation = useMutation({
-    mutationFn: deleteAccount,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      toast({
-        title: 'Account deleted successfully.',
-        className: 'bg-green-500 text-white border-none',
-      });
-    },
-    onError: () => {
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description:
-          'There was a problem deleting this account. Please check if there is any data related to this account.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
+  const { deleteAccountMutation } = useAccountMutations({});
 
   const handleEditAccount = (account: Account) => {
     setSelectedAccount(account);
@@ -77,7 +57,7 @@ const SettingsAccountsPage = () => {
           </Button>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8 ">
+        <div className="mx-auto w-full pt-8">
           {accounts?.length ? (
             <div className="divide-y divide-border rounded-md border">
               {accounts.map((account: Account) => (

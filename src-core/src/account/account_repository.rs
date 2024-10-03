@@ -26,6 +26,16 @@ impl AccountRepository {
         accounts.order(is_active.desc()).load::<Account>(conn)
     }
 
+    pub fn load_active_accounts(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        accounts
+            .filter(is_active.eq(true))
+            .order(name.asc())
+            .load::<Account>(conn)
+    }
+
     pub fn insert_new_account(
         &self,
         conn: &mut SqliteConnection,
@@ -66,5 +76,17 @@ impl AccountRepository {
         use crate::schema::accounts::dsl::*;
 
         diesel::delete(accounts.filter(id.eq(account_id))).execute(conn)
+    }
+
+    pub fn load_accounts_by_ids(
+        &self,
+        conn: &mut SqliteConnection,
+        account_ids: &[String],
+    ) -> Result<Vec<Account>, diesel::result::Error> {
+        accounts
+            .filter(id.eq_any(account_ids))
+            .filter(is_active.eq(true))
+            .order(created_at.desc())
+            .load::<Account>(conn)
     }
 }

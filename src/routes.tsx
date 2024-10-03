@@ -15,6 +15,8 @@ import useGlobalEventListener from './useGlobalEventListener';
 import GeneralSettingsPage from './pages/settings/general/general-page';
 import OnboardingPage from './pages/onboarding/onboarding-page';
 import SettingsGoalsPage from './pages/settings/goals/goals-page';
+import ExchangeRatesPage from './pages/settings/currencies/exchange-rates-page';
+import IncomePage from '@/pages/income/income-page';
 import ExportPage from './pages/settings/exports/exports-page';
 
 export function AppRoutes() {
@@ -31,12 +33,14 @@ export function AppRoutes() {
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />;
           <Route path="onboarding" element={<OnboardingPage />} />;
+          <Route path="income" element={<IncomePage />} />
           <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
+            <Route path="exchange-rates" element={<ExchangeRatesPage />} />
             <Route path="exports" element={<ExportPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />

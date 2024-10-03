@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "Wealthfolio",
-    "version": "1.0.13"
+    "version": "1.0.16"
   },
   "tauri": {
     "allowlist": {
@@ -36,6 +36,7 @@
       "active": true,
       "targets": "all",
       "identifier": "com.teymz.wealthfolio",
+      "category": "Finance",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

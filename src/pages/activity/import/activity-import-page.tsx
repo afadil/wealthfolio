@@ -1,57 +1,23 @@
 import { AlertFeedback } from '@/components/alert-feedback';
 import { ApplicationHeader } from '@/components/header';
 import { Separator } from '@/components/ui/separator';
-import { toast } from '@/components/ui/use-toast';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ActivityImport } from '@/lib/types';
 import { ActivityImportForm } from './import-form';
 import ValidationAlert from './import-validation-alert';
-import ImportedActivitiesTable from './imported-activity-table';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createActivities } from '@/commands/activity';
-import { syncHistoryQuotes } from '@/commands/symbol';
 import { ImportHelpPopover } from './import-help';
+import ImportedActivitiesTable from './imported-activity-table';
+import { useActivityImportMutations } from './useActivityImportMutations';
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [activities, setActivities] = useState<ActivityImport[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [warning, setWarning] = useState<number>(0);
 
-  const syncQuotesMutation = useMutation({
-    mutationFn: syncHistoryQuotes,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-    },
-  });
-
-  const confirmImportMutation = useMutation({
-    mutationFn: createActivities,
-    onSuccess: () => {
-      setError(null);
-      setWarning(0);
-      queryClient.invalidateQueries({ queryKey: ['activity-data'] });
-      queryClient.invalidateQueries({ queryKey: ['portfolio_history'] });
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-      syncQuotesMutation.mutate();
-      toast({
-        title: 'Activities imported successfully',
-        className: 'bg-green-500 text-white border-none',
-      });
-      navigate('/activities');
-    },
-    onError: (error: any) => {
-      setError(error);
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'Please check your csv file and try again.',
-        className: 'bg-red-500 text-white border-none',
-      });
-    },
-  });
+  const { confirmImportMutation } = useActivityImportMutations();
 
   function cancelImport() {
     setActivities([]);
@@ -68,7 +34,6 @@ const ActivityImportPage = () => {
   }
 
   function confirmImport() {
-    //map activities to new activity
     const newActivities = activities.map((activity) => ({
       id: activity.id,
       accountId: activity.accountId || '',
@@ -83,7 +48,16 @@ const ActivityImportPage = () => {
       comment: activity.comment,
     }));
 
-    confirmImportMutation.mutate(newActivities);
+    confirmImportMutation.mutate(newActivities, {
+      onSuccess: () => {
+        setError(null);
+        setWarning(0);
+        navigate('/activities');
+      },
+      onError: (error: any) => {
+        setError(error);
+      },
+    });
   }
 
   return (
