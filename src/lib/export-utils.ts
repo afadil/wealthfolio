@@ -134,6 +134,7 @@ async function fetchAndConvertData(
 }
 
 function formatData(data: any, format: string): string {
+  if (!data || data.length === 0) return '';
   if (format === 'CSV') {
     return convertToCSV(data);
   } else if (format === 'JSON') {
