@@ -58,25 +58,35 @@ export function useExportData() {
         const sqliteFile = await generateSQLiteFile();
         downloadFileFromContent(sqliteFile, 'data.sqlite');
       } else {
+        let haveDownloaded = false;
         switch (disiredData) {
           case 'accounts': {
             const accountsData = await fetchAndConvertData(fetchAccounts, format);
-            await downloadFileFromContent(accountsData, 'accounts.' + format.toLowerCase());
+            haveDownloaded = await downloadFileFromContent(
+              accountsData,
+              'accounts.' + format.toLowerCase(),
+            );
             break;
           }
           case 'activities': {
             const activitiesData = await fetchAndConvertData(fetchActivities, format);
-            await downloadFileFromContent(activitiesData, 'activities.' + format.toLowerCase());
+            haveDownloaded = await downloadFileFromContent(
+              activitiesData,
+              'activities.' + format.toLowerCase(),
+            );
             break;
           }
           case 'goals': {
             const goalsData = await fetchAndConvertData(fetchGoals, format);
-            await downloadFileFromContent(goalsData, 'goals.' + format.toLowerCase());
+            haveDownloaded = await downloadFileFromContent(
+              goalsData,
+              'goals.' + format.toLowerCase(),
+            );
             break;
           }
           case 'portfolio-history': {
             const portfolioHistoryData = await fetchAndConvertData(fetchPortfolioHistory, format);
-            await downloadFileFromContent(
+            haveDownloaded = await downloadFileFromContent(
               portfolioHistoryData,
               'portfolio-history.' + format.toLowerCase(),
             );
@@ -92,11 +102,14 @@ export function useExportData() {
             zip.file('activities.' + format.toLowerCase(), activities);
             zip.file('goals.' + format.toLowerCase(), goals);
             zip.file('portfolio-history.' + format.toLowerCase(), portfolioHistory);
-            await downloadFileFromContent(await zip.generateAsync({ type: 'blob' }), 'data.zip');
+            haveDownloaded = await downloadFileFromContent(
+              await zip.generateAsync({ type: 'blob' }),
+              'data.zip',
+            );
             break;
           }
         }
-        onSuccess();
+        haveDownloaded && onSuccess();
       }
     } catch (error) {
       console.log('Error while exporting', error);
@@ -154,7 +167,7 @@ export async function downloadFileFromContent(fileContent: string | Blob, fileNa
   });
 
   if (filePath === null) {
-    return;
+    return false;
   }
 
   let contentTosave: string | Uint8Array;
@@ -169,4 +182,6 @@ export async function downloadFileFromContent(fileContent: string | Blob, fileNa
     { path: filePath, contents: contentTosave },
     { dir: BaseDirectory.Document },
   );
+
+  return true;
 }
