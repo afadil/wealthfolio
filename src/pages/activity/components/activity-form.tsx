@@ -45,6 +45,7 @@ const activityTypes = [
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
   { label: 'Split', value: 'SPLIT' },
+  { label: 'Holding', value: 'HOLDING' },
 ] as const;
 
 const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
@@ -270,6 +271,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
   const watchedType = watch('activityType');
 
   const isSplitType = watchedType === 'SPLIT';
+  const isHoldingType = watchedType === 'HOLDING';
 
   return (
     <>
@@ -308,6 +310,35 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
             </FormItem>
           )}
         />
+      ) : isHoldingType ? (
+        <div className="flex space-x-4">
+          <FormField
+            control={control}
+            name="quantity"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Shares</FormLabel>
+                <FormControl>
+                  <Input type="number" inputMode="decimal" placeholder="Shares" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="unitPrice"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Average Cost</FormLabel>
+                <FormControl>
+                  <CurrencyInput placeholder="Average Cost" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
       ) : (
         <div className="flex space-x-4">
           <FormField

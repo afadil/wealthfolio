@@ -126,6 +126,11 @@ impl HoldingsService {
                         ));
                     }
                 }
+                "HOLDING" => {
+                    // For HOLDING activity, we set the quantity and book value directly
+                    holding.quantity = quantity.clone();
+                    holding.book_value = (&quantity * &unit_price).round(6);
+                }
                 _ => println!("Unhandled activity type: {}", activity.activity_type),
             }
         }
