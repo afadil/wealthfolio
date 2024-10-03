@@ -16,7 +16,7 @@ use commands::goal::{
 use commands::market_data::{get_asset_data, search_symbol, synch_quotes};
 use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
-    get_income_summary, recalculate_portfolio,
+    get_income_summary, recalculate_portfolio, get_accounts_history,
 };
 use commands::settings::{
     add_exchange_rate, delete_exchange_rate, get_exchange_rates, get_settings,
@@ -127,6 +127,7 @@ fn main() {
             get_account_history,
             get_accounts_summary,
             recalculate_portfolio,
+            get_accounts_history,
         ])
         .build(context)
         .expect("error while running wealthfolio application");

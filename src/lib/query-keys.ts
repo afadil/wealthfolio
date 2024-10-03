@@ -3,6 +3,7 @@ export const QueryKeys = {
   ACCOUNTS: 'accounts',
   ACCOUNTS_SUMMARY: 'accounts_summary',
   ACCOUNTS_HISTORY: 'accounts_history',
+  ALL_ACCOUNTS_HISTORY: 'all_accounts_history',
 
   // Activity related keys
   ACTIVITY_DATA: 'activity-data',
