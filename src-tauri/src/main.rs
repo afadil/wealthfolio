@@ -16,8 +16,8 @@ use commands::goal::{
 
 use commands::market_data::{get_asset_data, search_symbol, synch_quotes, update_asset_profile};
 use commands::portfolio::{
-    calculate_historical_data, compute_holdings, get_account_history, get_accounts_history,
-    get_accounts_summary, get_income_summary, recalculate_portfolio,
+    calculate_historical_data, compute_holdings, get_accounts_summary, get_income_summary,
+    get_portfolio_history, recalculate_portfolio,
 };
 use commands::settings::{
     add_exchange_rate, delete_exchange_rate, get_exchange_rates, get_settings,
@@ -129,7 +129,7 @@ fn main() {
             update_goal_allocations,
             load_goals_allocations,
             get_income_summary,
-            get_account_history,
+            get_portfolio_history,
             get_accounts_summary,
             recalculate_portfolio,
             backup_database,

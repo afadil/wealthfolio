@@ -45,24 +45,29 @@ impl HistoryService {
         conn: &mut SqliteConnection,
     ) -> Result<Vec<PortfolioHistory>> {
         use crate::schema::portfolio_history::dsl::*;
-    
+
         let result = portfolio_history
             // .filter(account_id.ne("TOTAL"))
             .load::<PortfolioHistory>(conn)
             .map_err(PortfolioError::from)?; // Convert diesel::result::Error to PortfolioError
-    
+
         Ok(result)
     }
 
-    pub fn get_account_history(
+    pub fn get_portfolio_history(
         &self,
         conn: &mut SqliteConnection,
-        input_account_id: &str,
+        input_account_id: Option<&str>,
     ) -> Result<Vec<PortfolioHistory>> {
         use crate::schema::portfolio_history::dsl::*;
 
-        portfolio_history
-            .filter(account_id.eq(input_account_id))
+        let mut query = portfolio_history.into_boxed();
+
+        if let Some(other_id) = input_account_id {
+            query = query.filter(account_id.eq(other_id));
+        }
+
+        query
             .order(date.asc())
             .load::<PortfolioHistory>(conn)
             .map_err(PortfolioError::from)

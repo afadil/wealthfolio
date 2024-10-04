@@ -26,4 +26,5 @@ export {
   listenQuotesSyncStartTauri,
   listenQuotesSyncCompleteTauri,
   listenQuotesSyncErrorTauri,
+  openFileSaveDialogTauri,
 } from './tauri';

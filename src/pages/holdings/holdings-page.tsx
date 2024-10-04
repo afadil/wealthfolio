@@ -17,7 +17,7 @@ import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { QueryKeys } from '@/lib/query-keys';
 import { PortfolioHistory } from '@/lib/types';
-import { getAccountHistory } from '@/commands/portfolio';
+import { getHistory } from '@/commands/portfolio';
 import { useLocation } from 'react-router-dom';
 
 export const HoldingsPage = () => {
@@ -33,7 +33,7 @@ export const HoldingsPage = () => {
 
   const { data: portfolioHistory } = useQuery<PortfolioHistory[], Error>({
     queryKey: QueryKeys.accountHistory('TOTAL'),
-    queryFn: () => getAccountHistory('TOTAL'),
+    queryFn: () => getHistory('TOTAL'),
   });
 
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
