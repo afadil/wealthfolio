@@ -52,7 +52,8 @@ const dataTypes = {
       key: 'portfolio-history',
       name: 'Portfolio History',
       icon: Icons.ScrollText,
-      description: 'Financial objectives and progress tracking',
+      description:
+        "Your portfolio's performance over time, including valuations, gains, and cash flow activities.",
     },
   ],
   JSON: [
@@ -78,7 +79,8 @@ const dataTypes = {
       key: 'portfolio-history',
       name: 'Portfolio History',
       icon: Icons.ScrollText,
-      description: 'Financial objectives and progress tracking',
+      description:
+        "Your portfolio's performance over time, including valuations, gains, and cash flow activities.",
     },
   ],
   SQLite: [
