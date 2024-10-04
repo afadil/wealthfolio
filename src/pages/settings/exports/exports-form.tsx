@@ -24,7 +24,7 @@ const dataFormats = [
     name: 'SQLite',
     icon: Database,
     description: 'Compact, self-contained database file',
-    commingSoon: true,
+    comingSoon: true,
   },
 ];
 
@@ -137,7 +137,7 @@ export const ExportForm = () => {
                 value={format.name}
                 id={format.name}
                 className="peer sr-only"
-                disabled={!!format.commingSoon}
+                disabled={!!format.comingSoon}
               />
               <Label
                 htmlFor={format.name}
@@ -145,7 +145,7 @@ export const ExportForm = () => {
                   format.name === 'SQLite' ? 'cursor-not-allowed opacity-50' : ''
                 }`}
               >
-                {!!format.commingSoon && (
+                {!!format.comingSoon && (
                   <div className="absolute right-0 top-0 rotate-12 transform rounded-bl-md rounded-tr-md bg-gradient-to-r from-purple-500 to-pink-500 px-2 py-1 text-xs font-bold text-white shadow-md">
                     Coming Soon
                   </div>
