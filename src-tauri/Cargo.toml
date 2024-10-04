@@ -17,6 +17,7 @@ wealthfolio_core = { path = "../src-core" }
 tauri = { version = "1.7.2", features = [ "updater", "dialog-save","dialog-open", "fs-all", "path-all", "window-start-dragging", "shell-open"] }
 diesel = { version = "2.2.4", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15.7"
+chrono = { version = "0.4.38", features = ["serde"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
