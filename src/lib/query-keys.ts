@@ -2,15 +2,13 @@ export const QueryKeys = {
   // Account related keys
   ACCOUNTS: 'accounts',
   ACCOUNTS_SUMMARY: 'accounts_summary',
-  ACCOUNTS_HISTORY: 'accounts_history',
-  ALL_ACCOUNTS_HISTORY: 'all_accounts_history',
 
   // Activity related keys
   ACTIVITY_DATA: 'activity-data',
   ACTIVITIES: 'activities',
 
   // Portfolio related keys
-  PORTFOLIO_HISTORY: 'portfolio_history',
+  HISTORY: 'history',
   HOLDINGS: 'holdings',
   INCOME_SUMMARY: 'incomeSummary',
 
@@ -27,5 +25,5 @@ export const QueryKeys = {
   QUOTE: 'quote',
 
   // Helper function to create account-specific keys
-  accountHistory: (id: string) => ['account_history', id],
+  accountHistory: (id: string) => ['history', id],
 } as const;

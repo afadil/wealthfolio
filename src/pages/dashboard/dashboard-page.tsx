@@ -4,7 +4,7 @@ import { HistoryChart } from '@/components/history-chart';
 import Balance from './balance';
 import { useQuery } from '@tanstack/react-query';
 import { PortfolioHistory, AccountSummary } from '@/lib/types';
-import { getAccountHistory, getAccountsSummary } from '@/commands/portfolio';
+import { getHistory, getAccountsSummary } from '@/commands/portfolio';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accounts } from './accounts';
 import SavingGoals from './goals';
@@ -48,7 +48,7 @@ export default function DashboardPage() {
     Error
   >({
     queryKey: QueryKeys.accountHistory('TOTAL'),
-    queryFn: () => getAccountHistory('TOTAL'),
+    queryFn: () => getHistory('TOTAL'),
   });
 
   if (isPortfolioHistoryLoading || isAccountsLoading) {

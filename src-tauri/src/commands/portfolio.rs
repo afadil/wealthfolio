@@ -42,28 +42,15 @@ pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>
 }
 
 #[tauri::command]
-pub async fn get_accounts_history(
+pub async fn get_portfolio_history(
     state: State<'_, AppState>,
+    account_id: Option<&str>,
 ) -> Result<Vec<PortfolioHistory>, String> {
     let service = create_portfolio_service(&state).await?;
     let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .get_all_accounts_history(&mut conn)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn get_account_history(
-    state: State<'_, AppState>,
-    account_id: String,
-) -> Result<Vec<PortfolioHistory>, String> {
-    println!("Fetching account history for account ID: {}", account_id);
-    let service = create_portfolio_service(&state).await?;
-    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
-
-    service
-        .get_account_history(&mut conn, &account_id)
+        .get_portfolio_history(&mut conn, account_id)
         .map_err(|e| format!("Failed to fetch account history: {}", e))
 }
 
