@@ -100,7 +100,6 @@ impl PortfolioService {
             .await?;
 
         // Then, calculate historical data
-        println!("calculate_historical_data");
         let result = self.calculate_historical_data(conn, None, false).await;
 
         let duration = start.elapsed();

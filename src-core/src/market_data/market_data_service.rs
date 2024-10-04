@@ -85,7 +85,9 @@ impl MarketDataService {
                 .await
             {
                 Ok(quotes) => all_quotes_to_insert.extend(quotes),
-                Err(e) => eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e),
+                Err(e) => {
+                    eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e);
+                }
             }
         }
 

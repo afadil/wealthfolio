@@ -7,7 +7,6 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use reqwest::{header, Client};
 use serde_json::json;
-use thiserror::Error;
 use yahoo::{YQuoteItem, YahooError};
 use yahoo_finance_api as yahoo;
 
@@ -22,11 +21,6 @@ impl From<&YQuoteItem> for QuoteSummary {
             score: item.score,
             type_display: item.type_display.clone(),
             long_name: item.long_name.clone(),
-            // sector: item.sector.clone(),
-            // industry: item.industry.clone(),
-            // data_source: item.data_source.clone(),
-            // exchange_display: item.exchange_display.clone(),
-            // data_source: "YAHOO".to_string(),
         }
     }
 }
@@ -45,14 +39,6 @@ impl From<&YQuoteItem> for NewAsset {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum MyError {
-    #[error("Network request failed")]
-    Network(#[from] reqwest::Error),
-    #[error("Regex error occurred")]
-    Regex(#[from] regex::Error),
-}
-
 lazy_static! {
     pub static ref YAHOO_CRUMB: RwLock<Option<CrumbData>> = RwLock::default();
 }
@@ -69,12 +55,120 @@ impl YahooProvider {
         Ok(yahoo_provider)
     }
 
+    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, yahoo::YahooError> {
+        let result = self.provider.search_ticker(query).await?;
+
+        let asset_profiles = result.quotes.iter().map(QuoteSummary::from).collect();
+
+        Ok(asset_profiles)
+    }
+
+    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+        // Handle the cash asset case
+        if let Some(currency) = symbol.strip_prefix("$CASH-") {
+            return Ok(self.build_cash_asset(symbol, currency));
+        }
+        match self.get_symbol_full_profile(symbol).await {
+            Ok(asset) => Ok(asset),
+            Err(_) => {
+                // If full profile fails, try to get short profile
+                match self.get_symbol_short_profile(symbol).await? {
+                    Some(asset) => Ok(asset),
+                    None => Err(yahoo::YahooError::EmptyDataSet),
+                }
+            }
+        }
+    }
+
     pub async fn get_latest_quote(&self, symbol: &str) -> Result<ModelQuote, yahoo::YahooError> {
-        let response = self.provider.get_latest_quotes(symbol, "1d").await?;
-        let yahoo_quote = response
-            .last_quote()
-            .map_err(|_| yahoo::YahooError::EmptyDataSet)?;
-        Ok(self.yahoo_quote_to_model_quote(symbol.to_string(), yahoo_quote))
+        match self.provider.get_latest_quotes(symbol, "1d").await {
+            Ok(response) => {
+                let yahoo_quote = response
+                    .last_quote()
+                    .map_err(|_| yahoo::YahooError::EmptyDataSet)?;
+                let model_quote = self.yahoo_quote_to_model_quote(symbol.to_string(), yahoo_quote);
+                Ok(model_quote)
+            }
+            Err(_) => {
+                // If the primary method fails, try the backup method
+                self.get_latest_quote_backup(symbol).await
+            }
+        }
+    }
+
+    /// Fetch historic quotes between start and end date
+    pub async fn get_stock_history(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
+        if symbol.starts_with("$CASH-") {
+            return Ok(vec![]);
+        }
+
+        let start_offset = start.into();
+        let end_offset = end.into();
+
+        let response = self
+            .provider
+            .get_quote_history(symbol, start_offset, end_offset)
+            .await?;
+
+        let quotes = response
+            .quotes()?
+            .into_iter()
+            .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
+            .collect();
+
+        Ok(quotes)
+    }
+
+    async fn get_latest_quote_backup(&self, symbol: &str) -> Result<ModelQuote, yahoo::YahooError> {
+        let asset_profile = self.fetch_asset_profile(symbol).await?;
+
+        let price = asset_profile
+            .quote_summary
+            .result
+            .first()
+            .and_then(|result| result.price.as_ref())
+            .ok_or(yahoo::YahooError::EmptyDataSet)?;
+
+        let regular_market_price = price
+            .regular_market_price
+            .as_ref()
+            .ok_or(yahoo::YahooError::EmptyDataSet)?;
+        let date = chrono::Utc::now().naive_utc();
+
+        Ok(ModelQuote {
+            id: format!("{}_{}", date.format("%Y%m%d"), symbol),
+            created_at: date,
+            data_source: "YAHOO".to_string(),
+            date,
+            symbol: symbol.to_string(),
+            open: price
+                .regular_market_open
+                .as_ref()
+                .and_then(|p| p.raw)
+                .unwrap_or(0.0),
+            high: price
+                .regular_market_day_high
+                .as_ref()
+                .and_then(|p| p.raw)
+                .unwrap_or(0.0),
+            low: price
+                .regular_market_day_low
+                .as_ref()
+                .and_then(|p| p.raw)
+                .unwrap_or(0.0),
+            volume: price
+                .regular_market_volume
+                .as_ref()
+                .and_then(|p| p.raw)
+                .unwrap_or(0.0),
+            close: regular_market_price.raw.unwrap_or(0.0),
+            adjclose: regular_market_price.raw.unwrap_or(0.0),
+        })
     }
 
     fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
@@ -95,6 +189,39 @@ impl YahooProvider {
             close: yahoo_quote.close,
             adjclose: yahoo_quote.adjclose,
         }
+    }
+
+    async fn get_symbol_short_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<Option<NewAsset>, yahoo::YahooError> {
+        let search_results = self.search_ticker(symbol).await?;
+
+        for result in search_results {
+            if result.symbol == symbol {
+                println!("Found symbol: {:?}", result);
+                return Ok(Some(NewAsset {
+                    id: result.symbol.clone(),
+                    isin: None,
+                    name: Some(self.format_name(
+                        Some(&result.long_name),
+                        &result.quote_type,
+                        Some(&result.short_name),
+                        &result.symbol,
+                    )),
+                    asset_type: Some(result.quote_type.clone()),
+                    asset_class: Some(result.quote_type),
+                    asset_sub_class: Some(result.type_display),
+                    symbol: result.symbol.clone(),
+                    symbol_mapping: Some(result.symbol),
+                    data_source: "YAHOO".to_string(),
+                    // exchange: Some(result.exchange),
+                    ..Default::default()
+                }));
+            }
+        }
+
+        Ok(None)
     }
 
     async fn set_crumb(&self) -> Result<(), yahoo::YahooError> {
@@ -141,26 +268,8 @@ impl YahooProvider {
         Ok(())
     }
 
-    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, yahoo::YahooError> {
-        // Call the search_ticker method on the provider instance and await the result
-        let result = self.provider.search_ticker(query).await?;
-
-        // Map the result to Vec<QuoteSummary>
-        let asset_profiles = result
-            .quotes
-            .iter()
-            .map(QuoteSummary::from) // No need to dereference or clone
-            .collect();
-
-        Ok(asset_profiles)
-    }
-
-    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+    async fn get_symbol_full_profile(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
         self.set_crumb().await?;
-        // Handle the cash asset case
-        if let Some(currency) = symbol.strip_prefix("$CASH-") {
-            return Ok(self.create_cash_asset(symbol, currency));
-        }
 
         let response = self.fetch_asset_profile(symbol).await?;
 
@@ -260,7 +369,7 @@ impl YahooProvider {
         Ok(new_asset)
     }
 
-    fn create_cash_asset(&self, symbol: &str, currency: &str) -> NewAsset {
+    fn build_cash_asset(&self, symbol: &str, currency: &str) -> NewAsset {
         NewAsset {
             id: symbol.to_string(),
             isin: None,
@@ -282,39 +391,7 @@ impl YahooProvider {
         }
     }
 
-    /// Fetch historic quotes between start and end date
-    pub async fn get_stock_history(
-        &self,
-        symbol: &str,
-        start: SystemTime,
-        end: SystemTime,
-    ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
-        if symbol.starts_with("$CASH-") {
-            return Ok(vec![]);
-        }
-
-        let start_offset = start.into();
-        let end_offset = end.into();
-
-        let response = self
-            .provider
-            .get_quote_history(symbol, start_offset, end_offset)
-            .await?;
-
-        // Use the new method to convert quotes
-        let quotes = response
-            .quotes()?
-            .into_iter()
-            .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
-            .collect();
-
-        Ok(quotes)
-    }
-
-    pub async fn fetch_asset_profile(
-        &self,
-        symbol: &str,
-    ) -> Result<YahooResult, yahoo::YahooError> {
+    async fn fetch_asset_profile(&self, symbol: &str) -> Result<YahooResult, yahoo::YahooError> {
         let crumb_data = {
             let guard = YAHOO_CRUMB.read().unwrap();
             guard
