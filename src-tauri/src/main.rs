@@ -3,10 +3,11 @@
 
 mod commands;
 
+use chrono::Local;
 use commands::account::{create_account, delete_account, get_accounts, update_account};
 use commands::activity::{
-    check_activities_import, create_activities, create_activity, delete_activity,
-    search_activities, update_activity, get_activities,
+    check_activities_import, create_activities, create_activity, delete_activity, get_activities,
+    search_activities, update_activity,
 };
 use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
@@ -15,8 +16,8 @@ use commands::goal::{
 
 use commands::market_data::{get_asset_data, search_symbol, synch_quotes, update_asset_profile};
 use commands::portfolio::{
-    calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
-    get_income_summary, recalculate_portfolio, get_accounts_history,
+    calculate_historical_data, compute_holdings, get_account_history, get_accounts_history,
+    get_accounts_summary, get_income_summary, recalculate_portfolio,
 };
 use commands::settings::{
     add_exchange_rate, delete_exchange_rate, get_exchange_rates, get_settings,
@@ -38,6 +39,8 @@ use wealthfolio_core::settings;
 
 use dotenvy::dotenv;
 use std::env;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
@@ -129,7 +132,7 @@ fn main() {
             get_account_history,
             get_accounts_summary,
             recalculate_portfolio,
-            get_accounts_history,
+            backup_database,
         ])
         .build(context)
         .expect("error while running wealthfolio application");
@@ -219,4 +222,45 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
                 .to_string()
         }
     }
+}
+
+#[tauri::command]
+async fn backup_database(app_handle: tauri::AppHandle) -> Result<(String, Vec<u8>), String> {
+    let db_path = get_db_path(&app_handle);
+    let backup_path = create_backup_path(&app_handle)?;
+
+    fs::copy(&db_path, &backup_path).map_err(|e| format!("Failed to create backup: {}", e))?;
+
+    // Read the backup file
+    let mut file =
+        File::open(&backup_path).map_err(|e| format!("Failed to open backup file: {}", e))?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)
+        .map_err(|e| format!("Failed to read backup file: {}", e))?;
+
+    // Get the filename
+    let filename = Path::new(&backup_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "Failed to get backup filename".to_string())?
+        .to_string();
+
+    Ok((filename, buffer))
+}
+
+fn create_backup_path(app_handle: &tauri::AppHandle) -> Result<String, String> {
+    let app_data_dir = app_handle
+        .path_resolver()
+        .app_data_dir()
+        .ok_or_else(|| "Failed to get app data directory".to_string())?;
+
+    let backup_dir = app_data_dir.join("backups");
+    fs::create_dir_all(&backup_dir)
+        .map_err(|e| format!("Failed to create backup directory: {}", e))?;
+
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let backup_file = format!("wealthfolio_backup_{}.db", timestamp);
+    let backup_path = backup_dir.join(backup_file);
+
+    Ok(backup_path.to_str().unwrap().to_string())
 }
