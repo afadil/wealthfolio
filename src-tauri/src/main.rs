@@ -6,7 +6,7 @@ mod commands;
 use commands::account::{create_account, delete_account, get_accounts, update_account};
 use commands::activity::{
     check_activities_import, create_activities, create_activity, delete_activity,
-    search_activities, update_activity,
+    search_activities, update_activity, get_activities,
 };
 use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
@@ -16,7 +16,7 @@ use commands::goal::{
 use commands::market_data::{get_asset_data, search_symbol, synch_quotes};
 use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_account_history, get_accounts_summary,
-    get_income_summary, recalculate_portfolio,
+    get_income_summary, recalculate_portfolio, get_accounts_history,
 };
 use commands::settings::{
     add_exchange_rate, delete_exchange_rate, get_exchange_rates, get_settings,
@@ -101,6 +101,7 @@ fn main() {
             update_account,
             delete_account,
             search_activities,
+            get_activities,
             create_activity,
             update_activity,
             delete_activity,
@@ -127,6 +128,7 @@ fn main() {
             get_account_history,
             get_accounts_summary,
             recalculate_portfolio,
+            get_accounts_history,
         ])
         .build(context)
         .expect("error while running wealthfolio application");
