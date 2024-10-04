@@ -20,11 +20,12 @@ const dataFormats = [
     icon: FileJson,
     description: 'Structured data for easy programmatic access',
   },
-  // {
-  //   name: 'SQLite',
-  //   icon: Database,
-  //   description: 'Compact, self-contained database file',
-  // },
+  {
+    name: 'SQLite',
+    icon: Database,
+    description: 'Compact, self-contained database file',
+    commingSoon: true,
+  },
 ];
 
 const dataTypes = {
@@ -132,11 +133,23 @@ export const ExportForm = () => {
         >
           {dataFormats.map((format) => (
             <div key={format.name}>
-              <RadioGroupItem value={format.name} id={format.name} className="peer sr-only" />
+              <RadioGroupItem
+                value={format.name}
+                id={format.name}
+                className="peer sr-only"
+                disabled={!!format.commingSoon}
+              />
               <Label
                 htmlFor={format.name}
-                className="flex cursor-pointer flex-col items-center justify-between rounded-md border bg-card p-4 shadow-sm hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-2 peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                className={`relative flex cursor-pointer flex-col items-center justify-between rounded-md border bg-card p-4 shadow-sm hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-2 peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary ${
+                  format.name === 'SQLite' ? 'cursor-not-allowed opacity-50' : ''
+                }`}
               >
+                {!!format.commingSoon && (
+                  <div className="absolute right-0 top-0 rotate-12 transform rounded-bl-md rounded-tr-md bg-gradient-to-r from-purple-500 to-pink-500 px-2 py-1 text-xs font-bold text-white shadow-md">
+                    Coming Soon
+                  </div>
+                )}
                 <format.icon className="mb-3 h-6 w-6" />
                 <div className="text-center">
                   <h3 className="font-semibold">{format.name}</h3>
