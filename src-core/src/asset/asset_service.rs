@@ -62,8 +62,6 @@ impl AssetService {
             .filter(assets::id.eq(asset_id))
             .first::<Asset>(conn)?;
 
-        println!("Found asset: {:?}", asset);
-
         let quote_history = quotes::table
             .filter(quotes::symbol.eq(&asset.symbol))
             .order(quotes::date.desc())
