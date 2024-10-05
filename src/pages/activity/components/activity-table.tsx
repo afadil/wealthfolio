@@ -33,10 +33,10 @@ const fetchSize = 25;
 
 const activityTypeOptions = [
   { label: 'Buy', value: 'BUY' },
-  { label: 'Deposit', value: 'DEPOSIT' },
-  { label: 'Dividend', value: 'DIVIDEND' },
   { label: 'Sell', value: 'SELL' },
+  { label: 'Deposit', value: 'DEPOSIT' },
   { label: 'Withdrawal', value: 'WITHDRAWAL' },
+  { label: 'Dividend', value: 'DIVIDEND' },
   { label: 'Transfer In', value: 'TRANSFER_IN' },
   { label: 'Transfer Out', value: 'TRANSFER_OUT' },
   { label: 'Conversion In', value: 'CONVERSION_IN' },

@@ -59,7 +59,10 @@ export const HoldingsPage = () => {
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
           </TabsList>
           <TabsContent value="holdings" className="space-y-4">
-            <HoldingsTable holdings={holdings || []} isLoading={isLoading} />
+            <HoldingsTable
+              holdings={(holdings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}
+              isLoading={isLoading}
+            />
           </TabsContent>
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-3">

@@ -45,7 +45,8 @@ const activityTypes = [
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
   { label: 'Split', value: 'SPLIT' },
-  { label: 'Holding', value: 'HOLDING' },
+  { label: 'Transfer In', value: 'TRANSFER_IN' },
+  { label: 'Transfer Out', value: 'TRANSFER_OUT' },
 ] as const;
 
 const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
@@ -214,6 +215,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     </Form>
   );
 }
+
 interface CashActivityFieldsProps {
   currentAccountCurrency: string;
 }
@@ -266,12 +268,17 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
   );
 };
 
+interface AssetActivityFieldsProps {
+  defaultAssetId?: string;
+}
+
 const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
   const { control, watch } = useFormContext();
   const watchedType = watch('activityType');
 
   const isSplitType = watchedType === 'SPLIT';
-  const isHoldingType = watchedType === 'HOLDING';
+  const isTransferType = watchedType === 'TRANSFER_IN' || watchedType === 'TRANSFER_OUT';
+  const isTransferOut = watchedType === 'TRANSFER_OUT';
 
   return (
     <>
@@ -310,7 +317,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
             </FormItem>
           )}
         />
-      ) : isHoldingType ? (
+      ) : isTransferType ? (
         <div className="flex space-x-4">
           <FormField
             control={control}
@@ -325,19 +332,21 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               </FormItem>
             )}
           />
-          <FormField
-            control={control}
-            name="unitPrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Average Cost</FormLabel>
-                <FormControl>
-                  <CurrencyInput placeholder="Average Cost" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {!isTransferOut && (
+            <FormField
+              control={control}
+              name="unitPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Average Cost</FormLabel>
+                  <FormControl>
+                    <CurrencyInput placeholder="Average Cost" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
       ) : (
         <div className="flex space-x-4">
@@ -386,6 +395,10 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
   );
 };
 
+interface DividendActivityFieldsProps {
+  defaultAssetId?: string;
+}
+
 const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps) => {
   const { control } = useFormContext();
 
@@ -423,10 +436,3 @@ const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps)
     </>
   );
 };
-
-interface AssetActivityFieldsProps {
-  defaultAssetId?: string;
-}
-interface DividendActivityFieldsProps {
-  defaultAssetId?: string;
-}

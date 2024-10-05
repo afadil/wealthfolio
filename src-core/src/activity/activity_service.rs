@@ -11,6 +11,7 @@ use crate::schema::activities;
 
 use csv::ReaderBuilder;
 use diesel::prelude::*;
+use diesel::sql_types::{Double, Text};
 
 use uuid::Uuid;
 
@@ -89,13 +90,23 @@ impl ActivityService {
             if !asset_profile.currency.is_empty() {
                 activity.currency = asset_profile.currency.clone();
             }
-            // Adjust unit price based on activity type
-            if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
-                .contains(&activity.activity_type.as_str())
-            {
-                activity.quantity = 1.0;
+
+            // Handle different activity types
+            match activity.activity_type.as_str() {
+                "TRANSFER_OUT" => {
+                    // Calculate the current average cost for the asset in this account
+                    let current_avg_cost = self.calculate_average_cost(
+                        conn,
+                        &activity.account_id,
+                        &activity.asset_id,
+                    )?;
+                    activity.unit_price = current_avg_cost;
+                }
+                "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "DIVIDEND" => {
+                    activity.quantity = 1.0;
+                }
+                _ => {}
             }
-            // For HOLDING type, we don't need to adjust anything as quantity and unit_price are provided
 
             // Create exchange rate if asset currency is different from account currency
             if activity.currency != account.currency {
@@ -133,13 +144,23 @@ impl ActivityService {
             if !asset_profile.currency.is_empty() {
                 activity.currency = asset_profile.currency.clone();
             }
-            // Adjust unit price based on activity type
-            if ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "DIVIDEND"]
-                .contains(&activity.activity_type.as_str())
-            {
-                activity.quantity = 1.0;
+
+            // Handle different activity types
+            match activity.activity_type.as_str() {
+                "TRANSFER_OUT" => {
+                    // Calculate the current average cost for the asset in this account
+                    let current_avg_cost = self.calculate_average_cost(
+                        conn,
+                        &activity.account_id,
+                        &activity.asset_id,
+                    )?;
+                    activity.unit_price = current_avg_cost;
+                }
+                "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "DIVIDEND" => {
+                    activity.quantity = 1.0;
+                }
+                _ => {}
             }
-            // For HOLDING type, we don't need to adjust anything as quantity and unit_price are provided
 
             // Create exchange rate if asset currency is different from account currency
             if activity.currency != account.currency {
@@ -282,5 +303,46 @@ impl ActivityService {
         account_ids: &[String],
     ) -> Result<Vec<Activity>, diesel::result::Error> {
         self.repo.get_activities_by_account_ids(conn, account_ids)
+    }
+
+    fn calculate_average_cost(
+        &self,
+        conn: &mut SqliteConnection,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<f64, Box<dyn std::error::Error>> {
+        #[derive(QueryableByName, Debug)]
+        struct AverageCost {
+            #[sql_type = "Double"]
+            average_cost: f64,
+        }
+
+        let result: AverageCost = diesel::sql_query(
+            r#"
+            WITH running_totals AS (
+                SELECT
+                    quantity,
+                    unit_price,
+                    quantity AS quantity_change,
+                    quantity * unit_price AS value_change,
+                    SUM(quantity) OVER (ORDER BY activity_date, id) AS running_quantity,
+                    SUM(quantity * unit_price) OVER (ORDER BY activity_date, id) AS running_value
+                FROM activities
+                WHERE account_id = ?1 AND asset_id = ?2
+                  AND activity_type IN ('BUY', 'TRANSFER_IN')
+            )
+            SELECT
+                CASE
+                    WHEN SUM(quantity_change) > 0 THEN SUM(value_change) / SUM(quantity_change)
+                    ELSE 0
+                END AS average_cost
+            FROM running_totals
+            "#,
+        )
+        .bind::<Text, _>(account_id)
+        .bind::<Text, _>(asset_id)
+        .get_result(conn)?;
+
+        Ok(result.average_cost)
     }
 }
