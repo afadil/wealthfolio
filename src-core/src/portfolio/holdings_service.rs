@@ -123,11 +123,11 @@ impl HoldingsService {
         let old_book_value = holding.book_value.clone();
 
         match activity.activity_type.as_str() {
-            "BUY" => {
+            "BUY" | "TRANSFER_IN" => {
                 holding.quantity += &quantity;
                 holding.book_value += &quantity * &unit_price + &fee;
             }
-            "SELL" => {
+            "SELL" | "TRANSFER_OUT" => {
                 holding.quantity -= &quantity;
                 if old_quantity != BigDecimal::from(0) {
                     let sell_ratio = (&quantity / &old_quantity).round(6);
@@ -146,10 +146,6 @@ impl HoldingsService {
                         "Invalid split ratio".to_string(),
                     ));
                 }
-            }
-            "HOLDING" => {
-                holding.quantity = quantity.clone();
-                holding.book_value = &quantity * &unit_price;
             }
             _ => println!("Unhandled activity type: {}", activity.activity_type),
         }
