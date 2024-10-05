@@ -17,7 +17,7 @@ import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { QueryKeys } from '@/lib/query-keys';
 import { PortfolioHistory } from '@/lib/types';
-import { getAccountHistory } from '@/commands/portfolio';
+import { getHistory } from '@/commands/portfolio';
 import { useLocation } from 'react-router-dom';
 
 export const HoldingsPage = () => {
@@ -33,7 +33,7 @@ export const HoldingsPage = () => {
 
   const { data: portfolioHistory } = useQuery<PortfolioHistory[], Error>({
     queryKey: QueryKeys.accountHistory('TOTAL'),
-    queryFn: () => getAccountHistory('TOTAL'),
+    queryFn: () => getHistory('TOTAL'),
   });
 
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
@@ -59,7 +59,10 @@ export const HoldingsPage = () => {
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
           </TabsList>
           <TabsContent value="holdings" className="space-y-4">
-            <HoldingsTable holdings={holdings || []} isLoading={isLoading} />
+            <HoldingsTable
+              holdings={(holdings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}
+              isLoading={isLoading}
+            />
           </TabsContent>
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-3">

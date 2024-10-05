@@ -92,7 +92,6 @@ impl IncomeService {
                 return Err(e);
             }
         };
-        println!("Income computed since {}", oldest_date);
         let mut months_since_first_transaction: i32 =
             (current_date.year() - oldest_date.year()) * 12;
         months_since_first_transaction = months_since_first_transaction

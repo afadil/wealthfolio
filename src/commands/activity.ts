@@ -18,14 +18,14 @@ interface Sort {
 
 export const getActivities = async (): Promise<ActivityDetails[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('get_activities');
-      default:
-        throw new Error(`Unsupported`);
-    }
+    const response = await searchActivities(0, Number.MAX_SAFE_INTEGER, {}, '', {
+      id: 'date',
+      desc: true,
+    });
+    console.log('getActivities', response);
+    return response.data;
   } catch (error) {
-    console.error('Error fetching activities:', error);
+    console.error('Error fetching all activities:', error);
     throw error;
   }
 };

@@ -103,18 +103,30 @@ impl PortfolioService {
         let result = self.calculate_historical_data(conn, None, false).await;
 
         let duration = start.elapsed();
-        println!("update_portfolio completed in: {:?}", duration);
+        println!(
+            "update_portfolio completed in: {:?} seconds",
+            duration.as_secs_f64()
+        );
 
         result
     }
 
-    pub fn get_account_history(
+    pub fn get_all_accounts_history(
         &self,
         conn: &mut SqliteConnection,
-        account_id: &str,
     ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
         self.history_service
-            .get_account_history(conn, account_id)
+            .get_all_accounts_history(conn)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    }
+
+    pub fn get_portfolio_history(
+        &self,
+        conn: &mut SqliteConnection,
+        account_id: Option<&str>,
+    ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
+        self.history_service
+            .get_portfolio_history(conn, account_id)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>) // Convert PortfolioError to Box<dyn std::error::Error>
     }
 

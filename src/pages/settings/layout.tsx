@@ -23,6 +23,10 @@ const sidebarNavItems = [
     title: 'Appearance',
     href: 'appearance',
   },
+  {
+    title: 'Exports',
+    href: 'exports',
+  },
 ];
 
 export default function SettingsLayout() {

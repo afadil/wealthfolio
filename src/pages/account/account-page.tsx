@@ -14,7 +14,7 @@ import AccountDetail from './account-detail';
 import AccountHoldings from './account-holdings';
 import { useQuery } from '@tanstack/react-query';
 import { Holding, PortfolioHistory, AccountSummary } from '@/lib/types';
-import { computeHoldings, getAccountHistory, getAccountsSummary } from '@/commands/portfolio';
+import { computeHoldings, getHistory, getAccountsSummary } from '@/commands/portfolio';
 import { QueryKeys } from '@/lib/query-keys';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Icons } from '@/components/icons';
@@ -37,7 +37,7 @@ const AccountPage = () => {
     Error
   >({
     queryKey: QueryKeys.accountHistory(id),
-    queryFn: () => getAccountHistory(id),
+    queryFn: () => getHistory(id),
     enabled: !!id,
   });
 

@@ -201,9 +201,13 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'quantity',
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
     ),
-    cell: ({ row }) => <div className="text-right">{row.getValue('quantity')}</div>,
+    cell: ({ row }) => {
+      const activityType = row.getValue('activityType') as string;
+      const quantity = row.getValue('quantity') as number;
+      return <div className="text-right">{activityType === 'SPLIT' ? '-' : quantity}</div>;
+    },
   },
   {
     id: 'unitPrice',
@@ -214,12 +218,18 @@ export const columns: ColumnDef<ActivityImport>[] = [
       <DataTableColumnHeader
         className="justify-end text-right"
         column={column}
-        title="Unit Price"
+        title="Price/Amount"
       />
     ),
     cell: ({ row }) => {
+      const activityType = row.getValue('activityType') as string;
       const unitPrice = row.getValue('unitPrice') as number;
       const currency = (row.getValue('currency') as string) || 'USD';
+
+      if (activityType === 'SPLIT') {
+        return <div className="text-right">{unitPrice.toFixed(0)} : 1</div>;
+      }
+
       return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
     },
   },
@@ -232,9 +242,15 @@ export const columns: ColumnDef<ActivityImport>[] = [
       <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
     ),
     cell: ({ row }) => {
+      const activityType = row.getValue('activityType') as string;
       const fee = row.getValue('fee') as number;
       const currency = (row.getValue('currency') as string) || 'USD';
-      return <div className="text-right">{formatAmount(fee, currency)}</div>;
+
+      return (
+        <div className="text-right">
+          {activityType === 'SPLIT' ? '-' : formatAmount(fee, currency)}
+        </div>
+      );
     },
   },
   {
@@ -244,11 +260,16 @@ export const columns: ColumnDef<ActivityImport>[] = [
       <DataTableColumnHeader className="justify-end text-right" column={column} title="Value" />
     ),
     cell: ({ row }) => {
+      const activityType = row.getValue('activityType') as string;
       const unitPrice = row.getValue('unitPrice') as number;
       const quantity = row.getValue('quantity') as number;
       const currency = (row.getValue('currency') as string) || 'USD';
 
-      return <div className="text-right">{formatAmount(unitPrice * quantity, currency)}</div>;
+      return (
+        <div className="text-right">
+          {activityType === 'SPLIT' ? '-' : formatAmount(unitPrice * quantity, currency)}
+        </div>
+      );
     },
   },
   {

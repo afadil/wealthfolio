@@ -44,6 +44,9 @@ const activityTypes = [
   { label: 'Dividend', value: 'DIVIDEND' },
   { label: 'Interest', value: 'INTEREST' },
   { label: 'Fee', value: 'FEE' },
+  { label: 'Split', value: 'SPLIT' },
+  { label: 'Transfer In', value: 'TRANSFER_IN' },
+  { label: 'Transfer Out', value: 'TRANSFER_OUT' },
 ] as const;
 
 const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
@@ -212,6 +215,7 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
     </Form>
   );
 }
+
 interface CashActivityFieldsProps {
   currentAccountCurrency: string;
 }
@@ -264,11 +268,17 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
   );
 };
 
+interface AssetActivityFieldsProps {
+  defaultAssetId?: string;
+}
+
 const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
   const { control, watch } = useFormContext();
   const watchedType = watch('activityType');
 
   const isSplitType = watchedType === 'SPLIT';
+  const isTransferType = watchedType === 'TRANSFER_IN' || watchedType === 'TRANSFER_OUT';
+  const isTransferOut = watchedType === 'TRANSFER_OUT';
 
   return (
     <>
@@ -291,15 +301,15 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
       {isSplitType ? (
         <FormField
           control={control}
-          name="quantity"
+          name="unitPrice"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Split Multiple</FormLabel>
+              <FormLabel>Split Ratio</FormLabel>
               <FormControl>
                 <Input
                   type="number"
                   inputMode="decimal"
-                  placeholder="Ex. 4 for 4:1 split, 0.5 for 1:2 split"
+                  placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split"
                   {...field}
                 />
               </FormControl>
@@ -307,6 +317,37 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
             </FormItem>
           )}
         />
+      ) : isTransferType ? (
+        <div className="flex space-x-4">
+          <FormField
+            control={control}
+            name="quantity"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Shares</FormLabel>
+                <FormControl>
+                  <Input type="number" inputMode="decimal" placeholder="Shares" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {!isTransferOut && (
+            <FormField
+              control={control}
+              name="unitPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Average Cost</FormLabel>
+                  <FormControl>
+                    <CurrencyInput placeholder="Average Cost" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
       ) : (
         <div className="flex space-x-4">
           <FormField
@@ -354,6 +395,10 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
   );
 };
 
+interface DividendActivityFieldsProps {
+  defaultAssetId?: string;
+}
+
 const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps) => {
   const { control } = useFormContext();
 
@@ -391,10 +436,3 @@ const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps)
     </>
   );
 };
-
-interface AssetActivityFieldsProps {
-  defaultAssetId?: string;
-}
-interface DividendActivityFieldsProps {
-  defaultAssetId?: string;
-}

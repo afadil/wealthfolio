@@ -8,13 +8,14 @@
   },
   "package": {
     "productName": "Wealthfolio",
-    "version": "1.0.17"
+    "version": "1.0.18"
   },
   "tauri": {
     "allowlist": {
       "all": false,
       "dialog": {
-        "open": true
+        "open": true,
+        "save": true
       },
       "fs": {
         "all": true,

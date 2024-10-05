@@ -66,16 +66,16 @@ export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   }
 };
 
-export const getAccountHistory = async (accountId: string): Promise<PortfolioHistory[]> => {
+export const getHistory = async (accountId?: string): Promise<PortfolioHistory[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_account_history', { accountId });
+        return invokeTauri('get_portfolio_history', accountId ? { accountId } : undefined);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching account history:', error);
+    console.error('Error fetching portfolio history:', error);
     throw error;
   }
 };

@@ -29,10 +29,6 @@ pub async fn calculate_historical_data(
 
 #[tauri::command]
 pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>, String> {
-    use std::time::Instant;
-    println!("Compute holdings...");
-    let start = Instant::now();
-
     let service = create_portfolio_service(&state).await?;
     let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
@@ -42,23 +38,19 @@ pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>
         .map_err(|e| e.to_string())
         .map(|vec| Ok(vec))?;
 
-    let duration = start.elapsed();
-    println!("Compute holdings completed in: {:?}", duration);
-
     result
 }
 
 #[tauri::command]
-pub async fn get_account_history(
+pub async fn get_portfolio_history(
     state: State<'_, AppState>,
-    account_id: String,
+    account_id: Option<&str>,
 ) -> Result<Vec<PortfolioHistory>, String> {
-    println!("Fetching account history for account ID: {}", account_id);
     let service = create_portfolio_service(&state).await?;
     let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     service
-        .get_account_history(&mut conn, &account_id)
+        .get_portfolio_history(&mut conn, account_id)
         .map_err(|e| format!("Failed to fetch account history: {}", e))
 }
 

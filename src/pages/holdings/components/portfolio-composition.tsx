@@ -3,6 +3,7 @@ import { Holding } from '@/lib/types';
 import { cn, formatPercent } from '@/lib/utils';
 import { useMemo } from 'react';
 import { ResponsiveContainer, Treemap } from 'recharts';
+import { Link } from 'react-router-dom';
 
 function opacity(value: number) {
   const gain = Math.abs(value * 100);
@@ -48,18 +49,20 @@ const CustomizedContent = (props: any) => {
       />
       {depth === 1 ? (
         <>
-          <text
-            x={x + width / 2}
-            y={y + height / 2}
-            textAnchor="middle"
-            fill="currentColor"
-            className="font-default text-sm"
-            style={{
-              fontSize: fontSize + 1,
-            }}
-          >
-            {name}
-          </text>
+          <Link to={`/holdings/${name}`}>
+            <text
+              x={x + width / 2}
+              y={y + height / 2}
+              textAnchor="middle"
+              fill="currentColor"
+              className="font-default cursor-pointer text-sm hover:underline"
+              style={{
+                fontSize: fontSize + 1,
+              }}
+            >
+              {name}
+            </text>
+          </Link>
 
           <text
             x={x + width / 2}
