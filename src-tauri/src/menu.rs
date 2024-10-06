@@ -1,5 +1,5 @@
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{App, AppHandle, Runtime};
+use tauri::{AppHandle, Runtime};
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
@@ -28,6 +28,8 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
 
     let help_menu = SubmenuBuilder::new(app, "Help")
         .item(&MenuItemBuilder::with_id("report_issue", "Report Issue").build(app)?)
+        .separator()
+        .item(&PredefinedMenuItem::about(app, None, None)?)
         .build()?;
 
     let menu = MenuBuilder::new(app)

@@ -23,6 +23,7 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
 } from '@/components/ui/command';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -79,28 +80,30 @@ export function GeneralSettingForm() {
                 <PopoverContent className="w-[300px] p-0">
                   <Command>
                     <CommandInput placeholder="Search currency..." />
-                    <CommandEmpty>No currency found.</CommandEmpty>
-                    <CommandGroup>
-                      <ScrollArea className="max-h-96 overflow-y-auto">
-                        {worldCurrencies.map((currency) => (
-                          <CommandItem
-                            value={currency.label}
-                            key={currency.value}
-                            onSelect={() => {
-                              form.setValue(field.name, currency.value);
-                            }}
-                          >
-                            <Icons.Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                currency.value === field.value ? 'opacity-100' : 'opacity-0',
-                              )}
-                            />
-                            {currency.label}
-                          </CommandItem>
-                        ))}
-                      </ScrollArea>
-                    </CommandGroup>
+                    <CommandList>
+                      <CommandEmpty>No currency found.</CommandEmpty>
+                      <CommandGroup>
+                        <ScrollArea className="max-h-96 overflow-y-auto">
+                          {worldCurrencies.map((currency) => (
+                            <CommandItem
+                              value={currency.label}
+                              key={currency.value}
+                              onSelect={() => {
+                                form.setValue(field.name, currency.value);
+                              }}
+                            >
+                              <Icons.Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              {currency.label}
+                            </CommandItem>
+                          ))}
+                        </ScrollArea>
+                      </CommandGroup>
+                    </CommandList>
                   </Command>
                 </PopoverContent>
               </Popover>
