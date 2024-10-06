@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod menu;
 
 use chrono::Local;
 use commands::account::{create_account, delete_account, get_accounts, update_account};
@@ -47,9 +48,11 @@ use std::sync::{Arc, RwLock};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
 use tauri::async_runtime::spawn;
-use tauri::{api::dialog, CustomMenuItem, Manager, Menu, Submenu};
 
+use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+use tauri::{AppHandle, Emitter};
 
 // AppState
 #[derive(Clone)]
@@ -61,16 +64,19 @@ struct AppState {
 fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
-    let context = tauri::generate_context!();
-    let menu = create_menu(&context);
-
     let app = tauri::Builder::default()
-        .menu(menu)
-        .on_menu_event(handle_menu_event)
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             let app_handle = app.handle();
             let db_path = get_db_path(&app_handle);
             db::init(&db_path);
+
+            // Use the new menu module here
+            let menu = menu::create_menu(&app_handle)?;
+            app.set_menu(menu)?;
 
             // Create connection pool
             let manager = ConnectionManager::<SqliteConnection>::new(&db_path);
@@ -94,7 +100,25 @@ fn main() {
             };
             app.manage(state.clone());
 
-            spawn_quote_sync(app_handle, state);
+            spawn_quote_sync(app_handle.clone(), state);
+
+            // Set up the menu event handler
+            app.on_menu_event(move |app, event| match event.id().as_ref() {
+                "report_issue" => {
+                    app.dialog()
+                        .message(
+                            "If you encounter any issues, please email us at wealthfolio@teymz.com",
+                        )
+                        .title("Report Issue")
+                        .show(|_| {});
+                }
+                "toggle_fullscreen" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.set_fullscreen(true);
+                    }
+                }
+                _ => {}
+            });
 
             Ok(())
         })
@@ -134,7 +158,7 @@ fn main() {
             recalculate_portfolio,
             backup_database,
         ])
-        .build(context)
+        .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
 
     app.run(|_app_handle, _event| {
@@ -142,25 +166,9 @@ fn main() {
     });
 }
 
-fn create_menu(context: &tauri::Context<tauri::utils::assets::EmbeddedAssets>) -> Menu {
-    let report_issue_menu_item = CustomMenuItem::new("report_issue".to_string(), "Report Issue");
-    tauri::Menu::os_default(&context.package_info().name).add_submenu(Submenu::new(
-        "Help",
-        Menu::new().add_item(report_issue_menu_item),
-    ))
-}
+// Remove the create_menu_and_handler function from main.rs as it's now in menu.rs
 
-fn handle_menu_event(event: tauri::WindowMenuEvent) {
-    if event.menu_item_id() == "report_issue" {
-        dialog::message(
-            Some(&event.window()),
-            "Contact Support",
-            "If you encounter any issues, please email us at wealthfolio@teymz.com",
-        );
-    }
-}
-
-fn spawn_quote_sync(app_handle: tauri::AppHandle, state: AppState) {
+fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     spawn(async move {
         let base_currency = {
             let currency = state.base_currency.read().unwrap().clone();
@@ -170,7 +178,7 @@ fn spawn_quote_sync(app_handle: tauri::AppHandle, state: AppState) {
             Ok(service) => service,
             Err(e) => {
                 eprintln!("Failed to create PortfolioService: {}", e);
-                if let Err(emit_err) = app_handle.emit_all(
+                if let Err(emit_err) = app_handle.emit(
                     "PORTFOLIO_SERVICE_ERROR",
                     "Failed to initialize PortfolioService",
                 ) {
@@ -181,20 +189,20 @@ fn spawn_quote_sync(app_handle: tauri::AppHandle, state: AppState) {
         };
 
         app_handle
-            .emit_all("PORTFOLIO_UPDATE_START", ())
+            .emit("PORTFOLIO_UPDATE_START", ())
             .expect("Failed to emit event");
 
         let mut conn = state.pool.get().expect("Failed to get database connection");
 
         match portfolio_service.update_portfolio(&mut conn).await {
             Ok(_) => {
-                if let Err(e) = app_handle.emit_all("PORTFOLIO_UPDATE_COMPLETE", ()) {
+                if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_COMPLETE", ()) {
                     eprintln!("Failed to emit PORTFOLIO_UPDATE_COMPLETE event: {}", e);
                 }
             }
             Err(e) => {
                 eprintln!("Failed to update portfolio: {}", e);
-                if let Err(e) = app_handle.emit_all("PORTFOLIO_UPDATE_ERROR", &e.to_string()) {
+                if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_ERROR", &e.to_string()) {
                     eprintln!("Failed to emit PORTFOLIO_UPDATE_ERROR event: {}", e);
                 }
             }
@@ -202,14 +210,14 @@ fn spawn_quote_sync(app_handle: tauri::AppHandle, state: AppState) {
     });
 }
 
-fn get_db_path(app_handle: &tauri::AppHandle) -> String {
+fn get_db_path(app_handle: &AppHandle) -> String {
     // Try to get the database URL from the environment variable
     match env::var("DATABASE_URL") {
         Ok(url) => url, // If DATABASE_URL is set, use it
         Err(_) => {
             // Fall back to app data directory
             let app_data_dir = app_handle
-                .path_resolver()
+                .path()
                 .app_data_dir()
                 .expect("failed to get app data dir")
                 .to_str()
@@ -225,7 +233,7 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 }
 
 #[tauri::command]
-async fn backup_database(app_handle: tauri::AppHandle) -> Result<(String, Vec<u8>), String> {
+async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {
     let db_path = get_db_path(&app_handle);
     let backup_path = create_backup_path(&app_handle)?;
 
@@ -248,13 +256,12 @@ async fn backup_database(app_handle: tauri::AppHandle) -> Result<(String, Vec<u8
     Ok((filename, buffer))
 }
 
-fn create_backup_path(app_handle: &tauri::AppHandle) -> Result<String, String> {
-    let app_data_dir = app_handle
-        .path_resolver()
-        .app_data_dir()
-        .ok_or_else(|| "Failed to get app data directory".to_string())?;
+fn create_backup_path(app_handle: &AppHandle) -> Result<String, String> {
+    let app_data_dir = app_handle.path().app_data_dir();
 
-    let backup_dir = app_data_dir.join("backups");
+    let backup_dir = app_data_dir
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?
+        .join("backups");
     fs::create_dir_all(&backup_dir)
         .map_err(|e| format!("Failed to create backup directory: {}", e))?;
 

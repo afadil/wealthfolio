@@ -20,7 +20,6 @@ pub async fn get_activities(state: State<'_, AppState>) -> Result<Vec<Activity>,
         .map_err(|e| format!("Failed to fetch activities: {}", e))
 }
 
-
 #[tauri::command]
 pub async fn search_activities(
     page: i64,                                 // Page number, 1-based

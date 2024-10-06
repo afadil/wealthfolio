@@ -1,7 +1,7 @@
-import { invoke } from '@tauri-apps/api';
-import { open, save } from '@tauri-apps/api/dialog';
+import { invoke } from '@tauri-apps/api/core';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
-import { writeBinaryFile, BaseDirectory } from '@tauri-apps/api/fs';
+import { writeFile, BaseDirectory } from '@tauri-apps/plugin-fs';
 import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
 
 export type { EventCallback, UnlistenFn };
@@ -39,6 +39,7 @@ export const listenQuotesSyncStartTauri = async <T>(
 export const listenQuotesSyncCompleteTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
+  console.log('listenQuotesSyncCompleteTauri');
   return listen<T>('PORTFOLIO_UPDATE_COMPLETE', handler);
 };
 
@@ -76,10 +77,7 @@ export const openFileSaveDialogTauri = async (
     contentToSave = fileContent;
   }
 
-  await writeBinaryFile(
-    { path: filePath, contents: contentToSave },
-    { dir: BaseDirectory.Document },
-  );
+  await writeFile(filePath, contentToSave, { baseDir: BaseDirectory.Document });
 
   return true;
 };
