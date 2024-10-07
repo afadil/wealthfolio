@@ -110,6 +110,10 @@ impl HoldingsService {
                 .sectors
                 .clone()
                 .and_then(|s| serde_json::from_str(&s).ok()),
+            countries: asset
+                .countries
+                .clone()
+                .and_then(|c| serde_json::from_str(&c).ok()),
             portfolio_percent: None,
         }
     }
@@ -324,6 +328,7 @@ impl HoldingsService {
             asset_class: holding.asset_class.clone(),
             asset_sub_class: holding.asset_sub_class.clone(),
             sectors: holding.sectors.clone(),
+            countries: holding.countries.clone(),
             portfolio_percent: None,
         }
     }

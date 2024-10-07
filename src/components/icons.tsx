@@ -54,6 +54,7 @@ import {
   LucideProps,
   Pencil,
   Info,
+  Globe2,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -75,6 +76,7 @@ export const Icons = {
   Search: Search,
   Group: Group,
   Ungroup: Ungroup,
+  Globe: Globe2,
   Close: X,
   Eye: Eye,
   Info: Info,

@@ -1,4 +1,4 @@
-import { CustomPieChart } from '@/components/CustomPieChart';
+import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding } from '@/lib/types';
 import { useMemo, useState } from 'react';
 

@@ -179,6 +179,12 @@ export interface Holding {
       weight: number;
     },
   ];
+  countries?: [
+    {
+      code: string;
+      weight: number;
+    },
+  ];
 }
 
 export interface Asset {

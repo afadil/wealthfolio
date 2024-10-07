@@ -337,6 +337,13 @@ pub struct Sector {
     pub weight: f64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Country {
+    pub code: String,
+    pub weight: f64,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Holding {
@@ -358,6 +365,7 @@ pub struct Holding {
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub sectors: Option<Vec<Sector>>,
+    pub countries: Option<Vec<Country>>,
     pub portfolio_percent: Option<BigDecimal>,
 }
 
