@@ -60,7 +60,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
         <div className="space-y-4 text-sm">
           {rows.map(({ label, value, color }, idx) => (
             <div key={idx} className="flex justify-between">
-              <span className="text-gray-600">{label}</span>
+              <span className="text-muted-foreground">{label}</span>
               <span className={`font-medium ${color || ''}`}>{value}</span>
             </div>
           ))}
