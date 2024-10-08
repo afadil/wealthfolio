@@ -7,7 +7,7 @@ interface CountryChartProps {
 }
 
 export const CountryChart = ({ holdings }: CountryChartProps) => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(1);
 
   const data = useMemo(() => {
     const countryMap = new Map<string, number>();
@@ -30,5 +30,14 @@ export const CountryChart = ({ holdings }: CountryChartProps) => {
     setActiveIndex(index);
   };
 
-  return <CustomPieChart data={data} activeIndex={activeIndex} onPieEnter={onPieEnter} />;
+  const onPieLeave = () => {};
+
+  return (
+    <CustomPieChart
+      data={data}
+      activeIndex={activeIndex}
+      onPieEnter={onPieEnter}
+      onPieLeave={onPieLeave}
+    />
+  );
 };

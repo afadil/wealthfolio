@@ -101,7 +101,7 @@ export const HoldingsPage = () => {
             </Card>
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">By Currency</CardTitle>
+                <CardTitle className="text-sm font-medium">By Country</CardTitle>
                 <Icons.Globe className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent className="w-full">

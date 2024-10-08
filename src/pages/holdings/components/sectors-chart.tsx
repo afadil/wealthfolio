@@ -2,7 +2,7 @@ import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { formatAmount } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -55,7 +55,7 @@ export function SectorsChart({ assets }: { assets: Holding[] }) {
   const sectors = useMemo(() => getSectorsData(assets), [assets]);
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
+    <ResponsiveContainer width="100%" height={330}>
       <BarChart
         width={600}
         height={300}
@@ -66,9 +66,9 @@ export function SectorsChart({ assets }: { assets: Holding[] }) {
         <XAxis type="number" hide />
         <YAxis type="category" dataKey="name" className="text-xs" stroke="currentColor" />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+        <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
           {sectors.map((_, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="py-12" />
           ))}
         </Bar>
       </BarChart>

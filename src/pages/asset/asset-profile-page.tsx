@@ -153,7 +153,7 @@ export const AssetProfilePage = () => {
               value={assetSubClass}
               onChange={(e) => setAssetSubClass(e.target.value)}
               placeholder="Enter sub-class"
-              className="w-[180px] bg-white"
+              className="w-[180px] bg-white dark:bg-neutral-950"
             />
           ) : (
             <Badge variant="secondary" className="uppercase">
@@ -163,7 +163,9 @@ export const AssetProfilePage = () => {
           <Separator orientation="vertical" />
           {isEditing ? (
             <InputTags
-              value={sectors.map((s) => `${s.name}:${s.weight}%`)}
+              value={sectors.map(
+                (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
+              )}
               placeholder="sector:weight"
               // @ts-ignore
               onChange={(values: string[]) =>
@@ -181,8 +183,8 @@ export const AssetProfilePage = () => {
                 <Badge
                   variant="secondary"
                   key={sector.name}
-                  className="bg-indigo-100 uppercase"
-                  title={`${sector.name}: ${sector.weight < 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
+                  className="cursor-help bg-indigo-100 uppercase dark:text-primary-foreground"
+                  title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
                 >
                   {sector.name}
                 </Badge>
@@ -193,7 +195,9 @@ export const AssetProfilePage = () => {
           {isEditing ? (
             <InputTags
               placeholder="country:weight"
-              value={countries.map((c) => `${c.code}:${c.weight}%`)}
+              value={countries.map(
+                (c) => `${c.code}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
+              )}
               // @ts-ignore
               onChange={(values: string[]) =>
                 setCountries(
@@ -209,8 +213,8 @@ export const AssetProfilePage = () => {
               <Badge
                 variant="secondary"
                 key={country.code}
-                className="bg-purple-100 uppercase"
-                title={`${country.code}: ${country.weight}%`}
+                className="bg-purple-100 uppercase dark:text-primary-foreground"
+                title={`${country.code}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
               >
                 {country.code}
               </Badge>

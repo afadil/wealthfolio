@@ -14,19 +14,8 @@ const COLORS = [
 
 const renderActiveShape = (props: any) => {
   const RADIAN = Math.PI / 180;
-  const {
-    cx,
-    cy,
-    midAngle,
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    fill,
-    payload,
-    percent,
-    value,
-  } = props;
+  const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value } =
+    props;
   const sin = Math.sin(-RADIAN * midAngle);
   const cos = Math.cos(-RADIAN * midAngle);
   const sx = cx + (outerRadius + 5) * cos;
@@ -66,7 +55,6 @@ const renderActiveShape = (props: any) => {
         fill="currentColor"
         className="text-xs font-semibold"
       >
-        {/* {`${payload.name.length > 12 ? payload.name.slice(0, 12) + '...' : payload.name}`} */}
         {payload.name}
       </text>
       <text
@@ -129,21 +117,23 @@ interface CustomPieChartProps {
   data: { name: string; value: number }[];
   activeIndex: number;
   onPieEnter: (event: React.MouseEvent, index: number) => void;
+  onPieLeave?: (event: React.MouseEvent, index: number) => void;
 }
 
 export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   data,
   activeIndex,
   onPieEnter,
+  onPieLeave,
 }) => (
-  <ResponsiveContainer width="100%" height={180}>
+  <ResponsiveContainer width="100%" height={200}>
     <PieChart>
       <Pie
         data={data}
         cx="50%"
         cy="50%"
-        innerRadius={45}
-        outerRadius={75}
+        innerRadius={40}
+        outerRadius={70}
         paddingAngle={2}
         animationDuration={100}
         dataKey="value"
@@ -151,6 +141,7 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
         activeShape={renderActiveShape}
         inactiveShape={renderInactiveActiveShape}
         onMouseEnter={onPieEnter}
+        onMouseLeave={onPieLeave}
       >
         {data.map((_, index) => (
           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
