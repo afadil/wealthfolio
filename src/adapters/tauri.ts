@@ -39,7 +39,6 @@ export const listenQuotesSyncStartTauri = async <T>(
 export const listenQuotesSyncCompleteTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  console.log('listenQuotesSyncCompleteTauri');
   return listen<T>('PORTFOLIO_UPDATE_COMPLETE', handler);
 };
 

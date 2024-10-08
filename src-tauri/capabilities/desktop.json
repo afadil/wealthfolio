@@ -8,6 +8,8 @@
   "permissions": [
     "updater:default",
     "dialog:default",
-    "shell:default"
+    "shell:default",
+    "core:app:allow-set-app-theme",
+    "core:window:allow-set-theme"
   ]
 }
