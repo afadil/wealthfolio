@@ -1,9 +1,11 @@
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
+use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
         .item(&PredefinedMenuItem::about(app, None, None)?)
+        .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
         .separator()
         .item(&PredefinedMenuItem::hide(app, None).unwrap())
         .item(&PredefinedMenuItem::hide_others(app, None).unwrap())
@@ -29,6 +31,9 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
     let help_menu = SubmenuBuilder::new(app, "Help")
         .item(&MenuItemBuilder::with_id("report_issue", "Report Issue").build(app)?)
         .separator()
+        // Add the new menu item for checking updates
+        .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
+        .separator()
         .item(&PredefinedMenuItem::about(app, None, None)?)
         .build()?;
 
@@ -40,4 +45,28 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
         .build()?;
 
     Ok(menu)
+}
+
+pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
+    match event_id {
+        "report_issue" => {
+            app.dialog()
+                .message("If you encounter any issues, please email us at wealthfolio@teymz.com")
+                .title("Report Issue")
+                .show(|_| {});
+        }
+        "toggle_fullscreen" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_fullscreen(true);
+            }
+        }
+        "check_for_update" => {
+            let app_handle = app.clone();
+            let instance_id = instance_id.to_string();
+            tauri::async_runtime::spawn(async move {
+                crate::updater::check_for_update(app_handle, &instance_id, true).await;
+            });
+        }
+        _ => {}
+    }
 }

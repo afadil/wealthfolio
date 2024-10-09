@@ -22,10 +22,16 @@ impl SettingsRepository {
             .select(setting_value)
             .first::<String>(conn)?;
 
+        let instance_id = app_settings
+            .filter(setting_key.eq("instance_id"))
+            .select(setting_value)
+            .first::<String>(conn)?;
+
         Ok(Settings {
             theme,
             font,
             base_currency,
+            instance_id,
         })
     }
 

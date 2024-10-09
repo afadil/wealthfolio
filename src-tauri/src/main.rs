@@ -3,8 +3,7 @@
 
 mod commands;
 mod menu;
-
-use chrono::Local;
+mod updater;
 use commands::account::{create_account, delete_account, get_accounts, update_account};
 use commands::activity::{
     check_activities_import, create_activities, create_activity, delete_activity, get_activities,
@@ -25,6 +24,7 @@ use commands::settings::{
     update_exchange_rate, update_settings,
 };
 
+use updater::check_for_update;
 use wealthfolio_core::db;
 use wealthfolio_core::models;
 
@@ -40,7 +40,7 @@ use wealthfolio_core::settings;
 
 use dotenvy::dotenv;
 use std::env;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -50,7 +50,6 @@ use diesel::SqliteConnection;
 use tauri::async_runtime::spawn;
 
 use tauri::Manager;
-use tauri_plugin_dialog::DialogExt;
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 use tauri::{AppHandle, Emitter};
 
@@ -61,7 +60,7 @@ struct AppState {
     base_currency: Arc<RwLock<String>>,
 }
 
-fn main() {
+pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
     let app = tauri::Builder::default()
@@ -70,54 +69,49 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let app_handle = app.handle();
-            let db_path = get_db_path(&app_handle);
-            db::init(&db_path);
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to get app data dir")
+                .to_str()
+                .expect("failed to convert path to string")
+                .to_string();
+
+            let db_path = db::init(&app_data_dir);
 
             // Use the new menu module here
-            let menu = menu::create_menu(&app_handle)?;
+            let menu = menu::create_menu(&app.handle())?;
             app.set_menu(menu)?;
 
             // Create connection pool
-            let manager = ConnectionManager::<SqliteConnection>::new(&db_path);
-            let pool = r2d2::Pool::builder()
-                .max_size(5)
-                .build(manager)
-                .expect("Failed to create database connection pool");
-            let pool = Arc::new(pool);
+            let pool = db::create_pool(&db_path);
 
             // Get initial base_currency from settings
             let mut conn = pool.get().expect("Failed to get database connection");
             let settings_service = settings::SettingsService::new();
-            let base_currency = settings_service
-                .get_base_currency(&mut conn)
-                .unwrap_or_else(|_| "USD".to_string());
+
+            // Get instance_id from settings
+            let settings = settings_service.get_settings(&mut conn)?;
+            let instance_id = settings.instance_id.clone();
 
             // Initialize state
             let state = AppState {
-                pool: pool.clone(),
-                base_currency: Arc::new(RwLock::new(base_currency)),
+                pool,
+                base_currency: Arc::new(RwLock::new(settings.base_currency)),
             };
             app.manage(state.clone());
 
-            spawn_quote_sync(app_handle.clone(), state);
+            let handle = app.handle().clone();
+            // Check for updates on startup
+            spawn(async move { check_for_update(handle, &instance_id, false).await });
+
+            // Sync quotes on startup
+            spawn_quote_sync(app.handle().clone(), state);
 
             // Set up the menu event handler
-            app.on_menu_event(move |app, event| match event.id().as_ref() {
-                "report_issue" => {
-                    app.dialog()
-                        .message(
-                            "If you encounter any issues, please email us at wealthfolio@teymz.com",
-                        )
-                        .title("Report Issue")
-                        .show(|_| {});
-                }
-                "toggle_fullscreen" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.set_fullscreen(true);
-                    }
-                }
-                _ => {}
+            let instance_id_clone = settings.instance_id.clone();
+            app.on_menu_event(move |app, event| {
+                menu::handle_menu_event(app, &instance_id_clone, event.id().as_ref());
             });
 
             Ok(())
@@ -161,12 +155,8 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
 
-    app.run(|_app_handle, _event| {
-        // Handle various app events here if needed, otherwise do nothing
-    });
+    app.run(|_app_handle, _event| {});
 }
-
-// Remove the create_menu_and_handler function from main.rs as it's now in menu.rs
 
 fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     spawn(async move {
@@ -210,34 +200,17 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     });
 }
 
-fn get_db_path(app_handle: &AppHandle) -> String {
-    // Try to get the database URL from the environment variable
-    match env::var("DATABASE_URL") {
-        Ok(url) => url, // If DATABASE_URL is set, use it
-        Err(_) => {
-            // Fall back to app data directory
-            let app_data_dir = app_handle
-                .path()
-                .app_data_dir()
-                .expect("failed to get app data dir")
-                .to_str()
-                .expect("failed to convert path to string")
-                .to_string();
-            Path::new(&app_data_dir)
-                .join("app.db")
-                .to_str()
-                .unwrap()
-                .to_string()
-        }
-    }
-}
-
 #[tauri::command]
 async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {
-    let db_path = get_db_path(&app_handle);
-    let backup_path = create_backup_path(&app_handle)?;
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .expect("failed to get app data dir")
+        .to_str()
+        .expect("failed to convert path to string")
+        .to_string();
 
-    fs::copy(&db_path, &backup_path).map_err(|e| format!("Failed to create backup: {}", e))?;
+    let backup_path = db::backup_database(&app_data_dir)?;
 
     // Read the backup file
     let mut file =
@@ -254,20 +227,4 @@ async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), Str
         .to_string();
 
     Ok((filename, buffer))
-}
-
-fn create_backup_path(app_handle: &AppHandle) -> Result<String, String> {
-    let app_data_dir = app_handle.path().app_data_dir();
-
-    let backup_dir = app_data_dir
-        .map_err(|e| format!("Failed to get app data directory: {}", e))?
-        .join("backups");
-    fs::create_dir_all(&backup_dir)
-        .map_err(|e| format!("Failed to create backup directory: {}", e))?;
-
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let backup_file = format!("wealthfolio_backup_{}.db", timestamp);
-    let backup_path = backup_dir.join(backup_file);
-
-    Ok(backup_path.to_str().unwrap().to_string())
 }

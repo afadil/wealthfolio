@@ -440,6 +440,7 @@ pub struct Settings {
     pub theme: String,
     pub font: String,
     pub base_currency: String,
+    pub instance_id: String,
 }
 
 #[derive(
