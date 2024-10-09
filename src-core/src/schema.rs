@@ -12,6 +12,7 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         platform_id -> Nullable<Text>,
+        contribution_limit_ids -> Nullable<Text>,
     }
 }
 
@@ -61,6 +62,17 @@ diesel::table! {
         data_source -> Text,
         sectors -> Nullable<Text>,
         url -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    contribution_limits (id) {
+        id -> Text,
+        group_name -> Text,
+        contribution_year -> Integer,
+        limit_amount -> Double,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
 
@@ -154,6 +166,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     activities,
     app_settings,
     assets,
+    contribution_limits,
     exchange_rates,
     goals,
     goals_allocation,
