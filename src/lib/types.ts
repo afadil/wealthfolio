@@ -327,3 +327,14 @@ export interface ExchangeRate {
 export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-history';
 
 export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';
+
+export interface ContributionLimits {
+  id: string;
+  groupName: string;
+  contributionYear: number;
+  limitAmount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NewContributionLimits = Omit<ContributionLimits, 'id' | 'createdAt' | 'updatedAt'>;

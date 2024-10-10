@@ -444,6 +444,14 @@ pub struct Settings {
     pub instance_id: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsUpdate {
+    pub theme: String,
+    pub font: String,
+    pub base_currency: String,
+}
+
 #[derive(
     Queryable,
     Identifiable,

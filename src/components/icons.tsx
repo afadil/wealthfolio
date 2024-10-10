@@ -16,6 +16,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronsUpDown,
+  Circle,
   CreditCard,
   DollarSign,
   Download,
@@ -55,6 +56,7 @@ import {
   Pencil,
   Info,
   Globe2,
+  CircleGauge,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -94,6 +96,7 @@ export const Icons = {
   ChevronRight: ChevronRight,
   ChevronsLeft: ChevronsLeft,
   ChevronsRight: ChevronsRight,
+  Circle: Circle,
   Plus: Plus,
   Pencil: Pencil,
   PlusCircle: PlusCircle,
@@ -114,6 +117,7 @@ export const Icons = {
   ScrollText: ScrollText,
   GaugeCircle,
   ListCollapse: ListCollapse,
+  CircleGauge: CircleGauge,
 
   Dashboard: ({ ...props }: LucideProps) => (
     <svg

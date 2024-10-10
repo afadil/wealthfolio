@@ -20,7 +20,8 @@ use commands::portfolio::{
     get_portfolio_history, recalculate_portfolio,
 };
 use commands::settings::{
-    add_exchange_rate, delete_exchange_rate, get_exchange_rates, get_settings,
+    add_exchange_rate, create_contribution_limit, delete_contribution_limit, delete_exchange_rate,
+    get_contribution_limits, get_exchange_rates, get_settings, update_contribution_limit,
     update_exchange_rate, update_settings,
 };
 
@@ -151,6 +152,11 @@ pub fn main() {
             get_accounts_summary,
             recalculate_portfolio,
             backup_database,
+            // Add these new commands for contribution limits
+            get_contribution_limits,
+            create_contribution_limit,
+            update_contribution_limit,
+            delete_contribution_limit,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

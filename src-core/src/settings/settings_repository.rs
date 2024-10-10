@@ -1,4 +1,4 @@
-use crate::models::{AppSetting, Settings};
+use crate::models::{AppSetting, Settings, SettingsUpdate};
 use crate::schema::app_settings::dsl::*;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
@@ -37,7 +37,7 @@ impl SettingsRepository {
 
     pub fn update_settings(
         conn: &mut SqliteConnection,
-        new_settings: &Settings,
+        new_settings: &SettingsUpdate,
     ) -> Result<(), diesel::result::Error> {
         let settings_to_insert = vec![
             AppSetting {
