@@ -328,13 +328,12 @@ export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-hi
 
 export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';
 
-export interface ContributionLimits {
+export interface ContributionLimit {
   id: string;
   groupName: string;
   contributionYear: number;
   limitAmount: number;
-  createdAt: string;
-  updatedAt: string;
+  accountIds: string;
 }
 
-export type NewContributionLimits = Omit<ContributionLimits, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;

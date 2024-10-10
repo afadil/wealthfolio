@@ -19,12 +19,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Icons } from '@/components/icons';
 
-import type { ContributionLimits } from '@/lib/types';
+import type { ContributionLimit } from '@/lib/types';
 
 export interface ContributionLimitOperationsProps {
-  limit: ContributionLimits;
-  onEdit: (limit: ContributionLimits) => void;
-  onDelete: (limit: ContributionLimits) => void;
+  limit: ContributionLimit;
+  onEdit: (limit: ContributionLimit) => void;
+  onDelete: (limit: ContributionLimit) => void;
 }
 
 export function ContributionLimitOperations({

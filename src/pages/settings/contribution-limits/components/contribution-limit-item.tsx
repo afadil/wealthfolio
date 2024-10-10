@@ -1,19 +1,25 @@
 import { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContributionLimitOperations } from './contribution-limit-operations';
-import type { ContributionLimits } from '@/lib/types';
+import type { Account, ContributionLimit } from '@/lib/types';
 import { Icons } from '@/components/icons';
 import { formatAmount } from '@/lib/utils';
 import { AccountSelection } from './account-selection';
 import { Button } from '@/components/ui/button';
 
 export interface ContributionLimitItemProps {
-  limit: ContributionLimits;
-  onEdit: (limit: ContributionLimits) => void;
-  onDelete: (limit: ContributionLimits) => void;
+  limit: ContributionLimit;
+  accounts: Account[];
+  onEdit: (limit: ContributionLimit) => void;
+  onDelete: (limit: ContributionLimit) => void;
 }
 
-export function ContributionLimitItem({ limit, onEdit, onDelete }: ContributionLimitItemProps) {
+export function ContributionLimitItem({
+  limit,
+  accounts,
+  onEdit,
+  onDelete,
+}: ContributionLimitItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -40,7 +46,7 @@ export function ContributionLimitItem({ limit, onEdit, onDelete }: ContributionL
       </div>
       {isExpanded && (
         <div className="border-t bg-card p-4">
-          <AccountSelection limitId={limit.id} />
+          <AccountSelection limit={limit} accounts={accounts} />
         </div>
       )}
     </div>

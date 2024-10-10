@@ -1,9 +1,9 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ContributionLimitForm } from './contribution-limit-form';
-import type { ContributionLimits } from '@/lib/types';
+import type { ContributionLimit } from '@/lib/types';
 
 interface ContributionLimitEditModalProps {
-  limit: ContributionLimits | null;
+  limit: ContributionLimit | null;
   open: boolean;
   onClose: () => void;
 }

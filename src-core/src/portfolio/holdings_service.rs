@@ -324,7 +324,6 @@ impl HoldingsService {
                 created_at: chrono::Utc::now().naive_utc(),
                 updated_at: chrono::Utc::now().naive_utc(),
                 platform_id: None,
-                contribution_limit_ids: None,
             }),
             asset_class: holding.asset_class.clone(),
             asset_sub_class: holding.asset_sub_class.clone(),

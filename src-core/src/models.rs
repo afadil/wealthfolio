@@ -40,7 +40,6 @@ pub struct Account {
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
     pub platform_id: Option<String>,
-    pub contribution_limit_ids: Option<String>,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone)]
@@ -644,11 +643,12 @@ pub struct NewExchangeRate {
 #[derive(Queryable, Insertable, Identifiable, Serialize, Deserialize, Debug, Clone)]
 #[diesel(table_name = crate::schema::contribution_limits)]
 #[serde(rename_all = "camelCase")]
-pub struct ContributionLimits {
+pub struct ContributionLimit {
     pub id: String,
     pub group_name: String,
     pub contribution_year: i32,
     pub limit_amount: f64,
+    pub account_ids: Option<String>, // New field to store account IDs
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
 }
@@ -656,9 +656,10 @@ pub struct ContributionLimits {
 #[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
 #[diesel(table_name = crate::schema::contribution_limits)]
 #[serde(rename_all = "camelCase")]
-pub struct NewContributionLimits {
+pub struct NewContributionLimit {
     pub id: Option<String>,
     pub group_name: String,
     pub contribution_year: i32,
     pub limit_amount: f64,
+    pub account_ids: Option<String>, // New field to store account IDs
 }

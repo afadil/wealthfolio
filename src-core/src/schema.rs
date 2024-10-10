@@ -12,7 +12,6 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         platform_id -> Nullable<Text>,
-        contribution_limit_ids -> Nullable<Text>,
     }
 }
 
@@ -71,6 +70,7 @@ diesel::table! {
         group_name -> Text,
         contribution_year -> Integer,
         limit_amount -> Double,
+        account_ids -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
     }

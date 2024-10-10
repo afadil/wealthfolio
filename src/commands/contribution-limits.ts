@@ -1,7 +1,7 @@
-import { ContributionLimits, NewContributionLimits } from '@/lib/types';
+import { ContributionLimit, NewContributionLimit } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
-export const getContributionLimits = async (): Promise<ContributionLimits[]> => {
+export const getContributionLimit = async (): Promise<ContributionLimit[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -16,8 +16,8 @@ export const getContributionLimits = async (): Promise<ContributionLimits[]> => 
 };
 
 export const createContributionLimit = async (
-  newLimit: NewContributionLimits,
-): Promise<ContributionLimits> => {
+  newLimit: NewContributionLimit,
+): Promise<ContributionLimit> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -33,8 +33,8 @@ export const createContributionLimit = async (
 
 export const updateContributionLimit = async (
   id: string,
-  updatedLimit: NewContributionLimits,
-): Promise<ContributionLimits> => {
+  updatedLimit: NewContributionLimit,
+): Promise<ContributionLimit> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

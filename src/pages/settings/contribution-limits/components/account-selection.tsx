@@ -1,29 +1,20 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { QueryKeys } from '@/lib/query-keys';
-import { getAccounts } from '@/commands/account';
+import { useState } from 'react';
 import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
-import { Account } from '@/lib/types';
 import { Icons } from '@/components/icons';
+import { Account, ContributionLimit } from '@/lib/types';
+import { useContributionLimitMutations } from '../useContributionLimitMutations';
 
 interface AccountSelectionProps {
-  limitId: string;
+  limit: ContributionLimit;
+  accounts: Account[];
 }
 
-export function AccountSelection({ limitId }: AccountSelectionProps) {
-  const { data: accounts, isLoading } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
-
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-
-  useEffect(() => {
-    // TODO: Fetch the currently selected accounts for this limit
-    // and set them in the selectedAccounts state
-  }, [limitId]);
+export function AccountSelection({ limit, accounts }: AccountSelectionProps) {
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(
+    limit.accountIds ? limit.accountIds.split(',') : [],
+  );
+  const { updateContributionLimitMutation } = useContributionLimitMutations();
 
   const handleAccountToggle = (accountId: string) => {
     setSelectedAccounts((prev) =>
@@ -32,17 +23,14 @@ export function AccountSelection({ limitId }: AccountSelectionProps) {
   };
 
   const handleSave = () => {
-    // TODO: Implement the save functionality
-    console.log('Saving selected accounts:', selectedAccounts);
-    toast({
-      title: 'Accounts updated',
-      description: 'The selected accounts have been updated for this contribution limit.',
+    updateContributionLimitMutation.mutate({
+      id: limit.id,
+      updatedLimit: {
+        ...limit,
+        accountIds: selectedAccounts.join(','),
+      },
     });
   };
-
-  if (isLoading) {
-    return <div>Loading accounts...</div>;
-  }
 
   return (
     <div className="space-y-4">
@@ -67,8 +55,12 @@ export function AccountSelection({ limitId }: AccountSelectionProps) {
             </Toggle>
           ))}
       </div>
-      <Button onClick={handleSave} className="mt-4">
-        Save Selected Accounts
+      <Button
+        onClick={handleSave}
+        className="mt-4"
+        disabled={updateContributionLimitMutation.isPending}
+      >
+        {updateContributionLimitMutation.isPending ? 'Saving...' : 'Save Selected Accounts'}
       </Button>
     </div>
   );

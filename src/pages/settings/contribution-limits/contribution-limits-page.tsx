@@ -3,24 +3,27 @@ import { EmptyPlaceholder } from '@/components/empty-placeholder';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
-import type { ContributionLimits } from '@/lib/types';
+import type { ContributionLimit } from '@/lib/types';
 import { SettingsHeader } from '../header';
-import { getContributionLimits } from '@/commands/contribution-limits';
+import { getContributionLimit } from '@/commands/contribution-limits';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
 import { useContributionLimitMutations } from './useContributionLimitMutations';
 import { ContributionLimitItem } from './components/contribution-limit-item';
 import { ContributionLimitEditModal } from './components/contribution-limit-edit-modal';
+import { useAccounts } from '@/pages/account/useAccounts';
 
-const SettingsContributionLimitsPage = () => {
-  const { data: limits, isLoading } = useQuery<ContributionLimits[], Error>({
-    queryKey: [QueryKeys.CONTRIBUTION_LIMITS],
-    queryFn: getContributionLimits,
-  });
-
+const SettingsContributionLimitPage = () => {
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedLimit, setSelectedLimit] = useState<ContributionLimits | null>(null);
+  const [selectedLimit, setSelectedLimit] = useState<ContributionLimit | null>(null);
+
+  const { data: accounts } = useAccounts();
+
+  const { data: limits, isLoading } = useQuery<ContributionLimit[], Error>({
+    queryKey: [QueryKeys.CONTRIBUTION_LIMITS],
+    queryFn: getContributionLimit,
+  });
 
   const { deleteContributionLimitMutation } = useContributionLimitMutations();
 
@@ -29,12 +32,12 @@ const SettingsContributionLimitsPage = () => {
     setVisibleModal(true);
   };
 
-  const handleEditLimit = (limit: ContributionLimits) => {
+  const handleEditLimit = (limit: ContributionLimit) => {
     setSelectedLimit(limit);
     setVisibleModal(true);
   };
 
-  const handleDeleteLimit = (limit: ContributionLimits) => {
+  const handleDeleteLimit = (limit: ContributionLimit) => {
     deleteContributionLimitMutation.mutate(limit.id);
   };
 
@@ -60,10 +63,11 @@ const SettingsContributionLimitsPage = () => {
         <div className="mx-auto w-full pt-8">
           {limits?.length ? (
             <div className="divide-y divide-border rounded-md border">
-              {limits.map((limit: ContributionLimits) => (
+              {limits.map((limit: ContributionLimit) => (
                 <ContributionLimitItem
                   key={limit.id}
                   limit={limit}
+                  accounts={accounts || []}
                   onEdit={handleEditLimit}
                   onDelete={handleDeleteLimit}
                 />
@@ -94,4 +98,4 @@ const SettingsContributionLimitsPage = () => {
   );
 };
 
-export default SettingsContributionLimitsPage;
+export default SettingsContributionLimitPage;

@@ -6,7 +6,7 @@ import {
 } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
 import { toast } from '@/components/ui/use-toast';
-import { NewContributionLimits } from '@/lib/types';
+import { NewContributionLimit } from '@/lib/types';
 
 export const useContributionLimitMutations = () => {
   const queryClient = useQueryClient();
@@ -31,11 +31,11 @@ export const useContributionLimitMutations = () => {
     mutationFn: createContributionLimit,
     onSuccess: () =>
       handleSuccess('Contribution limit added successfully.', [QueryKeys.CONTRIBUTION_LIMITS]),
-    onError: () => handleError('adding this contribution limit'),
+    onError: (e) => handleError('adding this contribution limit'),
   });
 
   const updateContributionLimitMutation = useMutation({
-    mutationFn: (params: { id: string; updatedLimit: NewContributionLimits }) =>
+    mutationFn: (params: { id: string; updatedLimit: NewContributionLimit }) =>
       updateContributionLimit(params.id, params.updatedLimit),
     onSuccess: () =>
       handleSuccess('Contribution limit updated successfully.', [QueryKeys.CONTRIBUTION_LIMITS]),
