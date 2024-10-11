@@ -30,7 +30,7 @@ interface HistoryChartData {
 
 export function HistoryChart({
   data,
-  height = 350,
+  height = 390,
 }: {
   data: HistoryChartData[];
   height?: number;

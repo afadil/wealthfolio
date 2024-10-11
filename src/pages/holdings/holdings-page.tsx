@@ -43,8 +43,6 @@ export const HoldingsPage = () => {
     return data?.filter((holding) => holding.account?.id === 'TOTAL') || [];
   }, [data]);
 
-  console.log(holdings);
-
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader heading="Holdings"></ApplicationHeader>

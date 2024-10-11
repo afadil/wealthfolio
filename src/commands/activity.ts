@@ -22,7 +22,6 @@ export const getActivities = async (): Promise<ActivityDetails[]> => {
       id: 'date',
       desc: true,
     });
-    console.log('getActivities', response);
     return response.data;
   } catch (error) {
     console.error('Error fetching all activities:', error);

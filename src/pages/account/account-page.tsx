@@ -150,7 +150,7 @@ const AccountPage = () => {
         {isAccountsLoading && !performance ? (
           <Skeleton className="h-full" />
         ) : (
-          <div className="flex h-full flex-col space-y-4">
+          <div className="flex flex-col space-y-4">
             <AccountDetail data={performance} className="flex-grow" />
             <AccountContributionLimit accountId={id} />
           </div>

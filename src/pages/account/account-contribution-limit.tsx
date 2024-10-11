@@ -35,7 +35,6 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
     enabled: !isLimitsLoading,
   });
 
-  console.log(deposits);
   if (isLimitsLoading || isDepositsLoading) {
     return <AccountContributionLimit.Skeleton />;
   }
@@ -49,23 +48,16 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   if (accountLimits.length === 0) {
     return (
-      <Card className="pt-6">
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <span>
-                You've contributed{' '}
-                <span className="font-semibold">
-                  {formatAmount(
-                    accountDeposit?.convertedAmount || 0,
-                    deposits?.baseCurrency || 'USD',
-                  )}
-                </span>{' '}
-                in {currentYear}. This account has no contribution limit set.
-              </span>
-            </div>
-          </div>
-        </CardContent>
+      <Card className="p-6">
+        <div className="flex items-center justify-between text-sm">
+          <span>
+            You've contributed{' '}
+            <span className="font-semibold">
+              {formatAmount(accountDeposit?.convertedAmount || 0, deposits?.baseCurrency || 'USD')}
+            </span>{' '}
+            so far in {currentYear}. There's no contribution limit set for this account.
+          </span>
+        </div>
       </Card>
     );
   }
@@ -112,15 +104,15 @@ function AccountContributionLimitItem({
                 <span className="font-semibold">
                   {formatAmount(deposit?.convertedAmount || 0, baseCurrency)}
                 </span>{' '}
-                to this account in {limit.contributionYear}. Your total contribution towards the{' '}
+                to this account in {limit.contributionYear}. Your total is{' '}
+                <span className="font-semibold text-destructive">
+                  {formatAmount(totalDeposits, baseCurrency)}
+                </span>{' '}
+                which is over the{' '}
                 <span className="font-semibold">
                   {formatAmount(limit.limitAmount, baseCurrency)}
                 </span>{' '}
-                {limit.groupName} limit is{' '}
-                <span className="font-semibold text-destructive">
-                  {formatAmount(totalDeposits, baseCurrency)}
-                </span>
-                , which is over the limit.
+                limit.
               </span>
             ) : (
               <span>
