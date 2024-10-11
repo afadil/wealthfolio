@@ -17,6 +17,7 @@ import { useAccounts } from '@/pages/account/useAccounts';
 const SettingsContributionLimitPage = () => {
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedLimit, setSelectedLimit] = useState<ContributionLimit | null>(null);
+  const [showPreviousYears, setShowPreviousYears] = useState(false);
 
   const { data: accounts } = useAccounts();
 
@@ -50,6 +51,10 @@ const SettingsContributionLimitPage = () => {
     );
   }
 
+  const currentYear = new Date().getFullYear();
+  const currentYearLimits = limits?.filter((limit) => limit.contributionYear === currentYear) || [];
+  const previousYearsLimits = limits?.filter((limit) => limit.contributionYear < currentYear) || [];
+
   return (
     <>
       <div className="space-y-6">
@@ -61,9 +66,12 @@ const SettingsContributionLimitPage = () => {
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">
-          {limits?.length ? (
-            <div className="divide-y divide-border rounded-md border">
-              {limits.map((limit: ContributionLimit) => (
+          <h2 className="text-md mb-3 font-semibold text-muted-foreground">
+            Current Year ({currentYear})
+          </h2>
+          {currentYearLimits.length ? (
+            <>
+              {currentYearLimits.map((limit: ContributionLimit) => (
                 <ContributionLimitItem
                   key={limit.id}
                   limit={limit}
@@ -72,20 +80,53 @@ const SettingsContributionLimitPage = () => {
                   onDelete={handleDeleteLimit}
                 />
               ))}
-            </div>
+            </>
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="CircleGauge" />
-              <EmptyPlaceholder.Title>No contribution limits added!</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Title>
+                No contribution limits for {currentYear}!
+              </EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any contribution limits yet. Start adding your contribution
-                limits.
+                You don&apos;t have any contribution limits for the current year. Start adding your
+                contribution limits.
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddLimit()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
                 Add a contribution limit
               </Button>
             </EmptyPlaceholder>
+          )}
+
+          {previousYearsLimits.length > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center justify-center">
+                <Separator className="w-1/3" />
+                <Button
+                  variant="outline"
+                  className="mx-4 rounded-full"
+                  onClick={() => setShowPreviousYears(!showPreviousYears)}
+                >
+                  {showPreviousYears ? 'Hide' : 'Show'} Previous Years
+                </Button>
+                <Separator className="w-1/3" />
+              </div>
+
+              {showPreviousYears && (
+                <div className="mt-8">
+                  <h2 className="text-md mb-3 text-muted-foreground">Previous Years</h2>
+                  {previousYearsLimits.map((limit: ContributionLimit) => (
+                    <ContributionLimitItem
+                      key={limit.id}
+                      limit={limit}
+                      accounts={accounts || []}
+                      onEdit={handleEditLimit}
+                      onDelete={handleDeleteLimit}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

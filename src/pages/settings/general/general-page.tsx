@@ -12,8 +12,9 @@ export default function GeneralSettingsPage() {
       />
       <Separator />
       <BaseCurrencySettings />
-
-      <ExchangeRatesSettings />
+      <div className="pt-6">
+        <ExchangeRatesSettings />
+      </div>
     </div>
   );
 }

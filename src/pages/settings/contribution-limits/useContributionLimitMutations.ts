@@ -30,22 +30,31 @@ export const useContributionLimitMutations = () => {
   const addContributionLimitMutation = useMutation({
     mutationFn: createContributionLimit,
     onSuccess: () =>
-      handleSuccess('Contribution limit added successfully.', [QueryKeys.CONTRIBUTION_LIMITS]),
-    onError: (e) => handleError('adding this contribution limit'),
+      handleSuccess('Contribution limit added successfully.', [
+        QueryKeys.CONTRIBUTION_LIMITS,
+        QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
+      ]),
+    onError: () => handleError('adding this contribution limit'),
   });
 
   const updateContributionLimitMutation = useMutation({
     mutationFn: (params: { id: string; updatedLimit: NewContributionLimit }) =>
       updateContributionLimit(params.id, params.updatedLimit),
     onSuccess: () =>
-      handleSuccess('Contribution limit updated successfully.', [QueryKeys.CONTRIBUTION_LIMITS]),
+      handleSuccess('Contribution limit updated successfully.', [
+        QueryKeys.CONTRIBUTION_LIMITS,
+        QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
+      ]),
     onError: () => handleError('updating this contribution limit'),
   });
 
   const deleteContributionLimitMutation = useMutation({
     mutationFn: deleteContributionLimit,
     onSuccess: () =>
-      handleSuccess('Contribution limit deleted successfully.', [QueryKeys.CONTRIBUTION_LIMITS]),
+      handleSuccess('Contribution limit deleted successfully.', [
+        QueryKeys.CONTRIBUTION_LIMITS,
+        QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
+      ]),
     onError: () => handleError('deleting this contribution limit'),
   });
 

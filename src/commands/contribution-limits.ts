@@ -61,3 +61,27 @@ export const deleteContributionLimit = async (id: string): Promise<void> => {
     throw error;
   }
 };
+
+export const getContributionProgress = async (
+  limitId: string,
+  year: number,
+): Promise<{ amount: number; currency: string }> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        const [amount, currency] = await invokeTauri<[number, string]>(
+          'get_contribution_progress',
+          {
+            limitId,
+            year,
+          },
+        );
+        return { amount, currency };
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    console.error('Error fetching contribution progress:', error);
+    throw error;
+  }
+};

@@ -17,7 +17,13 @@ export function ContributionLimitEditModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <ContributionLimitForm
-          defaultValues={limit || undefined}
+          defaultValues={
+            limit ?? {
+              groupName: '',
+              contributionYear: new Date().getFullYear(),
+              limitAmount: 0,
+            }
+          }
           onSuccess={() => {
             onClose();
           }}
