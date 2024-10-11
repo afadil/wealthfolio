@@ -1,4 +1,4 @@
-import { ContributionLimit, NewContributionLimit } from '@/lib/types';
+import { ContributionLimit, NewContributionLimit, DepositsCalculation } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
 export const getContributionLimit = async (): Promise<ContributionLimit[]> => {
@@ -62,26 +62,19 @@ export const deleteContributionLimit = async (id: string): Promise<void> => {
   }
 };
 
-export const getContributionProgress = async (
-  limitId: string,
+export const calculateDepositsForAccounts = async (
+  accountIds: string[],
   year: number,
-): Promise<{ amount: number; currency: string }> => {
+): Promise<DepositsCalculation> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        const [amount, currency] = await invokeTauri<[number, string]>(
-          'get_contribution_progress',
-          {
-            limitId,
-            year,
-          },
-        );
-        return { amount, currency };
+        return invokeTauri('calculate_deposits_for_accounts', { accountIds, year });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching contribution progress:', error);
+    console.error('Error calculating deposits for accounts:', error);
     throw error;
   }
 };

@@ -25,11 +25,8 @@ export const QueryKeys = {
   QUOTE: 'quote',
 
   CONTRIBUTION_LIMITS: 'contributionLimits',
-  CONTRIBUTION_LIMIT_PROGRESS: 'contributionProgress',
+  CONTRIBUTION_LIMIT_PROGRESS: 'contributionLimitProgress',
 
   // Helper function to create account-specific keys
   accountHistory: (id: string) => ['history', id],
-
-  // New key for account contribution limits
-  ACCOUNT_CONTRIBUTION_LIMITS: 'accountContributionLimits',
 } as const;

@@ -20,9 +20,9 @@ use commands::portfolio::{
     get_portfolio_history, recalculate_portfolio,
 };
 use commands::settings::{
-    add_exchange_rate, create_contribution_limit, delete_contribution_limit, delete_exchange_rate,
-    get_contribution_limits, get_contribution_progress, get_exchange_rates, get_settings,
-    update_contribution_limit, update_exchange_rate, update_settings,
+    add_exchange_rate, calculate_deposits_for_accounts, create_contribution_limit,
+    delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,
+    get_settings, update_contribution_limit, update_exchange_rate, update_settings,
 };
 
 use updater::check_for_update;
@@ -156,7 +156,7 @@ pub fn main() {
             create_contribution_limit,
             update_contribution_limit,
             delete_contribution_limit,
-            get_contribution_progress,
+            calculate_deposits_for_accounts,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

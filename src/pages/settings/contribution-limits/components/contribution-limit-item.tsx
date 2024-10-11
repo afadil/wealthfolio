@@ -5,12 +5,13 @@ import { Icons } from '@/components/icons';
 import { formatAmount } from '@/lib/utils';
 import { AccountSelection } from './account-selection';
 import { Button } from '@/components/ui/button';
-import { getContributionProgress } from '@/commands/contribution-limits';
+import { calculateDepositsForAccounts } from '@/commands/contribution-limits';
 import { Progress } from '@/components/ui/progress';
 import { useQuery } from '@tanstack/react-query';
 import { Account, ContributionLimit } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { QueryKeys } from '@/lib/query-keys';
+import { DepositsCalculation } from '@/lib/types';
 
 type ContributionLimitItemProps = {
   limit: ContributionLimit;
@@ -38,15 +39,21 @@ export function ContributionLimitItem({
     setIsExpanded(!isExpanded);
   };
 
-  const { data: progress, isLoading } = useQuery({
-    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, limit.id, limit.contributionYear],
-    queryFn: () => getContributionProgress(limit.id, limit.contributionYear),
+  const { data: progress, isLoading } = useQuery<DepositsCalculation>({
+    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, limit.accountIds, limit.contributionYear],
+    queryFn: async () => {
+      if (limit.accountIds && limit.accountIds.length > 0) {
+        return calculateDepositsForAccounts(limit.accountIds.split(','), limit.contributionYear);
+      } else {
+        return { total: 0, baseCurrency: 'USD', byAccount: {} };
+      }
+    },
   });
 
-  const progressValue = progress ? progress.amount : 0;
+  const progressValue = progress ? progress.total : 0;
   const progressPercentageNumber =
     limit.limitAmount > 0 ? (progressValue / limit.limitAmount) * 100 : 0;
-  const baseCurrency = progress?.currency || 'USD';
+  const baseCurrency = progress?.baseCurrency || 'USD';
   const isOverLimit = progressPercentageNumber > 100;
 
   return (
@@ -66,7 +73,7 @@ export function ContributionLimitItem({
                   <>
                     You have contributed{' '}
                     <span className={`font-semibold ${isOverLimit ? 'text-destructive' : ''}`}>
-                      {formatAmount(progress.amount, baseCurrency)}
+                      {formatAmount(progress.total, baseCurrency)}
                     </span>{' '}
                     so far in <span className="font-semibold">{limit.contributionYear}</span>.
                   </>
@@ -99,7 +106,12 @@ export function ContributionLimitItem({
         )}
         {isExpanded && (
           <div className="mt-4 border-t pt-4">
-            <AccountSelection limit={limit} accounts={accounts} />
+            <AccountSelection
+              limit={limit}
+              accounts={accounts}
+              deposits={progress}
+              isLoading={isLoading}
+            />
           </div>
         )}
       </CardContent>

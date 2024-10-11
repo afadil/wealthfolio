@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { getContributionLimit, getContributionProgress } from '@/commands/contribution-limits';
+import { getContributionLimit, calculateDepositsForAccounts } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
-import { ContributionLimit } from '@/lib/types';
+import { ContributionLimit, DepositsCalculation } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatAmount } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -12,25 +12,40 @@ interface AccountContributionLimitProps {
 }
 
 export function AccountContributionLimit({ accountId }: AccountContributionLimitProps) {
-  const { data: allLimits, isLoading } = useQuery<ContributionLimit[], Error>({
+  const currentYear = new Date().getFullYear();
+
+  const { data: allLimits, isLoading: isLimitsLoading } = useQuery<ContributionLimit[], Error>({
     queryKey: [QueryKeys.CONTRIBUTION_LIMITS],
     queryFn: getContributionLimit,
   });
 
-  const { data: progress, isLoading: isProgressLoading } = useQuery({
-    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountId, new Date().getFullYear()],
-    queryFn: () => getContributionProgress(accountId, new Date().getFullYear()),
+  const limitsForAccount =
+    allLimits?.filter(
+      (limit) => limit.accountIds?.includes(accountId) && limit.contributionYear === currentYear,
+    ) || [];
+
+  const accountIdsToQuery =
+    limitsForAccount.length > 0
+      ? limitsForAccount.flatMap((limit) => limit.accountIds?.split(',') || [])
+      : [accountId];
+
+  const { data: deposits, isLoading: isDepositsLoading } = useQuery<DepositsCalculation, Error>({
+    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountIdsToQuery, currentYear],
+    queryFn: () => calculateDepositsForAccounts(accountIdsToQuery, currentYear),
+    enabled: !isLimitsLoading,
   });
 
-  if (isLoading || isProgressLoading) {
+  console.log(deposits);
+  if (isLimitsLoading || isDepositsLoading) {
     return <AccountContributionLimit.Skeleton />;
   }
 
-  const currentYear = new Date().getFullYear();
   const accountLimits =
     allLimits?.filter(
       (limit) => limit.accountIds?.includes(accountId) && limit.contributionYear === currentYear,
     ) || [];
+
+  const accountDeposit = deposits?.byAccount[accountId];
 
   if (accountLimits.length === 0) {
     return (
@@ -41,7 +56,10 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
               <span>
                 You've contributed{' '}
                 <span className="font-semibold">
-                  {formatAmount(progress?.amount || 0, progress?.currency || 'USD')}
+                  {formatAmount(
+                    accountDeposit?.convertedAmount || 0,
+                    deposits?.baseCurrency || 'USD',
+                  )}
                 </span>{' '}
                 in {currentYear}. This account has no contribution limit set.
               </span>
@@ -55,7 +73,13 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
   return (
     <div className="space-y-4">
       {accountLimits.map((limit) => (
-        <AccountContributionLimitItem key={limit.id} limit={limit} progress={progress} />
+        <AccountContributionLimitItem
+          key={limit.id}
+          limit={limit}
+          deposit={accountDeposit}
+          totalDeposits={deposits?.total || 0}
+          baseCurrency={deposits?.baseCurrency || 'USD'}
+        />
       ))}
     </div>
   );
@@ -63,15 +87,18 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
 function AccountContributionLimitItem({
   limit,
-  progress,
+  deposit,
+  totalDeposits,
+  baseCurrency,
 }: {
   limit: ContributionLimit;
-  progress: any;
+  deposit?: { amount: number; currency: string; convertedAmount: number };
+  totalDeposits: number;
+  baseCurrency: string;
 }) {
-  const progressValue = progress ? progress.amount : 0;
+  const progressValue = totalDeposits ? totalDeposits : 0;
   const progressPercentageNumber =
     limit.limitAmount > 0 ? (progressValue / limit.limitAmount) * 100 : 0;
-  const baseCurrency = progress?.currency || 'USD';
   const isOverLimit = progressPercentageNumber > 100;
 
   return (
@@ -82,24 +109,31 @@ function AccountContributionLimitItem({
             {isOverLimit ? (
               <span>
                 You've contributed{' '}
-                <span className="font-semibold text-destructive">
-                  {formatAmount(progressValue, baseCurrency)}
+                <span className="font-semibold">
+                  {formatAmount(deposit?.convertedAmount || 0, baseCurrency)}
                 </span>{' '}
-                in {limit.contributionYear}, which is over the{' '}
+                to this account in {limit.contributionYear}. Your total contribution towards the{' '}
                 <span className="font-semibold">
                   {formatAmount(limit.limitAmount, baseCurrency)}
                 </span>{' '}
-                limit.
+                {limit.groupName} limit is{' '}
+                <span className="font-semibold text-destructive">
+                  {formatAmount(totalDeposits, baseCurrency)}
+                </span>
+                , which is over the limit.
               </span>
             ) : (
               <span>
                 You've contributed{' '}
-                <span className="font-semibold">{formatAmount(progressValue, baseCurrency)}</span>{' '}
-                towards your{' '}
+                <span className="font-semibold">
+                  {formatAmount(deposit?.convertedAmount || 0, baseCurrency)}
+                </span>{' '}
+                to this account in {limit.contributionYear}. Your total contribution towards the{' '}
                 <span className="font-semibold">
                   {formatAmount(limit.limitAmount, baseCurrency)}
                 </span>{' '}
-                limit for {limit.contributionYear}.
+                {limit.groupName} limit is{' '}
+                <span className="font-semibold">{formatAmount(totalDeposits, baseCurrency)}</span>.
               </span>
             )}
           </div>

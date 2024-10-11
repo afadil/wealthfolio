@@ -8,6 +8,7 @@ use crate::AppState;
 use diesel::r2d2::ConnectionManager;
 use diesel::SqliteConnection;
 use tauri::State;
+use wealthfolio_core::models::DepositsCalculation;
 
 fn get_connection(
     state: &State<AppState>,
@@ -161,17 +162,16 @@ pub async fn delete_contribution_limit(
 
 // Add this new command
 #[tauri::command]
-pub async fn get_contribution_progress(
-    limit_id: String,
+pub async fn calculate_deposits_for_accounts(
+    account_ids: Vec<String>,
     year: i32,
     state: State<'_, AppState>,
-) -> Result<(String, String), String> {
-    println!("Calculating contribution progress...");
+) -> Result<DepositsCalculation, String> {
+    println!("Calculating deposits for accounts...");
     let mut conn = get_connection(&state)?;
     let service = ContributionLimitService::new();
     let base_currency = state.base_currency.read().map_err(|e| e.to_string())?;
     service
-        .calculate_contribution_progress(&mut conn, &limit_id, year, &base_currency)
-        .map(|(amount, currency)| (amount.to_string(), currency))
-        .map_err(|e| format!("Failed to calculate contribution progress: {}", e))
+        .calculate_deposits_for_accounts(&mut conn, &account_ids, year, &base_currency)
+        .map_err(|e| format!("Failed to calculate deposits for accounts: {}", e))
 }

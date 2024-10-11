@@ -337,3 +337,15 @@ export interface ContributionLimit {
 }
 
 export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
+
+export interface AccountDeposit {
+  amount: number;
+  currency: string;
+  convertedAmount: number;
+}
+
+export interface DepositsCalculation {
+  total: number;
+  baseCurrency: string;
+  byAccount: Record<string, AccountDeposit>;
+}

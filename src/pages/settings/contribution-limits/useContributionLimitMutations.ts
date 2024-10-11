@@ -6,13 +6,16 @@ import {
 } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
 import { toast } from '@/components/ui/use-toast';
-import { NewContributionLimit } from '@/lib/types';
+import { ContributionLimit, NewContributionLimit } from '@/lib/types';
 
 export const useContributionLimitMutations = () => {
   const queryClient = useQueryClient();
 
-  const handleSuccess = (message: string, invalidateKeys: string[]) => {
-    invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+  const handleSuccess = (message: string, limit?: ContributionLimit) => {
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.CONTRIBUTION_LIMITS] });
+    queryClient.invalidateQueries({
+      queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, limit?.accountIds, limit?.contributionYear],
+    });
     toast({
       description: message,
       variant: 'success',
@@ -29,32 +32,20 @@ export const useContributionLimitMutations = () => {
 
   const addContributionLimitMutation = useMutation({
     mutationFn: createContributionLimit,
-    onSuccess: () =>
-      handleSuccess('Contribution limit added successfully.', [
-        QueryKeys.CONTRIBUTION_LIMITS,
-        QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
-      ]),
+    onSuccess: (limit) => handleSuccess('Contribution limit added successfully.', limit),
     onError: () => handleError('adding this contribution limit'),
   });
 
   const updateContributionLimitMutation = useMutation({
     mutationFn: (params: { id: string; updatedLimit: NewContributionLimit }) =>
       updateContributionLimit(params.id, params.updatedLimit),
-    onSuccess: () =>
-      handleSuccess('Contribution limit updated successfully.', [
-        QueryKeys.CONTRIBUTION_LIMITS,
-        QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
-      ]),
+    onSuccess: (limit) => handleSuccess('Contribution limit updated successfully.', limit),
     onError: () => handleError('updating this contribution limit'),
   });
 
   const deleteContributionLimitMutation = useMutation({
     mutationFn: deleteContributionLimit,
-    onSuccess: () =>
-      handleSuccess('Contribution limit deleted successfully.', [
-        QueryKeys.CONTRIBUTION_LIMITS,
-        QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
-      ]),
+    onSuccess: () => handleSuccess('Contribution limit deleted successfully.', undefined),
     onError: () => handleError('deleting this contribution limit'),
   });
 

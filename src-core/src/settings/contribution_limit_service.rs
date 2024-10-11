@@ -1,12 +1,12 @@
-use crate::schema::activities;
-use bigdecimal::{BigDecimal, FromPrimitive};
+use crate::schema::{accounts, activities};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::fx::fx_service::CurrencyExchangeService;
-use crate::models::{ContributionLimit, NewContributionLimit};
+use crate::models::{AccountDeposit, ContributionLimit, DepositsCalculation, NewContributionLimit};
 use crate::schema::contribution_limits;
 
 pub struct ContributionLimitService;
@@ -76,40 +76,13 @@ impl ContributionLimitService {
         Ok(())
     }
 
-    // pub fn get_accounts_for_limit(
-    //     &self,
-    //     conn: &mut SqliteConnection,
-    //     limit_id: &str,
-    // ) -> Result<Vec<Account>, diesel::result::Error> {
-    //     use crate::schema::accounts::dsl::*;
-
-    //     let limit: ContributionLimit = contribution_limits::table.find(limit_id).first(conn)?;
-
-    //     if let Some(account_ids_str) = limit.account_ids {
-    //         let account_id_vec: Vec<&str> = account_ids_str.split(',').collect();
-    //         accounts
-    //             .filter(id.eq_any(account_id_vec))
-    //             .load::<Account>(conn)
-    //     } else {
-    //         Ok(vec![])
-    //     }
-    // }
-
-    pub fn calculate_contribution_progress(
+    pub fn calculate_deposits_for_accounts(
         &self,
         conn: &mut SqliteConnection,
-        limit_id: &str,
+        account_ids: &[String],
         year: i32,
         base_currency: &str,
-    ) -> Result<(BigDecimal, String), diesel::result::Error> {
-        let limit: ContributionLimit = contribution_limits::table.find(limit_id).first(conn)?;
-
-        let account_ids: Vec<&str> = limit
-            .account_ids
-            .as_ref()
-            .map(|ids| ids.split(',').collect())
-            .unwrap_or_default();
-
+    ) -> Result<DepositsCalculation, diesel::result::Error> {
         let start_date =
             NaiveDateTime::parse_from_str(&format!("{}-01-01 00:00:00", year), "%Y-%m-%d %H:%M:%S")
                 .unwrap();
@@ -122,25 +95,50 @@ impl ContributionLimitService {
             .initialize(conn)
             .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
 
-        let total_deposits: BigDecimal = activities::table
-            .filter(activities::account_id.eq_any(account_ids))
+        let deposits: Vec<(String, f64, f64, String)> = activities::table
+            .inner_join(accounts::table)
+            .filter(accounts::id.eq_any(account_ids))
+            .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq("DEPOSIT"))
             .filter(activities::activity_date.between(start_date, end_date))
             .select((
+                activities::account_id,
                 activities::quantity,
                 activities::unit_price,
                 activities::currency,
             ))
-            .load::<(f64, f64, String)>(conn)?
-            .into_iter()
-            .map(|(quantity, unit_price, currency)| {
-                let converted_amount = fx_service
-                    .convert_currency(quantity * unit_price, &currency, base_currency)
-                    .unwrap_or(0.0);
-                BigDecimal::from_f64(converted_amount).unwrap()
-            })
-            .sum();
+            .load::<(String, f64, f64, String)>(conn)?;
 
-        Ok((total_deposits, base_currency.to_string()))
+        let mut total_deposits = 0.0;
+        let mut deposits_by_account: HashMap<String, AccountDeposit> = HashMap::new();
+
+        for (account_id, quantity, unit_price, currency) in deposits {
+            let amount = quantity * unit_price;
+            let converted_amount = fx_service
+                .convert_currency(amount, &currency, base_currency)
+                .unwrap_or_else(|e| {
+                    println!("Conversion error: {:?}", e);
+                    amount // Use original amount if conversion fails
+                });
+
+            total_deposits += converted_amount;
+            deposits_by_account
+                .entry(account_id.clone())
+                .and_modify(|e| {
+                    e.amount += amount;
+                    e.converted_amount += converted_amount;
+                })
+                .or_insert(AccountDeposit {
+                    amount,
+                    currency: currency.clone(),
+                    converted_amount,
+                });
+        }
+
+        Ok(DepositsCalculation {
+            total: total_deposits,
+            base_currency: base_currency.to_string(),
+            by_account: deposits_by_account,
+        })
     }
 }

@@ -663,3 +663,19 @@ pub struct NewContributionLimit {
     pub limit_amount: f64,
     pub account_ids: Option<String>, // New field to store account IDs
 }
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountDeposit {
+    pub amount: f64,
+    pub currency: String,
+    pub converted_amount: f64,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositsCalculation {
+    pub total: f64,
+    pub base_currency: String,
+    pub by_account: HashMap<String, AccountDeposit>,
+}
