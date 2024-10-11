@@ -14,7 +14,7 @@ export const useContributionLimitMutations = () => {
   const handleSuccess = (message: string, invalidateKeys: string[]) => {
     invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
     toast({
-      title: message,
+      description: message,
       variant: 'success',
     });
   };

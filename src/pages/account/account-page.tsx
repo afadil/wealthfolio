@@ -21,6 +21,7 @@ import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
+import { AccountContributionLimit } from './account-contribution-limit';
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
@@ -147,9 +148,12 @@ const AccountPage = () => {
         </Card>
 
         {isAccountsLoading && !performance ? (
-          <Skeleton className="h-40" />
+          <Skeleton className="h-full" />
         ) : (
-          <AccountDetail data={performance} className="col-span-1 md:col-span-1" />
+          <div className="flex h-full flex-col space-y-4">
+            <AccountDetail data={performance} className="flex-grow" />
+            <AccountContributionLimit accountId={id} />
+          </div>
         )}
       </div>
       <div className="pt-6">
