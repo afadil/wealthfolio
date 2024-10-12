@@ -19,11 +19,11 @@ import { Badge } from '@/components/ui/badge';
 // filter
 function DashboardSkeleton() {
   return (
-    <div className="grid h-full gap-2 md:grid-cols-2 xl:grid-cols-3">
-      <div className="flex h-full p-20 xl:col-span-2">
+    <div className="grid h-full gap-4 sm:grid-cols-1 md:grid-cols-3">
+      <div className="flex h-full p-4 md:col-span-2">
         <Skeleton className="h-full w-full" />
       </div>
-      <div className="h-full w-full space-y-3 p-20">
+      <div className="h-full w-full space-y-4 p-4">
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
         <Skeleton className="h-12" />
@@ -55,6 +55,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
+  console.log(portfolioHistory);
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const handleRecalculate = async () => {
@@ -64,7 +65,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
-      <div className="flex px-10 py-2">
+      <div className="flex px-4 py-2 md:px-6 lg:px-10">
         <HoverCard>
           <HoverCardTrigger className="flex cursor-pointer items-center">
             <div>
@@ -123,22 +124,16 @@ export default function DashboardPage() {
 
       <HistoryChart data={portfolioHistory || []} height={240} />
 
-      <div className="mx-auto w-full bg-gradient-to-b from-custom-green to-background px-12 pt-20 dark:from-custom-green-dark">
-        {/* Responsive grid */}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* Column 1 */}
-          <div className="pr-16 xl:col-span-2">
+      <div className="mx-auto w-full bg-gradient-to-b from-custom-green to-background px-4 pt-8 dark:from-custom-green-dark md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+        <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
+          <div className="md:col-span-2">
             <Accounts className="border-none bg-transparent shadow-none" accounts={accounts} />
           </div>
-
-          {/* Column 2 */}
-          <div className="">
+          <div className="sm:col-span-1">
             <SavingGoals accounts={accounts} />
           </div>
-          {/* Column 3 */}
         </div>
       </div>
-      {/* Grid container */}
     </div>
   );
 }
