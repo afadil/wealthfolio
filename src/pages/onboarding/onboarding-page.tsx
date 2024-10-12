@@ -40,7 +40,7 @@ export const OnboardingPage = () => {
           <h1 className="mb-4 text-3xl font-bold text-gray-900 dark:text-gray-100">
             Welcome to Wealthfolio
           </h1>
-          <p className="mb-8 text-lg text-gray-600 dark:text-gray-400">
+          <p className="mb-8 text-lg text-muted-foreground dark:text-gray-400">
             Your personal financial portfolio tracker, right on your computer. Here's how to get
             started:
           </p>

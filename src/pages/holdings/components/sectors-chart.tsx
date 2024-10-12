@@ -1,8 +1,18 @@
 import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
-import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { formatAmount } from '@/lib/utils';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
-const COLORS = ['#1f2937', '#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb'];
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--chart-6))',
+  'hsl(var(--chart-7))',
+];
 
 function getSectorsData(assets: Holding[]) {
   if (!assets) return [];
@@ -27,24 +37,38 @@ function getSectorsData(assets: Holding[]) {
   return sortedSectors;
 }
 
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <Card>
+        <CardHeader className="p-4">
+          <CardTitle className="text-sm text-muted-foreground">{payload[0].payload.name}</CardTitle>
+          <p className="text-sm font-semibold">{formatAmount(payload[0].value, 'USD', false)}</p>
+        </CardHeader>
+      </Card>
+    );
+  }
+  return null;
+};
+
 export function SectorsChart({ assets }: { assets: Holding[] }) {
   const sectors = useMemo(() => getSectorsData(assets), [assets]);
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
+    <ResponsiveContainer width="100%" height={330}>
       <BarChart
         width={600}
         height={300}
         data={sectors}
         layout="vertical"
-        margin={{ top: 0, right: 0, left: 45, bottom: 0 }}
+        margin={{ top: 0, right: 0, left: 50, bottom: 0 }}
       >
         <XAxis type="number" hide />
-        <YAxis type="category" dataKey="name" fontSize={12} stroke="currentColor" />
-
-        <Bar dataKey="value">
+        <YAxis type="category" dataKey="name" className="text-xs" stroke="currentColor" />
+        <Tooltip content={<CustomTooltip />} />
+        <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
           {sectors.map((_, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="py-12" />
           ))}
         </Bar>
       </BarChart>

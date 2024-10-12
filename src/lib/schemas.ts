@@ -82,3 +82,16 @@ export const newActivitySchema = z.object({
     .min(0, { message: 'Price must be a non-negative number.' }),
   comment: z.string().optional(),
 });
+
+export const newContributionLimitSchema = z.object({
+  id: z.string().optional(),
+  groupName: z.string().min(1, 'Group name is required'),
+  contributionYear: z.number().int().min(1900, 'Invalid year'),
+  limitAmount: z.coerce
+    .number({
+      required_error: 'Please enter a valid limit amount.',
+      invalid_type_error: 'Limit amount must be a positive number.',
+    })
+    .min(0, { message: 'Price must be a non-negative number.' }),
+  accountIds: z.string().optional(),
+});

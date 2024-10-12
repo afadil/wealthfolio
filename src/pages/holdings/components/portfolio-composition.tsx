@@ -40,8 +40,8 @@ const CustomizedContent = (props: any) => {
         className={cn('stroke-background', {
           'stroke-[4px]': depth === 1,
           'fill-none stroke-0': depth === 0,
-          'fill-green-600 dark:fill-green-300': gain >= 0,
-          'fill-red-600 dark:fill-red-300': gain < 0,
+          'fill-success': gain >= 0,
+          'fill-destructive': gain < 0,
         })}
         style={{
           fillOpacity: opacityVal,

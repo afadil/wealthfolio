@@ -1,6 +1,7 @@
 import { Separator } from '@/components/ui/separator';
-import { GeneralSettingForm } from './general-form';
+import { BaseCurrencySettings } from './currency-settings';
 import { SettingsHeader } from '../header';
+import { ExchangeRatesSettings } from './exchange-rates/exchange-rates-settings';
 
 export default function GeneralSettingsPage() {
   return (
@@ -10,7 +11,10 @@ export default function GeneralSettingsPage() {
         text="Manage the general application settings and preferences."
       />
       <Separator />
-      <GeneralSettingForm />
+      <BaseCurrencySettings />
+      <div className="pt-6">
+        <ExchangeRatesSettings />
+      </div>
     </div>
   );
 }

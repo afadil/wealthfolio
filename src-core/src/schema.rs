@@ -65,6 +65,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    contribution_limits (id) {
+        id -> Text,
+        group_name -> Text,
+        contribution_year -> Integer,
+        limit_amount -> Double,
+        account_ids -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     exchange_rates (id) {
         id -> Text,
         from_currency -> Text,
@@ -154,6 +166,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     activities,
     app_settings,
     assets,
+    contribution_limits,
     exchange_rates,
     goals,
     goals_allocation,

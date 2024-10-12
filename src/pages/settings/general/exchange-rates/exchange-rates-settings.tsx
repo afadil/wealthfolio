@@ -5,14 +5,13 @@ import { ColumnDef } from '@tanstack/react-table';
 import { ExchangeRate } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RateCell } from './rate-cell';
-import { Separator } from '@/components/ui/separator';
-import { SettingsHeader } from '../header';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { AddExchangeRateForm } from './add-exchange-rate-form';
 import { Icons } from '@/components/icons';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function ExchangeRatesPage() {
+export function ExchangeRatesSettings() {
   const { exchangeRates, isLoadingRates, updateExchangeRate, addExchangeRate, deleteExchangeRate } =
     useExchangeRates();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -59,12 +58,15 @@ export default function ExchangeRatesPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <SettingsHeader
-        heading="Exchange Rates"
-        text="Manage and view exchange rates for different currencies."
-      >
-        <div className="flex justify-end">
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Exchange Rates</CardTitle>
+            <CardDescription>
+              Manage exchange rates for currencies in your portfolio.
+            </CardDescription>
+          </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -83,18 +85,28 @@ export default function ExchangeRatesPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </SettingsHeader>
-      <Separator />
+      </CardHeader>
+      <CardContent>
+        {isLoadingRates ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, index) => (
+              <Skeleton key={index} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : exchangeRates && exchangeRates.length > 0 ? (
+          <DataTable columns={columns} data={exchangeRates} />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <Icons.DollarSign className="h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold">No exchange rates defined yet</h3>
 
-      {isLoadingRates ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, index) => (
-            <Skeleton key={index} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : (
-        <DataTable columns={columns} data={exchangeRates || []} />
-      )}
-    </div>
+            <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>
+              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              Add rate
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

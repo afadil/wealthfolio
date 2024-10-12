@@ -4,16 +4,8 @@ import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { cn } from '@/lib/utils';
 
 import { Icons } from '@/components/icons';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@/components/ui/command';
 import {
   DialogDescription,
   DialogFooter,
@@ -30,7 +22,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -47,9 +38,8 @@ const accountTypes = [
   { label: 'Crypto', value: 'CRYPTOCURRENCY' },
 ] as const;
 
-import { worldCurrencies } from '@/lib/currencies';
 import { newAccountSchema } from '@/lib/schemas';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -88,7 +78,6 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
 
         <div className="grid gap-10 p-4">
           <input type="hidden" name="id" />
-
           <FormField
             control={form.control}
             name="name"
@@ -147,50 +136,12 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Currency</FormLabel>
-                  <Popover modal={true}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn('justify-between', !field.value && 'text-muted-foreground')}
-                        >
-                          {field.value
-                            ? worldCurrencies.find((currency) => currency.value === field.value)
-                                ?.label
-                            : 'Select account currency'}
-                          <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search currency..." />
-                        <CommandEmpty>No currency found.</CommandEmpty>
-                        <CommandGroup>
-                          <ScrollArea className="max-h-96 overflow-y-auto">
-                            {worldCurrencies.map((currency) => (
-                              <CommandItem
-                                value={currency.label}
-                                key={currency.value}
-                                onSelect={() => {
-                                  form.setValue(field.name, currency.value);
-                                }}
-                              >
-                                <Icons.Check
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    currency.value === field.value ? 'opacity-100' : 'opacity-0',
-                                  )}
-                                />
-                                {currency.label}
-                              </CommandItem>
-                            ))}
-                          </ScrollArea>
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <CurrencyInput
+                      value={field.value}
+                      onChange={(value) => field.onChange(value)}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

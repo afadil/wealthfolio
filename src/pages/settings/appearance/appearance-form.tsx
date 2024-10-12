@@ -18,7 +18,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Icons } from '@/components/icons';
 
 const appearanceFormSchema = z.object({
-  theme: z.enum(['light', 'dark'], {
+  theme: z.enum(['light', 'dark', 'system'], {
     required_error: 'Please select a theme.',
   }),
   font: z.enum(['font-mono', 'font-sans', 'font-serif'], {

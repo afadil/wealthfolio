@@ -1,4 +1,4 @@
-import { CustomPieChart } from '@/components/CustomPieChart';
+import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding } from '@/lib/types';
 import { useMemo, useState } from 'react';
 
@@ -8,7 +8,7 @@ function getClassesData(assets: Holding[], cash: number) {
   const types = assets.reduce(
     (acc, asset) => {
       const assetType =
-        asset.assetSubClass === 'Cryptocurrency' ? 'Crypto' : asset.assetSubClass || 'Others'; // Use 'Others' as the default type if not provided
+        asset.assetSubClass === 'Cryptocurrency' ? 'Crypto' : asset.assetSubClass || 'Others';
 
       const current = acc[assetType] || 0;
       acc[assetType] = Number(current) + Number(asset.marketValueConverted);
@@ -17,7 +17,13 @@ function getClassesData(assets: Holding[], cash: number) {
     cash > 0 ? { Cash: cash } : ({} as Record<string, number>),
   );
 
-  return Object.entries(types).map(([name, value]) => ({ name, value }));
+  const totalValue = Object.values(types).reduce((sum, value) => sum + value, 0);
+  const threshold = 0.01; // 5% threshold
+
+  return Object.entries(types)
+    .map(([name, value]) => ({ name, value }))
+    .filter(({ value }) => value / totalValue >= threshold)
+    .sort((a, b) => b.value - a.value);
 }
 
 export function ClassesChart({ assets, cash }: { assets: Holding[]; cash: number }) {
@@ -26,6 +32,16 @@ export function ClassesChart({ assets, cash }: { assets: Holding[]; cash: number
   const onPieEnter = (_: React.MouseEvent, index: number) => {
     setActiveIndex(index);
   };
+  const onPieLeave = (_: React.MouseEvent, index: number) => {
+    setActiveIndex(index);
+  };
 
-  return <CustomPieChart data={data} activeIndex={activeIndex} onPieEnter={onPieEnter} />;
+  return (
+    <CustomPieChart
+      data={data}
+      activeIndex={activeIndex}
+      onPieEnter={onPieEnter}
+      onPieLeave={onPieLeave}
+    />
+  );
 }

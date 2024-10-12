@@ -12,19 +12,19 @@ const sidebarNavItems = [
     href: 'accounts',
   },
   {
-    title: 'Goals',
-    href: 'goals',
+    title: 'Limits',
+    href: 'contribution-limits',
   },
   {
-    title: 'Exchange Rates',
-    href: 'exchange-rates',
+    title: 'Goals',
+    href: 'goals',
   },
   {
     title: 'Appearance',
     href: 'appearance',
   },
   {
-    title: 'Exports',
+    title: 'Data Export',
     href: 'exports',
   },
 ];

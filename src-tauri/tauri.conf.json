@@ -2,55 +2,40 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": true
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "Wealthfolio",
-    "version": "1.0.18"
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "copyright": "2024 Teymz Inc.",
+    "category": "Finance",
+    "createUpdaterArtifacts": "v1Compatible"
   },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "dialog": {
-        "open": true,
-        "save": true
-      },
-      "fs": {
-        "all": true,
-        "scope": [
-          "$APPDATA/**"
-        ]
-      },
-      "path": {
-        "all": true
-      },
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "window": {
-        "startDragging": true
+  "productName": "Wealthfolio",
+  "mainBinaryName": "Wealthfolio",
+  "version": "1.0.19",
+  "identifier": "com.teymz.wealthfolio",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY0RjI4MkRFOUYwRDM3N0QKUldSOU53MmYzb0x5WlBySmErU21wcjVHZFNtMW9zdGcyZTBBRWpVcHRDMkoyKzF1bkQ1VmdKbkYK",
+      "endpoints": [
+        "https://wealthfolio.app/releases/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.teymz.wealthfolio",
-      "copyright": "2024 Teymz Inc.",
-      "category": "Finance",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
-    },
-    "security": {
-      "csp": null
-    },
+    }
+  },
+  "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "fullscreen": false,
@@ -63,16 +48,8 @@
         "height": 960
       }
     ],
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://wealthfolio.app/releases/{{target}}/{{arch}}/{{current_version}}"
-      ],
-      "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY0RjI4MkRFOUYwRDM3N0QKUldSOU53MmYzb0x5WlBySmErU21wcjVHZFNtMW9zdGcyZTBBRWpVcHRDMkoyKzF1bkQ1VmdKbkYK",
-      "windows": {
-        "installMode": "passive"
-      }
+    "security": {
+      "csp": null
     }
   }
 }

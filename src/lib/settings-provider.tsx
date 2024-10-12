@@ -1,4 +1,6 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+import { getCurrentWindow, Theme } from '@tauri-apps/api/window';
+
 import { Settings, SettingsContextType } from './types';
 import { useSettings } from './useSettings';
 import { useSettingsMutation } from './useSettingsMutation';
@@ -44,7 +46,7 @@ export function useSettingsContext() {
 }
 
 // Helper function to apply settings to the document
-const applySettingsToDocument = (newSettings: Settings) => {
+const applySettingsToDocument = async (newSettings: Settings) => {
   document.body.classList.remove('light', 'dark');
   document.body.classList.add(newSettings.theme);
 
@@ -53,4 +55,6 @@ const applySettingsToDocument = (newSettings: Settings) => {
 
   // Color scheme must be applied to document element (`<html>`)
   document.documentElement.style.colorScheme = newSettings.theme;
+  const currentWindow = await getCurrentWindow();
+  currentWindow.setTheme(newSettings.theme as Theme);
 };

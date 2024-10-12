@@ -19,7 +19,7 @@ impl IncomeService {
         }
     }
 
-    fn get_aggregated_income_data(
+    fn get_income_activities(
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<IncomeData>, diesel::result::Error> {
@@ -28,13 +28,13 @@ impl IncomeService {
              a.asset_id as symbol,
              COALESCE(ast.name, 'Unknown') as symbol_name,
              a.currency,
-             SUM(a.quantity * a.unit_price) as amount
+             a.quantity * a.unit_price as amount
              FROM activities a
              LEFT JOIN assets ast ON a.asset_id = ast.id
              INNER JOIN accounts acc ON a.account_id = acc.id
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              AND acc.is_active = 1
-             GROUP BY date, a.activity_type, a.asset_id, ast.name, a.currency";
+             ORDER BY a.activity_date";
 
         let result = diesel::sql_query(query).load::<IncomeData>(conn);
 
@@ -66,15 +66,16 @@ impl IncomeService {
         conn: &mut SqliteConnection,
     ) -> Result<Vec<IncomeSummary>, diesel::result::Error> {
         println!("Getting income summary...");
-        let income_data = match self.get_aggregated_income_data(conn) {
-            Ok(data) => data,
+
+        let activities = match self.get_income_activities(conn) {
+            Ok(activity) => activity,
             Err(e) => {
                 println!("Error getting aggregated income data: {:?}", e);
                 return Err(e);
             }
         };
 
-        if income_data.is_empty() {
+        if activities.is_empty() {
             return Ok(Vec::new());
         }
 
@@ -113,34 +114,37 @@ impl IncomeService {
         let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
-        for data in income_data {
-            let date = match NaiveDate::parse_from_str(&format!("{}-01", data.date), "%Y-%m-%d") {
+        let _ = self.fx_service.initialize(conn);
+
+        for activity in activities {
+            let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")
+            {
                 Ok(d) => d,
                 Err(e) => {
-                    println!("Error parsing date {}: {:?}", data.date, e);
+                    println!("Error parsing date {}: {:?}", activity.date, e);
                     continue;
                 }
             };
-            let converted_amount =
-                match self
-                    .fx_service
-                    .convert_currency(data.amount, &data.currency, &base_currency)
-                {
-                    Ok(amount) => amount,
-                    Err(e) => {
-                        println!("Error converting currency: {:?}", e);
-                        data.amount
-                    }
-                };
+            let converted_amount = match self.fx_service.convert_currency(
+                activity.amount,
+                &activity.currency,
+                &base_currency,
+            ) {
+                Ok(amount) => amount,
+                Err(e) => {
+                    println!("Error converting currency: {:?}", e);
+                    activity.amount
+                }
+            };
 
-            total_summary.add_income(&data, converted_amount);
+            total_summary.add_income(&activity, converted_amount);
 
             if date.year() == current_year {
-                ytd_summary.add_income(&data, converted_amount);
+                ytd_summary.add_income(&activity, converted_amount);
             } else if date.year() == last_year {
-                last_year_summary.add_income(&data, converted_amount);
+                last_year_summary.add_income(&activity, converted_amount);
             } else if date.year() == two_years_ago {
-                two_years_ago_summary.add_income(&data, converted_amount);
+                two_years_ago_summary.add_income(&activity, converted_amount);
             }
         }
 
@@ -160,7 +164,7 @@ impl IncomeService {
         ytd_summary.yoy_growth = Some(ytd_yoy_growth);
         last_year_summary.yoy_growth = Some(last_year_yoy_growth);
 
-        // Two years ago YoY growth can't be calculated without data from three years ago
+        // Two years ago YoY growth can't be calculated without activity from three years ago
         two_years_ago_summary.yoy_growth = None;
 
         println!("Income summary calculation completed successfully");
@@ -171,6 +175,4 @@ impl IncomeService {
             two_years_ago_summary,
         ])
     }
-
-    // Helper function to calculate YoY growth
 }

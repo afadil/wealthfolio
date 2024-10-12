@@ -337,6 +337,13 @@ pub struct Sector {
     pub weight: f64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Country {
+    pub code: String,
+    pub weight: f64,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Holding {
@@ -358,6 +365,7 @@ pub struct Holding {
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
     pub sectors: Option<Vec<Sector>>,
+    pub countries: Option<Vec<Country>>,
     pub portfolio_percent: Option<BigDecimal>,
 }
 
@@ -429,6 +437,15 @@ pub struct AppSetting {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    pub theme: String,
+    pub font: String,
+    pub base_currency: String,
+    pub instance_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsUpdate {
     pub theme: String,
     pub font: String,
     pub base_currency: String,
@@ -558,7 +575,7 @@ impl IncomeSummary {
     }
 }
 
-#[derive(Debug, Clone, Queryable, Insertable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Queryable, QueryableByName, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::portfolio_history)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioHistory {
@@ -621,4 +638,44 @@ pub struct NewExchangeRate {
     pub to_currency: String,
     pub rate: f64,
     pub source: String,
+}
+
+#[derive(Queryable, Insertable, Identifiable, Serialize, Deserialize, Debug, Clone)]
+#[diesel(table_name = crate::schema::contribution_limits)]
+#[serde(rename_all = "camelCase")]
+pub struct ContributionLimit {
+    pub id: String,
+    pub group_name: String,
+    pub contribution_year: i32,
+    pub limit_amount: f64,
+    pub account_ids: Option<String>, // New field to store account IDs
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+}
+
+#[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
+#[diesel(table_name = crate::schema::contribution_limits)]
+#[serde(rename_all = "camelCase")]
+pub struct NewContributionLimit {
+    pub id: Option<String>,
+    pub group_name: String,
+    pub contribution_year: i32,
+    pub limit_amount: f64,
+    pub account_ids: Option<String>, // New field to store account IDs
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountDeposit {
+    pub amount: f64,
+    pub currency: String,
+    pub converted_amount: f64,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositsCalculation {
+    pub total: f64,
+    pub base_currency: String,
+    pub by_account: HashMap<String, AccountDeposit>,
 }

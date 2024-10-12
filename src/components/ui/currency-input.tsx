@@ -1,66 +1,72 @@
-import * as React from 'react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Icons } from '@/components/icons';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { worldCurrencies } from '@/lib/currencies';
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  currency?: string;
-  maxDecimalPlaces?: number;
+interface CurrencyInputProps {
+  value: string;
+  onChange: (value: string) => void;
 }
 
-const CurrencyInput = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, currency = 'USD', maxDecimalPlaces = 6, ...props }, ref) => {
-    const { onChange } = props;
+export function CurrencyInput({ value, onChange }: CurrencyInputProps) {
+  const [open, setOpen] = useState(false);
 
-    const formatCurrency = (value: string): string => {
-      const numericValue = parseFloat(value);
-      return isNaN(numericValue)
-        ? ''
-        : numericValue.toLocaleString(undefined, {
-            style: 'currency',
-            currency: currency,
-            minimumFractionDigits: 2,
-            maximumFractionDigits: maxDecimalPlaces,
-          });
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let rawValue = e.target.value.replace(/[^\d.]/g, '');
-
-      // Ensure only one decimal point
-      const decimalIndex = rawValue.indexOf('.');
-      if (decimalIndex !== -1) {
-        rawValue =
-          rawValue.slice(0, decimalIndex + 1) + rawValue.slice(decimalIndex + 1).replace(/\./g, '');
-      }
-
-      const formattedValue = formatCurrency(rawValue);
-
-      // Update the input value with the formatted amount
-      e.target.value = formattedValue;
-
-      // Call the original onChange with the numeric value
-      if (onChange) {
-        const numericValue = parseFloat(rawValue);
-        const syntheticEvent = {
-          ...e,
-          target: { ...e.target, value: isNaN(numericValue) ? '' : rawValue },
-        };
-        onChange(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
-      }
-    };
-
-    return (
-      <input
-        className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-          className,
-        )}
-        ref={ref}
-        {...props}
-        onChange={handleChange}
-      />
-    );
-  },
-);
-CurrencyInput.displayName = 'CurrencyInput';
-
-export { CurrencyInput };
+  return (
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn('justify-between', !value && 'text-muted-foreground')}
+        >
+          {value
+            ? worldCurrencies.find((currency) => currency.value === value)?.label
+            : 'Select account currency'}
+          <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder="Search currency..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>No currency found.</CommandEmpty>
+            <CommandGroup>
+              <ScrollArea className="max-h-96 overflow-y-auto">
+                {worldCurrencies.map((currency) => (
+                  <CommandItem
+                    value={currency.label}
+                    key={currency.value}
+                    onSelect={() => {
+                      onChange(currency.value);
+                      setOpen(false);
+                    }}
+                  >
+                    {currency.label}
+                    <Icons.Check
+                      className={cn(
+                        'ml-auto h-4 w-4',
+                        currency.value === value ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                  </CommandItem>
+                ))}
+              </ScrollArea>
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}

@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { SelectSingleEventHandler } from 'react-day-picker';
 import { format, isValid, parse } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
@@ -46,8 +45,8 @@ export default function DatePickerInput({ onChange, value, disabled }: DatePicke
     }
   };
 
-  const handleSelectDate: SelectSingleEventHandler = React.useCallback(
-    (selected) => {
+  const handleSelectDate = React.useCallback(
+    (selected: Date | undefined) => {
       setDate(selected);
       if (selected) {
         setOpen(false);
@@ -86,7 +85,7 @@ export default function DatePickerInput({ onChange, value, disabled }: DatePicke
           defaultMonth={date}
           selected={date}
           onSelect={handleSelectDate}
-          initialFocus
+          disabled={disabled}
         />
       </PopoverContent>
     </Popover>

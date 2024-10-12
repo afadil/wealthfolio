@@ -24,6 +24,9 @@ export const QueryKeys = {
   EXCHANGE_RATE_SYMBOLS: 'exchange_rate_symbols',
   QUOTE: 'quote',
 
+  CONTRIBUTION_LIMITS: 'contributionLimits',
+  CONTRIBUTION_LIMIT_PROGRESS: 'contributionLimitProgress',
+
   // Helper function to create account-specific keys
   accountHistory: (id: string) => ['history', id],
 } as const;

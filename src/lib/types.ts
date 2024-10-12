@@ -179,6 +179,12 @@ export interface Holding {
       weight: number;
     },
   ];
+  countries?: [
+    {
+      code: string;
+      weight: number;
+    },
+  ];
 }
 
 export interface Asset {
@@ -321,3 +327,25 @@ export interface ExchangeRate {
 export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-history';
 
 export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';
+
+export interface ContributionLimit {
+  id: string;
+  groupName: string;
+  contributionYear: number;
+  limitAmount: number;
+  accountIds?: string;
+}
+
+export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
+
+export interface AccountDeposit {
+  amount: number;
+  currency: string;
+  convertedAmount: number;
+}
+
+export interface DepositsCalculation {
+  total: number;
+  baseCurrency: string;
+  byAccount: Record<string, AccountDeposit>;
+}

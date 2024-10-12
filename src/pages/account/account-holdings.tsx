@@ -27,9 +27,9 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
           <CardHeader>
             <div className="grid grid-cols-5 gap-4">
               <div className="col-span-2 text-left" />
-              <div className="text-right font-medium text-gray-600">Total value</div>
-              <div className="text-right font-medium text-gray-600">Today’s price</div>
-              <div className="text-right font-medium text-gray-600">All time return</div>
+              <div className="text-right font-medium text-muted-foreground">Total value</div>
+              <div className="text-right font-medium text-muted-foreground">Today’s price</div>
+              <div className="text-right font-medium text-muted-foreground">All time return</div>
             </div>
           </CardHeader>
           <Separator />
@@ -45,7 +45,7 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
 
                 <div className="text-right">
                   <p className="">{formatAmount(holding.marketValueConverted, holding.currency)}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {formatStockQuantity(holding.quantity)} shares
                   </p>
                 </div>
@@ -54,7 +54,7 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
                   <p className=" ">
                     {formatAmount(holding.marketPrice || 0, holding.currency, false)}
                   </p>
-                  <p className="text-sm text-gray-600">{holding.currency}</p>
+                  <p className="text-sm text-muted-foreground">{holding.currency}</p>
                 </div>
 
                 <div className="text-right">

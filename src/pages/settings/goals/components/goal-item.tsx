@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GoalOperations } from './goal-operations';
 import type { Goal } from '@/lib/types';
@@ -15,9 +14,7 @@ export function GoalItem({ goal, onEdit, onDelete }: GoalItemProps) {
   return (
     <div className="flex items-center justify-between p-4">
       <div className="grid gap-1">
-        <Link to={`/goals/${goal.id}`} className="font-semibold hover:underline">
-          {goal.title}
-        </Link>
+        <h3 className="font-semibold">{goal.title}</h3>
         <div>
           <p className="text-sm text-muted-foreground">{goal.description}</p>
         </div>
@@ -27,7 +24,7 @@ export function GoalItem({ goal, onEdit, onDelete }: GoalItemProps) {
           {goal.isAchieved ? (
             <Icons.CheckCircle className="h5 mr-1 text-green-600" />
           ) : (
-            <Icons.Goal className="mr-1 h-5  text-green-600" />
+            <Icons.Goal className="mr-1 h-5 text-green-600" />
           )}
           <span className="text-md">{formatAmount(goal.targetAmount, 'USD', false)}</span>
         </div>

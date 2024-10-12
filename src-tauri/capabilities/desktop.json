@@ -1,0 +1,15 @@
+{
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "permissions": [
+    "dialog:default",
+    "shell:default",
+    "core:app:allow-set-app-theme",
+    "core:window:allow-set-theme",
+    "updater:default"
+  ]
+}

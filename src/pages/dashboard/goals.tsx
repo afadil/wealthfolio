@@ -31,7 +31,7 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
             <CardTitle className="text-md">Saving Goals</CardTitle>
           </CardHeader>
           <CardContent>
-            <Card className="w-full">
+            <Card className="w-full border-none shadow-sm">
               <CardContent className="pt-6">
                 {goalsProgress && goalsProgress.length > 0 ? (
                   goalsProgress.map((goal: GoalProgress, index) => (
@@ -45,7 +45,11 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
                             ) : null}
                           </CardDescription>
 
-                          <Progress value={goal.progress} className="h-2.5 w-full" />
+                          <Progress
+                            value={goal.progress}
+                            className="h-2.5 w-full"
+                            indicatorClassName="dark:bg-success"
+                          />
                         </div>
                       </TooltipTrigger>
                       <TooltipContent className="space-y-2">

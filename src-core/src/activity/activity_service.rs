@@ -313,7 +313,7 @@ impl ActivityService {
     ) -> Result<f64, Box<dyn std::error::Error>> {
         #[derive(QueryableByName, Debug)]
         struct AverageCost {
-            #[sql_type = "Double"]
+            #[diesel(sql_type = Double)]
             average_cost: f64,
         }
 

@@ -1,5 +1,5 @@
 use super::settings_repository::SettingsRepository;
-use crate::models::Settings;
+use crate::models::{Settings, SettingsUpdate};
 use diesel::sqlite::SqliteConnection;
 
 pub struct SettingsService;
@@ -19,7 +19,7 @@ impl SettingsService {
     pub fn update_settings(
         &self,
         conn: &mut SqliteConnection,
-        new_settings: &Settings,
+        new_settings: &SettingsUpdate,
     ) -> Result<(), diesel::result::Error> {
         SettingsRepository::update_settings(conn, new_settings)
     }
