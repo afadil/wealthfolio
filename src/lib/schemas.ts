@@ -93,5 +93,5 @@ export const newContributionLimitSchema = z.object({
       invalid_type_error: 'Limit amount must be a positive number.',
     })
     .min(0, { message: 'Price must be a non-negative number.' }),
-  accountIds: z.string().optional(),
+  accountIds: z.string().nullable().optional(),
 });

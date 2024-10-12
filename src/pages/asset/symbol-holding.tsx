@@ -57,8 +57,18 @@ const SymbolHoldingCard: React.FC<SymbolHoldingProps> = ({ holdingData, classNam
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between pb-0">
-        <CardTitle className="text-lg font-bold">{`${formatStockQuantity(numShares)} shares`}</CardTitle>
-        <div className="text-2xl font-extrabold">{formatAmount(marketValue, currency)}</div>
+        <CardTitle className="flex w-full justify-between text-lg font-bold">
+          <div>
+            <div>{formatStockQuantity(numShares)}</div>
+            <div className="text-sm font-normal text-muted-foreground">shares</div>
+          </div>
+          <div>
+            <div className="text-xl font-extrabold">
+              {formatAmount(marketValue, currency, false)}
+            </div>
+            <div className="text-right text-sm font-normal text-muted-foreground">{currency}</div>
+          </div>
+        </CardTitle>
       </CardHeader>
 
       <CardContent>

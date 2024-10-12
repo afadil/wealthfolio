@@ -333,7 +333,7 @@ export interface ContributionLimit {
   groupName: string;
   contributionYear: number;
   limitAmount: number;
-  accountIds?: string;
+  accountIds?: string | null;
 }
 
 export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
