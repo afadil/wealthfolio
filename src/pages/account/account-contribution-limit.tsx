@@ -92,9 +92,14 @@ function AccountContributionLimitItem({
   const progressPercentageNumber =
     limit.limitAmount > 0 ? (progressValue / limit.limitAmount) * 100 : 0;
   const isOverLimit = progressPercentageNumber > 100;
+  const isAtLimit = progressPercentageNumber === 100;
 
   return (
-    <Card className={`pt-6 ${isOverLimit ? 'border-destructive/20 bg-destructive/10' : ''}`}>
+    <Card
+      className={`pt-6 ${
+        isOverLimit ? 'border-destructive/20 bg-destructive/10' : isAtLimit ? 'bg-success/10' : ''
+      }`}
+    >
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-sm">

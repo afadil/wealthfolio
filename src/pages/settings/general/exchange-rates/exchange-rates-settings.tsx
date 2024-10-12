@@ -93,8 +93,18 @@ export function ExchangeRatesSettings() {
               <Skeleton key={index} className="h-10 w-full" />
             ))}
           </div>
+        ) : exchangeRates && exchangeRates.length > 0 ? (
+          <DataTable columns={columns} data={exchangeRates} />
         ) : (
-          <DataTable columns={columns} data={exchangeRates || []} />
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <Icons.DollarSign className="h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold">No exchange rates defined yet</h3>
+
+            <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>
+              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              Add rate
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

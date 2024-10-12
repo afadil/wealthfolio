@@ -25,7 +25,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Command, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -97,57 +103,59 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                   </Button>
                 </FormControl>
               </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0">
+              <PopoverContent className="w-full p-0">
                 <Command>
                   <CommandInput
                     placeholder="Search currency..."
                     onValueChange={handleSearchChange}
                   />
-                  <CommandGroup>
-                    <ScrollArea className="max-h-96 overflow-y-auto">
-                      {searchValue && (
-                        <CommandItem
-                          value={searchValue}
-                          key={searchValue}
-                          onSelect={() => {
-                            form.setValue(fieldName, searchValue);
-                          }}
-                        >
-                          <Icons.Plus
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              searchValue === field.value ? 'opacity-100' : 'opacity-0',
-                            )}
-                          />
-                          <span className="font-semibold italic">Custom ({searchValue})</span>
-                        </CommandItem>
-                      )}
-
-                      {worldCurrencies
-                        .filter(
-                          (currency) =>
-                            currency.label.toLowerCase().includes(searchValue.toLowerCase()) ||
-                            currency.value.includes(searchValue),
-                        )
-                        .map((currency) => (
+                  <CommandList>
+                    <CommandGroup>
+                      <ScrollArea className="max-h-96 overflow-y-auto">
+                        {searchValue && (
                           <CommandItem
-                            value={currency.label}
-                            key={currency.value}
+                            value={searchValue}
+                            key={searchValue}
                             onSelect={() => {
-                              form.setValue(fieldName, currency.value);
+                              form.setValue(fieldName, searchValue);
                             }}
                           >
-                            <Icons.Check
+                            <Icons.Plus
                               className={cn(
                                 'mr-2 h-4 w-4',
-                                currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                                searchValue === field.value ? 'opacity-100' : 'opacity-0',
                               )}
                             />
-                            {currency.label}
+                            <span className="font-semibold italic">Custom ({searchValue})</span>
                           </CommandItem>
-                        ))}
-                    </ScrollArea>
-                  </CommandGroup>
+                        )}
+
+                        {worldCurrencies
+                          .filter(
+                            (currency) =>
+                              currency.label.toLowerCase().includes(searchValue.toLowerCase()) ||
+                              currency.value.includes(searchValue),
+                          )
+                          .map((currency) => (
+                            <CommandItem
+                              value={currency.label}
+                              key={currency.value}
+                              onSelect={() => {
+                                form.setValue(fieldName, currency.value);
+                              }}
+                            >
+                              <Icons.Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              {currency.label}
+                            </CommandItem>
+                          ))}
+                      </ScrollArea>
+                    </CommandGroup>
+                  </CommandList>
                 </Command>
               </PopoverContent>
             </Popover>

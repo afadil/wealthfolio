@@ -1,3 +1,4 @@
+
 CREATE TABLE contribution_limits (
     id TEXT PRIMARY KEY NOT NULL,
     group_name TEXT NOT NULL,

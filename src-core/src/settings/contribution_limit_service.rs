@@ -91,9 +91,7 @@ impl ContributionLimitService {
                 .unwrap();
 
         let fx_service = CurrencyExchangeService::new();
-        fx_service
-            .initialize(conn)
-            .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
+        let _ = fx_service.initialize(conn);
 
         let deposits: Vec<(String, f64, f64, String)> = activities::table
             .inner_join(accounts::table)

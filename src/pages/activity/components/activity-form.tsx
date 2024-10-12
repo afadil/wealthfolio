@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { MoneyInput } from '@/components/ui/money-input';
 import {
   Select,
   SelectContent,
@@ -243,7 +243,7 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
             <FormItem>
               <FormLabel>Fee</FormLabel>
               <FormControl>
-                <CurrencyInput placeholder="Fee" {...field} />
+                <MoneyInput placeholder="Fee" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -257,7 +257,7 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
             <FormItem>
               <FormLabel>Amount</FormLabel>
               <FormControl>
-                <CurrencyInput placeholder="Amount" {...field} />
+                <MoneyInput placeholder="Amount" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -340,7 +340,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
                 <FormItem>
                   <FormLabel>Average Cost</FormLabel>
                   <FormControl>
-                    <CurrencyInput placeholder="Average Cost" {...field} />
+                    <MoneyInput placeholder="Average Cost" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -370,7 +370,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Price</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="Price" {...field} />
+                  <MoneyInput placeholder="Price" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -383,7 +383,7 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
               <FormItem>
                 <FormLabel>Fee</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="Fee" {...field} />
+                  <MoneyInput placeholder="Fee" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -427,7 +427,7 @@ const DividendActivityFields = ({ defaultAssetId }: DividendActivityFieldsProps)
           <FormItem>
             <FormLabel>Dividend Amount</FormLabel>
             <FormControl>
-              <CurrencyInput placeholder="Dividend Amount" {...field} />
+              <MoneyInput placeholder="Dividend Amount" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>

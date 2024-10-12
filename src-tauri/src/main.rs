@@ -80,18 +80,17 @@ pub fn main() {
 
             let db_path = db::init(&app_data_dir);
 
-            // Use the new menu module here
             let menu = menu::create_menu(&app.handle())?;
             app.set_menu(menu)?;
 
             // Create connection pool
             let pool = db::create_pool(&db_path);
 
-            // Get initial base_currency from settings
+            // // Get initial base_currency from settings
             let mut conn = pool.get().expect("Failed to get database connection");
             let settings_service = settings::SettingsService::new();
 
-            // Get instance_id from settings
+            // // Get instance_id from settings
             let settings = settings_service.get_settings(&mut conn)?;
             let instance_id = settings.instance_id.clone();
 

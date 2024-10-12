@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 
 import { newContributionLimitSchema } from '@/lib/schemas';
 import { useContributionLimitMutations } from '../useContributionLimitMutations';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { MoneyInput } from '@/components/ui/money-input';
 
 type NewContributionLimit = z.infer<typeof newContributionLimitSchema>;
 
@@ -109,7 +109,7 @@ export function ContributionLimitForm({
               <FormItem>
                 <FormLabel>Limit Amount</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="Limit amount" {...field} />
+                  <MoneyInput placeholder="Limit amount" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
