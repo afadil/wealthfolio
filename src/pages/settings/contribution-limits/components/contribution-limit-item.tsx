@@ -58,7 +58,7 @@ export function ContributionLimitItem({
 
   return (
     <Card
-      className={`mb-4 ${progressPercentageNumber === 100 ? 'bg-success/10' : isOverLimit ? 'border-destructive/20 bg-destructive/10' : ''} last:mb-0`}
+      className={`mb-4 ${progressPercentageNumber === 100 ? 'border-none bg-success/10 shadow-sm' : isOverLimit ? 'border-none border-destructive/20 bg-destructive/10 shadow-sm' : ''} last:mb-0`}
     >
       <CardHeader className="cursor-pointer" onClick={toggleExpanded}>
         <div className="flex items-center justify-between">

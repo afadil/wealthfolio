@@ -48,7 +48,7 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   if (accountLimits.length === 0) {
     return (
-      <Card className="p-6">
+      <Card className="border-none bg-indigo-100 p-6 shadow-sm dark:border-primary/20 dark:bg-primary/20">
         <div className="flex items-center justify-between text-sm">
           <span>
             You've contributed{' '}
@@ -96,7 +96,7 @@ function AccountContributionLimitItem({
 
   return (
     <Card
-      className={`pt-6 ${
+      className={`border-none pt-6 shadow-sm ${
         isOverLimit ? 'border-destructive/20 bg-destructive/10' : isAtLimit ? 'bg-success/10' : ''
       }`}
     >
