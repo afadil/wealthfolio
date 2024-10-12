@@ -4,13 +4,21 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { formatAmount, formatStockQuantity } from '@/lib/utils';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { Row, ColumnDef, RowData } from '@tanstack/react-table';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
 import { useNavigate } from 'react-router-dom';
+
+ 
+const numericSortFunction = (rowA:Row<RowData>, rowB: Row<RowData>, columnId: string) => {
+  const valueA = rowA.getValue(columnId) as number;
+  const valueB = rowB.getValue(columnId) as number;
+  return valueA - valueB
+}
+
 
 export const HoldingsTable = ({
   holdings,
@@ -126,6 +134,7 @@ export const columns: ColumnDef<Holding>[] = [
     cell: ({ row }) => {
       return <div className="text-right">{formatStockQuantity(row.getValue('quantity'))}</div>;
     },
+    sortingFn: numericSortFunction
   },
   {
     id: 'marketPrice',
@@ -144,6 +153,7 @@ export const columns: ColumnDef<Holding>[] = [
       const currency = row.getValue('currency') as string;
       return <div className="text-right">{formatAmount(marketPrice, currency)}</div>;
     },
+    sortingFn: numericSortFunction
   },
   {
     id: 'bookValue',
@@ -158,6 +168,7 @@ export const columns: ColumnDef<Holding>[] = [
 
       return <div className="pr-4 text-right">{formatAmount(bookValue, currency)}</div>;
     },
+    sortingFn: numericSortFunction
   },
   {
     id: 'marketValue',
@@ -183,6 +194,7 @@ export const columns: ColumnDef<Holding>[] = [
         </div>
       );
     },
+    sortingFn: numericSortFunction
   },
 
   {
