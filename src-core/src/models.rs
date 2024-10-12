@@ -575,7 +575,7 @@ impl IncomeSummary {
     }
 }
 
-#[derive(Debug, Clone, Queryable, Insertable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Queryable, QueryableByName, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::portfolio_history)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioHistory {

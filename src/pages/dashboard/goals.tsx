@@ -45,7 +45,11 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
                             ) : null}
                           </CardDescription>
 
-                          <Progress value={goal.progress} className="h-2.5 w-full" />
+                          <Progress
+                            value={goal.progress}
+                            className="h-2.5 w-full"
+                            indicatorClassName="dark:bg-success"
+                          />
                         </div>
                       </TooltipTrigger>
                       <TooltipContent className="space-y-2">

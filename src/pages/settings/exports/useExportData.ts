@@ -101,7 +101,7 @@ export function useExportData() {
     try {
       await exportDataMutation(params);
     } catch (error) {
-      console.log('Error while exporting', error);
+      console.error('Error while exporting', error);
     }
   };
 

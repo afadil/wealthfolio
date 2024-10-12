@@ -22,12 +22,6 @@ const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
     0,
   );
 
-  const bookValue = accountsInCategory.reduce(
-    (total, account) =>
-      total + account.performance.bookCost * (account.performance.exchangeRate || 1),
-    0,
-  );
-
   const totalNetDeposit = accountsInCategory.reduce(
     (total, account) =>
       total + account.performance.netDeposit * (account.performance.exchangeRate || 1),
@@ -45,7 +39,7 @@ const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
     totalMarketValue,
     totalCashBalance,
     totalGainPercent: ((totalValue - totalNetDeposit) / totalNetDeposit) * 100,
-    totalGainAmount: totalMarketValue - bookValue,
+    totalGainAmount: totalValue - totalNetDeposit,
     numberOfAccounts: accountsInCategory.length,
   };
 };
@@ -211,7 +205,7 @@ export function Accounts({
             />
           ))}
           {ungroupedAccounts.map((accountSummary) => (
-            <Card key={accountSummary.account.id}>
+            <Card key={accountSummary.account.id} className="border-none shadow-sm">
               <CardHeader className="py-6">
                 <AccountSummaryComponent accountSummary={accountSummary} />
               </CardHeader>
@@ -221,7 +215,7 @@ export function Accounts({
       );
     } else {
       return accounts?.map((accountSummary) => (
-        <Card key={accountSummary.account.id}>
+        <Card key={accountSummary.account.id} className="border-none shadow-sm">
           <CardHeader className="py-6">
             <AccountSummaryComponent accountSummary={accountSummary} />
           </CardHeader>
