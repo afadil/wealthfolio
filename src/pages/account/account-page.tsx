@@ -157,7 +157,12 @@ const AccountPage = () => {
         )}
       </div>
       <div className="pt-6">
-        <AccountHoldings holdings={accountHoldings || []} isLoading={isLoadingHoldings} />
+        <AccountHoldings
+          holdings={(accountHoldings || []).filter(
+            (holding) => !holding.symbol.startsWith('$CASH'),
+          )}
+          isLoading={isLoadingHoldings}
+        />
       </div>
     </ApplicationShell>
   );

@@ -33,7 +33,7 @@ export const AssetProfilePage = () => {
   const location = useLocation();
 
   const { data, isLoading: isAssetDataLoading } = useQuery<AssetData, Error>({
-    queryKey: ['asset_data', symbol],
+    queryKey: [QueryKeys.ASSET_DATA, symbol],
     queryFn: () => getAssetData(symbol),
   });
 

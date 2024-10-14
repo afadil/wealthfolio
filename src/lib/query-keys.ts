@@ -27,6 +27,8 @@ export const QueryKeys = {
   CONTRIBUTION_LIMITS: 'contributionLimits',
   CONTRIBUTION_LIMIT_PROGRESS: 'contributionLimitProgress',
 
+  ASSET_DATA: 'asset_data',
+
   // Helper function to create account-specific keys
   accountHistory: (id: string) => ['history', id],
 } as const;
