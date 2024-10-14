@@ -60,7 +60,7 @@ track their investments and goals.
 ### Always Doing
 
 - Keeping the app safe and up-to-date
-- Making the app faster and bette using user feedback
+- Making the app faster and better using user feedback
 
 We're building Wealthfolio to be a great alternative to online investment trackers. Our plan might
 change based on what users tell us they want, but we'll always focus on keeping your data private
