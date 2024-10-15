@@ -80,7 +80,7 @@ impl AssetService {
         conn: &mut SqliteConnection,
         asset_id: &str,
         payload: UpdateAssetProfile,
-    ) -> Result<(), diesel::result::Error> {
+    ) -> Result<Asset, diesel::result::Error> {
         diesel::update(assets::table.filter(assets::id.eq(asset_id)))
             .set((
                 assets::sectors.eq(&payload.sectors),
@@ -88,8 +88,7 @@ impl AssetService {
                 assets::comment.eq(payload.comment),
                 assets::asset_sub_class.eq(&payload.asset_sub_class),
             ))
-            .execute(conn)?;
-        Ok(())
+            .get_result::<Asset>(conn)
     }
 
     pub fn load_currency_assets(

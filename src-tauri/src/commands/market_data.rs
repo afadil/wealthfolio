@@ -4,6 +4,7 @@ use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
 use crate::AppState;
 use tauri::State;
+use wealthfolio_core::models::Asset;
 
 #[tauri::command]
 pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
@@ -36,7 +37,7 @@ pub async fn update_asset_profile(
     id: String,
     payload: UpdateAssetProfile,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<Asset, String> {
     let mut conn = state
         .pool
         .get()
