@@ -1,4 +1,4 @@
-import { AssetData, QuoteSummary } from '@/lib/types';
+import { AssetData, QuoteSummary, Asset } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
@@ -50,12 +50,11 @@ export const updateAssetProfile = async (payload: {
   countries: string;
   comment: string;
   assetSubClass: string;
-}): Promise<void> => {
+}): Promise<Asset> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        await invokeTauri('update_asset_profile', { id: payload.symbol, payload });
-        return;
+        return invokeTauri('update_asset_profile', { id: payload.symbol, payload });
       default:
         throw new Error(`Unsupported`);
     }
