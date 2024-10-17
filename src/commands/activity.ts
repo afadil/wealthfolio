@@ -105,9 +105,11 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
 export const checkActivitiesImport = async ({
   account_id,
   file_path,
+  profile_id,
 }: {
   account_id: string;
   file_path: string;
+  profile_id: string;
 }): Promise<ActivityImport[]> => {
   try {
     switch (getRunEnv()) {
@@ -115,6 +117,7 @@ export const checkActivitiesImport = async ({
         return invokeTauri('check_activities_import', {
           accountId: account_id,
           filePath: file_path,
+          profileId: profile_id
         });
       default:
         throw new Error(`Unsupported`);

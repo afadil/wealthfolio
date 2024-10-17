@@ -6,6 +6,7 @@ mod menu;
 mod updater;
 use commands::account::{create_account, delete_account, get_accounts, update_account};
 use commands::activity::{
+    create_csv_import_profile, get_csv_import_profiles, import_transactions_with_profile,
     check_activities_import, create_activities, create_activity, delete_activity, get_activities,
     search_activities, update_activity,
 };
@@ -129,6 +130,9 @@ pub fn main() {
             search_symbol,
             check_activities_import,
             create_activities,
+            create_csv_import_profile,
+            get_csv_import_profiles,
+            import_transactions_with_profile,
             calculate_historical_data,
             compute_holdings,
             get_asset_data,

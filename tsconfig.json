@@ -5,6 +5,9 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "types": ["@tauri-apps/api"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
 
      /* Resolve paths */
     "baseUrl": ".",

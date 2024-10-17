@@ -17,6 +17,8 @@ wealthfolio_core = { path = "../src-core" }
 tauri = { version = "2.0.0", features = [] }
 diesel = { version = "2.2.4", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15.7"
+csv = "1.1"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.128"
 chrono = { version = "0.4.38", features = ["serde"] }
 tauri-plugin-fs = "2.0.0"

@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import type { Account, ActivityImport } from '@/lib/types';
+import type { Account, ActivityImport, CsvImportProfile } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -37,10 +37,12 @@ import {
 import { openCsvFileDialog } from '@/commands/file';
 import { QueryKeys } from '@/lib/query-keys';
 import { useActivityImportMutations } from './useActivityImportMutations';
+import { invoke } from '@tauri-apps/api/core';
 
 const importFormSchema = z.object({
   account_id: z.string({ required_error: 'Please select an account.' }),
   file_path: z.string({ required_error: 'Please select a file.' }),
+  profile_id: z.string({ required_error: 'Please select a profile.' })
 });
 type ImportFormInputs = z.infer<typeof importFormSchema>;
 
@@ -50,11 +52,28 @@ type ActivityImportFormProps = {
 };
 
 export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormProps) => {
+  const form = useForm<ImportFormInputs>({
+    resolver: zodResolver(importFormSchema),
+  });
+
+  const accountId = form.watch('account_id');
+
   const { checkImportMutation } = useActivityImportMutations(onSuccess, onError);
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
+  
+  // Fetch CSV profiles
+  const { data: profiles } = useQuery<CsvImportProfile[], Error>({
+    queryKey: ['csv-import-profiles', accountId],
+    queryFn: async () => {
+      return await invoke<CsvImportProfile[]>('get_csv_import_profiles', { account_id: accountId });
+    },
+    enabled: !!accountId,
+  });
+  
+  
 
   const [dragging, setDragging] = useState<boolean>(false);
 
@@ -92,10 +111,6 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
     };
   }, []);
 
-  const form = useForm<ImportFormInputs>({
-    resolver: zodResolver(importFormSchema),
-  });
-
   const openFilePicker = async () => {
     let filepath = await openCsvFileDialog();
     form.setValue('file_path', filepath as string);
@@ -105,6 +120,7 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
     await checkImportMutation.mutateAsync({
       account_id: data.account_id,
       file_path: data.file_path,
+      profile_id: data.profile_id // Pass the selected profile
     });
   }
 
@@ -146,6 +162,36 @@ export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormPro
             </FormItem>
           )}
         />
+        {/* Select profile */}
+        <FormField
+          control={form.control}
+          name="profile_id"
+          render={({ field }) => (
+            <FormItem className={isLoading ? 'pointer-events-none opacity-50' : ''}>
+              <FormLabel>CSV Import Profile</FormLabel>
+              <FormControl>
+                <Select
+                  disabled={checkImportMutation.isPending}
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles?.map((profile) => (
+                      <SelectItem value={profile.id} key={profile.id}>
+                        {profile.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {/* File input */}
         <FormField
           control={form.control}
           name="file_path"

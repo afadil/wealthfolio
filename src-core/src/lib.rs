@@ -12,3 +12,4 @@ pub mod portfolio;
 pub mod providers;
 pub mod schema;
 pub mod settings;
+pub mod db_functions;

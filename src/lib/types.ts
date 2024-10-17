@@ -349,3 +349,21 @@ export interface DepositsCalculation {
   baseCurrency: string;
   byAccount: Record<string, AccountDeposit>;
 }
+
+export interface CsvColumnMapping {
+  csv_column_name: string;
+  app_field_name: string;
+}
+
+export interface CsvTransactionTypeMapping {
+  csv_transaction_type: string;
+  app_activity_type: string;
+}
+
+export interface CsvImportProfile {
+  id: string;
+  name: string;
+  account_id: string;
+  column_mappings: CsvColumnMapping[];
+  transaction_type_mappings: CsvTransactionTypeMapping[];
+}
