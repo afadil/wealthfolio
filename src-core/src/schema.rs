@@ -77,6 +77,32 @@ diesel::table! {
 }
 
 diesel::table! {
+    csv_column_mappings (rowid) {
+        rowid -> Integer,
+        profile_id -> Text,
+        csv_column_name -> Text,
+        app_field_name -> Text,
+    }
+}
+
+diesel::table! {
+    csv_import_profiles (id) {
+        id -> Text,
+        name -> Text,
+        account_id -> Text,
+    }
+}
+
+diesel::table! {
+    csv_transaction_type_mappings (rowid) {
+        rowid -> Integer,
+        profile_id -> Text,
+        csv_transaction_type -> Text,
+        app_activity_type -> Text,
+    }
+}
+
+diesel::table! {
     exchange_rates (id) {
         id -> Text,
         from_currency -> Text,
@@ -157,6 +183,8 @@ diesel::table! {
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
+diesel::joinable!(csv_column_mappings -> csv_import_profiles (profile_id));
+diesel::joinable!(csv_transaction_type_mappings -> csv_import_profiles (profile_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
@@ -167,6 +195,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     app_settings,
     assets,
     contribution_limits,
+    csv_column_mappings,
+    csv_import_profiles,
+    csv_transaction_type_mappings,
     exchange_rates,
     goals,
     goals_allocation,

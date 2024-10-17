@@ -5087,8 +5087,10 @@ name = "wealthfolio-app"
 version = "1.0.19"
 dependencies = [
  "chrono",
+ "csv",
  "diesel",
  "dotenvy",
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",
