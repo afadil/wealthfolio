@@ -13,6 +13,7 @@
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",
     "@hookform/resolvers": "^3.9.0",
+    "@number-flow/react": "^0.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-checkbox": "^1.1.2",
     "@radix-ui/react-collapsible": "^1.1.1",
@@ -51,8 +52,8 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "react-router-dom": "^6.26.2",
-    "recharts": "^2.12.7",
-    "tailwind-merge": "^2.5.3",
+    "recharts": "^2.13.0",
+    "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.23.8"
   },

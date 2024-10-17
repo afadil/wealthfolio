@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Account } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { useSettings } from '@/lib/useSettings';
+import { QueryKeys } from '@/lib/query-keys';
 
 const navigation: NavigationProps = {
   primary: [
@@ -42,7 +43,7 @@ const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<Account[], Error>({
-    queryKey: ['accounts'],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
@@ -59,7 +60,7 @@ const AppLayout = () => {
     return <Navigate to="/onboarding?step=1" />;
   }
   return (
-    <div className="flex min-h-screen rounded-xl border bg-background">
+    <div className="flex min-h-screen bg-background">
       <SidebarNav navigation={navigation} />
       <div className="relative flex h-screen w-full overflow-hidden">
         <main className="flex flex-1 flex-col">

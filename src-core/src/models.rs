@@ -1,8 +1,8 @@
 use bigdecimal::BigDecimal;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use diesel::Selectable;
 use diesel::Queryable;
+use diesel::Selectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -687,7 +687,7 @@ pub struct DepositsCalculation {
 #[diesel(table_name = crate::schema::import_mappings)]
 pub struct ImportMapping {
     pub account_id: String,
-    pub fields_mappings: String,        // JSON string stored in the database
+    pub fields_mappings: String, // JSON string stored in the database
     pub activity_type_mappings: String, // JSON string stored in the database
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -701,4 +701,20 @@ pub struct NewImportMapping {
     pub activity_type_mappings: String, // JSON string to be stored
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CumulativeReturn {
+    pub date: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CumulativeReturns {
+    pub id: String,
+    pub cumulative_returns: Vec<CumulativeReturn>,
+    pub total_return: f64,
+    pub annualized_return: f64,
 }
