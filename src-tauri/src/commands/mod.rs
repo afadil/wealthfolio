@@ -4,4 +4,3 @@ pub mod goal;
 pub mod market_data;
 pub mod portfolio;
 pub mod settings;
-pub mod csv_profile;

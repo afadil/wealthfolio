@@ -5,7 +5,6 @@ use diesel::Selectable;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::schema::*;
 
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
 #[diesel(table_name= crate::schema::platforms)]
@@ -683,66 +682,23 @@ pub struct DepositsCalculation {
     pub by_account: HashMap<String, AccountDeposit>,
 }
 
-// CsvImportProfile struct
-#[derive(Queryable, Identifiable, Debug, Clone, Serialize, Deserialize, Selectable)]
-#[diesel(table_name = csv_import_profiles)]
-pub struct CsvImportProfile {
-    pub id: String,
-    pub name: String,
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset)]
+#[diesel(primary_key(account_id))]
+#[diesel(table_name = crate::schema::import_mappings)]
+pub struct ImportMapping {
     pub account_id: String,
+    pub fields_mappings: String,        // JSON string stored in the database
+    pub activity_type_mappings: String, // JSON string stored in the database
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
-// NewCsvImportProfile struct for insertions
-#[derive(Debug, Clone, Serialize, Deserialize, Insertable, Selectable)]
-#[diesel(table_name = csv_import_profiles)]
-pub struct NewCsvImportProfile {
-    pub id: String,
-    pub name: String,
-    pub account_id: String,
-}
-
-// CsvColumnMapping struct
-#[derive(Queryable, Insertable, Debug, Selectable, Clone, Serialize, Deserialize)]
-#[diesel(table_name = csv_column_mappings)]
-pub struct CsvColumnMapping {
-    pub profile_id: String,
-    pub csv_column_name: String,
-    pub app_field_name: String,
-}
-
-// NewCsvColumnMapping struct for insertions
 #[derive(Debug, Clone, Serialize, Deserialize, Insertable)]
-#[diesel(table_name = csv_column_mappings)]
-pub struct NewCsvColumnMapping {
-    pub profile_id: String,
-    pub csv_column_name: String,
-    pub app_field_name: String,
-}
-
-// CsvTransactionTypeMapping struct
-#[derive(Queryable, Insertable, Debug, Selectable, Clone, Serialize, Deserialize)]
-#[diesel(table_name = csv_transaction_type_mappings)]
-pub struct CsvTransactionTypeMapping {
-    pub profile_id: String,
-    pub csv_transaction_type: String,
-    pub app_activity_type: String,
-}
-
-// NewCsvTransactionTypeMapping struct for insertions
-#[derive(Debug, Clone, Serialize, Deserialize, Insertable)]
-#[diesel(table_name = csv_transaction_type_mappings)]
-pub struct NewCsvTransactionTypeMapping {
-    pub profile_id: String,
-    pub csv_transaction_type: String,
-    pub app_activity_type: String
-}
-
-// CsvImportProfileWithMappings struct combining profile and its mappings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CsvImportProfileWithMappings {
-    pub id: String,
-    pub name: String,
+#[diesel(table_name = crate::schema::import_mappings)]
+pub struct NewImportMapping {
     pub account_id: String,
-    pub column_mappings: Vec<CsvColumnMapping>,
-    pub transaction_type_mappings: Vec<CsvTransactionTypeMapping>,
+    pub fields_mappings: String,        // JSON string to be stored
+    pub activity_type_mappings: String, // JSON string to be stored
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }

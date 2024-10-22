@@ -1,19 +1,7 @@
-CREATE TABLE csv_import_profiles (
-    id TEXT NOT NULL PRIMARY KEY,
-    name TEXT NOT NULL,
-    account_id TEXT NOT NULL
-);
-
-CREATE TABLE csv_column_mappings (
-    profile_id TEXT NOT NULL,
-    csv_column_name TEXT NOT NULL,
-    app_field_name TEXT NOT NULL,
-    FOREIGN KEY(profile_id) REFERENCES csv_import_profiles(id)
-);
-
-CREATE TABLE csv_transaction_type_mappings (
-    profile_id TEXT NOT NULL,
-    csv_transaction_type TEXT NOT NULL,
-    app_activity_type TEXT NOT NULL,
-    FOREIGN KEY(profile_id) REFERENCES csv_import_profiles(id)
+CREATE TABLE IF NOT EXISTS import_mappings (
+    account_id TEXT PRIMARY KEY NOT NULL,
+    fields_mappings TEXT NOT NULL,
+    activity_type_mappings TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
