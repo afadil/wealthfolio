@@ -1,22 +1,11 @@
+import { useState, useCallback, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
+import Papa from 'papaparse';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { Link } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { z } from 'zod';
 
-import { EmptyPlaceholder } from '@/components/empty-placeholder';
-
-import { Icons } from '@/components/icons';
-import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -24,244 +13,443 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-import type { Account, ActivityImport, CsvImportProfile } from '@/lib/types';
-import { getAccounts } from '@/commands/account';
-import { useQuery } from '@tanstack/react-query';
-import {
-  listenImportFileDrop,
-  listenImportFileDropCancelled,
-  listenImportFileDropHover,
-  UnlistenFn,
-} from '@/commands/import-listener';
-import { openCsvFileDialog } from '@/commands/file';
-import { QueryKeys } from '@/lib/query-keys';
+import { Button } from '@/components/ui/button';
+import { Icons } from '@/components/icons';
+import { Link } from 'react-router-dom';
+import { Account, ActivityType, ImportActivity, ImportFormat, NewActivity } from '@/lib/types';
+import { getAccountImportMapping, saveAccountImportMapping } from '@/commands/activity-import';
 import { useActivityImportMutations } from './useActivityImportMutations';
-import { invoke } from '@tauri-apps/api/core';
+import { ActivityImport } from '@/lib/types';
 
-const importFormSchema = z.object({
-  account_id: z.string({ required_error: 'Please select an account.' }),
-  file_path: z.string({ required_error: 'Please select a file.' }),
-  profile_id: z.string({ required_error: 'Please select a profile.' })
-});
-type ImportFormInputs = z.infer<typeof importFormSchema>;
+// Components
+import { FileDropzone } from './components/FileDropzone';
+import {
+  importActivitySchema,
+  importFormSchema,
+  type ImportFormSchema,
+  newActivitySchema,
+} from '@/lib/schemas';
+import { ImportPreviewTable } from './components/ImportPreviewTable';
+import { QueryKeys } from '@/lib/query-keys';
+import { getAccounts } from '@/commands/account';
+import ErrorViewer from './components/csv-error.viewer';
 
-type ActivityImportFormProps = {
+export function ActivityImportForm({
+  onSuccess,
+  onError,
+}: {
   onSuccess: (activities: ActivityImport[]) => void;
   onError: (error: string) => void;
-};
-
-export const ActivityImportForm = ({ onSuccess, onError }: ActivityImportFormProps) => {
-  const form = useForm<ImportFormInputs>({
-    resolver: zodResolver(importFormSchema),
+}) {
+  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<ImportFormSchema['mapping']>({
+    columns: {} as Record<ImportFormat, string>,
+    activityTypes: {} as Record<ActivityType, string>,
   });
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isValidCsv, setIsValidCsv] = useState(true);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
 
-  const accountId = form.watch('account_id');
-
-  const { checkImportMutation } = useActivityImportMutations(onSuccess, onError);
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
-  
-  // Fetch CSV profiles
-  const { data: profiles } = useQuery<CsvImportProfile[], Error>({
-    queryKey: ['csv-import-profiles', accountId],
-    queryFn: async () => {
-      return await invoke<CsvImportProfile[]>('get_csv_import_profiles', { account_id: accountId });
+
+  const form = useForm<ImportFormSchema>({
+    resolver: zodResolver(importFormSchema),
+    defaultValues: {
+      accountId: '',
+      mapping: {
+        columns: {} as Record<ImportFormat, string>,
+        activityTypes: {} as Record<ActivityType, string>,
+      },
     },
+  });
+
+  const accountId = form.watch('accountId');
+
+  // Add this effect to reset states when account changes
+  useEffect(() => {
+    resetAccountStates();
+  }, [accountId]);
+
+  const { data: fetchedMapping, isLoading: isMappingLoading } = useQuery({
+    queryKey: ['mapping', accountId],
+    queryFn: () => getAccountImportMapping(accountId),
     enabled: !!accountId,
   });
-  
-  
-
-  const [dragging, setDragging] = useState<boolean>(false);
 
   useEffect(() => {
-    const unlistenHover = listenImportFileDropHover<string>(() => setDragging(true));
-    const unlistenDrop = listenImportFileDrop<string>(() => setDragging(false));
-    const unlistenCancelled = listenImportFileDropCancelled<string>(() => setDragging(false));
+    if (fetchedMapping) {
+      form.setValue('mapping', fetchedMapping);
+      setMapping(fetchedMapping);
+    }
+  }, [fetchedMapping, form]);
 
-    return () => {
-      unlistenHover;
-      unlistenDrop;
-      unlistenCancelled;
-    };
-  }, []);
+  const { checkImportMutation } = useActivityImportMutations();
 
-  const activeAccounts = accounts?.filter((account) => account.isActive);
+  const saveMappingMutation = useMutation({
+    mutationFn: saveAccountImportMapping,
+    onSuccess: () => {
+      // Optionally, you can show a success message here
+    },
+    onError: (error: any) => {
+      setError(`Failed to save mapping: ${error.message}`);
+      onError(`Failed to save mapping: ${error.message}`);
+    },
+  });
 
-  useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
-    (async () => {
-      //tauri://file-drop and tauri://file-drop-hover (and tauri://file-drop-cancelled)
-      unlisten = await listenImportFileDrop<string[]>((event) => {
-        if (event.payload) {
-          setDragging(false);
-          form.setValue('file_path', event.payload[0] as string);
-        }
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      resetFileStates();
+      const file = acceptedFiles[0];
+      setSelectedFile(file);
+      Papa.parse(file, {
+        complete: (results: Papa.ParseResult<string[]>) => {
+          if (results.data && results.data.length > 0) {
+            setCsvData(results.data);
+            const headerRow = results.data[0];
+            setHeaders(headerRow);
+
+            const isValid = validateCsvStructure(headerRow);
+
+            if (!isValid) {
+              setIsValidCsv(false);
+              setError(
+                "Oops! The CSV file structure doesn't look quite right. Please make sure your file starts with a header row containing multiple column names.",
+              );
+            } else {
+              initializeMapping(headerRow);
+            }
+          } else {
+            setIsValidCsv(false);
+            setError('The CSV file appears to be empty.');
+          }
+          setIsLoading(false);
+        },
+        error: (error: any) => {
+          setIsValidCsv(false);
+          setError(`Error parsing CSV: ${error.message}`);
+          setIsLoading(false);
+        },
       });
-    })();
-    return () => {
-      (async () => {
-        if (unlisten !== null) {
-          unlisten();
-        }
-      })();
-    };
-  }, []);
+    },
+    [form],
+  );
 
-  const openFilePicker = async () => {
-    let filepath = await openCsvFileDialog();
-    form.setValue('file_path', filepath as string);
+  const validateCsvStructure = (headerRow: string[]): boolean => {
+    return headerRow.length >= 3 && !headerRow.some((header) => header.trim() === '');
   };
 
-  async function onSubmit(data: ImportFormInputs) {
-    await checkImportMutation.mutateAsync({
-      account_id: data.account_id,
-      file_path: data.file_path,
-      profile_id: data.profile_id // Pass the selected profile
+  const initializeMapping = (headerRow: string[]) => {
+    const initialMapping: Partial<Record<ImportFormat, string>> = {};
+    Object.values(ImportFormat).forEach((field) => {
+      const matchingHeader = headerRow.find(
+        (header) => header.toLowerCase().trim() === field.toLowerCase(),
+      );
+      if (matchingHeader) {
+        initialMapping[field] = matchingHeader;
+      }
     });
-  }
 
-  const selectedFilePath = form.watch('file_path') as string | null;
+    form.setValue('mapping.columns', {
+      ...form.getValues('mapping.columns'),
+      ...initialMapping,
+    } as Record<ImportFormat, string>);
+    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, ...initialMapping } }));
+  };
 
-  const dropZoneClasses = `relative border cursor-pointer  ${
-    dragging ? 'border-blue-300 bg-blue-100' : 'border-gray-300'
-  }`;
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    open: openFilePicker,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv'],
+    },
+    noClick: true,
+  });
 
-  const isLoading = checkImportMutation.isPending;
+  const handleColumnMapping = (field: ImportFormat, value: string) => {
+    form.setValue('mapping.columns', {
+      ...form.getValues('mapping.columns'),
+      [field]: value,
+    } as Record<ImportFormat, string>);
+    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, [field]: value } }));
+  };
+
+  const handleActivityTypeMapping = useCallback(
+    (csvActivity: string, activityType: ActivityType) => {
+      const updatedActivityTypes = {
+        ...form.getValues('mapping.activityTypes'),
+        [activityType]: csvActivity,
+      };
+      form.setValue('mapping.activityTypes', updatedActivityTypes);
+      setMapping((prev) => ({
+        ...prev,
+        activityTypes: updatedActivityTypes,
+      }));
+    },
+    [form, setMapping],
+  );
+
+  const getMappedValue = useCallback(
+    (row: string[], field: ImportFormat): string => {
+      const columnIndex = headers.indexOf(mapping.columns[field] || '');
+      if (columnIndex === -1) return '';
+
+      let value = row[columnIndex];
+
+      if (field === ImportFormat.ActivityType) {
+        const mappedActivity = Object.entries(mapping.activityTypes).find(([_, v]) => v === value);
+        return mappedActivity ? mappedActivity[0] : value;
+      }
+
+      return value;
+    },
+    [headers, mapping.columns, mapping.activityTypes],
+  );
+
+  const isMapComplete = useCallback(() => {
+    const columnsComplete = Object.values(ImportFormat).every(
+      (field) => mapping.columns[field] && headers.includes(mapping.columns[field]),
+    );
+    const activityTypesComplete = csvData.slice(1).every((row) => {
+      const activityType = getMappedValue(row, ImportFormat.ActivityType);
+      return Object.values(ActivityType).includes(activityType as ActivityType);
+    });
+    return columnsComplete && activityTypesComplete;
+  }, [headers, mapping.columns, csvData, getMappedValue]);
+
+  const onSubmit = async (data: ImportFormSchema) => {
+    try {
+      // Save the mapping
+      await saveMappingMutation.mutateAsync({
+        accountId: data.accountId,
+        mapping: data.mapping,
+      });
+
+      // Prepare activities for import
+      const activitiesToImport: ImportActivity[] = csvData.slice(1).map((row) => ({
+        date: getMappedValue(row, ImportFormat.Date),
+        symbol: getMappedValue(row, ImportFormat.Symbol),
+        activityType: getMappedValue(row, ImportFormat.ActivityType) as ActivityType,
+        quantity: parseFloat(getMappedValue(row, ImportFormat.Quantity)),
+        unitPrice: parseFloat(getMappedValue(row, ImportFormat.UnitPrice)),
+        currency: getMappedValue(row, ImportFormat.Currency),
+        fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
+        accountId: data.accountId,
+        isDraft: true,
+        assetId: getMappedValue(row, ImportFormat.Symbol),
+        comment: '',
+      }));
+
+      // Validate activities
+      const validationErrors: Record<string, string[]> = {};
+      setValidationErrors({});
+      activitiesToImport.forEach((activity, index) => {
+        try {
+          importActivitySchema.parse(activity);
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            validationErrors[`${index + 2}`] = error.errors.map(
+              (e) => `${e.path.join('.')}: ${e.message}`,
+            );
+          }
+        }
+      });
+
+      if (Object.keys(validationErrors).length > 0) {
+        setValidationErrors(validationErrors);
+        return;
+      }
+
+      await checkImportMutation
+        .mutateAsync({
+          account_id: data.accountId,
+          activities: activitiesToImport,
+        })
+        .then((result) => {
+          onSuccess(result);
+        })
+        .catch((error) => {
+          onError(`Import failed: ${error}`);
+        });
+    } catch (error: any) {
+      onError(`Import failed: ${error}`);
+    }
+  };
+
+  // Add this function to reset states
+  const resetAccountStates = () => {
+    setError(null);
+    setIsLoading(false);
+    setIsValidCsv(true);
+    setValidationErrors({});
+  };
+
+  const resetFileStates = () => {
+    setCsvData([]);
+    setHeaders([]);
+    setError(null);
+    setIsLoading(false);
+    setIsValidCsv(true);
+    setValidationErrors({});
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 lg:max-w-4xl">
-        <FormField
-          control={form.control}
-          name="account_id"
-          render={({ field }) => (
-            <FormItem className={isLoading ? 'pointer-events-none opacity-50' : ''}>
-              <FormLabel>Account</FormLabel>
-              <FormControl>
-                <Select
-                  disabled={checkImportMutation.isPending}
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeAccounts?.map((account) => (
-                      <SelectItem value={account.id} key={account.id}>
-                        {account.name} ({account.currency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+    <div className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <AccountSelection control={form.control} accounts={accounts} />
+        <FileDropzone
+          getRootProps={getRootProps}
+          getInputProps={getInputProps}
+          isDragActive={isDragActive}
+          selectedFile={selectedFile}
+          isLoading={isLoading}
+          openFilePicker={openFilePicker}
         />
-        {/* Select profile */}
-        <FormField
-          control={form.control}
-          name="profile_id"
-          render={({ field }) => (
-            <FormItem className={isLoading ? 'pointer-events-none opacity-50' : ''}>
-              <FormLabel>CSV Import Profile</FormLabel>
-              <FormControl>
-                <Select
-                  disabled={checkImportMutation.isPending}
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a profile" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles?.map((profile) => (
-                      <SelectItem value={profile.id} key={profile.id}>
-                        {profile.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+
+        <PreviewContent
+          accountId={accountId}
+          selectedFile={selectedFile}
+          isValidCsv={isValidCsv}
+          error={error}
+          headers={headers}
+          mapping={mapping}
+          handleColumnMapping={handleColumnMapping}
+          handleActivityTypeMapping={handleActivityTypeMapping}
+          importFormatFields={Object.values(ImportFormat)}
+          csvData={csvData}
+          getMappedValue={getMappedValue}
+          validationErrors={validationErrors}
         />
-        {/* File input */}
-        <FormField
-          control={form.control}
-          name="file_path"
-          render={() => (
-            <FormItem className={isLoading ? 'pointer-events-none opacity-40' : ''}>
-              <FormLabel>File</FormLabel>
-              <FormControl>
-                <EmptyPlaceholder className={dropZoneClasses} onClick={openFilePicker}>
-                  {selectedFilePath ? (
-                    <>
-                      {isLoading ? (
-                        <EmptyPlaceholder.Icon name="Spinner" className="animate-spin" />
-                      ) : (
-                        <EmptyPlaceholder.Icon name="FileText" />
-                      )}
-                      <EmptyPlaceholder.Title>
-                        {selectedFilePath?.split('/').pop()}
-                      </EmptyPlaceholder.Title>
-                      <EmptyPlaceholder.Description>
-                        {/* {(selectedFile?.size / 1024).toFixed(2)} KB */}
-                        {checkImportMutation.isPending ? (
-                          <div className="relative h-2 w-full min-w-[200px] rounded-full bg-gray-200">
-                            <div
-                              className="absolute left-0 h-2 animate-pulse rounded-full bg-gray-800"
-                              style={{ width: '40%' }}
-                            ></div>
-                          </div>
-                        ) : null}
-                      </EmptyPlaceholder.Description>
-                    </>
-                  ) : (
-                    <>
-                      <EmptyPlaceholder.Icon name="Import" />
-                      <EmptyPlaceholder.Title>
-                        Drag and drop your CSV file here
-                      </EmptyPlaceholder.Title>
-                      <EmptyPlaceholder.Description>
-                        Or click here to choose a file.
-                      </EmptyPlaceholder.Description>
-                    </>
-                  )}
-                  <Input type="hidden" />
-                </EmptyPlaceholder>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="flex space-x-4">
-          <Button type="button" variant="outline" asChild>
-            <Link to="/activities">
-              {/* <Icons.ArrowLeft className="mr-2 h-4 w-4" /> */}
-              <span className="hidden sm:ml-2 sm:inline">Cancel</span>
-            </Link>
+
+        <div className="mt-4 flex justify-between">
+          <Button asChild variant="outline">
+            <Link to="/activities">Cancel</Link>
           </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                <span className="hidden sm:ml-2 sm:inline">Validating activities...</span>
-              </>
-            ) : (
-              <>
-                <Icons.Import className="mr-2 h-4 w-4" />
-                <span className="hidden sm:ml-2 sm:inline">Import activities</span>
-              </>
-            )}
-          </Button>
+          {accountId && selectedFile && isMapComplete() && (
+            <Button type="submit">Import Data</Button>
+          )}
+          {accountId && selectedFile && !isMapComplete() && (
+            <p className="flex items-center text-sm text-red-400">
+              <Icons.AlertTriangle className="mr-2 h-4 w-4" />
+              Please map all columns and activity types before importing.
+            </p>
+          )}
         </div>
       </form>
-    </Form>
+    </div>
   );
-};
+}
+
+function AccountSelection({
+  control,
+  accounts,
+}: {
+  control: any;
+  accounts: Account[] | undefined;
+}) {
+  return (
+    <div className="mb-4">
+      <label htmlFor="accountId" className="mb-1 block text-sm font-medium">
+        Select Account
+      </label>
+      <Controller
+        name="accountId"
+        control={control}
+        render={({ field }) => (
+          <Select onValueChange={field.onChange} value={field.value}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select an account" />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts ? (
+                accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="">Loading accounts...</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        )}
+      />
+    </div>
+  );
+}
+
+function PreviewContent({
+  accountId,
+  selectedFile,
+  isValidCsv,
+  error,
+  headers,
+  mapping,
+  handleColumnMapping,
+  handleActivityTypeMapping,
+  importFormatFields,
+  csvData,
+  getMappedValue,
+  validationErrors,
+}: {
+  accountId: string;
+  selectedFile: File | null;
+  isValidCsv: boolean;
+  error: string | null;
+  headers: string[];
+  mapping: ImportFormSchema['mapping'];
+  handleColumnMapping: (field: ImportFormat, value: string) => void;
+  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  importFormatFields: ImportFormat[];
+  csvData: string[][];
+  getMappedValue: (row: string[], field: ImportFormat) => string;
+  validationErrors: Record<string, string[]>;
+}) {
+  if (!accountId) {
+    return (
+      <div className="mt-2">
+        <p className="text-sm text-muted-foreground">Please select an account to proceed.</p>
+      </div>
+    );
+  }
+
+  if (!selectedFile) {
+    return (
+      <div className="mt-2">
+        <p className="text-sm text-muted-foreground">Please select a file to proceed.</p>
+      </div>
+    );
+  }
+
+  if (!isValidCsv || error || Object.keys(validationErrors).length > 0) {
+    const allErrors: Record<string, string[]> = {
+      ...(error ? { Error: [error] } : {}),
+      ...validationErrors,
+    };
+    return <ErrorViewer errors={allErrors} csvData={csvData} mapping={mapping} />;
+  }
+
+  return (
+    <div className="pt-6">
+      <h2 className="mb-2 font-semibold">Preview</h2>
+      <ImportPreviewTable
+        importFormatFields={importFormatFields}
+        mapping={mapping}
+        headers={headers}
+        csvData={csvData}
+        handleColumnMapping={handleColumnMapping}
+        handleActivityTypeMapping={handleActivityTypeMapping}
+        getMappedValue={getMappedValue}
+      />
+    </div>
+  );
+}

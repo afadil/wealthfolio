@@ -1,14 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { checkActivitiesImport, createActivities } from '@/commands/activity';
-import { ActivityImport } from '@/lib/types';
+import { checkActivitiesImport, createActivities } from '@/commands/activity-import';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
 
-export function useActivityImportMutations(
-  onSuccess?: (activities: ActivityImport[]) => void,
-  onError?: (error: string) => void,
-) {
+export function useActivityImportMutations() {
   const queryClient = useQueryClient();
 
   const calculateHistoryMutation = useCalculateHistoryMutation({
@@ -17,8 +13,13 @@ export function useActivityImportMutations(
 
   const checkImportMutation = useMutation({
     mutationFn: checkActivitiesImport,
-    onSuccess,
-    onError,
+    onError: (error: any) => {
+      toast({
+        title: 'Error checking import',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
   const confirmImportMutation = useMutation({
@@ -29,14 +30,18 @@ export function useActivityImportMutations(
         accountIds: undefined,
         forceFullCalculation: true,
       });
+      toast({
+        title: 'Import successful',
+        description: 'Activities have been imported successfully.',
+      });
     },
     onError: (error: any) => {
+      console.log('error', error);
       toast({
         title: 'Uh oh! Something went wrong.',
         description: 'Please try again or report an issue if the problem persists.',
         variant: 'destructive',
       });
-      return error;
     },
   });
 

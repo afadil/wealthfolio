@@ -90,13 +90,10 @@ pub async fn update_activity(
 #[tauri::command]
 pub async fn check_activities_import(
     account_id: String,
-    file_path: String,
+    activities: Vec<NewActivity>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ActivityImport>, String> {
-    println!(
-        "Checking activities import...: {}, {}",
-        account_id, file_path
-    );
+    println!("Checking activities import for account: {}", account_id);
     let mut conn = state
         .pool
         .get()
@@ -104,7 +101,7 @@ pub async fn check_activities_import(
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = activity_service::ActivityService::new(base_currency);
     service
-        .check_activities_import(&mut conn, account_id, file_path)
+        .check_activities_import(&mut conn, account_id, activities)
         .await
         .map_err(|e| e.to_string())
 }

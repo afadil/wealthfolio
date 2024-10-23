@@ -1,7 +1,7 @@
 import z from 'zod';
-import { Activity, ActivityDetails, ActivityImport, ActivitySearchResponse } from '@/lib/types';
-import { newActivitySchema } from '@/lib/schemas';
+import { Activity, ActivityDetails, ActivitySearchResponse } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
+import { newActivitySchema } from '@/lib/schemas';
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
 
@@ -97,48 +97,6 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
     }
   } catch (error) {
     console.error('Error deleting activity:', error);
-    throw error;
-  }
-};
-
-//checkActivitiesImport
-export const checkActivitiesImport = async ({
-  account_id,
-  file_path,
-  profile_id,
-}: {
-  account_id: string;
-  file_path: string;
-  profile_id: string;
-}): Promise<ActivityImport[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('check_activities_import', {
-          accountId: account_id,
-          filePath: file_path,
-          profileId: profile_id
-        });
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    console.error('Error checking activities import:', error);
-    throw error;
-  }
-};
-
-// importActivities
-export const createActivities = async (activities: NewActivity[]): Promise<Number> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('create_activities', { activities });
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    console.error('Error importing activities:', error);
     throw error;
   }
 };

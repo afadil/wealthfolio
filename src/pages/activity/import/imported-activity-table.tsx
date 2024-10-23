@@ -278,23 +278,4 @@ export const columns: ColumnDef<ActivityImport>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
     cell: ({ row }) => <div>{row.getValue('currency')}</div>,
   },
-  {
-    id: 'account',
-    accessorKey: 'account',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
-    cell: ({ row }) => {
-      return (
-        <div className="ml-2 flex flex-col">
-          <span>{row.getValue('accountName')}</span>
-          <span className="text-xs font-light">{row.getValue('currency')}</span>
-        </div>
-      );
-    },
-  },
-  {
-    id: 'actions',
-    cell: () => {
-      return <div>...</div>;
-    },
-  },
 ];

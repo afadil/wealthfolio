@@ -38,6 +38,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "dragDropEnabled": false,
         "fullscreen": false,
         "resizable": true,
         "theme": "Light",

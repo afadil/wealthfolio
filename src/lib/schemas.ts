@@ -1,4 +1,15 @@
 import * as z from 'zod';
+import { ImportFormat, ActivityType } from './types';
+
+export const importFormSchema = z.object({
+  accountId: z.string().min(1, 'Please select an account'),
+  mapping: z.object({
+    columns: z.record(z.nativeEnum(ImportFormat), z.string()),
+    activityTypes: z.record(z.nativeEnum(ActivityType), z.string()),
+  }),
+});
+
+export type ImportFormSchema = z.infer<typeof importFormSchema>;
 
 export const newAccountSchema = z.object({
   id: z.string().uuid().optional(),
@@ -32,10 +43,9 @@ export const newGoalSchema = z.object({
   isAchieved: z.boolean().optional(),
 });
 
-export const newActivitySchema = z.object({
+const baseActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
-  activityDate: z.union([z.date(), z.string().datetime()]).optional(),
   currency: z.string().min(1, { message: 'Currency is required' }),
   fee: z.coerce
     .number({
@@ -43,7 +53,6 @@ export const newActivitySchema = z.object({
       invalid_type_error: 'Fee must be a positive number.',
     })
     .min(0, { message: 'Fee must be a non-negative number.' }),
-
   isDraft: z.boolean(),
   quantity: z.coerce
     .number({
@@ -81,6 +90,14 @@ export const newActivitySchema = z.object({
     })
     .min(0, { message: 'Price must be a non-negative number.' }),
   comment: z.string().optional(),
+});
+
+export const newActivitySchema = baseActivitySchema.extend({
+  activityDate: z.union([z.date(), z.string().datetime()]).optional(),
+});
+
+export const importActivitySchema = baseActivitySchema.extend({
+  date: z.union([z.date(), z.string().datetime()]).optional(),
 });
 
 export const newContributionLimitSchema = z.object({

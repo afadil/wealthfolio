@@ -55,7 +55,7 @@ const ActivityImportPage = () => {
         navigate('/activities');
       },
       onError: (error: any) => {
-        setError(error);
+        setError(error.message);
       },
     });
   }

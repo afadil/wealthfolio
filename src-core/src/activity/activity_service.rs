@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use crate::account::AccountService;
 use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
@@ -9,7 +7,6 @@ use crate::models::{
 };
 use crate::schema::activities;
 
-use csv::ReaderBuilder;
 use diesel::prelude::*;
 use diesel::sql_types::{Double, Text};
 
@@ -184,29 +181,40 @@ impl ActivityService {
     pub async fn check_activities_import(
         &self,
         conn: &mut SqliteConnection,
-        _account_id: String,
-        file_path: String,
+        account_id: String,
+        activities: Vec<NewActivity>,
     ) -> Result<Vec<ActivityImport>, String> {
         let asset_service = AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
         let fx_service = CurrencyExchangeService::new();
         let account = account_service
-            .get_account_by_id(conn, &_account_id)
+            .get_account_by_id(conn, &account_id)
             .map_err(|e| e.to_string())?;
 
-        let file = File::open(&file_path).map_err(|e| e.to_string())?;
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b',')
-            .has_headers(true)
-            .from_reader(file);
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
         let mut symbols_to_sync: Vec<String> = Vec::new();
 
-        for (line_number, result) in rdr.deserialize().enumerate() {
-            let line_number = line_number + 1; // Adjust for human-readable line number
-            let mut activity_import: ActivityImport = result.map_err(|e| e.to_string())?;
+        for (index, activity) in activities.into_iter().enumerate() {
+            let mut activity_import = ActivityImport {
+                id: Some(Uuid::new_v4().to_string()),
+                account_id: Some(account.id.clone()),
+                account_name: Some(account.name.clone()),
+                symbol: activity.asset_id.clone(),
+                symbol_name: None,
+                activity_type: activity.activity_type,
+                quantity: activity.quantity,
+                unit_price: activity.unit_price,
+                currency: activity.currency,
+                fee: activity.fee,
+                date: activity.activity_date,
+                is_draft: Some("true".to_string()),
+                is_valid: None,
+                error: None,
+                comment: None,
+                line_number: Some((index + 1) as i32),
+            };
 
-            // Load the symbol profile here, now awaiting the async call
+            // Load the symbol profile
             let symbol_profile_result = asset_service
                 .get_asset_profile(conn, &activity_import.symbol, Some(false))
                 .await;
@@ -230,7 +238,10 @@ impl ActivityService {
                             Err(e) => {
                                 let error_msg = format!(
                                     "Failed to add exchange rate for {}/{}. Error: {}. Line: {}",
-                                    &account.currency, currency, e, line_number
+                                    &account.currency,
+                                    currency,
+                                    e,
+                                    activity_import.line_number.unwrap()
                                 );
                                 return Err(error_msg);
                             }
@@ -242,20 +253,15 @@ impl ActivityService {
                 Err(_) => {
                     let error_msg = format!(
                         "Symbol {} not found. Line: {}",
-                        &activity_import.symbol, line_number
+                        &activity_import.symbol,
+                        activity_import.line_number.unwrap()
                     );
                     (Some("false".to_string()), Some(error_msg))
                 }
             };
 
-            // Update the activity_import with the loaded symbol profile and status
-            activity_import.is_draft = Some("true".to_string());
-            activity_import.is_valid = is_valid.clone();
-            activity_import.error = error.clone();
-            activity_import.line_number = Some(line_number as i32);
-            activity_import.id = Some(Uuid::new_v4().to_string());
-            activity_import.account_id = Some(account.id.clone());
-            activity_import.account_name = Some(account.name.clone());
+            activity_import.is_valid = is_valid;
+            activity_import.error = error;
             activities_with_status.push(activity_import);
         }
 
@@ -277,7 +283,8 @@ impl ActivityService {
     ) -> Result<usize, diesel::result::Error> {
         conn.transaction(|conn| {
             let mut insert_count = 0;
-            for new_activity in activities {
+            for mut new_activity in activities {
+                new_activity.id = Some(Uuid::new_v4().to_string());
                 diesel::insert_into(activities::table)
                     .values(&new_activity)
                     .execute(conn)?;

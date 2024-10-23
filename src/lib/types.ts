@@ -1,11 +1,27 @@
 import * as z from 'zod';
-import { newActivitySchema } from '@/lib/schemas';
+import { importActivitySchema, newActivitySchema } from '@/lib/schemas';
 
 export enum AccountType {
   SECURITIES = 'SECURITIES',
   SAVINGS = 'SAVINGS',
   CHECKING = 'CHECKING',
   // Add more types as needed
+}
+
+export enum ActivityType {
+  BUY = 'BUY',
+  SELL = 'SELL',
+  DIVIDEND = 'DIVIDEND',
+  INTEREST = 'INTEREST',
+  DEPOSIT = 'DEPOSIT',
+  WITHDRAWAL = 'WITHDRAWAL',
+  TRANSFER_IN = 'TRANSFER_IN',
+  TRANSFER_OUT = 'TRANSFER_OUT',
+  CONVERSION_IN = 'CONVERSION_IN',
+  CONVERSION_OUT = 'CONVERSION_OUT',
+  FEE = 'FEE',
+  TAX = 'TAX',
+  SPLIT = 'SPLIT',
 }
 
 export type Account = {
@@ -66,6 +82,7 @@ export type ActivitySearchResponse = {
 };
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
+export type ImportActivity = z.infer<typeof importActivitySchema>;
 
 export interface AssetProfile {
   id: string;
@@ -350,20 +367,12 @@ export interface DepositsCalculation {
   byAccount: Record<string, AccountDeposit>;
 }
 
-export interface CsvColumnMapping {
-  csv_column_name: string;
-  app_field_name: string;
-}
-
-export interface CsvTransactionTypeMapping {
-  csv_transaction_type: string;
-  app_activity_type: string;
-}
-
-export interface CsvImportProfile {
-  id: string;
-  name: string;
-  account_id: string;
-  column_mappings: CsvColumnMapping[];
-  transaction_type_mappings: CsvTransactionTypeMapping[];
+export enum ImportFormat {
+  Date = 'date',
+  Symbol = 'symbol',
+  Quantity = 'quantity',
+  ActivityType = 'activityType',
+  UnitPrice = 'unitPrice',
+  Currency = 'currency',
+  Fee = 'fee',
 }
