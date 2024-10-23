@@ -182,7 +182,7 @@ export function ActivityImportForm({
 
   const handleActivityTypeMapping = useCallback(
     (csvActivity: string, activityType: ActivityType) => {
-      const trimmedCsvActivity = csvActivity.trim();
+      const trimmedCsvType = csvActivity.trim().toUpperCase();
       const updatedActivityTypes = {
         ...form.getValues('mapping.activityTypes'),
       };
@@ -194,19 +194,13 @@ export function ActivityImportForm({
         }
       });
 
-      // Remove the csvActivity from any existing mappings using prefix match
+      // Remove the csvActivity from any existing mappings
       Object.keys(updatedActivityTypes).forEach((key) => {
-        const compareValue =
-          trimmedCsvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
-            ? trimmedCsvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-            : trimmedCsvActivity.toUpperCase();
+        const compareValue = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
         updatedActivityTypes[key as ActivityType] = updatedActivityTypes[
           key as ActivityType
         ]?.filter((type) => {
-          const mappedValue =
-            type.length > ACTIVITY_TYPE_PREFIX_LENGTH
-              ? type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-              : type.toUpperCase();
+          const mappedValue = type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
           return mappedValue !== compareValue;
         });
       });
@@ -215,10 +209,8 @@ export function ActivityImportForm({
       if (!updatedActivityTypes[activityType]) {
         updatedActivityTypes[activityType] = [];
       }
-      const valueToStore =
-        trimmedCsvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
-          ? trimmedCsvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-          : trimmedCsvActivity.toUpperCase();
+      // Store only first ACTIVITY_TYPE_PREFIX_LENGTH characters
+      const valueToStore = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
       updatedActivityTypes[activityType]?.push(valueToStore);
 
       form.setValue('mapping.activityTypes', updatedActivityTypes);
@@ -253,13 +245,11 @@ export function ActivityImportForm({
     const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) => {
       return Object.values(mapping.activityTypes).some((mappedTypes) =>
         mappedTypes?.some((mappedType) => {
+          const normalizedCsvType = csvType.trim().toUpperCase();
           const normalizedMappedType = mappedType.trim().toUpperCase();
-          const normalizedCsvType =
-            csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-              ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH)
-              : csvType;
 
-          return normalizedMappedType === normalizedCsvType;
+          // Check if CSV type starts with the mapped type
+          return normalizedCsvType.startsWith(normalizedMappedType);
         }),
       );
     });
@@ -270,19 +260,13 @@ export function ActivityImportForm({
   const getMappedActivityType = useCallback(
     (row: string[]): ActivityType => {
       const csvType = getMappedValue(row, ImportFormat.ActivityType);
-      const compareValue =
-        csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-          ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-          : csvType.toUpperCase();
+      const normalizedCsvType = csvType.trim().toUpperCase();
 
       for (const [appType, csvTypes] of Object.entries(mapping.activityTypes)) {
         if (
-          csvTypes?.some((type) => {
-            const mappedValue =
-              type.length > ACTIVITY_TYPE_PREFIX_LENGTH
-                ? type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-                : type.toUpperCase();
-            return mappedValue === compareValue;
+          csvTypes?.some((mappedType) => {
+            const normalizedMappedType = mappedType.trim().toUpperCase();
+            return normalizedCsvType.startsWith(normalizedMappedType);
           })
         ) {
           return appType as ActivityType;

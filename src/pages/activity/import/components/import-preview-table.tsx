@@ -125,21 +125,13 @@ export function ImportPreviewTable({
     csvType: string,
     mappings: Partial<Record<ActivityType, string[]>>,
   ): ActivityType | null {
-    const trimmedCsvType = csvType.trim();
-    const compareValue =
-      trimmedCsvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-        ? trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-        : trimmedCsvType.toUpperCase();
+    const normalizedCsvType = csvType.trim().toUpperCase();
 
     for (const [appType, csvTypes] of Object.entries(mappings)) {
       if (
-        csvTypes?.some((type) => {
-          const trimmedType = type.trim();
-          const mappedValue =
-            trimmedType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-              ? trimmedType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-              : trimmedType.toUpperCase();
-          return mappedValue === compareValue;
+        csvTypes?.some((mappedType) => {
+          const normalizedMappedType = mappedType.trim().toUpperCase();
+          return normalizedCsvType.startsWith(normalizedMappedType);
         })
       ) {
         return appType as ActivityType;
@@ -163,7 +155,9 @@ export function ImportPreviewTable({
       return (
         <div className="flex items-center space-x-2">
           <Badge title={trimmedCsvType}>
-            {displayValue.length > 12 ? `${displayValue.substring(0, 12)}...` : displayValue}
+            {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH
+              ? `${displayValue.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH)}...`
+              : displayValue}
           </Badge>
           <Button
             type="button"
@@ -182,7 +176,7 @@ export function ImportPreviewTable({
 
     return (
       <div className="flex items-center space-x-2">
-        {displayValue.length > 12 ? (
+        {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH ? (
           <span className="text-destructive" title={trimmedCsvType}>
             {displayValue}
           </span>
