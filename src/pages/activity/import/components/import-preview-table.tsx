@@ -214,8 +214,14 @@ export function ImportPreviewTable({
           <div className="flex flex-wrap gap-2">
             {distinctActivityTypes.map(({ csvType, count, appType }) => (
               <div key={csvType} className="flex items-center space-x-1">
-                <span>{csvType}</span>
-                {appType && <span>→ {appType}</span>}
+                {csvType === appType ? (
+                  <span>{csvType}</span>
+                ) : (
+                  <>
+                    <span>{csvType}</span>
+                    {appType && <span>→ {appType}</span>}
+                  </>
+                )}
                 <Badge variant="secondary" className="text-xs">
                   {count}
                 </Badge>

@@ -6,14 +6,17 @@ export const checkActivitiesImport = async ({
   activities,
 }: {
   account_id: string;
-  activities: NewActivity[];
+  activities: ActivityImport[];
 }): Promise<ActivityImport[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('check_activities_import', {
           accountId: account_id,
-          activities: activities,
+          activities: activities.map((activity) => ({
+            ...activity,
+            activityDate: activity.date,
+          })),
         });
       default:
         throw new Error(`Unsupported`);
@@ -143,8 +146,8 @@ export const getAccountImportMapping = async (accountId: string) => {
             fee: 'fee',
           },
           activityTypes: {
-            BUY: ['BUY', 'BOUGHT', 'Purchase'],
-            SELL: ['SELL', 'SOLD'],
+            BUY: ['BUY'],
+            SELL: ['SELL'],
             DIVIDEND: ['DIVIDEND'],
             INTEREST: ['INTEREST'],
             DEPOSIT: ['DEPOSIT'],

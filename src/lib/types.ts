@@ -148,7 +148,7 @@ export interface ActivityImport {
   unitPrice: number;
   currency: string;
   fee: number;
-  amount?: number; // Add this new field
+  amount?: number;
   comment?: string;
   accountId?: string;
   accountName?: string;
