@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import Papa from 'papaparse';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -16,18 +15,21 @@ import {
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
-import { Account, ActivityType, ActivityImport, ImportFormat } from '@/lib/types';
+import { Account, ActivityType, ActivityImport, ImportFormat, ImportFormSchema } from '@/lib/types';
 import { getAccountImportMapping, saveAccountImportMapping } from '@/commands/activity-import';
-import { useActivityImportMutations } from './useActivityImportMutations';
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
+import { useActivityImportMutations } from './hooks/useActivityImportMutations';
 
 // Components
 import { FileDropzone } from './components/file-dropzone';
-import { importActivitySchema, importFormSchema, type ImportFormSchema } from '@/lib/schemas';
+import { importActivitySchema, importFormSchema } from '@/lib/schemas';
 import { ImportPreviewTable } from './components/import-preview-table';
 import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
 import { ErrorViewer } from './components/csv-error-viewer';
+
+import { useCsvParser } from './hooks/useCsvParser';
+import { useImportMapping } from './hooks/useImportMapping';
+import { isImportMapComplete } from './utils/csvValidation';
 
 export function ActivityImportForm({
   onSuccess,
@@ -36,22 +38,7 @@ export function ActivityImportForm({
   onSuccess: (activities: ActivityImport[]) => void;
   onError: (error: string) => void;
 }) {
-  const [csvData, setCsvData] = useState<string[][]>([]);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<ImportFormSchema['mapping']>({
-    columns: {} as Record<ImportFormat, string>,
-    activityTypes: {} as Partial<Record<ActivityType, string[]>>,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isValidCsv, setIsValidCsv] = useState(true);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
-
-  const { data: accounts } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
 
   const form = useForm<ImportFormSchema>({
     resolver: zodResolver(importFormSchema),
@@ -64,11 +51,30 @@ export function ActivityImportForm({
     },
   });
 
+  const {
+    csvData,
+    headers,
+    error,
+    isLoading,
+    selectedFile,
+    isValidCsv,
+    parseCsvFile,
+    resetFileStates,
+  } = useCsvParser();
+
+  const { mapping, setMapping, handleColumnMapping, handleActivityTypeMapping } =
+    useImportMapping(form);
+
+  const { data: accounts } = useQuery<Account[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: getAccounts,
+  });
+
   const accountId = form.watch('accountId');
 
-  // Add this effect to reset states when account changes
   useEffect(() => {
-    resetAccountStates();
+    resetFileStates();
+    setValidationErrors({});
   }, [accountId]);
 
   const { data: fetchedMapping } = useQuery({
@@ -82,144 +88,24 @@ export function ActivityImportForm({
       form.setValue('mapping', fetchedMapping as ImportFormSchema['mapping']);
       setMapping(fetchedMapping as ImportFormSchema['mapping']);
     }
-  }, [fetchedMapping, form]);
+  }, [fetchedMapping, form, setMapping]);
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const file = acceptedFiles[0];
+      parseCsvFile(file, form);
+    },
+    [parseCsvFile, form],
+  );
 
   const { checkImportMutation } = useActivityImportMutations();
 
   const saveMappingMutation = useMutation({
     mutationFn: saveAccountImportMapping,
-    onSuccess: () => {
-      // Optionally, you can show a success message here
-    },
     onError: (error: any) => {
-      setError(`Failed to save mapping: ${error.message}`);
       onError(`Failed to save mapping: ${error.message}`);
     },
   });
-
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      resetFileStates();
-      const file = acceptedFiles[0];
-      setSelectedFile(file);
-      Papa.parse(file, {
-        complete: (results: Papa.ParseResult<string[]>) => {
-          if (results.data && results.data.length > 0) {
-            setCsvData(results.data);
-            const headerRow = results.data[0].map((header) => header.trim()); // Trim headers
-            setHeaders(headerRow);
-
-            const isValid = validateCsvStructure(headerRow);
-
-            if (!isValid) {
-              setIsValidCsv(false);
-              setError(
-                "Oops! The CSV file structure doesn't look quite right. Please make sure your file starts with a header row containing multiple column names.",
-              );
-            } else {
-              initializeMapping(headerRow);
-            }
-          } else {
-            setIsValidCsv(false);
-            setError('The CSV file appears to be empty.');
-          }
-          setIsLoading(false);
-        },
-        error: (error: any) => {
-          setIsValidCsv(false);
-          setError(`Error parsing CSV: ${error.message}`);
-          setIsLoading(false);
-        },
-      });
-    },
-    [form],
-  );
-
-  const validateCsvStructure = (headerRow: string[]): boolean => {
-    return headerRow.length >= 3 && !headerRow.some((header) => header.trim() === '');
-  };
-
-  const initializeMapping = (headerRow: string[]) => {
-    const initialMapping: Partial<Record<ImportFormat, string>> = {};
-    Object.values(ImportFormat).forEach((field) => {
-      const matchingHeader = headerRow.find(
-        (header) => header.toLowerCase().trim() === field.toLowerCase(),
-      );
-      if (matchingHeader) {
-        initialMapping[field] = matchingHeader;
-      }
-    });
-
-    form.setValue('mapping.columns', {
-      ...form.getValues('mapping.columns'),
-      ...initialMapping,
-    } as Record<ImportFormat, string>);
-    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, ...initialMapping } }));
-  };
-
-  const {
-    getRootProps,
-    getInputProps,
-    isDragActive,
-    open: openFilePicker,
-  } = useDropzone({
-    onDrop,
-    accept: {
-      'text/csv': ['.csv'],
-    },
-    noClick: true,
-  });
-
-  const handleColumnMapping = (field: ImportFormat, value: string) => {
-    const trimmedValue = value.trim();
-    form.setValue('mapping.columns', {
-      ...form.getValues('mapping.columns'),
-      [field]: trimmedValue,
-    } as Record<ImportFormat, string>);
-    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, [field]: trimmedValue } }));
-  };
-
-  const handleActivityTypeMapping = useCallback(
-    (csvActivity: string, activityType: ActivityType) => {
-      const trimmedCsvType = csvActivity.trim().toUpperCase();
-      const updatedActivityTypes = {
-        ...form.getValues('mapping.activityTypes'),
-      };
-
-      // Ensure each activity type is initialized as an array
-      Object.keys(updatedActivityTypes).forEach((key) => {
-        if (!Array.isArray(updatedActivityTypes[key as ActivityType])) {
-          updatedActivityTypes[key as ActivityType] = [];
-        }
-      });
-
-      // Remove the csvActivity from any existing mappings
-      Object.keys(updatedActivityTypes).forEach((key) => {
-        const compareValue = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
-        updatedActivityTypes[key as ActivityType] = updatedActivityTypes[
-          key as ActivityType
-        ]?.filter((type) => {
-          const mappedValue = type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
-          return mappedValue !== compareValue;
-        });
-      });
-
-      // Add the csvActivity to the new activityType mapping
-      if (!updatedActivityTypes[activityType]) {
-        updatedActivityTypes[activityType] = [];
-      }
-      // Store only first ACTIVITY_TYPE_PREFIX_LENGTH characters
-      const valueToStore = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
-      updatedActivityTypes[activityType]?.push(valueToStore);
-
-      form.setValue('mapping.activityTypes', updatedActivityTypes);
-      setMapping((prev) => ({
-        ...prev,
-        activityTypes: updatedActivityTypes,
-      }));
-    },
-    [form, setMapping],
-  );
 
   const getMappedValue = useCallback(
     (row: string[], field: ImportFormat): string => {
@@ -231,37 +117,8 @@ export function ActivityImportForm({
   );
 
   const isMapComplete = useCallback(() => {
-    // Define required fields
-    const requiredFields = [
-      ImportFormat.Date,
-      ImportFormat.ActivityType,
-      ImportFormat.Symbol,
-      ImportFormat.Quantity,
-      ImportFormat.UnitPrice,
-    ];
-
-    const columnsComplete = requiredFields.every(
-      (field) => mapping.columns[field] && headers.includes(mapping.columns[field]),
-    );
-
-    const uniqueCsvTypes = new Set(
-      csvData
-        .slice(1)
-        .map((row) => getMappedValue(row, ImportFormat.ActivityType).trim().toUpperCase()),
-    );
-
-    const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) => {
-      return Object.values(mapping.activityTypes).some((mappedTypes) =>
-        mappedTypes?.some((mappedType) => {
-          const normalizedCsvType = csvType.trim().toUpperCase();
-          const normalizedMappedType = mappedType.trim().toUpperCase();
-          return normalizedCsvType.startsWith(normalizedMappedType);
-        }),
-      );
-    });
-
-    return columnsComplete && activityTypesComplete;
-  }, [headers, mapping.columns, mapping.activityTypes, csvData, getMappedValue]);
+    return isImportMapComplete(headers, mapping, csvData, getMappedValue);
+  }, [headers, mapping, csvData, getMappedValue]);
 
   const getMappedActivityType = useCallback(
     (row: string[]): ActivityType => {
@@ -384,22 +241,18 @@ export function ActivityImportForm({
     }
   };
 
-  // Add this function to reset states
-  const resetAccountStates = () => {
-    setError(null);
-    setIsLoading(false);
-    setIsValidCsv(true);
-    setValidationErrors({});
-  };
-
-  const resetFileStates = () => {
-    setCsvData([]);
-    setHeaders([]);
-    setError(null);
-    setIsLoading(false);
-    setIsValidCsv(true);
-    setValidationErrors({});
-  };
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    open: openFilePicker,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv'],
+    },
+    noClick: true,
+  });
 
   return (
     <div className="space-y-8">

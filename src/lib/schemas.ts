@@ -9,8 +9,6 @@ export const importFormSchema = z.object({
   }),
 });
 
-export type ImportFormSchema = z.infer<typeof importFormSchema>;
-
 export const newAccountSchema = z.object({
   id: z.string().uuid().optional(),
   name: z

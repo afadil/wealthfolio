@@ -8,7 +8,7 @@ import { ActivityImportForm } from './import-form';
 import ValidationAlert from './import-validation-alert';
 import { ImportHelpPopover } from './import-help';
 import ImportedActivitiesTable from './imported-activity-table';
-import { useActivityImportMutations } from './useActivityImportMutations';
+import { useActivityImportMutations } from './hooks/useActivityImportMutations';
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();

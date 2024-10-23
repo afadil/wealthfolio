@@ -50,12 +50,12 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
   return (
     <Card className="mx-auto w-full">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold">CSV Preview</CardTitle>
-        <div className="flex items-center space-x-2">
+        <CardTitle className="text-lg font-bold">
+          CSV Errors preview{' '}
           <Badge variant="destructive">
             {totalErrors} {totalErrors === 1 ? 'Error' : 'Errors'}
           </Badge>
-        </div>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'errors' | 'raw')}>

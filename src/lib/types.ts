@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { importActivitySchema, newActivitySchema } from '@/lib/schemas';
+import { importActivitySchema, importFormSchema, newActivitySchema } from '@/lib/schemas';
 
 export enum AccountType {
   SECURITIES = 'SECURITIES',
@@ -83,6 +83,7 @@ export type ActivitySearchResponse = {
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
 export type ActivityImport = z.infer<typeof importActivitySchema>;
+export type ImportFormSchema = z.infer<typeof importFormSchema>;
 
 export interface AssetProfile {
   id: string;

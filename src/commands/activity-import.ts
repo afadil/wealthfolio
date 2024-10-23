@@ -79,12 +79,12 @@ export const getAccountImportMapping = async (accountId: string) => {
           return {
             columns: {
               date: 'Run Date',
-              symbol: 'symbol',
+              symbol: 'Symbol',
               quantity: 'Quantity',
               activityType: 'Action',
               unitPrice: 'Price ($)',
               amount: 'Amount ($)',
-              currency: 'Commission ($)',
+              currency: '__skip__',
               fee: 'Fees ($)',
             },
             activityTypes: {
