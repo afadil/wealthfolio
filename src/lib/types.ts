@@ -82,7 +82,7 @@ export type ActivitySearchResponse = {
 };
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
-export type ImportActivity = z.infer<typeof importActivitySchema>;
+export type ActivityImport = z.infer<typeof importActivitySchema>;
 
 export interface AssetProfile {
   id: string;
@@ -138,26 +138,6 @@ export interface Tag {
 }
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
-
-export interface ActivityImport {
-  id?: string;
-  date: string;
-  symbol: string;
-  activityType: string;
-  quantity: number;
-  unitPrice: number;
-  currency: string;
-  fee: number;
-  amount?: number;
-  comment?: string;
-  accountId?: string;
-  accountName?: string;
-  symbolName?: string;
-  error?: string;
-  isDraft?: string;
-  isValid?: string;
-  lineNumber?: number;
-}
 
 export interface Holding {
   id: string;

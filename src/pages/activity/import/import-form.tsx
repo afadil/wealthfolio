@@ -16,10 +16,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
-import { Account, ActivityType, ImportActivity, ImportFormat } from '@/lib/types';
+import { Account, ActivityType, ActivityImport, ImportFormat } from '@/lib/types';
 import { getAccountImportMapping, saveAccountImportMapping } from '@/commands/activity-import';
 import { useActivityImportMutations } from './useActivityImportMutations';
-import { ActivityImport } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 
 // Components
@@ -284,7 +283,7 @@ export function ActivityImportForm({
         mapping: data.mapping,
       });
 
-      const activitiesToImport: ImportActivity[] = csvData.slice(1).map((row) => {
+      const activitiesToImport: ActivityImport[] = csvData.slice(1).map((row) => {
         const activityType = getMappedActivityType(row);
         const isCashActivity = [
           ActivityType.DIVIDEND,
@@ -329,6 +328,7 @@ export function ActivityImportForm({
           amount,
           accountId: data.accountId,
           isDraft: true,
+          isValid: false,
           assetId: getMappedValue(row, ImportFormat.Symbol),
           comment: '',
         };

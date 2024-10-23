@@ -60,7 +60,7 @@ const baseActivitySchema = z.object({
       invalid_type_error: 'Quantity must be a number.',
     })
     .min(0, { message: 'Quantity must be a non-negative number.' }),
-  assetId: z.string().min(1, { message: 'Asset ID is required' }),
+
   activityType: z.enum(
     [
       'BUY',
@@ -93,17 +93,25 @@ const baseActivitySchema = z.object({
 });
 
 export const newActivitySchema = baseActivitySchema.extend({
+  assetId: z.string().min(1, { message: 'Asset ID is required' }),
   activityDate: z.union([z.date(), z.string().datetime()]).optional(),
 });
 
 export const importActivitySchema = baseActivitySchema.extend({
   date: z.union([z.date(), z.string().datetime()]).optional(),
+  symbol: z.string().min(1, { message: 'Symbol is required' }),
   amount: z.coerce
     .number({
-      required_error: 'Please enter a valid amount.',
+      required_error: 'Should be a valid amount.',
       invalid_type_error: 'Amount must be a number.',
     })
     .optional(),
+  accountName: z.string().optional(),
+  symbolName: z.string().optional(),
+  error: z.string().optional(),
+  isDraft: z.boolean().default(true),
+  isValid: z.boolean().default(false),
+  lineNumber: z.number().optional(),
 });
 
 export const newContributionLimitSchema = z.object({
