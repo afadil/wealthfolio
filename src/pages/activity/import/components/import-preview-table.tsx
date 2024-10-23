@@ -11,6 +11,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -19,6 +20,16 @@ import { ImportFormat, ActivityType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
+
+const REQUIRED_FIELDS = [
+  ImportFormat.Date,
+  ImportFormat.ActivityType,
+  ImportFormat.Symbol,
+  ImportFormat.Quantity,
+  ImportFormat.UnitPrice,
+];
+
+const SKIP_FIELD_VALUE = '__skip__';
 
 interface ImportPreviewTableProps {
   importFormatFields: ImportFormat[];
@@ -83,23 +94,34 @@ export function ImportPreviewTable({
     const mappedHeader = mapping.columns[field];
     const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
     const isEditing = editingHeader === field || !isMapped;
+    const isRequired = REQUIRED_FIELDS.includes(field);
 
     return (
       <div>
-        <div className="px-4 pb-0 pt-2 font-bold">{field}</div>
+        <div className="flex items-center gap-2 px-4 pb-0 pt-2">
+          <span className="font-bold">{field}</span>
+        </div>
         {isEditing ? (
           <Select
             onValueChange={(val) => {
-              handleColumnMapping(field, val);
+              handleColumnMapping(field, val === SKIP_FIELD_VALUE ? '' : val);
               setEditingHeader(null);
             }}
-            value={mappedHeader || ''}
+            value={mappedHeader || SKIP_FIELD_VALUE}
             onOpenChange={(open) => !open && setEditingHeader(null)}
           >
             <SelectTrigger className="h-8 w-full px-3 py-2">
-              <SelectValue />
+              <SelectValue placeholder={isRequired ? 'Select column' : 'Optional'} />
             </SelectTrigger>
             <SelectContent className="max-h-[300px] overflow-y-auto">
+              {!isRequired && (
+                <>
+                  <SelectItem value={SKIP_FIELD_VALUE}>
+                    {field === ImportFormat.Currency ? 'Account Currency' : 'Ignore'}
+                  </SelectItem>
+                  <SelectSeparator />
+                </>
+              )}
               {headers.map((header) => (
                 <SelectItem key={header || '-'} value={header || '-'}>
                   {header || '-'}
@@ -114,7 +136,7 @@ export function ImportPreviewTable({
             className="h-8 py-0 font-normal text-muted-foreground"
             onClick={() => setEditingHeader(field)}
           >
-            {mappedHeader || 'Select column'}
+            {mappedHeader || (isRequired ? 'Select column' : 'Ignore')}
           </Button>
         )}
       </div>

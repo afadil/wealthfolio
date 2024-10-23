@@ -231,7 +231,16 @@ export function ActivityImportForm({
   );
 
   const isMapComplete = useCallback(() => {
-    const columnsComplete = Object.values(ImportFormat).every(
+    // Define required fields
+    const requiredFields = [
+      ImportFormat.Date,
+      ImportFormat.ActivityType,
+      ImportFormat.Symbol,
+      ImportFormat.Quantity,
+      ImportFormat.UnitPrice,
+    ];
+
+    const columnsComplete = requiredFields.every(
       (field) => mapping.columns[field] && headers.includes(mapping.columns[field]),
     );
 
@@ -246,8 +255,6 @@ export function ActivityImportForm({
         mappedTypes?.some((mappedType) => {
           const normalizedCsvType = csvType.trim().toUpperCase();
           const normalizedMappedType = mappedType.trim().toUpperCase();
-
-          // Check if CSV type starts with the mapped type
           return normalizedCsvType.startsWith(normalizedMappedType);
         }),
       );
@@ -297,10 +304,14 @@ export function ActivityImportForm({
         let quantity: number;
         let unitPrice: number;
 
+        // Try to get amount from the CSV if the field is mapped
+        const rawAmount = getMappedValue(row, ImportFormat.Amount);
+        if (rawAmount) {
+          amount = parseFloat(rawAmount) || undefined;
+        }
+
         if (isCashActivity) {
-          // For cash activities, try to get amount first
-          amount = parseFloat(getMappedValue(row, ImportFormat.Amount)) || undefined;
-          // If amount is not available, calculate it from quantity and unit price
+          // For cash activities, calculate amount if not provided
           if (!amount) {
             quantity = parseFloat(getMappedValue(row, ImportFormat.Quantity)) || 1;
             unitPrice = parseFloat(getMappedValue(row, ImportFormat.UnitPrice)) || 0;
@@ -315,15 +326,18 @@ export function ActivityImportForm({
           unitPrice = parseFloat(getMappedValue(row, ImportFormat.UnitPrice));
         }
 
+        // Get currency from CSV if mapped, otherwise use account currency
+        const currency =
+          getMappedValue(row, ImportFormat.Currency) ||
+          accounts?.find((a) => a.id === data.accountId)?.currency;
+
         return {
           date: getMappedValue(row, ImportFormat.Date),
           symbol: getMappedValue(row, ImportFormat.Symbol),
           activityType,
           quantity,
           unitPrice,
-          currency:
-            getMappedValue(row, ImportFormat.Currency) ||
-            accounts?.find((a) => a.id === data.accountId)?.currency,
+          currency,
           fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
           amount,
           accountId: data.accountId,
