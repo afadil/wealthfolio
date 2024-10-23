@@ -148,6 +148,7 @@ export interface ActivityImport {
   unitPrice: number;
   currency: string;
   fee: number;
+  amount?: number; // Add this new field
   comment?: string;
   accountId?: string;
   accountName?: string;
@@ -369,10 +370,11 @@ export interface DepositsCalculation {
 
 export enum ImportFormat {
   Date = 'date',
+  ActivityType = 'activityType',
   Symbol = 'symbol',
   Quantity = 'quantity',
-  ActivityType = 'activityType',
   UnitPrice = 'unitPrice',
+  Amount = 'amount',
   Currency = 'currency',
   Fee = 'fee',
 }

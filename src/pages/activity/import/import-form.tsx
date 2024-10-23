@@ -107,7 +107,7 @@ export function ActivityImportForm({
         complete: (results: Papa.ParseResult<string[]>) => {
           if (results.data && results.data.length > 0) {
             setCsvData(results.data);
-            const headerRow = results.data[0];
+            const headerRow = results.data[0].map((header) => header.trim()); // Trim headers
             setHeaders(headerRow);
 
             const isValid = validateCsvStructure(headerRow);
@@ -172,15 +172,17 @@ export function ActivityImportForm({
   });
 
   const handleColumnMapping = (field: ImportFormat, value: string) => {
+    const trimmedValue = value.trim();
     form.setValue('mapping.columns', {
       ...form.getValues('mapping.columns'),
-      [field]: value,
+      [field]: trimmedValue,
     } as Record<ImportFormat, string>);
-    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, [field]: value } }));
+    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, [field]: trimmedValue } }));
   };
 
   const handleActivityTypeMapping = useCallback(
     (csvActivity: string, activityType: ActivityType) => {
+      const trimmedCsvActivity = csvActivity.trim();
       const updatedActivityTypes = {
         ...form.getValues('mapping.activityTypes'),
       };
@@ -195,9 +197,9 @@ export function ActivityImportForm({
       // Remove the csvActivity from any existing mappings using prefix match
       Object.keys(updatedActivityTypes).forEach((key) => {
         const compareValue =
-          csvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
-            ? csvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-            : csvActivity.toUpperCase();
+          trimmedCsvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
+            ? trimmedCsvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+            : trimmedCsvActivity.toUpperCase();
         updatedActivityTypes[key as ActivityType] = updatedActivityTypes[
           key as ActivityType
         ]?.filter((type) => {
@@ -214,9 +216,9 @@ export function ActivityImportForm({
         updatedActivityTypes[activityType] = [];
       }
       const valueToStore =
-        csvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
-          ? csvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-          : csvActivity.toUpperCase();
+        trimmedCsvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
+          ? trimmedCsvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+          : trimmedCsvActivity.toUpperCase();
       updatedActivityTypes[activityType]?.push(valueToStore);
 
       form.setValue('mapping.activityTypes', updatedActivityTypes);
@@ -243,22 +245,21 @@ export function ActivityImportForm({
     );
 
     const uniqueCsvTypes = new Set(
-      csvData.slice(1).map((row) => getMappedValue(row, ImportFormat.ActivityType)),
+      csvData
+        .slice(1)
+        .map((row) => getMappedValue(row, ImportFormat.ActivityType).trim().toUpperCase()),
     );
 
     const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) => {
-      const compareValue =
-        csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-          ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-          : csvType.toUpperCase();
+      return Object.values(mapping.activityTypes).some((mappedTypes) =>
+        mappedTypes?.some((mappedType) => {
+          const normalizedMappedType = mappedType.trim().toUpperCase();
+          const normalizedCsvType =
+            csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+              ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH)
+              : csvType;
 
-      return Object.entries(mapping.activityTypes).some(([_, csvTypes]) =>
-        csvTypes?.some((mappedType) => {
-          const mappedValue =
-            mappedType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-              ? mappedType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-              : mappedType.toUpperCase();
-          return mappedValue === compareValue;
+          return normalizedMappedType === normalizedCsvType;
         }),
       );
     });
@@ -294,28 +295,60 @@ export function ActivityImportForm({
 
   const onSubmit = async (data: ImportFormSchema) => {
     try {
-      // Save the mapping
       await saveMappingMutation.mutateAsync({
         accountId: data.accountId,
         mapping: data.mapping,
       });
 
-      // Prepare activities for import
-      const activitiesToImport: ImportActivity[] = csvData.slice(1).map((row) => ({
-        date: getMappedValue(row, ImportFormat.Date),
-        symbol: getMappedValue(row, ImportFormat.Symbol),
-        activityType: getMappedActivityType(row),
-        quantity: parseFloat(getMappedValue(row, ImportFormat.Quantity)),
-        unitPrice: parseFloat(getMappedValue(row, ImportFormat.UnitPrice)),
-        currency:
-          getMappedValue(row, ImportFormat.Currency) ||
-          accounts?.find((a) => a.id === data.accountId)?.currency,
-        fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
-        accountId: data.accountId,
-        isDraft: true,
-        assetId: getMappedValue(row, ImportFormat.Symbol),
-        comment: '',
-      }));
+      const activitiesToImport: ImportActivity[] = csvData.slice(1).map((row) => {
+        const activityType = getMappedActivityType(row);
+        const isCashActivity = [
+          ActivityType.DIVIDEND,
+          ActivityType.DEPOSIT,
+          ActivityType.WITHDRAWAL,
+          ActivityType.FEE,
+          ActivityType.TAX,
+        ].includes(activityType);
+
+        let amount: number | undefined;
+        let quantity: number;
+        let unitPrice: number;
+
+        if (isCashActivity) {
+          // For cash activities, try to get amount first
+          amount = parseFloat(getMappedValue(row, ImportFormat.Amount)) || undefined;
+          // If amount is not available, calculate it from quantity and unit price
+          if (!amount) {
+            quantity = parseFloat(getMappedValue(row, ImportFormat.Quantity)) || 1;
+            unitPrice = parseFloat(getMappedValue(row, ImportFormat.UnitPrice)) || 0;
+            amount = quantity * unitPrice;
+          }
+          // Set quantity and unitPrice to match the amount
+          quantity = 1;
+          unitPrice = amount || 0;
+        } else {
+          // For non-cash activities, use regular quantity and unit price
+          quantity = parseFloat(getMappedValue(row, ImportFormat.Quantity));
+          unitPrice = parseFloat(getMappedValue(row, ImportFormat.UnitPrice));
+        }
+
+        return {
+          date: getMappedValue(row, ImportFormat.Date),
+          symbol: getMappedValue(row, ImportFormat.Symbol),
+          activityType,
+          quantity,
+          unitPrice,
+          currency:
+            getMappedValue(row, ImportFormat.Currency) ||
+            accounts?.find((a) => a.id === data.accountId)?.currency,
+          fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
+          amount,
+          accountId: data.accountId,
+          isDraft: true,
+          assetId: getMappedValue(row, ImportFormat.Symbol),
+          comment: '',
+        };
+      });
 
       // Validate activities
       const validationErrors: Record<string, string[]> = {};

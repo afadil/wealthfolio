@@ -98,6 +98,12 @@ export const newActivitySchema = baseActivitySchema.extend({
 
 export const importActivitySchema = baseActivitySchema.extend({
   date: z.union([z.date(), z.string().datetime()]).optional(),
+  amount: z.coerce
+    .number({
+      required_error: 'Please enter a valid amount.',
+      invalid_type_error: 'Amount must be a number.',
+    })
+    .optional(),
 });
 
 export const newContributionLimitSchema = z.object({

@@ -109,6 +109,7 @@ export function ImportPreviewTable({
           </Select>
         ) : (
           <Button
+            type="button"
             variant="ghost"
             className="h-8 py-0 font-normal text-muted-foreground"
             onClick={() => setEditingHeader(field)}
@@ -124,18 +125,20 @@ export function ImportPreviewTable({
     csvType: string,
     mappings: Partial<Record<ActivityType, string[]>>,
   ): ActivityType | null {
+    const trimmedCsvType = csvType.trim();
     const compareValue =
-      csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
-        ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-        : csvType.toUpperCase();
+      trimmedCsvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+        ? trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+        : trimmedCsvType.toUpperCase();
 
     for (const [appType, csvTypes] of Object.entries(mappings)) {
       if (
         csvTypes?.some((type) => {
+          const trimmedType = type.trim();
           const mappedValue =
-            type.length > ACTIVITY_TYPE_PREFIX_LENGTH
-              ? type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
-              : type.toUpperCase();
+            trimmedType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+              ? trimmedType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+              : trimmedType.toUpperCase();
           return mappedValue === compareValue;
         })
       ) {
@@ -152,16 +155,24 @@ export function ImportPreviewTable({
     csvType: string;
     appType: ActivityType | null;
   }) => {
-    const displayValue = csvType.length > 30 ? `${csvType.substring(0, 27)}...` : csvType;
+    const trimmedCsvType = csvType.trim().toUpperCase();
+    const displayValue =
+      trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
 
     if (appType) {
       return (
         <div className="flex items-center space-x-2">
-          <Badge title={csvType}>{displayValue}</Badge>
+          <Badge title={trimmedCsvType}>
+            {displayValue.length > 12 ? `${displayValue.substring(0, 12)}...` : displayValue}
+          </Badge>
           <Button
+            type="button"
             variant="ghost"
             className="h-8 py-0 font-normal text-muted-foreground"
-            onClick={() => handleActivityTypeMapping(csvType, appType)}
+            onClick={() => {
+              // Pass empty string as ActivityType to trigger removal of mapping
+              handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
+            }}
           >
             {appType}
           </Button>
@@ -171,15 +182,23 @@ export function ImportPreviewTable({
 
     return (
       <div className="flex items-center space-x-2">
-        <Badge variant="destructive" title={csvType}>
-          {displayValue}
-        </Badge>
+        {displayValue.length > 12 ? (
+          <span className="text-destructive" title={trimmedCsvType}>
+            {displayValue}
+          </span>
+        ) : (
+          <Badge variant="destructive" title={trimmedCsvType}>
+            {displayValue}
+          </Badge>
+        )}
         <Select
-          onValueChange={(newType) => handleActivityTypeMapping(csvType, newType as ActivityType)}
+          onValueChange={(newType) =>
+            handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
+          }
           value=""
         >
           <SelectTrigger className="h-8 w-full">
-            <SelectValue placeholder="Map to type..." />
+            <SelectValue placeholder="..." />
           </SelectTrigger>
           <SelectContent>
             {Object.values(ActivityType).map((type) => (

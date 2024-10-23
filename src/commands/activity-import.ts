@@ -80,11 +80,12 @@ export const getAccountImportMapping = async (accountId: string) => {
               quantity: 'Quantity',
               activityType: 'TYPE',
               unitPrice: 'Price ($)',
+              amount: 'Amount ($)',
               currency: 'Commission ($)',
               fee: 'Fees ($)',
             },
             activityTypes: {
-              BUY: [],
+              BUY: ['YOU BOUGHT', 'REINVESTMENT', 'YOU BOUGHT P'],
               SELL: [],
               DIVIDEND: ['TXPDDV', 'Dividend'],
               INTEREST: [],
