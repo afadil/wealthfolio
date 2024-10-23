@@ -5,7 +5,7 @@ export const importFormSchema = z.object({
   accountId: z.string().min(1, 'Please select an account'),
   mapping: z.object({
     columns: z.record(z.nativeEnum(ImportFormat), z.string()),
-    activityTypes: z.record(z.nativeEnum(ActivityType), z.string()),
+    activityTypes: z.record(z.nativeEnum(ActivityType), z.array(z.string())),
   }),
 });
 
@@ -46,7 +46,7 @@ export const newGoalSchema = z.object({
 const baseActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
-  currency: z.string().min(1, { message: 'Currency is required' }),
+  currency: z.string().optional(),
   fee: z.coerce
     .number({
       required_error: 'Please enter a valid fee.',

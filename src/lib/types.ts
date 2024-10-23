@@ -376,3 +376,10 @@ export enum ImportFormat {
   Currency = 'currency',
   Fee = 'fee',
 }
+
+export interface ImportMapping {
+  columns: Partial<Record<ImportFormat, string>>;
+  activityTypes: Partial<Record<ActivityType, string[]>>;
+}
+
+export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;

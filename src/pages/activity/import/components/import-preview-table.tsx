@@ -18,12 +18,13 @@ import { Button } from '@/components/ui/button';
 import { ImportFormat, ActivityType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 
 interface ImportPreviewTableProps {
   importFormatFields: ImportFormat[];
   mapping: {
     columns: Partial<Record<ImportFormat, string>>;
-    activityTypes: Partial<Record<ActivityType, string>>;
+    activityTypes: Partial<Record<ActivityType, string[]>>;
   };
   headers: string[];
   csvData: string[][];
@@ -42,37 +43,46 @@ export function ImportPreviewTable({
   getMappedValue,
 }: ImportPreviewTableProps) {
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
-  const [editingActivityType, setEditingActivityType] = useState<string | null>(null);
 
-  const { distinctActivityTypes, activityTypeCounts, totalRows } = useMemo(() => {
-    const activityTypes = new Map<string, string[]>();
-    const counts: Record<string, number> = {};
+  const { distinctActivityTypes, totalRows } = useMemo(() => {
+    const activityTypeMap = new Map<string, { row: string[]; count: number }>();
     let total = 0;
 
     csvData.slice(1).forEach((row, index) => {
-      const activityType = getMappedValue(row, ImportFormat.ActivityType);
-      if (!activityTypes.has(activityType)) {
-        activityTypes.set(activityType, [...row, (index + 2).toString()]); // Add line number
+      const csvType = getMappedValue(row, ImportFormat.ActivityType);
+      if (!activityTypeMap.has(csvType)) {
+        activityTypeMap.set(csvType, {
+          row: [...row, (index + 2).toString()],
+          count: 1,
+        });
+      } else {
+        const current = activityTypeMap.get(csvType)!;
+        activityTypeMap.set(csvType, {
+          ...current,
+          count: current.count + 1,
+        });
       }
-      counts[activityType] = (counts[activityType] || 0) + 1;
       total++;
     });
 
     return {
-      distinctActivityTypes: Array.from(activityTypes.values()),
-      activityTypeCounts: counts,
+      distinctActivityTypes: Array.from(activityTypeMap.entries()).map(([type, data]) => ({
+        csvType: type,
+        row: data.row,
+        count: data.count,
+        appType: findAppTypeForCsvType(type, mapping.activityTypes),
+      })),
+      activityTypeCounts: Object.fromEntries(
+        Array.from(activityTypeMap.entries()).map(([type, data]) => [type, data.count]),
+      ),
       totalRows: total,
     };
-  }, [csvData, getMappedValue]);
+  }, [csvData, getMappedValue, mapping.activityTypes]);
 
   const renderHeaderCell = (field: ImportFormat) => {
     const mappedHeader = mapping.columns[field];
     const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
     const isEditing = editingHeader === field || !isMapped;
-
-    const handleHeaderClick = () => {
-      setEditingHeader(field);
-    };
 
     return (
       <div>
@@ -84,11 +94,7 @@ export function ImportPreviewTable({
               setEditingHeader(null);
             }}
             value={mappedHeader || ''}
-            onOpenChange={(open) => {
-              if (!open) {
-                setEditingHeader(null);
-              }
-            }}
+            onOpenChange={(open) => !open && setEditingHeader(null)}
           >
             <SelectTrigger className="h-8 w-full px-3 py-2">
               <SelectValue />
@@ -105,7 +111,7 @@ export function ImportPreviewTable({
           <Button
             variant="ghost"
             className="h-8 py-0 font-normal text-muted-foreground"
-            onClick={handleHeaderClick}
+            onClick={() => setEditingHeader(field)}
           >
             {mappedHeader || 'Select column'}
           </Button>
@@ -114,58 +120,75 @@ export function ImportPreviewTable({
     );
   };
 
-  const renderActivityTypeCell = (activityType: string) => {
-    const activityMapping = Object.entries(mapping.activityTypes).find(
-      ([k, _]) => k === activityType,
-    );
-    const csvType = activityMapping ? (activityMapping[1] as ActivityType) : null;
-    const isEditing = editingActivityType === activityType || !csvType;
+  function findAppTypeForCsvType(
+    csvType: string,
+    mappings: Partial<Record<ActivityType, string[]>>,
+  ): ActivityType | null {
+    const compareValue =
+      csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+        ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+        : csvType.toUpperCase();
 
-    const handleActivityTypeClick = () => {
-      setEditingActivityType(activityType);
-    };
+    for (const [appType, csvTypes] of Object.entries(mappings)) {
+      if (
+        csvTypes?.some((type) => {
+          const mappedValue =
+            type.length > ACTIVITY_TYPE_PREFIX_LENGTH
+              ? type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+              : type.toUpperCase();
+          return mappedValue === compareValue;
+        })
+      ) {
+        return appType as ActivityType;
+      }
+    }
+    return null;
+  }
+
+  const renderActivityTypeCell = ({
+    csvType,
+    appType,
+  }: {
+    csvType: string;
+    appType: ActivityType | null;
+  }) => {
+    const displayValue = csvType.length > 30 ? `${csvType.substring(0, 27)}...` : csvType;
+
+    if (appType) {
+      return (
+        <div className="flex items-center space-x-2">
+          <Badge title={csvType}>{displayValue}</Badge>
+          <Button
+            variant="ghost"
+            className="h-8 py-0 font-normal text-muted-foreground"
+            onClick={() => handleActivityTypeMapping(csvType, appType)}
+          >
+            {appType}
+          </Button>
+        </div>
+      );
+    }
 
     return (
       <div className="flex items-center space-x-2">
-        {isEditing ? (
-          <>
-            {activityType && <Badge variant="destructive">{activityType}</Badge>}
-            <Select
-              onValueChange={(newType) => {
-                handleActivityTypeMapping(activityType, newType as ActivityType);
-                setEditingActivityType(null);
-              }}
-              value={csvType || ''}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setEditingActivityType(null);
-                }
-              }}
-            >
-              <SelectTrigger className="h-8 w-full">
-                <SelectValue placeholder={activityType} />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(ActivityType).map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        ) : (
-          <>
-            {activityType && <Badge>{activityType}</Badge>}
-            <Button
-              variant="ghost"
-              className="h-8 py-0 font-normal text-muted-foreground"
-              onClick={handleActivityTypeClick}
-            >
-              {csvType}
-            </Button>
-          </>
-        )}
+        <Badge variant="destructive" title={csvType}>
+          {displayValue}
+        </Badge>
+        <Select
+          onValueChange={(newType) => handleActivityTypeMapping(csvType, newType as ActivityType)}
+          value=""
+        >
+          <SelectTrigger className="h-8 w-full">
+            <SelectValue placeholder="Map to type..." />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.values(ActivityType).map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     );
   };
@@ -176,9 +199,10 @@ export function ImportPreviewTable({
         <CardTitle className="text-md font-semibold">{totalRows} activities to import</CardTitle>
         <CardDescription className="mt-2">
           <div className="flex flex-wrap gap-2">
-            {Object.entries(activityTypeCounts).map(([type, count]) => (
-              <div key={type} className="flex items-center space-x-1">
-                <span className="text-">{type}:</span>
+            {distinctActivityTypes.map(({ csvType, count, appType }) => (
+              <div key={csvType} className="flex items-center space-x-1">
+                <span>{csvType}</span>
+                {appType && <span>→ {appType}</span>}
                 <Badge variant="secondary" className="text-xs">
                   {count}
                 </Badge>
@@ -198,13 +222,13 @@ export function ImportPreviewTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {distinctActivityTypes.map((row, rowIndex) => (
-              <TableRow key={rowIndex}>
+            {distinctActivityTypes.map(({ row, csvType, appType }) => (
+              <TableRow key={csvType}>
                 <TableCell>{row[row.length - 1]}</TableCell>
                 {importFormatFields.map((field) => (
                   <TableCell key={field}>
                     {field === ImportFormat.ActivityType
-                      ? renderActivityTypeCell(getMappedValue(row, field))
+                      ? renderActivityTypeCell({ csvType, appType })
                       : getMappedValue(row, field)}
                   </TableCell>
                 ))}

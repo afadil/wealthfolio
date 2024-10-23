@@ -12,19 +12,16 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle } from 'lucide-react';
-import { ImportFormat } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMapping } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ErrorsPreviewProps {
   errors: Record<string, string[]>;
   csvData: string[][];
-  mapping: {
-    columns: Partial<Record<ImportFormat, string>>;
-    activityTypes: Partial<Record<string, string>>;
-  };
+  mapping: ImportMapping;
 }
 
-export default function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
+export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
   const [activeTab, setActiveTab] = useState<'errors' | 'raw'>('errors');
   const totalErrors = Object.values(errors).flat().length;
 
@@ -39,6 +36,15 @@ export default function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewP
   const getMappedHeader = (header: string) => {
     const mappedFormat = Object.entries(mapping.columns).find(([_, value]) => value === header);
     return mappedFormat ? mappedFormat[0] : header;
+  };
+
+  const getMappedActivityType = (activityType: string) => {
+    for (const [key, values] of Object.entries(mapping.activityTypes)) {
+      if (values.includes(activityType)) {
+        return key as ActivityType;
+      }
+    }
+    return activityType;
   };
 
   return (
@@ -95,7 +101,9 @@ export default function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewP
                                       <span className="flex cursor-help items-center space-x-1">
                                         <AlertCircle className="h-4 w-4 text-red-500" />
                                         <span className="underline decoration-dotted underline-offset-2">
-                                          {cell}
+                                          {mappedHeader === ImportFormat.ActivityType
+                                            ? getMappedActivityType(cell)
+                                            : cell}
                                         </span>
                                       </span>
                                     </TooltipTrigger>
@@ -106,6 +114,8 @@ export default function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewP
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
+                              ) : mappedHeader === ImportFormat.ActivityType ? (
+                                getMappedActivityType(cell)
                               ) : (
                                 cell
                               )}

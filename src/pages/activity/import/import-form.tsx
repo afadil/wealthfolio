@@ -16,23 +16,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
-import { Account, ActivityType, ImportActivity, ImportFormat, NewActivity } from '@/lib/types';
+import { Account, ActivityType, ImportActivity, ImportFormat } from '@/lib/types';
 import { getAccountImportMapping, saveAccountImportMapping } from '@/commands/activity-import';
 import { useActivityImportMutations } from './useActivityImportMutations';
 import { ActivityImport } from '@/lib/types';
+import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 
 // Components
-import { FileDropzone } from './components/FileDropzone';
-import {
-  importActivitySchema,
-  importFormSchema,
-  type ImportFormSchema,
-  newActivitySchema,
-} from '@/lib/schemas';
-import { ImportPreviewTable } from './components/ImportPreviewTable';
+import { FileDropzone } from './components/file-dropzone';
+import { importActivitySchema, importFormSchema, type ImportFormSchema } from '@/lib/schemas';
+import { ImportPreviewTable } from './components/import-preview-table';
 import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
-import ErrorViewer from './components/csv-error.viewer';
+import { ErrorViewer } from './components/csv-error-viewer';
 
 export function ActivityImportForm({
   onSuccess,
@@ -45,7 +41,7 @@ export function ActivityImportForm({
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ImportFormSchema['mapping']>({
     columns: {} as Record<ImportFormat, string>,
-    activityTypes: {} as Record<ActivityType, string>,
+    activityTypes: {} as Partial<Record<ActivityType, string[]>>,
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +60,7 @@ export function ActivityImportForm({
       accountId: '',
       mapping: {
         columns: {} as Record<ImportFormat, string>,
-        activityTypes: {} as Record<ActivityType, string>,
+        activityTypes: {} as Partial<Record<ActivityType, string[]>>,
       },
     },
   });
@@ -76,7 +72,7 @@ export function ActivityImportForm({
     resetAccountStates();
   }, [accountId]);
 
-  const { data: fetchedMapping, isLoading: isMappingLoading } = useQuery({
+  const { data: fetchedMapping } = useQuery({
     queryKey: ['mapping', accountId],
     queryFn: () => getAccountImportMapping(accountId),
     enabled: !!accountId,
@@ -84,8 +80,8 @@ export function ActivityImportForm({
 
   useEffect(() => {
     if (fetchedMapping) {
-      form.setValue('mapping', fetchedMapping);
-      setMapping(fetchedMapping);
+      form.setValue('mapping', fetchedMapping as ImportFormSchema['mapping']);
+      setMapping(fetchedMapping as ImportFormSchema['mapping']);
     }
   }, [fetchedMapping, form]);
 
@@ -187,8 +183,42 @@ export function ActivityImportForm({
     (csvActivity: string, activityType: ActivityType) => {
       const updatedActivityTypes = {
         ...form.getValues('mapping.activityTypes'),
-        [activityType]: csvActivity,
       };
+
+      // Ensure each activity type is initialized as an array
+      Object.keys(updatedActivityTypes).forEach((key) => {
+        if (!Array.isArray(updatedActivityTypes[key as ActivityType])) {
+          updatedActivityTypes[key as ActivityType] = [];
+        }
+      });
+
+      // Remove the csvActivity from any existing mappings using prefix match
+      Object.keys(updatedActivityTypes).forEach((key) => {
+        const compareValue =
+          csvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
+            ? csvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+            : csvActivity.toUpperCase();
+        updatedActivityTypes[key as ActivityType] = updatedActivityTypes[
+          key as ActivityType
+        ]?.filter((type) => {
+          const mappedValue =
+            type.length > ACTIVITY_TYPE_PREFIX_LENGTH
+              ? type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+              : type.toUpperCase();
+          return mappedValue !== compareValue;
+        });
+      });
+
+      // Add the csvActivity to the new activityType mapping
+      if (!updatedActivityTypes[activityType]) {
+        updatedActivityTypes[activityType] = [];
+      }
+      const valueToStore =
+        csvActivity.length > ACTIVITY_TYPE_PREFIX_LENGTH
+          ? csvActivity.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+          : csvActivity.toUpperCase();
+      updatedActivityTypes[activityType]?.push(valueToStore);
+
       form.setValue('mapping.activityTypes', updatedActivityTypes);
       setMapping((prev) => ({
         ...prev,
@@ -202,29 +232,65 @@ export function ActivityImportForm({
     (row: string[], field: ImportFormat): string => {
       const columnIndex = headers.indexOf(mapping.columns[field] || '');
       if (columnIndex === -1) return '';
-
-      let value = row[columnIndex];
-
-      if (field === ImportFormat.ActivityType) {
-        const mappedActivity = Object.entries(mapping.activityTypes).find(([_, v]) => v === value);
-        return mappedActivity ? mappedActivity[0] : value;
-      }
-
-      return value;
+      return row[columnIndex];
     },
-    [headers, mapping.columns, mapping.activityTypes],
+    [headers, mapping.columns],
   );
 
   const isMapComplete = useCallback(() => {
     const columnsComplete = Object.values(ImportFormat).every(
       (field) => mapping.columns[field] && headers.includes(mapping.columns[field]),
     );
-    const activityTypesComplete = csvData.slice(1).every((row) => {
-      const activityType = getMappedValue(row, ImportFormat.ActivityType);
-      return Object.values(ActivityType).includes(activityType as ActivityType);
+
+    const uniqueCsvTypes = new Set(
+      csvData.slice(1).map((row) => getMappedValue(row, ImportFormat.ActivityType)),
+    );
+
+    const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) => {
+      const compareValue =
+        csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+          ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+          : csvType.toUpperCase();
+
+      return Object.entries(mapping.activityTypes).some(([_, csvTypes]) =>
+        csvTypes?.some((mappedType) => {
+          const mappedValue =
+            mappedType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+              ? mappedType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+              : mappedType.toUpperCase();
+          return mappedValue === compareValue;
+        }),
+      );
     });
+
     return columnsComplete && activityTypesComplete;
-  }, [headers, mapping.columns, csvData, getMappedValue]);
+  }, [headers, mapping.columns, mapping.activityTypes, csvData, getMappedValue]);
+
+  const getMappedActivityType = useCallback(
+    (row: string[]): ActivityType => {
+      const csvType = getMappedValue(row, ImportFormat.ActivityType);
+      const compareValue =
+        csvType.length > ACTIVITY_TYPE_PREFIX_LENGTH
+          ? csvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+          : csvType.toUpperCase();
+
+      for (const [appType, csvTypes] of Object.entries(mapping.activityTypes)) {
+        if (
+          csvTypes?.some((type) => {
+            const mappedValue =
+              type.length > ACTIVITY_TYPE_PREFIX_LENGTH
+                ? type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH).toUpperCase()
+                : type.toUpperCase();
+            return mappedValue === compareValue;
+          })
+        ) {
+          return appType as ActivityType;
+        }
+      }
+      return csvType as ActivityType; // Fallback to original value if no mapping found
+    },
+    [getMappedValue, mapping.activityTypes],
+  );
 
   const onSubmit = async (data: ImportFormSchema) => {
     try {
@@ -238,10 +304,12 @@ export function ActivityImportForm({
       const activitiesToImport: ImportActivity[] = csvData.slice(1).map((row) => ({
         date: getMappedValue(row, ImportFormat.Date),
         symbol: getMappedValue(row, ImportFormat.Symbol),
-        activityType: getMappedValue(row, ImportFormat.ActivityType) as ActivityType,
+        activityType: getMappedActivityType(row),
         quantity: parseFloat(getMappedValue(row, ImportFormat.Quantity)),
         unitPrice: parseFloat(getMappedValue(row, ImportFormat.UnitPrice)),
-        currency: getMappedValue(row, ImportFormat.Currency),
+        currency:
+          getMappedValue(row, ImportFormat.Currency) ||
+          accounts?.find((a) => a.id === data.accountId)?.currency,
         fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
         accountId: data.accountId,
         isDraft: true,
