@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DialogDescription,
   DialogFooter,
@@ -35,6 +36,7 @@ import { newActivitySchema } from '@/lib/schemas';
 import { useActivityMutations } from '../hooks/useActivityMutations';
 import TickerSearchInput from './ticker-search';
 import DatePickerInput from '@/components/ui/data-picker-input';
+import TickerManualInput from './ticker-manual';
 
 const activityTypes = [
   { label: 'Buy', value: 'BUY' },
@@ -273,8 +275,15 @@ interface AssetActivityFieldsProps {
 }
 
 const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
-  const { control, watch } = useFormContext();
+  const { control, watch, setValue } = useFormContext();
   const watchedType = watch('activityType');
+  const watchedUseSymbolLookup = watch('isPublic', true); // Default to true if not set
+
+  useEffect(() => {
+    if (!watchedUseSymbolLookup) {
+      setValue('assetId', defaultAssetId);
+    }
+  }, [watchedUseSymbolLookup, setValue, defaultAssetId]);
 
   const isSplitType = watchedType === 'SPLIT';
   const isTransferType = watchedType === 'TRANSFER_IN' || watchedType === 'TRANSFER_OUT';
@@ -284,15 +293,41 @@ const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
     <>
       <FormField
         control={control}
+        name="isPublic"
+        render={({ field }) => (
+          <FormItem className="flex items-center justify-between">
+            <FormLabel>Symbol</FormLabel>
+            <div className="flex items-center">
+              <Checkbox
+                className="ml-2"
+                id="use-lookup-checkbox"
+                checked={watchedUseSymbolLookup}
+                onCheckedChange={(checked) => {
+                  field.onChange(checked);
+                }}
+              />
+              <label htmlFor="use-lookup-checkbox" className="ml-1">Use Symbol Lookup</label>
+            </div>
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={control}
         name="assetId"
         render={({ field }) => (
           <FormItem className="flex flex-col">
-            <FormLabel>Symbol</FormLabel>
             <FormControl>
-              <TickerSearchInput
-                onSelectResult={(value) => field.onChange(value)}
-                defaultValue={defaultAssetId}
-              />
+              {watchedUseSymbolLookup ? (
+                <TickerSearchInput
+                  onSelectResult={(value) => field.onChange(value)}
+                  defaultValue={defaultAssetId}
+                />
+              ) : (
+                <TickerManualInput
+                  defaultValue={defaultAssetId}
+                  onSymbolChange={(value) => field.onChange(value)}
+                />
+              )}
             </FormControl>
             <FormMessage />
           </FormItem>
