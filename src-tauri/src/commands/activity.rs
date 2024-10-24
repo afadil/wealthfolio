@@ -54,9 +54,11 @@ pub async fn search_activities(
 #[tauri::command]
 pub async fn create_activity(
     activity: NewActivity,
+    is_public: bool,
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
-    println!("Adding new activity...");
+    println!("Adding new activity... {:?}", activity);
+    println!("isPublic... {}", is_public);
     let mut conn = state
         .pool
         .get()
@@ -64,7 +66,7 @@ pub async fn create_activity(
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = activity_service::ActivityService::new(base_currency);
     service
-        .create_activity(&mut conn, activity)
+        .create_activity(&mut conn, activity, is_public)
         .await
         .map_err(|e| format!("Failed to add new activity: {}", e))
 }
