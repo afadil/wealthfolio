@@ -94,6 +94,48 @@ impl MarketDataService {
         self.insert_quotes(conn, &all_quotes_to_insert)
     }
 
+    pub async fn sync_asset_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_list: &Vec<Asset>,
+    ) -> Result<(), String> {
+        println!("Syncing history quotes for all assets...");
+        let end_date = SystemTime::now();
+        let mut all_quotes_to_insert = Vec::new();
+
+        for asset in asset_list {
+            let symbol = asset.symbol.clone();
+            let last_sync_date = self
+                .get_last_quote_sync_date(conn, symbol.as_str())
+                .map_err(|e| format!("Error getting last sync date for {}: {}", symbol.as_str(), e))?
+                .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
+
+            let start_date: SystemTime = Utc
+                .from_utc_datetime(&(last_sync_date - Duration::days(1)))
+                .into();
+
+            match asset.data_source.as_str() {
+                "PRIVATE" => (),
+                "Yahoo" => {
+                    match self
+                        .provider
+                        .get_stock_history(&asset.symbol, start_date, end_date)
+                        .await
+                    {
+                        Ok(quotes) => all_quotes_to_insert.extend(quotes),
+                        Err(e) => {
+                            eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e);
+                        }
+                    }
+                },
+                "Manual" => (),
+                _ => (),
+            }
+        }
+
+        self.insert_quotes(conn, &all_quotes_to_insert)
+    }
+
     fn get_last_quote_sync_date(
         &self,
         conn: &mut SqliteConnection,
@@ -129,14 +171,15 @@ impl MarketDataService {
             .load::<Asset>(conn)
             .map_err(|e| format!("Failed to load assets: {}", e))?;
 
-        self.sync_quotes(
-            conn,
-            &asset_list
-                .iter()
-                .map(|asset| asset.symbol.clone())
-                .collect::<Vec<String>>(),
-        )
-        .await?;
+        // self.sync_quotes(
+        //     conn,
+        //     &asset_list
+        //         .iter()
+        //         .map(|asset| asset.symbol.clone())
+        //         .collect::<Vec<String>>(),
+        // ).await?;
+
+        self.sync_asset_quotes(conn, &asset_list).await?;
 
         Ok(())
     }

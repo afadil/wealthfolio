@@ -364,6 +364,7 @@ pub struct Holding {
     pub account: Option<Account>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
+    pub asset_data_source: Option<String>,
     pub sectors: Option<Vec<Sector>>,
     pub countries: Option<Vec<Country>>,
     pub portfolio_percent: Option<BigDecimal>,
