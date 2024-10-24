@@ -37,10 +37,10 @@ const ActivityImportPage = () => {
     const newActivities = activities.map((activity) => ({
       id: activity.id,
       accountId: activity.accountId || '',
-      activityDate: new Date(activity.date),
+      activityDate: activity.date ? new Date(activity.date) : new Date(),
       currency: activity.currency,
       fee: activity.fee,
-      isDraft: activity?.isDraft === 'true',
+      isDraft: activity?.isDraft,
       quantity: activity.quantity,
       assetId: activity.symbol,
       activityType: activity.activityType as any,

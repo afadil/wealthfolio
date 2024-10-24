@@ -3,7 +3,6 @@ import { useDropzone } from 'react-dropzone';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { z } from 'zod';
 
 import {
   Select,
@@ -22,7 +21,7 @@ import { useActivityImportMutations } from './hooks/useActivityImportMutations';
 // Components
 import { FileDropzone } from './components/file-dropzone';
 import { importFormSchema } from '@/lib/schemas';
-import { ImportPreviewTable } from './components/import-preview-table';
+import { ImportMappingTable } from './components/import-mapping-table';
 import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
 import { ErrorViewer } from './components/csv-error-viewer';
@@ -39,8 +38,6 @@ export function ActivityImportForm({
   onSuccess: (activities: ActivityImport[]) => void;
   onError: (error: string) => void;
 }) {
-  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
-
   const form = useForm<ImportFormSchema>({
     resolver: zodResolver(importFormSchema),
     defaultValues: {
@@ -56,11 +53,13 @@ export function ActivityImportForm({
     csvData,
     headers,
     error,
+    validationErrors,
     isLoading,
     selectedFile,
     isValidCsv,
     parseCsvFile,
     resetFileStates,
+    setValidationErrors,
   } = useCsvParser();
 
   const { mapping, setMapping, handleColumnMapping, handleActivityTypeMapping } =
@@ -75,7 +74,6 @@ export function ActivityImportForm({
 
   useEffect(() => {
     resetFileStates();
-    setValidationErrors({});
   }, [accountId]);
 
   const { data: fetchedMapping } = useQuery({
@@ -371,25 +369,25 @@ function PreviewContent({
   }
 
   if (!isValidCsv || error || Object.keys(validationErrors).length > 0) {
-    const allErrors: Record<string, string[]> = {
-      ...(error ? { Error: [error] } : {}),
-      ...validationErrors,
-    };
-    return <ErrorViewer errors={allErrors} csvData={csvData} mapping={mapping} />;
+    return (
+      <ErrorViewer
+        parsingError={!!error}
+        validationErrors={validationErrors}
+        csvData={csvData}
+        mapping={mapping}
+      />
+    );
   }
 
   return (
-    <div className="pt-6">
-      <h2 className="mb-2 font-semibold">Preview</h2>
-      <ImportPreviewTable
-        importFormatFields={importFormatFields}
-        mapping={mapping}
-        headers={headers}
-        csvData={csvData}
-        handleColumnMapping={handleColumnMapping}
-        handleActivityTypeMapping={handleActivityTypeMapping}
-        getMappedValue={getMappedValue}
-      />
-    </div>
+    <ImportMappingTable
+      importFormatFields={importFormatFields}
+      mapping={mapping}
+      headers={headers}
+      csvData={csvData}
+      handleColumnMapping={handleColumnMapping}
+      handleActivityTypeMapping={handleActivityTypeMapping}
+      getMappedValue={getMappedValue}
+    />
   );
 }

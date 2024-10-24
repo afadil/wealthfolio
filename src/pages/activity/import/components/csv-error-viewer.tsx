@@ -14,24 +14,33 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle } from 'lucide-react';
 import { ImportFormat, ActivityType, ImportMapping } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Icons } from '@/components/icons';
 
 interface ErrorsPreviewProps {
-  errors: Record<string, string[]>;
+  parsingError: boolean;
+  validationErrors: Record<string, string[]>;
   csvData: string[][];
   mapping: ImportMapping;
 }
 
-export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
-  const [activeTab, setActiveTab] = useState<'errors' | 'raw'>('errors');
-  const totalErrors = Object.values(errors).flat().length;
+export function ErrorViewer({
+  parsingError,
+  validationErrors,
+  csvData,
+  mapping,
+}: ErrorsPreviewProps) {
+  const totalErrors = Object.values(validationErrors).flat().length;
 
   const mappedHeaders = useMemo(() => {
-    return csvData[0].filter((header) => Object.values(mapping.columns).includes(header));
+    return csvData[0]?.filter((header) => Object.values(mapping.columns).includes(header));
   }, [csvData, mapping.columns]);
 
   const rowsWithErrors = useMemo(() => {
-    return Object.keys(errors).map(Number);
-  }, [errors]);
+    const errorKeys = Object.keys(validationErrors);
+    return errorKeys.map(Number);
+  }, [validationErrors]);
+
+  console.log('csvData', csvData, validationErrors, rowsWithErrors);
 
   const getMappedHeader = (header: string) => {
     const mappedFormat = Object.entries(mapping.columns).find(([_, value]) => value === header);
@@ -49,20 +58,27 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
 
   return (
     <Card className="mx-auto w-full">
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'errors' | 'raw')}>
+      <Tabs defaultValue={parsingError ? 'raw' : 'errors'}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-lg font-bold">
             <div className="flex items-center gap-2">
               CSV Errors preview{' '}
-              <Badge variant="destructive">
-                {totalErrors} {totalErrors === 1 ? 'Error' : 'Errors'}
-              </Badge>
+              {totalErrors > 0 && (
+                <Badge variant="destructive">
+                  {totalErrors} {totalErrors === 1 ? 'Error' : 'Errors'}
+                </Badge>
+              )}
             </div>
             <TabsList>
               <TabsTrigger value="errors">Errors</TabsTrigger>
               <TabsTrigger value="raw">Raw CSV</TabsTrigger>
             </TabsList>
           </CardTitle>
+          {parsingError && (
+            <div className="text-sm font-light text-destructive">
+              Unable to parse the CSV file. Please verify the format and try again.
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <TabsContent value="errors">
@@ -71,7 +87,7 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[100px]">Row</TableHead>
-                    {mappedHeaders.map((header, index) => (
+                    {mappedHeaders?.map((header, index) => (
                       <TableHead key={index}>{getMappedHeader(header)}</TableHead>
                     ))}
                   </TableRow>
@@ -83,11 +99,11 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
                     .map((row, rowIndex) => (
                       <TableRow key={rowIndex}>
                         <TableCell className="font-medium">{rowsWithErrors[rowIndex]}</TableCell>
-                        {mappedHeaders.map((header, cellIndex) => {
+                        {mappedHeaders?.map((header, cellIndex) => {
                           const originalIndex = csvData[0].indexOf(header);
                           const cell = row[originalIndex];
                           const mappedHeader = getMappedHeader(header);
-                          const rowErrors = errors[`${rowsWithErrors[rowIndex]}`] || [];
+                          const rowErrors = validationErrors[`${rowsWithErrors[rowIndex]}`] || [];
                           const cellErrors = rowErrors.filter((error) =>
                             error.startsWith(mappedHeader),
                           );
@@ -140,18 +156,25 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {csvData
-                    .filter((_, index) => rowsWithErrors.includes(index + 1))
-                    .map((row, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{rowsWithErrors[index]}</TableCell>
-                        <TableCell>
-                          <code className="whitespace-pre-wrap font-mono text-sm">
-                            {row.join(',')}
-                          </code>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                  {(parsingError ? csvData.slice(0, 10) : csvData).map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="flex items-center font-medium">
+                        {index === 0 && parsingError ? (
+                          <>
+                            <Icons.ArrowRight className="h-4 w-4 text-red-500" />
+                            <span className="ml-2">{index + 1}</span>
+                          </>
+                        ) : (
+                          <span className="ml-6">{index + 1}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <code className="whitespace-pre-wrap font-mono text-sm">
+                          {row.join(',')}
+                        </code>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </ScrollArea>

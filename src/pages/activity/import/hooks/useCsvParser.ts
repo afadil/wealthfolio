@@ -7,6 +7,7 @@ export function useCsvParser() {
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isValidCsv, setIsValidCsv] = useState(true);
@@ -17,6 +18,7 @@ export function useCsvParser() {
     setError(null);
     setIsLoading(false);
     setIsValidCsv(true);
+    setValidationErrors({});
   };
 
   const parseCsvFile = useCallback((file: File, form: any) => {
@@ -62,11 +64,13 @@ export function useCsvParser() {
     csvData,
     headers,
     error,
+    validationErrors,
     isLoading,
     selectedFile,
     isValidCsv,
     parseCsvFile,
     resetFileStates,
+    setValidationErrors,
     setSelectedFile,
   };
 }

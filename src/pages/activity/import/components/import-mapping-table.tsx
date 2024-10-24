@@ -18,7 +18,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { ImportFormat, ActivityType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 
 const REQUIRED_FIELDS = [
@@ -44,7 +46,7 @@ interface ImportPreviewTableProps {
   getMappedValue: (row: string[], field: ImportFormat) => string;
 }
 
-export function ImportPreviewTable({
+export function ImportMappingTable({
   importFormatFields,
   mapping,
   headers,
@@ -54,6 +56,7 @@ export function ImportPreviewTable({
   getMappedValue,
 }: ImportPreviewTableProps) {
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
+  const [activeTab, setActiveTab] = useState<'preview' | 'raw'>('preview');
 
   const { distinctActivityTypes, totalRows } = useMemo(() => {
     const activityTypeMap = new Map<string, { row: string[]; count: number }>();
@@ -229,62 +232,106 @@ export function ImportPreviewTable({
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="p-4">
-        <CardTitle className="text-md font-semibold">{totalRows} activities to import</CardTitle>
-        <CardDescription className="mt-2">
-          <div className="flex flex-wrap gap-2">
-            {distinctActivityTypes.map(({ csvType, count, appType }) => (
-              <div key={csvType} className="flex items-center space-x-1">
-                {csvType === appType ? (
-                  <span>{csvType}</span>
-                ) : (
-                  <>
-                    <span>{csvType}</span>
-                    {appType && <span>→ {appType}</span>}
-                  </>
-                )}
-                <Badge variant="secondary" className="text-xs">
-                  {count}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </CardDescription>
-      </Card>
-      <div className="overflow-x-auto rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <div className="flex flex-col">
-                  <span>Field</span>
-                  <span className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-md px-4 py-0 text-sm font-normal text-muted-foreground">
-                    Mapping
-                  </span>
-                </div>
-              </TableHead>
-              {importFormatFields.map((field) => (
-                <TableHead key={field}>{renderHeaderCell(field)}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {distinctActivityTypes.map(({ row, csvType, appType }) => (
-              <TableRow key={csvType}>
-                <TableCell>{row[row.length - 1]}</TableCell>
-                {importFormatFields.map((field) => (
-                  <TableCell key={field}>
-                    {field === ImportFormat.ActivityType
-                      ? renderActivityTypeCell({ csvType, appType })
-                      : getMappedValue(row, field)}
-                  </TableCell>
+    <Card className="mx-auto w-full">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-lg font-bold">
+            <div>
+              <div>CSV Mapping</div>
+              <div className="text-sm font-normal text-muted-foreground">{totalRows} rows</div>
+            </div>
+            <TabsList>
+              <TabsTrigger value="preview">Mapping Preview</TabsTrigger>
+              <TabsTrigger value="raw">File Preview</TabsTrigger>
+            </TabsList>
+          </CardTitle>
+        </CardHeader>
+        {/* 
+        {distinctActivityTypes?.length > 0 && (
+          <Card className="p-4">
+            <CardTitle className="text-md font-semibold">
+              {totalRows} activities to import
+            </CardTitle>
+            <CardDescription className="mt-2">
+              <div className="flex flex-wrap gap-2">
+                {distinctActivityTypes.map(({ csvType, count, appType }) => (
+                  <div key={csvType} className="flex items-center space-x-1">
+                    {csvType === appType ? (
+                      <span>{csvType}</span>
+                    ) : (
+                      <>
+                        <span>{csvType}</span>
+                        {appType && <span>→ {appType}</span>}
+                      </>
+                    )}
+                    <Badge variant="secondary" className="text-xs">
+                      {count}
+                    </Badge>
+                  </div>
                 ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+              </div>
+            </CardDescription>
+          </Card>
+        )} */}
+
+        <TabsContent value="preview">
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <div className="flex flex-col">
+                      <span>Field</span>
+                      <span className="inline-flex h-8 items-center justify-center whitespace-nowrap py-0 text-sm font-normal text-muted-foreground">
+                        Mapping
+                      </span>
+                    </div>
+                  </TableHead>
+                  {importFormatFields.map((field) => (
+                    <TableHead key={field}>{renderHeaderCell(field)}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {distinctActivityTypes.map(({ row, csvType, appType }) => (
+                  <TableRow key={csvType}>
+                    <TableCell>{row[row.length - 1]}</TableCell>
+                    {importFormatFields.map((field) => (
+                      <TableCell key={field}>
+                        {field === ImportFormat.ActivityType
+                          ? renderActivityTypeCell({ csvType, appType })
+                          : getMappedValue(row, field)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+        <TabsContent value="raw">
+          <ScrollArea className="h-[400px] w-full">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">Row</TableHead>
+                  <TableHead>CSV Data</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {csvData.slice(1).map((row, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{index + 2}</TableCell>
+                    <TableCell>
+                      <code className="whitespace-pre-wrap font-mono text-sm">{row.join(',')}</code>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+    </Card>
   );
 }
