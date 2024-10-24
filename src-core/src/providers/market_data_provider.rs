@@ -21,6 +21,12 @@ pub enum MarketDataError {
     Unknown(String),
 }
 
+#[derive(Debug)]
+pub enum MarketDataProviderType {
+    Yahoo,
+    Private,
+}
+
 #[async_trait]
 pub trait MarketDataProvider: Send + Sync {
     async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError>;

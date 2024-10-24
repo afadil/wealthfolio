@@ -7,6 +7,7 @@ use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
     Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
 };
+use crate::providers::market_data_provider::MarketDataProviderType;
 use crate::schema::activities;
 
 use csv::ReaderBuilder;
@@ -76,9 +77,14 @@ impl ActivityService {
         &self,
         conn: &mut SqliteConnection,
         mut activity: NewActivity,
+        is_public: bool,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
+        let mut provider_type = MarketDataProviderType::Yahoo;
+        if !is_public {
+            provider_type = MarketDataProviderType::Private;
+        }
         let asset_id = activity.asset_id.clone();
-        let asset_service = AssetService::new().await;
+        let asset_service = AssetService::new( provider_type ).await;
         let account_service = AccountService::new(self.base_currency.clone());
         let asset_profile = asset_service
             .get_asset_profile(conn, &asset_id, Some(true))
@@ -132,7 +138,7 @@ impl ActivityService {
         conn: &mut SqliteConnection,
         mut activity: ActivityUpdate,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
-        let asset_service = AssetService::new().await;
+        let asset_service = AssetService::new(MarketDataProviderType::Yahoo).await;
         let account_service = AccountService::new(self.base_currency.clone());
         let asset_profile = asset_service
             .get_asset_profile(conn, &activity.asset_id, Some(true))
@@ -187,7 +193,7 @@ impl ActivityService {
         _account_id: String,
         file_path: String,
     ) -> Result<Vec<ActivityImport>, String> {
-        let asset_service = AssetService::new().await;
+        let asset_service = AssetService::new(MarketDataProviderType::Yahoo).await;
         let account_service = AccountService::new(self.base_currency.clone());
         let fx_service = CurrencyExchangeService::new();
         let account = account_service

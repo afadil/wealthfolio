@@ -1,6 +1,6 @@
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary, UpdateAssetProfile};
-use crate::providers::market_data_provider::MarketDataError;
+use crate::providers::market_data_provider::{MarketDataError, MarketDataProviderType};
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
@@ -29,8 +29,8 @@ impl From<yahoo_finance_api::Quote> for Quote {
 }
 
 impl AssetService {
-    pub async fn new() -> Self {
-        let market_data_service = Arc::new(MarketDataService::new().await);
+    pub async fn new(provider_type: MarketDataProviderType) -> Self {
+        let market_data_service = Arc::new(MarketDataService::new(provider_type).await);
         Self {
             market_data_service,
         }

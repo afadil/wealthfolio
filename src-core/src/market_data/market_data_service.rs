@@ -1,6 +1,6 @@
 use crate::models::{Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
-use crate::providers::market_data_factory::{MarketDataFactory, DEFAULT_PROVIDER};
-use crate::providers::market_data_provider::{MarketDataError, MarketDataProvider};
+use crate::providers::market_data_factory::MarketDataFactory;
+use crate::providers::market_data_provider::{MarketDataError, MarketDataProvider, MarketDataProviderType};
 use crate::schema::{activities, exchange_rates, quotes};
 use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
@@ -14,9 +14,9 @@ pub struct MarketDataService {
 }
 
 impl MarketDataService {
-    pub async fn new() -> Self {
+    pub async fn new( provider_type: MarketDataProviderType ) -> Self {
         MarketDataService {
-            provider: MarketDataFactory::get_provider(Some(DEFAULT_PROVIDER)).await,
+            provider: MarketDataFactory::get_provider(provider_type).await,
         }
     }
 

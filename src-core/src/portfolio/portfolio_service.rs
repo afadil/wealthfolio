@@ -3,6 +3,7 @@ use crate::activity::activity_service::ActivityService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
+use crate::providers::market_data_provider::MarketDataProviderType;
 
 use diesel::prelude::*;
 
@@ -23,7 +24,7 @@ pub struct PortfolioService {
 
 impl PortfolioService {
     pub async fn new(base_currency: String) -> Result<Self, Box<dyn std::error::Error>> {
-        let market_data_service = Arc::new(MarketDataService::new().await);
+        let market_data_service = Arc::new(MarketDataService::new(MarketDataProviderType::Yahoo).await);
 
         Ok(PortfolioService {
             account_service: AccountService::new(base_currency.clone()),
@@ -33,7 +34,7 @@ impl PortfolioService {
                 CurrencyExchangeService::new(),
                 base_currency.clone(),
             ),
-            holdings_service: HoldingsService::new(base_currency.clone()).await,
+            holdings_service: HoldingsService::new(base_currency.clone(),MarketDataProviderType::Yahoo).await,
             history_service: HistoryService::new(base_currency.clone(), market_data_service),
         })
     }

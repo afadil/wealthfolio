@@ -4,6 +4,7 @@ use crate::asset::asset_service::AssetService;
 use crate::error::{PortfolioError, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Account, Activity, Asset, Holding, Performance, Quote};
+use crate::providers::market_data_provider::MarketDataProviderType;
 use bigdecimal::BigDecimal;
 use diesel::SqliteConnection;
 use std::collections::{HashMap, HashSet};
@@ -24,11 +25,11 @@ pub struct HoldingsService {
 }
 
 impl HoldingsService {
-    pub async fn new(base_currency: String) -> Self {
+    pub async fn new(base_currency: String, provider_type: MarketDataProviderType) -> Self {
         Self {
             account_service: AccountService::new(base_currency.clone()),
             activity_service: ActivityService::new(base_currency.clone()),
-            asset_service: AssetService::new().await,
+            asset_service: AssetService::new(provider_type).await,
             fx_service: CurrencyExchangeService::new(),
             base_currency,
         }
