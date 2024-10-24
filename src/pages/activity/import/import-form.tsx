@@ -21,7 +21,7 @@ import { useActivityImportMutations } from './hooks/useActivityImportMutations';
 
 // Components
 import { FileDropzone } from './components/file-dropzone';
-import { importActivitySchema, importFormSchema } from '@/lib/schemas';
+import { importFormSchema } from '@/lib/schemas';
 import { ImportPreviewTable } from './components/import-preview-table';
 import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
@@ -30,6 +30,7 @@ import { ErrorViewer } from './components/csv-error-viewer';
 import { useCsvParser } from './hooks/useCsvParser';
 import { useImportMapping } from './hooks/useImportMapping';
 import { isImportMapComplete } from './utils/csvValidation';
+import { validateActivities } from './utils/csvValidation';
 
 export function ActivityImportForm({
   onSuccess,
@@ -190,7 +191,7 @@ export function ActivityImportForm({
 
         return {
           date: getMappedValue(row, ImportFormat.Date),
-          symbol: getMappedValue(row, ImportFormat.Symbol),
+          symbol: getMappedValue(row, ImportFormat.Symbol).trim(),
           activityType,
           quantity,
           unitPrice,
@@ -206,20 +207,7 @@ export function ActivityImportForm({
       });
 
       // Validate activities
-      const validationErrors: Record<string, string[]> = {};
-      setValidationErrors({});
-      activitiesToImport.forEach((activity, index) => {
-        try {
-          importActivitySchema.parse(activity);
-        } catch (error) {
-          if (error instanceof z.ZodError) {
-            validationErrors[`${index + 2}`] = error.errors.map(
-              (e) => `${e.path.join('.')}: ${e.message}`,
-            );
-          }
-        }
-      });
-
+      const validationErrors = validateActivities(activitiesToImport);
       if (Object.keys(validationErrors).length > 0) {
         setValidationErrors(validationErrors);
         return;

@@ -49,22 +49,24 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
 
   return (
     <Card className="mx-auto w-full">
-      <CardHeader>
-        <CardTitle className="text-lg font-bold">
-          CSV Errors preview{' '}
-          <Badge variant="destructive">
-            {totalErrors} {totalErrors === 1 ? 'Error' : 'Errors'}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'errors' | 'raw')}>
-          <TabsList>
-            <TabsTrigger value="errors">Errors</TabsTrigger>
-            <TabsTrigger value="raw">Raw CSV</TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'errors' | 'raw')}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-lg font-bold">
+            <div className="flex items-center gap-2">
+              CSV Errors preview{' '}
+              <Badge variant="destructive">
+                {totalErrors} {totalErrors === 1 ? 'Error' : 'Errors'}
+              </Badge>
+            </div>
+            <TabsList>
+              <TabsTrigger value="errors">Errors</TabsTrigger>
+              <TabsTrigger value="raw">Raw CSV</TabsTrigger>
+            </TabsList>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <TabsContent value="errors">
-            <ScrollArea className="h-[600px] w-full">
+            <ScrollArea className="h-[400px] w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -92,14 +94,14 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
                           return (
                             <TableCell
                               key={cellIndex}
-                              className={cellErrors.length > 0 ? 'bg-red-50' : ''}
+                              className={cellErrors.length > 0 ? 'bg-destructive/10' : ''}
                             >
                               {cellErrors.length > 0 ? (
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="flex cursor-help items-center space-x-1">
-                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                        <AlertCircle className="h-4 w-4 text-destructive" />
                                         <span className="underline decoration-dotted underline-offset-2">
                                           {mappedHeader === ImportFormat.ActivityType
                                             ? getMappedActivityType(cell)
@@ -107,7 +109,7 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
                                         </span>
                                       </span>
                                     </TooltipTrigger>
-                                    <TooltipContent>
+                                    <TooltipContent className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive">
                                       {cellErrors.map((error, index) => (
                                         <p key={index}>{error.split(': ')[1]}</p>
                                       ))}
@@ -129,7 +131,7 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
             </ScrollArea>
           </TabsContent>
           <TabsContent value="raw">
-            <ScrollArea className="h-[600px] w-full">
+            <ScrollArea className="h-[400px] w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -154,8 +156,8 @@ export function ErrorViewer({ errors, csvData, mapping }: ErrorsPreviewProps) {
               </Table>
             </ScrollArea>
           </TabsContent>
-        </Tabs>
-      </CardContent>
+        </CardContent>
+      </Tabs>
     </Card>
   );
 }
