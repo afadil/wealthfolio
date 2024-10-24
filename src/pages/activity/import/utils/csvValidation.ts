@@ -1,5 +1,9 @@
 import { ImportFormat, ActivityType, ActivityImport } from '@/lib/types';
 import { z } from 'zod';
+import { parse, isValid } from 'date-fns';
+
+// Define the date formats you want to support
+// const dateFormats = ['yyyy-MM-dd', 'MM/dd/yyyy', 'dd-MM-yyyy'];
 
 export function validateCsvStructure(headerRow: string[]): boolean {
   return headerRow.length >= 3 && !headerRow.some((header) => header.trim() === '');
@@ -74,7 +78,7 @@ const tickerRegex = /^[A-Z0-9.-]+$/;
 
 export const activityImportValidationSchema = z
   .object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format. Expected YYYY-MM-DD'),
+    date: z.string(),
     symbol: z.string().trim().regex(tickerRegex, 'Invalid ticker symbol format'),
     activityType: z.nativeEnum(ActivityType),
     quantity: z.number().positive('Quantity must be positive'),
@@ -122,6 +126,15 @@ export function validateActivities(activities: ActivityImport[]): Record<string,
   activities.forEach((activity, index) => {
     const rowErrors: string[] = [];
 
+    // Attempt to parse the date and update the activity object
+    const parsedDate = new Date(activity.date?.toString().trim() || '');
+
+    if (!parsedDate) {
+      rowErrors.push('date: Invalid date format');
+    } else {
+      activity.date = parsedDate.toISOString().split('T')[0]; // Convert to ISO format
+    }
+
     try {
       activityImportValidationSchema.parse(activity);
     } catch (error) {
@@ -130,7 +143,6 @@ export function validateActivities(activities: ActivityImport[]): Record<string,
       }
     }
 
-    // Add any remaining errors for this row
     if (rowErrors.length > 0) {
       validationErrors[`${index + 2}`] = rowErrors;
     }

@@ -191,6 +191,7 @@ export function ActivityImportForm({
 
         return {
           date: getMappedValue(row, ImportFormat.Date),
+          assetId: getMappedValue(row, ImportFormat.Symbol).trim(),
           symbol: getMappedValue(row, ImportFormat.Symbol).trim(),
           activityType,
           quantity,
@@ -199,9 +200,8 @@ export function ActivityImportForm({
           fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
           amount,
           accountId: data.accountId,
-          isDraft: true,
           isValid: false,
-          assetId: getMappedValue(row, ImportFormat.Symbol),
+          isDraft: true,
           comment: '',
         };
       });

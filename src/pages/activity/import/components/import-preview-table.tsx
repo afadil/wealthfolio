@@ -110,7 +110,7 @@ export function ImportPreviewTable({
             value={mappedHeader || SKIP_FIELD_VALUE}
             onOpenChange={(open) => !open && setEditingHeader(null)}
           >
-            <SelectTrigger className="h-8 w-full px-3 py-2">
+            <SelectTrigger className="h-8 w-full px-3 py-2 text-sm font-normal text-muted-foreground">
               <SelectValue placeholder={isRequired ? 'Select column' : 'Optional'} />
             </SelectTrigger>
             <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -256,7 +256,14 @@ export function ImportPreviewTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">Line</TableHead>
+              <TableHead className="w-[50px]">
+                <div className="flex flex-col">
+                  <span>Field</span>
+                  <span className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-md px-4 py-0 text-sm font-normal text-muted-foreground">
+                    Mapping
+                  </span>
+                </div>
+              </TableHead>
               {importFormatFields.map((field) => (
                 <TableHead key={field}>{renderHeaderCell(field)}</TableHead>
               ))}
