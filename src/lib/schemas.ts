@@ -6,6 +6,7 @@ export const importFormSchema = z.object({
   mapping: z.object({
     columns: z.record(z.nativeEnum(ImportFormat), z.string()),
     activityTypes: z.record(z.nativeEnum(ActivityType), z.array(z.string())),
+    symbolMappings: z.record(z.string(), z.string()).default({}),
   }),
 });
 

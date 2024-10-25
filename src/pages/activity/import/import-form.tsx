@@ -45,6 +45,7 @@ export function ActivityImportForm({
       mapping: {
         columns: {} as Record<ImportFormat, string>,
         activityTypes: {} as Partial<Record<ActivityType, string[]>>,
+        symbolMappings: {} as Record<string, string>,
       },
     },
   });
@@ -62,8 +63,13 @@ export function ActivityImportForm({
     setValidationErrors,
   } = useCsvParser();
 
-  const { mapping, setMapping, handleColumnMapping, handleActivityTypeMapping } =
-    useImportMapping(form);
+  const {
+    mapping,
+    setMapping,
+    handleColumnMapping,
+    handleActivityTypeMapping,
+    handleSymbolMapping,
+  } = useImportMapping(form);
 
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -262,6 +268,7 @@ export function ActivityImportForm({
           mapping={mapping}
           handleColumnMapping={handleColumnMapping}
           handleActivityTypeMapping={handleActivityTypeMapping}
+          handleSymbolMapping={handleSymbolMapping}
           importFormatFields={Object.values(ImportFormat)}
           csvData={csvData}
           getMappedValue={getMappedValue}
@@ -334,6 +341,7 @@ function PreviewContent({
   mapping,
   handleColumnMapping,
   handleActivityTypeMapping,
+  handleSymbolMapping,
   importFormatFields,
   csvData,
   getMappedValue,
@@ -347,6 +355,7 @@ function PreviewContent({
   mapping: ImportFormSchema['mapping'];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
   importFormatFields: ImportFormat[];
   csvData: string[][];
   getMappedValue: (row: string[], field: ImportFormat) => string;
@@ -387,6 +396,7 @@ function PreviewContent({
       csvData={csvData}
       handleColumnMapping={handleColumnMapping}
       handleActivityTypeMapping={handleActivityTypeMapping}
+      handleSymbolMapping={handleSymbolMapping}
       getMappedValue={getMappedValue}
     />
   );

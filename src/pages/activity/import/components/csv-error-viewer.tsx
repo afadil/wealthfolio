@@ -40,8 +40,6 @@ export function ErrorViewer({
     return errorKeys.map(Number);
   }, [validationErrors]);
 
-  console.log('csvData', csvData, validationErrors, rowsWithErrors);
-
   const getMappedHeader = (header: string) => {
     const mappedFormat = Object.entries(mapping.columns).find(([_, value]) => value === header);
     return mappedFormat ? mappedFormat[0] : header;

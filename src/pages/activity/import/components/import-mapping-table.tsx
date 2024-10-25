@@ -18,10 +18,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { ImportFormat, ActivityType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
+import { useSymbolValidation } from '../hooks/useSymbolValidation';
+import TickerSearchInput from '@/components/ticker-search';
 
 const REQUIRED_FIELDS = [
   ImportFormat.Date,
@@ -38,11 +40,13 @@ interface ImportPreviewTableProps {
   mapping: {
     columns: Partial<Record<ImportFormat, string>>;
     activityTypes: Partial<Record<ActivityType, string[]>>;
+    symbolMappings: Record<string, string>;
   };
   headers: string[];
   csvData: string[][];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
   getMappedValue: (row: string[], field: ImportFormat) => string;
 }
 
@@ -53,6 +57,7 @@ export function ImportMappingTable({
   csvData,
   handleColumnMapping,
   handleActivityTypeMapping,
+  handleSymbolMapping,
   getMappedValue,
 }: ImportPreviewTableProps) {
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
@@ -231,6 +236,71 @@ export function ImportMappingTable({
     );
   };
 
+  const distinctSymbols = useMemo(() => {
+    return Array.from(new Set(csvData.map((row) => getMappedValue(row, ImportFormat.Symbol))));
+  }, [csvData, getMappedValue]);
+
+  const { invalidSymbols, isLoading: isSymbolValidationLoading } =
+    useSymbolValidation(distinctSymbols);
+
+  const renderSymbolCell = ({
+    csvSymbol,
+    mappedSymbol,
+    isInvalid,
+  }: {
+    csvSymbol: string;
+    mappedSymbol: string | undefined;
+    isInvalid: boolean;
+  }) => {
+    if (mappedSymbol) {
+      return (
+        <div className="flex items-center space-x-2">
+          <span>{csvSymbol}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-8 py-0 font-normal text-muted-foreground"
+            onClick={() => {
+              handleSymbolMapping(csvSymbol, '');
+            }}
+          >
+            {mappedSymbol}
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center space-x-2">
+        <span className={isInvalid ? 'text-destructive' : ''}>{csvSymbol}</span>
+        <TickerSearchInput
+          defaultValue=""
+          onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
+        />
+      </div>
+    );
+  };
+
+  const renderCell = (field: ImportFormat, row: string[]) => {
+    const value = getMappedValue(row, field);
+
+    if (field === ImportFormat.Symbol && mapping.columns[ImportFormat.Symbol]) {
+      return renderSymbolCell({
+        csvSymbol: value,
+        mappedSymbol: mapping.symbolMappings?.[value],
+        isInvalid: invalidSymbols.includes(value),
+      });
+    }
+
+    if (field === ImportFormat.ActivityType) {
+      const csvType = value;
+      const appType = findAppTypeForCsvType(csvType, mapping.activityTypes);
+      return renderActivityTypeCell({ csvType, appType });
+    }
+
+    return value;
+  };
+
   return (
     <Card className="mx-auto w-full">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}>
@@ -246,33 +316,6 @@ export function ImportMappingTable({
             </TabsList>
           </CardTitle>
         </CardHeader>
-        {/* 
-        {distinctActivityTypes?.length > 0 && (
-          <Card className="p-4">
-            <CardTitle className="text-md font-semibold">
-              {totalRows} activities to import
-            </CardTitle>
-            <CardDescription className="mt-2">
-              <div className="flex flex-wrap gap-2">
-                {distinctActivityTypes.map(({ csvType, count, appType }) => (
-                  <div key={csvType} className="flex items-center space-x-1">
-                    {csvType === appType ? (
-                      <span>{csvType}</span>
-                    ) : (
-                      <>
-                        <span>{csvType}</span>
-                        {appType && <span>→ {appType}</span>}
-                      </>
-                    )}
-                    <Badge variant="secondary" className="text-xs">
-                      {count}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardDescription>
-          </Card>
-        )} */}
 
         <TabsContent value="preview">
           <div className="overflow-x-auto rounded-md border">
@@ -293,15 +336,11 @@ export function ImportMappingTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {distinctActivityTypes.map(({ row, csvType, appType }) => (
+                {distinctActivityTypes.map(({ row, csvType }) => (
                   <TableRow key={csvType}>
                     <TableCell>{row[row.length - 1]}</TableCell>
                     {importFormatFields.map((field) => (
-                      <TableCell key={field}>
-                        {field === ImportFormat.ActivityType
-                          ? renderActivityTypeCell({ csvType, appType })
-                          : getMappedValue(row, field)}
-                      </TableCell>
+                      <TableCell key={field}>{renderCell(field, row)}</TableCell>
                     ))}
                   </TableRow>
                 ))}

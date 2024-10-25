@@ -73,13 +73,18 @@ export const getAccountImportMapping = async (accountId: string) => {
               FEE: ['Fee'],
               TAX: ['Tax'],
             },
+            symbolMappings: {
+              'AAPL.US': 'AAPL',
+              'MSFT.US': 'MSFT',
+              'GOOGL.US': 'GOOGL',
+            },
           };
         }
         if (accountId === 'bec01413-742a-4e12-805d-d35e0a03da4e') {
           return {
             columns: {
               date: 'Run Date',
-              symbol: 'Symbol',
+              symbol: 'Description',
               quantity: 'Quantity',
               activityType: 'Action',
               unitPrice: 'Price ($)',
@@ -102,6 +107,7 @@ export const getAccountImportMapping = async (accountId: string) => {
               FEE: ['Fee'],
               TAX: ['Tax'],
             },
+            symbolMappings: {},
           };
         }
 
@@ -131,6 +137,7 @@ export const getAccountImportMapping = async (accountId: string) => {
               FEE: ['Fee'],
               TAX: ['Tax'],
             },
+            symbolMappings: {},
           };
         }
 
@@ -160,6 +167,7 @@ export const getAccountImportMapping = async (accountId: string) => {
             FEE: ['FEE'],
             TAX: ['TAX'],
           },
+          symbolMappings: {},
         };
       default:
         throw new Error(`Unsupported`);
@@ -170,7 +178,14 @@ export const getAccountImportMapping = async (accountId: string) => {
   }
 };
 
-export const saveAccountImportMapping = async (data: { accountId: string; mapping: any }) => {
+export const saveAccountImportMapping = async (data: {
+  accountId: string;
+  mapping: {
+    columns: Record<string, string>;
+    activityTypes: Record<string, string[]>;
+    symbolMappings: Record<string, string>;
+  };
+}) => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

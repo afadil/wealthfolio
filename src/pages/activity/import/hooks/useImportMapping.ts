@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
-import type { ImportFormat, ActivityType, ImportFormSchema } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportFormSchema } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 
 export function useImportMapping(form: any) {
   const [mapping, setMapping] = useState<ImportFormSchema['mapping']>({
     columns: {} as Record<ImportFormat, string>,
     activityTypes: {} as Partial<Record<ActivityType, string[]>>,
+    symbolMappings: {} as Record<string, string>,
   });
 
   const handleColumnMapping = (field: ImportFormat, value: string) => {
@@ -58,10 +59,28 @@ export function useImportMapping(form: any) {
     [form],
   );
 
+  const handleSymbolMapping = useCallback(
+    (csvSymbol: string, newSymbol: string) => {
+      const trimmedNewSymbol = newSymbol.trim();
+      const updatedSymbolMappings = {
+        ...form.getValues('mapping.symbolMappings'),
+        [csvSymbol]: trimmedNewSymbol,
+      };
+
+      form.setValue('mapping.symbolMappings', updatedSymbolMappings);
+      setMapping((prev) => ({
+        ...prev,
+        symbolMappings: updatedSymbolMappings,
+      }));
+    },
+    [form],
+  );
+
   return {
     mapping,
     setMapping,
     handleColumnMapping,
     handleActivityTypeMapping,
+    handleSymbolMapping,
   };
 }

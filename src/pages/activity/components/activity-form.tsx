@@ -33,7 +33,7 @@ import {
 
 import { newActivitySchema } from '@/lib/schemas';
 import { useActivityMutations } from '../hooks/useActivityMutations';
-import TickerSearchInput from './ticker-search';
+import TickerSearchInput from '@/components/ticker-search';
 import DatePickerInput from '@/components/ui/data-picker-input';
 
 const activityTypes = [
