@@ -138,29 +138,42 @@ export function ImportMappingTable({
   }, [csvData, getMappedValue, invalidSymbols, mapping.symbolMappings]);
 
   const rowsToShow = useMemo(() => {
-    const rowSet = new Set<number>();
+    const unmappedRows = new Set<number>();
+    const mappedRows = new Set<number>();
 
-    // Get the first row for each unique activity type
+    // Get rows for activity types, prioritizing unmapped ones
     const seenActivityTypes = new Set<string>();
-    distinctActivityTypes.forEach(({ row, csvType }) => {
+    distinctActivityTypes.forEach(({ row, csvType, appType }) => {
       if (!seenActivityTypes.has(csvType)) {
         const rowNum = parseInt(row[row.length - 1]);
-        rowSet.add(rowNum);
+        if (!appType) {
+          unmappedRows.add(rowNum);
+        } else {
+          mappedRows.add(rowNum);
+        }
         seenActivityTypes.add(csvType);
       }
     });
 
-    // Get the first row for each unique symbol
+    // Get rows for symbols, prioritizing unmapped/invalid ones
     const seenSymbols = new Set<string>();
-    distinctSymbolRows.forEach(({ row, symbol }) => {
+    distinctSymbolRows.forEach(({ row, symbol, isValid, mappedSymbol }) => {
       if (!seenSymbols.has(symbol)) {
         const rowNum = parseInt(row[row.length - 1]);
-        rowSet.add(rowNum);
+        if (!isValid && !mappedSymbol) {
+          unmappedRows.add(rowNum);
+        } else {
+          mappedRows.add(rowNum);
+        }
         seenSymbols.add(symbol);
       }
     });
 
-    return Array.from(rowSet).sort((a, b) => a - b);
+    // Combine rows, with unmapped rows first
+    return [
+      ...Array.from(unmappedRows).sort((a, b) => a - b),
+      ...Array.from(mappedRows).sort((a, b) => a - b),
+    ];
   }, [distinctActivityTypes, distinctSymbolRows]);
 
   const renderHeaderCell = (field: ImportFormat) => {
@@ -365,31 +378,31 @@ export function ImportMappingTable({
   };
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}
-        className="flex h-full flex-col overflow-hidden"
-      >
-        <CardHeader className="flex-none">
-          <CardTitle className="flex items-center justify-between text-lg font-bold">
-            <div>
-              <div>CSV Mapping</div>
-              <div className="text-sm font-normal text-muted-foreground">{totalRows} rows</div>
-            </div>
-            <TabsList>
-              <TabsTrigger value="preview">Mapping Preview</TabsTrigger>
-              <TabsTrigger value="raw">File Preview</TabsTrigger>
-            </TabsList>
-          </CardTitle>
-        </CardHeader>
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}
+      className="flex h-full flex-col space-y-4"
+    >
+      <div className="flex-none">
+        <div className="flex items-center justify-between text-lg font-bold">
+          <div>
+            <div>CSV Mapping</div>
+            <div className="text-sm font-normal text-muted-foreground">{totalRows} rows</div>
+          </div>
+          <TabsList>
+            <TabsTrigger value="preview">Mapping Preview</TabsTrigger>
+            <TabsTrigger value="raw">File Preview</TabsTrigger>
+          </TabsList>
+        </div>
+      </div>
 
-        <TabsContent value="preview" className="m-0 min-h-0 flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
-            <Table className="relative w-full">
+      <TabsContent value="preview" className="m-0 min-h-0 flex-1">
+        <div className="flex h-full flex-col rounded-md border">
+          <div className="flex-none">
+            <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="sticky left-0 z-20 w-[50px] bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                  <TableHead className="sticky left-0 z-30 w-[50px]">
                     <div className="flex flex-col">
                       <span>Field</span>
                       <span className="inline-flex h-8 items-center justify-center whitespace-nowrap py-0 text-sm font-normal text-muted-foreground">
@@ -402,14 +415,16 @@ export function ImportMappingTable({
                   ))}
                 </TableRow>
               </TableHeader>
+            </Table>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <Table>
               <TableBody>
                 {rowsToShow.map((rowNum) => {
                   const row = csvData[rowNum - 1];
                   return (
                     <TableRow key={`row-${rowNum}`}>
-                      <TableCell className="sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                        {rowNum}
-                      </TableCell>
+                      <TableCell className="sticky left-0 z-10">{rowNum}</TableCell>
                       {importFormatFields.map((field) => (
                         <TableCell key={field}>{renderCell(field, row)}</TableCell>
                       ))}
@@ -419,35 +434,35 @@ export function ImportMappingTable({
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
+        </div>
+      </TabsContent>
 
-        <TabsContent value="raw" className="m-0 min-h-0 flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
-            <Table className="relative w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 z-20 w-[100px] bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                    Row
-                  </TableHead>
-                  <TableHead className="min-w-[800px]">CSV Data</TableHead>
+      <TabsContent value="raw" className="m-0 min-h-0 flex-1 overflow-hidden">
+        <div className="h-full overflow-auto">
+          <Table className="relative w-full">
+            <TableHeader className="border-t">
+              <TableRow>
+                <TableHead className="sticky left-0 z-20 w-[100px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                  Row
+                </TableHead>
+                <TableHead className="min-w-[800px]">CSV Data</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {csvData.slice(1).map((row, index) => (
+                <TableRow key={index}>
+                  <TableCell className="sticky left-0 z-10 font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                    {index + 2}
+                  </TableCell>
+                  <TableCell className="min-w-[800px]">
+                    <code className="whitespace-pre-wrap font-mono text-sm">{row.join(',')}</code>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {csvData.slice(1).map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="sticky left-0 z-10 bg-background font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                      {index + 2}
-                    </TableCell>
-                    <TableCell className="min-w-[800px]">
-                      <code className="whitespace-pre-wrap font-mono text-sm">{row.join(',')}</code>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 }

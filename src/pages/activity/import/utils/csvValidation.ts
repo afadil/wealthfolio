@@ -86,7 +86,7 @@ const CASH_ACTIVITY_TYPES = new Set([
 ]);
 
 // Add a simple regex for ticker validation
-const tickerRegex = /^[A-Z0-9]{1,5}([.-][A-Z0-9]+)?$/;
+const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,5}([.-][A-Z0-9]+)?)$/;
 
 export const activityImportValidationSchema = z
   .object({
@@ -117,6 +117,23 @@ export const activityImportValidationSchema = z
       message:
         'This activity type requires the amount to be specified either in amount field or unitPrice field!',
       path: ['unitPrice', 'amount'],
+    },
+  )
+  .refine(
+    (data) => {
+      if (data.activityType === ActivityType.FEE) {
+        return (
+          Boolean(data.amount && data.amount > 0) ||
+          Boolean(data.fee && data.fee > 0) ||
+          data.unitPrice > 0
+        );
+      }
+      return true;
+    },
+    {
+      message:
+        'FEE activity type requires the amount to be specified either in amount, fee or unitPrice field!',
+      path: ['unitPrice', 'amount', 'fee'],
     },
   )
   .refine(
@@ -168,8 +185,5 @@ export function isCashActivity(activityType: ActivityType): boolean {
 }
 
 export function validateTickerSymbol(symbol: string): boolean {
-  if (symbol.startsWith('$CASH-')) {
-    return true;
-  }
   return tickerRegex.test(symbol);
 }

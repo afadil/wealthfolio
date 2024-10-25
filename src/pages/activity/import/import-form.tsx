@@ -30,6 +30,7 @@ import { useCsvParser } from './hooks/useCsvParser';
 import { useImportMapping } from './hooks/useImportMapping';
 import { isImportMapComplete } from './utils/csvValidation';
 import { validateActivities } from './utils/csvValidation';
+import { Separator } from '@/components/ui/separator';
 
 export function ActivityImportForm({
   onSuccess,
@@ -286,7 +287,7 @@ export function ActivityImportForm({
           />
         </div>
 
-        <div className="flex shrink-0 justify-between pt-4">
+        <div className="flex shrink-0 gap-4 pt-4">
           <Button asChild variant="outline">
             <Link to="/activities">Cancel</Link>
           </Button>
@@ -400,15 +401,18 @@ function PreviewContent({
   }
 
   return (
-    <ImportMappingTable
-      importFormatFields={importFormatFields}
-      mapping={mapping}
-      headers={headers}
-      csvData={csvData}
-      handleColumnMapping={handleColumnMapping}
-      handleActivityTypeMapping={handleActivityTypeMapping}
-      handleSymbolMapping={handleSymbolMapping}
-      getMappedValue={getMappedValue}
-    />
+    <>
+      <Separator className="my-4 opacity-50" />
+      <ImportMappingTable
+        importFormatFields={importFormatFields}
+        mapping={mapping}
+        headers={headers}
+        csvData={csvData}
+        handleColumnMapping={handleColumnMapping}
+        handleActivityTypeMapping={handleActivityTypeMapping}
+        handleSymbolMapping={handleSymbolMapping}
+        getMappedValue={getMappedValue}
+      />
+    </>
   );
 }
