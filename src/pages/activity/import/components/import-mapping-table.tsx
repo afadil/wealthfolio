@@ -75,6 +75,7 @@ export function ImportMappingTable({
     const activityTypeMap = new Map<string, { row: string[]; count: number }>();
     let total = 0;
 
+    // Only store the first occurrence of each activity type
     csvData.slice(1).forEach((row, index) => {
       const csvType = getMappedValue(row, ImportFormat.ActivityType);
       if (!activityTypeMap.has(csvType)) {
@@ -99,16 +100,14 @@ export function ImportMappingTable({
         count: data.count,
         appType: findAppTypeForCsvType(type, mapping.activityTypes),
       })),
-      activityTypeCounts: Object.fromEntries(
-        Array.from(activityTypeMap.entries()).map(([type, data]) => [type, data.count]),
-      ),
       totalRows: total,
     };
   }, [csvData, getMappedValue, mapping.activityTypes]);
 
   const { distinctSymbolRows } = useMemo(() => {
-    const symbolMap = new Map<string, { row: string[]; rowIndices: number[] }>();
+    const symbolMap = new Map<string, { row: string[]; count: number }>();
 
+    // Only store the first occurrence of each symbol
     csvData.slice(1).forEach((row, index) => {
       const symbol = getMappedValue(row, ImportFormat.Symbol);
       if (!symbol) return;
@@ -116,13 +115,13 @@ export function ImportMappingTable({
       if (!symbolMap.has(symbol)) {
         symbolMap.set(symbol, {
           row: [...row, (index + 2).toString()],
-          rowIndices: [index + 2],
+          count: 1,
         });
       } else {
         const current = symbolMap.get(symbol)!;
         symbolMap.set(symbol, {
           ...current,
-          rowIndices: [...current.rowIndices, index + 2],
+          count: current.count + 1,
         });
       }
     });
@@ -131,7 +130,7 @@ export function ImportMappingTable({
       distinctSymbolRows: Array.from(symbolMap.entries()).map(([symbol, data]) => ({
         symbol,
         row: data.row,
-        rowIndices: data.rowIndices,
+        count: data.count,
         isValid: !invalidSymbols.includes(symbol),
         mappedSymbol: mapping.symbolMappings[symbol],
       })),
@@ -141,27 +140,28 @@ export function ImportMappingTable({
   const rowsToShow = useMemo(() => {
     const rowSet = new Set<number>();
 
-    distinctActivityTypes.forEach(({ row }) => {
-      const rowNum = parseInt(row[row.length - 1]);
-      const csvType = getMappedValue(row, ImportFormat.ActivityType);
-      const hasMapping = findAppTypeForCsvType(csvType, mapping.activityTypes);
-
-      // Include both unmapped and mapped rows
-      if (!hasMapping || hasMapping) {
+    // Get the first row for each unique activity type
+    const seenActivityTypes = new Set<string>();
+    distinctActivityTypes.forEach(({ row, csvType }) => {
+      if (!seenActivityTypes.has(csvType)) {
+        const rowNum = parseInt(row[row.length - 1]);
         rowSet.add(rowNum);
+        seenActivityTypes.add(csvType);
       }
     });
 
-    // Add rows that need symbol mapping or have symbol mapping
-    distinctSymbolRows.forEach(({ rowIndices, isValid, mappedSymbol }) => {
-      // Include both unmapped and mapped symbols
-      if (!isValid || !mappedSymbol || mappedSymbol) {
-        rowIndices.forEach((rowNum) => rowSet.add(rowNum));
+    // Get the first row for each unique symbol
+    const seenSymbols = new Set<string>();
+    distinctSymbolRows.forEach(({ row, symbol }) => {
+      if (!seenSymbols.has(symbol)) {
+        const rowNum = parseInt(row[row.length - 1]);
+        rowSet.add(rowNum);
+        seenSymbols.add(symbol);
       }
     });
 
     return Array.from(rowSet).sort((a, b) => a - b);
-  }, [distinctActivityTypes, distinctSymbolRows, mapping.activityTypes]);
+  }, [distinctActivityTypes, distinctSymbolRows]);
 
   const renderHeaderCell = (field: ImportFormat) => {
     const mappedHeader = mapping.columns[field];
@@ -249,10 +249,8 @@ export function ImportMappingTable({
     if (appType) {
       return (
         <div className="flex items-center gap-3">
-          <div title={trimmedCsvType} className="text-sm font-medium">
-            {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH
-              ? `${displayValue.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH)}...`
-              : displayValue}
+          <div title={trimmedCsvType} className="flex items-center text-sm font-medium">
+            {displayValue}
           </div>
           <div className="flex items-center gap-3">
             →
@@ -317,9 +315,10 @@ export function ImportMappingTable({
     }
 
     if (field === ImportFormat.ActivityType) {
-      const csvType = value;
-      const appType = findAppTypeForCsvType(csvType, mapping.activityTypes);
-      return renderActivityTypeCell({ csvType, appType });
+      return renderActivityTypeCell({
+        csvType: value,
+        appType: findAppTypeForCsvType(value, mapping.activityTypes),
+      });
     }
 
     return value;
@@ -338,7 +337,7 @@ export function ImportMappingTable({
     if (mappedSymbol || !isInvalid) {
       return (
         <div className="flex items-center space-x-2">
-          <span>{csvSymbol}</span>
+          <span className={isInvalid ? 'text-destructive' : undefined}>{csvSymbol}</span>
           <Button
             type="button"
             variant="ghost"
