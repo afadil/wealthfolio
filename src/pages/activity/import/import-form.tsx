@@ -193,10 +193,14 @@ export function ActivityImportForm({
           getMappedValue(row, ImportFormat.Currency) ||
           accounts?.find((a) => a.id === data.accountId)?.currency;
 
+        // Get the raw symbol and use the mapped symbol if available
+        const rawSymbol = getMappedValue(row, ImportFormat.Symbol).trim();
+        const symbol = data.mapping.symbolMappings[rawSymbol] || rawSymbol;
+
         return {
           date: getMappedValue(row, ImportFormat.Date),
-          assetId: getMappedValue(row, ImportFormat.Symbol).trim(),
-          symbol: getMappedValue(row, ImportFormat.Symbol).trim(),
+          assetId: symbol,
+          symbol: symbol,
           activityType,
           quantity,
           unitPrice,

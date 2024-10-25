@@ -83,14 +83,14 @@ export const getAccountImportMapping = async (accountId: string) => {
         if (accountId === 'bec01413-742a-4e12-805d-d35e0a03da4e') {
           return {
             columns: {
-              date: 'Run Date',
+              date: 'Trade Date',
               symbol: 'Description',
               quantity: 'Quantity',
               activityType: 'Action',
-              unitPrice: 'Price ($)',
-              amount: 'Amount ($)',
+              unitPrice: 'Price',
+              amount: 'Net Amount',
               currency: '__skip__',
-              fee: 'Fees ($)',
+              fee: '__skip__',
             },
             activityTypes: {
               BUY: ['YOU BOUGHT', 'REINVESTMENT'],
@@ -107,26 +107,31 @@ export const getAccountImportMapping = async (accountId: string) => {
               FEE: ['Fee'],
               TAX: ['Tax'],
             },
-            symbolMappings: {},
+            symbolMappings: {
+              'AAPL.US': 'AAPL',
+              'BMO S&P 500 INDEX ETF C$': 'ZSP.TO',
+              'GOOGL.US': 'GOOGL',
+            },
           };
         }
 
         if (accountId === '3') {
           return {
             columns: {
-              date: 'date',
-              symbol: 'symbol',
-              quantity: 'quantity',
-              activityType: 'activityType',
-              unitPrice: 'unitPrice',
-              currency: 'currency',
-              fee: 'fee',
+              date: 'Run Date',
+              symbol: 'Description',
+              quantity: 'Quantity',
+              activityType: 'Action',
+              unitPrice: 'Price ($)',
+              amount: 'Amount ($)',
+              currency: '__skip__',
+              fee: 'Fees ($)',
             },
             activityTypes: {
-              BUY: ['Buy', 'BOUGHT', 'Purchase'],
-              SELL: ['SELLT', 'Sell', 'SOLD'],
+              BUY: ['YOU BOUGHT', 'REINVESTMENT'],
+              SELL: [],
               DIVIDEND: ['TXPDDV', 'Dividend'],
-              INTEREST: ['Interest'],
+              INTEREST: [],
               DEPOSIT: ['Deposit'],
               WITHDRAWAL: ['Withdrawal'],
               TRANSFER_IN: ['Transfer_In'],

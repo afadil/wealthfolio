@@ -54,6 +54,10 @@ export function ErrorViewer({
     return activityType;
   };
 
+  const getMappedSymbol = (symbol: string) => {
+    return mapping.symbolMappings[symbol] || symbol;
+  };
+
   return (
     <Card className="mx-auto w-full">
       <Tabs defaultValue={parsingError ? 'raw' : 'errors'}>
@@ -119,7 +123,9 @@ export function ErrorViewer({
                                         <span className="underline decoration-dotted underline-offset-2">
                                           {mappedHeader === ImportFormat.ActivityType
                                             ? getMappedActivityType(cell)
-                                            : cell}
+                                            : mappedHeader === ImportFormat.Symbol
+                                              ? getMappedSymbol(cell)
+                                              : cell}
                                         </span>
                                       </span>
                                     </TooltipTrigger>
@@ -132,6 +138,8 @@ export function ErrorViewer({
                                 </TooltipProvider>
                               ) : mappedHeader === ImportFormat.ActivityType ? (
                                 getMappedActivityType(cell)
+                              ) : mappedHeader === ImportFormat.Symbol ? (
+                                getMappedSymbol(cell)
                               ) : (
                                 cell
                               )}

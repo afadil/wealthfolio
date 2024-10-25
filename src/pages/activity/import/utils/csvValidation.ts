@@ -1,9 +1,5 @@
 import { ImportFormat, ActivityType, ActivityImport } from '@/lib/types';
 import { z } from 'zod';
-import { parse, isValid } from 'date-fns';
-
-// Define the date formats you want to support
-// const dateFormats = ['yyyy-MM-dd', 'MM/dd/yyyy', 'dd-MM-yyyy'];
 
 export function validateCsvStructure(headerRow: string[]): boolean {
   return headerRow.length >= 3 && !headerRow.some((header) => header.trim() === '');

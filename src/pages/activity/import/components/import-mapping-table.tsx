@@ -63,6 +63,21 @@ export function ImportMappingTable({
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
   const [activeTab, setActiveTab] = useState<'preview' | 'raw'>('preview');
 
+  const distinctSymbols = useMemo(() => {
+    return Array.from(
+      new Set(csvData.slice(1).map((row) => getMappedValue(row, ImportFormat.Symbol))),
+    ).filter(Boolean);
+  }, [csvData, getMappedValue]);
+
+  const { invalidSymbols, isLoading: isSymbolValidationLoading } =
+    useSymbolValidation(distinctSymbols);
+
+  const symbolsToMap = useMemo(() => {
+    return distinctSymbols.filter(
+      (symbol) => !mapping.symbolMappings[symbol] || invalidSymbols.includes(symbol),
+    );
+  }, [distinctSymbols, mapping.symbolMappings, invalidSymbols]);
+
   const { distinctActivityTypes, totalRows } = useMemo(() => {
     const activityTypeMap = new Map<string, { row: string[]; count: number }>();
     let total = 0;
@@ -97,6 +112,50 @@ export function ImportMappingTable({
       totalRows: total,
     };
   }, [csvData, getMappedValue, mapping.activityTypes]);
+
+  // Update the distinctSymbols calculation to include row data like distinctActivityTypes
+  const { distinctSymbolRows } = useMemo(() => {
+    const symbolMap = new Map<string, { row: string[]; count: number }>();
+
+    csvData.slice(1).forEach((row, index) => {
+      const symbol = getMappedValue(row, ImportFormat.Symbol);
+      if (!symbol) return;
+
+      if (!symbolMap.has(symbol)) {
+        symbolMap.set(symbol, {
+          row: [...row, (index + 2).toString()],
+          count: 1,
+        });
+      } else {
+        const current = symbolMap.get(symbol)!;
+        symbolMap.set(symbol, {
+          ...current,
+          count: current.count + 1,
+        });
+      }
+    });
+
+    return {
+      distinctSymbolRows: Array.from(symbolMap.entries()).map(([symbol, data]) => ({
+        symbol,
+        row: data.row,
+        count: data.count,
+        isValid: !invalidSymbols.includes(symbol),
+        mappedSymbol: mapping.symbolMappings[symbol],
+      })),
+    };
+  }, [csvData, getMappedValue, invalidSymbols, mapping.symbolMappings]);
+
+  // Filter symbols that need to be displayed
+  const symbolsToDisplay = useMemo(() => {
+    return distinctSymbolRows.filter(
+      ({ symbol, isValid, mappedSymbol }) =>
+        // Show if:
+        !isValid || // Is invalid
+        !mapping.symbolMappings[symbol] || // Has no mapping
+        mapping.symbolMappings[symbol], // Has mapping (to allow editing)
+    );
+  }, [distinctSymbolRows, mapping.symbolMappings]);
 
   const renderHeaderCell = (field: ImportFormat) => {
     const mappedHeader = mapping.columns[field];
@@ -236,12 +295,25 @@ export function ImportMappingTable({
     );
   };
 
-  const distinctSymbols = useMemo(() => {
-    return Array.from(new Set(csvData.map((row) => getMappedValue(row, ImportFormat.Symbol))));
-  }, [csvData, getMappedValue]);
+  const renderCell = (field: ImportFormat, row: string[]) => {
+    const value = getMappedValue(row, field);
 
-  const { invalidSymbols, isLoading: isSymbolValidationLoading } =
-    useSymbolValidation(distinctSymbols);
+    if (field === ImportFormat.Symbol && mapping.columns[ImportFormat.Symbol]) {
+      return renderSymbolCell({
+        csvSymbol: value,
+        mappedSymbol: mapping.symbolMappings?.[value],
+        isInvalid: invalidSymbols.includes(value),
+      });
+    }
+
+    if (field === ImportFormat.ActivityType) {
+      const csvType = value;
+      const appType = findAppTypeForCsvType(csvType, mapping.activityTypes);
+      return renderActivityTypeCell({ csvType, appType });
+    }
+
+    return value;
+  };
 
   const renderSymbolCell = ({
     csvSymbol,
@@ -252,7 +324,7 @@ export function ImportMappingTable({
     mappedSymbol: string | undefined;
     isInvalid: boolean;
   }) => {
-    if (mappedSymbol) {
+    if (mappedSymbol && !isInvalid) {
       return (
         <div className="flex items-center space-x-2">
           <span>{csvSymbol}</span>
@@ -274,31 +346,12 @@ export function ImportMappingTable({
       <div className="flex items-center space-x-2">
         <span className={isInvalid ? 'text-destructive' : ''}>{csvSymbol}</span>
         <TickerSearchInput
-          defaultValue=""
+          defaultValue={mappedSymbol || ''}
           onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
         />
+        {isInvalid && <Badge variant="destructive">Invalid</Badge>}
       </div>
     );
-  };
-
-  const renderCell = (field: ImportFormat, row: string[]) => {
-    const value = getMappedValue(row, field);
-
-    if (field === ImportFormat.Symbol && mapping.columns[ImportFormat.Symbol]) {
-      return renderSymbolCell({
-        csvSymbol: value,
-        mappedSymbol: mapping.symbolMappings?.[value],
-        isInvalid: invalidSymbols.includes(value),
-      });
-    }
-
-    if (field === ImportFormat.ActivityType) {
-      const csvType = value;
-      const appType = findAppTypeForCsvType(csvType, mapping.activityTypes);
-      return renderActivityTypeCell({ csvType, appType });
-    }
-
-    return value;
   };
 
   return (
@@ -318,7 +371,7 @@ export function ImportMappingTable({
         </CardHeader>
 
         <TabsContent value="preview">
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -336,11 +389,30 @@ export function ImportMappingTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Activity Type rows */}
                 {distinctActivityTypes.map(({ row, csvType }) => (
-                  <TableRow key={csvType}>
+                  <TableRow key={`activity-${csvType}`}>
                     <TableCell>{row[row.length - 1]}</TableCell>
                     {importFormatFields.map((field) => (
                       <TableCell key={field}>{renderCell(field, row)}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+
+                {/* Symbol mapping rows */}
+                {symbolsToDisplay.map(({ symbol, row }) => (
+                  <TableRow key={`symbol-${symbol}`}>
+                    <TableCell>{row[row.length - 1]}</TableCell>
+                    {importFormatFields.map((field) => (
+                      <TableCell key={field}>
+                        {field === ImportFormat.Symbol
+                          ? renderSymbolCell({
+                              csvSymbol: symbol,
+                              mappedSymbol: mapping.symbolMappings[symbol],
+                              isInvalid: invalidSymbols.includes(symbol),
+                            })
+                          : renderCell(field, row)}
+                      </TableCell>
                     ))}
                   </TableRow>
                 ))}

@@ -361,8 +361,9 @@ export enum ImportFormat {
 }
 
 export interface ImportMapping {
-  columns: Partial<Record<ImportFormat, string>>;
-  activityTypes: Partial<Record<ActivityType, string[]>>;
+  columns: Record<string, string>;
+  activityTypes: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
 }
 
 export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
