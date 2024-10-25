@@ -81,7 +81,6 @@ const CASH_ACTIVITY_TYPES = new Set([
   ActivityType.DIVIDEND,
   ActivityType.DEPOSIT,
   ActivityType.WITHDRAWAL,
-  ActivityType.FEE,
   ActivityType.TAX,
 ]);
 
@@ -93,7 +92,7 @@ export const activityImportValidationSchema = z
     date: z.string(),
     symbol: z.string().trim().regex(tickerRegex, 'Invalid ticker symbol format'),
     activityType: z.nativeEnum(ActivityType),
-    quantity: z.number().positive('Quantity must be positive'),
+    quantity: z.number(),
     unitPrice: z.number().min(0, 'Unit price cannot be negative'),
     currency: z
       .string()
@@ -146,6 +145,18 @@ export const activityImportValidationSchema = z
     {
       message: 'Buy/Sell activities must have a positive unit price!',
       path: ['unitPrice'],
+    },
+  )
+  .refine(
+    (data) => {
+      if (!CASH_ACTIVITY_TYPES.has(data.activityType) && data.activityType !== ActivityType.FEE) {
+        return data.quantity > 0;
+      }
+      return true;
+    },
+    {
+      message: 'Quantity must be positive for non-cash activities',
+      path: ['quantity'],
     },
   );
 

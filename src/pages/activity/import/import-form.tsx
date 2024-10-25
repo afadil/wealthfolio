@@ -28,7 +28,7 @@ import { ErrorViewer } from './components/csv-error-viewer';
 
 import { useCsvParser } from './hooks/useCsvParser';
 import { useImportMapping } from './hooks/useImportMapping';
-import { isImportMapComplete } from './utils/csvValidation';
+import { isCashActivity, isImportMapComplete } from './utils/csvValidation';
 import { validateActivities } from './utils/csvValidation';
 import { Separator } from '@/components/ui/separator';
 
@@ -155,13 +155,7 @@ export function ActivityImportForm({
 
       const activitiesToImport: ActivityImport[] = csvData.slice(1).map((row) => {
         const activityType = getMappedActivityType(row);
-        const isCashActivity = [
-          ActivityType.DIVIDEND,
-          ActivityType.DEPOSIT,
-          ActivityType.WITHDRAWAL,
-          ActivityType.FEE,
-          ActivityType.TAX,
-        ].includes(activityType);
+        const isCash = isCashActivity(activityType);
 
         let amount: number | undefined;
         let quantity: number;
@@ -173,7 +167,7 @@ export function ActivityImportForm({
           amount = parseFloat(rawAmount) || undefined;
         }
 
-        if (isCashActivity) {
+        if (isCash) {
           // For cash activities, calculate amount if not provided
           if (!amount) {
             quantity = parseFloat(getMappedValue(row, ImportFormat.Quantity)) || 1;
@@ -292,7 +286,19 @@ export function ActivityImportForm({
             <Link to="/activities">Cancel</Link>
           </Button>
           {accountId && selectedFile && isMapComplete() && (
-            <Button type="submit">Import Data</Button>
+            <Button
+              type="submit"
+              disabled={checkImportMutation.isPending || saveMappingMutation.isPending}
+            >
+              {checkImportMutation.isPending || saveMappingMutation.isPending ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <span>Importing...</span>
+                </>
+              ) : (
+                <span>Import Data</span>
+              )}
+            </Button>
           )}
           {accountId && selectedFile && !isMapComplete() && (
             <p className="flex items-center text-sm text-red-400">

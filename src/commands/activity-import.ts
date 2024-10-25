@@ -13,10 +13,7 @@ export const checkActivitiesImport = async ({
       case RUN_ENV.DESKTOP:
         return invokeTauri('check_activities_import', {
           accountId: account_id,
-          activities: activities.map((activity) => ({
-            ...activity,
-            activityDate: activity.date,
-          })),
+          activities: activities,
         });
       default:
         throw new Error(`Unsupported`);

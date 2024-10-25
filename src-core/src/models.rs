@@ -303,8 +303,8 @@ pub struct ActivityImport {
     pub account_name: Option<String>,
     pub symbol_name: Option<String>,
     pub error: Option<String>,
-    pub is_draft: Option<String>,
-    pub is_valid: Option<String>,
+    pub is_draft: bool,
+    pub is_valid: bool,
     pub line_number: Option<i32>,
 }
 

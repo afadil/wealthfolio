@@ -445,7 +445,9 @@ export function ImportMappingTable({
                 <TableHead className="sticky left-0 z-20 w-[100px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                   Row
                 </TableHead>
-                <TableHead className="min-w-[800px]">CSV Data</TableHead>
+                <TableHead className="min-w-[800px]">
+                  <code className="whitespace-pre-wrap font-mono text-sm">{headers.join(',')}</code>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

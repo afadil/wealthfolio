@@ -90,7 +90,7 @@ pub async fn update_activity(
 #[tauri::command]
 pub async fn check_activities_import(
     account_id: String,
-    activities: Vec<NewActivity>,
+    activities: Vec<ActivityImport>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ActivityImport>, String> {
     println!("Checking activities import for account: {}", account_id);

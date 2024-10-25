@@ -83,13 +83,13 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'isValid',
     header: ({ column }) => <DataTableColumnHeader column={column} title="" />,
     cell: ({ row }) => {
-      const isValid = row.getValue('isValid') as string;
+      const isValid = row.getValue('isValid') as boolean;
       const error = row.getValue('error') as string;
       const lineNumber = row.getValue('lineNumber') as number;
 
       return (
         <div className="flex items-center">
-          {isValid === 'true' ? (
+          {isValid ? (
             <Icons.CheckCircle className="h-4 w-4 text-success" />
           ) : (
             <TooltipProvider>
@@ -112,9 +112,9 @@ export const columns: ColumnDef<ActivityImport>[] = [
       return value.includes(isValid);
     },
     sortingFn: (rowA, rowB, id) => {
-      const statusA = rowA.getValue(id) as any;
-      const statusB = rowB.getValue(id) as any;
-      return statusA.localeCompare(statusB);
+      const statusA = rowA.getValue(id) as boolean;
+      const statusB = rowB.getValue(id) as boolean;
+      return statusA === statusB ? 0 : statusA ? -1 : 1;
     },
   },
   {

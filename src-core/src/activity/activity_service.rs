@@ -182,7 +182,7 @@ impl ActivityService {
         &self,
         conn: &mut SqliteConnection,
         account_id: String,
-        activities: Vec<NewActivity>,
+        activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>, String> {
         let asset_service = AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
@@ -194,39 +194,23 @@ impl ActivityService {
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
         let mut symbols_to_sync: Vec<String> = Vec::new();
 
-        for (index, activity) in activities.into_iter().enumerate() {
-            let mut activity_import = ActivityImport {
-                id: Some(Uuid::new_v4().to_string()),
-                account_id: Some(account.id.clone()),
-                account_name: Some(account.name.clone()),
-                symbol: activity.asset_id.clone(),
-                symbol_name: None,
-                activity_type: activity.activity_type,
-                quantity: activity.quantity,
-                unit_price: activity.unit_price,
-                currency: activity.currency,
-                fee: activity.fee,
-                date: activity.activity_date,
-                is_draft: Some("true".to_string()),
-                is_valid: None,
-                error: None,
-                comment: None,
-                line_number: Some((index + 1) as i32),
-            };
+        for mut activity in activities {
+            activity.id = Some(Uuid::new_v4().to_string());
+            activity.account_name = Some(account.name.clone());
 
             // Load the symbol profile
             let symbol_profile_result = asset_service
-                .get_asset_profile(conn, &activity_import.symbol, Some(false))
+                .get_asset_profile(conn, &activity.symbol, Some(false))
                 .await;
 
             // Check if symbol profile is valid
             let (is_valid, error) = match symbol_profile_result {
                 Ok(profile) => {
-                    activity_import.symbol_name = profile.name;
-                    symbols_to_sync.push(activity_import.symbol.clone());
+                    activity.symbol_name = profile.name;
+                    symbols_to_sync.push(activity.symbol.clone());
 
                     // Add exchange rate if the activity currency is different from the account currency
-                    let currency = &activity_import.currency;
+                    let currency = &activity.currency;
                     if currency != &account.currency {
                         match fx_service.add_exchange_rate(
                             conn,
@@ -241,36 +225,36 @@ impl ActivityService {
                                     &account.currency,
                                     currency,
                                     e,
-                                    activity_import.line_number.unwrap()
+                                    activity.line_number.unwrap()
                                 );
                                 return Err(error_msg);
                             }
                         }
                     }
 
-                    (Some("true".to_string()), None)
+                    (true, None)
                 }
                 Err(_) => {
                     let error_msg = format!(
                         "Symbol {} not found. Line: {}",
-                        &activity_import.symbol,
-                        activity_import.line_number.unwrap()
+                        &activity.symbol,
+                        activity.line_number.unwrap()
                     );
-                    (Some("false".to_string()), Some(error_msg))
+                    (false, Some(error_msg))
                 }
             };
 
-            activity_import.is_valid = is_valid;
-            activity_import.error = error;
-            activities_with_status.push(activity_import);
+            activity.is_valid = is_valid;
+            activity.error = error;
+            activities_with_status.push(activity);
         }
 
         // Sync quotes for all valid symbols
-        if !symbols_to_sync.is_empty() {
-            asset_service
-                .sync_symbol_quotes(conn, &symbols_to_sync)
-                .await?;
-        }
+        // if !symbols_to_sync.is_empty() {
+        //     asset_service
+        //         .sync_symbol_quotes(conn, &symbols_to_sync)
+        //         .await?;
+        // }
 
         Ok(activities_with_status)
     }
