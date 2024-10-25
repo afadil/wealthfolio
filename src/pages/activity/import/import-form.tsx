@@ -251,35 +251,42 @@ export function ActivityImportForm({
   });
 
   return (
-    <div className="space-y-8">
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <AccountSelection control={form.control} accounts={accounts} />
-        <FileDropzone
-          getRootProps={getRootProps}
-          getInputProps={getInputProps}
-          isDragActive={isDragActive}
-          selectedFile={selectedFile}
-          isLoading={isLoading}
-          openFilePicker={openFilePicker}
-        />
+    <div className="flex h-[calc(100vh-theme(spacing.16))] flex-col overflow-hidden">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex h-full flex-col gap-4 overflow-hidden"
+      >
+        <div className="shrink-0 space-y-4">
+          <AccountSelection control={form.control} accounts={accounts} />
+          <FileDropzone
+            getRootProps={getRootProps}
+            getInputProps={getInputProps}
+            isDragActive={isDragActive}
+            selectedFile={selectedFile}
+            isLoading={isLoading}
+            openFilePicker={openFilePicker}
+          />
+        </div>
 
-        <PreviewContent
-          accountId={accountId}
-          selectedFile={selectedFile}
-          isValidCsv={isValidCsv}
-          error={error}
-          headers={headers}
-          mapping={mapping}
-          handleColumnMapping={handleColumnMapping}
-          handleActivityTypeMapping={handleActivityTypeMapping}
-          handleSymbolMapping={handleSymbolMapping}
-          importFormatFields={Object.values(ImportFormat)}
-          csvData={csvData}
-          getMappedValue={getMappedValue}
-          validationErrors={validationErrors}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <PreviewContent
+            accountId={accountId}
+            selectedFile={selectedFile}
+            isValidCsv={isValidCsv}
+            error={error}
+            headers={headers}
+            mapping={mapping}
+            handleColumnMapping={handleColumnMapping}
+            handleActivityTypeMapping={handleActivityTypeMapping}
+            handleSymbolMapping={handleSymbolMapping}
+            importFormatFields={Object.values(ImportFormat)}
+            csvData={csvData}
+            getMappedValue={getMappedValue}
+            validationErrors={validationErrors}
+          />
+        </div>
 
-        <div className="mt-4 flex justify-between">
+        <div className="flex shrink-0 justify-between pt-4">
           <Button asChild variant="outline">
             <Link to="/activities">Cancel</Link>
           </Button>

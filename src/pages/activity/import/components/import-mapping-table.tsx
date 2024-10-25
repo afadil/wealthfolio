@@ -20,10 +20,9 @@ import { ImportFormat, ActivityType } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
-import { useSymbolValidation } from '../hooks/useSymbolValidation';
 import TickerSearchInput from '@/components/ticker-search';
+import { validateTickerSymbol } from '../utils/csvValidation';
 
 const REQUIRED_FIELDS = [
   ImportFormat.Date,
@@ -68,15 +67,9 @@ export function ImportMappingTable({
       new Set(csvData.slice(1).map((row) => getMappedValue(row, ImportFormat.Symbol))),
     ).filter(Boolean);
   }, [csvData, getMappedValue]);
-
-  const { invalidSymbols, isLoading: isSymbolValidationLoading } =
-    useSymbolValidation(distinctSymbols);
-
-  const symbolsToMap = useMemo(() => {
-    return distinctSymbols.filter(
-      (symbol) => !mapping.symbolMappings[symbol] || invalidSymbols.includes(symbol),
-    );
-  }, [distinctSymbols, mapping.symbolMappings, invalidSymbols]);
+  const invalidSymbols = useMemo(() => {
+    return distinctSymbols.filter((symbol) => !validateTickerSymbol(symbol));
+  }, [distinctSymbols]);
 
   const { distinctActivityTypes, totalRows } = useMemo(() => {
     const activityTypeMap = new Map<string, { row: string[]; count: number }>();
@@ -255,23 +248,27 @@ export function ImportMappingTable({
 
     if (appType) {
       return (
-        <div className="flex items-center space-x-2">
-          <Badge title={trimmedCsvType}>
+        <div className="flex items-center gap-3">
+          <div title={trimmedCsvType} className="text-sm font-medium">
             {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH
               ? `${displayValue.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH)}...`
               : displayValue}
-          </Badge>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-8 py-0 font-normal text-muted-foreground"
-            onClick={() => {
-              // Pass empty string as ActivityType to trigger removal of mapping
-              handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
-            }}
-          >
-            {appType}
-          </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            →
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="font-medium text-muted-foreground"
+              onClick={() => {
+                // Pass empty string as ActivityType to trigger removal of mapping
+                handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
+              }}
+            >
+              {appType}
+            </Button>
+          </div>
         </div>
       );
     }
@@ -337,7 +334,8 @@ export function ImportMappingTable({
     mappedSymbol: string | undefined;
     isInvalid: boolean;
   }) => {
-    if (mappedSymbol && !isInvalid) {
+    // Show edit button if symbol is mapped or valid
+    if (mappedSymbol || !isInvalid) {
       return (
         <div className="flex items-center space-x-2">
           <span>{csvSymbol}</span>
@@ -349,28 +347,32 @@ export function ImportMappingTable({
               handleSymbolMapping(csvSymbol, '');
             }}
           >
-            {mappedSymbol}
+            {mappedSymbol || csvSymbol}
           </Button>
         </div>
       );
     }
 
+    // Show search input only for invalid symbols without mapping
     return (
       <div className="flex items-center space-x-2">
-        <span className={isInvalid ? 'text-destructive' : ''}>{csvSymbol}</span>
+        <span className="text-destructive">{csvSymbol}</span>
         <TickerSearchInput
           defaultValue={mappedSymbol || ''}
           onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
         />
-        {isInvalid && <Badge variant="destructive">Invalid</Badge>}
       </div>
     );
   };
 
   return (
-    <Card className="mx-auto w-full">
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}>
-        <CardHeader>
+    <Card className="flex h-full flex-col overflow-hidden">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}
+        className="flex h-full flex-col overflow-hidden"
+      >
+        <CardHeader className="flex-none">
           <CardTitle className="flex items-center justify-between text-lg font-bold">
             <div>
               <div>CSV Mapping</div>
@@ -383,12 +385,12 @@ export function ImportMappingTable({
           </CardTitle>
         </CardHeader>
 
-        <TabsContent value="preview">
-          <div className="overflow-x-auto">
-            <Table>
+        <TabsContent value="preview" className="m-0 min-h-0 flex-1 overflow-hidden">
+          <div className="h-full overflow-auto">
+            <Table className="relative w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">
+                  <TableHead className="sticky left-0 z-20 w-[50px] bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                     <div className="flex flex-col">
                       <span>Field</span>
                       <span className="inline-flex h-8 items-center justify-center whitespace-nowrap py-0 text-sm font-normal text-muted-foreground">
@@ -406,7 +408,9 @@ export function ImportMappingTable({
                   const row = csvData[rowNum - 1];
                   return (
                     <TableRow key={`row-${rowNum}`}>
-                      <TableCell>{rowNum}</TableCell>
+                      <TableCell className="sticky left-0 z-10 bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        {rowNum}
+                      </TableCell>
                       {importFormatFields.map((field) => (
                         <TableCell key={field}>{renderCell(field, row)}</TableCell>
                       ))}
@@ -417,27 +421,32 @@ export function ImportMappingTable({
             </Table>
           </div>
         </TabsContent>
-        <TabsContent value="raw">
-          <ScrollArea className="h-[400px] w-full">
-            <Table>
+
+        <TabsContent value="raw" className="m-0 min-h-0 flex-1 overflow-hidden">
+          <div className="h-full overflow-auto">
+            <Table className="relative w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Row</TableHead>
-                  <TableHead>CSV Data</TableHead>
+                  <TableHead className="sticky left-0 z-20 w-[100px] bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                    Row
+                  </TableHead>
+                  <TableHead className="min-w-[800px]">CSV Data</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {csvData.slice(1).map((row, index) => (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{index + 2}</TableCell>
-                    <TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-background font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                      {index + 2}
+                    </TableCell>
+                    <TableCell className="min-w-[800px]">
                       <code className="whitespace-pre-wrap font-mono text-sm">{row.join(',')}</code>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </TabsContent>
       </Tabs>
     </Card>

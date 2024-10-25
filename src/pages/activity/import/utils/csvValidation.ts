@@ -25,6 +25,7 @@ export function isImportMapComplete(
   mapping: {
     columns: Partial<Record<ImportFormat, string>>;
     activityTypes: Partial<Record<ActivityType, string[]>>;
+    symbolMappings: Record<string, string>;
   },
   csvData: string[][],
   getMappedValue: (row: string[], field: ImportFormat) => string,
@@ -38,28 +39,42 @@ export function isImportMapComplete(
     ImportFormat.UnitPrice,
   ];
 
-  // Updated to safely check for undefined values
+  // Check if all required columns are mapped
   const columnsComplete = requiredFields.every(
     (field) => mapping.columns[field] && headers.includes(mapping.columns[field]!),
   );
 
+  if (!columnsComplete) return false;
+
+  // Get unique activity types from CSV data and check their mapping
   const uniqueCsvTypes = new Set(
     csvData
       .slice(1)
-      .map((row) => getMappedValue(row, ImportFormat.ActivityType).trim().toUpperCase()),
+      .map((row) => getMappedValue(row, ImportFormat.ActivityType))
+      .filter(Boolean)
+      .map((type) => type.trim().toUpperCase()),
   );
 
-  const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) => {
-    return Object.values(mapping.activityTypes).some((mappedTypes) =>
-      mappedTypes?.some((mappedType) => {
-        const normalizedCsvType = csvType.trim().toUpperCase();
-        const normalizedMappedType = mappedType.trim().toUpperCase();
-        return normalizedCsvType.startsWith(normalizedMappedType);
-      }),
-    );
-  });
+  const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) =>
+    Object.entries(mapping.activityTypes).some(([_, mappedTypes]) =>
+      mappedTypes?.some((mappedType) => csvType.startsWith(mappedType.trim().toUpperCase())),
+    ),
+  );
 
-  return columnsComplete && activityTypesComplete;
+  // Get unique symbols from CSV data and check their validity/mapping
+  const uniqueSymbols = new Set(
+    csvData
+      .slice(1)
+      .map((row) => getMappedValue(row, ImportFormat.Symbol))
+      .filter(Boolean)
+      .map((symbol) => symbol.trim()),
+  );
+
+  const symbolsComplete = Array.from(uniqueSymbols).every(
+    (symbol) => validateTickerSymbol(symbol) || mapping.symbolMappings[symbol],
+  );
+
+  return columnsComplete && activityTypesComplete && symbolsComplete;
 }
 
 const CASH_ACTIVITY_TYPES = new Set([
@@ -70,7 +85,8 @@ const CASH_ACTIVITY_TYPES = new Set([
   ActivityType.TAX,
 ]);
 
-const tickerRegex = /^[A-Z0-9.-]+$/;
+// Add a simple regex for ticker validation
+const tickerRegex = /^[A-Z0-9]{1,5}([.-][A-Z0-9]+)?$/;
 
 export const activityImportValidationSchema = z
   .object({
@@ -118,7 +134,6 @@ export const activityImportValidationSchema = z
 
 export function validateActivities(activities: ActivityImport[]): Record<string, string[]> {
   const validationErrors: Record<string, string[]> = {};
-
   activities.forEach((activity, index) => {
     const rowErrors: string[] = [];
 
@@ -144,11 +159,17 @@ export function validateActivities(activities: ActivityImport[]): Record<string,
     }
   });
 
-  console.log('validationErrors', validationErrors);
   return validationErrors;
 }
 
 // Helper function to check if an activity is a cash activity
 export function isCashActivity(activityType: ActivityType): boolean {
   return CASH_ACTIVITY_TYPES.has(activityType);
+}
+
+export function validateTickerSymbol(symbol: string): boolean {
+  if (symbol.startsWith('$CASH-')) {
+    return true;
+  }
+  return tickerRegex.test(symbol);
 }
