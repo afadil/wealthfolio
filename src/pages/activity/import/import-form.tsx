@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -84,7 +84,7 @@ export function ActivityImportForm({
   }, [accountId]);
 
   const { data: fetchedMapping } = useQuery({
-    queryKey: ['mapping', accountId],
+    queryKey: [QueryKeys.IMPORT_MAPPING, accountId],
     queryFn: () => getAccountImportMapping(accountId),
     enabled: !!accountId,
   });

@@ -112,6 +112,7 @@ diesel::table! {
         account_id -> Text,
         fields_mappings -> Text,
         activity_type_mappings -> Text,
+        symbol_mappings -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
     }
