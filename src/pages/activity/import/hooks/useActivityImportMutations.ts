@@ -1,25 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { checkActivitiesImport, createActivities } from '@/commands/activity-import';
+import {
+  checkActivitiesImport,
+  createActivities,
+  saveAccountImportMapping,
+} from '@/commands/activity-import';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
+import { ImportMappingData } from '@/lib/types';
 
-export function useActivityImportMutations() {
+export function useActivityImportMutations({
+  onSuccess,
+  onError,
+}: {
+  onSuccess?: (activities: any[]) => void;
+  onError?: (error: string) => void;
+} = {}) {
   const queryClient = useQueryClient();
 
   const calculateHistoryMutation = useCalculateHistoryMutation({
     successTitle: 'Activities imported successfully.',
-  });
-
-  const checkImportMutation = useMutation({
-    mutationFn: checkActivitiesImport,
-    onError: (error: any) => {
-      toast({
-        title: 'Error checking import',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
   });
 
   const confirmImportMutation = useMutation({
@@ -45,8 +45,40 @@ export function useActivityImportMutations() {
     },
   });
 
+  const saveAndCheckImportMutation = useMutation({
+    mutationFn: async ({
+      data,
+      activitiesToImport,
+    }: {
+      data: ImportMappingData;
+      activitiesToImport: any[];
+    }) => {
+      // Save the mapping
+      await saveAccountImportMapping(data);
+
+      // Then check the activities
+      return await checkActivitiesImport({
+        account_id: data.accountId,
+        activities: activitiesToImport,
+      });
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.IMPORT_MAPPING] });
+      onSuccess?.(result);
+    },
+    onError: (error: any) => {
+      const errorMessage = `Import failed: ${error.message}`;
+      onError?.(errorMessage);
+      toast({
+        title: 'Error importing activities',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
-    checkImportMutation,
     confirmImportMutation,
+    saveAndCheckImportMutation,
   };
 }

@@ -1,7 +1,6 @@
 use crate::account::account_service::AccountService;
-use crate::models::{Account, AccountUpdate, NewAccount, ImportMapping, NewImportMapping};
+use crate::models::{Account, AccountUpdate, NewAccount};
 use crate::AppState;
-use chrono::Utc;
 use tauri::State;
 
 #[tauri::command]
@@ -68,46 +67,4 @@ pub async fn delete_account(
     service
         .delete_account(&mut conn, account_id)
         .map_err(|e| format!("Failed to delete account: {}", e))
-}
-
-#[tauri::command]
-pub fn add_import_mapping(
-    state: State<'_, AppState>,
-    account_id: String,
-    fields_mappings: String,
-    activity_type_mappings: String,
-) -> Result<(), String> {
-    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
-
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let account_service = AccountService::new(base_currency);
-
-    let now = Utc::now().naive_utc();
-
-    let new_import_mapping = NewImportMapping {
-        account_id: account_id.clone(),
-        fields_mappings,
-        activity_type_mappings,
-        created_at: now,
-        updated_at: now,
-    };
-
-    account_service
-        .save_account_import_mapping(&mut conn, &account_id, new_import_mapping)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn fetch_import_mapping(
-    state: State<'_, AppState>,
-    account_id: String,
-) -> Result<Option<ImportMapping>, String> {
-    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
-
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let account_service = AccountService::new(base_currency);
-
-    account_service
-        .get_account_import_mapping(&mut conn, &account_id)
-        .map_err(|e| e.to_string())
 }

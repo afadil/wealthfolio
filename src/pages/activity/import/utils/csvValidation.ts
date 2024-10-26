@@ -1,4 +1,4 @@
-import { ImportFormat, ActivityType, ActivityImport } from '@/lib/types';
+import { ImportFormat, ActivityType, ActivityImport, ImportMappingData } from '@/lib/types';
 import { z } from 'zod';
 
 export function validateCsvStructure(headerRow: string[]): boolean {
@@ -22,11 +22,7 @@ export function initializeColumnMapping(
 
 export function isImportMapComplete(
   headers: string[],
-  mapping: {
-    columns: Partial<Record<ImportFormat, string>>;
-    activityTypes: Partial<Record<ActivityType, string[]>>;
-    symbolMappings: Record<string, string>;
-  },
+  mapping: ImportMappingData,
   csvData: string[][],
   getMappedValue: (row: string[], field: ImportFormat) => string,
 ): boolean {
@@ -41,7 +37,7 @@ export function isImportMapComplete(
 
   // Check if all required columns are mapped
   const columnsComplete = requiredFields.every(
-    (field) => mapping.columns[field] && headers.includes(mapping.columns[field]!),
+    (field) => mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
   );
 
   if (!columnsComplete) return false;
@@ -56,7 +52,7 @@ export function isImportMapComplete(
   );
 
   const activityTypesComplete = Array.from(uniqueCsvTypes).every((csvType) =>
-    Object.entries(mapping.activityTypes).some(([_, mappedTypes]) =>
+    Object.entries(mapping.activityMappings).some(([_, mappedTypes]) =>
       mappedTypes?.some((mappedType) => csvType.startsWith(mappedType.trim().toUpperCase())),
     ),
   );
@@ -166,12 +162,19 @@ export function validateActivities(activities: ActivityImport[]): Record<string,
     const rowErrors: string[] = [];
 
     // Attempt to parse the date and update the activity object
-    const parsedDate = new Date(activity.date?.toString().trim() || '');
+    const dateStr = activity.date?.toString().trim() || '';
+    const parsedDate = new Date(dateStr);
 
-    if (!parsedDate) {
+    if (isNaN(parsedDate.getTime())) {
       rowErrors.push('date: Invalid date format');
     } else {
-      activity.date = parsedDate.toISOString().split('T')[0]; // Convert to ISO format
+      // Just use the date portion directly from the input string if it's in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        activity.date = dateStr;
+      } else {
+        // Otherwise format the date, forcing it to YYYY-MM-DD
+        activity.date = parsedDate.toLocaleDateString('en-CA'); // en-CA outputs as YYYY-MM-DD
+      }
     }
 
     try {

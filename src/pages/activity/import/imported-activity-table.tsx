@@ -122,8 +122,8 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'date',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
     cell: ({ row }) => {
-      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const formattedDate = formatDateTime(row.getValue('date'), userTimezone);
+      // const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const formattedDate = formatDateTime(row.getValue('date'));
       return (
         <div className="ml-2 flex flex-col">
           <span>{formattedDate.date}</span>

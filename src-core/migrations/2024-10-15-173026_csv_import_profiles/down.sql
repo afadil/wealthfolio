@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS import_mappings;
+DROP TABLE IF EXISTS activity_import_profiles;

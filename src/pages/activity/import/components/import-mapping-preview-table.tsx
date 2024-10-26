@@ -1,5 +1,3 @@
-'use client';
-
 import {
   Table,
   TableBody,
@@ -8,16 +6,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ImportFormat, ActivityType } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
 import { renderHeaderCell, renderCell } from './import-mapping-table-cells';
 
 interface ImportMappingPreviewTableProps {
   importFormatFields: ImportFormat[];
-  mapping: {
-    columns: Partial<Record<ImportFormat, string>>;
-    activityTypes: Partial<Record<ActivityType, string[]>>;
-    symbolMappings: Record<string, string>;
-  };
+  mapping: ImportMappingData;
   headers: string[];
   csvData: string[][];
   rowsToShow: number[];
@@ -41,7 +35,7 @@ export function ImportMappingPreviewTable({
   invalidSymbols,
 }: ImportMappingPreviewTableProps) {
   return (
-    <div className="h-full w-full overflow-hidden rounded-md border-2">
+    <div className="mb-2 h-full w-full overflow-hidden rounded-md border text-sm">
       <div className="grid h-full" style={{ gridTemplateRows: 'auto 1fr' }}>
         {/* Sticky Header */}
         <div className="overflow-hidden">
@@ -78,7 +72,7 @@ export function ImportMappingPreviewTable({
                       {rowNum}
                     </TableCell>
                     {importFormatFields.map((field) => (
-                      <TableCell key={field} className="min-w-16">
+                      <TableCell key={field} className="w-[50px] min-w-16">
                         {renderCell({
                           field,
                           row,

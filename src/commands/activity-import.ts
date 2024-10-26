@@ -1,4 +1,4 @@
-import { ActivityImport, NewActivity } from '@/lib/types';
+import { ActivityImport, ImportMappingData, NewActivity } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 
 export const checkActivitiesImport = async ({
@@ -39,138 +39,11 @@ export const createActivities = async (activities: NewActivity[]): Promise<numbe
   }
 };
 
-export const getAccountImportMapping = async (accountId: string) => {
+export const getAccountImportMapping = async (accountId: string): Promise<ImportMappingData> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        // Return fake data for testing purposes
-        if (accountId === '1') {
-          return {
-            columns: {
-              date: 'date',
-              symbol: 'symbolId',
-              quantity: 'shares',
-              activityType: 'type',
-              unitPrice: 'unitPrice',
-              currency: 'currency',
-              fee: 'fee',
-            },
-            activityTypes: {
-              BUY: ['Buy', 'BOUGHT', 'Purchase'],
-              SELL: ['SELLT', 'Sell', 'SOLD'],
-              DIVIDEND: ['TXPDDV', 'Dividend'],
-              INTEREST: ['Interest'],
-              DEPOSIT: ['Deposit'],
-              WITHDRAWAL: ['Withdrawal'],
-              TRANSFER_IN: ['Transfer_In'],
-              TRANSFER_OUT: ['Transfer_Out'],
-              SPLIT: ['Split'],
-              CONVERSION_IN: ['Conversion_In'],
-              CONVERSION_OUT: ['Conversion_Out'],
-              FEE: ['Fee'],
-              TAX: ['Tax'],
-            },
-            symbolMappings: {
-              'AAPL.US': 'AAPL',
-              'MSFT.US': 'MSFT',
-              'GOOGL.US': 'GOOGL',
-            },
-          };
-        }
-        if (accountId === 'bec01413-742a-4e12-805d-d35e0a03da4e') {
-          return {
-            columns: {
-              date: 'Trade Date',
-              symbol: 'Description',
-              quantity: 'Quantity',
-              activityType: 'Action',
-              unitPrice: 'Price',
-              amount: 'Net Amount',
-              currency: '__skip__',
-              fee: '__skip__',
-            },
-            activityTypes: {
-              BUY: ['YOU BOUGHT', 'REINVESTMENT'],
-              SELL: [],
-              DIVIDEND: ['TXPDDV', 'Dividend'],
-              INTEREST: [],
-              DEPOSIT: ['Deposit'],
-              WITHDRAWAL: ['Withdrawal'],
-              TRANSFER_IN: ['Transfer_In'],
-              TRANSFER_OUT: ['Transfer_Out'],
-              SPLIT: ['Split'],
-              CONVERSION_IN: ['Conversion_In'],
-              CONVERSION_OUT: ['Conversion_Out'],
-              FEE: ['Fee'],
-              TAX: ['Tax'],
-            },
-            symbolMappings: {
-              'AAPL.US': 'AAPL',
-              'BMO S&P 500 INDEX ETF C$': 'ZSP.TO',
-              'GOOGL.US': 'GOOGL',
-            },
-          };
-        }
-
-        if (accountId === '3') {
-          return {
-            columns: {
-              date: 'Run Date',
-              symbol: 'Description',
-              quantity: 'Quantity',
-              activityType: 'Action',
-              unitPrice: 'Price ($)',
-              amount: 'Amount ($)',
-              currency: '__skip__',
-              fee: 'Fees ($)',
-            },
-            activityTypes: {
-              BUY: ['YOU BOUGHT', 'REINVESTMENT'],
-              SELL: [],
-              DIVIDEND: ['TXPDDV', 'Dividend'],
-              INTEREST: [],
-              DEPOSIT: ['Deposit'],
-              WITHDRAWAL: ['Withdrawal'],
-              TRANSFER_IN: ['Transfer_In'],
-              TRANSFER_OUT: ['Transfer_Out'],
-              SPLIT: ['Split'],
-              CONVERSION_IN: ['Conversion_In'],
-              CONVERSION_OUT: ['Conversion_Out'],
-              FEE: ['Fee'],
-              TAX: ['Tax'],
-            },
-            symbolMappings: {},
-          };
-        }
-
-        // Return a default mapping
-        return {
-          columns: {
-            date: 'date',
-            symbol: 'symbol',
-            quantity: 'quantity',
-            activityType: 'activityType',
-            unitPrice: 'unitPrice',
-            currency: 'currency',
-            fee: 'fee',
-          },
-          activityTypes: {
-            BUY: ['BUY'],
-            SELL: ['SELL'],
-            DIVIDEND: ['DIVIDEND'],
-            INTEREST: ['INTEREST'],
-            DEPOSIT: ['DEPOSIT'],
-            WITHDRAWAL: ['WITHDRAWAL'],
-            TRANSFER_IN: ['TRANSFER_IN'],
-            TRANSFER_OUT: ['TRANSFER_OUT'],
-            SPLIT: ['SPLIT'],
-            CONVERSION_IN: ['CONVERSION_IN'],
-            CONVERSION_OUT: ['CONVERSION_OUT'],
-            FEE: ['FEE'],
-            TAX: ['TAX'],
-          },
-          symbolMappings: {},
-        };
+        return invokeTauri('get_account_import_mapping', { accountId });
       default:
         throw new Error(`Unsupported`);
     }
@@ -180,20 +53,15 @@ export const getAccountImportMapping = async (accountId: string) => {
   }
 };
 
-export const saveAccountImportMapping = async (data: {
-  accountId: string;
-  mapping: {
-    columns: Record<string, string>;
-    activityTypes: Record<string, string[]>;
-    symbolMappings: Record<string, string>;
-  };
-}) => {
+export const saveAccountImportMapping = async (
+  mapping: ImportMappingData,
+): Promise<ImportMappingData> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        console.log('save_account_import_mapping', data);
-        return true;
-      // return invokeTauri('save_account_import_mapping', data);
+        return invokeTauri('save_account_import_mapping', {
+          mapping,
+        });
       default:
         throw new Error(`Unsupported`);
     }

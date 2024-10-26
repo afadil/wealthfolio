@@ -682,25 +682,92 @@ pub struct DepositsCalculation {
     pub by_account: HashMap<String, AccountDeposit>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
+)]
 #[diesel(primary_key(account_id))]
-#[diesel(table_name = crate::schema::import_mappings)]
+#[diesel(table_name = crate::schema::activity_import_profiles)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
 pub struct ImportMapping {
     pub account_id: String,
-    pub fields_mappings: String, // JSON string stored in the database
-    pub activity_type_mappings: String, // JSON string stored in the database
+    pub field_mappings: String,
+    pub activity_mappings: String,
+    pub symbol_mappings: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Insertable)]
-#[diesel(table_name = crate::schema::import_mappings)]
-pub struct NewImportMapping {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportMappingData {
     pub account_id: String,
-    pub fields_mappings: String,        // JSON string to be stored
-    pub activity_type_mappings: String, // JSON string to be stored
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub field_mappings: HashMap<String, String>,
+    pub activity_mappings: HashMap<String, Vec<String>>,
+    pub symbol_mappings: HashMap<String, String>,
+}
+
+impl Default for ImportMappingData {
+    fn default() -> Self {
+        let mut field_mappings = HashMap::new();
+        field_mappings.insert("date".to_string(), "date".to_string());
+        field_mappings.insert("symbol".to_string(), "symbol".to_string());
+        field_mappings.insert("quantity".to_string(), "quantity".to_string());
+        field_mappings.insert("activityType".to_string(), "activityType".to_string());
+        field_mappings.insert("unitPrice".to_string(), "unitPrice".to_string());
+        field_mappings.insert("currency".to_string(), "currency".to_string());
+        field_mappings.insert("fee".to_string(), "fee".to_string());
+
+        let mut activity_mappings = HashMap::new();
+        activity_mappings.insert("BUY".to_string(), vec!["BUY".to_string()]);
+        activity_mappings.insert("SELL".to_string(), vec!["SELL".to_string()]);
+        activity_mappings.insert("DIVIDEND".to_string(), vec!["DIVIDEND".to_string()]);
+        activity_mappings.insert("INTEREST".to_string(), vec!["INTEREST".to_string()]);
+        activity_mappings.insert("DEPOSIT".to_string(), vec!["DEPOSIT".to_string()]);
+        activity_mappings.insert("WITHDRAWAL".to_string(), vec!["WITHDRAWAL".to_string()]);
+        activity_mappings.insert("TRANSFER_IN".to_string(), vec!["TRANSFER_IN".to_string()]);
+        activity_mappings.insert("TRANSFER_OUT".to_string(), vec!["TRANSFER_OUT".to_string()]);
+        activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
+        activity_mappings.insert(
+            "CONVERSION_IN".to_string(),
+            vec!["CONVERSION_IN".to_string()],
+        );
+        activity_mappings.insert(
+            "CONVERSION_OUT".to_string(),
+            vec!["CONVERSION_OUT".to_string()],
+        );
+        activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
+        activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
+
+        ImportMappingData {
+            account_id: String::new(),
+            field_mappings,
+            activity_mappings,
+            symbol_mappings: HashMap::new(),
+        }
+    }
+}
+
+impl ImportMapping {
+    pub fn to_mapping_data(&self) -> Result<ImportMappingData, serde_json::Error> {
+        let mut mapping_data = ImportMappingData::default();
+        mapping_data.account_id = self.account_id.clone();
+        mapping_data.field_mappings = serde_json::from_str(&self.field_mappings)?;
+        mapping_data.activity_mappings = serde_json::from_str(&self.activity_mappings)?;
+        mapping_data.symbol_mappings = serde_json::from_str(&self.symbol_mappings)?;
+        Ok(mapping_data)
+    }
+
+    pub fn from_mapping_data(data: &ImportMappingData) -> Result<Self, serde_json::Error> {
+        Ok(Self {
+            account_id: data.account_id.clone(),
+            field_mappings: serde_json::to_string(&data.field_mappings)?,
+            activity_mappings: serde_json::to_string(&data.activity_mappings)?,
+            symbol_mappings: serde_json::to_string(&data.symbol_mappings)?,
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,17 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ImportFormat, ActivityType } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
 import { validateTickerSymbol } from '../utils/csvValidation';
 import { ImportMappingPreviewTable } from './import-mapping-preview-table';
 import { ImportMappingRawTable } from './import-mapping-raw-table';
 
 interface ImportMappingTableProps {
   importFormatFields: ImportFormat[];
-  mapping: {
-    columns: Partial<Record<ImportFormat, string>>;
-    activityTypes: Partial<Record<ActivityType, string[]>>;
-    symbolMappings: Record<string, string>;
-  };
+  mapping: ImportMappingData;
   headers: string[];
   csvData: string[][];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
@@ -59,11 +55,11 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
         csvType: type,
         row: data.row,
         count: data.count,
-        appType: findAppTypeForCsvType(type, props.mapping.activityTypes),
+        appType: findAppTypeForCsvType(type, props.mapping.activityMappings),
       })),
       totalRows: total,
     };
-  }, [props.csvData, props.getMappedValue, props.mapping.activityTypes]);
+  }, [props.csvData, props.getMappedValue, props.mapping.activityMappings]);
 
   const { distinctSymbolRows } = useMemo(() => {
     const symbolMap = new Map<string, { row: string[]; count: number }>();
@@ -103,7 +99,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
     const rowMap = new Map<number, { needsMapping: boolean }>();
 
     // First pass: collect rows that need mapping
-    distinctActivityTypes.forEach(({ row, csvType, appType }) => {
+    distinctActivityTypes.forEach(({ row, appType }) => {
       const rowNum = parseInt(row[row.length - 1]);
       if (!rowMap.has(rowNum)) {
         rowMap.set(rowNum, {
@@ -112,7 +108,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
       }
     });
 
-    distinctSymbolRows.forEach(({ row, symbol, isValid, mappedSymbol }) => {
+    distinctSymbolRows.forEach(({ row, isValid, mappedSymbol }) => {
       const rowNum = parseInt(row[row.length - 1]);
       if (!rowMap.has(rowNum)) {
         rowMap.set(rowNum, {

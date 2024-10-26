@@ -34,6 +34,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    activity_import_profiles (account_id) {
+        account_id -> Text,
+        field_mappings -> Text,
+        activity_mappings -> Text,
+        symbol_mappings -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     app_settings (setting_key) {
         setting_key -> Text,
         setting_value -> Text,
@@ -108,17 +119,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    import_mappings (account_id) {
-        account_id -> Text,
-        fields_mappings -> Text,
-        activity_type_mappings -> Text,
-        symbol_mappings -> Text,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     platforms (id) {
         id -> Text,
         name -> Nullable<Text>,
@@ -175,13 +175,13 @@ diesel::joinable!(quotes -> assets (symbol));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
+    activity_import_profiles,
     app_settings,
     assets,
     contribution_limits,
     exchange_rates,
     goals,
     goals_allocation,
-    import_mappings,
     platforms,
     portfolio_history,
     quotes,

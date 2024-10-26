@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle } from 'lucide-react';
-import { ImportFormat, ActivityType, ImportMapping } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Icons } from '@/components/icons';
 
@@ -20,7 +20,7 @@ interface ErrorsPreviewProps {
   parsingError: boolean;
   validationErrors: Record<string, string[]>;
   csvData: string[][];
-  mapping: ImportMapping;
+  mapping: ImportMappingData;
 }
 
 export function ErrorViewer({
@@ -32,8 +32,8 @@ export function ErrorViewer({
   const totalErrors = Object.values(validationErrors).flat().length;
 
   const mappedHeaders = useMemo(() => {
-    return csvData[0]?.filter((header) => Object.values(mapping.columns).includes(header));
-  }, [csvData, mapping.columns]);
+    return csvData[0]?.filter((header) => Object.values(mapping.fieldMappings).includes(header));
+  }, [csvData, mapping.fieldMappings]);
 
   const rowsWithErrors = useMemo(() => {
     const errorKeys = Object.keys(validationErrors);
@@ -41,12 +41,14 @@ export function ErrorViewer({
   }, [validationErrors]);
 
   const getMappedHeader = (header: string) => {
-    const mappedFormat = Object.entries(mapping.columns).find(([_, value]) => value === header);
+    const mappedFormat = Object.entries(mapping.fieldMappings).find(
+      ([_, value]) => value === header,
+    );
     return mappedFormat ? mappedFormat[0] : header;
   };
 
   const getMappedActivityType = (activityType: string) => {
-    for (const [key, values] of Object.entries(mapping.activityTypes)) {
+    for (const [key, values] of Object.entries(mapping.activityMappings)) {
       if (values.includes(activityType)) {
         return key as ActivityType;
       }

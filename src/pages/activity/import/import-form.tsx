@@ -1,8 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import {
   Select,
@@ -14,13 +12,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
-import { Account, ActivityType, ActivityImport, ImportFormat, ImportFormSchema } from '@/lib/types';
-import { getAccountImportMapping, saveAccountImportMapping } from '@/commands/activity-import';
+import {
+  Account,
+  ActivityType,
+  ActivityImport,
+  ImportFormat,
+  ImportMappingData,
+} from '@/lib/types';
+import { getAccountImportMapping } from '@/commands/activity-import';
 import { useActivityImportMutations } from './hooks/useActivityImportMutations';
 
 // Components
 import { FileDropzone } from './components/file-dropzone';
-import { importFormSchema } from '@/lib/schemas';
 import { ImportMappingTable } from './components/import-mapping-table';
 import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
@@ -39,18 +42,6 @@ export function ActivityImportForm({
   onSuccess: (activities: ActivityImport[]) => void;
   onError: (error: string) => void;
 }) {
-  const form = useForm<ImportFormSchema>({
-    resolver: zodResolver(importFormSchema),
-    defaultValues: {
-      accountId: '',
-      mapping: {
-        columns: {} as Record<ImportFormat, string>,
-        activityTypes: {} as Partial<Record<ActivityType, string[]>>,
-        symbolMappings: {} as Record<string, string>,
-      },
-    },
-  });
-
   const {
     csvData,
     headers,
@@ -64,62 +55,55 @@ export function ActivityImportForm({
     setValidationErrors,
   } = useCsvParser();
 
-  const {
-    mapping,
-    setMapping,
-    handleColumnMapping,
-    handleActivityTypeMapping,
-    handleSymbolMapping,
-  } = useImportMapping(form);
-
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
-  const accountId = form.watch('accountId');
-
-  useEffect(() => {
-    resetFileStates();
-  }, [accountId]);
+  const {
+    mapping,
+    updateMapping,
+    handleColumnMapping,
+    handleActivityTypeMapping,
+    handleSymbolMapping,
+  } = useImportMapping();
 
   const { data: fetchedMapping } = useQuery({
-    queryKey: [QueryKeys.IMPORT_MAPPING, accountId],
-    queryFn: () => getAccountImportMapping(accountId),
-    enabled: !!accountId,
+    queryKey: [QueryKeys.IMPORT_MAPPING, mapping.accountId],
+    queryFn: () => getAccountImportMapping(mapping.accountId),
+    enabled: !!mapping.accountId,
   });
 
+  console.log('fetchedMapping', fetchedMapping);
+
+  // Update mapping when fetched mapping is available
   useEffect(() => {
     if (fetchedMapping) {
-      form.setValue('mapping', fetchedMapping as ImportFormSchema['mapping']);
-      setMapping(fetchedMapping as ImportFormSchema['mapping']);
+      updateMapping(fetchedMapping);
     }
-  }, [fetchedMapping, form, setMapping]);
+  }, [fetchedMapping, updateMapping]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
-      parseCsvFile(file, form);
+      resetFileStates();
+      parseCsvFile(file, mapping);
     },
-    [parseCsvFile, form],
+    [parseCsvFile, mapping, resetFileStates],
   );
 
-  const { checkImportMutation } = useActivityImportMutations();
-
-  const saveMappingMutation = useMutation({
-    mutationFn: saveAccountImportMapping,
-    onError: (error: any) => {
-      onError(`Failed to save mapping: ${error.message}`);
-    },
+  const { saveAndCheckImportMutation } = useActivityImportMutations({
+    onSuccess,
+    onError: (error) => onError(`Import failed: ${error}`),
   });
 
   const getMappedValue = useCallback(
     (row: string[], field: ImportFormat): string => {
-      const columnIndex = headers.indexOf(mapping.columns[field] || '');
+      const columnIndex = headers.indexOf(mapping.fieldMappings[field] || '');
       if (columnIndex === -1) return '';
       return row[columnIndex];
     },
-    [headers, mapping.columns],
+    [headers, mapping.fieldMappings],
   );
 
   const isMapComplete = useCallback(() => {
@@ -131,7 +115,7 @@ export function ActivityImportForm({
       const csvType = getMappedValue(row, ImportFormat.ActivityType);
       const normalizedCsvType = csvType.trim().toUpperCase();
 
-      for (const [appType, csvTypes] of Object.entries(mapping.activityTypes)) {
+      for (const [appType, csvTypes] of Object.entries(mapping.activityMappings)) {
         if (
           csvTypes?.some((mappedType) => {
             const normalizedMappedType = mappedType.trim().toUpperCase();
@@ -143,16 +127,11 @@ export function ActivityImportForm({
       }
       return csvType as ActivityType; // Fallback to original value if no mapping found
     },
-    [getMappedValue, mapping.activityTypes],
+    [getMappedValue, mapping.activityMappings],
   );
 
-  const onSubmit = async (data: ImportFormSchema) => {
+  const handleImport = async () => {
     try {
-      await saveMappingMutation.mutateAsync({
-        accountId: data.accountId,
-        mapping: data.mapping,
-      });
-
       const activitiesToImport: ActivityImport[] = csvData.slice(1).map((row) => {
         const activityType = getMappedActivityType(row);
         const isCash = isCashActivity(activityType);
@@ -186,11 +165,11 @@ export function ActivityImportForm({
         // Get currency from CSV if mapped, otherwise use account currency
         const currency =
           getMappedValue(row, ImportFormat.Currency) ||
-          accounts?.find((a) => a.id === data.accountId)?.currency;
+          accounts?.find((a) => a.id === mapping.accountId)?.currency;
 
         // Get the raw symbol and use the mapped symbol if available
         const rawSymbol = getMappedValue(row, ImportFormat.Symbol).trim();
-        const symbol = data.mapping.symbolMappings[rawSymbol] || rawSymbol;
+        const symbol = mapping.symbolMappings[rawSymbol] || rawSymbol;
 
         return {
           date: getMappedValue(row, ImportFormat.Date),
@@ -202,7 +181,7 @@ export function ActivityImportForm({
           currency,
           fee: parseFloat(getMappedValue(row, ImportFormat.Fee)) || 0,
           amount,
-          accountId: data.accountId,
+          accountId: mapping.accountId,
           isValid: false,
           isDraft: true,
           comment: '',
@@ -216,17 +195,10 @@ export function ActivityImportForm({
         return;
       }
 
-      await checkImportMutation
-        .mutateAsync({
-          account_id: data.accountId,
-          activities: activitiesToImport,
-        })
-        .then((result) => {
-          onSuccess(result);
-        })
-        .catch((error) => {
-          onError(`Import failed: ${error}`);
-        });
+      await saveAndCheckImportMutation.mutateAsync({
+        data: mapping,
+        activitiesToImport,
+      });
     } catch (error: any) {
       onError(`Import failed: ${error}`);
     }
@@ -247,12 +219,13 @@ export function ActivityImportForm({
 
   return (
     <div className="flex h-[calc(100vh-theme(spacing.16))] flex-col overflow-hidden">
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex h-full flex-col gap-4 overflow-hidden"
-      >
+      <div className="flex h-full flex-col gap-4 overflow-hidden">
         <div className="shrink-0 space-y-4">
-          <AccountSelection control={form.control} accounts={accounts} />
+          <AccountSelection
+            value={mapping.accountId}
+            onChange={(id) => updateMapping({ accountId: id })}
+            accounts={accounts}
+          />
           <FileDropzone
             getRootProps={getRootProps}
             getInputProps={getInputProps}
@@ -265,7 +238,7 @@ export function ActivityImportForm({
 
         <div className="min-h-0 flex-1 overflow-hidden">
           <PreviewContent
-            accountId={accountId}
+            accountId={mapping.accountId}
             selectedFile={selectedFile}
             isValidCsv={isValidCsv}
             error={error}
@@ -285,12 +258,9 @@ export function ActivityImportForm({
           <Button asChild variant="outline">
             <Link to="/activities">Cancel</Link>
           </Button>
-          {accountId && selectedFile && isMapComplete() && (
-            <Button
-              type="submit"
-              disabled={checkImportMutation.isPending || saveMappingMutation.isPending}
-            >
-              {checkImportMutation.isPending || saveMappingMutation.isPending ? (
+          {mapping.accountId && selectedFile && isMapComplete() && (
+            <Button onClick={handleImport} disabled={saveAndCheckImportMutation.isPending}>
+              {saveAndCheckImportMutation.isPending ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                   <span>Importing...</span>
@@ -300,52 +270,49 @@ export function ActivityImportForm({
               )}
             </Button>
           )}
-          {accountId && selectedFile && !isMapComplete() && (
+          {mapping.accountId && selectedFile && !isMapComplete() && (
             <p className="flex items-center text-sm text-red-400">
               <Icons.AlertTriangle className="mr-2 h-4 w-4" />
               Please map all columns and activity types before importing.
             </p>
           )}
         </div>
-      </form>
+      </div>
     </div>
   );
 }
 
 function AccountSelection({
-  control,
+  value,
+  onChange,
   accounts,
 }: {
-  control: any;
+  value: string;
+  onChange: (value: string) => void;
   accounts: Account[] | undefined;
 }) {
+  console.log('AccountSelection', value);
   return (
     <div className="mb-4">
       <label htmlFor="accountId" className="mb-1 block text-sm font-medium">
         Select Account
       </label>
-      <Controller
-        name="accountId"
-        control={control}
-        render={({ field }) => (
-          <Select onValueChange={field.onChange} value={field.value}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select an account" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts ? (
-                accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="">Loading accounts...</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        )}
-      />
+      <Select onValueChange={onChange} value={value}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select an account" />
+        </SelectTrigger>
+        <SelectContent>
+          {accounts ? (
+            accounts.map((account) => (
+              <SelectItem key={account.id} value={account.id}>
+                {account.name}
+              </SelectItem>
+            ))
+          ) : (
+            <SelectItem value="">Loading accounts...</SelectItem>
+          )}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -370,7 +337,7 @@ function PreviewContent({
   isValidCsv: boolean;
   error: string | null;
   headers: string[];
-  mapping: ImportFormSchema['mapping'];
+  mapping: ImportMappingData;
   handleColumnMapping: (field: ImportFormat, value: string) => void;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;

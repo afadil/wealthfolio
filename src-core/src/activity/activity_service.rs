@@ -3,7 +3,8 @@ use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
+    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMapping,
+    ImportMappingData, NewActivity, Sort,
 };
 use crate::schema::activities;
 
@@ -335,5 +336,35 @@ impl ActivityService {
         .get_result(conn)?;
 
         Ok(result.average_cost)
+    }
+
+    pub fn get_import_mapping(
+        &self,
+        conn: &mut SqliteConnection,
+        some_account_id: String,
+    ) -> Result<ImportMappingData, diesel::result::Error> {
+        let mapping = self.repo.get_import_mapping(conn, &some_account_id)?;
+
+        let mut result = match mapping {
+            Some(m) => m
+                .to_mapping_data()
+                .map_err(|e| diesel::result::Error::DeserializationError(Box::new(e)))?,
+            None => ImportMappingData::default(),
+        };
+        result.account_id = some_account_id;
+        Ok(result)
+    }
+
+    pub fn save_import_mapping(
+        &self,
+        conn: &mut SqliteConnection,
+        mapping_data: ImportMappingData,
+    ) -> Result<ImportMappingData, diesel::result::Error> {
+        let new_mapping = ImportMapping::from_mapping_data(&mapping_data)
+            .map_err(|e| diesel::result::Error::SerializationError(Box::new(e)))?;
+
+        self.repo.save_import_mapping(conn, &new_mapping)?;
+
+        Ok(mapping_data)
     }
 }

@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ImportFormat, ActivityType } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 import TickerSearchInput from '@/components/ticker-search';
 import { useState } from 'react';
@@ -29,12 +29,12 @@ export function renderHeaderCell({
   handleColumnMapping,
 }: {
   field: ImportFormat;
-  mapping: { columns: Partial<Record<ImportFormat, string>> };
+  mapping: ImportMappingData;
   headers: string[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
 }) {
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
-  const mappedHeader = mapping.columns[field];
+  const mappedHeader = mapping.fieldMappings[field];
   const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
   const isEditing = editingHeader === field || !isMapped;
   const isRequired = REQUIRED_FIELDS.includes(field);
@@ -88,7 +88,7 @@ export function renderHeaderCell({
 
 function findAppTypeForCsvType(
   csvType: string,
-  mappings: Partial<Record<ActivityType, string[]>>,
+  mappings: Record<string, string[]>,
 ): ActivityType | null {
   const normalizedCsvType = csvType.trim().toUpperCase();
 
@@ -228,11 +228,7 @@ export function renderCell({
 }: {
   field: ImportFormat;
   row: string[];
-  mapping: {
-    columns: Partial<Record<ImportFormat, string>>;
-    activityTypes: Partial<Record<ActivityType, string[]>>;
-    symbolMappings: Record<string, string>;
-  };
+  mapping: ImportMappingData;
   getMappedValue: (row: string[], field: ImportFormat) => string;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
@@ -240,7 +236,7 @@ export function renderCell({
 }) {
   const value = getMappedValue(row, field);
 
-  if (field === ImportFormat.Symbol && mapping.columns[ImportFormat.Symbol]) {
+  if (field === ImportFormat.Symbol && mapping.fieldMappings[ImportFormat.Symbol]) {
     return renderSymbolCell({
       csvSymbol: value,
       mappedSymbol: mapping.symbolMappings?.[value],
@@ -252,7 +248,7 @@ export function renderCell({
   if (field === ImportFormat.ActivityType) {
     return renderActivityTypeCell({
       csvType: value,
-      appType: findAppTypeForCsvType(value, mapping.activityTypes),
+      appType: findAppTypeForCsvType(value, mapping.activityMappings),
       handleActivityTypeMapping,
     });
   }

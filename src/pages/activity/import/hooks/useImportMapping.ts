@@ -1,84 +1,71 @@
 import { useState, useCallback } from 'react';
-import { ImportFormat, ActivityType, ImportFormSchema } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 
-export function useImportMapping(form: any) {
-  const [mapping, setMapping] = useState<ImportFormSchema['mapping']>({
-    columns: {} as Record<ImportFormat, string>,
-    activityTypes: {} as Partial<Record<ActivityType, string[]>>,
-    symbolMappings: {} as Record<string, string>,
-  });
+const initialMapping: ImportMappingData = {
+  accountId: '',
+  fieldMappings: {},
+  activityMappings: {},
+  symbolMappings: {},
+};
 
-  const handleColumnMapping = (field: ImportFormat, value: string) => {
-    const trimmedValue = value.trim();
-    form.setValue('mapping.columns', {
-      ...form.getValues('mapping.columns'),
-      [field]: trimmedValue,
-    } as Record<ImportFormat, string>);
-    setMapping((prev) => ({ ...prev, columns: { ...prev.columns, [field]: trimmedValue } }));
-  };
+export function useImportMapping(defaultMapping?: ImportMappingData) {
+  const [mapping, setMapping] = useState<ImportMappingData>(defaultMapping ?? initialMapping);
+
+  const updateMapping = useCallback((updates: Partial<ImportMappingData>) => {
+    setMapping((prev) => ({ ...prev, ...updates }));
+  }, []);
+
+  const handleColumnMapping = useCallback((field: ImportFormat, value: string) => {
+    setMapping((prev) => ({
+      ...prev,
+      fieldMappings: { ...prev.fieldMappings, [field]: value.trim() },
+    }));
+  }, []);
 
   const handleActivityTypeMapping = useCallback(
     (csvActivity: string, activityType: ActivityType) => {
       const trimmedCsvType = csvActivity.trim().toUpperCase();
-      const updatedActivityTypes = {
-        ...form.getValues('mapping.activityTypes'),
-      };
+      const compareValue = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
 
-      // Initialize arrays
-      Object.keys(updatedActivityTypes).forEach((key) => {
-        if (!Array.isArray(updatedActivityTypes[key as ActivityType])) {
-          updatedActivityTypes[key as ActivityType] = [];
-        }
-      });
+      setMapping((prev) => {
+        const updatedMappings = { ...prev.activityMappings };
 
-      // Remove existing mappings
-      Object.keys(updatedActivityTypes).forEach((key) => {
-        const compareValue = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
-        updatedActivityTypes[key as ActivityType] = updatedActivityTypes[
-          key as ActivityType
-        ]?.filter((type: string) => {
-          const mappedValue = type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
-          return mappedValue !== compareValue;
+        // Remove existing mappings for this CSV type
+        Object.keys(updatedMappings).forEach((key) => {
+          updatedMappings[key] = (updatedMappings[key] ?? []).filter(
+            (type: string) => type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH) !== compareValue,
+          );
         });
+
+        // Add new mapping
+        if (!updatedMappings[activityType]) {
+          updatedMappings[activityType] = [];
+        }
+        updatedMappings[activityType]?.push(compareValue);
+
+        return {
+          ...prev,
+          activityMappings: updatedMappings,
+        };
       });
-
-      // Add new mapping
-      if (!updatedActivityTypes[activityType]) {
-        updatedActivityTypes[activityType] = [];
-      }
-      const valueToStore = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
-      updatedActivityTypes[activityType]?.push(valueToStore);
-
-      form.setValue('mapping.activityTypes', updatedActivityTypes);
-      setMapping((prev) => ({
-        ...prev,
-        activityTypes: updatedActivityTypes,
-      }));
     },
-    [form],
+    [],
   );
 
-  const handleSymbolMapping = useCallback(
-    (csvSymbol: string, newSymbol: string) => {
-      const trimmedNewSymbol = newSymbol.trim();
-      const updatedSymbolMappings = {
-        ...form.getValues('mapping.symbolMappings'),
-        [csvSymbol]: trimmedNewSymbol,
-      };
-
-      form.setValue('mapping.symbolMappings', updatedSymbolMappings);
-      setMapping((prev) => ({
-        ...prev,
-        symbolMappings: updatedSymbolMappings,
-      }));
-    },
-    [form],
-  );
+  const handleSymbolMapping = useCallback((csvSymbol: string, newSymbol: string) => {
+    setMapping((prev) => ({
+      ...prev,
+      symbolMappings: {
+        ...prev.symbolMappings,
+        [csvSymbol]: newSymbol.trim(),
+      },
+    }));
+  }, []);
 
   return {
     mapping,
-    setMapping,
+    updateMapping,
     handleColumnMapping,
     handleActivityTypeMapping,
     handleSymbolMapping,

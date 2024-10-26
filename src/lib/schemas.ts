@@ -1,13 +1,10 @@
 import * as z from 'zod';
-import { ImportFormat, ActivityType } from './types';
 
-export const importFormSchema = z.object({
-  accountId: z.string().min(1, 'Please select an account'),
-  mapping: z.object({
-    columns: z.record(z.nativeEnum(ImportFormat), z.string()),
-    activityTypes: z.record(z.nativeEnum(ActivityType), z.array(z.string())),
-    symbolMappings: z.record(z.string(), z.string()).default({}),
-  }),
+export const importMappingSchema = z.object({
+  accountId: z.string(),
+  fieldMappings: z.record(z.string(), z.string()),
+  activityMappings: z.record(z.string(), z.array(z.string())),
+  symbolMappings: z.record(z.string(), z.string()),
 });
 
 export const newAccountSchema = z.object({
