@@ -1,40 +1,11 @@
 import { useState, useMemo } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { ImportFormat, ActivityType } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
-import TickerSearchInput from '@/components/ticker-search';
+import { ImportFormat, ActivityType } from '@/lib/types';
 import { validateTickerSymbol } from '../utils/csvValidation';
+import { ImportMappingPreviewTable } from './import-mapping-preview-table';
+import { ImportMappingRawTable } from './import-mapping-raw-table';
 
-const REQUIRED_FIELDS = [
-  ImportFormat.Date,
-  ImportFormat.ActivityType,
-  ImportFormat.Symbol,
-  ImportFormat.Quantity,
-  ImportFormat.UnitPrice,
-];
-
-const SKIP_FIELD_VALUE = '__skip__';
-
-interface ImportPreviewTableProps {
+interface ImportMappingTableProps {
   importFormatFields: ImportFormat[];
   mapping: {
     columns: Partial<Record<ImportFormat, string>>;
@@ -49,24 +20,15 @@ interface ImportPreviewTableProps {
   getMappedValue: (row: string[], field: ImportFormat) => string;
 }
 
-export function ImportMappingTable({
-  importFormatFields,
-  mapping,
-  headers,
-  csvData,
-  handleColumnMapping,
-  handleActivityTypeMapping,
-  handleSymbolMapping,
-  getMappedValue,
-}: ImportPreviewTableProps) {
-  const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
+export function ImportMappingTable(props: ImportMappingTableProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'raw'>('preview');
 
   const distinctSymbols = useMemo(() => {
     return Array.from(
-      new Set(csvData.slice(1).map((row) => getMappedValue(row, ImportFormat.Symbol))),
+      new Set(props.csvData.slice(1).map((row) => props.getMappedValue(row, ImportFormat.Symbol))),
     ).filter(Boolean);
-  }, [csvData, getMappedValue]);
+  }, [props.csvData, props.getMappedValue]);
+
   const invalidSymbols = useMemo(() => {
     return distinctSymbols.filter((symbol) => !validateTickerSymbol(symbol));
   }, [distinctSymbols]);
@@ -75,9 +37,8 @@ export function ImportMappingTable({
     const activityTypeMap = new Map<string, { row: string[]; count: number }>();
     let total = 0;
 
-    // Only store the first occurrence of each activity type
-    csvData.slice(1).forEach((row, index) => {
-      const csvType = getMappedValue(row, ImportFormat.ActivityType);
+    props.csvData.slice(1).forEach((row, index) => {
+      const csvType = props.getMappedValue(row, ImportFormat.ActivityType);
       if (!activityTypeMap.has(csvType)) {
         activityTypeMap.set(csvType, {
           row: [...row, (index + 2).toString()],
@@ -98,18 +59,17 @@ export function ImportMappingTable({
         csvType: type,
         row: data.row,
         count: data.count,
-        appType: findAppTypeForCsvType(type, mapping.activityTypes),
+        appType: findAppTypeForCsvType(type, props.mapping.activityTypes),
       })),
       totalRows: total,
     };
-  }, [csvData, getMappedValue, mapping.activityTypes]);
+  }, [props.csvData, props.getMappedValue, props.mapping.activityTypes]);
 
   const { distinctSymbolRows } = useMemo(() => {
     const symbolMap = new Map<string, { row: string[]; count: number }>();
 
-    // Only store the first occurrence of each symbol
-    csvData.slice(1).forEach((row, index) => {
-      const symbol = getMappedValue(row, ImportFormat.Symbol);
+    props.csvData.slice(1).forEach((row, index) => {
+      const symbol = props.getMappedValue(row, ImportFormat.Symbol);
       if (!symbol) return;
 
       if (!symbolMap.has(symbol)) {
@@ -132,102 +92,52 @@ export function ImportMappingTable({
         row: data.row,
         count: data.count,
         isValid: !invalidSymbols.includes(symbol),
-        mappedSymbol: mapping.symbolMappings[symbol],
+        mappedSymbol: props.mapping.symbolMappings[symbol],
       })),
     };
-  }, [csvData, getMappedValue, invalidSymbols, mapping.symbolMappings]);
+  }, [props.csvData, props.getMappedValue, invalidSymbols, props.mapping.symbolMappings]);
 
   const rowsToShow = useMemo(() => {
-    const unmappedRows = new Set<number>();
-    const mappedRows = new Set<number>();
+    // Use a Map to track rows and their mapping status
+    // key: rowNum, value: { needsMapping: boolean }
+    const rowMap = new Map<number, { needsMapping: boolean }>();
 
-    // Get rows for activity types, prioritizing unmapped ones
-    const seenActivityTypes = new Set<string>();
+    // First pass: collect rows that need mapping
     distinctActivityTypes.forEach(({ row, csvType, appType }) => {
-      if (!seenActivityTypes.has(csvType)) {
-        const rowNum = parseInt(row[row.length - 1]);
-        if (!appType) {
-          unmappedRows.add(rowNum);
-        } else {
-          mappedRows.add(rowNum);
-        }
-        seenActivityTypes.add(csvType);
+      const rowNum = parseInt(row[row.length - 1]);
+      if (!rowMap.has(rowNum)) {
+        rowMap.set(rowNum, {
+          needsMapping: !appType, // needs mapping if no appType
+        });
       }
     });
 
-    // Get rows for symbols, prioritizing unmapped/invalid ones
-    const seenSymbols = new Set<string>();
     distinctSymbolRows.forEach(({ row, symbol, isValid, mappedSymbol }) => {
-      if (!seenSymbols.has(symbol)) {
-        const rowNum = parseInt(row[row.length - 1]);
+      const rowNum = parseInt(row[row.length - 1]);
+      if (!rowMap.has(rowNum)) {
+        rowMap.set(rowNum, {
+          needsMapping: !isValid && !mappedSymbol,
+        });
+      } else {
+        // If row already exists, update needsMapping if symbol needs mapping
+        const existing = rowMap.get(rowNum)!;
         if (!isValid && !mappedSymbol) {
-          unmappedRows.add(rowNum);
-        } else {
-          mappedRows.add(rowNum);
+          existing.needsMapping = true;
         }
-        seenSymbols.add(symbol);
       }
     });
 
-    // Combine rows, with unmapped rows first
-    return [
-      ...Array.from(unmappedRows).sort((a, b) => a - b),
-      ...Array.from(mappedRows).sort((a, b) => a - b),
-    ];
+    // Sort rows: unmapped first, then mapped, both in ascending order
+    return Array.from(rowMap.entries())
+      .sort((a, b) => {
+        // First sort by mapping status
+        if (a[1].needsMapping && !b[1].needsMapping) return -1;
+        if (!a[1].needsMapping && b[1].needsMapping) return 1;
+        // Then sort by row number
+        return a[0] - b[0];
+      })
+      .map(([rowNum]) => rowNum);
   }, [distinctActivityTypes, distinctSymbolRows]);
-
-  const renderHeaderCell = (field: ImportFormat) => {
-    const mappedHeader = mapping.columns[field];
-    const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
-    const isEditing = editingHeader === field || !isMapped;
-    const isRequired = REQUIRED_FIELDS.includes(field);
-
-    return (
-      <div>
-        <div className="flex items-center gap-2 px-4 pb-0 pt-2">
-          <span className="font-bold">{field}</span>
-        </div>
-        {isEditing ? (
-          <Select
-            onValueChange={(val) => {
-              handleColumnMapping(field, val === SKIP_FIELD_VALUE ? '' : val);
-              setEditingHeader(null);
-            }}
-            value={mappedHeader || SKIP_FIELD_VALUE}
-            onOpenChange={(open) => !open && setEditingHeader(null)}
-          >
-            <SelectTrigger className="h-8 w-full px-3 py-2 text-sm font-normal text-muted-foreground">
-              <SelectValue placeholder={isRequired ? 'Select column' : 'Optional'} />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px] overflow-y-auto">
-              {!isRequired && (
-                <>
-                  <SelectItem value={SKIP_FIELD_VALUE}>
-                    {field === ImportFormat.Currency ? 'Account Currency' : 'Ignore'}
-                  </SelectItem>
-                  <SelectSeparator />
-                </>
-              )}
-              {headers.map((header) => (
-                <SelectItem key={header || '-'} value={header || '-'}>
-                  {header || '-'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-8 py-0 font-normal text-muted-foreground"
-            onClick={() => setEditingHeader(field)}
-          >
-            {mappedHeader || (isRequired ? 'Select column' : 'Ignore')}
-          </Button>
-        )}
-      </div>
-    );
-  };
 
   function findAppTypeForCsvType(
     csvType: string,
@@ -247,135 +157,6 @@ export function ImportMappingTable({
     }
     return null;
   }
-
-  const renderActivityTypeCell = ({
-    csvType,
-    appType,
-  }: {
-    csvType: string;
-    appType: ActivityType | null;
-  }) => {
-    const trimmedCsvType = csvType.trim().toUpperCase();
-    const displayValue =
-      trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
-
-    if (appType) {
-      return (
-        <div className="flex items-center gap-3">
-          <div title={trimmedCsvType} className="flex items-center text-sm font-medium">
-            {displayValue}
-          </div>
-          <div className="flex items-center gap-3">
-            →
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="font-medium text-muted-foreground"
-              onClick={() => {
-                // Pass empty string as ActivityType to trigger removal of mapping
-                handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
-              }}
-            >
-              {appType}
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex items-center space-x-2">
-        {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH ? (
-          <span className="text-destructive" title={trimmedCsvType}>
-            {displayValue}
-          </span>
-        ) : (
-          <Badge variant="destructive" title={trimmedCsvType}>
-            {displayValue}
-          </Badge>
-        )}
-        <Select
-          onValueChange={(newType) =>
-            handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
-          }
-          value=""
-        >
-          <SelectTrigger className="h-8 w-full">
-            <SelectValue placeholder="..." />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.values(ActivityType).map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  };
-
-  const renderCell = (field: ImportFormat, row: string[]) => {
-    const value = getMappedValue(row, field);
-
-    if (field === ImportFormat.Symbol && mapping.columns[ImportFormat.Symbol]) {
-      return renderSymbolCell({
-        csvSymbol: value,
-        mappedSymbol: mapping.symbolMappings?.[value],
-        isInvalid: invalidSymbols.includes(value),
-      });
-    }
-
-    if (field === ImportFormat.ActivityType) {
-      return renderActivityTypeCell({
-        csvType: value,
-        appType: findAppTypeForCsvType(value, mapping.activityTypes),
-      });
-    }
-
-    return value;
-  };
-
-  const renderSymbolCell = ({
-    csvSymbol,
-    mappedSymbol,
-    isInvalid,
-  }: {
-    csvSymbol: string;
-    mappedSymbol: string | undefined;
-    isInvalid: boolean;
-  }) => {
-    // Show edit button if symbol is mapped or valid
-    if (mappedSymbol || !isInvalid) {
-      return (
-        <div className="flex items-center space-x-2">
-          <span className={isInvalid ? 'text-destructive' : undefined}>{csvSymbol}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-8 py-0 font-normal text-muted-foreground"
-            onClick={() => {
-              handleSymbolMapping(csvSymbol, '');
-            }}
-          >
-            {mappedSymbol || csvSymbol}
-          </Button>
-        </div>
-      );
-    }
-
-    // Show search input only for invalid symbols without mapping
-    return (
-      <div className="flex items-center space-x-2">
-        <span className="text-destructive">{csvSymbol}</span>
-        <TickerSearchInput
-          defaultValue={mappedSymbol || ''}
-          onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
-        />
-      </div>
-    );
-  };
 
   return (
     <Tabs
@@ -397,73 +178,15 @@ export function ImportMappingTable({
       </div>
 
       <TabsContent value="preview" className="m-0 min-h-0 flex-1">
-        <div className="flex h-full flex-col rounded-md border">
-          <div className="flex-none">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 z-30 w-[50px]">
-                    <div className="flex flex-col">
-                      <span>Field</span>
-                      <span className="inline-flex h-8 items-center justify-center whitespace-nowrap py-0 text-sm font-normal text-muted-foreground">
-                        Mapping
-                      </span>
-                    </div>
-                  </TableHead>
-                  {importFormatFields.map((field) => (
-                    <TableHead key={field}>{renderHeaderCell(field)}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-            </Table>
-          </div>
-          <div className="flex-1 overflow-auto">
-            <Table>
-              <TableBody>
-                {rowsToShow.map((rowNum) => {
-                  const row = csvData[rowNum - 1];
-                  return (
-                    <TableRow key={`row-${rowNum}`}>
-                      <TableCell className="sticky left-0 z-10">{rowNum}</TableCell>
-                      {importFormatFields.map((field) => (
-                        <TableCell key={field}>{renderCell(field, row)}</TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+        <ImportMappingPreviewTable
+          {...props}
+          rowsToShow={rowsToShow}
+          invalidSymbols={invalidSymbols}
+        />
       </TabsContent>
 
       <TabsContent value="raw" className="m-0 min-h-0 flex-1 overflow-hidden">
-        <div className="h-full overflow-auto">
-          <Table className="relative w-full">
-            <TableHeader className="border-t">
-              <TableRow>
-                <TableHead className="sticky left-0 z-20 w-[100px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                  Row
-                </TableHead>
-                <TableHead className="min-w-[800px]">
-                  <code className="whitespace-pre-wrap font-mono text-sm">{headers.join(',')}</code>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {csvData.slice(1).map((row, index) => (
-                <TableRow key={index}>
-                  <TableCell className="sticky left-0 z-10 font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                    {index + 2}
-                  </TableCell>
-                  <TableCell className="min-w-[800px]">
-                    <code className="whitespace-pre-wrap font-mono text-sm">{row.join(',')}</code>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ImportMappingRawTable headers={props.headers} csvData={props.csvData} />
       </TabsContent>
     </Tabs>
   );
