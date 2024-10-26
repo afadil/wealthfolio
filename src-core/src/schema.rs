@@ -108,6 +108,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    import_mappings (account_id) {
+        account_id -> Text,
+        fields_mappings -> Text,
+        activity_type_mappings -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     platforms (id) {
         id -> Text,
         name -> Nullable<Text>,
@@ -170,6 +180,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     exchange_rates,
     goals,
     goals_allocation,
+    import_mappings,
     platforms,
     portfolio_history,
     quotes,

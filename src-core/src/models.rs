@@ -1,6 +1,8 @@
 use bigdecimal::BigDecimal;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use diesel::Selectable;
+use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -678,4 +680,25 @@ pub struct DepositsCalculation {
     pub total: f64,
     pub base_currency: String,
     pub by_account: HashMap<String, AccountDeposit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset)]
+#[diesel(primary_key(account_id))]
+#[diesel(table_name = crate::schema::import_mappings)]
+pub struct ImportMapping {
+    pub account_id: String,
+    pub fields_mappings: String,        // JSON string stored in the database
+    pub activity_type_mappings: String, // JSON string stored in the database
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Insertable)]
+#[diesel(table_name = crate::schema::import_mappings)]
+pub struct NewImportMapping {
+    pub account_id: String,
+    pub fields_mappings: String,        // JSON string to be stored
+    pub activity_type_mappings: String, // JSON string to be stored
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }

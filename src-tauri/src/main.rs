@@ -4,7 +4,10 @@
 mod commands;
 mod menu;
 mod updater;
-use commands::account::{create_account, delete_account, get_accounts, update_account};
+use commands::account::{
+    create_account, delete_account, get_accounts, update_account, add_import_mapping, 
+    fetch_import_mapping
+};
 use commands::activity::{
     check_activities_import, create_activities, create_activity, delete_activity, get_activities,
     search_activities, update_activity,
@@ -13,7 +16,6 @@ use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
     update_goal_allocations,
 };
-
 use commands::market_data::{get_asset_data, search_symbol, synch_quotes, update_asset_profile};
 use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_accounts_summary, get_income_summary,
@@ -129,6 +131,8 @@ pub fn main() {
             search_symbol,
             check_activities_import,
             create_activities,
+            add_import_mapping,
+            fetch_import_mapping,
             calculate_historical_data,
             compute_holdings,
             get_asset_data,

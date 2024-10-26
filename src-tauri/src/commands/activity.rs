@@ -1,6 +1,6 @@
 use crate::activity::activity_service;
 use crate::models::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
+    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort
 };
 use crate::AppState;
 use tauri::State;
