@@ -26,7 +26,6 @@ export const useAssetProfileMutations = () => {
   const updateAssetProfileMutation = useMutation({
     mutationFn: updateAssetProfile,
     onSuccess: (result) => {
-      console.log('Asset profile update result:', result);
       handleSuccess('Asset profile updated successfully.', result.id);
     },
     onError: (error) => {
