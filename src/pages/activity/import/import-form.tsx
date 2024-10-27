@@ -218,41 +218,37 @@ export function ActivityImportForm({
   });
 
   return (
-    <div className="flex h-[calc(100vh-theme(spacing.16))] flex-col overflow-hidden">
-      <div className="flex h-full flex-col gap-4 overflow-hidden">
-        <div className="shrink-0 space-y-4">
-          <AccountSelection
-            value={mapping.accountId}
-            onChange={(id) => updateMapping({ accountId: id })}
-            accounts={accounts}
-          />
-          <FileDropzone
-            getRootProps={getRootProps}
-            getInputProps={getInputProps}
-            isDragActive={isDragActive}
-            selectedFile={selectedFile}
-            isLoading={isLoading}
-            openFilePicker={openFilePicker}
-          />
-        </div>
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-2">
+        <AccountSelection
+          value={mapping.accountId}
+          onChange={(id) => updateMapping({ accountId: id })}
+          accounts={accounts}
+        />
+        <FileDropzone
+          getRootProps={getRootProps}
+          getInputProps={getInputProps}
+          isDragActive={isDragActive}
+          selectedFile={selectedFile}
+          isLoading={isLoading}
+          openFilePicker={openFilePicker}
+        />
 
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <PreviewContent
-            accountId={mapping.accountId}
-            selectedFile={selectedFile}
-            isValidCsv={isValidCsv}
-            error={error}
-            headers={headers}
-            mapping={mapping}
-            handleColumnMapping={handleColumnMapping}
-            handleActivityTypeMapping={handleActivityTypeMapping}
-            handleSymbolMapping={handleSymbolMapping}
-            importFormatFields={Object.values(ImportFormat)}
-            csvData={csvData}
-            getMappedValue={getMappedValue}
-            validationErrors={validationErrors}
-          />
-        </div>
+        <PreviewContent
+          accountId={mapping.accountId}
+          selectedFile={selectedFile}
+          isValidCsv={isValidCsv}
+          error={error}
+          headers={headers}
+          mapping={mapping}
+          handleColumnMapping={handleColumnMapping}
+          handleActivityTypeMapping={handleActivityTypeMapping}
+          handleSymbolMapping={handleSymbolMapping}
+          importFormatFields={Object.values(ImportFormat)}
+          csvData={csvData}
+          getMappedValue={getMappedValue}
+          validationErrors={validationErrors}
+        />
 
         <div className="flex shrink-0 gap-4 pt-4">
           <Button asChild variant="outline">
@@ -291,9 +287,8 @@ function AccountSelection({
   onChange: (value: string) => void;
   accounts: Account[] | undefined;
 }) {
-  console.log('AccountSelection', value);
   return (
-    <div className="mb-4">
+    <div>
       <label htmlFor="accountId" className="mb-1 block text-sm font-medium">
         Select Account
       </label>
@@ -374,18 +369,15 @@ function PreviewContent({
   }
 
   return (
-    <>
-      <Separator className="my-4 opacity-50" />
-      <ImportMappingTable
-        importFormatFields={importFormatFields}
-        mapping={mapping}
-        headers={headers}
-        csvData={csvData}
-        handleColumnMapping={handleColumnMapping}
-        handleActivityTypeMapping={handleActivityTypeMapping}
-        handleSymbolMapping={handleSymbolMapping}
-        getMappedValue={getMappedValue}
-      />
-    </>
+    <ImportMappingTable
+      importFormatFields={importFormatFields}
+      mapping={mapping}
+      headers={headers}
+      csvData={csvData}
+      handleColumnMapping={handleColumnMapping}
+      handleActivityTypeMapping={handleActivityTypeMapping}
+      handleSymbolMapping={handleSymbolMapping}
+      getMappedValue={getMappedValue}
+    />
   );
 }

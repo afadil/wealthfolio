@@ -28,10 +28,7 @@ export function FileDropzone({
       )}
     >
       <input {...getInputProps()} />
-      <div
-        className={`flex items-center justify-center ${selectedFile ? 'h-[80px]' : 'h-[120px]'}`}
-        onClick={openFilePicker}
-      >
+      <div className="flex h-[50px]" onClick={openFilePicker}>
         <div className="flex items-center">
           <div className="mr-4 flex-shrink-0 rounded-full bg-secondary p-6">
             {selectedFile ? (
@@ -41,10 +38,10 @@ export function FileDropzone({
                 <Icons.FileText className="h-8 w-8" />
               )
             ) : (
-              <Icons.Import className="h-10 w-10" />
+              <Icons.Import className="h-8 w-8" />
             )}
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col text-left">
             {selectedFile ? (
               <>
                 <p className="text-base font-semibold">{selectedFile.name}</p>

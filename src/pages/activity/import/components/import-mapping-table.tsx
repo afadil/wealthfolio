@@ -173,7 +173,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
         </div>
       </div>
 
-      <TabsContent value="preview" className="m-0 min-h-0 flex-1">
+      <TabsContent value="preview" className="m-0 h-[400px] min-h-0 flex-1">
         <ImportMappingPreviewTable
           {...props}
           rowsToShow={rowsToShow}
@@ -181,7 +181,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
         />
       </TabsContent>
 
-      <TabsContent value="raw" className="m-0 min-h-0 flex-1 overflow-hidden">
+      <TabsContent value="raw">
         <ImportMappingRawTable headers={props.headers} csvData={props.csvData} />
       </TabsContent>
     </Tabs>
