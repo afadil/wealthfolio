@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import Papa from 'papaparse';
-import { ImportFormat, ImportMappingData } from '@/lib/types';
+import { ImportMappingData } from '@/lib/types';
 import { validateCsvStructure, initializeColumnMapping } from '../utils/csvValidation';
 
 export function useCsvParser() {
