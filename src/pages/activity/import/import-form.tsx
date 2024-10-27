@@ -79,8 +79,6 @@ export function ActivityImportForm({
     enabled: !!mapping.accountId,
   });
 
-  console.log('fetchedMapping', fetchedMapping);
-
   // Update mapping when fetched mapping is available
   useEffect(() => {
     if (fetchedMapping) {
@@ -227,39 +225,39 @@ export function ActivityImportForm({
   });
 
   return (
-    <div className="flex flex-col">
-      <div className="flex flex-col gap-2">
-        <Accordion
-          type="single"
-          value={accordionValue}
-          onValueChange={setAccordionValue}
-          collapsible
-          className="shadow-xs rounded-md border bg-card px-4"
-        >
-          <AccordionItem value="setup" className="border-none">
-            <AccordionTrigger className="text-base font-medium hover:no-underline">
-              Account & File Selection
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="flex flex-col gap-2 pt-2">
-                <AccountSelection
-                  value={mapping.accountId}
-                  onChange={(id) => updateMapping({ accountId: id })}
-                  accounts={accounts}
-                />
-                <FileDropzone
-                  getRootProps={getRootProps}
-                  getInputProps={getInputProps}
-                  isDragActive={isDragActive}
-                  selectedFile={selectedFile}
-                  isLoading={isLoading}
-                  openFilePicker={openFilePicker}
-                />
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+    <div className="flex flex-col gap-4">
+      <Accordion
+        type="single"
+        value={accordionValue}
+        onValueChange={setAccordionValue}
+        collapsible
+        className="shadow-xs rounded-md border bg-card px-4"
+      >
+        <AccordionItem value="setup" className="border-none">
+          <AccordionTrigger className="text-base font-medium hover:no-underline">
+            Account & File Selection
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="flex flex-col gap-2 pt-2">
+              <AccountSelection
+                value={mapping.accountId}
+                onChange={(id) => updateMapping({ accountId: id })}
+                accounts={accounts}
+              />
+              <FileDropzone
+                getRootProps={getRootProps}
+                getInputProps={getInputProps}
+                isDragActive={isDragActive}
+                selectedFile={selectedFile}
+                isLoading={isLoading}
+                openFilePicker={openFilePicker}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
+      <div className="max-w-[1200px]">
         <PreviewContent
           accountId={mapping.accountId}
           selectedFile={selectedFile}
@@ -275,30 +273,30 @@ export function ActivityImportForm({
           getMappedValue={getMappedValue}
           validationErrors={validationErrors}
         />
+      </div>
 
-        <div className="flex shrink-0 gap-4 pt-4">
-          <Button asChild variant="outline">
-            <Link to="/activities">Cancel</Link>
+      <div className="flex shrink-0 gap-4">
+        <Button asChild variant="outline">
+          <Link to="/activities">Cancel</Link>
+        </Button>
+        {mapping.accountId && selectedFile && isMapComplete() && (
+          <Button onClick={handleImport} disabled={saveAndCheckImportMutation.isPending}>
+            {saveAndCheckImportMutation.isPending ? (
+              <>
+                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <span>Importing...</span>
+              </>
+            ) : (
+              <span>Import Data</span>
+            )}
           </Button>
-          {mapping.accountId && selectedFile && isMapComplete() && (
-            <Button onClick={handleImport} disabled={saveAndCheckImportMutation.isPending}>
-              {saveAndCheckImportMutation.isPending ? (
-                <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  <span>Importing...</span>
-                </>
-              ) : (
-                <span>Import Data</span>
-              )}
-            </Button>
-          )}
-          {mapping.accountId && selectedFile && !isMapComplete() && (
-            <p className="flex items-center text-sm text-red-400">
-              <Icons.AlertTriangle className="mr-2 h-4 w-4" />
-              Please map all columns and activity types before importing.
-            </p>
-          )}
-        </div>
+        )}
+        {mapping.accountId && selectedFile && !isMapComplete() && (
+          <p className="flex items-center text-sm text-red-400">
+            <Icons.AlertTriangle className="mr-2 h-4 w-4" />
+            Please map all columns and activity types before importing.
+          </p>
+        )}
       </div>
     </div>
   );

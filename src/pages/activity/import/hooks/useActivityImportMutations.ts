@@ -51,8 +51,7 @@ export function useActivityImportMutations({
         description: 'Activities have been imported successfully.',
       });
     },
-    onError: (error: any) => {
-      console.log('error', error);
+    onError: () => {
       toast({
         title: 'Uh oh! Something went wrong.',
         description: 'Please try again or report an issue if the problem persists.',

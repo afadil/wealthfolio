@@ -41,7 +41,7 @@ export function renderHeaderCell({
 
   return (
     <div>
-      <div className="flex items-center gap-2 px-4 pb-0 pt-2">
+      <div className="flex items-center gap-2 pb-0 pt-2">
         <span className="font-bold">{field}</span>
       </div>
       {isEditing ? (
@@ -53,7 +53,7 @@ export function renderHeaderCell({
           value={mappedHeader || SKIP_FIELD_VALUE}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
-          <SelectTrigger className="h-8 w-full px-3 py-2 text-sm font-normal text-muted-foreground">
+          <SelectTrigger className="h-8 w-full py-2 text-sm font-normal text-muted-foreground">
             <SelectValue placeholder={isRequired ? 'Select column' : 'Optional'} />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -76,7 +76,7 @@ export function renderHeaderCell({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 py-0 font-normal text-muted-foreground"
+          className="h-8 py-0 pl-0 font-normal text-muted-foreground"
           onClick={() => setEditingHeader(field)}
         >
           {mappedHeader || (isRequired ? 'Select column' : 'Ignore')}

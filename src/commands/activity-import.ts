@@ -28,7 +28,6 @@ export const createActivities = async (activities: NewActivity[]): Promise<numbe
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        console.log('create_activities', activities);
         return invokeTauri('create_activities', { activities });
       default:
         throw new Error(`Unsupported`);

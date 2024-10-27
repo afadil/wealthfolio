@@ -156,11 +156,11 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
   }
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}
-        className="flex h-full flex-col space-y-4"
+        className="flex flex-1 flex-col"
       >
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -177,16 +177,18 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
           </div>
         </CardHeader>
 
-        <CardContent>
-          <TabsContent value="preview" className="m-0 h-[500px] min-h-0 flex-1">
-            <ImportMappingPreviewTable
-              {...props}
-              rowsToShow={rowsToShow}
-              invalidSymbols={invalidSymbols}
-            />
+        <CardContent className="flex-1 p-0">
+          <TabsContent value="preview" className="m-0 flex h-[500px] flex-col border-0">
+            <div className="flex-1 overflow-hidden">
+              <ImportMappingPreviewTable
+                {...props}
+                rowsToShow={rowsToShow}
+                invalidSymbols={invalidSymbols}
+              />
+            </div>
           </TabsContent>
 
-          <TabsContent value="raw">
+          <TabsContent value="raw" className="m-0 border-0">
             <ImportMappingRawTable headers={props.headers} csvData={props.csvData} />
           </TabsContent>
         </CardContent>
