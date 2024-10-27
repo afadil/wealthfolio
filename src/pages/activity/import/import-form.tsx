@@ -92,10 +92,10 @@ export function ActivityImportForm({
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       resetFileStates();
-      parseCsvFile(file, mapping);
+      parseCsvFile(file, mapping, updateMapping);
       setAccordionValue('');
     },
-    [parseCsvFile, mapping, resetFileStates],
+    [parseCsvFile, mapping, resetFileStates, updateMapping],
   );
 
   const { saveAndCheckImportMutation } = useActivityImportMutations({

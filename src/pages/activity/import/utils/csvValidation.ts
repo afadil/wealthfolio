@@ -199,5 +199,5 @@ export function isCashActivity(activityType: ActivityType): boolean {
 }
 
 export function validateTickerSymbol(symbol: string): boolean {
-  return tickerRegex.test(symbol);
+  return tickerRegex.test(symbol.trim());
 }
