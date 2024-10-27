@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
+import IntervalSelector from '@/components/interval-selector';
 import Balance from './balance';
 import { useQuery } from '@tanstack/react-query';
 import { PortfolioHistory, AccountSummary } from '@/lib/types';
@@ -33,6 +35,7 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
+  const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
   const updatePortfolioMutation = useRecalculatePortfolioMutation({
     successTitle: 'Portfolio recalculated successfully',
     errorTitle: 'Failed to recalculate portfolio',
@@ -62,16 +65,16 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-screen flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
-      <div className="flex h-full px-4 py-2 md:px-6 lg:px-10">
+      <div className="flex px-4 py-2 md:px-6 lg:px-10">
         <HoverCard>
           <HoverCardTrigger className="flex cursor-pointer items-center">
             <div>
               <Balance
                 targetValue={todayValue?.totalValue || 0}
-                duration={500}
                 currency={todayValue?.currency || 'USD'}
+                displayCurrency={true}
               />
 
               <div className="flex space-x-3 text-sm">
@@ -81,7 +84,7 @@ export default function DashboardPage() {
                   currency={todayValue?.currency || 'USD'}
                   displayCurrency={false}
                 ></GainAmount>
-                <div className="my-1 border-r border-gray-300 pr-2" />
+                <div className="my-1 border-r border-secondary pr-2" />
                 <GainPercent
                   className="text-md font-light"
                   value={todayValue?.totalGainPercentage || 0}
@@ -121,9 +124,17 @@ export default function DashboardPage() {
         </HoverCard>
       </div>
 
-      <HistoryChart data={portfolioHistory || []} height={240} />
+      <div className="h-[300px]">
+        <HistoryChart data={portfolioHistory || []} interval={interval} />
+        <IntervalSelector
+          className="relative bottom-0 left-0 right-0 z-10"
+          onIntervalSelect={(newInterval) => {
+            setInterval(newInterval);
+          }}
+        />
+      </div>
 
-      <div className="mx-auto h-full w-full bg-gradient-to-b from-custom-green to-custom-green/30 px-4 pt-8 dark:from-custom-green-dark dark:to-custom-green-dark/30 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+      <div className="flex-grow bg-gradient-to-b from-custom-green to-custom-green/30 px-4 pt-8 dark:from-custom-green-dark dark:to-custom-green-dark/30 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
         <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2">
             <Accounts className="border-none bg-transparent shadow-none" accounts={accounts} />

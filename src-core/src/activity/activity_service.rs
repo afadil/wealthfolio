@@ -1,15 +1,13 @@
-use std::fs::File;
-
 use crate::account::AccountService;
 use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
+    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMapping,
+    ImportMappingData, NewActivity, Sort,
 };
 use crate::schema::activities;
 
-use csv::ReaderBuilder;
 use diesel::prelude::*;
 use diesel::sql_types::{Double, Text};
 
@@ -184,41 +182,36 @@ impl ActivityService {
     pub async fn check_activities_import(
         &self,
         conn: &mut SqliteConnection,
-        _account_id: String,
-        file_path: String,
+        account_id: String,
+        activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>, String> {
         let asset_service = AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
         let fx_service = CurrencyExchangeService::new();
         let account = account_service
-            .get_account_by_id(conn, &_account_id)
+            .get_account_by_id(conn, &account_id)
             .map_err(|e| e.to_string())?;
 
-        let file = File::open(&file_path).map_err(|e| e.to_string())?;
-        let mut rdr = ReaderBuilder::new()
-            .delimiter(b',')
-            .has_headers(true)
-            .from_reader(file);
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
         let mut symbols_to_sync: Vec<String> = Vec::new();
 
-        for (line_number, result) in rdr.deserialize().enumerate() {
-            let line_number = line_number + 1; // Adjust for human-readable line number
-            let mut activity_import: ActivityImport = result.map_err(|e| e.to_string())?;
+        for mut activity in activities {
+            activity.id = Some(Uuid::new_v4().to_string());
+            activity.account_name = Some(account.name.clone());
 
-            // Load the symbol profile here, now awaiting the async call
+            // Load the symbol profile
             let symbol_profile_result = asset_service
-                .get_asset_profile(conn, &activity_import.symbol, Some(false))
+                .get_asset_profile(conn, &activity.symbol, Some(false))
                 .await;
 
             // Check if symbol profile is valid
             let (is_valid, error) = match symbol_profile_result {
                 Ok(profile) => {
-                    activity_import.symbol_name = profile.name;
-                    symbols_to_sync.push(activity_import.symbol.clone());
+                    activity.symbol_name = profile.name;
+                    symbols_to_sync.push(activity.symbol.clone());
 
                     // Add exchange rate if the activity currency is different from the account currency
-                    let currency = &activity_import.currency;
+                    let currency = &activity.currency;
                     if currency != &account.currency {
                         match fx_service.add_exchange_rate(
                             conn,
@@ -230,41 +223,39 @@ impl ActivityService {
                             Err(e) => {
                                 let error_msg = format!(
                                     "Failed to add exchange rate for {}/{}. Error: {}. Line: {}",
-                                    &account.currency, currency, e, line_number
+                                    &account.currency,
+                                    currency,
+                                    e,
+                                    activity.line_number.unwrap()
                                 );
                                 return Err(error_msg);
                             }
                         }
                     }
 
-                    (Some("true".to_string()), None)
+                    (true, None)
                 }
                 Err(_) => {
                     let error_msg = format!(
                         "Symbol {} not found. Line: {}",
-                        &activity_import.symbol, line_number
+                        &activity.symbol,
+                        activity.line_number.unwrap()
                     );
-                    (Some("false".to_string()), Some(error_msg))
+                    (false, Some(error_msg))
                 }
             };
 
-            // Update the activity_import with the loaded symbol profile and status
-            activity_import.is_draft = Some("true".to_string());
-            activity_import.is_valid = is_valid.clone();
-            activity_import.error = error.clone();
-            activity_import.line_number = Some(line_number as i32);
-            activity_import.id = Some(Uuid::new_v4().to_string());
-            activity_import.account_id = Some(account.id.clone());
-            activity_import.account_name = Some(account.name.clone());
-            activities_with_status.push(activity_import);
+            activity.is_valid = is_valid;
+            activity.error = error;
+            activities_with_status.push(activity);
         }
 
         // Sync quotes for all valid symbols
-        if !symbols_to_sync.is_empty() {
-            asset_service
-                .sync_symbol_quotes(conn, &symbols_to_sync)
-                .await?;
-        }
+        // if !symbols_to_sync.is_empty() {
+        //     asset_service
+        //         .sync_symbol_quotes(conn, &symbols_to_sync)
+        //         .await?;
+        // }
 
         Ok(activities_with_status)
     }
@@ -277,7 +268,8 @@ impl ActivityService {
     ) -> Result<usize, diesel::result::Error> {
         conn.transaction(|conn| {
             let mut insert_count = 0;
-            for new_activity in activities {
+            for mut new_activity in activities {
+                new_activity.id = Some(Uuid::new_v4().to_string());
                 diesel::insert_into(activities::table)
                     .values(&new_activity)
                     .execute(conn)?;
@@ -344,5 +336,35 @@ impl ActivityService {
         .get_result(conn)?;
 
         Ok(result.average_cost)
+    }
+
+    pub fn get_import_mapping(
+        &self,
+        conn: &mut SqliteConnection,
+        some_account_id: String,
+    ) -> Result<ImportMappingData, diesel::result::Error> {
+        let mapping = self.repo.get_import_mapping(conn, &some_account_id)?;
+
+        let mut result = match mapping {
+            Some(m) => m
+                .to_mapping_data()
+                .map_err(|e| diesel::result::Error::DeserializationError(Box::new(e)))?,
+            None => ImportMappingData::default(),
+        };
+        result.account_id = some_account_id;
+        Ok(result)
+    }
+
+    pub fn save_import_mapping(
+        &self,
+        conn: &mut SqliteConnection,
+        mapping_data: ImportMappingData,
+    ) -> Result<ImportMappingData, diesel::result::Error> {
+        let new_mapping = ImportMapping::from_mapping_data(&mapping_data)
+            .map_err(|e| diesel::result::Error::SerializationError(Box::new(e)))?;
+
+        self.repo.save_import_mapping(conn, &new_mapping)?;
+
+        Ok(mapping_data)
     }
 }

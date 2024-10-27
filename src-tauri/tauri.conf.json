@@ -38,6 +38,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "dragDropEnabled": false,
         "fullscreen": false,
         "resizable": true,
         "theme": "Light",
@@ -45,7 +46,8 @@
         "hiddenTitle": true,
         "title": "Wealthfolio",
         "width": 1366,
-        "height": 960
+        "height": 960,
+        "center": true
       }
     ],
     "security": {

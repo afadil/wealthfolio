@@ -1,11 +1,27 @@
 import * as z from 'zod';
-import { newActivitySchema } from '@/lib/schemas';
+import { importActivitySchema, importMappingSchema, newActivitySchema } from '@/lib/schemas';
 
 export enum AccountType {
   SECURITIES = 'SECURITIES',
   SAVINGS = 'SAVINGS',
   CHECKING = 'CHECKING',
   // Add more types as needed
+}
+
+export enum ActivityType {
+  BUY = 'BUY',
+  SELL = 'SELL',
+  DIVIDEND = 'DIVIDEND',
+  INTEREST = 'INTEREST',
+  DEPOSIT = 'DEPOSIT',
+  WITHDRAWAL = 'WITHDRAWAL',
+  TRANSFER_IN = 'TRANSFER_IN',
+  TRANSFER_OUT = 'TRANSFER_OUT',
+  CONVERSION_IN = 'CONVERSION_IN',
+  CONVERSION_OUT = 'CONVERSION_OUT',
+  FEE = 'FEE',
+  TAX = 'TAX',
+  SPLIT = 'SPLIT',
 }
 
 export type Account = {
@@ -66,6 +82,8 @@ export type ActivitySearchResponse = {
 };
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
+export type ActivityImport = z.infer<typeof importActivitySchema>;
+export type ImportMappingData = z.infer<typeof importMappingSchema>;
 
 export interface AssetProfile {
   id: string;
@@ -121,25 +139,6 @@ export interface Tag {
 }
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
-
-export interface ActivityImport {
-  id?: string;
-  date: string;
-  symbol: string;
-  activityType: string;
-  quantity: number;
-  unitPrice: number;
-  currency: string;
-  fee: number;
-  comment?: string;
-  accountId?: string;
-  accountName?: string;
-  symbolName?: string;
-  error?: string;
-  isDraft?: string;
-  isValid?: string;
-  lineNumber?: number;
-}
 
 export interface Holding {
   id: string;
@@ -350,20 +349,22 @@ export interface DepositsCalculation {
   byAccount: Record<string, AccountDeposit>;
 }
 
-export interface CsvColumnMapping {
-  csv_column_name: string;
-  app_field_name: string;
+export enum ImportFormat {
+  Date = 'date',
+  ActivityType = 'activityType',
+  Symbol = 'symbol',
+  Quantity = 'quantity',
+  UnitPrice = 'unitPrice',
+  Amount = 'amount',
+  Currency = 'currency',
+  Fee = 'fee',
 }
 
-export interface CsvTransactionTypeMapping {
-  csv_transaction_type: string;
-  app_activity_type: string;
-}
+// export interface ImportMappingData {
+//   accountId: string;
+//   fieldMappings: Record<string, string>;
+//   activityMappings: Record<string, string[]>;
+//   symbolMappings: Record<string, string>;
+// }
 
-export interface CsvImportProfile {
-  id: string;
-  name: string;
-  account_id: string;
-  column_mappings: CsvColumnMapping[];
-  transaction_type_mappings: CsvTransactionTypeMapping[];
-}
+export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;

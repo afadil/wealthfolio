@@ -1,5 +1,12 @@
 import * as z from 'zod';
 
+export const importMappingSchema = z.object({
+  accountId: z.string(),
+  fieldMappings: z.record(z.string(), z.string()),
+  activityMappings: z.record(z.string(), z.array(z.string())),
+  symbolMappings: z.record(z.string(), z.string()),
+});
+
 export const newAccountSchema = z.object({
   id: z.string().uuid().optional(),
   name: z
@@ -32,18 +39,16 @@ export const newGoalSchema = z.object({
   isAchieved: z.boolean().optional(),
 });
 
-export const newActivitySchema = z.object({
+const baseActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
-  activityDate: z.union([z.date(), z.string().datetime()]).optional(),
-  currency: z.string().min(1, { message: 'Currency is required' }),
+  currency: z.string().optional(),
   fee: z.coerce
     .number({
       required_error: 'Please enter a valid fee.',
       invalid_type_error: 'Fee must be a positive number.',
     })
     .min(0, { message: 'Fee must be a non-negative number.' }),
-
   isDraft: z.boolean(),
   quantity: z.coerce
     .number({
@@ -51,7 +56,7 @@ export const newActivitySchema = z.object({
       invalid_type_error: 'Quantity must be a number.',
     })
     .min(0, { message: 'Quantity must be a non-negative number.' }),
-  assetId: z.string().min(1, { message: 'Asset ID is required' }),
+
   activityType: z.enum(
     [
       'BUY',
@@ -81,6 +86,28 @@ export const newActivitySchema = z.object({
     })
     .min(0, { message: 'Price must be a non-negative number.' }),
   comment: z.string().optional(),
+});
+
+export const newActivitySchema = baseActivitySchema.extend({
+  assetId: z.string().min(1, { message: 'Asset ID is required' }),
+  activityDate: z.union([z.date(), z.string().datetime()]).optional(),
+});
+
+export const importActivitySchema = baseActivitySchema.extend({
+  date: z.union([z.date(), z.string().datetime()]).optional(),
+  symbol: z.string().min(1, { message: 'Symbol is required' }),
+  amount: z.coerce
+    .number({
+      required_error: 'Should be a valid amount.',
+      invalid_type_error: 'Amount must be a number.',
+    })
+    .optional(),
+  accountName: z.string().optional(),
+  symbolName: z.string().optional(),
+  error: z.string().optional(),
+  isDraft: z.boolean().default(true),
+  isValid: z.boolean().default(false),
+  lineNumber: z.number().optional(),
 });
 
 export const newContributionLimitSchema = z.object({

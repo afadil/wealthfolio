@@ -2,7 +2,10 @@ use crate::account::account_service::AccountService;
 use crate::activity::activity_service::ActivityService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
-use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
+use crate::models::{
+    AccountSummary, CumulativeReturn, CumulativeReturns, HistorySummary, Holding, IncomeSummary,
+    PortfolioHistory,
+};
 
 use diesel::prelude::*;
 
@@ -11,6 +14,8 @@ use std::sync::Arc;
 use crate::portfolio::history_service::HistoryService;
 use crate::portfolio::holdings_service::HoldingsService;
 use crate::portfolio::income_service::IncomeService;
+
+use chrono::NaiveDate;
 
 pub struct PortfolioService {
     account_service: AccountService,
@@ -173,5 +178,121 @@ impl PortfolioService {
         }
 
         Ok(account_summaries)
+    }
+
+    pub fn calculate_account_cumulative_returns(
+        &self,
+        conn: &mut SqliteConnection,
+        account_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<CumulativeReturns, Box<dyn std::error::Error>> {
+        let portfolio_history = self
+            .history_service
+            .get_portfolio_history(conn, Some(account_id))?;
+
+        let mut portfolio_returns = Vec::new();
+        let mut prev_value = None;
+
+        for history in portfolio_history
+            .iter()
+            .filter(|h| h.date >= start_date.to_string() && h.date <= end_date.to_string())
+        {
+            let date = NaiveDate::parse_from_str(&history.date, "%Y-%m-%d")?;
+            let value = history.market_value;
+
+            if let Some(prev) = prev_value {
+                let daily_return = (value / prev) - 1.0;
+                portfolio_returns.push((date, daily_return));
+            }
+            prev_value = Some(value);
+        }
+
+        let mut cumulative_returns = Vec::new();
+        let mut total_return = 1.0;
+
+        for (date, return_value) in portfolio_returns.iter() {
+            total_return *= 1.0 + return_value;
+            cumulative_returns.push(CumulativeReturn {
+                date: date.format("%Y-%m-%d").to_string(),
+                value: total_return - 1.0,
+            });
+        }
+
+        let total_return = if !cumulative_returns.is_empty() {
+            cumulative_returns.last().unwrap().value
+        } else {
+            0.0
+        };
+
+        let annualized_return = if !cumulative_returns.is_empty() {
+            let years = (end_date - start_date).num_days() as f64 / 365.25;
+            (1.0 + total_return).powf(1.0 / years) - 1.0
+        } else {
+            0.0
+        };
+
+        Ok(CumulativeReturns {
+            id: account_id.to_string(),
+            cumulative_returns,
+            total_return,
+            annualized_return,
+        })
+    }
+
+    pub fn calculate_symbol_cumulative_returns(
+        &self,
+        conn: &mut SqliteConnection,
+        symbol: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<CumulativeReturns, Box<dyn std::error::Error>> {
+        let quote_history = self
+            .market_data_service
+            .get_quote_history(conn, symbol, start_date, end_date)?;
+
+        let mut symbol_returns = Vec::new();
+        let mut prev_value = None;
+
+        for quote in quote_history.iter() {
+            let value = quote.adjclose;
+
+            if let Some(prev) = prev_value {
+                let daily_return = (value / prev) - 1.0;
+                symbol_returns.push((quote.date, daily_return));
+            }
+            prev_value = Some(value);
+        }
+
+        let mut cumulative_returns = Vec::new();
+        let mut total_return = 1.0;
+
+        for (date, return_value) in symbol_returns.iter() {
+            total_return *= 1.0 + return_value;
+            cumulative_returns.push(CumulativeReturn {
+                date: date.format("%Y-%m-%d").to_string(),
+                value: total_return - 1.0,
+            });
+        }
+
+        let total_return = if !cumulative_returns.is_empty() {
+            cumulative_returns.last().unwrap().value
+        } else {
+            0.0
+        };
+
+        let annualized_return = if !cumulative_returns.is_empty() {
+            let years = (end_date - start_date).num_days() as f64 / 365.25;
+            (1.0 + total_return).powf(1.0 / years) - 1.0
+        } else {
+            0.0
+        };
+
+        Ok(CumulativeReturns {
+            id: symbol.to_string(),
+            cumulative_returns,
+            total_return,
+            annualized_return,
+        })
     }
 }

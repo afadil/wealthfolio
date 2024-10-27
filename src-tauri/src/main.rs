@@ -4,13 +4,11 @@
 mod commands;
 mod menu;
 mod updater;
-use commands::account::{
-    create_account, delete_account, get_accounts, update_account, add_import_mapping, 
-    fetch_import_mapping
-};
+use commands::account::{create_account, delete_account, get_accounts, update_account};
 use commands::activity::{
-    check_activities_import, create_activities, create_activity, delete_activity, get_activities,
-    search_activities, update_activity,
+    check_activities_import, create_activities, create_activity, delete_activity,
+    get_account_import_mapping, get_activities, save_account_import_mapping, search_activities,
+    update_activity,
 };
 use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
@@ -131,8 +129,6 @@ pub fn main() {
             search_symbol,
             check_activities_import,
             create_activities,
-            add_import_mapping,
-            fetch_import_mapping,
             calculate_historical_data,
             compute_holdings,
             get_asset_data,
@@ -160,6 +156,8 @@ pub fn main() {
             update_contribution_limit,
             delete_contribution_limit,
             calculate_deposits_for_accounts,
+            get_account_import_mapping,
+            save_account_import_mapping,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
