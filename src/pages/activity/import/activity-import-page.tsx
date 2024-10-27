@@ -44,7 +44,7 @@ const ActivityImportPage = () => {
       quantity: activity.quantity,
       assetId: activity.symbol,
       activityType: activity.activityType as any,
-      unitPrice: activity.unitPrice,
+      unitPrice: activity.amount ? activity.amount : activity.unitPrice,
       comment: activity.comment,
     }));
 
