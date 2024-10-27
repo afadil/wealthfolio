@@ -35,7 +35,7 @@ export function ImportMappingPreviewTable({
   invalidSymbols,
 }: ImportMappingPreviewTableProps) {
   return (
-    <div className="mb-2 h-full w-full overflow-hidden rounded-md border text-sm">
+    <div className="h-full w-full overflow-hidden rounded-md border text-sm">
       <div className="grid h-full" style={{ gridTemplateRows: 'auto 1fr' }}>
         {/* Sticky Header */}
         <div className="overflow-hidden">

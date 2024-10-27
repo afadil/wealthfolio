@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useQuery } from '@tanstack/react-query';
 
@@ -33,7 +33,12 @@ import { useCsvParser } from './hooks/useCsvParser';
 import { useImportMapping } from './hooks/useImportMapping';
 import { isCashActivity, isImportMapComplete } from './utils/csvValidation';
 import { validateActivities } from './utils/csvValidation';
-import { Separator } from '@/components/ui/separator';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 export function ActivityImportForm({
   onSuccess,
@@ -83,11 +88,14 @@ export function ActivityImportForm({
     }
   }, [fetchedMapping, updateMapping]);
 
+  const [accordionValue, setAccordionValue] = useState<string>('setup');
+
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
       resetFileStates();
       parseCsvFile(file, mapping);
+      setAccordionValue('');
     },
     [parseCsvFile, mapping, resetFileStates],
   );
@@ -125,14 +133,14 @@ export function ActivityImportForm({
           return appType as ActivityType;
         }
       }
-      return csvType as ActivityType; // Fallback to original value if no mapping found
+      return csvType as ActivityType;
     },
     [getMappedValue, mapping.activityMappings],
   );
 
   const handleImport = async () => {
     try {
-      const activitiesToImport: ActivityImport[] = csvData.slice(1).map((row) => {
+      const activitiesToImport: ActivityImport[] = csvData.slice(1).map((row, index) => {
         const activityType = getMappedActivityType(row);
         const isCash = isCashActivity(activityType);
 
@@ -185,6 +193,7 @@ export function ActivityImportForm({
           isValid: false,
           isDraft: true,
           comment: '',
+          lineNumber: index + 2,
         };
       });
 
@@ -220,19 +229,36 @@ export function ActivityImportForm({
   return (
     <div className="flex flex-col">
       <div className="flex flex-col gap-2">
-        <AccountSelection
-          value={mapping.accountId}
-          onChange={(id) => updateMapping({ accountId: id })}
-          accounts={accounts}
-        />
-        <FileDropzone
-          getRootProps={getRootProps}
-          getInputProps={getInputProps}
-          isDragActive={isDragActive}
-          selectedFile={selectedFile}
-          isLoading={isLoading}
-          openFilePicker={openFilePicker}
-        />
+        <Accordion
+          type="single"
+          value={accordionValue}
+          onValueChange={setAccordionValue}
+          collapsible
+          className="shadow-xs rounded-md border bg-card px-4"
+        >
+          <AccordionItem value="setup" className="border-none">
+            <AccordionTrigger className="text-base font-medium hover:no-underline">
+              Account & File Selection
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="flex flex-col gap-2 pt-2">
+                <AccountSelection
+                  value={mapping.accountId}
+                  onChange={(id) => updateMapping({ accountId: id })}
+                  accounts={accounts}
+                />
+                <FileDropzone
+                  getRootProps={getRootProps}
+                  getInputProps={getInputProps}
+                  isDragActive={isDragActive}
+                  selectedFile={selectedFile}
+                  isLoading={isLoading}
+                  openFilePicker={openFilePicker}
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         <PreviewContent
           accountId={mapping.accountId}
@@ -288,27 +314,22 @@ function AccountSelection({
   accounts: Account[] | undefined;
 }) {
   return (
-    <div>
-      <label htmlFor="accountId" className="mb-1 block text-sm font-medium">
-        Select Account
-      </label>
-      <Select onValueChange={onChange} value={value}>
-        <SelectTrigger>
-          <SelectValue placeholder="Select an account" />
-        </SelectTrigger>
-        <SelectContent>
-          {accounts ? (
-            accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.name}
-              </SelectItem>
-            ))
-          ) : (
-            <SelectItem value="">Loading accounts...</SelectItem>
-          )}
-        </SelectContent>
-      </Select>
-    </div>
+    <Select onValueChange={onChange} value={value}>
+      <SelectTrigger>
+        <SelectValue placeholder="Select an account" />
+      </SelectTrigger>
+      <SelectContent>
+        {accounts ? (
+          accounts.map((account) => (
+            <SelectItem key={account.id} value={account.id}>
+              {account.name}
+            </SelectItem>
+          ))
+        ) : (
+          <SelectItem value="">Loading accounts...</SelectItem>
+        )}
+      </SelectContent>
+    </Select>
   );
 }
 

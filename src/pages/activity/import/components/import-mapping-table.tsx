@@ -4,6 +4,7 @@ import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
 import { validateTickerSymbol } from '../utils/csvValidation';
 import { ImportMappingPreviewTable } from './import-mapping-preview-table';
 import { ImportMappingRawTable } from './import-mapping-raw-table';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 interface ImportMappingTableProps {
   importFormatFields: ImportFormat[];
@@ -155,35 +156,41 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
   }
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}
-      className="flex h-full flex-col space-y-4"
-    >
-      <div className="flex-none">
-        <div className="flex items-center justify-between text-lg font-bold">
-          <div>
-            <div>CSV Mapping</div>
-            <div className="text-sm font-normal text-muted-foreground">{totalRows} rows</div>
+    <Card>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as 'preview' | 'raw')}
+        className="flex h-full flex-col space-y-4"
+      >
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-xl font-semibold">Mapping</h2>
+              <span className="rounded-md bg-muted px-2 py-1 text-sm font-medium text-muted-foreground">
+                {totalRows} rows
+              </span>
+            </div>
+            <TabsList>
+              <TabsTrigger value="preview">Mapping Preview</TabsTrigger>
+              <TabsTrigger value="raw">File Preview</TabsTrigger>
+            </TabsList>
           </div>
-          <TabsList>
-            <TabsTrigger value="preview">Mapping Preview</TabsTrigger>
-            <TabsTrigger value="raw">File Preview</TabsTrigger>
-          </TabsList>
-        </div>
-      </div>
+        </CardHeader>
 
-      <TabsContent value="preview" className="m-0 h-[400px] min-h-0 flex-1">
-        <ImportMappingPreviewTable
-          {...props}
-          rowsToShow={rowsToShow}
-          invalidSymbols={invalidSymbols}
-        />
-      </TabsContent>
+        <CardContent>
+          <TabsContent value="preview" className="m-0 h-[500px] min-h-0 flex-1">
+            <ImportMappingPreviewTable
+              {...props}
+              rowsToShow={rowsToShow}
+              invalidSymbols={invalidSymbols}
+            />
+          </TabsContent>
 
-      <TabsContent value="raw">
-        <ImportMappingRawTable headers={props.headers} csvData={props.csvData} />
-      </TabsContent>
-    </Tabs>
+          <TabsContent value="raw">
+            <ImportMappingRawTable headers={props.headers} csvData={props.csvData} />
+          </TabsContent>
+        </CardContent>
+      </Tabs>
+    </Card>
   );
 }

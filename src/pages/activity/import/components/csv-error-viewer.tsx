@@ -66,9 +66,9 @@ export function ErrorViewer({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-lg font-bold">
             <div className="flex items-center gap-2">
-              CSV Errors preview{' '}
+              Errors preview{' '}
               {totalErrors > 0 && (
-                <Badge variant="destructive">
+                <Badge variant="destructive" className="rounded-md">
                   {totalErrors} {totalErrors === 1 ? 'Error' : 'Errors'}
                 </Badge>
               )}
@@ -86,7 +86,7 @@ export function ErrorViewer({
         </CardHeader>
         <CardContent>
           <TabsContent value="errors">
-            <ScrollArea className="h-[400px] w-full">
+            <ScrollArea className="h-[500px] w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -155,7 +155,7 @@ export function ErrorViewer({
             </ScrollArea>
           </TabsContent>
           <TabsContent value="raw">
-            <ScrollArea className="h-[400px] w-full">
+            <ScrollArea className="h-[500px] w-full">
               <Table>
                 <TableHeader>
                   <TableRow>

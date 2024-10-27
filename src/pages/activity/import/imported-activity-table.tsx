@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { Account, ActivityImport } from '@/lib/types';
 import { formatAmount, formatDateTime, toPascalCase } from '@/lib/utils';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import { DataTableFacetedFilterProps } from '@/components/ui/data-table/data-table-faceted-filter';
 
 export const ImportedActivitiesTable = ({
   activities,
@@ -47,7 +48,7 @@ export const ImportedActivitiesTable = ({
       title: 'Type',
       options: activitiesType,
     },
-  ];
+  ] satisfies DataTableFacetedFilterProps<ActivityImport, string>[];
 
   const defaultSorting: SortingState = [
     {
@@ -97,8 +98,8 @@ export const columns: ColumnDef<ActivityImport>[] = [
                 <TooltipTrigger asChild>
                   <Icons.XCircle className="h-4 w-4 cursor-help text-destructive" />
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-destructive">{error}</p>
+                <TooltipContent className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive">
+                  {error}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -107,9 +108,10 @@ export const columns: ColumnDef<ActivityImport>[] = [
         </div>
       );
     },
-    filterFn: (row, id, value: string) => {
-      const isValid = row.getValue(id) as any;
-      return value.includes(isValid);
+    filterFn: (row, id, filterValue: string[]) => {
+      const isValid = row.getValue(id) as boolean;
+      const filterBoolean = filterValue[0] === 'true';
+      return isValid === filterBoolean;
     },
     sortingFn: (rowA, rowB, id) => {
       const statusA = rowA.getValue(id) as boolean;

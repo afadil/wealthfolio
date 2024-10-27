@@ -14,7 +14,7 @@ interface ImportMappingRawTableProps {
 
 export function ImportMappingRawTable({ headers, csvData }: ImportMappingRawTableProps) {
   return (
-    <Table className="relative h-[400px] w-full">
+    <Table className="relative h-[500px] w-full">
       <TableHeader className="border-t">
         <TableRow>
           <TableHead className="sticky left-0 z-20 w-[100px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">

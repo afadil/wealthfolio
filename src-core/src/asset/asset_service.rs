@@ -246,10 +246,7 @@ impl AssetService {
         let should_sync = sync.unwrap_or(true);
 
         match assets.find(asset_id).first::<Asset>(conn) {
-            Ok(existing_profile) => {
-                println!("Found existing profile for asset_id: {}", asset_id);
-                Ok(existing_profile)
-            }
+            Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
                 // symbol not found in database. Fetching from market data service.
                 let fetched_profile = self
