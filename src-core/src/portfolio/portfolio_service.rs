@@ -34,7 +34,7 @@ impl PortfolioService {
                 CurrencyExchangeService::new(),
                 base_currency.clone(),
             ),
-            holdings_service: HoldingsService::new(base_currency.clone(),MarketDataProviderType::Yahoo).await,
+            holdings_service: HoldingsService::new(base_currency.clone()).await,
             history_service: HistoryService::new(base_currency.clone(), market_data_service),
         })
     }

@@ -35,13 +35,6 @@ impl MarketDataService {
             .first::<Quote>(conn)
     }
 
-    pub fn get_history_quotes(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Quote>, diesel::result::Error> {
-        quotes::table.load::<Quote>(conn)
-    }
-
     pub fn load_quotes(&self, conn: &mut SqliteConnection) -> HashMap<(String, NaiveDate), Quote> {
         let quotes_result: QueryResult<Vec<Quote>> = quotes::table.load::<Quote>(conn);
 
@@ -70,20 +63,24 @@ impl MarketDataService {
         let mut all_quotes_to_insert = Vec::new();
 
         for symbol in symbols {
+            // Get the most recent quote date for the symbol
             let last_sync_date = self
                 .get_last_quote_sync_date(conn, symbol)
                 .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
                 .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
 
+            // Build a start date for the sync from the last sync date
             let start_date: SystemTime = Utc
                 .from_utc_datetime(&(last_sync_date - Duration::days(1)))
                 .into();
 
+            // Get the quote history for the symbol from start date to now
             match self
                 .provider
                 .get_stock_history(symbol, start_date, end_date)
                 .await
             {
+                // Build a data structure of quotes to insert
                 Ok(quotes) => all_quotes_to_insert.extend(quotes),
                 Err(e) => {
                     eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e);
@@ -91,6 +88,7 @@ impl MarketDataService {
             }
         }
 
+        // Insert the quotes into the database
         self.insert_quotes(conn, &all_quotes_to_insert)
     }
 
@@ -171,18 +169,11 @@ impl MarketDataService {
             .load::<Asset>(conn)
             .map_err(|e| format!("Failed to load assets: {}", e))?;
 
-        // self.sync_quotes(
-        //     conn,
-        //     &asset_list
-        //         .iter()
-        //         .map(|asset| asset.symbol.clone())
-        //         .collect::<Vec<String>>(),
-        // ).await?;
-
         self.sync_asset_quotes(conn, &asset_list).await?;
 
         Ok(())
     }
+
     pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, String> {
         self.provider
             .get_symbol_profile(symbol)

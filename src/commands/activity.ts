@@ -61,7 +61,7 @@ export const createActivity = async (activity: NewActivity): Promise<Activity> =
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('create_activity', { activity, isPublic: activity.isPublic });
+        return invokeTauri('create_activity', { activity });
       default:
         throw new Error(`Unsupported`);
     }

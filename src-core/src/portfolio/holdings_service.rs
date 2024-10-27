@@ -25,11 +25,13 @@ pub struct HoldingsService {
 }
 
 impl HoldingsService {
-    pub async fn new(base_currency: String, provider_type: MarketDataProviderType) -> Self {
+    pub async fn new(base_currency: String) -> Self {
         Self {
             account_service: AccountService::new(base_currency.clone()),
             activity_service: ActivityService::new(base_currency.clone()),
-            asset_service: AssetService::new(provider_type).await,
+            asset_service: AssetService::new(
+                MarketDataProviderType::Yahoo,
+                MarketDataProviderType::Private).await,
             fx_service: CurrencyExchangeService::new(),
             base_currency,
         }

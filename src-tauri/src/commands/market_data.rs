@@ -27,7 +27,10 @@ pub async fn get_asset_data(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new(MarketDataProviderType::Yahoo).await;
+    let service = AssetService::new(
+        MarketDataProviderType::Yahoo,
+        MarketDataProviderType::Private
+    ).await;
     service
         .get_asset_data(&mut conn, &asset_id)
         .map_err(|e| e.to_string())
@@ -43,7 +46,9 @@ pub async fn update_asset_profile(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new(MarketDataProviderType::Yahoo).await;
+    let service = AssetService::new(
+        MarketDataProviderType::Yahoo,
+        MarketDataProviderType::Private).await;
     service
         .update_asset_profile(&mut conn, &id, payload)
         .map_err(|e| e.to_string())

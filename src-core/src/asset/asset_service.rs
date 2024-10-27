@@ -1,13 +1,14 @@
 use crate::market_data::market_data_service::MarketDataService;
-use crate::models::{Asset, AssetProfile, NewAsset, Quote, QuoteSummary, UpdateAssetProfile};
-use crate::providers::market_data_provider::{MarketDataError, MarketDataProviderType};
+use crate::models::{Asset, AssetProfile, NewAsset, Quote, UpdateAssetProfile};
+use crate::providers::market_data_provider::MarketDataProviderType;
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use std::sync::Arc;
 
 pub struct AssetService {
-    market_data_service: Arc<MarketDataService>,
+    public_market_data_service: Arc<MarketDataService>,
+    private_market_data_service: Arc<MarketDataService>,
 }
 
 impl From<yahoo_finance_api::Quote> for Quote {
@@ -29,10 +30,13 @@ impl From<yahoo_finance_api::Quote> for Quote {
 }
 
 impl AssetService {
-    pub async fn new(provider_type: MarketDataProviderType) -> Self {
-        let market_data_service = Arc::new(MarketDataService::new(provider_type).await);
+    pub async fn new(public_provider_type: MarketDataProviderType,
+                    private_provider_type: MarketDataProviderType) -> Self {
+        let public_market_data_service = Arc::new(MarketDataService::new(public_provider_type).await);
+        let private_market_data_service = Arc::new(MarketDataService::new(private_provider_type).await);
         Self {
-            market_data_service,
+            public_market_data_service,
+            private_market_data_service,
         }
     }
 
@@ -218,83 +222,89 @@ impl AssetService {
     pub fn get_latest_quote(
         &self,
         conn: &mut SqliteConnection,
-        symbol_query: &str,
+        symbol: &str,
     ) -> QueryResult<Quote> {
-        self.market_data_service
-            .get_latest_quote(conn, symbol_query)
+        quotes::table
+            .filter(quotes::symbol.eq(symbol))
+            .order(quotes::date.desc())
+            .first::<Quote>(conn)
     }
 
     pub fn get_history_quotes(
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Quote>, diesel::result::Error> {
-        self.market_data_service.get_history_quotes(conn)
+        quotes::table.load::<Quote>(conn)
     }
 
-    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
-        self.market_data_service.search_symbol(query).await
-    }
-
-    pub async fn get_asset_profile(
+    pub async fn get_asset(
         &self,
         conn: &mut SqliteConnection,
         asset_id: &str,
-        sync: Option<bool>,
     ) -> Result<Asset, diesel::result::Error> {
         use crate::schema::assets::dsl::*;
-
-        let should_sync = sync.unwrap_or(true);
 
         match assets.find(asset_id).first::<Asset>(conn) {
             Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
-                // symbol not found in database. Fetching from market data service.
-                let fetched_profile = self
-                    .market_data_service
+
+                // Symbol not found in database. Try fetching info from market data service.
+                match self
+                    .public_market_data_service
                     .get_symbol_profile(asset_id)
-                    .await
-                    .map_err(|e| {
-                        println!(
-                            "Failed to fetch symbol summary for asset_id: {}. Error: {:?}",
-                            asset_id, e
-                        );
-                        diesel::result::Error::NotFound
-                    })?;
+                    .await {
 
-                let inserted_asset = diesel::insert_into(assets)
-                    .values(&fetched_profile)
-                    .returning(Asset::as_returning())
-                    .get_result(conn)?;
+                        // Info found. Create and return a new asset based on this info.
+                        Ok(fetched_profile) => {
+                            let inserted_asset = self
+                                .insert_new_asset(conn, fetched_profile)
+                                .await?;
+                            return Ok(inserted_asset);
+                        },
+                        Err(_) => {
 
-                if should_sync {
-                    self.sync_symbol_quotes(conn, &[inserted_asset.symbol.clone()])
-                        .await
-                        .map_err(|e| {
-                            println!(
-                                "Failed to sync quotes for asset_id: {}. Error: {:?}",
-                                asset_id, e
-                            );
-                            diesel::result::Error::NotFound
-                        })?;
+                            // No public info found. Use the private market data service to create abriged Asset info.
+                            let _: Result<NewAsset, String> = match self
+                                .private_market_data_service
+                                .get_symbol_profile(asset_id)
+                                .await {
+                                    // Create and return a new asset from the abridege info.
+                                    Ok(new_asset) => {
+                                        let inserted_asset = self
+                                            .insert_new_asset(conn, new_asset)
+                                                .await?;
+
+                                        return Ok(inserted_asset)
+                                    },
+                                    Err(e) => Err(e.to_string()),
+                                };
+                            return Err(diesel::result::Error::NotFound);
+                        }
+                    }
                 }
-
-                Ok(inserted_asset)
-            }
-            Err(e) => {
-                println!(
-                    "Error while getting asset profile for asset_id: {}. Error: {:?}",
-                    asset_id, e
-                );
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
 
-    pub async fn sync_symbol_quotes(
+    async fn insert_new_asset(
         &self,
         conn: &mut SqliteConnection,
-        symbols: &[String],
+        new_asset: NewAsset )
+        -> Result<Asset, diesel::result::Error> {
+        use crate::schema::assets::dsl::*;
+
+        let inserted_asset = diesel::insert_into(assets)
+            .values(&new_asset)
+            .returning(Asset::as_returning())
+            .get_result(conn)?;
+        Ok(inserted_asset)
+    }
+
+    pub async fn sync_asset_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_list: &Vec<Asset>,
     ) -> Result<(), String> {
-        self.market_data_service.sync_quotes(conn, symbols).await
+        self.public_market_data_service.sync_asset_quotes(conn, asset_list).await
     }
 }

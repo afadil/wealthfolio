@@ -45,7 +45,6 @@ export const newActivitySchema = z.object({
     .min(0, { message: 'Fee must be a non-negative number.' }),
 
   isDraft: z.boolean(),
-  isPublic: z.boolean(),
   quantity: z.coerce
     .number({
       required_error: 'Please enter a valid quantity.',
