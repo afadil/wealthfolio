@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import Papa from 'papaparse';
-import { ImportFormat } from '@/lib/types';
+import { ImportFormat, ImportMappingData } from '@/lib/types';
 import { validateCsvStructure, initializeColumnMapping } from '../utils/csvValidation';
 
 export function useCsvParser() {
@@ -21,44 +21,55 @@ export function useCsvParser() {
     setValidationErrors({});
   };
 
-  const parseCsvFile = useCallback((file: File, form: any) => {
-    resetFileStates();
-    setSelectedFile(file);
+  const parseCsvFile = useCallback(
+    (
+      file: File,
+      mapping: ImportMappingData,
+      onUpdateMapping?: (updates: Partial<ImportMappingData>) => void,
+    ) => {
+      resetFileStates();
+      setSelectedFile(file);
 
-    Papa.parse(file, {
-      complete: (results: Papa.ParseResult<string[]>) => {
-        if (results.data && results.data.length > 0) {
-          setCsvData(results.data);
-          const headerRow = results.data[0].map((header) => header.trim());
-          setHeaders(headerRow);
+      Papa.parse<string[]>(file, {
+        complete: (results) => {
+          if (results.data && results.data.length > 0) {
+            setCsvData(results.data);
+            const headerRow = results.data[0].map((header) => header.trim());
+            setHeaders(headerRow);
 
-          const isValid = validateCsvStructure(headerRow);
+            const isValid = validateCsvStructure(headerRow);
 
-          if (!isValid) {
-            setIsValidCsv(false);
-            setError(
-              "Oops! The CSV file structure doesn't look quite right. Please make sure your file starts with a header row containing multiple column names.",
-            );
+            if (!isValid) {
+              setIsValidCsv(false);
+              setError(
+                "Oops! The CSV file structure doesn't look quite right. Please make sure your file starts with a header row containing multiple column names.",
+              );
+            } else {
+              const initialMapping = initializeColumnMapping(headerRow);
+              if (onUpdateMapping) {
+                onUpdateMapping({
+                  fieldMappings: {
+                    ...mapping.fieldMappings,
+                    ...initialMapping,
+                  },
+                });
+              }
+            }
           } else {
-            const initialMapping = initializeColumnMapping(headerRow);
-            form.setValue('mapping.columns', {
-              ...form.getValues('mapping.columns'),
-              ...initialMapping,
-            } as Record<ImportFormat, string>);
+            setIsValidCsv(false);
+            setError('The CSV file appears to be empty.');
           }
-        } else {
+          setIsLoading(false);
+        },
+        error: (error: any) => {
           setIsValidCsv(false);
-          setError('The CSV file appears to be empty.');
-        }
-        setIsLoading(false);
-      },
-      error: (error: any) => {
-        setIsValidCsv(false);
-        setError(`Error parsing CSV: ${error.message}`);
-        setIsLoading(false);
-      },
-    });
-  }, []);
+          setError(`Error parsing CSV: ${error.message}`);
+          setIsLoading(false);
+        },
+      });
+    },
+    [],
+  );
 
   return {
     csvData,
