@@ -5,12 +5,11 @@ use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
 use crate::AppState;
 use tauri::State;
 use wealthfolio_core::models::Asset;
-use wealthfolio_core::providers::market_data_provider::MarketDataProviderType;
 
 #[tauri::command]
 pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
     println!("Searching for ticker symbol: {}", query);
-    let service = MarketDataService::new(MarketDataProviderType::Yahoo).await;
+    let service = MarketDataService::new().await;
 
     service
         .search_symbol(&query)
@@ -27,10 +26,7 @@ pub async fn get_asset_data(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new(
-        MarketDataProviderType::Yahoo,
-        MarketDataProviderType::Private
-    ).await;
+    let service = AssetService::new().await;
     service
         .get_asset_data(&mut conn, &asset_id)
         .map_err(|e| e.to_string())
@@ -46,9 +42,7 @@ pub async fn update_asset_profile(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new(
-        MarketDataProviderType::Yahoo,
-        MarketDataProviderType::Private).await;
+    let service = AssetService::new().await;
     service
         .update_asset_profile(&mut conn, &id, payload)
         .map_err(|e| e.to_string())
@@ -61,7 +55,7 @@ pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new(MarketDataProviderType::Yahoo).await;
+    let service = MarketDataService::new().await;
     service
         .initialize_and_sync_quotes(&mut conn)
         .await

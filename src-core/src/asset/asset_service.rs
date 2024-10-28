@@ -1,14 +1,12 @@
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Asset, AssetProfile, NewAsset, Quote, UpdateAssetProfile};
-use crate::providers::market_data_provider::MarketDataProviderType;
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use std::sync::Arc;
 
 pub struct AssetService {
-    public_market_data_service: Arc<MarketDataService>,
-    private_market_data_service: Arc<MarketDataService>,
+    market_data_service: Arc<MarketDataService>,
 }
 
 impl From<yahoo_finance_api::Quote> for Quote {
@@ -30,13 +28,10 @@ impl From<yahoo_finance_api::Quote> for Quote {
 }
 
 impl AssetService {
-    pub async fn new(public_provider_type: MarketDataProviderType,
-                    private_provider_type: MarketDataProviderType) -> Self {
-        let public_market_data_service = Arc::new(MarketDataService::new(public_provider_type).await);
-        let private_market_data_service = Arc::new(MarketDataService::new(private_provider_type).await);
+    pub async fn new() -> Self {
+        let market_data_service = Arc::new(MarketDataService::new().await);
         Self {
-            public_market_data_service,
-            private_market_data_service,
+            market_data_service,
         }
     }
 
@@ -237,7 +232,7 @@ impl AssetService {
         quotes::table.load::<Quote>(conn)
     }
 
-    pub async fn get_asset(
+    pub async fn get_or_create_asset(
         &self,
         conn: &mut SqliteConnection,
         asset_id: &str,
@@ -248,9 +243,10 @@ impl AssetService {
             Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
 
+                println!("No asset found in database for asset_id: {}", asset_id);
                 // Symbol not found in database. Try fetching info from market data service.
                 match self
-                    .public_market_data_service
+                    .market_data_service
                     .get_symbol_profile(asset_id)
                     .await {
 
@@ -259,26 +255,11 @@ impl AssetService {
                             let inserted_asset = self
                                 .insert_new_asset(conn, fetched_profile)
                                 .await?;
-                            return Ok(inserted_asset);
+                            Ok(inserted_asset)
                         },
                         Err(_) => {
-
-                            // No public info found. Use the private market data service to create abriged Asset info.
-                            let _: Result<NewAsset, String> = match self
-                                .private_market_data_service
-                                .get_symbol_profile(asset_id)
-                                .await {
-                                    // Create and return a new asset from the abridege info.
-                                    Ok(new_asset) => {
-                                        let inserted_asset = self
-                                            .insert_new_asset(conn, new_asset)
-                                                .await?;
-
-                                        return Ok(inserted_asset)
-                                    },
-                                    Err(e) => Err(e.to_string()),
-                                };
-                            return Err(diesel::result::Error::NotFound);
+                            println!("No data found for asset_id: {}", asset_id);
+                            Err(diesel::result::Error::NotFound)
                         }
                     }
                 }
@@ -304,7 +285,8 @@ impl AssetService {
         &self,
         conn: &mut SqliteConnection,
         asset_list: &Vec<Asset>,
-    ) -> Result<(), String> {
-        self.public_market_data_service.sync_asset_quotes(conn, asset_list).await
+    ) -> Result<(), String>{
+
+        self.market_data_service.sync_asset_quotes(conn, asset_list).await
     }
 }

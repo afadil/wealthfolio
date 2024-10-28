@@ -5,9 +5,8 @@ use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, Asset, NewActivity, Sort,
+    Account, Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, Asset, NewActivity, Sort,
 };
-use crate::providers::market_data_provider::MarketDataProviderType;
 use crate::schema::activities;
 
 use csv::ReaderBuilder;
@@ -76,37 +75,40 @@ impl ActivityService {
     pub async fn create_activity(
         &self,
         conn: &mut SqliteConnection,
-        mut activity: NewActivity,
+        activity: NewActivity,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
 
-        // Use Yahoo as the default provider type
-        let public_provider_type = MarketDataProviderType::Yahoo;
-        let private_provider_type = MarketDataProviderType::Private;
-
-        // Generate an asset service and account service
+        // Instantiate services
         let asset_service =
-            AssetService::new( public_provider_type, private_provider_type ).await;
+            AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
 
         // Fetch the asset profile for the activity
         let asset_id = activity.asset_id.clone();
 
+        // Get or create the asset profile
         let asset = asset_service
-            .get_asset(conn, &asset_id)
+            .get_or_create_asset(conn, &asset_id)
             .await?;
 
-        // Sync the symbol quotes for the asset profile
-        asset_service.sync_asset_quotes(conn, &vec![asset.clone()])
-            .await
-            .map_err(|e| {
-                println!(
-                    "Failed to sync quotes for asset_id: {}. Error: {:?}",
-                    asset_id, e
-                );
-                diesel::result::Error::NotFound
-            })?;
         let account = account_service.get_account_by_id(conn, &activity.account_id)?;
 
+        // Handle the database transaction
+        let inserted_activity = self.insert_activity_transation(conn, activity, &asset, &account).await?;
+
+        // Sync the symbol quotes for the asset profile
+        self.sync_asset_quotes(asset_service, conn, &asset).await?;
+
+        return Ok(inserted_activity);
+    }
+
+    async fn insert_activity_transation(
+        &self,
+        conn: &mut SqliteConnection,
+        mut activity: NewActivity,
+        asset: &Asset,
+        account: &Account,
+    ) -> Result<Activity, Box<dyn std::error::Error>> {
         conn.transaction(|conn| {
             // Update activity currency if asset_profile.currency is available
             if !asset.currency.is_empty() {
@@ -148,6 +150,24 @@ impl ActivityService {
         })
     }
 
+    async fn sync_asset_quotes(
+        &self,
+        asset_service: AssetService,
+        conn: &mut SqliteConnection,
+        asset: &Asset,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        asset_service.sync_asset_quotes(conn, &vec![asset.clone()])
+            .await
+            .map_err(|e| {
+                println!(
+                    "Failed to sync quotes for asset_id: {}. Error: {:?}",
+                    asset.id, e
+                );
+                diesel::result::Error::NotFound
+            })?;
+        Ok(())
+    }
+
     // update an activity
     pub async fn update_activity(
         &self,
@@ -155,11 +175,10 @@ impl ActivityService {
         mut activity: ActivityUpdate,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
         let asset_service=
-            AssetService::new(MarketDataProviderType::Yahoo,
-            MarketDataProviderType::Private).await;
+            AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
         let asset = asset_service
-            .get_asset(conn, &activity.asset_id)
+            .get_or_create_asset(conn, &activity.asset_id)
             .await?;
         asset_service.sync_asset_quotes(conn, &vec![asset.clone()])
             .await
@@ -221,8 +240,7 @@ impl ActivityService {
         file_path: String,
     ) -> Result<Vec<ActivityImport>, String> {
         let asset_service =
-            AssetService::new(MarketDataProviderType::Yahoo,
-                MarketDataProviderType::Private).await;
+            AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
         let fx_service = CurrencyExchangeService::new();
         let account = account_service
@@ -243,7 +261,7 @@ impl ActivityService {
 
             // Load the symbol profile here, now awaiting the async call
             let symbol_profile_result = asset_service
-                .get_asset(conn, &activity_import.symbol)
+                .get_or_create_asset(conn, &activity_import.symbol)
                 .await;
 
             // Check if symbol profile is valid
@@ -303,9 +321,14 @@ impl ActivityService {
 
         // Sync quotes for all valid assets
         if !assets_to_sync.is_empty() {
-            asset_service
+            match asset_service
                 .sync_asset_quotes(conn, &assets_to_sync)
-                .await?;
+                .await{
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(format!("Failed to sync quotes for assets: {}", e));
+                }
+            }
         }
 
         Ok(activities_with_status)

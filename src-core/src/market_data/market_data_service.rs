@@ -1,4 +1,4 @@
-use crate::models::{Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
+use crate::models::{Activity, Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
 use crate::providers::market_data_factory::MarketDataFactory;
 use crate::providers::market_data_provider::{MarketDataError, MarketDataProvider, MarketDataProviderType};
 use crate::schema::{activities, exchange_rates, quotes};
@@ -10,18 +10,20 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 pub struct MarketDataService {
-    provider: Arc<dyn MarketDataProvider>,
+    public_data_provider: Arc<dyn MarketDataProvider>,
+    private_data_provider: Arc<dyn MarketDataProvider>,
 }
 
 impl MarketDataService {
-    pub async fn new( provider_type: MarketDataProviderType ) -> Self {
+    pub async fn new() -> Self {
         MarketDataService {
-            provider: MarketDataFactory::get_provider(provider_type).await,
+            public_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Yahoo).await,
+            private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Private).await,
         }
     }
 
     pub async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
-        self.provider.search_ticker(query).await
+        self.public_data_provider.search_ticker(query).await
     }
 
     pub fn get_latest_quote(
@@ -53,85 +55,143 @@ impl MarketDataService {
         }
     }
 
-    pub async fn sync_quotes(
-        &self,
-        conn: &mut SqliteConnection,
-        symbols: &[String],
-    ) -> Result<(), String> {
-        println!("Syncing history quotes for all assets...");
-        let end_date = SystemTime::now();
-        let mut all_quotes_to_insert = Vec::new();
-
-        for symbol in symbols {
-            // Get the most recent quote date for the symbol
-            let last_sync_date = self
-                .get_last_quote_sync_date(conn, symbol)
-                .map_err(|e| format!("Error getting last sync date for {}: {}", symbol, e))?
-                .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
-
-            // Build a start date for the sync from the last sync date
-            let start_date: SystemTime = Utc
-                .from_utc_datetime(&(last_sync_date - Duration::days(1)))
-                .into();
-
-            // Get the quote history for the symbol from start date to now
-            match self
-                .provider
-                .get_stock_history(symbol, start_date, end_date)
-                .await
-            {
-                // Build a data structure of quotes to insert
-                Ok(quotes) => all_quotes_to_insert.extend(quotes),
-                Err(e) => {
-                    eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e);
-                }
-            }
-        }
-
-        // Insert the quotes into the database
-        self.insert_quotes(conn, &all_quotes_to_insert)
-    }
-
     pub async fn sync_asset_quotes(
         &self,
         conn: &mut SqliteConnection,
         asset_list: &Vec<Asset>,
     ) -> Result<(), String> {
-        println!("Syncing history quotes for all assets...");
+        println!("Syncing history quotes for assets...");
         let end_date = SystemTime::now();
         let mut all_quotes_to_insert = Vec::new();
 
         for asset in asset_list {
-            let symbol = asset.symbol.clone();
-            let last_sync_date = self
-                .get_last_quote_sync_date(conn, symbol.as_str())
-                .map_err(|e| format!("Error getting last sync date for {}: {}", symbol.as_str(), e))?
-                .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
-
-            let start_date: SystemTime = Utc
-                .from_utc_datetime(&(last_sync_date - Duration::days(1)))
-                .into();
-
             match asset.data_source.as_str() {
-                "PRIVATE" => (),
+                "CASH" => continue,
                 "Yahoo" => {
-                    match self
-                        .provider
-                        .get_stock_history(&asset.symbol, start_date, end_date)
-                        .await
-                    {
-                        Ok(quotes) => all_quotes_to_insert.extend(quotes),
-                        Err(e) => {
-                            eprintln!("Error fetching history for {}: {}. Skipping.", symbol, e);
-                        }
-                    }
-                },
-                "Manual" => (),
-                _ => (),
+                    let quotes =  self.sync_public_asset_quotes(conn, asset, end_date).await?;
+                    all_quotes_to_insert.extend(quotes)
+                }
+                "Private" => {
+                    let quotes = self.sync_private_asset_quotes(conn, asset).await?;
+                    all_quotes_to_insert.extend(quotes)
+                }
+                _ => continue,
             }
         }
 
         self.insert_quotes(conn, &all_quotes_to_insert)
+    }
+
+    async fn sync_private_asset_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        asset: &Asset,
+    ) -> Result<Vec<Quote>, String> {
+        let activities = activities::table
+                        .filter(activities::asset_id.eq(asset.symbol.as_str()))
+                        .order(activities::activity_date.asc())
+                        .load::<Activity>(conn)
+                        .map_err(|e| format!("Failed to load activities for {}: {}", asset.symbol, e))?;
+
+        let mut quotes = Vec::new();
+        if activities.is_empty() {
+            return Ok(quotes);
+        }
+
+        let mut activity_iter = activities.iter().peekable();
+        let mut current_activity = activity_iter.next().unwrap();
+        let mut current_date = current_activity.activity_date.date();
+
+        while let Some(next_activity) = activity_iter.peek() {
+            let next_date = next_activity.activity_date.date();
+
+            while current_date < next_date {
+            let quote = Quote {
+                id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
+                symbol: asset.symbol.clone(),
+                date: current_date.and_hms_opt(2, 0, 0).unwrap(),
+                open: current_activity.unit_price,
+                high: current_activity.unit_price,
+                low: current_activity.unit_price,
+                close: current_activity.unit_price,
+                adjclose: current_activity.unit_price,
+                volume: current_activity.quantity,
+                data_source: "Private".to_string(),
+                created_at: Utc::now().naive_utc(),
+            };
+            quotes.push(quote);
+            current_date += Duration::days(1);
+            }
+
+            current_activity = activity_iter.next().unwrap();
+        }
+
+        // Add quotes for remaining days up to the last activity date
+        while current_date <= current_activity.activity_date.date() {
+            let quote = Quote {
+                id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
+                symbol: asset.symbol.clone(),
+                date: current_date.and_hms_opt(2, 0, 0).unwrap(),
+                open: current_activity.unit_price,
+                high: current_activity.unit_price,
+                low: current_activity.unit_price,
+                close: current_activity.unit_price,
+                adjclose: current_activity.unit_price,
+                volume: current_activity.quantity,
+                data_source: "Private".to_string(),
+                created_at: Utc::now().naive_utc(),
+            };
+            quotes.push(quote);
+            current_date += Duration::days(1);
+        }
+
+        // Add quotes for remaining days from the last activity date to the current date
+        let today = Utc::now().naive_utc().date();
+        while current_date <= today {
+            let quote = Quote {
+                id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
+                symbol: asset.symbol.clone(),
+                date: current_date.and_hms_opt(2, 0, 0).unwrap(),
+                open: current_activity.unit_price,
+                high: current_activity.unit_price,
+                low: current_activity.unit_price,
+                close: current_activity.unit_price,
+                adjclose: current_activity.unit_price,
+                volume: current_activity.quantity,
+                data_source: "Private".to_string(),
+                created_at: Utc::now().naive_utc(),
+            };
+            quotes.push(quote);
+            current_date += Duration::days(1);
+        }
+
+        Ok(quotes)
+    }
+
+    async fn sync_public_asset_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        asset: &Asset,
+        end_date: SystemTime,
+    ) -> Result<Vec<Quote>, String> {
+        let symbol = asset.symbol.clone();
+        let last_sync_date = self
+            .get_last_quote_sync_date(conn, symbol.as_str())
+            .map_err(|e| format!("Error getting last sync date for {}: {}", symbol.as_str(), e))?
+            .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
+
+        let start_date: SystemTime = Utc
+            .from_utc_datetime(&(last_sync_date - Duration::days(1)))
+            .into();
+
+        match self
+            .public_data_provider
+            .get_stock_history(&asset.symbol, start_date, end_date)
+            .await
+        {
+            Ok(quotes) => return Ok(quotes),
+            Err(e) => Err(format!("Failed to fetch quotes for {}: {}", symbol, e)),
+        }
     }
 
     fn get_last_quote_sync_date(
@@ -169,16 +229,28 @@ impl MarketDataService {
             .load::<Asset>(conn)
             .map_err(|e| format!("Failed to load assets: {}", e))?;
 
-        self.sync_asset_quotes(conn, &asset_list).await?;
+        match self.sync_asset_quotes(conn, &asset_list).await{
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("Failed to sync asset quotes: {}", e);
+            }
+        };
 
         Ok(())
     }
 
     pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, String> {
-        self.provider
+        match self.public_data_provider
             .get_symbol_profile(symbol)
-            .await
-            .map_err(|e| e.to_string())
+            .await{
+                Ok(asset) => Ok(asset),
+                Err(_) => {
+                    self.private_data_provider
+                        .get_symbol_profile(symbol)
+                        .await
+                        .map_err(|e| format!("Failed to get symbol profile for {}: {}", symbol, e))
+                },
+            }
     }
 
     pub fn get_asset_currencies(
@@ -256,13 +328,13 @@ impl MarketDataService {
 
         // Try direct conversion
         let symbol = format!("{}{}=X", from, to);
-        if let Ok(quote) = self.provider.get_latest_quote(&symbol).await {
+        if let Ok(quote) = self.public_data_provider.get_latest_quote(&symbol).await {
             return Ok(quote.close);
         }
 
         // Try reverse conversion
         let reverse_symbol = format!("{}{}=X", to, from);
-        if let Ok(quote) = self.provider.get_latest_quote(&reverse_symbol).await {
+        if let Ok(quote) = self.public_data_provider.get_latest_quote(&reverse_symbol).await {
             return Ok(1.0 / quote.close);
         }
 
@@ -279,7 +351,7 @@ impl MarketDataService {
             "".to_string()
         };
         let from_usd = if !from_usd_symbol.is_empty() {
-            match self.provider.get_latest_quote(&from_usd_symbol).await {
+            match self.public_data_provider.get_latest_quote(&from_usd_symbol).await {
                 Ok(quote) => quote.close,
                 Err(_) => return Ok(-1.0),
             }
@@ -288,7 +360,7 @@ impl MarketDataService {
         };
 
         let to_usd = if !to_usd_symbol.is_empty() {
-            match self.provider.get_latest_quote(&to_usd_symbol).await {
+            match self.public_data_provider.get_latest_quote(&to_usd_symbol).await {
                 Ok(quote) => quote.close,
                 Err(_) => return Ok(-1.0),
             }
