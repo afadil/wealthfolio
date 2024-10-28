@@ -56,7 +56,7 @@ pub async fn create_activity(
     activity: NewActivity,
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
-    println!("Adding new activity... {:?}", activity);
+    println!("Adding new activity...");
     let mut conn = state
         .pool
         .get()
