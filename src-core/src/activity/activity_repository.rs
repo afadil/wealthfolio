@@ -1,9 +1,9 @@
 use crate::{
     models::{
         Activity, ActivityDetails, ActivitySearchResponse, ActivitySearchResponseMeta,
-        ActivityUpdate, NewActivity, Sort,
+        ActivityUpdate, ImportMapping, NewActivity, Sort,
     },
-    schema::{accounts, activities, assets},
+    schema::{accounts, activities, activity_import_profiles, assets},
 };
 use chrono::NaiveDate;
 use diesel::prelude::*;
@@ -239,5 +239,35 @@ impl ActivityRepository {
                 activities::activity_date,
             )))
             .first::<Option<NaiveDate>>(conn)
+    }
+
+    pub fn get_import_mapping(
+        &self,
+        conn: &mut SqliteConnection,
+        some_account_id: &str,
+    ) -> Result<Option<ImportMapping>, diesel::result::Error> {
+        activity_import_profiles::table
+            .filter(activity_import_profiles::account_id.eq(some_account_id))
+            .first::<ImportMapping>(conn)
+            .optional()
+    }
+
+    pub fn save_import_mapping(
+        &self,
+        conn: &mut SqliteConnection,
+        mapping: &ImportMapping,
+    ) -> Result<(), diesel::result::Error> {
+        diesel::insert_into(activity_import_profiles::table)
+            .values(mapping)
+            .on_conflict(activity_import_profiles::account_id)
+            .do_update()
+            .set((
+                activity_import_profiles::field_mappings.eq(&mapping.field_mappings),
+                activity_import_profiles::activity_mappings.eq(&mapping.activity_mappings),
+                activity_import_profiles::symbol_mappings.eq(&mapping.symbol_mappings),
+                activity_import_profiles::updated_at.eq(&mapping.updated_at),
+            ))
+            .execute(conn)?;
+        Ok(())
     }
 }

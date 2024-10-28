@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
@@ -5,6 +6,7 @@ import { ApplicationShell } from '@/components/shell';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
+import IntervalSelector from '@/components/interval-selector';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -25,6 +27,7 @@ import { AccountContributionLimit } from './account-contribution-limit';
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
+  const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
 
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
     queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
@@ -140,7 +143,15 @@ const AccountPage = () => {
                     <Skeleton className="h-8 w-full" />
                   </div>
                 ) : (
-                  <HistoryChart data={accountHistory || []} />
+                  <div className="h-[400px] w-full">
+                    <HistoryChart data={accountHistory || []} interval={interval} />
+                    <IntervalSelector
+                      className="relative bottom-10 left-0 right-0 z-10"
+                      onIntervalSelect={(newInterval) => {
+                        setInterval(newInterval);
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -156,14 +167,11 @@ const AccountPage = () => {
           </div>
         )}
       </div>
-      <div className="pt-6">
-        <AccountHoldings
-          holdings={(accountHoldings || []).filter(
-            (holding) => !holding.symbol.startsWith('$CASH'),
-          )}
-          isLoading={isLoadingHoldings}
-        />
-      </div>
+
+      <AccountHoldings
+        holdings={(accountHoldings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}
+        isLoading={isLoadingHoldings}
+      />
     </ApplicationShell>
   );
 };

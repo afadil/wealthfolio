@@ -34,11 +34,14 @@ const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
     0,
   );
 
+  const totalGainPercent =
+    totalNetDeposit !== 0 ? ((totalValue - totalNetDeposit) / totalNetDeposit) * 100 : 0;
+
   return {
     baseCurrency: accountsInCategory[0].performance.baseCurrency,
     totalMarketValue,
     totalCashBalance,
-    totalGainPercent: ((totalValue - totalNetDeposit) / totalNetDeposit) * 100,
+    totalGainPercent,
     totalGainAmount: totalValue - totalNetDeposit,
     numberOfAccounts: accountsInCategory.length,
   };

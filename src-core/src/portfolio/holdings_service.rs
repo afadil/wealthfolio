@@ -167,7 +167,12 @@ impl HoldingsService {
         holdings: &HashMap<String, Holding>,
     ) -> Result<HashMap<String, Quote>> {
 
-        let unique_symbols: HashSet<String> = holdings.values().map(|h| h.symbol.clone()).collect();
+        let unique_symbols: HashSet<String> = holdings
+            .values()
+            .map(|h| h.symbol.clone())
+            .filter(|symbol| !symbol.starts_with("$CASH-"))
+            .collect();
+
         let mut quotes = HashMap::new();
 
         for symbol in unique_symbols {

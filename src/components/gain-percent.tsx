@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Icons } from '@/components/icons';
-import { cn, formatPercent } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import NumberFlow from '@number-flow/react';
 
 interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
@@ -24,7 +25,14 @@ export function GainPercent({ value, className, ...props }: GainPercentProps) {
         ) : (
           <Icons.ArrowRight className="h-3 w-3" />
         )}
-        {formatPercent(Math.abs(value))}
+        <NumberFlow
+          value={value / 100}
+          format={{
+            style: 'percent',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }}
+        />
       </div>
     </div>
   );

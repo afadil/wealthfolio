@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { Account, ActivityImport } from '@/lib/types';
 import { formatAmount, formatDateTime, toPascalCase } from '@/lib/utils';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import { DataTableFacetedFilterProps } from '@/components/ui/data-table/data-table-faceted-filter';
 
 export const ImportedActivitiesTable = ({
   activities,
@@ -47,7 +48,7 @@ export const ImportedActivitiesTable = ({
       title: 'Type',
       options: activitiesType,
     },
-  ];
+  ] satisfies DataTableFacetedFilterProps<ActivityImport, string>[];
 
   const defaultSorting: SortingState = [
     {
@@ -83,13 +84,13 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'isValid',
     header: ({ column }) => <DataTableColumnHeader column={column} title="" />,
     cell: ({ row }) => {
-      const isValid = row.getValue('isValid') as string;
+      const isValid = row.getValue('isValid') as boolean;
       const error = row.getValue('error') as string;
       const lineNumber = row.getValue('lineNumber') as number;
 
       return (
         <div className="flex items-center">
-          {isValid === 'true' ? (
+          {isValid ? (
             <Icons.CheckCircle className="h-4 w-4 text-success" />
           ) : (
             <TooltipProvider>
@@ -97,8 +98,8 @@ export const columns: ColumnDef<ActivityImport>[] = [
                 <TooltipTrigger asChild>
                   <Icons.XCircle className="h-4 w-4 cursor-help text-destructive" />
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-destructive">{error}</p>
+                <TooltipContent className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive">
+                  {error}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -107,14 +108,15 @@ export const columns: ColumnDef<ActivityImport>[] = [
         </div>
       );
     },
-    filterFn: (row, id, value: string) => {
-      const isValid = row.getValue(id) as any;
-      return value.includes(isValid);
+    filterFn: (row, id, filterValue: string[]) => {
+      const isValid = row.getValue(id) as boolean;
+      const filterBoolean = filterValue[0] === 'true';
+      return isValid === filterBoolean;
     },
     sortingFn: (rowA, rowB, id) => {
-      const statusA = rowA.getValue(id) as any;
-      const statusB = rowB.getValue(id) as any;
-      return statusA.localeCompare(statusB);
+      const statusA = rowA.getValue(id) as boolean;
+      const statusB = rowB.getValue(id) as boolean;
+      return statusA === statusB ? 0 : statusA ? -1 : 1;
     },
   },
   {
@@ -122,8 +124,8 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'date',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
     cell: ({ row }) => {
-      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const formattedDate = formatDateTime(row.getValue('date'), userTimezone);
+      // const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const formattedDate = formatDateTime(row.getValue('date'));
       return (
         <div className="ml-2 flex flex-col">
           <span>{formattedDate.date}</span>
@@ -277,24 +279,5 @@ export const columns: ColumnDef<ActivityImport>[] = [
     accessorKey: 'currency',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
     cell: ({ row }) => <div>{row.getValue('currency')}</div>,
-  },
-  {
-    id: 'account',
-    accessorKey: 'account',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
-    cell: ({ row }) => {
-      return (
-        <div className="ml-2 flex flex-col">
-          <span>{row.getValue('accountName')}</span>
-          <span className="text-xs font-light">{row.getValue('currency')}</span>
-        </div>
-      );
-    },
-  },
-  {
-    id: 'actions',
-    cell: () => {
-      return <div>...</div>;
-    },
   },
 ];

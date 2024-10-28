@@ -370,4 +370,21 @@ impl MarketDataService {
 
         Ok(from_usd / to_usd)
     }
+
+    pub fn get_quote_history(
+        &self,
+        conn: &mut SqliteConnection,
+        a_symbol: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>, diesel::result::Error> {
+        use crate::schema::quotes::dsl::*;
+
+        quotes
+            .filter(symbol.eq(a_symbol))
+            .filter(date.ge(start_date.and_hms_opt(0, 0, 0).unwrap()))
+            .filter(date.le(end_date.and_hms_opt(23, 59, 59).unwrap()))
+            .order(date.asc())
+            .load::<Quote>(conn)
+    }
 }

@@ -8,7 +8,7 @@ import { ActivityImportForm } from './import-form';
 import ValidationAlert from './import-validation-alert';
 import { ImportHelpPopover } from './import-help';
 import ImportedActivitiesTable from './imported-activity-table';
-import { useActivityImportMutations } from './useActivityImportMutations';
+import { useActivityImportMutations } from './hooks/useActivityImportMutations';
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();
@@ -37,14 +37,14 @@ const ActivityImportPage = () => {
     const newActivities = activities.map((activity) => ({
       id: activity.id,
       accountId: activity.accountId || '',
-      activityDate: new Date(activity.date),
+      activityDate: activity.date ? new Date(activity.date) : new Date(),
       currency: activity.currency,
       fee: activity.fee,
-      isDraft: activity?.isDraft === 'true',
+      isDraft: activity?.isDraft,
       quantity: activity.quantity,
       assetId: activity.symbol,
       activityType: activity.activityType as any,
-      unitPrice: activity.unitPrice,
+      unitPrice: activity.amount ? activity.amount : activity.unitPrice,
       comment: activity.comment,
     }));
 
@@ -55,7 +55,7 @@ const ActivityImportPage = () => {
         navigate('/activities');
       },
       onError: (error: any) => {
-        setError(error);
+        setError(error.message);
       },
     });
   }
