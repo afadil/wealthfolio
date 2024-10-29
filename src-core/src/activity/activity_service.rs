@@ -254,15 +254,15 @@ impl ActivityService {
 
             // Load the symbol profile
             let symbol_profile_result = asset_service
-                .get_or_create_asset(conn, &activity_import.symbol)
+                .get_or_create_asset(conn, &activity.symbol)
                 .await;
 
             // Check if symbol profile is valid
             let (is_valid, error) = match symbol_profile_result {
                 Ok(profile) => {
-                    activity_import.symbol_name = profile.name;
+                    activity.symbol_name = profile.name;
                     let asset_copy = Asset {
-                        symbol: activity_import.symbol.clone(),
+                        symbol: activity.symbol.clone(),
                         currency: profile.currency.clone(),
                         asset_type: profile.asset_type.clone(),
                         data_source: profile.data_source.clone(),
