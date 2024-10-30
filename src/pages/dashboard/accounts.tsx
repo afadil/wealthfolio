@@ -79,12 +79,18 @@ const AccountSummaryComponent = ({
       <div className="flex items-center">
         <div className="flex flex-col items-end">
           <p className="font-medium leading-none">
-            {formatAmount(
-              accountSummary.performance.totalValue ||
-                accountSummary.performance.totalMarketValue +
-                  accountSummary.performance.totalCashBalance,
-              accountSummary.account.currency,
-            )}
+            {isGroup
+              ? formatAmount(
+                  accountSummary.performance.totalValue ||
+                    accountSummary.performance.totalMarketValue +
+                      accountSummary.performance.totalCashBalance,
+                  accountSummary.account.currency,)
+              : formatAmount(
+                accountSummary.performance.totalValue ||
+                  accountSummary.performance.marketValue +
+                    accountSummary.performance.availableCash,
+                accountSummary.account.currency,)
+            }
           </p>
           {(accountSummary.performance.totalGainPercentage !== 0 ||
             accountSummary.performance.totalGainPercent !== 0) && (
