@@ -193,7 +193,9 @@ export function ActivityForm({ accounts, defaultValues, onSuccess = () => {} }: 
           ) : watchedType === 'DIVIDEND' ? (
             <DividendActivityFields defaultAssetId={defaultValues?.assetId} />
           ) : (
-            <AssetActivityFields defaultAssetId={defaultValues?.assetId} />
+            <AssetActivityFields
+              defaultAssetId={defaultValues?.assetId}
+              isPublicAsset={defaultValues?.assetDataSource != "Private"} />
           )}
         </div>
         <DialogFooter>
@@ -272,12 +274,13 @@ const CashActivityFields = ({ currentAccountCurrency }: CashActivityFieldsProps)
 
 interface AssetActivityFieldsProps {
   defaultAssetId?: string;
+  isPublicAsset?: boolean;
 }
 
-const AssetActivityFields = ({ defaultAssetId }: AssetActivityFieldsProps) => {
+const AssetActivityFields = ({ defaultAssetId, isPublicAsset }: AssetActivityFieldsProps) => {
   const { control, watch, setValue } = useFormContext();
   const watchedType = watch('activityType');
-  const watchedUseSymbolLookup = watch('isPublic', true); // Default to true if not set
+  const watchedUseSymbolLookup = watch('isPublic', isPublicAsset); // Default to true if not set
 
   useEffect(() => {
     if (!watchedUseSymbolLookup) {

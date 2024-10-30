@@ -23,6 +23,7 @@ export function ActivityEditModal({ accounts, activity, open, onClose }: Activit
     assetId: activity?.assetId || '',
     comment: activity?.comment || '',
     currency: activity?.currency || '',
+    assetDataSource: activity?.assetDataSource || '',
   };
 
   return (

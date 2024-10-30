@@ -272,6 +272,7 @@ pub struct ActivityDetails {
     pub account_currency: String,
     pub asset_symbol: String,
     pub asset_name: Option<String>,
+    pub asset_data_source: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
