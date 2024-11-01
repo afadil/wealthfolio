@@ -26,7 +26,6 @@ export function useCalculateHistoryMutation({
     },
     onError: (error) => {
       queryClient.invalidateQueries();
-      console.error(error);
       toast({
         title: errorTitle,
         description: 'Please try again or report an issue if the problem persists.',
@@ -54,7 +53,6 @@ export function useRecalculatePortfolioMutation({
     },
     onError: (error) => {
       queryClient.invalidateQueries();
-      console.error(error);
       toast({
         title: errorTitle,
         description: 'Please try again or report an issue if the problem persists.',

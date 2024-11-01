@@ -1,6 +1,6 @@
 import type { ExchangeRate } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-
+import { error as logError } from '@tauri-apps/plugin-log';
 export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
   try {
     switch (getRunEnv()) {
@@ -10,7 +10,7 @@ export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
         throw new Error('Unsupported environment');
     }
   } catch (error) {
-    console.error('Error fetching exchange rates:', error);
+    logError('Error fetching exchange rates.');
     return [];
   }
 };
@@ -24,7 +24,7 @@ export const updateExchangeRate = async (updatedRate: ExchangeRate): Promise<Exc
         throw new Error('Unsupported environment');
     }
   } catch (error) {
-    console.error('Error updating exchange rate:', error);
+    logError('Error updating exchange rate.');
     throw error;
   }
 };
@@ -38,7 +38,7 @@ export const addExchangeRate = async (newRate: Omit<ExchangeRate, 'id'>): Promis
         throw new Error('Unsupported environment');
     }
   } catch (error) {
-    console.error('Error adding exchange rate:', error);
+    logError('Error adding exchange rate.');
     throw error;
   }
 };
@@ -52,7 +52,7 @@ export const deleteExchangeRate = async (rateId: string): Promise<void> => {
         throw new Error('Unsupported environment');
     }
   } catch (error) {
-    console.error('Error deleting exchange rate:', error);
+    logError('Error deleting exchange rate.');
     throw error;
   }
 };

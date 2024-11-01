@@ -1,5 +1,6 @@
 import { ContributionLimit, NewContributionLimit, DepositsCalculation } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
+import { error as logError } from '@tauri-apps/plugin-log';
 
 export const getContributionLimit = async (): Promise<ContributionLimit[]> => {
   try {
@@ -10,7 +11,7 @@ export const getContributionLimit = async (): Promise<ContributionLimit[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching contribution limits:', error);
+    logError('Error fetching contribution limits.');
     throw error;
   }
 };
@@ -26,7 +27,7 @@ export const createContributionLimit = async (
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error creating contribution limit:', error);
+    logError('Error creating contribution limit.');
     throw error;
   }
 };
@@ -43,7 +44,7 @@ export const updateContributionLimit = async (
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error updating contribution limit:', error);
+    logError('Error updating contribution limit.');
     throw error;
   }
 };
@@ -57,7 +58,7 @@ export const deleteContributionLimit = async (id: string): Promise<void> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error deleting contribution limit:', error);
+    logError('Error deleting contribution limit.');
     throw error;
   }
 };
@@ -74,7 +75,7 @@ export const calculateDepositsForAccounts = async (
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error calculating deposits for accounts:', error);
+    logError('Error calculating deposits for accounts.');
     throw error;
   }
 };

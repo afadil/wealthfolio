@@ -2,7 +2,7 @@ import z from 'zod';
 import { Goal, GoalAllocation } from '@/lib/types';
 import { newGoalSchema } from '@/lib/schemas';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-
+import { error as logError } from '@tauri-apps/plugin-log';
 type NewGoal = z.infer<typeof newGoalSchema>;
 
 export const getGoals = async (): Promise<Goal[]> => {
@@ -14,7 +14,7 @@ export const getGoals = async (): Promise<Goal[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching goals:', error);
+    logError('Error fetching goals.');
     throw error;
   }
 };
@@ -34,7 +34,7 @@ export const createGoal = async (goal: NewGoal): Promise<Goal> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error creating goal:', error);
+    logError('Error creating goal.');
     throw error;
   }
 };
@@ -48,7 +48,7 @@ export const updateGoal = async (goal: Goal): Promise<Goal> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error updating goal:', error);
+    logError('Error updating goal.');
     throw error;
   }
 };
@@ -63,7 +63,7 @@ export const deleteGoal = async (goalId: string): Promise<void> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error deleting goal:', error);
+    logError('Error deleting goal.');
     throw error;
   }
 };
@@ -78,7 +78,7 @@ export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Pro
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error saving goals allocations:', error);
+    logError('Error saving goals allocations.');
     throw error;
   }
 };
@@ -90,9 +90,9 @@ export const getGoalsAllocation = async (): Promise<GoalAllocation[]> => {
         return invokeTauri('load_goals_allocations');
       default:
         throw new Error(`Unsupported`);
-    };
+    }
   } catch (error) {
-    console.error('Error fetching goals allocations:', error);
+    logError('Error fetching goals allocations.');
     throw error;
   }
 };

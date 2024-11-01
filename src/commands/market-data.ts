@@ -1,6 +1,6 @@
 import { AssetData, QuoteSummary, Asset } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-
+import { error as logError } from '@tauri-apps/plugin-log';
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   try {
     switch (getRunEnv()) {
@@ -10,7 +10,7 @@ export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error searching for ticker:', error);
+    logError('Error searching for ticker.');
     throw error;
   }
 };
@@ -25,7 +25,7 @@ export const syncHistoryQuotes = async (): Promise<void> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error syncing history quotes:', error);
+    logError('Error syncing history quotes.');
     throw error;
   }
 };
@@ -39,7 +39,7 @@ export const getAssetData = async (assetId: string): Promise<AssetData> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error loading asset data:', error);
+    logError('Error loading asset data.');
     throw error;
   }
 };
@@ -59,7 +59,7 @@ export const updateAssetProfile = async (payload: {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error updating asset profile:', error);
+    logError('Error updating asset profile.');
     throw error;
   }
 };

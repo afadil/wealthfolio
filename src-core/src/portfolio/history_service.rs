@@ -1,13 +1,15 @@
-use crate::error::{PortfolioError, Result};
+use crate::errors::{CurrencyError, Error, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Account, Activity, HistorySummary, PortfolioHistory, Quote};
 use chrono::{Duration, NaiveDate, Utc};
+use diesel::result::Error as DieselError;
 
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel::sql_types::Text;
 use diesel::SqliteConnection;
+use log::warn;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::default::Default;
@@ -47,10 +49,7 @@ impl HistoryService {
     ) -> Result<Vec<PortfolioHistory>> {
         use crate::schema::portfolio_history::dsl::*;
 
-        let result = portfolio_history
-            .load::<PortfolioHistory>(conn)
-            .map_err(PortfolioError::from)?;
-
+        let result = portfolio_history.load::<PortfolioHistory>(conn)?;
         Ok(result)
     }
 
@@ -67,10 +66,8 @@ impl HistoryService {
             query = query.filter(account_id.eq(other_id));
         }
 
-        query
-            .order(date.asc())
-            .load::<PortfolioHistory>(conn)
-            .map_err(PortfolioError::from)
+        let result = query.order(date.asc()).load::<PortfolioHistory>(conn)?;
+        Ok(result)
     }
 
     pub fn get_latest_account_history(
@@ -80,11 +77,12 @@ impl HistoryService {
     ) -> Result<PortfolioHistory> {
         use crate::schema::portfolio_history::dsl::*;
 
-        portfolio_history
+        let result = portfolio_history
             .filter(account_id.eq(input_account_id))
             .order(date.desc())
-            .first(conn)
-            .map_err(PortfolioError::from)
+            .first(conn)?;
+
+        Ok(result)
     }
 
     pub fn calculate_historical_data(
@@ -176,7 +174,7 @@ impl HistoryService {
     fn initialize_fx_service(&self, conn: &mut SqliteConnection) -> Result<()> {
         self.fx_service
             .initialize(conn)
-            .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))
+            .map_err(|e| Error::Currency(CurrencyError::ConversionFailed(e.to_string())))
     }
 
     fn group_activities_by_account(
@@ -277,12 +275,21 @@ impl HistoryService {
         let mut last_histories = Vec::new();
 
         for account_id in &account_ids {
-            let history: QueryResult<PortfolioHistory> = diesel::sql_query(query)
+            let history = diesel::sql_query(query)
                 .bind::<Text, _>(account_id)
-                .get_result(conn);
+                .get_result::<PortfolioHistory>(conn);
 
-            if let Ok(history) = history {
-                last_histories.push(history);
+            match history {
+                Ok(history) => {
+                    last_histories.push(history);
+                }
+                Err(DieselError::NotFound) => {
+                    // Skip if no history found for this account
+                    warn!("No history found for account {}", account_id);
+                }
+                Err(e) => {
+                    return Err(Error::from(e));
+                }
             }
         }
 
@@ -773,8 +780,7 @@ impl HistoryService {
                     holdings.eq(&record.holdings),
                     calculated_at.eq(record.calculated_at),
                 ))
-                .execute(conn)
-                .map_err(PortfolioError::from)?;
+                .execute(conn)?;
         }
 
         Ok(())
@@ -877,9 +883,7 @@ impl HistoryService {
         let mut account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
         account_ids.push("TOTAL".to_string());
 
-        delete(portfolio_history.filter(account_id.eq_any(account_ids)))
-            .execute(conn)
-            .map_err(PortfolioError::from)?;
+        delete(portfolio_history.filter(account_id.eq_any(account_ids))).execute(conn)?;
 
         Ok(())
     }

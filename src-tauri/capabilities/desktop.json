@@ -1,15 +1,42 @@
 {
   "identifier": "desktop-capability",
+  "description": "desktop-capability",
+  "local": true,
+  "windows": [
+    "main"
+  ],
   "platforms": [
     "macOS",
     "windows",
     "linux"
   ],
   "permissions": [
+    "core:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-copy-file",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$APPDATA/**"
+      ]
+    },
+    "core:window:allow-start-dragging",
+    "shell:allow-open",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:default",
     "dialog:default",
     "shell:default",
     "core:app:allow-set-app-theme",
     "core:window:allow-set-theme",
-    "updater:default"
+    "updater:default",
+    "log:default"
   ]
 }

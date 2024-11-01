@@ -65,7 +65,11 @@ pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -79,19 +83,18 @@ pub fn main() {
                 .expect("failed to convert path to string")
                 .to_string();
 
-            let db_path = db::init(&app_data_dir);
+            let db_path = db::init(&app_data_dir).expect("Failed to initialize database");
+
+            let pool = db::create_pool(&db_path).expect("Failed to create database pool");
 
             let menu = menu::create_menu(&app.handle())?;
             app.set_menu(menu)?;
 
-            // Create connection pool
-            let pool = db::create_pool(&db_path);
-
-            // // Get initial base_currency from settings
+            // Get initial base_currency from settings
             let mut conn = pool.get().expect("Failed to get database connection");
             let settings_service = settings::SettingsService::new();
 
-            // // Get instance_id from settings
+            // Get instance_id from settings
             let settings = settings_service.get_settings(&mut conn)?;
             let instance_id = settings.instance_id.clone();
 
@@ -218,7 +221,7 @@ async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), Str
         .expect("failed to convert path to string")
         .to_string();
 
-    let backup_path = db::backup_database(&app_data_dir)?;
+    let backup_path = db::backup_database(&app_data_dir).map_err(|e| e.to_string())?;
 
     // Read the backup file
     let mut file =

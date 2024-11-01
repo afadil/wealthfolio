@@ -6,6 +6,7 @@ import {
   PortfolioHistory,
   AccountSummary,
 } from '@/lib/types';
+import { error as logError } from '@tauri-apps/plugin-log';
 
 export const calculateHistoricalData = async (params: {
   accountIds?: string[];
@@ -19,7 +20,7 @@ export const calculateHistoricalData = async (params: {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error calculating historical data:', error);
+    logError('Error calculating historical data.');
     throw error;
   }
 };
@@ -33,7 +34,7 @@ export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error recalculating portfolio:', error);
+    logError('Error recalculating portfolio.');
     throw error;
   }
 };
@@ -47,7 +48,7 @@ export const computeHoldings = async (): Promise<Holding[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error computing holdings:', error);
+    logError('Error computing holdings.');
     throw error;
   }
 };
@@ -61,7 +62,7 @@ export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching income summary:', error);
+    logError('Error fetching income summary.');
     throw error;
   }
 };
@@ -75,7 +76,7 @@ export const getHistory = async (accountId?: string): Promise<PortfolioHistory[]
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching portfolio history:', error);
+    logError('Error fetching portfolio history.');
     throw error;
   }
 };
@@ -89,7 +90,7 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching active accounts summary:', error);
+    logError('Error fetching active accounts summary.');
     throw error;
   }
 };

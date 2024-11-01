@@ -2,6 +2,7 @@ import z from 'zod';
 import { Activity, ActivityDetails, ActivitySearchResponse } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 import { newActivitySchema } from '@/lib/schemas';
+import { error as logError } from '@tauri-apps/plugin-log';
 
 export type NewActivity = z.infer<typeof newActivitySchema>;
 
@@ -24,7 +25,7 @@ export const getActivities = async (): Promise<ActivityDetails[]> => {
     });
     return response.data;
   } catch (error) {
-    console.error('Error fetching all activities:', error);
+    logError('Error fetching all activities.');
     throw error;
   }
 };
@@ -51,7 +52,7 @@ export const searchActivities = async (
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching activities:', error);
+    logError('Error fetching activities.');
     throw error;
   }
 };
@@ -66,7 +67,7 @@ export const createActivity = async (activity: NewActivity): Promise<Activity> =
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error creating activity:', error);
+    logError('Error creating activity.');
     throw error;
   }
 };
@@ -81,7 +82,7 @@ export const updateActivity = async (activity: NewActivity): Promise<Activity> =
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error updating activity:', error);
+    logError('Error updating activity.');
     throw error;
   }
 };
@@ -96,7 +97,7 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error deleting activity:', error);
+    logError('Error deleting activity.');
     throw error;
   }
 };
