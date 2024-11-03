@@ -8,14 +8,14 @@ import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import {
   Form,
   FormControl,
@@ -121,16 +121,16 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[625px]">
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent className="sm:max-w-[625px]">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <DialogHeader>
-              <DialogTitle> {activity?.id ? 'Update Activity' : 'Add Activity'}</DialogTitle>
-              <DialogDescription>
+            <SheetHeader>
+              <SheetTitle>{activity?.id ? 'Update Activity' : 'Add Activity'}</SheetTitle>
+              <SheetDescription>
                 {activity?.id ? 'Update transaction details' : 'Record a new account transaction.'}
-              </DialogDescription>
-            </DialogHeader>
+              </SheetDescription>
+            </SheetHeader>
 
             <div className="grid gap-6 p-4">
               {addActivityMutation.error && (
@@ -220,12 +220,12 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                 <AssetActivityFields />
               )}
             </div>
-            <DialogFooter>
-              <DialogTrigger asChild>
+            <SheetFooter>
+              <SheetTrigger asChild>
                 <Button variant="outline" disabled={isLoading}>
                   Cancel
                 </Button>
-              </DialogTrigger>
+              </SheetTrigger>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
@@ -238,11 +238,11 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                   {activity?.id ? 'Update Activity' : 'Add Activity'}
                 </span>
               </Button>
-            </DialogFooter>
+            </SheetFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -390,7 +390,7 @@ const AssetActivityFields = () => {
             name="quantity"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Sharess</FormLabel>
+                <FormLabel>Shares</FormLabel>
                 <FormControl>
                   <QuantityInput {...field} />
                 </FormControl>
