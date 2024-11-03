@@ -29,7 +29,7 @@ export function CurrencyInput({ value, onChange }: CurrencyInputProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('justify-between', !value && 'text-muted-foreground')}
+          className={cn('w-full justify-between', !value && 'text-muted-foreground')}
         >
           {value
             ? worldCurrencies.find((currency) => currency.value === value)?.label

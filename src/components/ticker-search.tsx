@@ -13,6 +13,7 @@ import { Icons } from './icons';
 interface SearchProps {
   selectedResult?: QuoteSummary;
   defaultValue?: string;
+  value?: string;
   onSelectResult: (symbol: string) => void;
 }
 
@@ -25,15 +26,18 @@ interface SearchResultsProps {
   onSelect: (symbol: QuoteSummary) => void;
 }
 
-function TickerSearchInput({ selectedResult, defaultValue, onSelectResult }: SearchProps) {
+function TickerSearchInput({ selectedResult, defaultValue, value, onSelectResult }: SearchProps) {
   const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(defaultValue || '');
+  const [searchQuery, setSearchQuery] = useState(defaultValue || value || '');
   const [selected, setSelected] = useState(() => {
     if (selectedResult) {
       return `${selectedResult.symbol} - ${selectedResult.longName}`;
     }
     if (defaultValue) {
       return defaultValue;
+    }
+    if (value) {
+      return value;
     }
     return '';
   });

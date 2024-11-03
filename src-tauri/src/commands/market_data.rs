@@ -8,7 +8,6 @@ use wealthfolio_core::models::Asset;
 
 #[tauri::command]
 pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
-    println!("Searching for ticker symbol: {}", query);
     let service = MarketDataService::new().await;
 
     service

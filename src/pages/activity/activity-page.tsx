@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ActivityEditModal } from './components/activity-edit-modal';
 import ActivityTable from './components/activity-table';
 import { useQuery } from '@tanstack/react-query';
 import { Account, ActivityDetails } from '@/lib/types';
@@ -12,11 +11,12 @@ import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { QueryKeys } from '@/lib/query-keys';
 import { useActivityMutations } from './hooks/useActivityMutations';
+import { ActivityForm } from './components/activity-form';
 
 const ActivityPage = () => {
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityDetails | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<any>();
 
   const { data: accounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -25,27 +25,26 @@ const ActivityPage = () => {
 
   const { deleteActivityMutation } = useActivityMutations();
 
-  const handleEdit = useCallback(
-    (activity?: ActivityDetails) => {
-      setSelectedActivity(activity);
-      setShowEditModal(!showEditModal);
-    },
-    [showEditModal],
-  );
+  const handleEdit = useCallback((activity?: ActivityDetails) => {
+    setSelectedActivity(activity);
+    setShowForm(true);
+  }, []);
 
-  const handleDelete = useCallback(
-    (activity: ActivityDetails) => {
-      setSelectedActivity(activity);
-      setShowDeleteAlert(true);
-    },
-    [showDeleteAlert],
-  );
+  const handleDelete = useCallback((activity: ActivityDetails) => {
+    setSelectedActivity(activity);
+    setShowDeleteAlert(true);
+  }, []);
 
   const handleDeleteConfirm = async () => {
-    await deleteActivityMutation.mutateAsync(selectedActivity.id);
+    await deleteActivityMutation.mutateAsync(selectedActivity!.id);
     setShowDeleteAlert(false);
-    setSelectedActivity(null);
+    setSelectedActivity(undefined);
   };
+
+  const handleFormClose = useCallback(() => {
+    setShowForm(false);
+    setSelectedActivity(undefined);
+  }, []);
 
   return (
     <div className="flex flex-col p-6">
@@ -57,7 +56,7 @@ const ActivityPage = () => {
               Upload CSV
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
             Add Manually
           </Button>
@@ -71,7 +70,7 @@ const ActivityPage = () => {
           handleDelete={handleDelete}
         />
       </div>
-      <ActivityEditModal
+      <ActivityForm
         accounts={
           accounts
             ?.filter((acc) => acc.isActive)
@@ -82,19 +81,16 @@ const ActivityPage = () => {
             })) || []
         }
         activity={selectedActivity}
-        open={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedActivity(null);
-        }}
+        open={showForm}
+        onClose={handleFormClose}
       />
       <ActivityDeleteModal
         isOpen={showDeleteAlert}
-        isDeleting={false}
+        isDeleting={deleteActivityMutation.isPending}
         onConfirm={handleDeleteConfirm}
         onCancel={() => {
           setShowDeleteAlert(false);
-          setSelectedActivity(null);
+          setSelectedActivity(undefined);
         }}
       />
     </div>

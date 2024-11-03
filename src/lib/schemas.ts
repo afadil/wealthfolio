@@ -49,7 +49,7 @@ const baseActivitySchema = z.object({
       invalid_type_error: 'Fee must be a positive number.',
     })
     .min(0, { message: 'Fee must be a non-negative number.' }),
-  isDraft: z.boolean(),
+  isDraft: z.boolean().optional().default(false),
   quantity: z.coerce
     .number({
       required_error: 'Please enter a valid quantity.',
@@ -85,7 +85,7 @@ const baseActivitySchema = z.object({
       invalid_type_error: 'Price must be a non-negative number.',
     })
     .min(0, { message: 'Price must be a non-negative number.' }),
-  comment: z.string().optional(),
+  comment: z.string().optional().nullable(),
 });
 
 export const newActivitySchema = baseActivitySchema.extend({
