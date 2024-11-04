@@ -1,11 +1,12 @@
 use crate::account::account_service::AccountService;
 use crate::models::{Account, AccountUpdate, NewAccount};
 use crate::AppState;
+use log::debug;
 use tauri::State;
 
 #[tauri::command]
 pub async fn get_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, String> {
-    println!("Fetching active accounts...");
+    debug!("Fetching active accounts...");
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = AccountService::new(base_currency);
     let mut conn = state
@@ -22,7 +23,7 @@ pub async fn create_account(
     account: NewAccount,
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
-    println!("Adding new account...");
+    debug!("Adding new account...");
     let mut conn = state
         .pool
         .get()
@@ -40,7 +41,7 @@ pub async fn update_account(
     account: AccountUpdate,
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
-    println!("Updating account...");
+    debug!("Updating account...");
     let mut conn = state
         .pool
         .get()
@@ -57,7 +58,7 @@ pub async fn delete_account(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    println!("Deleting account...");
+    debug!("Deleting account...");
     let base_currency = state.base_currency.read().unwrap().clone();
     let service = AccountService::new(base_currency);
     let mut conn = state

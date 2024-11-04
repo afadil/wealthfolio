@@ -25,6 +25,7 @@ use commands::settings::{
     get_settings, update_contribution_limit, update_exchange_rate, update_settings,
 };
 
+use log::error;
 use updater::check_for_update;
 use wealthfolio_core::db;
 use wealthfolio_core::models;
@@ -178,12 +179,12 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
         let portfolio_service = match portfolio::PortfolioService::new(base_currency).await {
             Ok(service) => service,
             Err(e) => {
-                eprintln!("Failed to create PortfolioService: {}", e);
+                error!("Failed to create PortfolioService: {}", e);
                 if let Err(emit_err) = app_handle.emit(
                     "PORTFOLIO_SERVICE_ERROR",
                     "Failed to initialize PortfolioService",
                 ) {
-                    eprintln!("Failed to emit PORTFOLIO_SERVICE_ERROR event: {}", emit_err);
+                    error!("Failed to emit PORTFOLIO_SERVICE_ERROR event: {}", emit_err);
                 }
                 return;
             }
@@ -198,13 +199,13 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
         match portfolio_service.update_portfolio(&mut conn).await {
             Ok(_) => {
                 if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_COMPLETE", ()) {
-                    eprintln!("Failed to emit PORTFOLIO_UPDATE_COMPLETE event: {}", e);
+                    error!("Failed to emit PORTFOLIO_UPDATE_COMPLETE event: {}", e);
                 }
             }
             Err(e) => {
-                eprintln!("Failed to update portfolio: {}", e);
+                error!("Failed to update portfolio: {}", e);
                 if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_ERROR", &e.to_string()) {
-                    eprintln!("Failed to emit PORTFOLIO_UPDATE_ERROR event: {}", e);
+                    error!("Failed to emit PORTFOLIO_UPDATE_ERROR event: {}", e);
                 }
             }
         }

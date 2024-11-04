@@ -6,6 +6,7 @@ use crate::{
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Utc};
 use diesel::dsl::min;
 use diesel::prelude::*;
+use log::{debug, error};
 pub struct IncomeService {
     fx_service: CurrencyExchangeService,
     base_currency: String,
@@ -65,12 +66,12 @@ impl IncomeService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<IncomeSummary>, diesel::result::Error> {
-        println!("Getting income summary...");
+        debug!("Getting income summary...");
 
         let activities = match self.get_income_activities(conn) {
             Ok(activity) => activity,
             Err(e) => {
-                println!("Error getting aggregated income data: {:?}", e);
+                error!("Error getting aggregated income data: {:?}", e);
                 return Err(e);
             }
         };
@@ -89,7 +90,7 @@ impl IncomeService {
         let oldest_date = match self.get_first_transaction_date(conn) {
             Ok(date) => date,
             Err(e) => {
-                println!("Error getting first transaction date: {:?}", e);
+                error!("Error getting first transaction date: {:?}", e);
                 return Err(e);
             }
         };
@@ -121,7 +122,7 @@ impl IncomeService {
             {
                 Ok(d) => d,
                 Err(e) => {
-                    println!("Error parsing date {}: {:?}", activity.date, e);
+                    error!("Error parsing date {}: {:?}", activity.date, e);
                     continue;
                 }
             };
@@ -132,7 +133,7 @@ impl IncomeService {
             ) {
                 Ok(amount) => amount,
                 Err(e) => {
-                    println!("Error converting currency: {:?}", e);
+                    error!("Error converting currency: {:?}", e);
                     activity.amount
                 }
             };
@@ -167,7 +168,7 @@ impl IncomeService {
         // Two years ago YoY growth can't be calculated without activity from three years ago
         two_years_ago_summary.yoy_growth = None;
 
-        println!("Income summary calculation completed successfully");
+        debug!("Income summary calculation completed successfully");
         Ok(vec![
             total_summary,
             ytd_summary,

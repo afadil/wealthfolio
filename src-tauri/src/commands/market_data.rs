@@ -3,6 +3,7 @@ use crate::market_data::market_data_service::MarketDataService;
 
 use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
 use crate::AppState;
+use log::debug;
 use tauri::State;
 use wealthfolio_core::models::Asset;
 
@@ -49,7 +50,7 @@ pub async fn update_asset_profile(
 
 #[tauri::command]
 pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
-    println!("Synching quotes history");
+    debug!("Synching quotes history");
     let mut conn = state
         .pool
         .get()

@@ -3,6 +3,7 @@ use crate::models::{Asset, AssetProfile, NewAsset, Quote, UpdateAssetProfile};
 use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
+use log::{debug, error};
 use std::sync::Arc;
 
 pub struct AssetService {
@@ -55,7 +56,7 @@ impl AssetService {
         conn: &mut SqliteConnection,
         asset_id: &str,
     ) -> Result<AssetProfile, diesel::result::Error> {
-        println!("Fetching asset data for asset_id: {}", asset_id);
+        debug!("Fetching asset data for asset_id: {}", asset_id);
 
         let asset = assets::table
             .filter(assets::id.eq(asset_id))
@@ -242,27 +243,20 @@ impl AssetService {
         match assets.find(asset_id).first::<Asset>(conn) {
             Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
-
                 println!("No asset found in database for asset_id: {}", asset_id);
                 // Symbol not found in database. Try fetching info from market data service.
-                match self
-                    .market_data_service
-                    .get_symbol_profile(asset_id)
-                    .await {
-
-                        // Info found. Create and return a new asset based on this info.
-                        Ok(fetched_profile) => {
-                            let inserted_asset = self
-                                .insert_new_asset(conn, fetched_profile)
-                                .await?;
-                            Ok(inserted_asset)
-                        },
-                        Err(_) => {
-                            println!("No data found for asset_id: {}", asset_id);
-                            Err(diesel::result::Error::NotFound)
-                        }
+                match self.market_data_service.get_symbol_profile(asset_id).await {
+                    // Info found. Create and return a new asset based on this info.
+                    Ok(fetched_profile) => {
+                        let inserted_asset = self.insert_new_asset(conn, fetched_profile).await?;
+                        Ok(inserted_asset)
+                    }
+                    Err(_) => {
+                        println!("No data found for asset_id: {}", asset_id);
+                        Err(diesel::result::Error::NotFound)
                     }
                 }
+            }
             Err(e) => Err(e),
         }
     }
@@ -270,8 +264,8 @@ impl AssetService {
     async fn insert_new_asset(
         &self,
         conn: &mut SqliteConnection,
-        new_asset: NewAsset )
-        -> Result<Asset, diesel::result::Error> {
+        new_asset: NewAsset,
+    ) -> Result<Asset, diesel::result::Error> {
         use crate::schema::assets::dsl::*;
 
         let inserted_asset = diesel::insert_into(assets)
@@ -285,8 +279,9 @@ impl AssetService {
         &self,
         conn: &mut SqliteConnection,
         asset_list: &Vec<Asset>,
-    ) -> Result<(), String>{
-
-        self.market_data_service.sync_asset_quotes(conn, asset_list).await
+    ) -> Result<(), String> {
+        self.market_data_service
+            .sync_asset_quotes(conn, asset_list)
+            .await
     }
 }

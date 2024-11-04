@@ -199,7 +199,6 @@ impl YahooProvider {
 
         for result in search_results {
             if result.symbol == symbol {
-                println!("Found symbol: {:?}", result);
                 return Ok(Some(NewAsset {
                     id: result.symbol.clone(),
                     isin: None,
@@ -427,10 +426,8 @@ impl YahooProvider {
             .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
 
         // Deserialize the JSON response into your struct
-        let deserialized: YahooResult = serde_json::from_str(&response_text).map_err(|err| {
-            println!("JSON Deserialization Error: {}", err);
-            YahooError::FetchFailed(err.to_string())
-        })?;
+        let deserialized: YahooResult = serde_json::from_str(&response_text)
+            .map_err(|err| YahooError::FetchFailed(err.to_string()))?;
 
         Ok(deserialized)
     }

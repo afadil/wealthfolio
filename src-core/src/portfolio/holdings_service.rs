@@ -6,6 +6,7 @@ use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Account, Activity, Asset, Holding, Performance, Quote};
 use bigdecimal::BigDecimal;
 use diesel::SqliteConnection;
+use log::{error, warn};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
@@ -150,7 +151,7 @@ impl HoldingsService {
                     )));
                 }
             }
-            _ => println!("Unhandled activity type: {}", activity.activity_type),
+            _ => warn!("Unhandled activity type: {}", activity.activity_type),
         }
 
         holding.quantity = holding.quantity.round(6);
@@ -178,7 +179,7 @@ impl HoldingsService {
                 Ok(quote) => {
                     quotes.insert(symbol.clone(), quote);
                 }
-                Err(e) => eprintln!("Error fetching quote for symbol {}: {}", symbol, e),
+                Err(e) => error!("Error fetching quote for symbol {}: {}", symbol, e),
             }
         }
 

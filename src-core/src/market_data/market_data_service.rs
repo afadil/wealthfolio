@@ -1,10 +1,13 @@
 use crate::models::{Activity, Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
 use crate::providers::market_data_factory::MarketDataFactory;
-use crate::providers::market_data_provider::{MarketDataError, MarketDataProvider, MarketDataProviderType};
+use crate::providers::market_data_provider::{
+    MarketDataError, MarketDataProvider, MarketDataProviderType,
+};
 use crate::schema::{activities, exchange_rates, quotes};
 use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
+use log::{debug, error};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -17,8 +20,10 @@ pub struct MarketDataService {
 impl MarketDataService {
     pub async fn new() -> Self {
         MarketDataService {
-            public_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Yahoo).await,
-            private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Private).await,
+            public_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Yahoo)
+                .await,
+            private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Private)
+                .await,
         }
     }
 
@@ -49,7 +54,7 @@ impl MarketDataService {
                 })
                 .collect(),
             Err(e) => {
-                eprintln!("Error loading quotes: {}", e);
+                error!("Error loading quotes: {}", e);
                 HashMap::new()
             }
         }
@@ -68,7 +73,7 @@ impl MarketDataService {
             match asset.data_source.as_str() {
                 "CASH" => continue,
                 "Yahoo" => {
-                    let quotes =  self.sync_public_asset_quotes(conn, asset, end_date).await?;
+                    let quotes = self.sync_public_asset_quotes(conn, asset, end_date).await?;
                     all_quotes_to_insert.extend(quotes)
                 }
                 "Private" => {
@@ -88,10 +93,10 @@ impl MarketDataService {
         asset: &Asset,
     ) -> Result<Vec<Quote>, String> {
         let activities = activities::table
-                        .filter(activities::asset_id.eq(asset.symbol.as_str()))
-                        .order(activities::activity_date.asc())
-                        .load::<Activity>(conn)
-                        .map_err(|e| format!("Failed to load activities for {}: {}", asset.symbol, e))?;
+            .filter(activities::asset_id.eq(asset.symbol.as_str()))
+            .order(activities::activity_date.asc())
+            .load::<Activity>(conn)
+            .map_err(|e| format!("Failed to load activities for {}: {}", asset.symbol, e))?;
 
         let mut quotes = Vec::new();
         if activities.is_empty() {
@@ -106,21 +111,21 @@ impl MarketDataService {
             let next_date = next_activity.activity_date.date();
 
             while current_date < next_date {
-            let quote = Quote {
-                id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
-                symbol: asset.symbol.clone(),
-                date: current_date.and_hms_opt(2, 0, 0).unwrap(),
-                open: current_activity.unit_price,
-                high: current_activity.unit_price,
-                low: current_activity.unit_price,
-                close: current_activity.unit_price,
-                adjclose: current_activity.unit_price,
-                volume: current_activity.quantity,
-                data_source: "Private".to_string(),
-                created_at: Utc::now().naive_utc(),
-            };
-            quotes.push(quote);
-            current_date += Duration::days(1);
+                let quote = Quote {
+                    id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
+                    symbol: asset.symbol.clone(),
+                    date: current_date.and_hms_opt(2, 0, 0).unwrap(),
+                    open: current_activity.unit_price,
+                    high: current_activity.unit_price,
+                    low: current_activity.unit_price,
+                    close: current_activity.unit_price,
+                    adjclose: current_activity.unit_price,
+                    volume: current_activity.quantity,
+                    data_source: "Private".to_string(),
+                    created_at: Utc::now().naive_utc(),
+                };
+                quotes.push(quote);
+                current_date += Duration::days(1);
             }
 
             current_activity = activity_iter.next().unwrap();
@@ -177,7 +182,13 @@ impl MarketDataService {
         let symbol = asset.symbol.clone();
         let last_sync_date = self
             .get_last_quote_sync_date(conn, symbol.as_str())
-            .map_err(|e| format!("Error getting last sync date for {}: {}", symbol.as_str(), e))?
+            .map_err(|e| {
+                format!(
+                    "Error getting last sync date for {}: {}",
+                    symbol.as_str(),
+                    e
+                )
+            })?
             .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
 
         let start_date: SystemTime = Utc
@@ -229,8 +240,8 @@ impl MarketDataService {
             .load::<Asset>(conn)
             .map_err(|e| format!("Failed to load assets: {}", e))?;
 
-        match self.sync_asset_quotes(conn, &asset_list).await{
-            Ok(_) => {},
+        match self.sync_asset_quotes(conn, &asset_list).await {
+            Ok(_) => {}
             Err(e) => {
                 eprintln!("Failed to sync asset quotes: {}", e);
             }
@@ -240,17 +251,14 @@ impl MarketDataService {
     }
 
     pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, String> {
-        match self.public_data_provider
-            .get_symbol_profile(symbol)
-            .await{
-                Ok(asset) => Ok(asset),
-                Err(_) => {
-                    self.private_data_provider
-                        .get_symbol_profile(symbol)
-                        .await
-                        .map_err(|e| format!("Failed to get symbol profile for {}: {}", symbol, e))
-                },
-            }
+        match self.public_data_provider.get_symbol_profile(symbol).await {
+            Ok(asset) => Ok(asset),
+            Err(_) => self
+                .private_data_provider
+                .get_symbol_profile(symbol)
+                .await
+                .map_err(|e| format!("Failed to get symbol profile for {}: {}", symbol, e)),
+        }
     }
 
     pub fn get_asset_currencies(
@@ -266,13 +274,13 @@ impl MarketDataService {
             .load::<(String, String)>(conn)
             .map(|results| results.into_iter().collect::<HashMap<_, _>>())
             .unwrap_or_else(|e| {
-                eprintln!("Error fetching asset currencies: {}", e);
+                error!("Error fetching asset currencies: {}", e);
                 HashMap::new()
             })
     }
 
     pub async fn sync_exchange_rates(&self, conn: &mut SqliteConnection) -> Result<(), String> {
-        println!("Syncing exchange rates...");
+        debug!("Syncing exchange rates...");
 
         // Load existing exchange rates
         let existing_rates: Vec<ExchangeRate> = exchange_rates::table
@@ -300,7 +308,7 @@ impl MarketDataService {
                     }
                 }
                 Err(e) => {
-                    eprintln!(
+                    error!(
                         "Failed to fetch rate for {}-{}: {}. Skipping update.",
                         rate.from_currency, rate.to_currency, e
                     );
@@ -334,7 +342,11 @@ impl MarketDataService {
 
         // Try reverse conversion
         let reverse_symbol = format!("{}{}=X", to, from);
-        if let Ok(quote) = self.public_data_provider.get_latest_quote(&reverse_symbol).await {
+        if let Ok(quote) = self
+            .public_data_provider
+            .get_latest_quote(&reverse_symbol)
+            .await
+        {
             return Ok(1.0 / quote.close);
         }
 
@@ -351,7 +363,11 @@ impl MarketDataService {
             "".to_string()
         };
         let from_usd = if !from_usd_symbol.is_empty() {
-            match self.public_data_provider.get_latest_quote(&from_usd_symbol).await {
+            match self
+                .public_data_provider
+                .get_latest_quote(&from_usd_symbol)
+                .await
+            {
                 Ok(quote) => quote.close,
                 Err(_) => return Ok(-1.0),
             }
@@ -360,7 +376,11 @@ impl MarketDataService {
         };
 
         let to_usd = if !to_usd_symbol.is_empty() {
-            match self.public_data_provider.get_latest_quote(&to_usd_symbol).await {
+            match self
+                .public_data_provider
+                .get_latest_quote(&to_usd_symbol)
+                .await
+            {
                 Ok(quote) => quote.close,
                 Err(_) => return Ok(-1.0),
             }

@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { useForm, useFormContext } from 'react-hook-form';
 import * as z from 'zod';
+import { error as logError } from '@tauri-apps/plugin-log';
 
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Icons } from '@/components/icons';
@@ -114,9 +115,9 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       }
       return await addActivityMutation.mutateAsync({ currency, ...rest });
     } catch (error) {
-      console.error('Activity Form Submit Error:', error);
-      console.error('Activity Form Errors:', form.formState.errors);
-      console.error('Activity Form Values:', form.getValues());
+      logError(`Activity Form Submit Error: ${JSON.stringify(error)}`);
+      logError(`Activity Form Errors: ${JSON.stringify(form.formState.errors)}`);
+      logError(`Activity Form Values: ${JSON.stringify(form.getValues())}`);
     }
   }
 
@@ -245,7 +246,6 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     </Sheet>
   );
 }
-
 const CashActivityFields = () => {
   const { control, watch } = useFormContext();
   const watchedType = watch('activityType');

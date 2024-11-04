@@ -4,11 +4,12 @@ use crate::models::{
     Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, NewActivity, Sort,
 };
 use crate::AppState;
+use log::debug;
 use tauri::State;
 
 #[tauri::command]
 pub async fn get_activities(state: State<'_, AppState>) -> Result<Vec<Activity>, String> {
-    println!("Fetching all activities...");
+    debug!("Fetching all activities...");
     let mut conn = state
         .pool
         .get()
@@ -31,7 +32,7 @@ pub async fn search_activities(
     sort: Option<Sort>,
     state: State<'_, AppState>,
 ) -> Result<ActivitySearchResponse, String> {
-    println!("Search activities... {}, {}", page, page_size);
+    debug!("Search activities... {}, {}", page, page_size);
     let mut conn = state
         .pool
         .get()
@@ -57,7 +58,7 @@ pub async fn create_activity(
     activity: NewActivity,
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
-    println!("Adding new activity...");
+    debug!("Creating activity...");
     let mut conn = state
         .pool
         .get()
@@ -75,7 +76,7 @@ pub async fn update_activity(
     activity: ActivityUpdate,
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
-    println!("Updating activity...");
+    debug!("Updating activity...");
     let mut conn = state
         .pool
         .get()
@@ -94,7 +95,7 @@ pub async fn check_activities_import(
     activities: Vec<ActivityImport>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ActivityImport>, String> {
-    println!("Checking activities import for account: {}", account_id);
+    debug!("Checking activities import for account: {}", account_id);
     let mut conn = state
         .pool
         .get()
@@ -112,7 +113,7 @@ pub async fn create_activities(
     activities: Vec<NewActivity>,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    println!("Importing activities...");
+    debug!("Creating activities...");
     let mut conn = state
         .pool
         .get()
@@ -129,7 +130,7 @@ pub async fn delete_activity(
     activity_id: String,
     state: State<'_, AppState>,
 ) -> Result<Activity, String> {
-    println!("Deleting activity...");
+    debug!("Deleting activity...");
     let mut conn = state
         .pool
         .get()
@@ -146,7 +147,7 @@ pub async fn get_account_import_mapping(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<ImportMappingData, String> {
-    println!("Getting import mapping for account: {}", account_id);
+    debug!("Getting import mapping for account: {}", account_id);
     let mut conn = state
         .pool
         .get()
@@ -164,7 +165,7 @@ pub async fn save_account_import_mapping(
     mapping: ImportMappingData,
     state: State<'_, AppState>,
 ) -> Result<ImportMappingData, String> {
-    println!("Saving import mapping for account: {}", mapping.account_id);
+    debug!("Saving import mapping for account: {}", mapping.account_id);
     let mut conn = state
         .pool
         .get()

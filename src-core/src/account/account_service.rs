@@ -3,7 +3,7 @@ use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Account, AccountUpdate, NewAccount};
 use diesel::Connection;
 use diesel::SqliteConnection;
-
+use log::debug;
 pub struct AccountService {
     account_repo: AccountRepository,
     base_currency: String,
@@ -45,8 +45,7 @@ impl AccountService {
         new_account: NewAccount,
     ) -> Result<Account, Box<dyn std::error::Error>> {
         let base_currency = self.base_currency.clone();
-
-        println!(
+        debug!(
             "Creating account..., base_currency: {}, new_account.currency: {}",
             base_currency, new_account.currency
         );
