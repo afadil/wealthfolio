@@ -272,6 +272,7 @@ pub struct ActivityDetails {
     pub account_currency: String,
     pub asset_symbol: String,
     pub asset_name: Option<String>,
+    pub asset_data_source: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -366,6 +367,7 @@ pub struct Holding {
     pub account: Option<Account>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
+    pub asset_data_source: Option<String>,
     pub sectors: Option<Vec<Sector>>,
     pub countries: Option<Vec<Country>>,
     pub portfolio_percent: Option<BigDecimal>,

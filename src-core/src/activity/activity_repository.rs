@@ -153,6 +153,7 @@ impl ActivityRepository {
                 accounts::currency,
                 assets::symbol,
                 assets::name,
+                assets::data_source,
             ))
             .limit(page_size)
             .offset(offset)

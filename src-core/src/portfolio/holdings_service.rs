@@ -106,6 +106,7 @@ impl HoldingsService {
             account: Some(account.clone()),
             asset_class: asset.asset_class.clone(),
             asset_sub_class: asset.asset_sub_class.clone(),
+            asset_data_source: Some(asset.data_source.clone()),
             sectors: asset
                 .sectors
                 .clone()
@@ -165,11 +166,13 @@ impl HoldingsService {
         conn: &mut SqliteConnection,
         holdings: &HashMap<String, Holding>,
     ) -> Result<HashMap<String, Quote>> {
+
         let unique_symbols: HashSet<String> = holdings
             .values()
             .map(|h| h.symbol.clone())
             .filter(|symbol| !symbol.starts_with("$CASH-"))
             .collect();
+
         let mut quotes = HashMap::new();
 
         for symbol in unique_symbols {
@@ -331,6 +334,7 @@ impl HoldingsService {
             }),
             asset_class: holding.asset_class.clone(),
             asset_sub_class: holding.asset_sub_class.clone(),
+            asset_data_source: holding.asset_data_source.clone(),
             sectors: holding.sectors.clone(),
             countries: holding.countries.clone(),
             portfolio_percent: None,
