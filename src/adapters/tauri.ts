@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 import { writeFile, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { error, info, warn, trace, debug } from '@tauri-apps/plugin-log';
 import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
 
 export type { EventCallback, UnlistenFn };
@@ -79,4 +80,12 @@ export const openFileSaveDialogTauri = async (
   await writeFile(filePath, contentToSave, { baseDir: BaseDirectory.Document });
 
   return true;
+};
+
+export const logger = {
+  error,
+  info,
+  warn,
+  trace,
+  debug,
 };

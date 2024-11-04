@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import { calculateHistoricalData, recalculatePortfolio } from '@/commands/portfolio';
+import { logger } from '@/adapters';
 
 interface UseCalculateHistoryMutationOptions {
   successTitle?: string;
@@ -31,6 +32,7 @@ export function useCalculateHistoryMutation({
         description: 'Please try again or report an issue if the problem persists.',
         variant: 'destructive',
       });
+      logger.error(`Error calculating historical data: ${error}`);
     },
   });
 }
@@ -58,6 +60,7 @@ export function useRecalculatePortfolioMutation({
         description: 'Please try again or report an issue if the problem persists.',
         variant: 'destructive',
       });
+      logger.error(`Error recalculating portfolio: ${error}`);
     },
   });
 }

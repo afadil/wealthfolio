@@ -5,8 +5,9 @@ import {
   listenFileDropCancelledTauri,
   listenFileDropHoverTauri,
   listenFileDropTauri,
+  logger,
 } from '@/adapters';
-import { error as logError } from '@tauri-apps/plugin-log';
+
 // listenImportFileDropHover
 export const listenImportFileDropHover = async <T>(
   handler: EventCallback<T>,
@@ -19,7 +20,7 @@ export const listenImportFileDropHover = async <T>(
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error listen tauri://file-drop-hover.');
+    logger.error('Error listen tauri://file-drop-hover.');
     throw error;
   }
 };
@@ -34,7 +35,7 @@ export const listenImportFileDrop = async <T>(handler: EventCallback<T>): Promis
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error listen tauri://file-drop.');
+    logger.error('Error listen tauri://file-drop.');
     throw error;
   }
 };
@@ -51,7 +52,7 @@ export const listenImportFileDropCancelled = async <T>(
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error listen tauri://file-drop-cancelled.');
+    logger.error('Error listen tauri://file-drop-cancelled.');
     throw error;
   }
 };

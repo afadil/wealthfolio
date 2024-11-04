@@ -1,6 +1,7 @@
 import { ActivityImport, ImportMappingData, NewActivity } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-import { error as logError } from '@tauri-apps/plugin-log';
+import { logger } from '@/adapters';
+
 export const checkActivitiesImport = async ({
   account_id,
   activities,
@@ -19,7 +20,7 @@ export const checkActivitiesImport = async ({
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error checking activities import.');
+    logger.error('Error checking activities import.');
     throw error;
   }
 };
@@ -33,7 +34,7 @@ export const createActivities = async (activities: NewActivity[]): Promise<numbe
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error importing activities.');
+    logger.error('Error importing activities.');
     throw error;
   }
 };
@@ -47,7 +48,7 @@ export const getAccountImportMapping = async (accountId: string): Promise<Import
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching mapping.');
+    logger.error('Error fetching mapping.');
     throw error;
   }
 };
@@ -65,7 +66,7 @@ export const saveAccountImportMapping = async (
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error saving mapping.');
+    logger.error('Error saving mapping.');
     throw error;
   }
 };

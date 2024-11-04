@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { useForm, useFormContext } from 'react-hook-form';
 import * as z from 'zod';
-import { error as logError } from '@tauri-apps/plugin-log';
+import { logger } from '@/adapters';
 
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Icons } from '@/components/icons';
@@ -115,9 +115,9 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       }
       return await addActivityMutation.mutateAsync({ currency, ...rest });
     } catch (error) {
-      logError(`Activity Form Submit Error: ${JSON.stringify(error)}`);
-      logError(`Activity Form Errors: ${JSON.stringify(form.formState.errors)}`);
-      logError(`Activity Form Values: ${JSON.stringify(form.getValues())}`);
+      logger.error(`Activity Form Submit Error: ${JSON.stringify(error)}`);
+      logger.error(`Activity Form Errors: ${JSON.stringify(form.formState.errors)}`);
+      logger.error(`Activity Form Values: ${JSON.stringify(form.getValues())}`);
     }
   }
 

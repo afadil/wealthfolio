@@ -1,4 +1,4 @@
-import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
+import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 import {
   Holding,
   IncomeSummary,
@@ -6,7 +6,6 @@ import {
   PortfolioHistory,
   AccountSummary,
 } from '@/lib/types';
-import { error as logError } from '@tauri-apps/plugin-log';
 
 export const calculateHistoricalData = async (params: {
   accountIds?: string[];
@@ -20,7 +19,7 @@ export const calculateHistoricalData = async (params: {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error calculating historical data.');
+    logger.error('Error calculating historical data.');
     throw error;
   }
 };
@@ -34,7 +33,7 @@ export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error recalculating portfolio.');
+    logger.error('Error recalculating portfolio.');
     throw error;
   }
 };
@@ -48,7 +47,7 @@ export const computeHoldings = async (): Promise<Holding[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error computing holdings.');
+    logger.error('Error computing holdings.');
     throw error;
   }
 };
@@ -62,7 +61,7 @@ export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching income summary.');
+    logger.error('Error fetching income summary.');
     throw error;
   }
 };
@@ -76,7 +75,7 @@ export const getHistory = async (accountId?: string): Promise<PortfolioHistory[]
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching portfolio history.');
+    logger.error('Error fetching portfolio history.');
     throw error;
   }
 };
@@ -90,7 +89,7 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching active accounts summary.');
+    logger.error('Error fetching active accounts summary.');
     throw error;
   }
 };

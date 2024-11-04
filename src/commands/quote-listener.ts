@@ -5,8 +5,8 @@ import {
   listenQuotesSyncStartTauri,
   listenQuotesSyncCompleteTauri,
   listenQuotesSyncErrorTauri,
+  logger,
 } from '@/adapters';
-import { error as logError } from '@tauri-apps/plugin-log';
 
 // listenQuotesSyncStart
 export const listenQuotesSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
@@ -18,7 +18,7 @@ export const listenQuotesSyncStart = async <T>(handler: EventCallback<T>): Promi
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error listen PORTFOLIO_UPDATE_START.');
+    logger.error('Error listen PORTFOLIO_UPDATE_START.');
     throw error;
   }
 };
@@ -35,7 +35,7 @@ export const listenQuotesSyncComplete = async <T>(
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error listen PORTFOLIO_UPDATE_COMPLETE.');
+    logger.error('Error listen PORTFOLIO_UPDATE_COMPLETE.');
     throw error;
   }
 };
@@ -50,7 +50,7 @@ export const listenQuotesSyncError = async <T>(handler: EventCallback<T>): Promi
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error listen PORTFOLIO_UPDATE_ERROR.');
+    logger.error('Error listen PORTFOLIO_UPDATE_ERROR.');
     throw error;
   }
 };

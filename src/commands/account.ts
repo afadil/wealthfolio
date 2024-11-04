@@ -2,7 +2,7 @@ import z from 'zod';
 import { Account } from '@/lib/types';
 import { newAccountSchema } from '@/lib/schemas';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-import { error as logError } from '@tauri-apps/plugin-log';
+import { logger } from '@/adapters';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -15,7 +15,7 @@ export const getAccounts = async (): Promise<Account[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching accounts.');
+    logger.error('Error fetching accounts.');
     throw error;
   }
 };
@@ -30,7 +30,7 @@ export const createAccount = async (account: NewAccount): Promise<Account> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error creating account.');
+    logger.error('Error creating account.');
     throw error;
   }
 };
@@ -46,7 +46,7 @@ export const updateAccount = async (account: NewAccount): Promise<Account> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error updating account.');
+    logger.error('Error updating account.');
     throw error;
   }
 };
@@ -62,7 +62,7 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error deleting account.');
+    logger.error('Error deleting account.');
     throw error;
   }
 };

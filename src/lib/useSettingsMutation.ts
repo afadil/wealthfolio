@@ -4,6 +4,7 @@ import { saveSettings } from '@/commands/settings';
 import { Settings } from './types';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { QueryKeys } from './query-keys';
+import { logger } from '@/adapters';
 export function useSettingsMutation(
   setSettings: React.Dispatch<React.SetStateAction<Settings | null>>,
   applySettingsToDocument: (newSettings: Settings) => void,
@@ -32,7 +33,7 @@ export function useSettingsMutation(
       }
     },
     onError: (error) => {
-      console.error('Error updating settings:', error);
+      logger.error(`Error updating settings: ${error}`);
       toast({
         title: 'Uh oh! Something went wrong.',
         description: 'There was a problem updating your settings.',

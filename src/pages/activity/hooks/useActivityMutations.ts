@@ -5,7 +5,7 @@ import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { newActivitySchema } from '@/lib/schemas';
 import * as z from 'zod';
 import { QueryKeys } from '@/lib/query-keys';
-
+import { logger } from '@/adapters';
 type ActivityFormValues = z.infer<typeof newActivitySchema>;
 
 export function useActivityMutations(onSuccess?: () => void) {
@@ -24,6 +24,7 @@ export function useActivityMutations(onSuccess?: () => void) {
       if (onSuccess) onSuccess();
     },
     onError: (error: string) => {
+      logger.error(`Error ${action} activity: ${error}`);
       toast({
         title: `Uh oh! Something went wrong ${action} this activity.`,
         description: `Please try again or report an issue if the problem persists. Error: ${error}`,

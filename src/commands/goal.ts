@@ -2,7 +2,8 @@ import z from 'zod';
 import { Goal, GoalAllocation } from '@/lib/types';
 import { newGoalSchema } from '@/lib/schemas';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
-import { error as logError } from '@tauri-apps/plugin-log';
+import { logger } from '@/adapters';
+
 type NewGoal = z.infer<typeof newGoalSchema>;
 
 export const getGoals = async (): Promise<Goal[]> => {
@@ -14,7 +15,7 @@ export const getGoals = async (): Promise<Goal[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching goals.');
+    logger.error('Error fetching goals.');
     throw error;
   }
 };
@@ -34,7 +35,7 @@ export const createGoal = async (goal: NewGoal): Promise<Goal> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error creating goal.');
+    logger.error('Error creating goal.');
     throw error;
   }
 };
@@ -48,7 +49,7 @@ export const updateGoal = async (goal: Goal): Promise<Goal> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error updating goal.');
+    logger.error('Error updating goal.');
     throw error;
   }
 };
@@ -63,7 +64,7 @@ export const deleteGoal = async (goalId: string): Promise<void> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error deleting goal.');
+    logger.error('Error deleting goal.');
     throw error;
   }
 };
@@ -78,7 +79,7 @@ export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Pro
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error saving goals allocations.');
+    logger.error('Error saving goals allocations.');
     throw error;
   }
 };
@@ -92,7 +93,7 @@ export const getGoalsAllocation = async (): Promise<GoalAllocation[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logError('Error fetching goals allocations.');
+    logger.error('Error fetching goals allocations.');
     throw error;
   }
 };

@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/adapters';
 
 // filter
 function DashboardSkeleton() {

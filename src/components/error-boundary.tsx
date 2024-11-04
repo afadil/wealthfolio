@@ -1,7 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from './ui/button';
 import { XCircle } from 'lucide-react';
-import { error as logError } from '@tauri-apps/plugin-log';
+import { logger } from '@/adapters';
 
 interface Props {
   children: ReactNode;
@@ -23,7 +23,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logError(`Error Boundary Caught Error:
+    logger.error(`Error Boundary Caught Error:
       Message: ${error.message}
       Stack: ${error.stack}
       Component Stack: ${errorInfo.componentStack}
