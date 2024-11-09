@@ -63,3 +63,18 @@ export const updateAssetProfile = async (payload: {
     throw error;
   }
 };
+
+export const refreshQuotesForSymbols = async (symbols: string[]): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri('refresh_quotes_for_symbols', { symbols });
+        return;
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error refreshing quotes for symbols.');
+    throw error;
+  }
+};

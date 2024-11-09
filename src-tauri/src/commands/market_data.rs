@@ -61,3 +61,20 @@ pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn refresh_quotes_for_symbols(
+    symbols: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Refreshing quotes for symbols: {:?}", symbols);
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = MarketDataService::new().await;
+    service
+        .refresh_quotes_for_symbols(&mut conn, &symbols)
+        .await
+        .map_err(|e| e.to_string())
+}

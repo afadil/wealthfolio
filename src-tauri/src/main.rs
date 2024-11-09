@@ -14,7 +14,9 @@ use commands::goal::{
     create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
     update_goal_allocations,
 };
-use commands::market_data::{get_asset_data, search_symbol, synch_quotes, update_asset_profile};
+use commands::market_data::{
+    get_asset_data, refresh_quotes_for_symbols, search_symbol, synch_quotes, update_asset_profile,
+};
 use commands::portfolio::{
     calculate_historical_data, compute_holdings, get_accounts_summary, get_income_summary,
     get_portfolio_history, recalculate_portfolio,
@@ -163,6 +165,7 @@ pub fn main() {
             calculate_deposits_for_accounts,
             get_account_import_mapping,
             save_account_import_mapping,
+            refresh_quotes_for_symbols,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

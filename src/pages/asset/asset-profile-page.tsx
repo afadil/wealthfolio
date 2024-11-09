@@ -80,7 +80,7 @@ export const AssetProfilePage = () => {
 
   const profile = {
     ...data?.asset,
-    marketPrice: quote?.adjclose ?? 0,
+    marketPrice: quote?.close ?? 0,
     totalGainAmount: holding?.performance?.totalGainAmount ?? 0,
     totalGainPercent: holding?.performance?.totalGainPercent ?? 0,
     calculatedAt: holding?.calculatedAt,
@@ -92,8 +92,8 @@ export const AssetProfilePage = () => {
     bookValue: holding?.bookValue,
     averagePrice: holding?.averageCost ?? 0,
     portfolioPercent: holding?.portfolioPercent,
-    todaysReturn: (quote?.adjclose ?? 0) - (quote?.open ?? 0),
-    todaysReturnPercent: (((quote?.adjclose ?? 0) - (quote?.open ?? 0)) / (quote?.open ?? 1)) * 100,
+    todaysReturn: (quote?.close ?? 0) - (quote?.open ?? 0),
+    todaysReturnPercent: (((quote?.close ?? 0) - (quote?.open ?? 0)) / (quote?.open ?? 1)) * 100,
     totalReturn: holding?.performance?.totalGainAmount,
     totalReturnPercent: holding?.performance?.totalGainPercent,
     currency: data?.asset.currency || 'USD',
@@ -132,6 +132,7 @@ export const AssetProfilePage = () => {
       <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
         {profile && (
           <SymbolCard
+            symbol={profile?.symbol || holding?.symbol}
             className={`col-span-1 ${holding ? 'md:col-span-2' : 'md:col-span-3'}`}
             marketPrice={profile?.marketPrice}
             totalGainAmount={profile?.totalGainAmount}
