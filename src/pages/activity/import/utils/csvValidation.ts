@@ -81,7 +81,7 @@ const CASH_ACTIVITY_TYPES = new Set([
 ]);
 
 // Add a simple regex for ticker validation
-const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,5}([.-][A-Z0-9]+)?)$/;
+const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([\.-][A-Z0-9]+){0,2})$/;
 
 export const activityImportValidationSchema = z
   .object({
