@@ -150,7 +150,7 @@ export const ActivityTable = ({
           const activityType = row.getValue('activityType') as string;
           const quantity = row.getValue('quantity') as number;
 
-          if (CASH_ACTIVITY_TYPES.includes(activityType) && activityType !== 'SPLIT') {
+          if (CASH_ACTIVITY_TYPES.includes(activityType) || activityType === 'SPLIT') {
             return <div className="pr-4 text-right">-</div>;
           }
 

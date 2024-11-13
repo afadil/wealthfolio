@@ -71,6 +71,14 @@ function transformToApiData(activity: NewActivity): ActivityApiData {
         fee: 0,
       };
 
+    case 'TRANSFER_OUT':
+      return {
+        ...baseData,
+        unitPrice: 1,
+        quantity: activity.quantity,
+        fee: activity.fee || 0,
+      };
+
     default:
       return {
         ...baseData,

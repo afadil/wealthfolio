@@ -101,11 +101,24 @@ const splitActivitySchema = baseActivitySchema.extend({
     .optional(),
 });
 
-const transferActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum(['TRANSFER_IN', 'TRANSFER_OUT']),
+const transferInActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('TRANSFER_IN'),
   assetId: z.string().min(1, { message: 'Please select a security' }),
   quantity: z.coerce.number().positive(),
   unitPrice: z.coerce.number().min(0),
+  fee: z.coerce
+    .number({
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0)
+    .optional(),
+});
+
+const transferOutActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('TRANSFER_OUT'),
+  assetId: z.string().min(1, { message: 'Please select a security' }),
+  quantity: z.coerce.number().positive(),
   fee: z.coerce
     .number({
       invalid_type_error: 'Fee must be a positive number.',
@@ -140,7 +153,8 @@ export const newActivitySchema = z.discriminatedUnion('activityType', [
   feeActivitySchema,
   dividendActivitySchema,
   splitActivitySchema,
-  transferActivitySchema,
+  transferInActivitySchema,
+  transferOutActivitySchema,
   tradeActivitySchema,
 ]);
 
