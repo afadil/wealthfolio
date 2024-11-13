@@ -31,6 +31,7 @@ export function useCsvParser() {
       setSelectedFile(file);
 
       Papa.parse<string[]>(file, {
+        skipEmptyLines: true,
         complete: (results) => {
           if (results.data && results.data.length > 0) {
             setCsvData(results.data);
