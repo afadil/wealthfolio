@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowRightLeft,
   ArrowUp,
   CalendarDays,
   Check,
@@ -57,6 +58,10 @@ import {
   Info,
   Globe2,
   CircleGauge,
+  Receipt,
+  Percent,
+  Split,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -118,6 +123,11 @@ export const Icons = {
   GaugeCircle,
   ListCollapse: ListCollapse,
   CircleGauge: CircleGauge,
+  ArrowRightLeft: ArrowRightLeft,
+  ArrowLeftRight: ArrowLeftRight,
+  Receipt: Receipt,
+  Percent: Percent,
+  Split: Split,
 
   Dashboard: ({ ...props }: LucideProps) => (
     <svg

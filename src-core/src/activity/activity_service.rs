@@ -3,7 +3,7 @@ use crate::activity::ActivityRepository;
 use crate::asset::asset_service::AssetService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
-    Account, Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, Asset, ImportMapping,
+    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, Asset, ImportMapping,
     ImportMappingData, NewActivity, Sort,
 };
 use crate::schema::activities;
@@ -75,27 +75,24 @@ impl ActivityService {
         conn: &mut SqliteConnection,
         activity: NewActivity,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
-
         // Instantiate services
-        let asset_service =
-            AssetService::new().await;
+        let asset_service = AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
 
         // Fetch the asset profile for the activity
         let asset_id = activity.asset_id.clone();
 
         // Get or create the asset profile
-        let asset = asset_service
-            .get_or_create_asset(conn, &asset_id)
-            .await?;
+        let asset = asset_service.get_or_create_asset(conn, &asset_id).await?;
 
-        let account = account_service.get_account_by_id(conn, &activity.account_id)?;
+        let account_currency = account_service
+            .get_account_by_id(conn, &activity.account_id)?
+            .currency;
 
         // Handle the database transaction
-        let inserted_activity = self.insert_activity_transation(conn, activity, &asset, &account).await?;
-
-        // Sync the symbol quotes for the asset profile
-        self.sync_asset_quotes(asset_service, conn, &asset).await?;
+        let inserted_activity = self
+            .insert_activity_transation(conn, activity, &asset, &account_currency)
+            .await?;
 
         return Ok(inserted_activity);
     }
@@ -105,12 +102,16 @@ impl ActivityService {
         conn: &mut SqliteConnection,
         mut activity: NewActivity,
         asset: &Asset,
-        account: &Account,
+        account_currency: &str,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
         conn.transaction(|conn| {
-            // Update activity currency if asset_profile.currency is available
-            if !asset.currency.is_empty() {
-                activity.currency = asset.currency.clone();
+            // Update activity currency if empty/undefined
+            if activity.currency.is_empty() {
+                if !asset.currency.is_empty() {
+                    activity.currency = asset.currency.clone();
+                } else {
+                    activity.currency = account_currency.to_string();
+                }
             }
 
             // Handle different activity types
@@ -131,11 +132,11 @@ impl ActivityService {
             }
 
             // Create exchange rate if asset currency is different from account currency
-            if activity.currency != account.currency {
+            if activity.currency != account_currency {
                 let fx_service = CurrencyExchangeService::new();
                 fx_service.add_exchange_rate(
                     conn,
-                    account.currency.clone(),
+                    account_currency.to_string(),
                     activity.currency.clone(),
                     None,
                 )?;
@@ -148,37 +149,19 @@ impl ActivityService {
         })
     }
 
-    async fn sync_asset_quotes(
-        &self,
-        asset_service: AssetService,
-        conn: &mut SqliteConnection,
-        asset: &Asset,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        asset_service.sync_asset_quotes(conn, &vec![asset.clone()])
-            .await
-            .map_err(|e| {
-                println!(
-                    "Failed to sync quotes for asset_id: {}. Error: {:?}",
-                    asset.id, e
-                );
-                diesel::result::Error::NotFound
-            })?;
-        Ok(())
-    }
-
     // update an activity
     pub async fn update_activity(
         &self,
         conn: &mut SqliteConnection,
         mut activity: ActivityUpdate,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
-        let asset_service=
-            AssetService::new().await;
+        let asset_service = AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
         let asset = asset_service
             .get_or_create_asset(conn, &activity.asset_id)
             .await?;
-        asset_service.sync_asset_quotes(conn, &vec![asset.clone()])
+        asset_service
+            .sync_asset_quotes(conn, &vec![asset.clone()])
             .await
             .map_err(|e| {
                 println!(
@@ -189,12 +172,15 @@ impl ActivityService {
             })?;
         let account = account_service.get_account_by_id(conn, &activity.account_id)?;
 
-        conn.transaction(|conn| {
-            // Update activity currency if asset_profile.currency is available
+        if activity.currency.is_empty() {
             if !asset.currency.is_empty() {
                 activity.currency = asset.currency.clone();
+            } else {
+                activity.currency = account.currency.to_string();
             }
+        }
 
+        conn.transaction(|conn| {
             // Handle different activity types
             match activity.activity_type.as_str() {
                 "TRANSFER_OUT" => {
@@ -237,8 +223,7 @@ impl ActivityService {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>, String> {
-        let asset_service =
-            AssetService::new().await;
+        let asset_service = AssetService::new().await;
         let account_service = AccountService::new(self.base_currency.clone());
         let fx_service = CurrencyExchangeService::new();
         let account = account_service
@@ -269,7 +254,6 @@ impl ActivityService {
                         ..Default::default()
                     };
                     assets_to_sync.push(asset_copy);
-
 
                     // Add exchange rate if the activity currency is different from the account currency
                     let currency = &activity.currency;
@@ -313,9 +297,7 @@ impl ActivityService {
 
         // Sync quotes for all valid assets
         if !assets_to_sync.is_empty() {
-            match asset_service
-                .sync_asset_quotes(conn, &assets_to_sync)
-                .await{
+            match asset_service.sync_asset_quotes(conn, &assets_to_sync).await {
                 Ok(_) => (),
                 Err(e) => {
                     return Err(format!("Failed to sync quotes for assets: {}", e));

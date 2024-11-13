@@ -104,52 +104,6 @@ impl AssetService {
             .load::<Asset>(conn)
     }
 
-    pub fn create_exchange_rate_symbols(
-        &self,
-        conn: &mut SqliteConnection,
-        from_currency: &str,
-        to_currency: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut symbols = Vec::new();
-        if from_currency != to_currency {
-            symbols.push(format!("{}{}=X", from_currency, to_currency));
-            symbols.push(format!("{}{}=X", to_currency, from_currency));
-        }
-        if from_currency != "USD" {
-            symbols.push(format!("{}USD=X", from_currency));
-        }
-
-        let new_assets: Vec<NewAsset> = symbols
-            .iter()
-            .filter(|symbol| self.get_asset_by_id(conn, symbol).is_err())
-            .map(|symbol| NewAsset {
-                id: symbol.to_string(),
-                isin: None,
-                name: None,
-                asset_type: Some("Currency".to_string()),
-                symbol: symbol.to_string(),
-                symbol_mapping: None,
-                asset_class: Some("".to_string()),
-                asset_sub_class: Some("".to_string()),
-                comment: None,
-                countries: None,
-                categories: None,
-                classes: None,
-                attributes: None,
-                currency: to_currency.to_string(),
-                data_source: "MANUAL".to_string(),
-                sectors: None,
-                url: None,
-            })
-            .collect();
-
-        diesel::replace_into(assets::table)
-            .values(&new_assets)
-            .execute(conn)?;
-
-        Ok(())
-    }
-
     pub fn create_cash_asset(
         &self,
         conn: &mut SqliteConnection,
@@ -220,17 +174,7 @@ impl AssetService {
         conn: &mut SqliteConnection,
         symbol: &str,
     ) -> QueryResult<Quote> {
-        quotes::table
-            .filter(quotes::symbol.eq(symbol))
-            .order(quotes::date.desc())
-            .first::<Quote>(conn)
-    }
-
-    pub fn get_history_quotes(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Quote>, diesel::result::Error> {
-        quotes::table.load::<Quote>(conn)
+        return self.market_data_service.get_latest_quote(conn, symbol);
     }
 
     pub async fn get_or_create_asset(
@@ -243,16 +187,21 @@ impl AssetService {
         match assets.find(asset_id).first::<Asset>(conn) {
             Ok(existing_profile) => Ok(existing_profile),
             Err(diesel::NotFound) => {
-                println!("No asset found in database for asset_id: {}", asset_id);
+                error!("No asset found in database for asset_id: {}", asset_id);
                 // Symbol not found in database. Try fetching info from market data service.
                 match self.market_data_service.get_symbol_profile(asset_id).await {
                     // Info found. Create and return a new asset based on this info.
                     Ok(fetched_profile) => {
                         let inserted_asset = self.insert_new_asset(conn, fetched_profile).await?;
+
+                        // Sync the quotes for the new asset
+                        self.sync_asset_quotes(conn, &vec![inserted_asset.clone()])
+                            .await
+                            .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
                         Ok(inserted_asset)
                     }
                     Err(_) => {
-                        println!("No data found for asset_id: {}", asset_id);
+                        error!("No data found for asset_id: {}", asset_id);
                         Err(diesel::result::Error::NotFound)
                     }
                 }

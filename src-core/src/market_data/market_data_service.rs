@@ -22,7 +22,7 @@ impl MarketDataService {
         MarketDataService {
             public_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Yahoo)
                 .await,
-            private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Private)
+            private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Manual)
                 .await,
         }
     }
@@ -71,12 +71,11 @@ impl MarketDataService {
 
         for asset in asset_list {
             match asset.data_source.as_str() {
-                "CASH" => continue,
                 "Yahoo" => {
                     let quotes = self.sync_public_asset_quotes(conn, asset, end_date).await?;
                     all_quotes_to_insert.extend(quotes)
                 }
-                "Private" => {
+                "MANUAL" => {
                     let quotes = self.sync_private_asset_quotes(conn, asset).await?;
                     all_quotes_to_insert.extend(quotes)
                 }
@@ -92,84 +91,59 @@ impl MarketDataService {
         conn: &mut SqliteConnection,
         asset: &Asset,
     ) -> Result<Vec<Quote>, String> {
+        // Load activities for the asset
         let activities = activities::table
             .filter(activities::asset_id.eq(asset.symbol.as_str()))
             .order(activities::activity_date.asc())
             .load::<Activity>(conn)
             .map_err(|e| format!("Failed to load activities for {}: {}", asset.symbol, e))?;
 
-        let mut quotes = Vec::new();
         if activities.is_empty() {
-            return Ok(quotes);
+            debug!("No activities found for asset {}", asset.symbol);
+            return Ok(Vec::new());
         }
 
-        let mut activity_iter = activities.iter().peekable();
-        let mut current_activity = activity_iter.next().unwrap();
-        let mut current_date = current_activity.activity_date.date();
-
-        while let Some(next_activity) = activity_iter.peek() {
-            let next_date = next_activity.activity_date.date();
-
-            while current_date < next_date {
-                let quote = Quote {
-                    id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
-                    symbol: asset.symbol.clone(),
-                    date: current_date.and_hms_opt(2, 0, 0).unwrap(),
-                    open: current_activity.unit_price,
-                    high: current_activity.unit_price,
-                    low: current_activity.unit_price,
-                    close: current_activity.unit_price,
-                    adjclose: current_activity.unit_price,
-                    volume: current_activity.quantity,
-                    data_source: "Private".to_string(),
-                    created_at: Utc::now().naive_utc(),
-                };
-                quotes.push(quote);
-                current_date += Duration::days(1);
-            }
-
-            current_activity = activity_iter.next().unwrap();
-        }
-
-        // Add quotes for remaining days up to the last activity date
-        while current_date <= current_activity.activity_date.date() {
-            let quote = Quote {
-                id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
-                symbol: asset.symbol.clone(),
-                date: current_date.and_hms_opt(2, 0, 0).unwrap(),
-                open: current_activity.unit_price,
-                high: current_activity.unit_price,
-                low: current_activity.unit_price,
-                close: current_activity.unit_price,
-                adjclose: current_activity.unit_price,
-                volume: current_activity.quantity,
-                data_source: "Private".to_string(),
-                created_at: Utc::now().naive_utc(),
-            };
-            quotes.push(quote);
-            current_date += Duration::days(1);
-        }
-
-        // Add quotes for remaining days from the last activity date to the current date
         let today = Utc::now().naive_utc().date();
-        while current_date <= today {
-            let quote = Quote {
-                id: format!("{}_{}", current_date.format("%Y%m%d"), asset.symbol),
-                symbol: asset.symbol.clone(),
-                date: current_date.and_hms_opt(2, 0, 0).unwrap(),
-                open: current_activity.unit_price,
-                high: current_activity.unit_price,
-                low: current_activity.unit_price,
-                close: current_activity.unit_price,
-                adjclose: current_activity.unit_price,
-                volume: current_activity.quantity,
-                data_source: "Private".to_string(),
-                created_at: Utc::now().naive_utc(),
-            };
-            quotes.push(quote);
-            current_date += Duration::days(1);
+        let first_activity_date = activities[0].activity_date.date();
+        let capacity = (today - first_activity_date).num_days() as usize + 1;
+        let mut quotes = Vec::with_capacity(capacity);
+
+        // Create an iterator over activity dates and prices
+        let mut activity_changes: Vec<(NaiveDate, f64)> = activities
+            .iter()
+            .map(|activity| (activity.activity_date.date(), activity.unit_price))
+            .collect();
+        activity_changes.push((today, activity_changes.last().unwrap().1));
+
+        // Generate quotes for each day between activities
+        for window in activity_changes.windows(2) {
+            let (current_date, current_price) = window[0];
+            let next_date = window[1].0;
+            let mut date = current_date;
+
+            while date <= next_date {
+                quotes.push(Quote {
+                    id: format!("{}_{}", date.format("%Y%m%d"), asset.symbol),
+                    symbol: asset.symbol.clone(),
+                    date: date.and_hms_opt(2, 0, 0).unwrap(),
+                    open: current_price,
+                    high: current_price,
+                    low: current_price,
+                    close: current_price,
+                    adjclose: current_price,
+                    volume: 0.0, // Set to 0 since volume isn't meaningful for manual quotes
+                    data_source: "MANUAL".to_string(),
+                    created_at: Utc::now().naive_utc(),
+                });
+                date += Duration::days(1);
+            }
         }
 
+        debug!(
+            "Generated {} quotes for asset {}",
+            quotes.len(),
+            asset.symbol
+        );
         Ok(quotes)
     }
 
@@ -188,8 +162,7 @@ impl MarketDataService {
                     symbol.as_str(),
                     e
                 )
-            })?
-            .unwrap_or_else(|| Utc::now().naive_utc() - Duration::days(3 * 365));
+            })?;
 
         let start_date: SystemTime = Utc
             .from_utc_datetime(&(last_sync_date - Duration::days(1)))
@@ -209,17 +182,28 @@ impl MarketDataService {
         &self,
         conn: &mut SqliteConnection,
         ticker: &str,
-    ) -> Result<Option<NaiveDateTime>, diesel::result::Error> {
-        quotes::table
+    ) -> Result<NaiveDateTime, diesel::result::Error> {
+        let five_years_ago = Utc::now().naive_utc() - Duration::days(5 * 365);
+
+        // First try to get the most recent quote
+        let last_quote_date = quotes::table
             .filter(quotes::symbol.eq(ticker))
             .select(diesel::dsl::max(quotes::date))
-            .first::<Option<NaiveDateTime>>(conn)
-            .or_else(|_| {
-                activities::table
-                    .filter(activities::asset_id.eq(ticker))
-                    .select(diesel::dsl::min(activities::activity_date))
-                    .first::<Option<NaiveDateTime>>(conn)
-            })
+            .first::<Option<NaiveDateTime>>(conn)?;
+
+        if let Some(date) = last_quote_date {
+            return Ok(date);
+        }
+
+        // If no quotes, try to get first activity date only if it's older than 5 years
+        let first_activity_date = activities::table
+            .filter(activities::asset_id.eq(ticker))
+            .select(diesel::dsl::min(activities::activity_date))
+            .first::<Option<NaiveDateTime>>(conn)?;
+
+        Ok(first_activity_date
+            .filter(|date| *date < five_years_ago)
+            .unwrap_or(five_years_ago))
     }
 
     fn insert_quotes(&self, conn: &mut SqliteConnection, quotes: &[Quote]) -> Result<(), String> {
@@ -406,5 +390,29 @@ impl MarketDataService {
             .filter(date.le(end_date.and_hms_opt(23, 59, 59).unwrap()))
             .order(date.asc())
             .load::<Quote>(conn)
+    }
+
+    pub async fn refresh_quotes_for_symbols(
+        &self,
+        conn: &mut SqliteConnection,
+        symbols: &[String],
+    ) -> Result<(), String> {
+        debug!("Refreshing quotes for {} symbols", symbols.len());
+
+        use crate::schema::quotes;
+        diesel::delete(quotes::table)
+            .filter(quotes::symbol.eq_any(symbols))
+            .execute(conn)
+            .map_err(|e| format!("Failed to delete existing quotes: {}", e))?;
+
+        // Load assets for the given symbols
+        use crate::schema::assets::dsl::*;
+        let asset_list: Vec<Asset> = assets
+            .filter(crate::schema::assets::symbol.eq_any(symbols))
+            .load::<Asset>(conn)
+            .map_err(|e| format!("Failed to load assets: {}", e))?;
+
+        // Sync quotes for these assets
+        self.sync_asset_quotes(conn, &asset_list).await
     }
 }

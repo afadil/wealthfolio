@@ -8,8 +8,11 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, maxDecimalPlaces = 6, ...props }, ref) => {
-    const { onChange, placeholder = '0.00' } = props;
+  ({ className, maxDecimalPlaces = 6, value, onChange, ...props }, ref) => {
+    const { placeholder = '0.00' } = props;
+
+    // Ensure value is always a string
+    const controlledValue = value === undefined || value === null ? '' : value.toString();
 
     const formatCurrency = (value: string): string => {
       const numericValue = parseFloat(value);
@@ -58,6 +61,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
         className={cn('text-right', className)}
         ref={ref}
         {...props}
+        value={controlledValue}
         onChange={handleChange}
         placeholder={placeholder}
       />
