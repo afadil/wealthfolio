@@ -2,6 +2,7 @@ import z from 'zod';
 import { Goal, GoalAllocation } from '@/lib/types';
 import { newGoalSchema } from '@/lib/schemas';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
+import { logger } from '@/adapters';
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
@@ -14,7 +15,7 @@ export const getGoals = async (): Promise<Goal[]> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching goals:', error);
+    logger.error('Error fetching goals.');
     throw error;
   }
 };
@@ -34,7 +35,7 @@ export const createGoal = async (goal: NewGoal): Promise<Goal> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error creating goal:', error);
+    logger.error('Error creating goal.');
     throw error;
   }
 };
@@ -48,7 +49,7 @@ export const updateGoal = async (goal: Goal): Promise<Goal> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error updating goal:', error);
+    logger.error('Error updating goal.');
     throw error;
   }
 };
@@ -63,7 +64,7 @@ export const deleteGoal = async (goalId: string): Promise<void> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error deleting goal:', error);
+    logger.error('Error deleting goal.');
     throw error;
   }
 };
@@ -78,7 +79,7 @@ export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Pro
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error saving goals allocations:', error);
+    logger.error('Error saving goals allocations.');
     throw error;
   }
 };
@@ -90,9 +91,9 @@ export const getGoalsAllocation = async (): Promise<GoalAllocation[]> => {
         return invokeTauri('load_goals_allocations');
       default:
         throw new Error(`Unsupported`);
-    };
+    }
   } catch (error) {
-    console.error('Error fetching goals allocations:', error);
+    logger.error('Error fetching goals allocations.');
     throw error;
   }
 };

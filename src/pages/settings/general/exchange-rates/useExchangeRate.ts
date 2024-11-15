@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
+import { logger } from '@/adapters';
 import { ExchangeRate } from '@/lib/types';
 import {
   getExchangeRates,
@@ -59,9 +60,10 @@ export function useExchangeRates() {
       });
     },
     onError: (error) => {
+      logger.error(`Error updating exchange rate: ${error}`);
       toast({
         title: 'Uh oh! Something went wrong.',
-        description: `There was a problem updating the exchange rate: ${error.message}`,
+        description: `There was a problem updating the exchange rate: ${error?.message}`,
         variant: 'destructive',
       });
     },
@@ -77,9 +79,10 @@ export function useExchangeRates() {
       });
     },
     onError: (error) => {
+      logger.error(`Error adding exchange rate: ${error}`);
       toast({
         title: 'Error adding exchange rate',
-        description: `There was a problem adding the exchange rate: ${error.message}`,
+        description: `There was a problem adding the exchange rate: ${error?.message}`,
         variant: 'destructive',
       });
     },
@@ -95,9 +98,10 @@ export function useExchangeRates() {
       });
     },
     onError: (error) => {
+      logger.error(`Error deleting exchange rate: ${error}`);
       toast({
         title: 'Error deleting exchange rate',
-        description: `There was a problem deleting the exchange rate: ${error.message}`,
+        description: `There was a problem deleting the exchange rate: ${error?.message}`,
         variant: 'destructive',
       });
     },

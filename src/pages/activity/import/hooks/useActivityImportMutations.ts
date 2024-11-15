@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { logger } from '@/adapters';
 import {
   checkActivitiesImport,
   createActivities,
@@ -32,7 +33,7 @@ export function useActivityImportMutations({
       try {
         await syncHistoryQuotes();
       } catch (error) {
-        console.error('Error syncing quotes:', error);
+        logger.error(`Error syncing quotes: ${error}`);
         toast({
           title: 'Warning',
           description: 'Failed to sync market data. Portfolio values might be incomplete.',
@@ -51,7 +52,8 @@ export function useActivityImportMutations({
         description: 'Activities have been imported successfully.',
       });
     },
-    onError: () => {
+    onError: (error) => {
+      logger.error(`Error confirming import: ${error}`);
       toast({
         title: 'Uh oh! Something went wrong.',
         description: 'Please try again or report an issue if the problem persists.',
@@ -82,6 +84,7 @@ export function useActivityImportMutations({
       onSuccess?.(result);
     },
     onError: (error: any) => {
+      logger.error(`Error saving and checking import: ${error}`);
       const errorMessage = `Import failed: ${error.message}`;
       onError?.(errorMessage);
       toast({

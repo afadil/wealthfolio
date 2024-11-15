@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteGoal, updateGoalsAllocations, createGoal, updateGoal } from '@/commands/goal';
 import { QueryKeys } from '@/lib/query-keys';
 import { toast } from '@/components/ui/use-toast';
+import { logger } from '@/adapters';
 
 export const useGoalMutations = () => {
   const queryClient = useQueryClient();
@@ -28,20 +29,29 @@ export const useGoalMutations = () => {
       handleSuccess('Goal added successfully. Start adding or importing this goal activities.', [
         QueryKeys.GOALS,
       ]),
-    onError: () => handleError('adding this goal'),
+    onError: (e) => {
+      logger.error(`Error adding goal: ${e}`);
+      handleError('adding this goal');
+    },
   });
 
   const updateGoalMutation = useMutation({
     mutationFn: updateGoal,
     onSuccess: () => handleSuccess('Goal updated successfully.', [QueryKeys.GOALS]),
-    onError: () => handleError('updating this goal'),
+    onError: (e) => {
+      logger.error(`Error updating goal: ${e}`);
+      handleError('updating this goal');
+    },
   });
 
   const deleteGoalMutation = useMutation({
     mutationFn: deleteGoal,
     onSuccess: () =>
       handleSuccess('Goal deleted successfully.', [QueryKeys.GOALS, QueryKeys.GOALS_ALLOCATIONS]),
-    onError: () => handleError('deleting this goal'),
+    onError: (e) => {
+      logger.error(`Error deleting goal: ${e}`);
+      handleError('deleting this goal');
+    },
   });
 
   const saveAllocationsMutation = useMutation({
@@ -51,7 +61,10 @@ export const useGoalMutations = () => {
         QueryKeys.GOALS,
         QueryKeys.GOALS_ALLOCATIONS,
       ]),
-    onError: () => handleError('saving the allocations'),
+    onError: (e) => {
+      logger.error(`Error saving allocations: ${e}`);
+      handleError('saving the allocations');
+    },
   });
 
   return {

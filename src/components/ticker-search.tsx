@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Command as CommandPrimitive } from 'cmdk';
 import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -13,6 +13,8 @@ import { Icons } from './icons';
 interface SearchProps {
   selectedResult?: QuoteSummary;
   defaultValue?: string;
+  value?: string;
+  placeholder?: string;
   onSelectResult: (symbol: string) => void;
 }
 
@@ -25,72 +27,83 @@ interface SearchResultsProps {
   onSelect: (symbol: QuoteSummary) => void;
 }
 
-function TickerSearchInput({ selectedResult, defaultValue, onSelectResult }: SearchProps) {
-  const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(defaultValue || '');
-  const [selected, setSelected] = useState(() => {
-    if (selectedResult) {
-      return `${selectedResult.symbol} - ${selectedResult.longName}`;
-    }
-    if (defaultValue) {
-      return defaultValue;
-    }
-    return '';
-  });
+const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
+  (
+    { selectedResult, defaultValue, value, placeholder = 'Select symbol...', onSelectResult },
+    ref,
+  ) => {
+    const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState(defaultValue || value || '');
+    const [selected, setSelected] = useState(() => {
+      if (selectedResult) {
+        return `${selectedResult.symbol} - ${selectedResult.longName}`;
+      }
+      if (defaultValue) {
+        return defaultValue;
+      }
+      if (value) {
+        return value;
+      }
+      return '';
+    });
 
-  const handleSelectResult = (ticker: QuoteSummary) => {
-    onSelectResult(ticker?.symbol);
-    const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
-    setSearchQuery(displayText);
-    setSelected(displayText);
-    setOpen(false);
-  };
+    const handleSelectResult = (ticker: QuoteSummary) => {
+      onSelectResult(ticker?.symbol);
+      const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
+      setSearchQuery(displayText);
+      setSelected(displayText);
+      setOpen(false);
+    };
 
-  const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
-    queryKey: ['ticker-search', searchQuery],
-    queryFn: () => searchTicker(searchQuery),
-    enabled: searchQuery?.length > 1 && selected !== searchQuery && defaultValue !== searchQuery,
-  });
+    const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
+      queryKey: ['ticker-search', searchQuery],
+      queryFn: () => searchTicker(searchQuery),
+      enabled: searchQuery?.length > 1 && selected !== searchQuery && defaultValue !== searchQuery,
+    });
 
-  const tickers = data?.sort((a, b) => b.score - a.score);
+    const tickers = data?.sort((a, b) => b.score - a.score);
 
-  // Calculate display name for the button
-  const displayName = selected || 'Select symbol...';
+    // Calculate display name for the button
+    const displayName = selected || placeholder;
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between">
-          {displayName}
-          <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" role="combobox" className="w-full justify-between" ref={ref}>
+            {displayName}
+            <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
 
-      <PopoverContent
-        side="bottom"
-        align="start"
-        className="h-auto w-[--radix-popover-trigger-width] p-0"
-      >
-        <Command shouldFilter={false} className="border-none">
-          <CommandInput
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            placeholder="Search for symbol"
-          />
+        <PopoverContent
+          side="bottom"
+          align="start"
+          className="h-auto w-[--radix-popover-trigger-width] p-0"
+        >
+          <Command shouldFilter={false} className="border-none">
+            <CommandInput
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              placeholder="Search for symbol"
+            />
 
-          <SearchResults
-            isLoading={isLoading}
-            isError={isError}
-            query={searchQuery}
-            results={tickers}
-            selectedResult={selectedResult}
-            onSelect={handleSelectResult}
-          />
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
+            <SearchResults
+              isLoading={isLoading}
+              isError={isError}
+              query={searchQuery}
+              results={tickers}
+              selectedResult={selectedResult}
+              onSelect={handleSelectResult}
+            />
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  },
+);
+
+// Add a display name for better debugging
+TickerSearchInput.displayName = 'TickerSearchInput';
 
 function SearchResults({
   results,

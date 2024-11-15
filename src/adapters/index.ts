@@ -33,4 +33,5 @@ export {
   listenQuotesSyncCompleteTauri,
   listenQuotesSyncErrorTauri,
   openFileSaveDialogTauri,
+  logger,
 } from './tauri';

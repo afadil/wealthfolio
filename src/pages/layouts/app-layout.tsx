@@ -7,6 +7,7 @@ import { Account } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { useSettings } from '@/lib/useSettings';
 import { QueryKeys } from '@/lib/query-keys';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 const navigation: NavigationProps = {
   primary: [
@@ -63,12 +64,14 @@ const AppLayout = () => {
     <div className="flex min-h-screen bg-background">
       <SidebarNav navigation={navigation} />
       <div className="relative flex h-screen w-full overflow-hidden">
-        <main className="flex flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto">
-            <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
-            <Outlet />
-          </div>
-        </main>
+        <ErrorBoundary>
+          <main className="flex flex-1 flex-col">
+            <div className="flex-1 overflow-y-auto">
+              <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
+              <Outlet />
+            </div>
+          </main>
+        </ErrorBoundary>
       </div>
       <Toaster />
       {/* <TailwindIndicator /> */}

@@ -7,6 +7,7 @@ import {
   Goal,
   PortfolioHistory,
 } from '@/lib/types';
+import { logger } from '@/adapters';
 import { toast } from '@/components/ui/use-toast';
 import { backupDatabase } from '@/commands/settings';
 import { openFileSaveDialog } from '@/commands/file';
@@ -89,7 +90,8 @@ export function useExportData() {
         variant: 'success',
       });
     },
-    onError: () => {
+    onError: (e) => {
+      logger.error(`Error while exporting: ${e}`);
       toast({
         title: 'Something went wrong.',
         variant: 'destructive',
@@ -101,7 +103,7 @@ export function useExportData() {
     try {
       await exportDataMutation(params);
     } catch (error) {
-      console.error('Error while exporting', error);
+      logger.error(`Error while exporting: ${error}`);
     }
   };
 

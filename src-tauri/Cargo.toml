@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio-app"
-version = "1.0.20"
+version = "1.0.21"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "LGPL-3.0"
@@ -24,6 +24,8 @@ chrono = { version = "0.4.38", features = ["serde"] }
 tauri-plugin-fs = "2.0.0"
 tauri-plugin-dialog = "2.0.0"
 tauri-plugin-shell = "2.0.0"
+tauri-plugin-log = "2"
+log = "0.4"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

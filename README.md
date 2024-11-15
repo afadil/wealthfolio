@@ -110,7 +110,7 @@ Ensure you have the following installed on your machine:
 
 ### Backend
 
--  **Tauri**: Framework for building tiny, secure, and fast desktop applications.
+- **Tauri**: Framework for building tiny, secure, and fast desktop applications.
 
 ### Development Tools
 
@@ -118,7 +118,6 @@ Ensure you have the following installed on your machine:
 - **TypeScript**: Typed superset of JavaScript.
 - **ESLint**: Pluggable linting utility for JavaScript and JSX.
 - **Prettier**: Code formatter.
-
 
 ## Folder Structure
 
@@ -153,7 +152,7 @@ Contributions are welcome! Please follow these steps:
 
 ## License
 
-This project is licensed under the LGPL-3.0 license. See the `LICENSE` file for details.
+This project is licensed under the AGPL-3.0 license. See the `LICENSE` file for details.
 
 ## 🌟 Star History
 

@@ -3,6 +3,7 @@ use crate::models::{Goal, GoalsAllocation, NewGoal};
 use crate::AppState;
 use diesel::r2d2::ConnectionManager;
 use diesel::SqliteConnection;
+use log::debug;
 use tauri::State;
 
 fn get_connection(
@@ -17,7 +18,7 @@ fn get_connection(
 
 #[tauri::command]
 pub async fn get_goals(state: State<'_, AppState>) -> Result<Vec<Goal>, String> {
-    println!("Fetching active goals...");
+    debug!("Fetching active goals...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
@@ -27,7 +28,7 @@ pub async fn get_goals(state: State<'_, AppState>) -> Result<Vec<Goal>, String> 
 
 #[tauri::command]
 pub async fn create_goal(goal: NewGoal, state: State<'_, AppState>) -> Result<Goal, String> {
-    println!("Adding new goal...");
+    debug!("Adding new goal...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
@@ -37,7 +38,7 @@ pub async fn create_goal(goal: NewGoal, state: State<'_, AppState>) -> Result<Go
 
 #[tauri::command]
 pub async fn update_goal(goal: Goal, state: State<'_, AppState>) -> Result<Goal, String> {
-    println!("Updating goal...");
+    debug!("Updating goal...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
@@ -47,7 +48,7 @@ pub async fn update_goal(goal: Goal, state: State<'_, AppState>) -> Result<Goal,
 
 #[tauri::command]
 pub async fn delete_goal(goal_id: String, state: State<'_, AppState>) -> Result<usize, String> {
-    println!("Deleting goal...");
+    debug!("Deleting goal...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
@@ -60,7 +61,7 @@ pub async fn update_goal_allocations(
     allocations: Vec<GoalsAllocation>,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    println!("Updating goal allocations...");
+    debug!("Updating goal allocations...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service
@@ -72,7 +73,7 @@ pub async fn update_goal_allocations(
 pub async fn load_goals_allocations(
     state: State<'_, AppState>,
 ) -> Result<Vec<GoalsAllocation>, String> {
-    println!("Loading goal allocations...");
+    debug!("Loading goal allocations...");
     let mut conn = get_connection(&state)?;
     let service = goal_service::GoalService::new();
     service

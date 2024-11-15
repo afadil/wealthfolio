@@ -5,6 +5,7 @@ import {
   listenQuotesSyncStartTauri,
   listenQuotesSyncCompleteTauri,
   listenQuotesSyncErrorTauri,
+  logger,
 } from '@/adapters';
 
 // listenQuotesSyncStart
@@ -17,7 +18,7 @@ export const listenQuotesSyncStart = async <T>(handler: EventCallback<T>): Promi
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error listen PORTFOLIO_UPDATE_START:', error);
+    logger.error('Error listen PORTFOLIO_UPDATE_START.');
     throw error;
   }
 };
@@ -34,7 +35,7 @@ export const listenQuotesSyncComplete = async <T>(
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error listen PORTFOLIO_UPDATE_COMPLETE:', error);
+    logger.error('Error listen PORTFOLIO_UPDATE_COMPLETE.');
     throw error;
   }
 };
@@ -49,7 +50,7 @@ export const listenQuotesSyncError = async <T>(handler: EventCallback<T>): Promi
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error listen PORTFOLIO_UPDATE_ERROR:', error);
+    logger.error('Error listen PORTFOLIO_UPDATE_ERROR.');
     throw error;
   }
 };

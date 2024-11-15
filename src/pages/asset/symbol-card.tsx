@@ -8,7 +8,7 @@ import { Quote, TimePeriod } from '@/lib/types';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
-import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
+import { useRefreshQuotesMutation } from '@/hooks/useRefreshQuotes';
 import { Button } from '@/components/ui/button';
 
 // Interval descriptions mapping
@@ -27,11 +27,20 @@ const SymbolCard: React.FC<{
   totalGainPercent: number;
   currency: string;
   quoteHistory: Quote[];
+  symbol: string;
   className?: string;
-}> = ({ marketPrice, totalGainAmount, totalGainPercent, currency, quoteHistory, className }) => {
-  const updatePortfolioMutation = useRecalculatePortfolioMutation({
-    successTitle: 'Portfolio recalculated successfully',
-    errorTitle: 'Failed to recalculate portfolio',
+}> = ({
+  marketPrice,
+  totalGainAmount,
+  totalGainPercent,
+  currency,
+  quoteHistory,
+  symbol,
+  className,
+}) => {
+  const refreshQuotesMutation = useRefreshQuotesMutation({
+    successTitle: 'Quotes refreshed successfully',
+    errorTitle: 'Failed to refresh quotes',
   });
 
   const [interval, setInterval] = useState<TimePeriod>('3M');
@@ -63,7 +72,7 @@ const SymbolCard: React.FC<{
       return quoteHistory
         .map((quote) => ({
           date: quote.date,
-          totalValue: quote.adjclose,
+          totalValue: quote.close,
           currency: currency,
         }))
         .reverse();
@@ -73,7 +82,7 @@ const SymbolCard: React.FC<{
       .filter((quote) => new Date(quote.date) >= comparisonDate)
       .map((quote) => ({
         date: quote.date,
-        totalValue: quote.adjclose,
+        totalValue: quote.close,
         currency: currency,
       }))
       .reverse();
@@ -132,18 +141,18 @@ const SymbolCard: React.FC<{
                   </h4>
                 </div>
                 <Button
-                  onClick={() => updatePortfolioMutation.mutate()}
+                  onClick={() => refreshQuotesMutation.mutate([symbol])}
                   variant="outline"
                   size="sm"
                   className="rounded-full"
-                  disabled={updatePortfolioMutation.isPending}
+                  disabled={refreshQuotesMutation.isPending}
                 >
-                  {updatePortfolioMutation.isPending ? (
+                  {refreshQuotesMutation.isPending ? (
                     <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Icons.Refresh className="mr-2 h-4 w-4" />
                   )}
-                  {updatePortfolioMutation.isPending ? 'Updating portfolio...' : 'Update Portfolio'}
+                  {refreshQuotesMutation.isPending ? 'Refreshing quotes...' : 'Refresh Quotes'}
                 </Button>
               </div>
             </HoverCardContent>

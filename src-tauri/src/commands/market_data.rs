@@ -3,12 +3,12 @@ use crate::market_data::market_data_service::MarketDataService;
 
 use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
 use crate::AppState;
+use log::debug;
 use tauri::State;
 use wealthfolio_core::models::Asset;
 
 #[tauri::command]
 pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
-    println!("Searching for ticker symbol: {}", query);
     let service = MarketDataService::new().await;
 
     service
@@ -50,7 +50,7 @@ pub async fn update_asset_profile(
 
 #[tauri::command]
 pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
-    println!("Synching quotes history");
+    debug!("Synching quotes history");
     let mut conn = state
         .pool
         .get()
@@ -58,6 +58,23 @@ pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
     let service = MarketDataService::new().await;
     service
         .initialize_and_sync_quotes(&mut conn)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn refresh_quotes_for_symbols(
+    symbols: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Refreshing quotes for symbols: {:?}", symbols);
+    let mut conn = state
+        .pool
+        .get()
+        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = MarketDataService::new().await;
+    service
+        .refresh_quotes_for_symbols(&mut conn, &symbols)
         .await
         .map_err(|e| e.to_string())
 }

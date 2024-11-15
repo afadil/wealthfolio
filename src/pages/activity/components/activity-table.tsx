@@ -46,6 +46,8 @@ const activityTypeOptions = [
   { label: 'Interest', value: 'INTEREST' },
 ];
 
+const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
+
 export const ActivityTable = ({
   accounts,
   handleEdit,
@@ -147,7 +149,12 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activityType = row.getValue('activityType') as string;
           const quantity = row.getValue('quantity') as number;
-          return <div className="pr-4 text-right">{activityType === 'SPLIT' ? '-' : quantity}</div>;
+
+          if (CASH_ACTIVITY_TYPES.includes(activityType) || activityType === 'SPLIT') {
+            return <div className="pr-4 text-right">-</div>;
+          }
+
+          return <div className="pr-4 text-right">{quantity}</div>;
         },
       },
       {
@@ -170,7 +177,9 @@ export const ActivityTable = ({
           if (activityType === 'SPLIT') {
             return <div className="text-right">{unitPrice.toFixed(0)} : 1</div>;
           }
-
+          if (activityType === 'FEE') {
+            return <div className="pr-4 text-right">-</div>;
+          }
           return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },
@@ -206,11 +215,18 @@ export const ActivityTable = ({
           const unitPrice = row.getValue('unitPrice') as number;
           const quantity = row.getValue('quantity') as number;
           const currency = (row.getValue('currency') as string) || 'USD';
+          const fee = row.getValue('fee') as number;
+
+          if (activityType === 'SPLIT') {
+            return <div className="pr-4 text-right">-</div>;
+          }
+
+          if (activityType === 'FEE') {
+            return <div className="pr-4 text-right">{formatAmount(fee, currency)}</div>;
+          }
 
           return (
-            <div className="pr-4 text-right">
-              {activityType === 'SPLIT' ? '-' : formatAmount(unitPrice * quantity, currency)}
-            </div>
+            <div className="pr-4 text-right">{formatAmount(unitPrice * quantity, currency)}</div>
           );
         },
       },
@@ -379,7 +395,7 @@ export const ActivityTable = ({
         onScroll={(e) => fetchMoreOnBottomReachedDebounced(e.target as HTMLDivElement)}
       >
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted-foreground/5">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {

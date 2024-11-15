@@ -72,7 +72,7 @@ export interface ActivityDetails {
   accountCurrency: string;
   assetSymbol: string;
   assetName?: string;
-  assetDataSource?: string;
+  assetDataSource?: 'Yahoo' | 'MANUAL';
 }
 
 export type ActivitySearchResponse = {

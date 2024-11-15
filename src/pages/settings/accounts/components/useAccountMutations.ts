@@ -3,6 +3,7 @@ import { toast } from '@/components/ui/use-toast';
 import { createAccount, updateAccount, deleteAccount } from '@/commands/account';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { QueryKeys } from '@/lib/query-keys';
+import { logger } from '@/adapters';
 interface UseAccountMutationsProps {
   onSuccess?: () => void;
 }
@@ -35,7 +36,10 @@ export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutation
       handleSuccess('Account created successfully.');
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     },
-    onError: () => handleError('creating'),
+    onError: (e) => {
+      logger.error(`Error creating account: ${e}`);
+      handleError('creating');
+    },
   });
 
   const updateAccountMutation = useMutation({
@@ -47,7 +51,10 @@ export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutation
         forceFullCalculation: true,
       });
     },
-    onError: () => handleError('updating'),
+    onError: (e) => {
+      logger.error(`Error updating account: ${e}`);
+      handleError('updating');
+    },
   });
 
   const deleteAccountMutation = useMutation({
@@ -59,7 +66,10 @@ export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutation
         forceFullCalculation: true,
       });
     },
-    onError: () => handleError('deleting'),
+    onError: (e) => {
+      logger.error(`Error deleting account: ${e}`);
+      handleError('deleting');
+    },
   });
 
   return { createAccountMutation, updateAccountMutation, deleteAccountMutation };

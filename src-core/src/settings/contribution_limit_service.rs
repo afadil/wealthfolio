@@ -2,6 +2,7 @@ use crate::schema::{accounts, activities};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use log::error;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -115,7 +116,7 @@ impl ContributionLimitService {
             let converted_amount = fx_service
                 .convert_currency(amount, &currency, base_currency)
                 .unwrap_or_else(|e| {
-                    println!("Conversion error: {:?}", e);
+                    error!("Currency conversion error: {:?}", e);
                     amount // Use original amount if conversion fails
                 });
 

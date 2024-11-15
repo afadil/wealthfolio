@@ -42,21 +42,128 @@ export const newGoalSchema = z.object({
 const baseActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
+  activityDate: z.union([z.date(), z.string().datetime()]).default(new Date()),
   currency: z.string().optional(),
+  comment: z.string().optional().nullable(),
+  isDraft: z.boolean().optional().default(false),
+});
+
+const feeActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('FEE'),
+  assetId: z.string().optional(),
   fee: z.coerce
     .number({
-      required_error: 'Please enter a valid fee.',
+      required_error: 'Fee is required.',
       invalid_type_error: 'Fee must be a positive number.',
     })
     .min(0, { message: 'Fee must be a non-negative number.' }),
-  isDraft: z.boolean(),
+});
+
+const cashActivitySchema = baseActivitySchema.extend({
+  activityType: z.enum(['DEPOSIT', 'WITHDRAWAL', 'INTEREST']),
+  assetId: z.string().optional(),
+  quantity: z.number().default(1),
+  unitPrice: z.coerce.number().min(0),
+  fee: z.coerce
+    .number({
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0)
+    .optional(),
+});
+
+const dividendActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('DIVIDEND'),
+  assetId: z.string().min(1, { message: 'Please select a security' }),
+  quantity: z.number().default(1),
+  unitPrice: z.coerce.number().min(0),
+  fee: z.coerce
+    .number({
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0)
+    .optional(),
+});
+
+const splitActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('SPLIT'),
+  assetId: z.string().min(1, { message: 'Please select a security' }),
+  unitPrice: z.coerce.number().positive('Split ratio must be greater than 0'),
+  quantity: z.number().default(1),
+  fee: z.coerce
+    .number({
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0)
+    .optional(),
+});
+
+const transferInActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('TRANSFER_IN'),
+  assetId: z.string().min(1, { message: 'Please select a security' }),
+  quantity: z.coerce.number().positive(),
+  unitPrice: z.coerce.number().min(0),
+  fee: z.coerce
+    .number({
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0)
+    .optional(),
+});
+
+const transferOutActivitySchema = baseActivitySchema.extend({
+  activityType: z.literal('TRANSFER_OUT'),
+  assetId: z.string().min(1, { message: 'Please select a security' }),
+  quantity: z.coerce.number().positive(),
+  fee: z.coerce
+    .number({
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0)
+    .optional(),
+});
+
+const tradeActivitySchema = baseActivitySchema.extend({
+  activityType: z.enum(['BUY', 'SELL']),
+  assetId: z.string().min(1, { message: 'Please select a security' }),
   quantity: z.coerce
     .number({
       required_error: 'Please enter a valid quantity.',
       invalid_type_error: 'Quantity must be a number.',
     })
-    .min(0, { message: 'Quantity must be a non-negative number.' }),
+    .positive(),
+  unitPrice: z.coerce.number().min(0),
+  fee: z.coerce
+    .number({
+      required_error: 'Please enter a valid fee.',
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .default(0),
+  assetDataSource: z.enum(['Yahoo', 'MANUAL']).default('Yahoo'),
+});
 
+export const newActivitySchema = z.discriminatedUnion('activityType', [
+  cashActivitySchema,
+  feeActivitySchema,
+  dividendActivitySchema,
+  splitActivitySchema,
+  transferInActivitySchema,
+  transferOutActivitySchema,
+  tradeActivitySchema,
+]);
+
+export type ActivityFormValues = z.infer<typeof newActivitySchema>;
+
+export const importActivitySchema = z.object({
+  id: z.string().uuid().optional(),
+  accountId: z.string().min(1, { message: 'Please select an account.' }),
+  currency: z.string().optional(),
   activityType: z.enum(
     [
       'BUY',
@@ -79,21 +186,6 @@ const baseActivitySchema = z.object({
       },
     },
   ),
-  unitPrice: z.coerce
-    .number({
-      required_error: 'Please enter a valid price.',
-      invalid_type_error: 'Price must be a non-negative number.',
-    })
-    .min(0, { message: 'Price must be a non-negative number.' }),
-  comment: z.string().optional(),
-});
-
-export const newActivitySchema = baseActivitySchema.extend({
-  assetId: z.string().min(1, { message: 'Asset ID is required' }),
-  activityDate: z.union([z.date(), z.string().datetime()]).optional(),
-});
-
-export const importActivitySchema = baseActivitySchema.extend({
   date: z.union([z.date(), z.string().datetime()]).optional(),
   symbol: z.string().min(1, { message: 'Symbol is required' }),
   amount: z.coerce
@@ -102,12 +194,31 @@ export const importActivitySchema = baseActivitySchema.extend({
       invalid_type_error: 'Amount must be a number.',
     })
     .optional(),
+  quantity: z.coerce
+    .number({
+      required_error: 'Please enter a valid quantity.',
+      invalid_type_error: 'Quantity must be a number.',
+    })
+    .min(0, { message: 'Quantity must be a non-negative number.' }),
+  unitPrice: z.coerce
+    .number({
+      required_error: 'Please enter a valid price.',
+      invalid_type_error: 'Price must be a non-negative number.',
+    })
+    .min(0, { message: 'Price must be a non-negative number.' }),
+  fee: z.coerce
+    .number({
+      required_error: 'Please enter a valid fee.',
+      invalid_type_error: 'Fee must be a positive number.',
+    })
+    .min(0, { message: 'Fee must be a non-negative number.' }),
   accountName: z.string().optional(),
   symbolName: z.string().optional(),
   error: z.string().optional(),
-  isDraft: z.boolean().default(true),
   isValid: z.boolean().default(false),
   lineNumber: z.number().optional(),
+  isDraft: z.boolean(),
+  comment: z.string().optional(),
 });
 
 export const newContributionLimitSchema = z.object({

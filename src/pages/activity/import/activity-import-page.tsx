@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ActivityImport } from '@/lib/types';
+import { logger } from '@/adapters';
 import { ActivityImportForm } from './import-form';
 import ValidationAlert from './import-validation-alert';
 import { ImportHelpPopover } from './import-help';
@@ -55,6 +56,7 @@ const ActivityImportPage = () => {
         navigate('/activities');
       },
       onError: (error: any) => {
+        logger.error(`Error confirming import: ${error}`);
         setError(error.message);
       },
     });

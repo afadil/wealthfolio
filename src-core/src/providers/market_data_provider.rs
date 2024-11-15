@@ -24,7 +24,7 @@ pub enum MarketDataError {
 #[derive(Debug)]
 pub enum MarketDataProviderType {
     Yahoo,
-    Private,
+    Manual,
 }
 
 #[async_trait]

@@ -32,6 +32,8 @@ export const AssetProfilePage = () => {
   const { symbol = '' } = useParams<{ symbol: string }>();
   const location = useLocation();
 
+  if (!symbol) return null;
+
   const { data, isLoading: isAssetDataLoading } = useQuery<AssetData, Error>({
     queryKey: [QueryKeys.ASSET_DATA, symbol],
     queryFn: () => getAssetData(symbol),
@@ -78,13 +80,11 @@ export const AssetProfilePage = () => {
 
   const profile = {
     ...data?.asset,
-    marketPrice: quote?.adjclose ?? 0,
+    marketPrice: quote?.close ?? 0,
     totalGainAmount: holding?.performance?.totalGainAmount ?? 0,
     totalGainPercent: holding?.performance?.totalGainPercent ?? 0,
     calculatedAt: holding?.calculatedAt,
   };
-
-  if (!symbol || !holding) return null;
 
   const symbolHolding = {
     numShares: holding?.quantity,
@@ -92,8 +92,8 @@ export const AssetProfilePage = () => {
     bookValue: holding?.bookValue,
     averagePrice: holding?.averageCost ?? 0,
     portfolioPercent: holding?.portfolioPercent,
-    todaysReturn: (quote?.adjclose ?? 0) - (quote?.open ?? 0),
-    todaysReturnPercent: (((quote?.adjclose ?? 0) - (quote?.open ?? 0)) / (quote?.open ?? 1)) * 100,
+    todaysReturn: (quote?.close ?? 0) - (quote?.open ?? 0),
+    todaysReturnPercent: (((quote?.close ?? 0) - (quote?.open ?? 0)) / (quote?.open ?? 1)) * 100,
     totalReturn: holding?.performance?.totalGainAmount,
     totalReturnPercent: holding?.performance?.totalGainPercent,
     currency: data?.asset.currency || 'USD',
@@ -132,7 +132,8 @@ export const AssetProfilePage = () => {
       <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
         {profile && (
           <SymbolCard
-            className="col-span-1 md:col-span-2"
+            symbol={profile?.symbol || holding?.symbol}
+            className={`col-span-1 ${holding ? 'md:col-span-2' : 'md:col-span-3'}`}
             marketPrice={profile?.marketPrice}
             totalGainAmount={profile?.totalGainAmount}
             totalGainPercent={profile?.totalGainPercent}
@@ -140,7 +141,9 @@ export const AssetProfilePage = () => {
             quoteHistory={data?.quoteHistory ?? []}
           />
         )}
-        <SymbolHoldingCard holdingData={symbolHolding} className="col-span-1 md:col-span-1" />
+        {holding && (
+          <SymbolHoldingCard holdingData={symbolHolding} className="col-span-1 md:col-span-1" />
+        )}
       </div>
       <div className="group relative">
         <h3 className="text-lg font-bold">About</h3>

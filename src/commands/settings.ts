@@ -1,5 +1,5 @@
 import { Settings } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
+import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 
 export const getSettings = async (): Promise<Settings> => {
   try {
@@ -10,7 +10,7 @@ export const getSettings = async (): Promise<Settings> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    logger.error('Error fetching settings.');
     return {} as Settings;
   }
 };
@@ -24,7 +24,7 @@ export const saveSettings = async (settings: Settings): Promise<Settings> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error updating settings:', error);
+    logger.error('Error updating settings.');
     throw error;
   }
 };
@@ -40,7 +40,7 @@ export const backupDatabase = async (): Promise<{ filename: string; data: Uint8A
         throw new Error(`Unsupported environment for database backup`);
     }
   } catch (error) {
-    console.error('Error backing up database:', error);
+    logger.error('Error backing up database.');
     throw error;
   }
 };

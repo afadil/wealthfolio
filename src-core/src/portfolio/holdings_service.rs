@@ -1,19 +1,14 @@
 use crate::account::account_service::AccountService;
 use crate::activity::activity_service::ActivityService;
 use crate::asset::asset_service::AssetService;
-use crate::error::{PortfolioError, Result};
+use crate::errors::{AssetError, CurrencyError, Error, Result, ValidationError};
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Account, Activity, Asset, Holding, Performance, Quote};
 use bigdecimal::BigDecimal;
 use diesel::SqliteConnection;
+use log::{error, warn};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-
-impl From<bigdecimal::ParseBigDecimalError> for PortfolioError {
-    fn from(error: bigdecimal::ParseBigDecimalError) -> Self {
-        PortfolioError::InvalidDataError(error.to_string())
-    }
-}
 
 pub struct HoldingsService {
     account_service: AccountService,
@@ -40,7 +35,7 @@ impl HoldingsService {
         let assets = self.asset_service.get_assets(conn)?;
         self.fx_service
             .initialize(conn)
-            .map_err(|e| PortfolioError::CurrencyConversionError(e.to_string()))?;
+            .map_err(|e| Error::Currency(CurrencyError::ConversionFailed(e.to_string())))?;
 
         let mut holdings = self.aggregate_holdings(&accounts, &activities, &assets)?;
         let quotes = self.fetch_quotes(conn, &holdings)?;
@@ -63,12 +58,16 @@ impl HoldingsService {
             let asset = assets
                 .iter()
                 .find(|a| a.id == activity.asset_id)
-                .ok_or_else(|| PortfolioError::AssetNotFoundError(activity.asset_id.clone()))?;
+                .ok_or_else(|| Error::Asset(AssetError::NotFound(activity.asset_id.clone())))?;
 
             let account = accounts
                 .iter()
                 .find(|a| a.id == activity.account_id)
-                .ok_or_else(|| PortfolioError::InvalidDataError("Account not found".to_string()))?;
+                .ok_or_else(|| {
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Account not found".to_string(),
+                    ))
+                })?;
 
             let key = format!("{}-{}", activity.account_id, activity.asset_id);
             let holding = holdings
@@ -147,12 +146,12 @@ impl HoldingsService {
                         *avg_cost = avg_cost.clone() / &split_ratio;
                     }
                 } else {
-                    return Err(PortfolioError::InvalidDataError(
+                    return Err(Error::Validation(ValidationError::InvalidInput(
                         "Invalid split ratio".to_string(),
-                    ));
+                    )));
                 }
             }
-            _ => println!("Unhandled activity type: {}", activity.activity_type),
+            _ => warn!("Unhandled activity type: {}", activity.activity_type),
         }
 
         holding.quantity = holding.quantity.round(6);
@@ -180,7 +179,7 @@ impl HoldingsService {
                 Ok(quote) => {
                     quotes.insert(symbol.clone(), quote);
                 }
-                Err(e) => eprintln!("Error fetching quote for symbol {}: {}", symbol, e),
+                Err(e) => error!("Error fetching quote for symbol {}: {}", symbol, e),
             }
         }
 
@@ -208,7 +207,11 @@ impl HoldingsService {
     fn update_holding_with_quote(&self, holding: &mut Holding, quote: &Quote) -> Result<()> {
         holding.market_price = Some(
             BigDecimal::from_str(&quote.close.to_string())
-                .map_err(|_| PortfolioError::InvalidDataError("Invalid market price".to_string()))?
+                .map_err(|_| {
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Invalid market price".to_string(),
+                    ))
+                })?
                 .round(6),
         );
         holding.market_value = (&holding.quantity
@@ -220,12 +223,16 @@ impl HoldingsService {
 
         let opening_value = (&holding.quantity
             * BigDecimal::from_str(&quote.open.to_string()).map_err(|_| {
-                PortfolioError::InvalidDataError("Invalid opening price".to_string())
+                Error::Validation(ValidationError::InvalidInput(
+                    "Invalid opening price".to_string(),
+                ))
             })?)
         .round(6);
         let closing_value = (&holding.quantity
             * BigDecimal::from_str(&quote.close.to_string()).map_err(|_| {
-                PortfolioError::InvalidDataError("Invalid closing price".to_string())
+                Error::Validation(ValidationError::InvalidInput(
+                    "Invalid closing price".to_string(),
+                ))
             })?)
         .round(6);
         holding.performance.day_gain_amount = Some((&closing_value - &opening_value).round(6));
@@ -257,7 +264,9 @@ impl HoldingsService {
             .get_latest_exchange_rate(&holding.currency, account_currency)
             .map(|rate| {
                 BigDecimal::from_str(&rate.to_string()).map_err(|_| {
-                    PortfolioError::InvalidDataError("Invalid exchange rate".to_string())
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Invalid exchange rate".to_string(),
+                    ))
                 })
             })
             .unwrap_or_else(|_| Ok(BigDecimal::from(1)))?;

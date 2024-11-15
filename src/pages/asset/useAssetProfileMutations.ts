@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateAssetProfile } from '@/commands/market-data';
 import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
+import { logger } from '@/adapters';
 
 export const useAssetProfileMutations = () => {
   const queryClient = useQueryClient();
@@ -29,7 +30,7 @@ export const useAssetProfileMutations = () => {
       handleSuccess('Asset profile updated successfully.', result.id);
     },
     onError: (error) => {
-      console.error('Error updating asset profile:', error);
+      logger.error(`Error updating asset profile: ${error}`);
       handleError('updating the asset profile');
     },
   });

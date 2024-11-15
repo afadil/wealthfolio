@@ -45,12 +45,16 @@ export const HoldingsPage = () => {
 
   return (
     <ApplicationShell className="p-6">
-      <ApplicationHeader heading="Holdings"></ApplicationHeader>
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="holdings">Holdings</TabsTrigger>
-        </TabsList>
+        <ApplicationHeader heading="Holdings">
+          <div className="flex items-center space-x-2">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            </TabsList>
+          </div>
+        </ApplicationHeader>
+
         <TabsContent value="holdings" className="space-y-4">
           <HoldingsTable
             holdings={(holdings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}

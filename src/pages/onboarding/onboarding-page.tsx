@@ -66,7 +66,7 @@ export const OnboardingPage = () => {
               <Button className="mt-4" asChild>
                 <Link to="/settings/general">
                   Let's get started
-                  <Icons.ArrowRight className="ml-2 h-4 w-4 text-white" />
+                  <Icons.ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </div>

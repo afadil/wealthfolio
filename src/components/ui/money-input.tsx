@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { Input } from './input';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   currency?: string;
@@ -7,22 +8,24 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, currency = 'USD', maxDecimalPlaces = 6, ...props }, ref) => {
-    const { onChange } = props;
+  ({ className, maxDecimalPlaces = 6, value, onChange, ...props }, ref) => {
+    const { placeholder = '0.00' } = props;
+
+    // Ensure value is always a string
+    const controlledValue = value === undefined || value === null ? '' : value.toString();
 
     const formatCurrency = (value: string): string => {
       const numericValue = parseFloat(value);
       return isNaN(numericValue)
         ? ''
         : numericValue.toLocaleString(undefined, {
-            style: 'currency',
-            currency: currency,
             minimumFractionDigits: 2,
             maximumFractionDigits: maxDecimalPlaces,
           });
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const cursorPos = e.target.selectionStart;
       let rawValue = e.target.value.replace(/[^\d.]/g, '');
 
       // Ensure only one decimal point
@@ -37,6 +40,11 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
       // Update the input value with the formatted amount
       e.target.value = formattedValue;
 
+      // Immediately restore cursor position
+      if (cursorPos !== null) {
+        e.target.setSelectionRange(cursorPos, cursorPos);
+      }
+
       // Call the original onChange with the numeric value
       if (onChange) {
         const numericValue = parseFloat(rawValue);
@@ -49,14 +57,13 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
     };
 
     return (
-      <input
-        className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-          className,
-        )}
+      <Input
+        className={cn('text-right', className)}
         ref={ref}
         {...props}
+        value={controlledValue}
         onChange={handleChange}
+        placeholder={placeholder}
       />
     );
   },

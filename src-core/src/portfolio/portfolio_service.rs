@@ -8,6 +8,7 @@ use crate::models::{
 };
 
 use diesel::prelude::*;
+use log::debug;
 
 use std::sync::Arc;
 
@@ -108,7 +109,7 @@ impl PortfolioService {
         let result = self.calculate_historical_data(conn, None, false).await;
 
         let duration = start.elapsed();
-        println!(
+        debug!(
             "update_portfolio completed in: {:?} seconds",
             duration.as_secs_f64()
         );
@@ -255,7 +256,7 @@ impl PortfolioService {
         let mut prev_value = None;
 
         for quote in quote_history.iter() {
-            let value = quote.adjclose;
+            let value = quote.close;
 
             if let Some(prev) = prev_value {
                 let daily_return = (value / prev) - 1.0;

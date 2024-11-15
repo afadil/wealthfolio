@@ -1,4 +1,10 @@
-import { getRunEnv, openCsvFileDialogTauri, openFileSaveDialogTauri, RUN_ENV } from '@/adapters';
+import {
+  getRunEnv,
+  openCsvFileDialogTauri,
+  openFileSaveDialogTauri,
+  RUN_ENV,
+  logger,
+} from '@/adapters';
 
 // openCsvFileDialog
 export const openCsvFileDialog = async (): Promise<null | string | string[]> => {
@@ -10,7 +16,7 @@ export const openCsvFileDialog = async (): Promise<null | string | string[]> => 
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    console.error('Error open csv file', error);
+    logger.error('Error open csv file.');
     throw error;
   }
 };
