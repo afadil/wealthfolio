@@ -22,6 +22,11 @@ const navigation: NavigationProps = {
       href: '/holdings',
     },
     {
+      icon: <Icons.Performance className="h-5 w-5" />,
+      title: 'Performance',
+      href: '/performance',
+    },
+    {
       icon: <Icons.Income className="h-5 w-5" />,
       title: 'Income',
       href: '/income',

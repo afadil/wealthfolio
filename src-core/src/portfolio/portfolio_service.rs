@@ -18,6 +18,18 @@ use crate::portfolio::income_service::IncomeService;
 
 use chrono::NaiveDate;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ReturnMethod {
+    TimeWeighted,
+    MoneyWeighted,
+}
+
+impl Default for ReturnMethod {
+    fn default() -> Self {
+        ReturnMethod::TimeWeighted
+    }
+}
+
 pub struct PortfolioService {
     account_service: AccountService,
     activity_service: ActivityService,
@@ -187,51 +199,87 @@ impl PortfolioService {
         account_id: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
+        method: ReturnMethod,
     ) -> Result<CumulativeReturns, Box<dyn std::error::Error>> {
         let portfolio_history = self
             .history_service
             .get_portfolio_history(conn, Some(account_id))?;
 
-        let mut portfolio_returns = Vec::new();
-        let mut prev_value = None;
-
-        for history in portfolio_history
+        // Parse dates and filter history
+        let mut sorted_history: Vec<_> = portfolio_history
             .iter()
-            .filter(|h| h.date >= start_date.to_string() && h.date <= end_date.to_string())
-        {
-            let date = NaiveDate::parse_from_str(&history.date, "%Y-%m-%d")?;
-            let value = history.market_value;
+            .filter_map(|h| {
+                NaiveDate::parse_from_str(&h.date, "%Y-%m-%d")
+                    .ok()
+                    .filter(|date| date >= &start_date && date <= &end_date)
+                    .map(|date| (date, h))
+            })
+            .collect();
 
-            if let Some(prev) = prev_value {
-                let daily_return = (value / prev) - 1.0;
-                portfolio_returns.push((date, daily_return));
-            }
-            prev_value = Some(value);
-        }
+        // Sort by parsed date
+        sorted_history.sort_by_key(|(date, _)| *date);
 
         let mut cumulative_returns = Vec::new();
-        let mut total_return = 1.0;
 
-        for (date, return_value) in portfolio_returns.iter() {
-            total_return *= 1.0 + return_value;
-            cumulative_returns.push(CumulativeReturn {
-                date: date.format("%Y-%m-%d").to_string(),
-                value: total_return - 1.0,
-            });
+        if let Some((_, first_day)) = sorted_history.first() {
+            let mut prev_total_value = first_day.total_value;
+            let mut prev_net_deposit = first_day.net_deposit;
+
+            for (date, history) in sorted_history.iter() {
+                let deposit_change = history.net_deposit - prev_net_deposit;
+
+                let period_return = match method {
+                    ReturnMethod::TimeWeighted => {
+                        if prev_total_value != 0.0 {
+                            if deposit_change != 0.0 {
+                                let adjusted_end_value = history.total_value - deposit_change;
+                                (adjusted_end_value - prev_total_value) / prev_total_value
+                            } else {
+                                (history.total_value - prev_total_value) / prev_total_value
+                            }
+                        } else {
+                            0.0
+                        }
+                    }
+                    ReturnMethod::MoneyWeighted => {
+                        let denominator = prev_total_value + (deposit_change / 2.0);
+                        if denominator != 0.0 {
+                            (history.total_value - prev_total_value - deposit_change) / denominator
+                        } else {
+                            0.0
+                        }
+                    }
+                };
+
+                cumulative_returns.push(CumulativeReturn {
+                    date: date.format("%Y-%m-%d").to_string(),
+                    value: period_return,
+                });
+
+                prev_total_value = history.total_value;
+                prev_net_deposit = history.net_deposit;
+            }
+
+            // Calculate cumulative returns
+            let mut cumulative_value = 1.0;
+            for ret in cumulative_returns.iter_mut() {
+                cumulative_value *= 1.0 + ret.value;
+                ret.value = cumulative_value - 1.0;
+            }
         }
 
-        let total_return = if !cumulative_returns.is_empty() {
-            cumulative_returns.last().unwrap().value
-        } else {
-            0.0
-        };
+        let total_return = cumulative_returns
+            .last()
+            .map(|ret| ret.value)
+            .unwrap_or(0.0);
 
-        let annualized_return = if !cumulative_returns.is_empty() {
-            let years = (end_date - start_date).num_days() as f64 / 365.25;
-            (1.0 + total_return).powf(1.0 / years) - 1.0
-        } else {
-            0.0
-        };
+        let years = (end_date - start_date).num_days() as f64 / 365.25;
+        let annualized_return =
+            if !cumulative_returns.is_empty() && total_return > -1.0 && years > 0.0 {
+                ((1.0 + total_return).powf(1.0 / years)) - 1.0
+            } else {
+                total_return
+            };
 
         Ok(CumulativeReturns {
             id: account_id.to_string(),

@@ -18,8 +18,9 @@ use commands::market_data::{
     get_asset_data, refresh_quotes_for_symbols, search_symbol, synch_quotes, update_asset_profile,
 };
 use commands::portfolio::{
-    calculate_historical_data, compute_holdings, get_accounts_summary, get_income_summary,
-    get_portfolio_history, recalculate_portfolio,
+    calculate_account_cumulative_returns, calculate_historical_data,
+    calculate_symbol_cumulative_returns, compute_holdings, get_accounts_summary,
+    get_income_summary, get_portfolio_history, recalculate_portfolio,
 };
 use commands::settings::{
     add_exchange_rate, calculate_deposits_for_accounts, create_contribution_limit,
@@ -157,6 +158,8 @@ pub fn main() {
             get_portfolio_history,
             get_accounts_summary,
             recalculate_portfolio,
+            calculate_account_cumulative_returns,
+            calculate_symbol_cumulative_returns,
             backup_database,
             get_contribution_limits,
             create_contribution_limit,

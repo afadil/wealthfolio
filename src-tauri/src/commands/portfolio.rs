@@ -2,8 +2,11 @@ use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, Port
 use crate::portfolio::portfolio_service::PortfolioService;
 use crate::AppState;
 
+use chrono::NaiveDate;
 use log::debug;
 use tauri::State;
+use wealthfolio_core::models::CumulativeReturns;
+use wealthfolio_core::portfolio::portfolio_service::ReturnMethod;
 
 async fn create_portfolio_service(state: &State<'_, AppState>) -> Result<PortfolioService, String> {
     let base_currency = state.base_currency.read().unwrap().clone();
@@ -91,4 +94,50 @@ pub async fn get_income_summary(state: State<'_, AppState>) -> Result<Vec<Income
     service
         .get_income_summary(&mut conn)
         .map_err(|e| format!("Failed to fetch income summary: {}", e))
+}
+
+#[tauri::command]
+pub async fn calculate_account_cumulative_returns(
+    state: State<'_, AppState>,
+    account_id: String,
+    start_date: String,
+    end_date: String,
+    method: Option<String>,
+) -> Result<CumulativeReturns, String> {
+    let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
+
+    let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid start date: {}", e))?;
+    let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid end date: {}", e))?;
+
+    let return_method = match method.as_deref() {
+        Some("MWR") => ReturnMethod::MoneyWeighted,
+        _ => ReturnMethod::TimeWeighted,
+    };
+
+    service
+        .calculate_account_cumulative_returns(&mut conn, &account_id, start, end, return_method)
+        .map_err(|e| format!("Failed to calculate cumulative returns: {}", e))
+}
+
+#[tauri::command]
+pub async fn calculate_symbol_cumulative_returns(
+    state: State<'_, AppState>,
+    symbol: String,
+    start_date: String,
+    end_date: String,
+) -> Result<CumulativeReturns, String> {
+    let service = create_portfolio_service(&state).await?;
+    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
+
+    let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid start date: {}", e))?;
+    let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid end date: {}", e))?;
+
+    service
+        .calculate_symbol_cumulative_returns(&mut conn, &symbol, start, end)
+        .map_err(|e| format!("Failed to calculate cumulative returns: {}", e))
 }
