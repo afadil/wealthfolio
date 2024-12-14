@@ -3,28 +3,28 @@ name = "wealthfolio-app"
 version = "1.0.21"
 description = "Portfolio tracker"
 authors = ["Aziz Fadil"]
-license = "LGPL-3.0"
+license = "AGPL-3.0"
 repository = ""
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.0.0", features = [] }
+tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
 wealthfolio_core = { path = "../src-core" }
-tauri = { version = "2.0.0", features = [] }
-diesel = { version = "2.2.4", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
+tauri = { version = "2.1", features = [] }
+diesel = { version = "2.2", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15.7"
 csv = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.128"
 chrono = { version = "0.4.38", features = ["serde"] }
-tauri-plugin-fs = "2.0.0"
-tauri-plugin-dialog = "2.0.0"
-tauri-plugin-shell = "2.0.0"
-tauri-plugin-log = "2"
+tauri-plugin-fs = "2.2"
+tauri-plugin-dialog = "2.2"
+tauri-plugin-shell = "2.2"
+tauri-plugin-log = "2.2"
 log = "0.4"
 
 [features]
