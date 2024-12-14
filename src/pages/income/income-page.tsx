@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { GainPercent } from '@/components/gain-percent';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Badge } from '@/components/ui/badge';
+import { useHideInvestmentValues } from '@/context/hideInvestmentValuesProvider';
 
 const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [
   { code: 'TOTAL', label: 'All Time' },
@@ -62,6 +63,7 @@ const IncomePeriodSelector: React.FC<{
 
 export default function IncomePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<'TOTAL' | 'YTD' | 'LAST_YEAR'>('TOTAL');
+  const { hideValues } = useHideInvestmentValues();
 
   const {
     data: incomeData,
@@ -187,7 +189,7 @@ export default function IncomePage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{formatAmount(totalIncome, currency)}</div>
+                  <div className="text-2xl font-bold">{hideValues ? '•••' : formatAmount(totalIncome, currency)}</div>
                   <div className="justify-start text-xs">
                     {periodSummary.yoyGrowth !== null ? (
                       <div className="flex items-center text-xs">
@@ -239,7 +241,7 @@ export default function IncomePage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatAmount(monthlyAverage, currency)}</div>
+              <div className="text-2xl font-bold">{hideValues ? '•••' : formatAmount(monthlyAverage, currency)}</div>
               <div className="flex items-center text-xs">
                 <GainPercent value={monthlyAverageChange} className="text-left text-xs" />
                 <span className="ml-2 text-xs text-muted-foreground">Since last period</span>
@@ -256,12 +258,12 @@ export default function IncomePage() {
                 {[
                   {
                     name: 'Dividends',
-                    amount: formatAmount(dividendIncome, currency),
+                    amount: hideValues ? '•••' : formatAmount(dividendIncome, currency),
                     percentage: dividendPercentage,
                   },
                   {
                     name: 'Interest',
-                    amount: formatAmount(interestIncome, currency),
+                    amount: hideValues ? '•••' : formatAmount(interestIncome, currency),
                     percentage: interestPercentage,
                   },
                 ].map((source, index) => (
@@ -328,7 +330,7 @@ export default function IncomePage() {
                   <ComposedChart
                     data={monthlyIncomeData.map(([month, income], index) => ({
                       month,
-                      income,
+                      income: income, // Hide income if hideValues is true
                       cumulative: monthlyIncomeData
                         .slice(0, index + 1)
                         .reduce((sum, [, value]) => sum + value, 0),
@@ -343,9 +345,22 @@ export default function IncomePage() {
                       axisLine={false}
                       tickFormatter={(value) => value}
                     />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <YAxis
+                      yAxisId="left"
+                      tickFormatter={(value) => (hideValues ? '•••' : value)} // Hide Y-axis values
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tickFormatter={(value) => (hideValues ? '•••' : value)} // Hide Y-axis values
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value) => (hideValues ? '•••' : value)} // Hide tooltip values
+                        />
+                      }
+                    />
                     <ChartLegend content={<ChartLegendContent />} />
                     <Bar
                       yAxisId="left"
@@ -400,7 +415,9 @@ export default function IncomePage() {
                           {symbol.replace(/\[.*?\]-/, '').trim()}
                         </span>
                       </div>
-                      <div className="text-sm text-success">{formatAmount(income, currency)}</div>
+                      <div className="text-sm text-success">
+                        {hideValues ? '•••' : formatAmount(income, currency)}
+                      </div>
                     </div>
                   ))}
                 </div>

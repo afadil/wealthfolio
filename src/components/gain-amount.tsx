@@ -7,6 +7,7 @@ interface GainAmountProps extends React.HTMLAttributes<HTMLDivElement> {
   displayCurrency?: boolean;
   currency: string;
   displayDecimal?: boolean;
+  hideValues?: boolean;
 }
 
 export function GainAmount({
@@ -15,6 +16,7 @@ export function GainAmount({
   displayCurrency = true,
   className,
   displayDecimal = true,
+  hideValues = false,
   ...props
 }: GainAmountProps) {
   return (
@@ -25,19 +27,22 @@ export function GainAmount({
           value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-red-400',
         )}
       >
-        {/* <span>{formatAmount(value, currency, displayCurrency)}</span> */}
-        <NumberFlow
-          value={value}
-          isolate={false}
-          format={{
-            currency: currency,
-            style: displayCurrency ? 'currency' : 'decimal',
-            currencyDisplay: 'narrowSymbol',
-            minimumFractionDigits: displayDecimal ? 2 : 0,
-            maximumFractionDigits: displayDecimal ? 2 : 0,
-          }}
-          locales={navigator.language || 'en-US'}
-        />
+        {hideValues ? (
+          <span>•••</span> // Render placeholder value when hideValues is true
+        ) : (
+          <NumberFlow
+            value={value}
+            isolate={false}
+            format={{
+              currency: currency,
+              style: displayCurrency ? 'currency' : 'decimal',
+              currencyDisplay: 'narrowSymbol',
+              minimumFractionDigits: displayDecimal ? 2 : 0,
+              maximumFractionDigits: displayDecimal ? 2 : 0,
+            }}
+            locales={navigator.language || 'en-US'}
+          />
+        )}
       </div>
     </div>
   );
