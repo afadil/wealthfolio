@@ -7,14 +7,33 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+.pnp
+.pnp.js
+
+# Build outputs
 dist
 dist-ssr
 *.local
+build
+out
+
+# Testing
+coverage
+.nyc_output
+
+# Environment files
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea
 .DS_Store
 *.suo
@@ -22,5 +41,31 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.node.tsbuildinfo
+
+# Cache and temp files
+.cache
+.temp
+.tmp
+.eslintcache
+.stylelintcache
+
+# Database
 db/*
+
+# Rust/Cargo (since you have Rust files)
+target/
+**/*.rs.bk
+Cargo.lock
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
