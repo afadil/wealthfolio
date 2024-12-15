@@ -369,3 +369,16 @@ export enum ImportFormat {
 // }
 
 export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
+
+export interface CumulativeReturn {
+  date: string;
+  value: number;
+}
+
+export interface CumulativeReturns {
+  id: string;
+  name: string;
+  cumulativeReturns: CumulativeReturn[];
+  totalReturn: number;
+  annualizedReturn: number;
+}

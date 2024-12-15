@@ -18,6 +18,7 @@ import SettingsGoalsPage from './pages/settings/goals/goals-page';
 import IncomePage from '@/pages/income/income-page';
 import ExportSettingsPage from './pages/settings/exports/exports-page';
 import ContributionLimitPage from './pages/settings/contribution-limits/contribution-limits-page';
+import PerformancePage from '@/pages/performance/performance-page';
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -34,6 +35,7 @@ export function AppRoutes() {
           <Route path="accounts/:id" element={<AccountPage />} />;
           <Route path="onboarding" element={<OnboardingPage />} />;
           <Route path="income" element={<IncomePage />} />
+          <Route path="performance" element={<PerformancePage />} />
           <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />

@@ -1931,7 +1931,7 @@ checksum = "c62a0a307cb4a311d3a07867860911ca130c3494e8c2719593806c08bc5d0484"
 
 [[package]]
 name = "wealthfolio_core"
-version = "1.0.11"
+version = "1.0.21"
 dependencies = [
  "async-trait",
  "bigdecimal",
@@ -2106,9 +2106,9 @@ dependencies = [
 
 [[package]]
 name = "yahoo_finance_api"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a3281ec47078118649163dcdc751df4e788cc4ffa01baaab989f784523bbd62"
+checksum = "a2d318435472bd7e2e95e95d0f546efc075f77a7dfcaeb1469cb747c088566d7"
 dependencies = [
  "reqwest",
  "serde",

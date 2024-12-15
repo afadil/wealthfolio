@@ -5,6 +5,7 @@ import {
   HistorySummary,
   PortfolioHistory,
   AccountSummary,
+  CumulativeReturns,
 } from '@/lib/types';
 
 export const calculateHistoricalData = async (params: {
@@ -90,6 +91,42 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
     }
   } catch (error) {
     logger.error('Error fetching active accounts summary.');
+    throw error;
+  }
+};
+
+export const calculateAccountCumulativeReturns = async (
+  accountId: string,
+  startDate: string,
+  endDate: string,
+  method: 'TWR' | 'MWR' = 'TWR',
+): Promise<CumulativeReturns> => {
+  try {
+    return invokeTauri('calculate_account_cumulative_returns', {
+      accountId,
+      startDate,
+      endDate,
+      method,
+    });
+  } catch (error) {
+    logger.error('Error calculating cumulative returns.');
+    throw error;
+  }
+};
+
+export const calculateSymbolCumulativeReturns = async (
+  symbol: string,
+  startDate: string,
+  endDate: string,
+): Promise<CumulativeReturns> => {
+  try {
+    return invokeTauri('calculate_symbol_cumulative_returns', {
+      symbol,
+      startDate,
+      endDate,
+    });
+  } catch (error) {
+    logger.error('Error calculating symbol cumulative returns.');
     throw error;
   }
 };
