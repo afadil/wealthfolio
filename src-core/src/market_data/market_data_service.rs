@@ -65,7 +65,7 @@ impl MarketDataService {
         conn: &mut SqliteConnection,
         asset_list: &Vec<Asset>,
     ) -> Result<(), String> {
-        println!("Syncing history quotes for assets...");
+        debug!("Syncing history quotes for assets...");
         let end_date = SystemTime::now();
         let mut all_quotes_to_insert = Vec::new();
         let mut failed_assets = Vec::new();
@@ -250,7 +250,7 @@ impl MarketDataService {
         match self.sync_asset_quotes(conn, &asset_list).await {
             Ok(_) => {}
             Err(e) => {
-                eprintln!("Failed to sync asset quotes: {}", e);
+                error!("Failed to sync asset quotes: {}", e);
             }
         };
 
@@ -437,5 +437,40 @@ impl MarketDataService {
 
         // Sync quotes for these assets
         self.sync_asset_quotes(conn, &asset_list).await
+    }
+
+    pub async fn get_symbol_history_from_provider(
+        &self,
+        symbol: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>, String> {
+        debug!(
+            "Getting symbol history for {} from {} to {}",
+            symbol, start_date, end_date
+        );
+        let start_time: SystemTime = Utc
+            .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
+            .into();
+        let end_time: SystemTime = Utc
+            .from_utc_datetime(&end_date.and_hms_opt(23, 59, 59).unwrap())
+            .into();
+
+        // Try to get data from public provider first
+        match self
+            .public_data_provider
+            .get_stock_history(symbol, start_time, end_time)
+            .await
+        {
+            Ok(quotes) => Ok(quotes),
+            Err(MarketDataError::NotFound(_)) => {
+                // If not found in public provider, try private provider
+                self.private_data_provider
+                    .get_stock_history(symbol, start_time, end_time)
+                    .await
+                    .map_err(|e| format!("Failed to fetch history for {}: {}", symbol, e))
+            }
+            Err(e) => Err(format!("Failed to fetch history for {}: {}", symbol, e)),
+        }
     }
 }

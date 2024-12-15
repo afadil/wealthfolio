@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
-import { startOfYear, subDays, subMonths, subYears, startOfDay, isSameDay } from 'date-fns';
+import { startOfYear, subDays, subMonths, subYears, isSameDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 const ranges = [
@@ -109,7 +109,7 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
               isCustomRange && 'bg-primary text-primary-foreground hover:bg-primary/90',
             )}
           >
-            <CalendarIcon className="h-4 w-4" />
+            <Icons.Calendar className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">

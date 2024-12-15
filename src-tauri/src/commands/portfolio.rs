@@ -130,7 +130,6 @@ pub async fn calculate_symbol_cumulative_returns(
     end_date: String,
 ) -> Result<CumulativeReturns, String> {
     let service = create_portfolio_service(&state).await?;
-    let mut conn = state.pool.get().map_err(|e| e.to_string())?;
 
     let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
         .map_err(|e| format!("Invalid start date: {}", e))?;
@@ -138,6 +137,7 @@ pub async fn calculate_symbol_cumulative_returns(
         .map_err(|e| format!("Invalid end date: {}", e))?;
 
     service
-        .calculate_symbol_cumulative_returns(&mut conn, &symbol, start, end)
+        .calculate_symbol_cumulative_returns(&symbol, start, end)
+        .await
         .map_err(|e| format!("Failed to calculate cumulative returns: {}", e))
 }

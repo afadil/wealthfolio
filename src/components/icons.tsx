@@ -136,6 +136,7 @@ export const Icons = {
       height="32"
       fill="currentColor"
       viewBox="0 0 256 256"
+      {...props}
     >
       <path
         d="M232,152v24a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V153.13C24,95.65,70.15,48.2,127.63,48A104,104,0,0,1,232,152Z"

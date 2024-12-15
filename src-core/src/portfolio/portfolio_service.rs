@@ -18,6 +18,8 @@ use crate::portfolio::income_service::IncomeService;
 
 use chrono::NaiveDate;
 
+use std::collections::HashMap;
+
 #[derive(Debug, Clone, Copy)]
 pub enum ReturnMethod {
     TimeWeighted,
@@ -289,26 +291,53 @@ impl PortfolioService {
         })
     }
 
-    pub fn calculate_symbol_cumulative_returns(
+    pub async fn calculate_symbol_cumulative_returns(
         &self,
-        conn: &mut SqliteConnection,
         symbol: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<CumulativeReturns, Box<dyn std::error::Error>> {
         let quote_history = self
             .market_data_service
-            .get_quote_history(conn, symbol, start_date, end_date)?;
+            .get_symbol_history_from_provider(symbol, start_date, end_date)
+            .await?;
 
+        // Create a complete date range
+        let mut all_dates: Vec<NaiveDate> = Vec::new();
+        let mut current_date = start_date;
+        while current_date <= end_date {
+            all_dates.push(current_date);
+            current_date = current_date.succ_opt().unwrap();
+        }
+
+        // Create a map of existing quotes
+        let quote_map: HashMap<NaiveDate, f64> = quote_history
+            .iter()
+            .map(|quote| (quote.date.date(), quote.close))
+            .collect();
+
+        // Fill in missing dates with interpolated values
+        let mut filled_quotes: Vec<(NaiveDate, f64)> = Vec::with_capacity(all_dates.len());
+        let mut last_value = None;
+
+        for date in all_dates {
+            if let Some(&value) = quote_map.get(&date) {
+                filled_quotes.push((date, value));
+                last_value = Some(value);
+            } else if let Some(last) = last_value {
+                // Use last known value for missing dates
+                filled_quotes.push((date, last));
+            }
+        }
+
+        // Calculate returns
         let mut symbol_returns = Vec::new();
         let mut prev_value = None;
 
-        for quote in quote_history.iter() {
-            let value = quote.close;
-
+        for (date, value) in filled_quotes {
             if let Some(prev) = prev_value {
                 let daily_return = (value / prev) - 1.0;
-                symbol_returns.push((quote.date, daily_return));
+                symbol_returns.push((date, daily_return));
             }
             prev_value = Some(value);
         }
@@ -316,7 +345,7 @@ impl PortfolioService {
         let mut cumulative_returns = Vec::new();
         let mut total_return = 1.0;
 
-        for (date, return_value) in symbol_returns.iter() {
+        for (date, return_value) in symbol_returns {
             total_return *= 1.0 + return_value;
             cumulative_returns.push(CumulativeReturn {
                 date: date.format("%Y-%m-%d").to_string(),
@@ -330,9 +359,13 @@ impl PortfolioService {
             0.0
         };
 
-        let annualized_return = if !cumulative_returns.is_empty() {
+        let annualized_return = if !cumulative_returns.is_empty() && total_return > -1.0 {
             let years = (end_date - start_date).num_days() as f64 / 365.25;
-            (1.0 + total_return).powf(1.0 / years) - 1.0
+            if years > 0.0 {
+                ((1.0 + total_return).powf(1.0 / years)) - 1.0
+            } else {
+                total_return
+            }
         } else {
             0.0
         };

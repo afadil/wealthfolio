@@ -19,33 +19,58 @@ import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { ReturnMethod, usePerformanceData } from './hooks/usePerformanceData';
+import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
 
-const PORTFOLIO_TOTAL = {
+const PORTFOLIO_TOTAL: ComparisonItem = {
   id: 'TOTAL',
+  type: 'account',
   name: 'All Portfolio',
 };
 
+type ComparisonItem = {
+  id: string;
+  type: 'account' | 'symbol';
+  name: string;
+};
+
 export default function PerformancePage() {
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subMonths(new Date(), 12),
     to: new Date(),
   });
   const [returnMethod, setReturnMethod] = useState<ReturnMethod>('TWR');
 
-  console.log('PerformancePage', returnMethod);
-
   const { data: accounts, isLoading: isLoadingAccounts } = useAccounts();
   const { data: performanceData, isLoading: isLoadingPerformance } = usePerformanceData({
-    selectedAccounts,
+    selectedItems,
     dateRange,
     returnMethod,
   });
 
-  const handleAccountToggle = (accountId: string) => {
-    setSelectedAccounts((prev) =>
-      prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId],
-    );
+  const handleAccountSelect = (accountId: string) => {
+    const account =
+      accountId === PORTFOLIO_TOTAL.id
+        ? PORTFOLIO_TOTAL
+        : accounts?.find((a) => a.id === accountId);
+
+    if (account) {
+      setSelectedItems((prev) => {
+        const exists = prev.some((item) => item.id === accountId);
+        if (exists) {
+          return prev.filter((item) => item.id !== accountId);
+        }
+        return [...prev, { id: accountId, type: 'account', name: account.name }];
+      });
+    }
+  };
+
+  const handleSymbolSelect = (symbol: { id: string; name: string }) => {
+    setSelectedItems((prev) => {
+      const exists = prev.some((item) => item.id === symbol.id);
+      if (exists) return prev;
+      return [...prev, { id: symbol.id, type: 'symbol', name: symbol.name }];
+    });
   };
 
   const accountOptions = accounts ? [PORTFOLIO_TOTAL, ...accounts] : [PORTFOLIO_TOTAL];
@@ -56,10 +81,10 @@ export default function PerformancePage() {
 
   return (
     <ApplicationShell className="p-6">
-      <ApplicationHeader heading="Performance Comparison">
+      <ApplicationHeader heading="Portfolio Performance">
         <div className="flex items-center space-x-2">
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
-          <Select value={selectedAccounts[0]} onValueChange={(value) => handleAccountToggle(value)}>
+          <Select value={selectedItems[0]?.id} onValueChange={handleAccountSelect}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select accounts" />
             </SelectTrigger>
@@ -80,26 +105,31 @@ export default function PerformancePage() {
 
       <div className="space-y-6">
         <div className="flex flex-wrap gap-2">
-          {selectedAccounts.map((accountId) => (
+          {selectedItems.map((item) => (
             <Button
-              key={accountId}
+              key={item.id}
               variant="secondary"
               size="sm"
-              onClick={() => handleAccountToggle(accountId)}
+              onClick={() => {
+                if (item.type === 'account') {
+                  handleAccountSelect(item.id);
+                } else {
+                  setSelectedItems((prev) => prev.filter((i) => i.id !== item.id));
+                }
+              }}
             >
-              {accountId === 'TOTAL'
-                ? PORTFOLIO_TOTAL.name
-                : accounts?.find((a) => a.id === accountId)?.name}
+              {item.name}
               <X className="ml-2 h-4 w-4" />
             </Button>
           ))}
+          <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
         </div>
 
         <Card>
           <CardHeader className="flex flex-col space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Cumulative Returns</CardTitle>
+                <CardTitle className="text-xl">Cumulative Returns</CardTitle>
                 <CardDescription>Compare account performance over time</CardDescription>
               </div>
               <ReturnMethodSelector
