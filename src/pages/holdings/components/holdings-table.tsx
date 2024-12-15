@@ -3,22 +3,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatAmount, formatStockQuantity } from '@/lib/utils';
-import type { Row, ColumnDef, RowData } from '@tanstack/react-table';
+import { formatAmount } from '@/lib/utils';
+import type { ColumnDef, SortingFn } from '@tanstack/react-table';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
+import { PrivacyAmount } from '@/components/privacy-amount';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
 import { useNavigate } from 'react-router-dom';
+import { useBalancePrivacy } from '@/context/privacy-context';
+import { AmountDisplay } from '@/components/amount-display';
+import { QuantityDisplay } from '@/components/quantity-display';
 
- 
-const numericSortFunction = (rowA:Row<RowData>, rowB: Row<RowData>, columnId: string) => {
+const numericSortFunction: SortingFn<Holding> = (rowA, rowB, columnId) => {
   const valueA = rowA.getValue(columnId) as number;
   const valueB = rowB.getValue(columnId) as number;
-  return valueA - valueB
-}
-
+  return valueA - valueB;
+};
 
 export const HoldingsTable = ({
   holdings,
@@ -27,6 +29,8 @@ export const HoldingsTable = ({
   holdings: Holding[];
   isLoading: boolean;
 }) => {
+  const { isBalanceHidden } = useBalancePrivacy();
+
   if (isLoading) {
     return (
       <div className="space-y-4 pt-6">
@@ -62,7 +66,7 @@ export const HoldingsTable = ({
     <div className="pt-6">
       <DataTable
         data={holdings}
-        columns={columns}
+        columns={getColumns(isBalanceHidden)}
         searchBy="symbol"
         filters={filters}
         defaultColumnVisibility={{ currency: false, symbolName: false, holdingType: false }}
@@ -75,7 +79,7 @@ export const HoldingsTable = ({
 
 export default HoldingsTable;
 
-export const columns: ColumnDef<Holding>[] = [
+const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
   {
     id: 'symbol',
     accessorKey: 'symbol',
@@ -131,10 +135,12 @@ export const columns: ColumnDef<Holding>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
     ),
-    cell: ({ row }) => {
-      return <div className="text-right">{formatStockQuantity(row.getValue('quantity'))}</div>;
-    },
-    sortingFn: numericSortFunction
+    cell: ({ row }) => (
+      <div className="text-right">
+        <QuantityDisplay value={row.getValue('quantity')} isHidden={isHidden} />
+      </div>
+    ),
+    sortingFn: numericSortFunction,
   },
   {
     id: 'marketPrice',
@@ -153,7 +159,7 @@ export const columns: ColumnDef<Holding>[] = [
       const currency = row.getValue('currency') as string;
       return <div className="text-right">{formatAmount(marketPrice, currency)}</div>;
     },
-    sortingFn: numericSortFunction
+    sortingFn: numericSortFunction,
   },
   {
     id: 'bookValue',
@@ -166,9 +172,13 @@ export const columns: ColumnDef<Holding>[] = [
       const bookValue = row.getValue('bookValue') as number;
       const currency = row.getValue('currency') as string;
 
-      return <div className="pr-4 text-right">{formatAmount(bookValue, currency)}</div>;
+      return (
+        <div className="pr-4 text-right">
+          <PrivacyAmount value={bookValue} currency={currency} />
+        </div>
+      );
     },
-    sortingFn: numericSortFunction
+    sortingFn: numericSortFunction,
   },
   {
     id: 'marketValue',
@@ -177,24 +187,16 @@ export const columns: ColumnDef<Holding>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Market Value" />
     ),
-    cell: ({ row }) => {
-      const performance = row.getValue('performance');
-      // @ts-ignore
-      const isLoading = performance?.isLoading || false;
-      const marketValue = row.getValue('marketValue') as number;
-      const currency = row.getValue('currency') as string;
-
-      return (
-        <div className="items-end pr-4 text-right font-semibold">
-          {isLoading ? (
-            <Icons.Spinner className="ml-auto h-4 w-4 animate-spin" />
-          ) : (
-            formatAmount(marketValue, currency)
-          )}
-        </div>
-      );
-    },
-    sortingFn: numericSortFunction
+    cell: ({ row }) => (
+      <div className="text-right">
+        <AmountDisplay
+          value={row.getValue('marketValue')}
+          currency={row.getValue('currency')}
+          isHidden={isHidden}
+        />
+      </div>
+    ),
+    sortingFn: numericSortFunction,
   },
 
   {

@@ -3,9 +3,9 @@ import { getContributionLimit, calculateDepositsForAccounts } from '@/commands/c
 import { QueryKeys } from '@/lib/query-keys';
 import { ContributionLimit, DepositsCalculation } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { formatAmount } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PrivacyAmount } from '@/components/privacy-amount';
 
 interface AccountContributionLimitProps {
   accountId: string;
@@ -53,7 +53,10 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
           <span>
             You've contributed{' '}
             <span className="font-semibold">
-              {formatAmount(accountDeposit?.convertedAmount || 0, deposits?.baseCurrency || 'USD')}
+              <PrivacyAmount
+                value={accountDeposit?.convertedAmount || 0}
+                currency={deposits?.baseCurrency || 'USD'}
+              />
             </span>{' '}
             so far in {currentYear}. There's no contribution limit set for this account.
           </span>
@@ -107,15 +110,15 @@ function AccountContributionLimitItem({
               <span>
                 You've contributed{' '}
                 <span className="font-semibold">
-                  {formatAmount(deposit?.convertedAmount || 0, baseCurrency)}
+                  <PrivacyAmount value={deposit?.convertedAmount || 0} currency={baseCurrency} />
                 </span>{' '}
                 to this account in {limit.contributionYear}. Your total is{' '}
                 <span className="font-semibold text-destructive">
-                  {formatAmount(totalDeposits, baseCurrency)}
+                  <PrivacyAmount value={totalDeposits} currency={baseCurrency} />
                 </span>{' '}
                 which is over the{' '}
                 <span className="font-semibold">
-                  {formatAmount(limit.limitAmount, baseCurrency)}
+                  <PrivacyAmount value={limit.limitAmount} currency={baseCurrency} />
                 </span>{' '}
                 limit.
               </span>
@@ -123,14 +126,17 @@ function AccountContributionLimitItem({
               <span>
                 You've contributed{' '}
                 <span className="font-semibold">
-                  {formatAmount(deposit?.convertedAmount || 0, baseCurrency)}
+                  <PrivacyAmount value={deposit?.convertedAmount || 0} currency={baseCurrency} />
                 </span>{' '}
                 to this account in {limit.contributionYear}. Your total contribution towards the{' '}
                 <span className="font-semibold">
-                  {formatAmount(limit.limitAmount, baseCurrency)}
+                  <PrivacyAmount value={limit.limitAmount} currency={baseCurrency} />
                 </span>{' '}
                 {limit.groupName} limit is{' '}
-                <span className="font-semibold">{formatAmount(totalDeposits, baseCurrency)}</span>.
+                <span className="font-semibold">
+                  <PrivacyAmount value={totalDeposits} currency={baseCurrency} />
+                </span>
+                .
               </span>
             )}
           </div>

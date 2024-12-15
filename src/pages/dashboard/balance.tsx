@@ -1,11 +1,11 @@
 import NumberFlow from '@number-flow/react';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 interface BalanceProps {
   targetValue: number;
   currency: string;
   displayCurrency?: boolean;
   displayDecimal?: boolean;
-  hideValues?: boolean; // Add hideValues prop
 }
 
 const Balance: React.FC<BalanceProps> = ({
@@ -13,12 +13,32 @@ const Balance: React.FC<BalanceProps> = ({
   currency,
   displayCurrency = false,
   displayDecimal = true,
-  hideValues = false, // Default to false
 }) => {
+  const { isBalanceHidden } = useBalancePrivacy();
+
+  const getCurrencySymbol = (currency: string) => {
+    try {
+      return (
+        new Intl.NumberFormat(navigator.language || 'en-US', {
+          style: 'currency',
+          currency: currency,
+          currencyDisplay: 'narrowSymbol',
+        })
+          .formatToParts(0)
+          .find((part) => part.type === 'currency')?.value || currency
+      );
+    } catch {
+      return currency;
+    }
+  };
+
   return (
     <h1 className="font-heading text-3xl font-bold tracking-tight">
-      {hideValues ? (
-        <span>•••</span> // Render obfuscated value when hideValues is true
+      {isBalanceHidden ? (
+        <span>
+          {displayCurrency ? `${getCurrencySymbol(currency)}` : ''}
+          ••••••
+        </span>
       ) : (
         <NumberFlow
           value={targetValue}
@@ -36,6 +56,5 @@ const Balance: React.FC<BalanceProps> = ({
     </h1>
   );
 };
-
 
 export default Balance;

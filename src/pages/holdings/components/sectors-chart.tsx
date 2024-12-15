@@ -1,8 +1,8 @@
 import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
-import { formatAmount } from '@/lib/utils';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { PrivacyAmount } from '@/components/privacy-amount';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -43,7 +43,9 @@ const CustomTooltip = ({ active, payload }: any) => {
       <Card>
         <CardHeader className="p-4">
           <CardTitle className="text-sm text-muted-foreground">{payload[0].payload.name}</CardTitle>
-          <p className="text-sm font-semibold">{formatAmount(payload[0].value, 'USD', false)}</p>
+          <p className="text-sm font-semibold">
+            <PrivacyAmount value={payload[0].value} currency="USD" />
+          </p>
         </CardHeader>
       </Card>
     );

@@ -4,10 +4,15 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
-import { formatAmount, formatStockQuantity } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import { AmountDisplay } from '@/components/amount-display';
+import { useBalancePrivacy } from '@/context/privacy-context';
+import { QuantityDisplay } from '@/components/quantity-display';
 
 const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoading: boolean }) => {
+  const { isBalanceHidden } = useBalancePrivacy();
+
   if (!isLoading && !holdings.length) {
     return null;
   }
@@ -44,16 +49,18 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
                 </div>
 
                 <div className="text-right">
-                  <p className="">{formatAmount(holding.marketValueConverted, holding.currency)}</p>
+                  <AmountDisplay
+                    value={holding.marketValueConverted}
+                    currency={holding.currency}
+                    isHidden={isBalanceHidden}
+                  />
                   <p className="text-sm text-muted-foreground">
-                    {formatStockQuantity(holding.quantity)} shares
+                    <QuantityDisplay value={holding.quantity} isHidden={isBalanceHidden} /> shares
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <p className=" ">
-                    {formatAmount(holding.marketPrice || 0, holding.currency, false)}
-                  </p>
+                  <p>{formatAmount(holding.marketPrice || 0, holding.currency, false)}</p>
                   <p className="text-sm text-muted-foreground">{holding.currency}</p>
                 </div>
 
@@ -66,6 +73,7 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
                   <GainPercent
                     className="text-sm"
                     value={holding.performance.totalGainPercent}
+                    animated={true}
                   ></GainPercent>
                 </div>
               </div>

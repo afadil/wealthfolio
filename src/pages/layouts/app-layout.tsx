@@ -8,16 +8,6 @@ import { getAccounts } from '@/commands/account';
 import { useSettings } from '@/lib/useSettings';
 import { QueryKeys } from '@/lib/query-keys';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { useHideInvestmentValues } from '@/hooks/useHideInvestmentValues';
-
-const AppLayout = () => {
-  const { hideValues, toggleHideValues } = useHideInvestmentValues(); // Use the hook
-  const { data: settings, isLoading: isSettingsLoading } = useSettings();
-  const location = useLocation();
-  const { data: accounts, isLoading: isAccountsLoading } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
 
 const navigation: NavigationProps = {
   primary: [
@@ -89,6 +79,7 @@ const AppLayout = () => {
         </ErrorBoundary>
       </div>
       <Toaster />
+      {/* <TailwindIndicator /> */}
     </div>
   );
 };

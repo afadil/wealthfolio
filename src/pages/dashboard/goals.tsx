@@ -5,10 +5,14 @@ import { calculateGoalProgress } from '@/lib/portfolio-helper';
 import { AccountSummary, Goal, GoalAllocation, GoalProgress } from '@/lib/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useQuery } from '@tanstack/react-query';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatPercent } from '@/lib/utils';
 import { Icons } from '@/components/icons';
+import { useBalancePrivacy } from '@/context/privacy-context';
+import { AmountDisplay } from '@/components/amount-display';
 
 export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
+  const { isBalanceHidden } = useBalancePrivacy();
+
   const { data: goals } = useQuery<Goal[], Error>({
     queryKey: ['goals'],
     queryFn: getGoals,
@@ -60,11 +64,23 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
                           </li>
                           <li>
                             Current Value:{' '}
-                            <b>{formatAmount(goal.currentValue, goal.currency, false)}</b>
+                            <b>
+                              <AmountDisplay
+                                value={goal.currentValue}
+                                currency={goal.currency}
+                                isHidden={isBalanceHidden}
+                              />
+                            </b>
                           </li>
                           <li>
                             Target Value:{' '}
-                            <b>{formatAmount(goal.targetValue, goal.currency, false)}</b>
+                            <b>
+                              <AmountDisplay
+                                value={goal.targetValue}
+                                currency={goal.currency}
+                                isHidden={isBalanceHidden}
+                              />
+                            </b>
                           </li>
                         </ul>
                       </TooltipContent>
