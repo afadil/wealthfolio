@@ -17,8 +17,8 @@ import { Button } from '@/components/ui/button';
 import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
+import { PrivacyToggle } from '@/components/privacy-toggle';
 
-// filter
 function DashboardSkeleton() {
   return (
     <div className="grid h-full gap-4 sm:grid-cols-1 md:grid-cols-3">
@@ -70,26 +70,30 @@ export default function DashboardPage() {
       <div className="flex px-4 py-2 md:px-6 lg:px-10">
         <HoverCard>
           <HoverCardTrigger className="flex cursor-pointer items-center">
-            <div>
-              <Balance
-                targetValue={todayValue?.totalValue || 0}
-                currency={todayValue?.currency || 'USD'}
-                displayCurrency={true}
-              />
-
-              <div className="flex space-x-3 text-sm">
-                <GainAmount
-                  className="text-md font-light"
-                  value={todayValue?.totalGainValue || 0}
+            <div className="flex items-start gap-2">
+              <div>
+                <Balance
+                  targetValue={todayValue?.totalValue || 0}
                   currency={todayValue?.currency || 'USD'}
-                  displayCurrency={false}
-                ></GainAmount>
-                <div className="my-1 border-r border-secondary pr-2" />
-                <GainPercent
-                  className="text-md font-light"
-                  value={todayValue?.totalGainPercentage || 0}
-                ></GainPercent>
+                  displayCurrency={true}
+                />
+
+                <div className="flex space-x-3 text-sm">
+                  <GainAmount
+                    className="text-md font-light"
+                    value={todayValue?.totalGainValue || 0}
+                    currency={todayValue?.currency || 'USD'}
+                    displayCurrency={false}
+                  ></GainAmount>
+                  <div className="my-1 border-r border-secondary pr-2" />
+                  <GainPercent
+                    className="text-md font-light"
+                    value={todayValue?.totalGainPercentage || 0}
+                    animated={true}
+                  ></GainPercent>
+                </div>
               </div>
+              <PrivacyToggle className="mt-1" />
             </div>
           </HoverCardTrigger>
           <HoverCardContent align="start" className="w-80 shadow-none">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Sector, ResponsiveContainer } from 'recharts';
-import { formatAmount } from '@/lib/utils';
+import { AmountDisplay } from '@/components/amount-display';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -13,6 +14,7 @@ const COLORS = [
 ];
 
 const renderActiveShape = (props: any) => {
+  const { isBalanceHidden } = useBalancePrivacy();
   const RADIAN = Math.PI / 180;
   const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value } =
     props;
@@ -57,16 +59,23 @@ const renderActiveShape = (props: any) => {
       >
         {payload.name}
       </text>
-      <text
+      <foreignObject
         x={ex + (cos >= 0 ? 1 : -1) * 6}
-        y={ey}
-        dy={12}
-        textAnchor={textAnchor}
-        fill="currentColor"
-        className="text-xs"
+        y={ey + 4}
+        width={100}
+        height={20}
+        style={{ overflow: 'visible' }}
       >
-        {formatAmount(value, 'USD', false)}
-      </text>
+        <div
+          style={{
+            textAnchor: textAnchor,
+            color: 'currentColor',
+            fontSize: '0.75rem',
+          }}
+        >
+          <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
+        </div>
+      </foreignObject>
     </g>
   );
 };

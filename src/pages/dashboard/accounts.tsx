@@ -6,8 +6,8 @@ import { GainPercent } from '@/components/gain-percent';
 import { GainAmount } from '@/components/gain-amount';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSummary } from '@/lib/types';
-import { formatAmount } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
+import { PrivacyAmount } from '@/components/privacy-amount';
 
 // Helper function to calculate category summary
 const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
@@ -79,18 +79,24 @@ const AccountSummaryComponent = ({
       <div className="flex items-center">
         <div className="flex flex-col items-end">
           <p className="font-medium leading-none">
-            {isGroup
-              ? formatAmount(
+            {isGroup ? (
+              <PrivacyAmount
+                value={
                   accountSummary.performance.totalValue ||
-                    accountSummary.performance.totalMarketValue +
-                      accountSummary.performance.totalCashBalance,
-                  accountSummary.account.currency,)
-              : formatAmount(
-                accountSummary.performance.totalValue ||
-                  accountSummary.performance.marketValue +
-                    accountSummary.performance.availableCash,
-                accountSummary.account.currency,)
-            }
+                  accountSummary.performance.totalMarketValue +
+                    accountSummary.performance.totalCashBalance
+                }
+                currency={accountSummary.account.currency}
+              />
+            ) : (
+              <PrivacyAmount
+                value={
+                  accountSummary.performance.totalValue ||
+                  accountSummary.performance.marketValue + accountSummary.performance.availableCash
+                }
+                currency={accountSummary.account.currency}
+              />
+            )}
           </p>
           {(accountSummary.performance.totalGainPercentage !== 0 ||
             accountSummary.performance.totalGainPercent !== 0) && (
@@ -113,6 +119,7 @@ const AccountSummaryComponent = ({
                   accountSummary.performance.totalGainPercent ||
                   0
                 }
+                animated={true}
               />
             </div>
           )}

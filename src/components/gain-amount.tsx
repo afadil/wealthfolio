@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import NumberFlow from '@number-flow/react';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 interface GainAmountProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
@@ -17,6 +18,8 @@ export function GainAmount({
   displayDecimal = true,
   ...props
 }: GainAmountProps) {
+  const { isBalanceHidden } = useBalancePrivacy();
+
   return (
     <div className={cn('flex flex-col items-end text-right', className)} {...props}>
       <div
@@ -25,19 +28,22 @@ export function GainAmount({
           value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-red-400',
         )}
       >
-        {/* <span>{formatAmount(value, currency, displayCurrency)}</span> */}
-        <NumberFlow
-          value={value}
-          isolate={false}
-          format={{
-            currency: currency,
-            style: displayCurrency ? 'currency' : 'decimal',
-            currencyDisplay: 'narrowSymbol',
-            minimumFractionDigits: displayDecimal ? 2 : 0,
-            maximumFractionDigits: displayDecimal ? 2 : 0,
-          }}
-          locales={navigator.language || 'en-US'}
-        />
+        {isBalanceHidden ? (
+          <span>••••</span>
+        ) : (
+          <NumberFlow
+            value={value}
+            isolate={false}
+            format={{
+              currency: currency,
+              style: displayCurrency ? 'currency' : 'decimal',
+              currencyDisplay: 'narrowSymbol',
+              minimumFractionDigits: displayDecimal ? 2 : 0,
+              maximumFractionDigits: displayDecimal ? 2 : 0,
+            }}
+            locales={navigator.language || 'en-US'}
+          />
+        )}
       </div>
     </div>
   );
