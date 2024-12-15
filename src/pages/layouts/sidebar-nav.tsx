@@ -8,9 +8,8 @@ import { cn } from '@/lib/utils';
 
 export interface NavLink {
   title: string;
-  href?: string; // href can be optional for action-only buttons
+  href: string;
   icon?: React.ReactNode;
-  action?: () => void; 
 }
 
 export interface NavigationSection {
@@ -26,7 +25,6 @@ export interface NavigationProps {
 export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(true);
-
   return (
     <div
       className={cn({
@@ -46,22 +44,39 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                 aria-label="Sidebar"
                 className="flex flex-shrink-0 flex-col space-y-3 p-2"
               >
-                {navigation?.primary?.map((item) =>
-                  item.action ? (
-                    <ActionItem
-                      key={item.title}
-                      item={item}
-                      collapsed={collapsed}
-                      action={item.action} // Directly use the action from props
+                <div
+                  data-tauri-drag-region="true"
+                  className="draggable flex items-center justify-center pb-12"
+                >
+                  <Link to="/">
+                    <img
+                      className={`h-10 w-10 rounded-full bg-transparent shadow-lg duration-700 [transform-style:preserve-3d] hover:[transform:rotateY(-180deg)] ${
+                        collapsed ? '[transform:rotateY(180deg)]' : ''
+                      }`}
+                      aria-hidden="true"
+                      src="/logo.svg"
                     />
-                  ) : (
-                    <NavItem key={item.title} item={item} />
-                  )
-                )}
+                  </Link>
+
+                  <span
+                    className={cn(
+                      'text-md ml-2 font-bold transition-opacity delay-100 duration-300 ease-in-out',
+                      {
+                        'sr-only opacity-0': collapsed,
+                        'block opacity-100': !collapsed,
+                      },
+                    )}
+                  >
+                    Wealthfolio
+                  </span>
+                </div>
+
+                {navigation?.primary?.map((item) => NavItem({ item }))}
               </nav>
             </div>
 
             <div className="flex flex-shrink-0 flex-col p-2">
+              {navigation?.secondary?.map((item) => NavItem({ item }))}
               <Separator className="mt-0" />
               <div className="flex justify-end">
                 <Button
@@ -97,11 +112,11 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     return (
       <Button
         key={item.title}
-        variant={location.pathname.includes(item.href || '') ? 'secondary' : 'ghost'}
+        variant={location.pathname.includes(item.href) ? 'secondary' : 'ghost'}
         asChild
         className={cn('h-12 justify-start', className)}
       >
-        <Link key={item.title} to={item.href || ''} title={item.title} {...props}>
+        <Link key={item.title} to={item.href} title={item.title} {...props}>
           {item.icon ?? <Icons.ArrowRight className="h-6 w-6" aria-hidden="true" />}
 
           <span
@@ -114,36 +129,6 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
             {item.title}
           </span>
         </Link>
-      </Button>
-    );
-  }
-
-  function ActionItem({
-    item,
-    action,
-    collapsed,
-  }: {
-    item: NavLink;
-    action: () => void;
-    collapsed: boolean;
-  }) {
-    return (
-      <Button
-        key={item.title}
-        variant="ghost"
-        className="h-12 justify-start"
-        onClick={action}
-      >
-        {item.icon ?? <Icons.ArrowRight className="h-6 w-6" aria-hidden="true" />}
-        <span
-          className={cn({
-            'ml-2 transition-opacity delay-100 duration-300 ease-in-out': true,
-            'sr-only opacity-0': collapsed,
-            'block opacity-100': !collapsed,
-          })}
-        >
-          {item.title}
-        </span>
       </Button>
     );
   }

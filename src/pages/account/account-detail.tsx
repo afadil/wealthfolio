@@ -3,8 +3,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatPercent } from '@/lib/utils';
 import { PortfolioHistory } from '@/lib/types';
+import { PrivacyAmount } from '@/components/privacy-amount';
 
 interface AccountDetailProps {
   data?: PortfolioHistory;
@@ -32,18 +33,28 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
   } = data;
 
   const rows = [
-    { label: 'Investments', value: formatAmount(marketValue, currency) },
-    { label: 'Book Cost', value: formatAmount(bookCost, currency) },
-    { label: 'Net Deposit', value: formatAmount(netDeposit, currency) },
+    { label: 'Investments', value: <PrivacyAmount value={marketValue} currency={currency} /> },
+    { label: 'Book Cost', value: <PrivacyAmount value={bookCost} currency={currency} /> },
+    { label: 'Net Deposit', value: <PrivacyAmount value={netDeposit} currency={currency} /> },
     { label: '% of my portfolio', value: formatPercent(allocationPercentage || 0) },
     {
       label: "Today's return",
-      value: `${formatAmount(dayGainValue, currency)} (${formatPercent(dayGainPercentage)})`,
+      value: (
+        <>
+          <PrivacyAmount value={dayGainValue} currency={currency} /> (
+          {formatPercent(dayGainPercentage)})
+        </>
+      ),
       color: dayGainValue < 0 ? 'text-red-400' : 'text-success',
     },
     {
       label: 'Total return',
-      value: `${formatAmount(totalGainValue, currency)} (${formatPercent(totalGainPercentage)})`,
+      value: (
+        <>
+          <PrivacyAmount value={totalGainValue} currency={currency} /> (
+          {formatPercent(totalGainPercentage)})
+        </>
+      ),
       color: totalGainPercentage < 0 ? 'text-red-400' : 'text-success',
     },
   ];
@@ -52,7 +63,9 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between pb-0">
         <CardTitle className="text-lg font-bold">Cash Balance</CardTitle>
-        <div className="text-lg font-extrabold">{formatAmount(availableCash, currency)}</div>
+        <div className="text-lg font-extrabold">
+          <PrivacyAmount value={availableCash} currency={currency} />
+        </div>
       </CardHeader>
 
       <CardContent>

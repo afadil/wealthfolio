@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Card, CardTitle, CardContent, CardHeader } from '@/components/ui/card';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatPercent } from '@/lib/utils';
 import HistoryChart from '@/components/history-chart-symbol';
 import IntervalSelector from '@/components/interval-selector'; // Ensure you have this component
 import { Quote, TimePeriod } from '@/lib/types';
@@ -10,6 +10,8 @@ import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { useRefreshQuotesMutation } from '@/hooks/useRefreshQuotes';
 import { Button } from '@/components/ui/button';
+import { AmountDisplay } from '@/components/amount-display';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 // Interval descriptions mapping
 const intervalDescriptions = {
@@ -44,6 +46,7 @@ const SymbolCard: React.FC<{
   });
 
   const [interval, setInterval] = useState<TimePeriod>('3M');
+  const { isBalanceHidden } = useBalancePrivacy();
 
   // Filter data based on the selected interval
   const filteredData = useMemo(() => {
@@ -122,10 +125,16 @@ const SymbolCard: React.FC<{
           <HoverCard>
             <HoverCardTrigger asChild className="cursor-pointer">
               <div>
-                <p className="pt-3 text-xl font-bold">{formatAmount(marketPrice, currency)}</p>
+                <p className="pt-3 text-xl font-bold">
+                  <AmountDisplay
+                    value={marketPrice}
+                    currency={currency}
+                    isHidden={isBalanceHidden}
+                  />
+                </p>
                 <p className={`text-sm ${ganAmount > 0 ? 'text-success' : 'text-red-400'}`}>
-                  {formatAmount(ganAmount, currency)} ({formatPercent(percentage)}){' '}
-                  {intervalDescriptions[interval]}
+                  <AmountDisplay value={ganAmount} currency={currency} isHidden={isBalanceHidden} />{' '}
+                  ({formatPercent(percentage)}) {intervalDescriptions[interval]}
                 </p>
               </div>
             </HoverCardTrigger>

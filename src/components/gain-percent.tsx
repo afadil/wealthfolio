@@ -5,9 +5,10 @@ import NumberFlow from '@number-flow/react';
 
 interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
+  animated?: boolean;
 }
 
-export function GainPercent({ value, className, ...props }: GainPercentProps) {
+export function GainPercent({ value, animated = false, className, ...props }: GainPercentProps) {
   return (
     <div
       className={cn(
@@ -27,6 +28,7 @@ export function GainPercent({ value, className, ...props }: GainPercentProps) {
         )}
         <NumberFlow
           value={value / 100}
+          animated={animated}
           format={{
             style: 'percent',
             minimumFractionDigits: 2,

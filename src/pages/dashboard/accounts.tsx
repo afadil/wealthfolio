@@ -6,9 +6,8 @@ import { GainPercent } from '@/components/gain-percent';
 import { GainAmount } from '@/components/gain-amount';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSummary } from '@/lib/types';
-import { formatAmount } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
-import { useHideInvestmentValues } from '@/context/hideInvestmentValuesProvider';
+import { PrivacyAmount } from '@/components/privacy-amount';
 
 // Helper function to calculate category summary
 const calculateCategorySummary = (accountsInCategory: AccountSummary[]) => {
@@ -53,7 +52,6 @@ const AccountSummaryComponent = ({
   isGroup = false,
   isExpanded = false,
   onToggle,
-  hideValues = false,
 }: {
   accountSummary:
     | AccountSummary
@@ -61,7 +59,6 @@ const AccountSummaryComponent = ({
   isGroup?: boolean;
   isExpanded?: boolean;
   onToggle?: () => void;
-  hideValues?: boolean;
 }) => {
   return (
     <div
@@ -75,29 +72,30 @@ const AccountSummaryComponent = ({
           {isGroup
             ? `${accountSummary.performance.numberOfAccounts} accounts`
             : accountSummary.account.group
-            ? `${accountSummary.account.group} - ${accountSummary.account.currency}`
-            : accountSummary.account.currency}
+              ? `${accountSummary.account.group} - ${accountSummary.account.currency}`
+              : accountSummary.account.currency}
         </span>
       </div>
       <div className="flex items-center">
         <div className="flex flex-col items-end">
           <p className="font-medium leading-none">
-            {hideValues ? (
-              '•••'
-            ) : isGroup ? (
-              formatAmount(
-                accountSummary.performance.totalValue ||
+            {isGroup ? (
+              <PrivacyAmount
+                value={
+                  accountSummary.performance.totalValue ||
                   accountSummary.performance.totalMarketValue +
-                    accountSummary.performance.totalCashBalance,
-                accountSummary.account.currency,
-              )
+                    accountSummary.performance.totalCashBalance
+                }
+                currency={accountSummary.account.currency}
+              />
             ) : (
-              formatAmount(
-                accountSummary.performance.totalValue ||
-                  accountSummary.performance.marketValue +
-                    accountSummary.performance.availableCash,
-                accountSummary.account.currency,
-              )
+              <PrivacyAmount
+                value={
+                  accountSummary.performance.totalValue ||
+                  accountSummary.performance.marketValue + accountSummary.performance.availableCash
+                }
+                currency={accountSummary.account.currency}
+              />
             )}
           </p>
           {(accountSummary.performance.totalGainPercentage !== 0 ||
@@ -106,14 +104,12 @@ const AccountSummaryComponent = ({
               <GainAmount
                 className="text-sm font-light"
                 value={
-                  hideValues
-                    ? 0 // Hide value when hideValues is true
-                    : accountSummary.performance.totalGainValue ||
-                      accountSummary.performance.totalGainAmount ||
-                      0
+                  accountSummary.performance.totalGainValue ||
+                  accountSummary.performance.totalGainAmount ||
+                  0
                 }
                 currency={accountSummary.account.currency || 'USD'}
-                displayCurrency={!hideValues}
+                displayCurrency={false}
               />
               <div className="mx-1 h-3 border-r border-gray-300" />
               <GainPercent
@@ -123,15 +119,14 @@ const AccountSummaryComponent = ({
                   accountSummary.performance.totalGainPercent ||
                   0
                 }
+                animated={true}
               />
             </div>
           )}
         </div>
         {isGroup ? (
           <Icons.ChevronDown
-            className={`ml-2 h-5 w-5 transition-transform ${
-              isExpanded ? 'rotate-180 transform' : ''
-            }`}
+            className={`ml-2 h-5 w-5 transition-transform ${isExpanded ? 'rotate-180 transform' : ''}`}
           />
         ) : (
           <Link to={`/accounts/${accountSummary.account.id}`} className="ml-2 p-0">
@@ -151,7 +146,6 @@ export function Accounts({
   className?: string;
 }) {
   const { accountsGrouped, setAccountsGrouped } = useSettingsContext();
-  const { hideValues } = useHideInvestmentValues();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const groupAccountsByCategory = () => {
@@ -199,14 +193,13 @@ export function Accounts({
             isGroup={true}
             isExpanded={isExpanded}
             onToggle={() => toggleCategory(category)}
-            hideValues={hideValues} // Pass hideValues
           />
         </CardHeader>
         {isExpanded && (
           <CardContent className="border-t pt-4">
             {accountsInCategory.map((accountSummary) => (
               <div key={accountSummary.account.id} className="py-4">
-                <AccountSummaryComponent accountSummary={accountSummary} hideValues={hideValues} />
+                <AccountSummaryComponent accountSummary={accountSummary} />
               </div>
             ))}
           </CardContent>
@@ -230,7 +223,7 @@ export function Accounts({
           {ungroupedAccounts.map((accountSummary) => (
             <Card key={accountSummary.account.id} className="border-none shadow-sm">
               <CardHeader className="py-6">
-                <AccountSummaryComponent accountSummary={accountSummary} hideValues={hideValues} />
+                <AccountSummaryComponent accountSummary={accountSummary} />
               </CardHeader>
             </Card>
           ))}
@@ -240,7 +233,7 @@ export function Accounts({
       return accounts?.map((accountSummary) => (
         <Card key={accountSummary.account.id} className="border-none shadow-sm">
           <CardHeader className="py-6">
-            <AccountSummaryComponent accountSummary={accountSummary} hideValues={hideValues} />
+            <AccountSummaryComponent accountSummary={accountSummary} />
           </CardHeader>
         </Card>
       ));

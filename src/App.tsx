@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SettingsProvider } from '@/lib/settings-provider';
-import { HideInvestmentValuesProvider } from './context/hideInvestmentValuesProvider';
+import { PrivacyProvider } from './context/privacy-context';
 import { AppRoutes } from './routes';
 import { useState } from 'react';
 
@@ -19,11 +19,11 @@ function App() {
   );
   return (
     <QueryClientProvider client={queryClient}>
-      <HideInvestmentValuesProvider>
+      <PrivacyProvider>
         <SettingsProvider>
           <AppRoutes />
         </SettingsProvider>
-      </HideInvestmentValuesProvider>
+      </PrivacyProvider>
     </QueryClientProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
@@ -17,9 +17,8 @@ import { Button } from '@/components/ui/button';
 import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
-import { useHideInvestmentValues } from '@/context/hideInvestmentValuesProvider';
+import { PrivacyToggle } from '@/components/privacy-toggle';
 
-// filter
 function DashboardSkeleton() {
   return (
     <div className="grid h-full gap-4 sm:grid-cols-1 md:grid-cols-3">
@@ -55,14 +54,6 @@ export default function DashboardPage() {
     queryFn: () => getHistory('TOTAL'),
   });
 
-  const { hideValues } = useHideInvestmentValues();
-  const [localHideValues, setLocalHideValues] = useState(hideValues);
-
-  // Synchronize hideValues with local state
-  useEffect(() => {
-    setLocalHideValues(hideValues);
-  }, [hideValues]);
-
   if (isPortfolioHistoryLoading || isAccountsLoading) {
     return <DashboardSkeleton />;
   }
@@ -74,35 +65,35 @@ export default function DashboardPage() {
   };
 
   return (
-    <div key={localHideValues ? 'hidden' : 'visible'} className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
-      <div
-        className="flex px-4 py-2 md:px-6 lg:px-10"
-        key={hideValues ? 'hidden' : 'visible'} // Force re-render on hideValues change
-      >
+      <div className="flex px-4 py-2 md:px-6 lg:px-10">
         <HoverCard>
           <HoverCardTrigger className="flex cursor-pointer items-center">
-            <div>
-            <Balance
-              targetValue={localHideValues ? 0 : todayValue?.totalValue || 0} // Obfuscate value
-              currency={todayValue?.currency || 'USD'}
-              displayCurrency={!localHideValues} // Hide currency if values are hidden
-              hideValues={localHideValues}
-            />
-            <div className="flex space-x-3 text-sm">
-              <GainAmount
-                className="text-md font-light"
-                value={localHideValues ? 0 : todayValue?.totalGainValue || 0} // Obfuscate value
-                currency={todayValue?.currency || 'USD'}
-                displayCurrency={!localHideValues} // Hide currency if values are hidden
-                hideValues={localHideValues}
-            />
-              <div className="my-1 border-r border-secondary pr-2" />
-              <GainPercent
-                className="text-md font-light"
-                value={todayValue?.totalGainPercentage || 0}
-              />
-            </div>
+            <div className="flex items-start gap-2">
+              <div>
+                <Balance
+                  targetValue={todayValue?.totalValue || 0}
+                  currency={todayValue?.currency || 'USD'}
+                  displayCurrency={true}
+                />
+
+                <div className="flex space-x-3 text-sm">
+                  <GainAmount
+                    className="text-md font-light"
+                    value={todayValue?.totalGainValue || 0}
+                    currency={todayValue?.currency || 'USD'}
+                    displayCurrency={false}
+                  ></GainAmount>
+                  <div className="my-1 border-r border-secondary pr-2" />
+                  <GainPercent
+                    className="text-md font-light"
+                    value={todayValue?.totalGainPercentage || 0}
+                    animated={true}
+                  ></GainPercent>
+                </div>
+              </div>
+              <PrivacyToggle className="mt-1" />
             </div>
           </HoverCardTrigger>
           <HoverCardContent align="start" className="w-80 shadow-none">

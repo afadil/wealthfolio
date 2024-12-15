@@ -10,7 +10,6 @@ import IntervalSelector from '@/components/interval-selector';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { formatAmount } from '@/lib/utils';
 import { useParams } from 'react-router-dom';
 import AccountDetail from './account-detail';
 import AccountHoldings from './account-holdings';
@@ -24,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
 import { AccountContributionLimit } from './account-contribution-limit';
+import { PrivacyAmount } from '@/components/privacy-amount';
+import { PrivacyToggle } from '@/components/privacy-toggle';
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
@@ -75,23 +76,30 @@ const AccountPage = () => {
             <CardTitle className="text-md">
               <HoverCard>
                 <HoverCardTrigger asChild className="cursor-pointer">
-                  <div>
-                    <p className="pt-3 text-xl font-bold">
-                      {formatAmount(performance?.totalValue || 0, performance?.currency || 'USD')}
-                    </p>
-                    <div className="flex space-x-3 text-sm">
-                      <GainAmount
-                        className="text-sm font-light"
-                        value={performance?.totalGainValue || 0}
-                        currency={account?.currency || 'USD'}
-                        displayCurrency={false}
-                      />
-                      <div className="my-1 border-r border-gray-300 pr-2" />
-                      <GainPercent
-                        className="text-sm font-light"
-                        value={performance?.totalGainPercentage || 0}
-                      />
+                  <div className="flex items-start gap-2">
+                    <div>
+                      <p className="pt-3 text-xl font-bold">
+                        <PrivacyAmount
+                          value={performance?.totalValue || 0}
+                          currency={performance?.currency || 'USD'}
+                        />
+                      </p>
+                      <div className="flex space-x-3 text-sm">
+                        <GainAmount
+                          className="text-sm font-light"
+                          value={performance?.totalGainValue || 0}
+                          currency={account?.currency || 'USD'}
+                          displayCurrency={false}
+                        />
+                        <div className="my-1 border-r border-gray-300 pr-2" />
+                        <GainPercent
+                          className="text-sm font-light"
+                          value={performance?.totalGainPercentage || 0}
+                          animated={true}
+                        />
+                      </div>
                     </div>
+                    <PrivacyToggle className="mt-3" />
                   </div>
                 </HoverCardTrigger>
                 <HoverCardContent align="start" className="w-80 shadow-none">

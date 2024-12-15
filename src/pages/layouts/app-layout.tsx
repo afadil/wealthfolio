@@ -8,52 +8,45 @@ import { getAccounts } from '@/commands/account';
 import { useSettings } from '@/lib/useSettings';
 import { QueryKeys } from '@/lib/query-keys';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { useHideInvestmentValues } from '@/hooks/useHideInvestmentValues';
+
+const navigation: NavigationProps = {
+  primary: [
+    {
+      icon: <Icons.Dashboard className="h-5 w-5" />,
+      title: 'Dashboard',
+      href: '/dashboard',
+    },
+    {
+      icon: <Icons.Holdings className="h-5 w-5" />,
+      title: 'Holdings',
+      href: '/holdings',
+    },
+    {
+      icon: <Icons.Income className="h-5 w-5" />,
+      title: 'Income',
+      href: '/income',
+    },
+    {
+      icon: <Icons.Activity className="h-5 w-5" />,
+      title: 'Activities',
+      href: '/activities',
+    },
+    {
+      icon: <Icons.Settings className="h-5 w-5" />,
+      title: 'Settings',
+      href: '/settings/general',
+    },
+  ],
+  secondary: [],
+};
 
 const AppLayout = () => {
-  const { hideValues, toggleHideValues } = useHideInvestmentValues(); // Use the hook
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
-
-  const navigation: NavigationProps = {
-    primary: [
-      {
-        icon: <Icons.Dashboard className="h-5 w-5" />,
-        title: 'Dashboard',
-        href: '/dashboard',
-      },
-      {
-        icon: <Icons.Holdings className="h-5 w-5" />,
-        title: 'Holdings',
-        href: '/holdings',
-      },
-      {
-        icon: <Icons.Income className="h-5 w-5" />,
-        title: 'Income',
-        href: '/income',
-      },
-      {
-        icon: <Icons.Activity className="h-5 w-5" />,
-        title: 'Activities',
-        href: '/activities',
-      },
-      {
-        icon: <Icons.Settings className="h-5 w-5" />,
-        title: 'Settings',
-        href: '/settings/general',
-      },
-      {
-        icon: hideValues ? <Icons.EyeOff className="h-5 w-5" /> : <Icons.Eye className="h-5 w-5" />,
-        title: hideValues ? 'Show Values' : 'Hide Values',
-        action: toggleHideValues, // Pass the toggle function
-      },
-    ],
-    secondary: [],
-  };
 
   if (isSettingsLoading || isAccountsLoading) {
     return null;
@@ -81,6 +74,7 @@ const AppLayout = () => {
         </ErrorBoundary>
       </div>
       <Toaster />
+      {/* <TailwindIndicator /> */}
     </div>
   );
 };

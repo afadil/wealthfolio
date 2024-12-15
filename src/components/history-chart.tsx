@@ -1,20 +1,27 @@
 import { useMemo } from 'react';
-import { Area, AreaChart, Tooltip, YAxis } from 'recharts';
+import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
+import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { formatAmount, formatDate } from '@/lib/utils';
 import { ChartConfig, ChartContainer } from './ui/chart';
+import { useBalancePrivacy } from '@/context/privacy-context';
+import { GainPercent } from '@/components/gain-percent';
 
-type CustomTooltipProps = {
-  active: boolean;
-  payload: { value: number; payload: any }[];
+type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
+  isBalanceHidden: boolean;
 };
 
-const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="center-items">
+      <div className="center-items space-y-1">
         <p className="font-thin">{formatDate(data.date)}</p>
-        <p className="label">{formatAmount(payload[0].value, data.currency, false)}</p>
+        <p className="label">
+          {isBalanceHidden
+            ? `•••• `
+            : `${formatAmount(Number(payload[0].value), data.currency, false)} `}
+          <GainPercent value={data.totalGainPercentage} />
+        </p>
       </div>
     );
   }
@@ -25,6 +32,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 interface HistoryChartData {
   date: string;
   totalValue: number;
+  totalGainPercentage: number;
   currency: string;
 }
 
@@ -35,6 +43,8 @@ export function HistoryChart({
   data: HistoryChartData[];
   interval: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
 }) {
+  const { isBalanceHidden } = useBalancePrivacy();
+
   const filteredData = useMemo(() => {
     if (!data) return [];
     const today = new Date();
@@ -87,7 +97,9 @@ export function HistoryChart({
           </linearGradient>
         </defs>
         {/* @ts-ignore */}
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip
+          content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} />}
+        />
         {interval !== 'ALL' && interval !== '1Y' && (
           <YAxis hide type="number" domain={['auto', 'auto']} />
         )}

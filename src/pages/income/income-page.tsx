@@ -25,14 +25,17 @@ import {
 import { Icons } from '@/components/icons';
 import { getIncomeSummary } from '@/commands/portfolio';
 import type { IncomeSummary } from '@/lib/types';
-import { formatAmount } from '@/lib/utils';
 import { QueryKeys } from '@/lib/query-keys';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { GainPercent } from '@/components/gain-percent';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Badge } from '@/components/ui/badge';
-import { useHideInvestmentValues } from '@/context/hideInvestmentValuesProvider';
+import { PrivacyAmount } from '@/components/privacy-amount';
+import { useBalancePrivacy } from '@/context/privacy-context';
+import { formatAmount } from '@/lib/utils';
+import { format } from 'date-fns';
+import { AmountDisplay } from '@/components/amount-display';
 
 const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [
   { code: 'TOTAL', label: 'All Time' },
@@ -63,7 +66,6 @@ const IncomePeriodSelector: React.FC<{
 
 export default function IncomePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<'TOTAL' | 'YTD' | 'LAST_YEAR'>('TOTAL');
-  const { hideValues } = useHideInvestmentValues();
 
   const {
     data: incomeData,
@@ -163,6 +165,8 @@ export default function IncomePage() {
     amount,
   }));
 
+  const { isBalanceHidden } = useBalancePrivacy();
+
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader heading="Investment Income">
@@ -189,13 +193,20 @@ export default function IncomePage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{hideValues ? '•••' : formatAmount(totalIncome, currency)}</div>
+                  <div className="text-2xl font-bold">
+                    <AmountDisplay
+                      value={totalIncome}
+                      currency={currency}
+                      isHidden={isBalanceHidden}
+                    />
+                  </div>
                   <div className="justify-start text-xs">
                     {periodSummary.yoyGrowth !== null ? (
                       <div className="flex items-center text-xs">
                         <GainPercent
                           value={periodSummary.yoyGrowth}
                           className="text-left text-xs"
+                          animated={true}
                         />
                         <span className="ml-2 text-xs text-muted-foreground">
                           Year-over-year growth
@@ -241,7 +252,13 @@ export default function IncomePage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{hideValues ? '•••' : formatAmount(monthlyAverage, currency)}</div>
+              <div className="text-2xl font-bold">
+                <AmountDisplay
+                  value={monthlyAverage}
+                  currency={currency}
+                  isHidden={isBalanceHidden}
+                />
+              </div>
               <div className="flex items-center text-xs">
                 <GainPercent value={monthlyAverageChange} className="text-left text-xs" />
                 <span className="ml-2 text-xs text-muted-foreground">Since last period</span>
@@ -258,12 +275,24 @@ export default function IncomePage() {
                 {[
                   {
                     name: 'Dividends',
-                    amount: hideValues ? '•••' : formatAmount(dividendIncome, currency),
+                    amount: (
+                      <AmountDisplay
+                        value={dividendIncome}
+                        currency={currency}
+                        isHidden={isBalanceHidden}
+                      />
+                    ),
                     percentage: dividendPercentage,
                   },
                   {
                     name: 'Interest',
-                    amount: hideValues ? '•••' : formatAmount(interestIncome, currency),
+                    amount: (
+                      <AmountDisplay
+                        value={interestIncome}
+                        currency={currency}
+                        isHidden={isBalanceHidden}
+                      />
+                    ),
                     percentage: interestPercentage,
                   },
                 ].map((source, index) => (
@@ -330,7 +359,7 @@ export default function IncomePage() {
                   <ComposedChart
                     data={monthlyIncomeData.map(([month, income], index) => ({
                       month,
-                      income: income, // Hide income if hideValues is true
+                      income,
                       cumulative: monthlyIncomeData
                         .slice(0, index + 1)
                         .reduce((sum, [, value]) => sum + value, 0),
@@ -345,19 +374,42 @@ export default function IncomePage() {
                       axisLine={false}
                       tickFormatter={(value) => value}
                     />
-                    <YAxis
-                      yAxisId="left"
-                      tickFormatter={(value) => (hideValues ? '•••' : value)} // Hide Y-axis values
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      tickFormatter={(value) => (hideValues ? '•••' : value)} // Hide Y-axis values
-                    />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
                     <ChartTooltip
                       content={
                         <ChartTooltipContent
-                          formatter={(value) => (hideValues ? '•••' : value)} // Hide tooltip values
+                          formatter={(value, name, entry) => {
+                            const formattedValue = isBalanceHidden
+                              ? '••••'
+                              : formatAmount(Number(value), currency);
+                            return (
+                              <>
+                                <div
+                                  className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]"
+                                  style={
+                                    {
+                                      '--color-bg': entry.color,
+                                      '--color-border': entry.color,
+                                    } as React.CSSProperties
+                                  }
+                                />
+                                <div className="flex flex-1 items-center justify-between">
+                                  <span className="text-muted-foreground">
+                                    {name === 'income'
+                                      ? 'Monthly Income'
+                                      : name === 'previousIncome'
+                                        ? 'Previous Period'
+                                        : name}
+                                  </span>
+                                  <span className="ml-2 font-mono font-medium tabular-nums text-foreground">
+                                    {formattedValue}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          }}
+                          labelFormatter={(label) => format(new Date(label), 'MMMM yyyy')}
                         />
                       }
                     />
@@ -416,7 +468,7 @@ export default function IncomePage() {
                         </span>
                       </div>
                       <div className="text-sm text-success">
-                        {hideValues ? '•••' : formatAmount(income, currency)}
+                        <PrivacyAmount value={income} currency={currency} />
                       </div>
                     </div>
                   ))}
