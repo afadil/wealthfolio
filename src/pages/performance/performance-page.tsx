@@ -18,7 +18,7 @@ import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { ReturnMethod, usePerformanceData } from './hooks/usePerformanceData';
+import { ReturnMethod, usePerformanceData } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
 
 const PORTFOLIO_TOTAL: ComparisonItem = {
@@ -32,6 +32,36 @@ type ComparisonItem = {
   type: 'account' | 'symbol';
   name: string;
 };
+
+function PerformanceContent({
+  performanceData,
+  isLoading,
+}: {
+  performanceData: any[] | undefined;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="relative">
+      {performanceData && performanceData.length > 0 && <PerformanceChart data={performanceData} />}
+
+      {!performanceData?.length && !isLoading && (
+        <EmptyPlaceholder
+          className="mx-auto flex h-[400px] max-w-[420px] items-center justify-center"
+          icon={<BarChart className="h-10 w-10" />}
+          title="No performance data"
+          description="Select accounts to compare their performance over time."
+        />
+      )}
+
+      {/* Overlay loading indicator */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+          <Skeleton className="h-[400px] w-full bg-muted/50" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PerformancePage() {
   const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
@@ -139,18 +169,10 @@ export default function PerformancePage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {isLoadingPerformance ? (
-              <Skeleton className="h-[400px] w-full" />
-            ) : performanceData && performanceData.length > 0 ? (
-              <PerformanceChart data={performanceData} />
-            ) : (
-              <EmptyPlaceholder
-                className="mx-auto flex h-[400px] max-w-[420px] items-center justify-center"
-                icon={<BarChart className="h-10 w-10" />}
-                title="No performance data"
-                description="Select accounts to compare their performance over time."
-              />
-            )}
+            <PerformanceContent
+              performanceData={performanceData}
+              isLoading={isLoadingPerformance}
+            />
           </CardContent>
         </Card>
       </div>
@@ -168,7 +190,7 @@ function PerformanceDashboardSkeleton() {
             <Skeleton className="h-4 w-[100px]" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-[400px] w-full" />
+            <Skeleton className="h-[400px] w-full bg-muted/50" />
           </CardContent>
         </Card>
       </main>

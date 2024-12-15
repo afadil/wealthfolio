@@ -60,5 +60,8 @@ export function usePerformanceData({
         .map((result) => result.value);
     },
     enabled: selectedItems.length > 0 && !!dateRange?.from && !!dateRange?.to,
+    placeholderData: (previousData) => previousData,
+    staleTime: 30 * 1000,
+    refetchInterval: false,
   });
 }
