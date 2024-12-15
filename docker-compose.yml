@@ -1,0 +1,12 @@
+services:
+  wealthfolio-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "1420:1420"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+    environment:
+      - PATH=/root/.cargo/bin:${PATH}
