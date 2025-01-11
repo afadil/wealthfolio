@@ -10,7 +10,7 @@ export const OnboardingPage = () => {
 
   const renderStepIcon = (stepNumber: number) => {
     return currentStep >= stepNumber ? (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
+      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-success">
         <Icons.CheckCircle className="text-xs text-white" />
       </div>
     ) : (

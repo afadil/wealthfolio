@@ -148,7 +148,7 @@ export const columns: ColumnDef<ActivityImport>[] = [
         type === 'CONVERSION_IN' ||
         type === 'TRANSFER_IN'
           ? 'success'
-          : 'error';
+          : 'destructive';
       return (
         <div className="flex items-center">
           <Badge variant={badgeVariant}>{type}</Badge>

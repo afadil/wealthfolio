@@ -114,7 +114,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
         key={item.title}
         variant={location.pathname.includes(item.href) ? 'secondary' : 'ghost'}
         asChild
-        className={cn('h-12 justify-start', className)}
+        className={cn('h-12 justify-start text-foreground', className)}
       >
         <Link key={item.title} to={item.href} title={item.title} {...props}>
           {item.icon ?? <Icons.ArrowRight className="h-6 w-6" aria-hidden="true" />}
