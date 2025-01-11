@@ -292,7 +292,7 @@ export function ActivityImportForm({
           </Button>
         )}
         {mapping.accountId && selectedFile && !isMapComplete() && (
-          <p className="flex items-center text-sm text-red-400">
+          <p className="flex items-center text-sm text-destructive">
             <Icons.AlertTriangle className="mr-2 h-4 w-4" />
             Please map all columns and activity types before importing.
           </p>

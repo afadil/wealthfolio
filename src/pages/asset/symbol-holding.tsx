@@ -63,12 +63,12 @@ const SymbolHoldingCard: React.FC<SymbolHoldingProps> = ({ holdingData, classNam
           ({formatPercent(todaysReturnPercent / 100)})
         </>
       ),
-      color: todaysReturn < 0 ? 'text-red-400' : 'text-success',
+      color: todaysReturn < 0 ? 'text-destructive' : 'text-success',
     },
     {
       label: 'Total return',
       value: `${formatAmount(totalReturn, currency)} (${formatPercent(totalReturnPercent)})`,
-      color: totalReturn < 0 ? 'text-red-400' : 'text-success',
+      color: totalReturn < 0 ? 'text-destructive' : 'text-success',
     },
   ];
 

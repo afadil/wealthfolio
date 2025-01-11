@@ -94,7 +94,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
                 <td
                   key={account.id}
                   className={`border-l border-t px-4 py-2 text-right text-xs text-muted-foreground ${
-                    totalAllocations[account.id] > 100 ? 'text-red-400' : ''
+                    totalAllocations[account.id] > 100 ? 'text-destructive' : ''
                   }`}
                 >
                   {totalAllocations[account.id]}%

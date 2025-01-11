@@ -8,7 +8,7 @@ import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
-import { PortfolioComposition } from './components/portfolio-composition';
+import { PortfolioComposition } from './components/composition-chart';
 import { SectorsChart } from './components/sectors-chart';
 import { computeHoldings } from '@/commands/portfolio';
 import { useQuery } from '@tanstack/react-query';

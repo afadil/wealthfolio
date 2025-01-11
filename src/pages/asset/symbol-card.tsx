@@ -132,7 +132,7 @@ const SymbolCard: React.FC<{
                     isHidden={isBalanceHidden}
                   />
                 </p>
-                <p className={`text-sm ${ganAmount > 0 ? 'text-success' : 'text-red-400'}`}>
+                <p className={`text-sm ${ganAmount > 0 ? 'text-success' : 'text-destructive'}`}>
                   <AmountDisplay value={ganAmount} currency={currency} isHidden={isBalanceHidden} />{' '}
                   ({formatPercent(percentage)}) {intervalDescriptions[interval]}
                 </p>

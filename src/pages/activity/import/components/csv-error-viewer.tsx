@@ -169,7 +169,7 @@ export function ErrorViewer({
                       <TableCell className="flex items-center font-medium">
                         {index === 0 && parsingError ? (
                           <>
-                            <Icons.ArrowRight className="h-4 w-4 text-red-500" />
+                            <Icons.ArrowRight className="h-4 w-4 text-destructive" />
                             <span className="ml-2">{index + 1}</span>
                           </>
                         ) : (
