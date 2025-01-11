@@ -5,31 +5,39 @@ import { useMemo } from 'react';
 import { ResponsiveContainer, Treemap } from 'recharts';
 import { Link } from 'react-router-dom';
 
-function opacity(value: number) {
-  const gain = Math.abs(value * 100);
+interface ColorScale {
+  opacity: number;
+  className: string;
+}
 
-  if (gain >= 7) {
-    return 0.7;
-  } else if (gain >= 4) {
-    return 0.6;
-  } else if (gain >= 2) {
-    return 0.5;
-  } else if (gain > 0) {
-    return 0.4;
+function getColorScale(gain: number, maxGain: number, minGain: number): ColorScale {
+  const isGain = gain >= 0;
+
+  // Calculate relative position in the range
+  let relativePosition: number;
+  if (isGain) {
+    relativePosition = maxGain === 0 ? 0 : gain / maxGain;
+  } else {
+    relativePosition = minGain === 0 ? 0 : gain / minGain;
   }
 
-  return 0.5;
+  // Scale opacity between 0.4 and 1.0 based on relative position
+  const opacity = 0.4 + Math.abs(relativePosition) * 0.6;
+
+  return {
+    opacity,
+    className: isGain ? 'fill-success' : 'fill-destructive',
+  };
 }
 
 const CustomizedContent = (props: any) => {
-  const { depth, x, y, width, height, name, gain } = props;
-
+  const { depth, x, y, width, height, name, gain, maxGain, minGain } = props;
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
-  const opacityVal = 1 - opacity(gain);
+  const colorScale = getColorScale(gain, maxGain, minGain);
 
   return (
-    <g className="">
+    <g>
       <rect
         x={x}
         y={y}
@@ -37,14 +45,13 @@ const CustomizedContent = (props: any) => {
         height={height}
         rx={10}
         ry={10}
-        className={cn('stroke-background', {
+        className={cn('stroke-card', {
           'stroke-[4px]': depth === 1,
           'fill-none stroke-0': depth === 0,
-          'fill-success': gain >= 0,
-          'fill-destructive': gain < 0,
+          [colorScale.className]: depth === 1,
         })}
         style={{
-          fillOpacity: opacityVal,
+          fillOpacity: colorScale.opacity,
         }}
       />
       {depth === 1 ? (
@@ -83,6 +90,7 @@ const CustomizedContent = (props: any) => {
 };
 
 export function PortfolioComposition({ assets }: { assets: Holding[] }) {
+  console.log(assets);
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
     const data: {
@@ -94,9 +102,17 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
       };
     } = {};
 
+    let maxGain = -Infinity;
+    let minGain = Infinity;
+
     assets.forEach((asset) => {
       if (asset.symbol) {
         const symbol = asset.symbol;
+        const gain = Number(asset.performance.dayGainPercent);
+
+        maxGain = Math.max(maxGain, gain);
+        minGain = Math.min(minGain, gain);
+
         if (data[symbol]) {
           data[symbol].marketValueConverted += Number(asset.marketValueConverted);
           data[symbol].bookBalueConverted += Number(asset.bookValueConverted);
@@ -108,23 +124,23 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
             name: symbol,
             marketValueConverted: Number(asset.marketValueConverted),
             bookBalueConverted: Number(asset.bookValueConverted),
-            gain:
-              (asset.marketValueConverted - asset.bookValueConverted) / asset.bookValueConverted,
+            gain,
           };
         }
       }
     });
 
     // Convert the object values to an array
-    const dataArray = Object.values(data);
+    const dataArray = Object.values(data).map((item) => ({
+      ...item,
+      maxGain,
+      minGain,
+    }));
 
     // Sort the array by marketValue in descending order
     dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
-    // Keep only the top 10 entries
-    const topHolding = dataArray; //.slice(0, 25);
-
-    return topHolding;
+    return dataArray;
   }, [assets]);
 
   return (
