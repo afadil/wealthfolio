@@ -49,6 +49,7 @@ export const updateAssetProfile = async (payload: {
   sectors: string;
   countries: string;
   comment: string;
+  assetClass: string;
   assetSubClass: string;
 }): Promise<Asset> => {
   try {
