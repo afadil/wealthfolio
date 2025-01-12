@@ -1,2 +1,2 @@
 export * from './holdings-table';
-export * from './portfolio-composition';
+export * from './composition-chart';

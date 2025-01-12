@@ -45,7 +45,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
           {formatPercent(dayGainPercentage)})
         </>
       ),
-      color: dayGainValue < 0 ? 'text-red-400' : 'text-success',
+      color: dayGainValue < 0 ? 'text-destructive' : 'text-success',
     },
     {
       label: 'Total return',
@@ -55,7 +55,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
           {formatPercent(totalGainPercentage)})
         </>
       ),
-      color: totalGainPercentage < 0 ? 'text-red-400' : 'text-success',
+      color: totalGainPercentage < 0 ? 'text-destructive' : 'text-success',
     },
   ];
 

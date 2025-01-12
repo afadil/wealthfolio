@@ -24,7 +24,7 @@ export function FileDropzone({
       {...getRootProps()}
       className={cn(
         'mb-4 cursor-pointer rounded-md border border-dashed p-8 text-center animate-in fade-in-50',
-        isDragActive && 'bg-success-background/10',
+        isDragActive && 'bg-success/10',
       )}
     >
       <input {...getInputProps()} />

@@ -8,7 +8,7 @@ import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
-import { PortfolioComposition } from './components/portfolio-composition';
+import { PortfolioComposition } from './components/composition-chart';
 import { SectorsChart } from './components/sectors-chart';
 import { computeHoldings } from '@/commands/portfolio';
 import { useQuery } from '@tanstack/react-query';
@@ -48,9 +48,19 @@ export const HoldingsPage = () => {
       <Tabs defaultValue={defaultTab} className="space-y-4">
         <ApplicationHeader heading="Holdings">
           <div className="flex items-center space-x-2">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
+              <TabsTrigger
+                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                value="overview"
+              >
+                Analytics
+              </TabsTrigger>
+              <TabsTrigger
+                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                value="holdings"
+              >
+                Positions
+              </TabsTrigger>
             </TabsList>
           </div>
         </ApplicationHeader>
@@ -120,22 +130,17 @@ export const HoldingsPage = () => {
             </Card>
 
             {/* Second row: Composition and Sector */}
-            <Card className="col-span-12 lg:col-span-8">
-              <CardHeader>
-                <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
-              </CardHeader>
-              <CardContent className="pl-2">
-                {holdings && holdings.length > 0 ? (
-                  <PortfolioComposition assets={holdings} />
-                ) : (
-                  <EmptyPlaceholder
-                    icon={<Icons.BarChart className="h-10 w-10" />}
-                    title="No holdings data"
-                    description="There is no holdings data available for your portfolio."
-                  />
-                )}
-              </CardContent>
-            </Card>
+            <div className="col-span-12 lg:col-span-8">
+              {holdings && holdings.length > 0 ? (
+                <PortfolioComposition assets={holdings} />
+              ) : (
+                <EmptyPlaceholder
+                  icon={<Icons.BarChart className="h-10 w-10" />}
+                  title="No holdings data"
+                  description="There is no holdings data available for your portfolio."
+                />
+              )}
+            </div>
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader>
                 <CardTitle className="text-md font-medium">By Sector</CardTitle>

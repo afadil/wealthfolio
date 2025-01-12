@@ -87,6 +87,7 @@ impl AssetService {
                 assets::countries.eq(&payload.countries),
                 assets::comment.eq(payload.comment),
                 assets::asset_sub_class.eq(&payload.asset_sub_class),
+                assets::asset_class.eq(&payload.asset_class),
             ))
             .get_result::<Asset>(conn)
     }

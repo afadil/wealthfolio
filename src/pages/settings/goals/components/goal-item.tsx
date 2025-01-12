@@ -22,9 +22,9 @@ export function GoalItem({ goal, onEdit, onDelete }: GoalItemProps) {
       <div className="flex items-center space-x-4">
         <div className="flex items-center">
           {goal.isAchieved ? (
-            <Icons.CheckCircle className="h5 mr-1 text-green-600" />
+            <Icons.CheckCircle className="h5 mr-1 text-success" />
           ) : (
-            <Icons.Goal className="mr-1 h-5 text-green-600" />
+            <Icons.Goal className="mr-1 h-5 text-success" />
           )}
           <span className="text-md">{formatAmount(goal.targetAmount, 'USD', false)}</span>
         </div>

@@ -165,7 +165,6 @@ impl HoldingsService {
         conn: &mut SqliteConnection,
         holdings: &HashMap<String, Holding>,
     ) -> Result<HashMap<String, Quote>> {
-
         let unique_symbols: HashSet<String> = holdings
             .values()
             .map(|h| h.symbol.clone())
@@ -356,6 +355,32 @@ impl HoldingsService {
         total_holding.market_value_converted += &holding.market_value_converted;
         total_holding.book_value += &holding.book_value;
         total_holding.book_value_converted += &holding.book_value_converted;
+
+        if let Some(day_gain_amount) = &holding.performance.day_gain_amount {
+            total_holding.performance.day_gain_amount = Some(
+                total_holding
+                    .performance
+                    .day_gain_amount
+                    .as_ref()
+                    .map_or_else(
+                        || day_gain_amount.clone(),
+                        |total| (total + day_gain_amount).round(6),
+                    ),
+            );
+        }
+
+        if let Some(day_gain_amount_converted) = &holding.performance.day_gain_amount_converted {
+            total_holding.performance.day_gain_amount_converted = Some(
+                total_holding
+                    .performance
+                    .day_gain_amount_converted
+                    .as_ref()
+                    .map_or_else(
+                        || day_gain_amount_converted.clone(),
+                        |total| (total + day_gain_amount_converted).round(6),
+                    ),
+            );
+        }
     }
 
     fn calculate_total_holding_metrics(
@@ -401,6 +426,17 @@ impl HoldingsService {
             } else {
                 BigDecimal::from(0)
             };
+
+        if let Some(day_gain_amount) = &total_holding.performance.day_gain_amount {
+            total_holding.performance.day_gain_percent =
+                Some(if total_holding.market_value != BigDecimal::from(0) {
+                    (day_gain_amount / (&total_holding.market_value - day_gain_amount)
+                        * BigDecimal::from(100))
+                    .round(6)
+                } else {
+                    BigDecimal::from(0)
+                });
+        }
 
         Ok(())
     }

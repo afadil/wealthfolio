@@ -25,7 +25,7 @@ export function GainAmount({
       <div
         className={cn(
           'flex items-center',
-          value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-red-400',
+          value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-destructive',
         )}
       >
         {isBalanceHidden ? (

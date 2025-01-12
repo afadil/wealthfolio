@@ -96,7 +96,7 @@ export const ActivityTable = ({
               ? 'success'
               : activityType === 'SPLIT'
                 ? 'secondary'
-                : 'error';
+                : 'destructive';
           return (
             <div className="flex items-center text-sm">
               <Badge className="text-xs font-normal" variant={badgeVariant}>

@@ -14,7 +14,7 @@ import { QueryKeys } from '@/lib/query-keys';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
+import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyToggle } from '@/components/privacy-toggle';
@@ -36,7 +36,7 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
-  const updatePortfolioMutation = useRecalculatePortfolioMutation({
+  const updatePortfolioMutation = useCalculateHistoryMutation({
     successTitle: 'Portfolio recalculated successfully',
     errorTitle: 'Failed to recalculate portfolio',
   });
@@ -61,7 +61,10 @@ export default function DashboardPage() {
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const handleRecalculate = async () => {
-    updatePortfolioMutation.mutate();
+    updatePortfolioMutation.mutate({
+      accountIds: undefined,
+      forceFullCalculation: true,
+    });
   };
 
   return (
@@ -138,7 +141,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="flex-grow bg-gradient-to-b from-custom-green to-custom-green/30 px-4 pt-8 dark:from-custom-green-dark dark:to-custom-green-dark/30 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+      <div className="flex-grow bg-gradient-to-t from-success/30 via-success/15 to-success/10 px-4 pt-8 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
         <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2">
             <Accounts className="border-none bg-transparent shadow-none" accounts={accounts} />

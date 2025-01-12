@@ -52,7 +52,7 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
                           <Progress
                             value={goal.progress}
                             className="h-2.5 w-full"
-                            indicatorClassName="dark:bg-success"
+                            indicatorClassName="bg-success"
                           />
                         </div>
                       </TooltipTrigger>

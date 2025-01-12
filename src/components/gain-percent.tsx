@@ -14,7 +14,7 @@ export function GainPercent({ value, animated = false, className, ...props }: Ga
       className={cn(
         'amount flex flex-col items-end text-right',
         className,
-        value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-red-400',
+        value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-destructive',
       )}
       {...props}
     >

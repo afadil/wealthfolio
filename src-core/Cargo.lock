@@ -1931,7 +1931,7 @@ checksum = "c62a0a307cb4a311d3a07867860911ca130c3494e8c2719593806c08bc5d0484"
 
 [[package]]
 name = "wealthfolio_core"
-version = "1.0.22"
+version = "1.0.23"
 dependencies = [
  "async-trait",
  "bigdecimal",
