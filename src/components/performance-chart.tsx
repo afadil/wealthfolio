@@ -74,14 +74,14 @@ export function PerformanceChart({ data, height = 360 }: PerformanceChartProps) 
 
   // Add back the custom colors
   const CHART_COLORS = [
-    'hsl(215 100% 50%)', // Blue
-    'hsl(280 87% 65%)', // Purple
-    'hsl(173.4 80.4% 40%)', // Teal-500
-    'hsl(188.7 94.5% 42.7%)', // cyan-500
-    'hsl(43 96% 58%)', // Yellow
-    'hsl(330.4 81.2% 60.4%)', // Pink-500
-    'hsl(24 75% 50%)', // Orange
-    'hsl(271 91% 65%)', // Violet
+    '#4385BE', // blue-400
+    '#CE5D97', // magenta-400
+    '#3AA99F', // cyan-400
+    '#8B7EC8', // purple-400
+    '#879A39', // green-400
+    '#D0A215', // yellow-500
+    '#DA702C', // orange-400
+    '#D14D41', // red-400
   ];
 
   // Update the chartConfig and Line components to use CHART_COLORS
