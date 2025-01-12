@@ -408,28 +408,47 @@ const IncomeFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
                 <AssetSymbolInput field={field} isManualAsset={isManualAsset} />
               )}
             />
-            <FormField
-              control={control}
-              name="unitPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    {activityType === 'DIVIDEND' ? 'Dividend Amount' : 'Interest Amount'}
-                  </FormLabel>
-                  <FormControl>
-                    <MoneyInput
-                      placeholder={
-                        activityType === 'DIVIDEND'
-                          ? 'Enter dividend amount'
-                          : 'Enter interest amount'
-                      }
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <div
+              className={`grid ${activityType === 'INTEREST' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}
+            >
+              <FormField
+                control={control}
+                name="unitPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {activityType === 'DIVIDEND' ? 'Dividend Amount' : 'Interest Amount'}
+                    </FormLabel>
+                    <FormControl>
+                      <MoneyInput
+                        placeholder={
+                          activityType === 'DIVIDEND'
+                            ? 'Enter dividend amount'
+                            : 'Enter interest amount'
+                        }
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {activityType === 'INTEREST' && (
+                <FormField
+                  control={control}
+                  name="fee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fee</FormLabel>
+                      <FormControl>
+                        <MoneyInput {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
-            />
+            </div>
           </>
           <CommonFields accounts={accounts} />
         </CardContent>
