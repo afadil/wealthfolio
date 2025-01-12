@@ -5507,7 +5507,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio_core"
-version = "1.0.22"
+version = "1.0.23"
 dependencies = [
  "async-trait",
  "bigdecimal",
