@@ -14,7 +14,10 @@ import { QueryKeys } from '@/lib/query-keys';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
+import {
+  useCalculateHistoryMutation,
+  useRecalculatePortfolioMutation,
+} from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyToggle } from '@/components/privacy-toggle';
@@ -36,7 +39,7 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
-  const updatePortfolioMutation = useRecalculatePortfolioMutation({
+  const updatePortfolioMutation = useCalculateHistoryMutation({
     successTitle: 'Portfolio recalculated successfully',
     errorTitle: 'Failed to recalculate portfolio',
   });
@@ -61,7 +64,10 @@ export default function DashboardPage() {
   const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
 
   const handleRecalculate = async () => {
-    updatePortfolioMutation.mutate();
+    updatePortfolioMutation.mutate({
+      accountIds: undefined,
+      forceFullCalculation: true,
+    });
   };
 
   return (

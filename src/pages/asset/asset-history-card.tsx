@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Card, CardTitle, CardContent, CardHeader } from '@/components/ui/card';
 import { formatPercent } from '@/lib/utils';
 import HistoryChart from '@/components/history-chart-symbol';
-import IntervalSelector from '@/components/interval-selector'; // Ensure you have this component
+import IntervalSelector from '@/components/interval-selector';
 import { Quote, TimePeriod } from '@/lib/types';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Icons } from '@/components/icons';
@@ -23,7 +23,7 @@ const intervalDescriptions = {
   ALL: 'All Time',
 };
 
-const SymbolCard: React.FC<{
+interface AssetHistoryProps {
   marketPrice: number;
   totalGainAmount: number;
   totalGainPercent: number;
@@ -31,7 +31,9 @@ const SymbolCard: React.FC<{
   quoteHistory: Quote[];
   symbol: string;
   className?: string;
-}> = ({
+}
+
+const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   marketPrice,
   totalGainAmount,
   totalGainPercent,
@@ -179,4 +181,4 @@ const SymbolCard: React.FC<{
   );
 };
 
-export default SymbolCard;
+export default AssetHistoryCard;
