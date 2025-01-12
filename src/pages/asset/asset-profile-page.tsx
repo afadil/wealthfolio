@@ -57,7 +57,6 @@ export const AssetProfilePage = () => {
     return assetData?.quoteHistory?.[0] ?? null;
   }, [assetData?.quoteHistory]);
 
-  console.log('quote', quote);
   const { updateAssetProfileMutation } = useAssetProfileMutations();
 
   useEffect(() => {

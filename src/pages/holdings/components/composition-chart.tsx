@@ -1,9 +1,40 @@
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Holding } from '@/lib/types';
 import { cn, formatPercent } from '@/lib/utils';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ResponsiveContainer, Treemap } from 'recharts';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BarChart } from 'lucide-react';
+
+type ReturnType = 'daily' | 'total';
+
+const ReturnTypeSelector: React.FC<{
+  selectedType: ReturnType;
+  onTypeSelect: (type: ReturnType) => void;
+}> = ({ selectedType, onTypeSelect }) => (
+  <div className="flex justify-end">
+    <div className="flex space-x-1 rounded-full bg-secondary p-1">
+      <Button
+        size="sm"
+        className="h-8 rounded-full px-2 text-xs"
+        variant={selectedType === 'daily' ? 'outline' : 'ghost'}
+        onClick={() => onTypeSelect('daily')}
+      >
+        Daily Return
+      </Button>
+      <Button
+        size="sm"
+        className="h-8 rounded-full px-2 text-xs"
+        variant={selectedType === 'total' ? 'outline' : 'ghost'}
+        onClick={() => onTypeSelect('total')}
+      >
+        Total Return
+      </Button>
+    </div>
+  </div>
+);
 
 interface ColorScale {
   opacity: number;
@@ -90,7 +121,7 @@ const CustomizedContent = (props: any) => {
 };
 
 export function PortfolioComposition({ assets }: { assets: Holding[] }) {
-  console.log(assets);
+  const [returnType, setReturnType] = useState<ReturnType>('daily');
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
     const data: {
@@ -108,7 +139,10 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
     assets.forEach((asset) => {
       if (asset.symbol) {
         const symbol = asset.symbol;
-        const gain = Number(asset.performance.dayGainPercent);
+        const gain =
+          returnType === 'daily'
+            ? Number(asset.performance.dayGainPercent)
+            : Number(asset.performance.totalGainPercent);
 
         maxGain = Math.max(maxGain, gain);
         minGain = Math.min(minGain, gain);
@@ -116,9 +150,7 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
         if (data[symbol]) {
           data[symbol].marketValueConverted += Number(asset.marketValueConverted);
           data[symbol].bookBalueConverted += Number(asset.bookValueConverted);
-          data[symbol].gain =
-            (data[symbol].marketValueConverted - data[symbol].bookBalueConverted) /
-            data[symbol].bookBalueConverted;
+          data[symbol].gain = gain;
         } else {
           data[symbol] = {
             name: symbol,
@@ -141,18 +173,29 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
     dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
     return dataArray;
-  }, [assets]);
+  }, [assets, returnType]);
 
   return (
-    <ResponsiveContainer width="100%" height={500}>
-      <Treemap
-        width={400}
-        height={200}
-        data={data}
-        dataKey="marketValueConverted"
-        animationDuration={100}
-        content={<CustomizedContent theme={settings?.theme || 'light'} />}
-      />
-    </ResponsiveContainer>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div className="flex items-center space-x-2">
+          <BarChart className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+        </div>
+        <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />
+      </CardHeader>
+      <CardContent className="pl-2">
+        <ResponsiveContainer width="100%" height={500}>
+          <Treemap
+            width={400}
+            height={200}
+            data={data}
+            dataKey="marketValueConverted"
+            animationDuration={100}
+            content={<CustomizedContent theme={settings?.theme || 'light'} />}
+          />
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
   );
 }
