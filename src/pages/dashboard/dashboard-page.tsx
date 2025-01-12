@@ -14,10 +14,7 @@ import { QueryKeys } from '@/lib/query-keys';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import {
-  useCalculateHistoryMutation,
-  useRecalculatePortfolioMutation,
-} from '@/hooks/useCalculateHistory';
+import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyToggle } from '@/components/privacy-toggle';

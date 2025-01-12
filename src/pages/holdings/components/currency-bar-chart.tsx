@@ -1,4 +1,3 @@
-import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
 import { Bar, BarChart, XAxis, YAxis, LabelList } from 'recharts';
@@ -71,7 +70,7 @@ const chartConfig: ChartConfig = {
 } as const;
 
 const renderCustomLabel = (props: any) => {
-  const { x, y, width, height, value, name, percent } = props;
+  const { x, y, width, height, name, percent } = props;
   const xPos = x + width / 2;
   const yPos = y + height / 2;
 
