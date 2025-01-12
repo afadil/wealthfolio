@@ -2,6 +2,7 @@ import React from 'react';
 import { PieChart, Pie, Cell, Sector, ResponsiveContainer } from 'recharts';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
+import { ChartContainer } from '@/components/ui/chart';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -16,17 +17,29 @@ const COLORS = [
 const renderActiveShape = (props: any) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const RADIAN = Math.PI / 180;
-  const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value } =
-    props;
+  const {
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    startAngle,
+    endAngle,
+    fill,
+    payload,
+    value,
+    percent,
+  } = props;
   const sin = Math.sin(-RADIAN * midAngle);
   const cos = Math.cos(-RADIAN * midAngle);
   const sx = cx + (outerRadius + 5) * cos;
   const sy = cy + (outerRadius + 5) * sin;
-  const mx = cx + (outerRadius + 15) * cos;
-  const my = cy + (outerRadius + 15) * sin;
+  const mx = cx + (outerRadius + 20) * cos;
+  const my = cy + (outerRadius + 20) * sin;
   const ex = mx + (cos >= 0 ? 1 : -1) * 11;
   const ey = my;
   const textAnchor = cos >= 0 ? 'start' : 'end';
+  const labelOffset = cos >= 0 ? 12 : -12;
 
   return (
     <g>
@@ -48,29 +61,34 @@ const renderActiveShape = (props: any) => {
         outerRadius={outerRadius + 4}
         fill={fill}
       />
+      <text
+        x={cx}
+        y={cy}
+        fill="currentColor"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="text-xs font-medium"
+      >
+        {(percent * 100).toFixed(0)}%
+      </text>
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
       <text
-        x={ex + (cos >= 0 ? 1 : -1) * 6}
+        x={ex + labelOffset}
         y={ey}
         textAnchor={textAnchor}
         fill="currentColor"
         className="text-xs font-semibold"
       >
-        {payload.name}
+        {`${payload.name} (${(percent * 100).toFixed(0)}%)`}
       </text>
-      <foreignObject
-        x={ex + (cos >= 0 ? 1 : -1) * 6}
-        y={ey + 4}
-        width={100}
-        height={20}
-        style={{ overflow: 'visible' }}
-      >
+      <foreignObject x={ex + (cos >= 0 ? 1 : -80)} y={ey + 4} width={80} height={20}>
         <div
           style={{
-            textAnchor: textAnchor,
+            textAlign: cos >= 0 ? 'left' : 'right',
             color: 'currentColor',
             fontSize: '0.75rem',
+            whiteSpace: 'nowrap',
           }}
         >
           <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
@@ -94,9 +112,7 @@ const renderInactiveActiveShape = (props: any) => {
     payload,
     percent,
   } = props;
-  const radius = innerRadius + (outerRadius - innerRadius) * 1.4;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
   return (
     <g>
       <Sector
@@ -108,16 +124,6 @@ const renderInactiveActiveShape = (props: any) => {
         endAngle={endAngle}
         fill={fill}
       />
-      <text
-        x={x}
-        y={y}
-        fill="currentColor"
-        textAnchor={x > cx ? 'start' : 'end'}
-        dominantBaseline="central"
-        className="text-xs"
-      >
-        {`${payload.name}(${(percent * 100).toFixed(0)}%)`}
-      </text>
     </g>
   );
 };
@@ -134,28 +140,44 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   activeIndex,
   onPieEnter,
   onPieLeave,
-}) => (
-  <ResponsiveContainer width="100%" height={200}>
-    <PieChart>
-      <Pie
-        data={data}
-        cx="50%"
-        cy="50%"
-        innerRadius={40}
-        outerRadius={70}
-        paddingAngle={2}
-        animationDuration={100}
-        dataKey="value"
-        activeIndex={activeIndex}
-        activeShape={renderActiveShape}
-        inactiveShape={renderInactiveActiveShape}
-        onMouseEnter={onPieEnter}
-        onMouseLeave={onPieLeave}
-      >
-        {data.map((_, index) => (
-          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-        ))}
-      </Pie>
-    </PieChart>
-  </ResponsiveContainer>
-);
+}) => {
+  const chartConfig = data.reduce(
+    (acc, item, index) => {
+      acc[item.name] = {
+        label: item.name,
+        color: COLORS[index % COLORS.length],
+      };
+      return acc;
+    },
+    {} as Record<string, { label: string; color: string }>,
+  );
+
+  return (
+    <ChartContainer config={chartConfig} className="h-[200px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={40}
+            outerRadius={65}
+            paddingAngle={2}
+            animationDuration={100}
+            dataKey="value"
+            nameKey="name"
+            activeIndex={activeIndex}
+            activeShape={renderActiveShape}
+            inactiveShape={renderInactiveActiveShape}
+            onMouseEnter={onPieEnter}
+            onMouseLeave={onPieLeave}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={chartConfig[entry.name].color} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+};
