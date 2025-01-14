@@ -4,9 +4,9 @@ import { ApplicationShell } from '@/components/shell';
 import { Badge } from '@/components/ui/badge';
 import { useLocation, useParams } from 'react-router-dom';
 import AssetHistoryCard from './asset-history-card';
-import { AssetData, Holding } from '@/lib/types';
+import { AssetData, Holding, Quote } from '@/lib/types';
 import { getAssetData } from '@/commands/market-data';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Separator } from '@/components/ui/separator';
 import { InputTags } from '@/components/ui/tag-input';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,6 @@ export const AssetProfilePage = () => {
     assetSubClass: '',
   });
   const [isHistoryTableOpen, setIsHistoryTableOpen] = useState(false);
-  const queryClient = useQueryClient();
 
   const { data: assetData, isLoading: isAssetDataLoading } = useQuery<AssetData, Error>({
     queryKey: [QueryKeys.ASSET_DATA, symbol],
@@ -184,9 +183,9 @@ export const AssetProfilePage = () => {
         <CollapsibleContent>
           <AssetHistoryTable
             data={assetData?.quoteHistory ?? []}
-            isManualDataSource={assetData?.asset.dataSource === 'MANUAL'}
-            onSaveQuote={(quote) => saveQuoteMutation.mutate(quote)}
-            onDeleteQuote={(id) => deleteQuoteMutation.mutate(id)}
+            isManualDataSource={assetData?.asset?.dataSource === 'MANUAL'}
+            onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
+            onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
           />
         </CollapsibleContent>
       </Collapsible>
