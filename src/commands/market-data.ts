@@ -1,4 +1,11 @@
-import { AssetData, QuoteSummary, Asset, Quote, QuoteUpdate } from '@/lib/types';
+import {
+  AssetData,
+  QuoteSummary,
+  Asset,
+  Quote,
+  QuoteUpdate,
+  UpdateAssetProfile,
+} from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
@@ -44,14 +51,7 @@ export const getAssetData = async (assetId: string): Promise<AssetData> => {
   }
 };
 
-export const updateAssetProfile = async (payload: {
-  symbol: string;
-  sectors: string;
-  countries: string;
-  comment: string;
-  assetClass: string;
-  assetSubClass: string;
-}): Promise<Asset> => {
+export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<Asset> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -67,7 +67,6 @@ export const updateAssetProfile = async (payload: {
 
 export const updateQuote = async (symbol: string, quote: Quote): Promise<void> => {
   try {
-    console.log('updateQuote', symbol, quote);
     const runEnv = await getRunEnv();
     if (runEnv === RUN_ENV.DESKTOP) {
       // Convert Date to YYYY-MM-DD format

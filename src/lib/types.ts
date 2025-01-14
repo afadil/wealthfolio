@@ -393,3 +393,13 @@ export interface CumulativeReturns {
   totalReturn: number;
   annualizedReturn: number;
 }
+
+export interface UpdateAssetProfile {
+  symbol: string;
+  sectors: string;
+  countries: string;
+  comment: string;
+  assetClass: string;
+  assetSubClass: string;
+  dataSource?: string;
+}

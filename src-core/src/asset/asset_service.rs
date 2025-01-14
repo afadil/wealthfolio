@@ -88,6 +88,7 @@ impl AssetService {
                 assets::comment.eq(payload.comment),
                 assets::asset_sub_class.eq(&payload.asset_sub_class),
                 assets::asset_class.eq(&payload.asset_class),
+                assets::data_source.eq(payload.data_source.unwrap_or_else(|| "Yahoo".to_string())),
             ))
             .get_result::<Asset>(conn)
     }

@@ -137,6 +137,7 @@ pub struct UpdateAssetProfile {
     pub comment: String,
     pub asset_sub_class: Option<String>,
     pub asset_class: Option<String>,
+    pub data_source: Option<String>,
 }
 
 #[derive(
