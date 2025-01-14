@@ -6,16 +6,19 @@ import { useLocation, useParams } from 'react-router-dom';
 import AssetHistoryCard from './asset-history-card';
 import { AssetData, Holding } from '@/lib/types';
 import { getAssetData } from '@/commands/market-data';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Separator } from '@/components/ui/separator';
 import { InputTags } from '@/components/ui/tag-input';
 import { Button } from '@/components/ui/button';
 import { useAssetProfileMutations } from './useAssetProfileMutations';
+import { useQuoteMutations } from './useQuoteMutations';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { computeHoldings } from '@/commands/portfolio';
 import { QueryKeys } from '@/lib/query-keys';
 import AssetDetailCard from './asset-detail-card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import AssetHistoryTable from './asset-history-table';
 
 interface AssetProfileFormData {
   sectors: Array<{ name: string; weight: number }>;
@@ -36,6 +39,8 @@ export const AssetProfilePage = () => {
     assetClass: '',
     assetSubClass: '',
   });
+  const [isHistoryTableOpen, setIsHistoryTableOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: assetData, isLoading: isAssetDataLoading } = useQuery<AssetData, Error>({
     queryKey: [QueryKeys.ASSET_DATA, symbol],
@@ -58,6 +63,7 @@ export const AssetProfilePage = () => {
   }, [assetData?.quoteHistory]);
 
   const { updateAssetProfileMutation } = useAssetProfileMutations();
+  const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
 
   useEffect(() => {
     if (assetData?.asset) {
@@ -157,6 +163,33 @@ export const AssetProfilePage = () => {
           <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
         )}
       </div>
+
+      <Collapsible
+        open={isHistoryTableOpen}
+        onOpenChange={setIsHistoryTableOpen}
+        className="mt-4 space-y-2"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold">History Data</h3>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              {isHistoryTableOpen ? (
+                <Icons.ChevronUp className="h-4 w-4" />
+              ) : (
+                <Icons.ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent>
+          <AssetHistoryTable
+            data={assetData?.quoteHistory ?? []}
+            isManualDataSource={assetData?.asset.dataSource === 'MANUAL'}
+            onSaveQuote={(quote) => saveQuoteMutation.mutate(quote)}
+            onDeleteQuote={(id) => deleteQuoteMutation.mutate(id)}
+          />
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="group relative">
         <h3 className="text-lg font-bold">About</h3>

@@ -15,7 +15,8 @@ use commands::goal::{
     update_goal_allocations,
 };
 use commands::market_data::{
-    get_asset_data, refresh_quotes_for_symbols, search_symbol, synch_quotes, update_asset_profile,
+    delete_quote, get_asset_data, refresh_quotes_for_symbols, search_symbol, synch_quotes,
+    update_asset_profile, update_quote,
 };
 use commands::portfolio::{
     calculate_account_cumulative_returns, calculate_historical_data,
@@ -169,6 +170,8 @@ pub fn main() {
             get_account_import_mapping,
             save_account_import_mapping,
             refresh_quotes_for_symbols,
+            update_quote,
+            delete_quote,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

@@ -233,6 +233,19 @@ pub struct Quote {
     pub adjclose: f64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteUpdate {
+    pub date: String,
+    pub symbol: String,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub volume: f64,
+    pub close: f64,
+    pub data_source: String,
+}
+
 //********************************** */
 // Custom models
 //********************************** */

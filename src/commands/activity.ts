@@ -148,8 +148,9 @@ export const createActivity = async (activity: NewActivity): Promise<Activity> =
 
 export const updateActivity = async (activity: NewActivity): Promise<Activity> => {
   try {
+    console.log('activity', activity);
     const apiData = transformToApiData(activity);
-
+    console.log('apiData', apiData);
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('update_activity', { activity: apiData });

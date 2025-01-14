@@ -7,6 +7,7 @@ use crate::models::{
     ImportMappingData, NewActivity, Sort,
 };
 use crate::schema::activities;
+use log::error;
 
 use diesel::prelude::*;
 use diesel::sql_types::{Double, Text};
@@ -160,16 +161,17 @@ impl ActivityService {
         let asset = asset_service
             .get_or_create_asset(conn, &activity.asset_id)
             .await?;
-        asset_service
+
+        if let Err(e) = asset_service
             .sync_asset_quotes(conn, &vec![asset.clone()])
             .await
-            .map_err(|e| {
-                println!(
-                    "Failed to sync quotes for asset: {}. Error: {:?}",
-                    asset.symbol, e
-                );
-                diesel::result::Error::NotFound
-            })?;
+        {
+            error!(
+                "Failed to sync quotes for asset: {}. Error: {:?}",
+                asset.symbol, e
+            );
+        }
+
         let account = account_service.get_account_by_id(conn, &activity.account_id)?;
 
         if activity.currency.is_empty() {

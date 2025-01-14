@@ -1,4 +1,4 @@
-import { AssetData, QuoteSummary, Asset } from '@/lib/types';
+import { AssetData, QuoteSummary, Asset, Quote, QuoteUpdate } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
@@ -65,6 +65,37 @@ export const updateAssetProfile = async (payload: {
   }
 };
 
+export const updateQuote = async (symbol: string, quote: Quote): Promise<void> => {
+  try {
+    console.log('updateQuote', symbol, quote);
+    const runEnv = await getRunEnv();
+    if (runEnv === RUN_ENV.DESKTOP) {
+      // Convert Date to YYYY-MM-DD format
+      const formatDate = (date: Date | string) => {
+        const d = date instanceof Date ? date : new Date(date);
+        return d.toISOString().split('T')[0];
+      };
+
+      // Create QuoteUpdate object
+      const quoteUpdate: QuoteUpdate = {
+        date: formatDate(quote.date),
+        symbol,
+        open: quote.open,
+        high: quote.high,
+        low: quote.low,
+        volume: quote.volume,
+        close: quote.close,
+        dataSource: 'MANUAL',
+      };
+
+      return invokeTauri('update_quote', { symbol, quote: quoteUpdate });
+    }
+  } catch (error) {
+    logger.error('Error updating quote');
+    throw error;
+  }
+};
+
 export const refreshQuotesForSymbols = async (symbols: string[]): Promise<void> => {
   try {
     switch (getRunEnv()) {
@@ -76,6 +107,18 @@ export const refreshQuotesForSymbols = async (symbols: string[]): Promise<void> 
     }
   } catch (error) {
     logger.error('Error refreshing quotes for symbols.');
+    throw error;
+  }
+};
+
+export const deleteQuote = async (id: string): Promise<void> => {
+  try {
+    const runEnv = await getRunEnv();
+    if (runEnv === RUN_ENV.DESKTOP) {
+      return invokeTauri('delete_quote', { id });
+    }
+  } catch (error) {
+    logger.error('Error deleting quote');
     throw error;
   }
 };
