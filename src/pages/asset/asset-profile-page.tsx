@@ -19,6 +19,9 @@ import { QueryKeys } from '@/lib/query-keys';
 import AssetDetailCard from './asset-detail-card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import AssetHistoryTable from './asset-history-table';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/components/ui/popover';
 
 interface AssetProfileFormData {
   sectors: Array<{ name: string; weight: number }>;
@@ -26,6 +29,7 @@ interface AssetProfileFormData {
   comment: string;
   assetClass: string;
   assetSubClass: string;
+  dataSource: string;
 }
 
 export const AssetProfilePage = () => {
@@ -38,6 +42,7 @@ export const AssetProfilePage = () => {
     comment: '',
     assetClass: '',
     assetSubClass: '',
+    dataSource: 'Manual',
   });
   const [isHistoryTableOpen, setIsHistoryTableOpen] = useState(false);
 
@@ -72,6 +77,7 @@ export const AssetProfilePage = () => {
         comment: assetData.asset.comment || '',
         assetSubClass: assetData.asset.assetSubClass || '',
         assetClass: assetData.asset.assetClass || '',
+        dataSource: assetData.asset.dataSource || 'Yahoo',
       });
     }
   }, [assetData?.asset]);
@@ -133,6 +139,7 @@ export const AssetProfilePage = () => {
         comment: assetData.asset.comment || '',
         assetSubClass: assetData.asset.assetSubClass || '',
         assetClass: assetData.asset.assetClass || '',
+        dataSource: assetData.asset.dataSource || 'Yahoo',
       });
     }
   };
@@ -170,15 +177,85 @@ export const AssetProfilePage = () => {
       >
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold">History Data</h3>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm">
-              {isHistoryTableOpen ? (
-                <Icons.ChevronUp className="h-4 w-4" />
-              ) : (
-                <Icons.ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="manual-tracking"
+                      checked={assetData?.asset?.dataSource === 'MANUAL'}
+                    />
+                    <Label htmlFor="manual-tracking" className="cursor-pointer">
+                      Manual tracking
+                    </Label>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-[360px] p-4">
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Change Tracking Mode</h4>
+                    {assetData?.asset?.dataSource === 'MANUAL' ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Switching to automatic tracking will enable data fetching from Market Data
+                          Provider. Please note that this will override any manually entered quotes
+                          on the next sync.
+                        </p>
+                        <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                          ⚠️ Your manually entered historical data may be lost.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Switching to manual tracking will stop automatic data fetching from Market
+                          Data Provider. You'll need to enter and maintain price data manually.
+                        </p>
+                        <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                          ⚠️ Automatic price updates will be disabled.
+                        </p>
+                      </>
+                    )}
+                    <div className="flex justify-end space-x-2">
+                      <PopoverClose asChild>
+                        <Button variant="ghost" size="sm">
+                          Cancel
+                        </Button>
+                      </PopoverClose>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          const newDataSource =
+                            assetData?.asset?.dataSource === 'MANUAL' ? 'Yahoo' : 'MANUAL';
+                          updateAssetProfileMutation.mutate({
+                            symbol,
+                            sectors: JSON.stringify(formData.sectors),
+                            countries: JSON.stringify(formData.countries),
+                            comment: formData.comment,
+                            assetSubClass: formData.assetSubClass,
+                            assetClass: formData.assetClass,
+                            dataSource: newDataSource,
+                          });
+                        }}
+                      >
+                        Confirm Change
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                {isHistoryTableOpen ? (
+                  <Icons.ChevronUp className="h-4 w-4" />
+                ) : (
+                  <Icons.ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+          </div>
         </div>
         <CollapsibleContent>
           <AssetHistoryTable

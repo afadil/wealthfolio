@@ -308,7 +308,7 @@ impl MarketDataService {
                             from_currency: rate.from_currency,
                             to_currency: rate.to_currency,
                             rate: new_rate,
-                            source: "YAHOO".to_string(),
+                            source: rate.source,
                             created_at: rate.created_at,
                             updated_at: Utc::now().naive_utc(),
                         });

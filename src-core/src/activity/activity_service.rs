@@ -86,6 +86,7 @@ impl ActivityService {
         // Get or create the asset profile
         let asset = asset_service.get_or_create_asset(conn, &asset_id).await?;
 
+        println!("asset created: {:?}", asset);
         let account_currency = account_service
             .get_account_by_id(conn, &activity.account_id)?
             .currency;

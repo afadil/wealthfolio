@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/components/ui/popover';
 import { MoneyInput } from '@/components/ui/money-input';
 
 interface AssetHistoryTableProps {
@@ -302,17 +302,23 @@ export const AssetHistoryTable: React.FC<AssetHistoryTableProps> = ({
                           </PopoverTrigger>
                           <PopoverContent>
                             <div className="flex flex-col items-center space-y-2">
-                              <span>Are you sure?</span>
+                              <h4 className="font-medium">Delete Quote</h4>
+                              <p className="text-center text-sm text-muted-foreground">
+                                Are you sure you want to delete this historical quote? This action
+                                cannot be undone.
+                              </p>
                               <div className="flex space-x-2">
+                                <PopoverClose asChild>
+                                  <Button variant="ghost" size="sm">
+                                    Cancel
+                                  </Button>
+                                </PopoverClose>
                                 <Button
-                                  variant="ghost"
+                                  variant="destructive"
                                   size="sm"
                                   onClick={() => handleDelete(quote.id)}
                                 >
-                                  OK
-                                </Button>
-                                <Button variant="ghost" size="sm">
-                                  Cancel
+                                  Delete
                                 </Button>
                               </div>
                             </div>

@@ -196,10 +196,16 @@ impl AssetService {
                     Ok(fetched_profile) => {
                         let inserted_asset = self.insert_new_asset(conn, fetched_profile).await?;
 
-                        // Sync the quotes for the new asset
-                        self.sync_asset_quotes(conn, &vec![inserted_asset.clone()])
+                        // Sync the quotes for the new asset but don't fail if sync fails
+                        if let Err(e) = self
+                            .sync_asset_quotes(conn, &vec![inserted_asset.clone()])
                             .await
-                            .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
+                        {
+                            error!(
+                                "Failed to sync quotes for new asset {}: {}",
+                                inserted_asset.id, e
+                            );
+                        }
                         Ok(inserted_asset)
                     }
                     Err(_) => {

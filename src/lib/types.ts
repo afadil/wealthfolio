@@ -211,9 +211,9 @@ export interface Asset {
 
 export interface Quote {
   id: string;
-  createdAt: Date;
+  createdAt: string;
   dataSource: string;
-  date: Date;
+  date: string;
   symbol: string;
   open: number;
   high: number;
@@ -224,7 +224,7 @@ export interface Quote {
 }
 
 export interface QuoteUpdate {
-  date: string; // YYYY-MM-DD format
+  date: string;
   symbol: string;
   open: number;
   high: number;
