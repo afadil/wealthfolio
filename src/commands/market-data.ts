@@ -65,6 +65,20 @@ export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<A
   }
 };
 
+export const updateAssetDataSource = async (symbol: string, dataSource: string): Promise<Asset> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('update_asset_data_source', { id: symbol, dataSource });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error updating asset data source.');
+    throw error;
+  }
+};
+
 export const updateQuote = async (symbol: string, quote: Quote): Promise<void> => {
   try {
     const runEnv = await getRunEnv();

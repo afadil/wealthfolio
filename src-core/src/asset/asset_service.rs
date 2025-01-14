@@ -88,7 +88,6 @@ impl AssetService {
                 assets::comment.eq(payload.comment),
                 assets::asset_sub_class.eq(&payload.asset_sub_class),
                 assets::asset_class.eq(&payload.asset_class),
-                assets::data_source.eq(payload.data_source.unwrap_or_else(|| "Yahoo".to_string())),
             ))
             .get_result::<Asset>(conn)
     }
@@ -240,5 +239,16 @@ impl AssetService {
         self.market_data_service
             .sync_asset_quotes(conn, asset_list)
             .await
+    }
+
+    pub fn update_asset_data_source(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_id: &str,
+        data_source: String,
+    ) -> Result<Asset, diesel::result::Error> {
+        diesel::update(assets::table.filter(assets::id.eq(asset_id)))
+            .set(assets::data_source.eq(data_source))
+            .get_result::<Asset>(conn)
     }
 }

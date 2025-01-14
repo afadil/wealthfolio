@@ -32,6 +32,27 @@ interface AssetProfileFormData {
   dataSource: string;
 }
 
+interface AssetDetailData {
+  numShares: number;
+  marketValue: number;
+  bookValue: number;
+  averagePrice: number;
+  portfolioPercent: number;
+  todaysReturn: number | null;
+  todaysReturnPercent: number | null;
+  totalReturn: number;
+  totalReturnPercent: number;
+  currency: string;
+  quote: {
+    open: number;
+    high: number;
+    low: number;
+    volume: number;
+    close: number;
+    adjclose: number;
+  } | null;
+}
+
 export const AssetProfilePage = () => {
   const { symbol = '' } = useParams<{ symbol: string }>();
   const location = useLocation();
@@ -66,7 +87,7 @@ export const AssetProfilePage = () => {
     return assetData?.quoteHistory?.[0] ?? null;
   }, [assetData?.quoteHistory]);
 
-  const { updateAssetProfileMutation } = useAssetProfileMutations();
+  const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
 
   useEffect(() => {
@@ -93,28 +114,37 @@ export const AssetProfilePage = () => {
     };
   }, [assetData?.asset, quote, holding]);
 
-  const symbolHolding = useMemo(() => {
-    if (!holding || !quote) return null;
-    const todaysReturn = (quote.close ?? 0) - (quote.open ?? 0);
+  const symbolHolding = useMemo((): AssetDetailData | null => {
+    if (!holding) return null;
+
+    // Handle quote data separately to avoid null issues
+    const quoteData = quote
+      ? {
+          todaysReturn: quote.close - quote.open,
+          todaysReturnPercent: Number(((quote.close - quote.open) / quote.open) * 100),
+          quote: {
+            open: quote.open,
+            high: quote.high,
+            low: quote.low,
+            volume: quote.volume,
+            close: quote.close,
+            adjclose: quote.adjclose,
+          },
+        }
+      : null;
+
     return {
-      numShares: holding.quantity,
-      marketValue: holding.marketValue,
-      bookValue: holding.bookValue,
-      averagePrice: holding.averageCost ?? 0,
-      portfolioPercent: holding.portfolioPercent,
-      todaysReturn,
-      todaysReturnPercent: Number((todaysReturn / (quote.open ?? 1)) * 100),
-      totalReturn: holding.performance?.totalGainAmount,
-      totalReturnPercent: holding.performance?.totalGainPercent,
+      numShares: Number(holding.quantity),
+      marketValue: Number(holding.marketValue),
+      bookValue: Number(holding.bookValue),
+      averagePrice: Number(holding.averageCost ?? 0),
+      portfolioPercent: Number(holding.portfolioPercent ?? 0),
+      todaysReturn: quoteData?.todaysReturn ?? null,
+      todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
+      totalReturn: Number(holding.performance?.totalGainAmount ?? 0),
+      totalReturnPercent: Number(holding.performance?.totalGainPercent ?? 0),
       currency: assetData?.asset.currency || 'USD',
-      quote: {
-        open: quote.open,
-        high: quote.high,
-        low: quote.low,
-        volume: quote.volume,
-        close: quote.close,
-        adjclose: quote.adjclose,
-      },
+      quote: quoteData?.quote ?? null,
     };
   }, [holding, quote, assetData?.asset.currency]);
 
@@ -168,6 +198,139 @@ export const AssetProfilePage = () => {
         {symbolHolding && (
           <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
         )}
+      </div>
+
+      <div className="group relative">
+        <h3 className="text-lg font-bold">About</h3>
+        <div className="flex h-12 flex-row items-center space-x-2 py-4">
+          {isEditing ? (
+            <Input
+              value={formData.assetClass}
+              onChange={(e) => setFormData((prev) => ({ ...prev, assetClass: e.target.value }))}
+              placeholder="Enter asset class"
+              className="w-[180px]"
+            />
+          ) : (
+            formData.assetClass && (
+              <Badge variant="secondary" className="uppercase">
+                {formData.assetClass}
+              </Badge>
+            )
+          )}
+          {isEditing ? (
+            <Input
+              value={formData.assetSubClass}
+              onChange={(e) => setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))}
+              placeholder="Enter sub-class"
+              className="w-[180px]"
+            />
+          ) : (
+            formData.assetSubClass && (
+              <Badge variant="secondary" className="uppercase">
+                {formData.assetSubClass}
+              </Badge>
+            )
+          )}
+          {(formData.assetClass || formData.assetSubClass) && formData.sectors.length > 0 && (
+            <Separator orientation="vertical" />
+          )}
+          {isEditing ? (
+            <InputTags
+              value={formData.sectors.map(
+                (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
+              )}
+              placeholder="sector:weight"
+              onChange={(values) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  sectors: (values as string[]).map((value) => {
+                    const [name, weight] = value.split(':');
+                    return { name, weight: parseFloat(weight) || 0 };
+                  }),
+                }))
+              }
+            />
+          ) : (
+            <>
+              {formData.sectors.map((sector) => (
+                <Badge
+                  variant="secondary"
+                  key={sector.name}
+                  className="cursor-help bg-indigo-100 uppercase dark:text-primary-foreground"
+                  title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
+                >
+                  {sector.name}
+                </Badge>
+              ))}
+            </>
+          )}
+          {formData.sectors.length > 0 && formData.countries.length > 0 && (
+            <Separator orientation="vertical" />
+          )}
+          {isEditing ? (
+            <InputTags
+              placeholder="country:weight"
+              value={formData.countries.map(
+                (c) => `${c.code}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
+              )}
+              onChange={(values) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  countries: (values as string[]).map((value) => {
+                    const [code, weight] = value.split(':');
+                    return { code, weight: parseFloat(weight) || 0 };
+                  }),
+                }))
+              }
+            />
+          ) : (
+            formData.countries.map((country) => (
+              <Badge
+                variant="secondary"
+                key={country.code}
+                className="bg-purple-100 uppercase dark:text-primary-foreground"
+                title={`${country.code}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
+              >
+                {country.code}
+              </Badge>
+            ))
+          )}
+          {(formData.sectors.length > 0 || formData.countries.length > 0) && (
+            <Separator orientation="vertical" />
+          )}
+          {isEditing ? (
+            <>
+              <Button variant="default" size="icon" className="min-w-10" onClick={handleSave}>
+                <Icons.Check className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="min-w-10" onClick={handleCancel}>
+                <Icons.Close className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsEditing(true)}
+              className="min-w-10 opacity-0 group-hover:opacity-100"
+            >
+              <Icons.Pencil className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <div className="mt-2">
+          {isEditing ? (
+            <textarea
+              className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
+              value={formData.comment}
+              placeholder="Symbol/Company description"
+              rows={6}
+              onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
+            />
+          ) : (
+            <p className="text-sm font-light text-muted-foreground">{formData.comment}</p>
+          )}
+        </div>
       </div>
 
       <Collapsible
@@ -228,13 +391,8 @@ export const AssetProfilePage = () => {
                         onClick={() => {
                           const newDataSource =
                             assetData?.asset?.dataSource === 'MANUAL' ? 'Yahoo' : 'MANUAL';
-                          updateAssetProfileMutation.mutate({
+                          updateAssetDataSourceMutation.mutate({
                             symbol,
-                            sectors: JSON.stringify(formData.sectors),
-                            countries: JSON.stringify(formData.countries),
-                            comment: formData.comment,
-                            assetSubClass: formData.assetSubClass,
-                            assetClass: formData.assetClass,
                             dataSource: newDataSource,
                           });
                         }}
@@ -266,129 +424,6 @@ export const AssetProfilePage = () => {
           />
         </CollapsibleContent>
       </Collapsible>
-
-      <div className="group relative">
-        <h3 className="text-lg font-bold">About</h3>
-        <div className="flex h-12 flex-row items-center space-x-2 py-4">
-          {isEditing ? (
-            <Input
-              value={formData.assetClass}
-              onChange={(e) => setFormData((prev) => ({ ...prev, assetClass: e.target.value }))}
-              placeholder="Enter asset class"
-              className="w-[180px]"
-            />
-          ) : (
-            <Badge variant="secondary" className="uppercase">
-              {profile.assetClass}
-            </Badge>
-          )}
-          {isEditing ? (
-            <Input
-              value={formData.assetSubClass}
-              onChange={(e) => setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))}
-              placeholder="Enter sub-class"
-              className="w-[180px]"
-            />
-          ) : (
-            <Badge variant="secondary" className="uppercase">
-              {profile.assetSubClass}
-            </Badge>
-          )}
-          <Separator orientation="vertical" />
-          {isEditing ? (
-            <InputTags
-              value={formData.sectors.map(
-                (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
-              )}
-              placeholder="sector:weight"
-              onChange={(values) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  sectors: (values as string[]).map((value) => {
-                    const [name, weight] = value.split(':');
-                    return { name, weight: parseFloat(weight) || 0 };
-                  }),
-                }))
-              }
-            />
-          ) : (
-            <>
-              {formData.sectors.map((sector) => (
-                <Badge
-                  variant="secondary"
-                  key={sector.name}
-                  className="cursor-help bg-indigo-100 uppercase dark:text-primary-foreground"
-                  title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
-                >
-                  {sector.name}
-                </Badge>
-              ))}
-            </>
-          )}
-          <Separator orientation="vertical" />
-          {isEditing ? (
-            <InputTags
-              placeholder="country:weight"
-              value={formData.countries.map(
-                (c) => `${c.code}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
-              )}
-              onChange={(values) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  countries: (values as string[]).map((value) => {
-                    const [code, weight] = value.split(':');
-                    return { code, weight: parseFloat(weight) || 0 };
-                  }),
-                }))
-              }
-            />
-          ) : (
-            formData.countries.map((country) => (
-              <Badge
-                variant="secondary"
-                key={country.code}
-                className="bg-purple-100 uppercase dark:text-primary-foreground"
-                title={`${country.code}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
-              >
-                {country.code}
-              </Badge>
-            ))
-          )}
-          <Separator orientation="vertical" />
-          {isEditing ? (
-            <>
-              <Button variant="default" size="icon" className="min-w-10" onClick={handleSave}>
-                <Icons.Check className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="min-w-10" onClick={handleCancel}>
-                <Icons.Close className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsEditing(true)}
-              className="min-w-10 opacity-0 group-hover:opacity-100"
-            >
-              <Icons.Pencil className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-        <div className="mt-2">
-          {isEditing ? (
-            <textarea
-              className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
-              value={formData.comment}
-              placeholder="Symbol/Company description"
-              rows={6}
-              onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
-            />
-          ) : (
-            <p className="text-sm font-light text-muted-foreground">{formData.comment}</p>
-          )}
-        </div>
-      </div>
     </ApplicationShell>
   );
 };

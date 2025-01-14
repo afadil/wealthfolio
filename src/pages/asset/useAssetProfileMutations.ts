@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateAssetProfile } from '@/commands/market-data';
+import { updateAssetProfile, updateAssetDataSource } from '@/commands/market-data';
 import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
 import { logger } from '@/adapters';
@@ -36,7 +36,20 @@ export const useAssetProfileMutations = () => {
     },
   });
 
+  const updateAssetDataSourceMutation = useMutation({
+    mutationFn: ({ symbol, dataSource }: { symbol: string; dataSource: string }) =>
+      updateAssetDataSource(symbol, dataSource),
+    onSuccess: (result) => {
+      handleSuccess('Asset data source updated successfully.', result.id);
+    },
+    onError: (error) => {
+      logger.error(`Error updating asset data source: ${error}`);
+      handleError('updating the asset data source');
+    },
+  });
+
   return {
     updateAssetProfileMutation,
+    updateAssetDataSourceMutation,
   };
 };

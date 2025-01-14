@@ -13,8 +13,8 @@ interface AssetDetail {
   bookValue: number;
   averagePrice: number;
   portfolioPercent: number;
-  todaysReturn: number;
-  todaysReturnPercent: number;
+  todaysReturn: number | null;
+  todaysReturnPercent: number | null;
   totalReturn: number;
   totalReturnPercent: number;
   currency: string;
@@ -25,7 +25,7 @@ interface AssetDetail {
     volume: number;
     close: number;
     adjclose: number;
-  };
+  } | null;
   className?: string;
 }
 
@@ -61,20 +61,24 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
       value: <AmountDisplay value={averagePrice} currency={currency} isHidden={isBalanceHidden} />,
     },
     { label: '% of my portfolio', value: formatPercent(portfolioPercent) },
-    {
-      label: "Today's return",
-      value: (
-        <>
-          <AmountDisplay
-            value={todaysReturn * numShares}
-            currency={currency}
-            isHidden={isBalanceHidden}
-          />{' '}
-          ({formatPercent(todaysReturnPercent)})
-        </>
-      ),
-      color: todaysReturn < 0 ? 'text-destructive' : 'text-success',
-    },
+    ...(todaysReturn !== null && todaysReturnPercent !== null
+      ? [
+          {
+            label: "Today's return",
+            value: (
+              <>
+                <AmountDisplay
+                  value={todaysReturn * numShares}
+                  currency={currency}
+                  isHidden={isBalanceHidden}
+                />{' '}
+                ({formatPercent(todaysReturnPercent)})
+              </>
+            ),
+            color: todaysReturn < 0 ? 'text-destructive' : 'text-success',
+          },
+        ]
+      : []),
     {
       label: 'Total return',
       value: `${formatAmount(totalReturn, currency)} (${formatPercent(totalReturnPercent)})`,

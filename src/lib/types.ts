@@ -401,5 +401,4 @@ export interface UpdateAssetProfile {
   comment: string;
   assetClass: string;
   assetSubClass: string;
-  dataSource?: string;
 }

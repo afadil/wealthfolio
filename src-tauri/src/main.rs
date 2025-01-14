@@ -16,7 +16,7 @@ use commands::goal::{
 };
 use commands::market_data::{
     delete_quote, get_asset_data, refresh_quotes_for_symbols, search_symbol, synch_quotes,
-    update_asset_profile, update_quote,
+    update_asset_data_source, update_asset_profile, update_quote,
 };
 use commands::portfolio::{
     calculate_account_cumulative_returns, calculate_historical_data,
@@ -149,6 +149,7 @@ pub fn main() {
             add_exchange_rate,
             delete_exchange_rate,
             update_asset_profile,
+            update_asset_data_source,
             create_goal,
             update_goal,
             delete_goal,
