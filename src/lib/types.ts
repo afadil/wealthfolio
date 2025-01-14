@@ -402,3 +402,10 @@ export interface UpdateAssetProfile {
   assetClass: string;
   assetSubClass: string;
 }
+
+export const DataSource = {
+  MANUAL: 'MANUAL',
+  YAHOO: 'YAHOO',
+} as const;
+
+export type DataSource = (typeof DataSource)[keyof typeof DataSource];
