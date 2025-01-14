@@ -21,7 +21,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                         Current version: {}\n\
                         New version: {}\n\n\
                         {}\n\n\
-                        Would you like to update now?",
+                        Would you like to update now? The app will restart automatically.",
                         current_version,
                         update.version,
                         update
@@ -39,7 +39,28 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                         .blocking_show();
 
                     if do_update {
-                        let _ = update.download_and_install(|_, _| {}, || {}).await;
+                        match update.download_and_install(|_, _| {}, || {}).await {
+                            Ok(_) => {
+                                // Show a message that update is complete and app will restart
+                                app_handle
+                                    .dialog()
+                                    .message("Update installed successfully. The application will now restart.")
+                                    .title("Update Complete")
+                                    .kind(MessageDialogKind::Info)
+                                    .blocking_show();
+
+                                // Restart the app
+                                app_handle.restart();
+                            }
+                            Err(e) => {
+                                app_handle
+                                    .dialog()
+                                    .message(format!("Failed to install update: {}", e))
+                                    .title("Update Failed")
+                                    .kind(MessageDialogKind::Error)
+                                    .blocking_show();
+                            }
+                        }
                     }
                 } else if show_all_messages {
                     app_handle
@@ -68,5 +89,4 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
         }
         _ => {}
     }
-    // Ok(())
 }
