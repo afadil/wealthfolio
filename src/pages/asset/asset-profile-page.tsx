@@ -19,9 +19,6 @@ import { QueryKeys } from '@/lib/query-keys';
 import AssetDetailCard from './asset-detail-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AssetHistoryTable from './asset-history-table';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/components/ui/popover';
 
 interface AssetProfileFormData {
   sectors: Array<{ name: string; weight: number }>;
