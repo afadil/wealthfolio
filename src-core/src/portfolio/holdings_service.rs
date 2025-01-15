@@ -10,6 +10,8 @@ use log::{error, warn};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
+type HoldingKey = (String, String); // (account_id, asset_id)
+
 pub struct HoldingsService {
     account_service: AccountService,
     activity_service: ActivityService,
@@ -51,28 +53,26 @@ impl HoldingsService {
         accounts: &[Account],
         activities: &[Activity],
         assets: &[Asset],
-    ) -> Result<HashMap<String, Holding>> {
+    ) -> Result<HashMap<HoldingKey, Holding>> {
         let mut holdings = HashMap::new();
+        let assets_map: HashMap<_, _> = assets.iter().map(|a| (&a.id, a)).collect();
+        let accounts_map: HashMap<_, _> = accounts.iter().map(|a| (&a.id, a)).collect();
 
         for activity in activities {
-            let asset = assets
-                .iter()
-                .find(|a| a.id == activity.asset_id)
+            let asset = assets_map
+                .get(&activity.asset_id)
                 .ok_or_else(|| Error::Asset(AssetError::NotFound(activity.asset_id.clone())))?;
 
-            let account = accounts
-                .iter()
-                .find(|a| a.id == activity.account_id)
-                .ok_or_else(|| {
-                    Error::Validation(ValidationError::InvalidInput(
-                        "Account not found".to_string(),
-                    ))
-                })?;
+            let account = accounts_map.get(&activity.account_id).ok_or_else(|| {
+                Error::Validation(ValidationError::InvalidInput(
+                    "Account not found".to_string(),
+                ))
+            })?;
 
-            let key = format!("{}-{}", activity.account_id, activity.asset_id);
+            let key = (activity.account_id.clone(), activity.asset_id.clone());
             let holding = holdings
                 .entry(key.clone())
-                .or_insert_with(|| self.create_holding(key, activity, asset, account));
+                .or_insert_with(|| self.create_holding(&key, activity, asset, account));
 
             self.update_holding(holding, activity)?;
         }
@@ -82,13 +82,13 @@ impl HoldingsService {
 
     fn create_holding(
         &self,
-        key: String,
+        key: &HoldingKey,
         activity: &Activity,
         asset: &Asset,
         account: &Account,
     ) -> Holding {
         Holding {
-            id: key,
+            id: format!("{}-{}", key.0, key.1),
             symbol: activity.asset_id.clone(),
             symbol_name: asset.name.clone(),
             holding_type: asset.asset_type.clone().unwrap_or_default(),
@@ -163,7 +163,7 @@ impl HoldingsService {
     fn fetch_quotes(
         &self,
         conn: &mut SqliteConnection,
-        holdings: &HashMap<String, Holding>,
+        holdings: &HashMap<HoldingKey, Holding>,
     ) -> Result<HashMap<String, Quote>> {
         let unique_symbols: HashSet<String> = holdings
             .values()
@@ -171,23 +171,21 @@ impl HoldingsService {
             .filter(|symbol| !symbol.starts_with("$CASH-"))
             .collect();
 
-        let mut quotes = HashMap::new();
-
-        for symbol in unique_symbols {
-            match self.asset_service.get_latest_quote(conn, &symbol) {
-                Ok(quote) => {
-                    quotes.insert(symbol.clone(), quote);
-                }
-                Err(e) => error!("Error fetching quote for symbol {}: {}", symbol, e),
+        match self
+            .asset_service
+            .get_latest_quotes(conn, &unique_symbols.into_iter().collect::<Vec<_>>())
+        {
+            Ok(quotes) => Ok(quotes),
+            Err(e) => {
+                error!("Error fetching quotes: {}", e);
+                Ok(HashMap::new()) // Return empty map to allow processing to continue
             }
         }
-
-        Ok(quotes)
     }
 
     fn calculate_holding_metrics(
         &self,
-        holdings: &mut HashMap<String, Holding>,
+        holdings: &mut HashMap<HoldingKey, Holding>,
         quotes: &HashMap<String, Quote>,
     ) -> Result<()> {
         for holding in holdings.values_mut() {
@@ -294,11 +292,11 @@ impl HoldingsService {
             (&holding.market_value_converted - &holding.book_value_converted).round(6);
     }
 
-    fn calculate_total_holdings(&self, holdings: &mut HashMap<String, Holding>) -> Result<()> {
+    fn calculate_total_holdings(&self, holdings: &mut HashMap<HoldingKey, Holding>) -> Result<()> {
         let mut total_holdings = HashMap::new();
 
         for holding in holdings.values() {
-            let total_key = holding.symbol.clone();
+            let total_key = (holding.symbol.clone(), "TOTAL".to_string());
             let total_holding = total_holdings
                 .entry(total_key)
                 .or_insert_with(|| self.create_total_holding(holding));
@@ -385,7 +383,7 @@ impl HoldingsService {
 
     fn calculate_total_holding_metrics(
         &self,
-        total_holdings: &mut HashMap<String, Holding>,
+        total_holdings: &mut HashMap<HoldingKey, Holding>,
     ) -> Result<()> {
         let total_portfolio_value: BigDecimal = total_holdings
             .values()
@@ -457,7 +455,7 @@ impl HoldingsService {
         }
     }
 
-    fn filter_holdings(&self, holdings: HashMap<String, Holding>) -> Vec<Holding> {
+    fn filter_holdings(&self, holdings: HashMap<HoldingKey, Holding>) -> Vec<Holding> {
         let threshold = BigDecimal::from_str("0.000001").unwrap();
         holdings
             .into_values()

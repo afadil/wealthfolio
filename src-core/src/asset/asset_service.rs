@@ -4,6 +4,7 @@ use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use log::{debug, error};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct AssetService {
@@ -250,5 +251,13 @@ impl AssetService {
         diesel::update(assets::table.filter(assets::id.eq(asset_id)))
             .set(assets::data_source.eq(data_source))
             .get_result::<Asset>(conn)
+    }
+
+    pub fn get_latest_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        symbols: &[String],
+    ) -> QueryResult<HashMap<String, Quote>> {
+        self.market_data_service.get_latest_quotes(conn, symbols)
     }
 }

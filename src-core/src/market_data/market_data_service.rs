@@ -524,4 +524,23 @@ impl MarketDataService {
 
         Ok(())
     }
+
+    pub fn get_latest_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        symbols: &[String],
+    ) -> QueryResult<HashMap<String, Quote>> {
+        let quotes = quotes::table
+            .filter(quotes::symbol.eq_any(symbols))
+            .order_by((quotes::symbol.asc(), quotes::date.desc()))
+            .load::<Quote>(conn)?;
+
+        // Group by symbol and take the latest quote for each
+        let mut latest_quotes = HashMap::new();
+        for quote in quotes {
+            latest_quotes.entry(quote.symbol.clone()).or_insert(quote);
+        }
+
+        Ok(latest_quotes)
+    }
 }
