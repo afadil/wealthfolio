@@ -10,8 +10,15 @@ use log::{error, warn};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
+/// Type alias for the composite key used in holdings maps
 type HoldingKey = (String, String); // (account_id, asset_id)
 
+/// Constants for business logic
+const ROUNDING_SCALE: i64 = 6;
+const PORTFOLIO_PERCENT_SCALE: i64 = 2;
+const QUANTITY_THRESHOLD: &str = "0.000001";
+
+/// Service for managing portfolio holdings
 pub struct HoldingsService {
     account_service: AccountService,
     activity_service: ActivityService,
@@ -20,6 +27,7 @@ pub struct HoldingsService {
     base_currency: String,
 }
 
+/// Core service implementation
 impl HoldingsService {
     pub async fn new(base_currency: String) -> Self {
         Self {
@@ -31,23 +39,43 @@ impl HoldingsService {
         }
     }
 
+    /// Computes all holdings including totals
     pub fn compute_holdings(&self, conn: &mut SqliteConnection) -> Result<Vec<Holding>> {
-        let accounts = self.account_service.get_active_accounts(conn)?;
-        let activities = self.activity_service.get_trading_activities(conn)?;
-        let assets = self.asset_service.get_assets(conn)?;
+        // Load required data
+        let (accounts, activities, assets) = self.load_required_data(conn)?;
+
+        // Initialize FX service
         self.fx_service
             .initialize(conn)
             .map_err(|e| Error::Currency(CurrencyError::ConversionFailed(e.to_string())))?;
 
+        // Process holdings
         let mut holdings = self.aggregate_holdings(&accounts, &activities, &assets)?;
         let quotes = self.fetch_quotes(conn, &holdings)?;
 
+        // Calculate metrics
         self.calculate_holding_metrics(&mut holdings, &quotes)?;
         self.calculate_total_holdings(&mut holdings)?;
 
+        // Filter and return
         Ok(self.filter_holdings(holdings))
     }
 
+    /// Loads all required data for holdings computation
+    fn load_required_data(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<(Vec<Account>, Vec<Activity>, Vec<Asset>)> {
+        Ok((
+            self.account_service.get_active_accounts(conn)?,
+            self.activity_service.get_trading_activities(conn)?,
+            self.asset_service.get_assets(conn)?,
+        ))
+    }
+}
+
+/// Holdings aggregation implementation
+impl HoldingsService {
     fn aggregate_holdings(
         &self,
         accounts: &[Account],
@@ -59,15 +87,8 @@ impl HoldingsService {
         let accounts_map: HashMap<_, _> = accounts.iter().map(|a| (&a.id, a)).collect();
 
         for activity in activities {
-            let asset = assets_map
-                .get(&activity.asset_id)
-                .ok_or_else(|| Error::Asset(AssetError::NotFound(activity.asset_id.clone())))?;
-
-            let account = accounts_map.get(&activity.account_id).ok_or_else(|| {
-                Error::Validation(ValidationError::InvalidInput(
-                    "Account not found".to_string(),
-                ))
-            })?;
+            let asset = self.get_asset_for_activity(&assets_map, activity)?;
+            let account = self.get_account_for_activity(&accounts_map, activity)?;
 
             let key = (activity.account_id.clone(), activity.asset_id.clone());
             let holding = holdings
@@ -80,6 +101,61 @@ impl HoldingsService {
         Ok(holdings)
     }
 
+    fn get_asset_for_activity<'a>(
+        &self,
+        assets_map: &'a HashMap<&String, &'a Asset>,
+        activity: &Activity,
+    ) -> Result<&'a Asset> {
+        assets_map
+            .get(&activity.asset_id)
+            .copied()
+            .ok_or_else(|| Error::Asset(AssetError::NotFound(activity.asset_id.clone())))
+    }
+
+    fn get_account_for_activity<'a>(
+        &self,
+        accounts_map: &'a HashMap<&String, &'a Account>,
+        activity: &Activity,
+    ) -> Result<&'a Account> {
+        accounts_map
+            .get(&activity.account_id)
+            .copied()
+            .ok_or_else(|| {
+                Error::Validation(ValidationError::InvalidInput(
+                    "Account not found".to_string(),
+                ))
+            })
+    }
+}
+
+/// Quote handling implementation
+impl HoldingsService {
+    fn fetch_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        holdings: &HashMap<HoldingKey, Holding>,
+    ) -> Result<HashMap<String, Quote>> {
+        let unique_symbols: HashSet<String> = holdings
+            .values()
+            .map(|h| h.symbol.clone())
+            .filter(|symbol| !symbol.starts_with("$CASH-"))
+            .collect();
+
+        match self
+            .asset_service
+            .get_latest_quotes(conn, &unique_symbols.into_iter().collect::<Vec<_>>())
+        {
+            Ok(quotes) => Ok(quotes),
+            Err(e) => {
+                error!("Error fetching quotes: {}", e);
+                Ok(HashMap::new()) // Return empty map to allow processing to continue
+            }
+        }
+    }
+}
+
+/// Holding creation and updates implementation
+impl HoldingsService {
     fn create_holding(
         &self,
         key: &HoldingKey,
@@ -123,66 +199,64 @@ impl HoldingsService {
         let unit_price = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
 
-        let old_quantity = holding.quantity.clone();
-        let old_book_value = holding.book_value.clone();
-
         match activity.activity_type.as_str() {
             "BUY" | "TRANSFER_IN" => {
-                holding.quantity += &quantity;
-                holding.book_value += &quantity * &unit_price + &fee;
+                self.process_buy_activity(holding, &quantity, &unit_price, &fee)
             }
-            "SELL" | "TRANSFER_OUT" => {
-                holding.quantity -= &quantity;
-                if old_quantity != BigDecimal::from(0) {
-                    let sell_ratio = (&quantity / &old_quantity).round(6);
-                    holding.book_value -= &sell_ratio * &old_book_value;
-                }
-            }
-            "SPLIT" => {
-                let split_ratio = unit_price;
-                if split_ratio != BigDecimal::from(0) {
-                    holding.quantity *= &split_ratio;
-                    if let Some(avg_cost) = holding.average_cost.as_mut() {
-                        *avg_cost = avg_cost.clone() / &split_ratio;
-                    }
-                } else {
-                    return Err(Error::Validation(ValidationError::InvalidInput(
-                        "Invalid split ratio".to_string(),
-                    )));
-                }
-            }
+            "SELL" | "TRANSFER_OUT" => self.process_sell_activity(holding, &quantity),
+            "SPLIT" => self.process_split_activity(
+                holding,
+                unit_price.to_string().parse::<f64>().unwrap_or(0.0),
+            )?,
             _ => warn!("Unhandled activity type: {}", activity.activity_type),
         }
 
-        holding.quantity = holding.quantity.round(6);
-        holding.book_value = holding.book_value.round(6);
+        holding.quantity = holding.quantity.round(ROUNDING_SCALE);
+        holding.book_value = holding.book_value.round(ROUNDING_SCALE);
 
         Ok(())
     }
 
-    fn fetch_quotes(
+    fn process_buy_activity(
         &self,
-        conn: &mut SqliteConnection,
-        holdings: &HashMap<HoldingKey, Holding>,
-    ) -> Result<HashMap<String, Quote>> {
-        let unique_symbols: HashSet<String> = holdings
-            .values()
-            .map(|h| h.symbol.clone())
-            .filter(|symbol| !symbol.starts_with("$CASH-"))
-            .collect();
+        holding: &mut Holding,
+        quantity: &BigDecimal,
+        unit_price: &BigDecimal,
+        fee: &BigDecimal,
+    ) {
+        holding.quantity += quantity;
+        holding.book_value += quantity * unit_price + fee;
+    }
 
-        match self
-            .asset_service
-            .get_latest_quotes(conn, &unique_symbols.into_iter().collect::<Vec<_>>())
-        {
-            Ok(quotes) => Ok(quotes),
-            Err(e) => {
-                error!("Error fetching quotes: {}", e);
-                Ok(HashMap::new()) // Return empty map to allow processing to continue
-            }
+    fn process_sell_activity(&self, holding: &mut Holding, quantity: &BigDecimal) {
+        let old_quantity = holding.quantity.clone();
+        let old_book_value = holding.book_value.clone();
+
+        holding.quantity -= quantity;
+        if old_quantity != BigDecimal::from(0) {
+            let sell_ratio = (quantity / &old_quantity).round(ROUNDING_SCALE);
+            holding.book_value -= &sell_ratio * &old_book_value;
         }
     }
 
+    fn process_split_activity(&self, holding: &mut Holding, split_ratio: f64) -> Result<()> {
+        if split_ratio == 0.0 {
+            return Err(Error::Validation(ValidationError::InvalidInput(
+                "Invalid split ratio".to_string(),
+            )));
+        }
+
+        let ratio = BigDecimal::from_str(&split_ratio.to_string())?;
+        holding.quantity *= &ratio;
+        if let Some(avg_cost) = holding.average_cost.as_mut() {
+            *avg_cost = avg_cost.clone() / &ratio;
+        }
+        Ok(())
+    }
+}
+
+/// Metrics calculation implementation
+impl HoldingsService {
     fn calculate_holding_metrics(
         &self,
         holdings: &mut HashMap<HoldingKey, Holding>,
@@ -202,39 +276,30 @@ impl HoldingsService {
     }
 
     fn update_holding_with_quote(&self, holding: &mut Holding, quote: &Quote) -> Result<()> {
-        holding.market_price = Some(
-            BigDecimal::from_str(&quote.close.to_string())
-                .map_err(|_| {
-                    Error::Validation(ValidationError::InvalidInput(
-                        "Invalid market price".to_string(),
-                    ))
-                })?
-                .round(6),
-        );
+        holding.market_price =
+            Some(BigDecimal::from_str(&quote.close.to_string())?.round(ROUNDING_SCALE));
         holding.market_value = (&holding.quantity
             * holding
                 .market_price
-                .clone()
-                .unwrap_or_else(|| BigDecimal::from(0)))
-        .round(6);
+                .as_ref()
+                .unwrap_or(&BigDecimal::from(0)))
+        .round(ROUNDING_SCALE);
 
-        let opening_value = (&holding.quantity
-            * BigDecimal::from_str(&quote.open.to_string()).map_err(|_| {
-                Error::Validation(ValidationError::InvalidInput(
-                    "Invalid opening price".to_string(),
-                ))
-            })?)
-        .round(6);
-        let closing_value = (&holding.quantity
-            * BigDecimal::from_str(&quote.close.to_string()).map_err(|_| {
-                Error::Validation(ValidationError::InvalidInput(
-                    "Invalid closing price".to_string(),
-                ))
-            })?)
-        .round(6);
-        holding.performance.day_gain_amount = Some((&closing_value - &opening_value).round(6));
+        self.calculate_day_gain(holding, quote)?;
+        Ok(())
+    }
+
+    fn calculate_day_gain(&self, holding: &mut Holding, quote: &Quote) -> Result<()> {
+        let opening_value = (&holding.quantity * BigDecimal::from_str(&quote.open.to_string())?)
+            .round(ROUNDING_SCALE);
+        let closing_value = (&holding.quantity * BigDecimal::from_str(&quote.close.to_string())?)
+            .round(ROUNDING_SCALE);
+
+        holding.performance.day_gain_amount =
+            Some((&closing_value - &opening_value).round(ROUNDING_SCALE));
         holding.performance.day_gain_percent = Some(if opening_value != BigDecimal::from(0) {
-            ((&closing_value - &opening_value) / &opening_value * BigDecimal::from(100)).round(6)
+            ((&closing_value - &opening_value) / &opening_value * BigDecimal::from(100))
+                .round(ROUNDING_SCALE)
         } else {
             BigDecimal::from(0)
         });
@@ -244,7 +309,7 @@ impl HoldingsService {
 
     fn calculate_average_cost(&self, holding: &mut Holding) {
         holding.average_cost = if holding.quantity != BigDecimal::from(0) {
-            Some((&holding.book_value / &holding.quantity).round(6))
+            Some((&holding.book_value / &holding.quantity).round(ROUNDING_SCALE))
         } else {
             None
         };
@@ -256,45 +321,55 @@ impl HoldingsService {
             .as_ref()
             .map(|a| &a.currency)
             .unwrap_or(&self.base_currency);
-        let exchange_rate = self
-            .fx_service
-            .get_latest_exchange_rate(&holding.currency, account_currency)
-            .map(|rate| {
+
+        let exchange_rate = self.get_exchange_rate(&holding.currency, account_currency)?;
+
+        holding.market_value_converted =
+            (&holding.market_value * &exchange_rate).round(ROUNDING_SCALE);
+        holding.book_value_converted = (&holding.book_value * &exchange_rate).round(ROUNDING_SCALE);
+
+        if let Some(day_gain_amount) = holding.performance.day_gain_amount.as_ref() {
+            holding.performance.day_gain_amount_converted =
+                Some((day_gain_amount * &exchange_rate).round(ROUNDING_SCALE));
+        }
+
+        Ok(())
+    }
+
+    fn get_exchange_rate(&self, from_currency: &str, to_currency: &str) -> Result<BigDecimal> {
+        self.fx_service
+            .get_latest_exchange_rate(from_currency, to_currency)
+            .map_err(|e| Error::Currency(CurrencyError::ConversionFailed(e.to_string())))
+            .and_then(|rate| {
                 BigDecimal::from_str(&rate.to_string()).map_err(|_| {
                     Error::Validation(ValidationError::InvalidInput(
                         "Invalid exchange rate".to_string(),
                     ))
                 })
             })
-            .unwrap_or_else(|_| Ok(BigDecimal::from(1)))?;
-
-        holding.market_value_converted = (&holding.market_value * &exchange_rate).round(6);
-        holding.book_value_converted = (&holding.book_value * &exchange_rate).round(6);
-
-        if let Some(day_gain_amount) = holding.performance.day_gain_amount.as_ref() {
-            holding.performance.day_gain_amount_converted =
-                Some((day_gain_amount * &exchange_rate).round(6));
-        }
-
-        Ok(())
     }
 
     fn calculate_performance_metrics(&self, holding: &mut Holding) {
         holding.performance.total_gain_amount =
-            (&holding.market_value - &holding.book_value).round(6);
+            (&holding.market_value - &holding.book_value).round(ROUNDING_SCALE);
+        holding.performance.total_gain_amount_converted =
+            (&holding.market_value_converted - &holding.book_value_converted).round(ROUNDING_SCALE);
+
         holding.performance.total_gain_percent = if holding.book_value != BigDecimal::from(0) {
             (&holding.performance.total_gain_amount / &holding.book_value * BigDecimal::from(100))
-                .round(6)
+                .round(ROUNDING_SCALE)
         } else {
             BigDecimal::from(0)
         };
-        holding.performance.total_gain_amount_converted =
-            (&holding.market_value_converted - &holding.book_value_converted).round(6);
     }
+}
 
+/// Total holdings calculation implementation
+impl HoldingsService {
     fn calculate_total_holdings(&self, holdings: &mut HashMap<HoldingKey, Holding>) -> Result<()> {
         let mut total_holdings = HashMap::new();
 
+        // Aggregate totals
         for holding in holdings.values() {
             let total_key = (holding.symbol.clone(), "TOTAL".to_string());
             let total_holding = total_holdings
@@ -304,7 +379,10 @@ impl HoldingsService {
             self.aggregate_total_holding(total_holding, holding);
         }
 
+        // Calculate metrics for totals
         self.calculate_total_holding_metrics(&mut total_holdings)?;
+
+        // Merge totals into main holdings
         holdings.extend(total_holdings);
 
         Ok(())
@@ -347,35 +425,34 @@ impl HoldingsService {
         }
     }
 
-    fn aggregate_total_holding(&self, total_holding: &mut Holding, holding: &Holding) {
-        total_holding.quantity += &holding.quantity;
-        total_holding.market_value += &holding.market_value;
-        total_holding.market_value_converted += &holding.market_value_converted;
-        total_holding.book_value += &holding.book_value;
-        total_holding.book_value_converted += &holding.book_value_converted;
+    fn aggregate_total_holding(&self, total: &mut Holding, holding: &Holding) {
+        total.quantity += &holding.quantity;
+        total.market_value += &holding.market_value;
+        total.market_value_converted += &holding.market_value_converted;
+        total.book_value += &holding.book_value;
+        total.book_value_converted += &holding.book_value_converted;
 
+        self.aggregate_day_gains(total, holding);
+    }
+
+    fn aggregate_day_gains(&self, total: &mut Holding, holding: &Holding) {
         if let Some(day_gain_amount) = &holding.performance.day_gain_amount {
-            total_holding.performance.day_gain_amount = Some(
-                total_holding
-                    .performance
-                    .day_gain_amount
-                    .as_ref()
-                    .map_or_else(
-                        || day_gain_amount.clone(),
-                        |total| (total + day_gain_amount).round(6),
-                    ),
-            );
+            total.performance.day_gain_amount =
+                Some(total.performance.day_gain_amount.as_ref().map_or_else(
+                    || day_gain_amount.clone(),
+                    |total_gain| (total_gain + day_gain_amount).round(ROUNDING_SCALE),
+                ));
         }
 
         if let Some(day_gain_amount_converted) = &holding.performance.day_gain_amount_converted {
-            total_holding.performance.day_gain_amount_converted = Some(
-                total_holding
+            total.performance.day_gain_amount_converted = Some(
+                total
                     .performance
                     .day_gain_amount_converted
                     .as_ref()
                     .map_or_else(
                         || day_gain_amount_converted.clone(),
-                        |total| (total + day_gain_amount_converted).round(6),
+                        |total_gain| (total_gain + day_gain_amount_converted).round(ROUNDING_SCALE),
                     ),
             );
         }
@@ -398,39 +475,37 @@ impl HoldingsService {
         Ok(())
     }
 
-    fn calculate_total_holding_performance(&self, total_holding: &mut Holding) -> Result<()> {
-        total_holding.market_price = Some(if total_holding.quantity != BigDecimal::from(0) {
-            (&total_holding.market_value / &total_holding.quantity).round(6)
+    fn calculate_total_holding_performance(&self, total: &mut Holding) -> Result<()> {
+        total.market_price = Some(if total.quantity != BigDecimal::from(0) {
+            (&total.market_value / &total.quantity).round(ROUNDING_SCALE)
         } else {
             BigDecimal::from(0)
         });
 
-        total_holding.average_cost = Some(if total_holding.quantity != BigDecimal::from(0) {
-            (&total_holding.book_value / &total_holding.quantity).round(6)
+        total.average_cost = Some(if total.quantity != BigDecimal::from(0) {
+            (&total.book_value / &total.quantity).round(ROUNDING_SCALE)
         } else {
             BigDecimal::from(0)
         });
 
-        total_holding.performance.total_gain_amount =
-            (&total_holding.market_value - &total_holding.book_value).round(6);
-        total_holding.performance.total_gain_amount_converted =
-            (&total_holding.market_value_converted - &total_holding.book_value_converted).round(6);
+        total.performance.total_gain_amount =
+            (&total.market_value - &total.book_value).round(ROUNDING_SCALE);
+        total.performance.total_gain_amount_converted =
+            (&total.market_value_converted - &total.book_value_converted).round(ROUNDING_SCALE);
 
-        total_holding.performance.total_gain_percent =
-            if total_holding.book_value != BigDecimal::from(0) {
-                (&total_holding.performance.total_gain_amount / &total_holding.book_value
-                    * BigDecimal::from(100))
-                .round(6)
-            } else {
-                BigDecimal::from(0)
-            };
+        total.performance.total_gain_percent = if total.book_value != BigDecimal::from(0) {
+            (&total.performance.total_gain_amount / &total.book_value * BigDecimal::from(100))
+                .round(ROUNDING_SCALE)
+        } else {
+            BigDecimal::from(0)
+        };
 
-        if let Some(day_gain_amount) = &total_holding.performance.day_gain_amount {
-            total_holding.performance.day_gain_percent =
-                Some(if total_holding.market_value != BigDecimal::from(0) {
-                    (day_gain_amount / (&total_holding.market_value - day_gain_amount)
+        if let Some(day_gain_amount) = &total.performance.day_gain_amount {
+            total.performance.day_gain_percent =
+                Some(if total.market_value != BigDecimal::from(0) {
+                    (day_gain_amount / (&total.market_value - day_gain_amount)
                         * BigDecimal::from(100))
-                    .round(6)
+                    .round(ROUNDING_SCALE)
                 } else {
                     BigDecimal::from(0)
                 });
@@ -441,22 +516,19 @@ impl HoldingsService {
 
     fn calculate_portfolio_percentage(
         &self,
-        total_holding: &mut Holding,
+        total: &mut Holding,
         total_portfolio_value: &BigDecimal,
     ) {
-        if total_portfolio_value != &BigDecimal::from(0) {
-            total_holding.portfolio_percent = Some(
-                (&total_holding.market_value_converted / total_portfolio_value
-                    * BigDecimal::from(100))
-                .round(2),
-            );
+        total.portfolio_percent = Some(if total_portfolio_value != &BigDecimal::from(0) {
+            (&total.market_value_converted / total_portfolio_value * BigDecimal::from(100))
+                .round(PORTFOLIO_PERCENT_SCALE)
         } else {
-            total_holding.portfolio_percent = Some(BigDecimal::from(0));
-        }
+            BigDecimal::from(0)
+        });
     }
 
     fn filter_holdings(&self, holdings: HashMap<HoldingKey, Holding>) -> Vec<Holding> {
-        let threshold = BigDecimal::from_str("0.000001").unwrap();
+        let threshold = BigDecimal::from_str(QUANTITY_THRESHOLD).unwrap();
         holdings
             .into_values()
             .filter(|holding| holding.quantity.abs() > threshold)
