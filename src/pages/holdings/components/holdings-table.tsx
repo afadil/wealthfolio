@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from '@/components/amount-display';
 import { QuantityDisplay } from '@/components/quantity-display';
+import { useMemo } from 'react';
 
 const numericSortFunction: SortingFn<Holding> = (rowA, rowB, columnId) => {
   const valueA = rowA.getValue(columnId) as number;
@@ -31,6 +32,10 @@ export const HoldingsTable = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
+  const nonCashHoldings = useMemo(() => {
+    return holdings.filter((holding) => holding.holdingType !== 'CASH');
+  }, [holdings]);
+
   if (isLoading) {
     return (
       <div className="space-y-4 pt-6">
@@ -43,7 +48,7 @@ export const HoldingsTable = ({
   }
 
   const uniqueTypesSet = new Set();
-  const assetsTypes: { label: string; value: string }[] = holdings.reduce(
+  const assetsTypes: { label: string; value: string }[] = nonCashHoldings.reduce(
     (result: { label: string; value: string }[], asset) => {
       const type = asset?.holdingType;
       if (type && !uniqueTypesSet.has(type)) {
@@ -65,7 +70,7 @@ export const HoldingsTable = ({
   return (
     <div className="pt-6">
       <DataTable
-        data={holdings}
+        data={nonCashHoldings}
         columns={getColumns(isBalanceHidden)}
         searchBy="symbol"
         filters={filters}
@@ -83,7 +88,7 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
   {
     id: 'symbol',
     accessorKey: 'symbol',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
     cell: ({ row }) => {
       const navigate = useNavigate();
       let ogSymbol = row.getValue('symbol') as string;
@@ -133,7 +138,7 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
     accessorKey: 'quantity',
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
     ),
     cell: ({ row }) => (
       <div className="text-right">
@@ -151,7 +156,7 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
       <DataTableColumnHeader
         className="justify-end text-right"
         column={column}
-        title="Market Price"
+        title="Today's Price"
       />
     ),
     cell: ({ row }) => {
@@ -185,7 +190,7 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
     accessorKey: 'marketValue',
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Market Value" />
+      <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
     ),
     cell: ({ row }) => (
       <div className="text-right">

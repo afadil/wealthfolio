@@ -23,21 +23,12 @@ impl Holding {
 
         self.quantity = &self.quantity + &quantity;
 
-        // Only update average cost if quantity is non-zero
+        // Update values without rounding
         if self.quantity != BigDecimal::from(0) {
             self.average_cost = Some(&new_value / &self.quantity);
         }
-
         self.book_value = &self.book_value + &position_value;
         self.book_value_converted = self.book_value.clone();
-
-        // Round only at the end
-        self.quantity = self.quantity.round(ROUNDING_SCALE);
-        if let Some(avg_cost) = self.average_cost.as_mut() {
-            *avg_cost = avg_cost.round(ROUNDING_SCALE);
-        }
-        self.book_value = self.book_value.round(ROUNDING_SCALE);
-        self.book_value_converted = self.book_value_converted.round(ROUNDING_SCALE);
     }
 
     pub fn reduce_position(&mut self, quantity: BigDecimal) -> Result<()> {
@@ -48,11 +39,10 @@ impl Holding {
             )));
         }
 
-        // Calculate sell ratio and reductions without intermediate rounding
+        // Calculate and update values without rounding
         let sell_ratio = &quantity / &self.quantity;
         let book_value_reduction = &self.book_value * &sell_ratio;
 
-        // Update values without intermediate rounding
         self.quantity = &self.quantity - &quantity;
         self.book_value = &self.book_value - &book_value_reduction;
         self.book_value_converted = self.book_value.clone();
@@ -64,12 +54,48 @@ impl Holding {
             self.book_value_converted = BigDecimal::from(0);
         }
 
-        // Round only at the end
+        Ok(())
+    }
+
+    // Add a new method to round all values
+    pub fn round_values(&mut self) {
         self.quantity = self.quantity.round(ROUNDING_SCALE);
+        if let Some(avg_cost) = self.average_cost.as_mut() {
+            *avg_cost = avg_cost.round(ROUNDING_SCALE);
+        }
+        if let Some(market_price) = self.market_price.as_mut() {
+            *market_price = market_price.round(ROUNDING_SCALE);
+        }
+        self.market_value = self.market_value.round(ROUNDING_SCALE);
         self.book_value = self.book_value.round(ROUNDING_SCALE);
+        self.market_value_converted = self.market_value_converted.round(ROUNDING_SCALE);
         self.book_value_converted = self.book_value_converted.round(ROUNDING_SCALE);
 
-        Ok(())
+        // Round non-optional performance values
+        self.performance.total_gain_percent =
+            self.performance.total_gain_percent.round(ROUNDING_SCALE);
+        self.performance.total_gain_amount =
+            self.performance.total_gain_amount.round(ROUNDING_SCALE);
+        self.performance.total_gain_amount_converted = self
+            .performance
+            .total_gain_amount_converted
+            .round(ROUNDING_SCALE);
+
+        // Round optional performance values
+        if let Some(day_gain) = self.performance.day_gain_amount.as_mut() {
+            *day_gain = day_gain.round(ROUNDING_SCALE);
+        }
+        if let Some(day_gain_converted) = self.performance.day_gain_amount_converted.as_mut() {
+            *day_gain_converted = day_gain_converted.round(ROUNDING_SCALE);
+        }
+        if let Some(day_gain_percent) = self.performance.day_gain_percent.as_mut() {
+            *day_gain_percent = day_gain_percent.round(ROUNDING_SCALE);
+        }
+
+        // Round portfolio percentage if present
+        if let Some(portfolio_pct) = self.portfolio_percent.as_mut() {
+            *portfolio_pct = portfolio_pct.round(PORTFOLIO_PERCENT_SCALE);
+        }
     }
 }
 
@@ -120,20 +146,8 @@ impl Portfolio {
             .entry(currency.to_string())
             .or_insert(BigDecimal::from(0));
 
-        // Add without rounding
+        // Update without rounding
         *balance = balance.clone() + amount;
-
-        // Round only at the end
-        *balance = balance.round(ROUNDING_SCALE);
-
-        // Remove zero balances
-        if !Self::is_quantity_significant(balance) {
-            account_cash.remove(currency);
-            // Remove empty account cash map
-            if account_cash.is_empty() {
-                self.cash_positions.remove(account_id);
-            }
-        }
     }
 
     pub fn process_activity(
@@ -228,11 +242,9 @@ impl Portfolio {
         fee: BigDecimal,
         activity_amount: BigDecimal,
     ) -> Result<()> {
-        // Decrease cash
         let buy_cost = &activity_amount + &fee;
-        self.adjust_cash(&account.id, &activity.currency, -buy_cost.clone());
+        self.adjust_cash(&account.id, &activity.currency, -buy_cost);
 
-        // Update or create holding
         let holding =
             self.get_or_create_holding(&account.id, &activity.asset_id, activity, asset, account);
         holding.add_position(quantity, unit_price);
@@ -250,15 +262,13 @@ impl Portfolio {
         fee: BigDecimal,
         activity_amount: BigDecimal,
     ) -> Result<()> {
-        // Increase cash
         let sell_profit = &activity_amount - &fee;
+
         self.adjust_cash(&account.id, &activity.currency, sell_profit);
 
-        // Update holding
         if let Some(holding) = self.get_holding_mut(&account.id, &activity.asset_id) {
             holding.reduce_position(quantity)?;
 
-            // Remove holding if quantity becomes zero
             if holding.quantity == BigDecimal::from(0) {
                 self.remove_holding(&account.id, &activity.asset_id);
             }
@@ -277,8 +287,9 @@ impl Portfolio {
         fee: BigDecimal,
         activity_amount: BigDecimal,
     ) -> Result<()> {
+        let net_amount = &activity_amount - &fee;
+
         if activity.asset_id.starts_with("$CASH") {
-            let net_amount = &activity_amount - &fee;
             self.adjust_cash(&account.id, &activity.currency, net_amount);
         } else {
             let holding = self.get_or_create_holding(
@@ -302,8 +313,9 @@ impl Portfolio {
         fee: BigDecimal,
         activity_amount: BigDecimal,
     ) -> Result<()> {
+        let total_amount = &activity_amount + &fee;
+
         if activity.asset_id.starts_with("$CASH") {
-            let total_amount = &activity_amount + &fee;
             self.adjust_cash(&account.id, &activity.currency, -total_amount);
         } else if let Some(holding) = self.get_holding_mut(&account.id, &activity.asset_id) {
             holding.reduce_position(quantity)?;
@@ -466,10 +478,10 @@ impl Portfolio {
                 )?;
 
                 if holding.holding_type == "CASH" {
-                    holding.market_value_converted =
-                        (&holding.market_value * &exchange_rate).round(ROUNDING_SCALE);
-                    holding.book_value_converted =
-                        (&holding.book_value * &exchange_rate).round(ROUNDING_SCALE);
+                    holding.market_value = holding.quantity.clone();
+                    holding.book_value = holding.quantity.clone();
+                    holding.market_value_converted = &holding.market_value * &exchange_rate;
+                    holding.book_value_converted = &holding.book_value * &exchange_rate;
                     continue;
                 }
 
@@ -713,11 +725,12 @@ impl Portfolio {
     fn get_cash_holdings(&self) -> Vec<Holding> {
         let mut cash_holdings = Vec::new();
 
-        // Convert cash positions to holdings for each account
+        // Convert cash positions to holdings
         for (account_id, currencies) in &self.cash_positions {
             for (currency, amount) in currencies {
-                if *amount != BigDecimal::from(0) {
-                    cash_holdings.push(Holding {
+                let amount = amount.clone();
+                if amount != BigDecimal::from(0) {
+                    let holding = Holding {
                         id: format!("{}-$CASH-{}", account_id, currency),
                         symbol: format!("$CASH-{}", currency),
                         symbol_name: Some(format!("Cash {}", currency)),
@@ -730,7 +743,7 @@ impl Portfolio {
                         market_value: amount.clone(),
                         book_value: amount.clone(),
                         market_value_converted: amount.clone(),
-                        book_value_converted: amount.clone(),
+                        book_value_converted: amount,
                         performance: Performance::default(),
                         account: Some(Account {
                             id: account_id.clone(),
@@ -750,7 +763,8 @@ impl Portfolio {
                         sectors: None,
                         countries: None,
                         portfolio_percent: None,
-                    });
+                    };
+                    cash_holdings.push(holding);
                 }
             }
         }
@@ -825,6 +839,11 @@ impl HoldingsService {
         // Get final holdings including totals
         let mut final_holdings = portfolio.get_holdings();
         final_holdings.extend(portfolio.get_total_portfolio());
+
+        // Round all values before returning
+        for holding in &mut final_holdings {
+            holding.round_values();
+        }
 
         Ok(final_holdings)
     }

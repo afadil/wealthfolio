@@ -18,6 +18,7 @@ import { useSettingsContext } from '@/lib/settings-provider';
 import { QueryKeys } from '@/lib/query-keys';
 import { useLocation } from 'react-router-dom';
 import { CountryChart } from './components/country-chart';
+import { CashHoldingsWidget } from './components/cash-holdings-widget';
 
 const PORTFOLIO_ACCOUNT_ID = 'PORTFOLIO';
 
@@ -43,24 +44,27 @@ export const HoldingsPage = () => {
   return (
     <ApplicationShell className="p-6">
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <ApplicationHeader heading="Holdings">
-          <div className="flex items-center space-x-2">
-            <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
-              <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
-                value="overview"
-              >
-                Analytics
-              </TabsTrigger>
-              <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
-                value="holdings"
-              >
-                Positions
-              </TabsTrigger>
-            </TabsList>
-          </div>
-        </ApplicationHeader>
+        <div className="space-y-2">
+          <ApplicationHeader heading="Holdings">
+            <div className="flex items-center space-x-2">
+              <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
+                <TabsTrigger
+                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                  value="overview"
+                >
+                  Analytics
+                </TabsTrigger>
+                <TabsTrigger
+                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                  value="holdings"
+                >
+                  Positions
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </ApplicationHeader>
+          <CashHoldingsWidget holdings={holdings} isLoading={isLoading} />
+        </div>
 
         <TabsContent value="holdings" className="space-y-4">
           <HoldingsTable holdings={holdings} isLoading={isLoading} />
@@ -74,7 +78,7 @@ export const HoldingsPage = () => {
               </CardHeader>
               <CardContent>
                 {holdings && holdings.length > 0 ? (
-                  <ClassesChart holdings={holdings} />
+                  <ClassesChart holdings={holdings} isLoading={isLoading} />
                 ) : (
                   <EmptyPlaceholder
                     icon={<Icons.PieChart className="h-10 w-10" />}
@@ -94,6 +98,7 @@ export const HoldingsPage = () => {
                   <HoldingCurrencyChart
                     holdings={holdings}
                     baseCurrency={settings?.baseCurrency || 'USD'}
+                    isLoading={isLoading}
                   />
                 ) : (
                   <EmptyPlaceholder
@@ -111,7 +116,7 @@ export const HoldingsPage = () => {
               </CardHeader>
               <CardContent className="w-full">
                 {holdings && holdings.length > 0 ? (
-                  <CountryChart holdings={nonCashHoldings} />
+                  <CountryChart holdings={nonCashHoldings} isLoading={isLoading} />
                 ) : (
                   <EmptyPlaceholder
                     icon={<Icons.Globe className="h-10 w-10" />}
@@ -125,7 +130,7 @@ export const HoldingsPage = () => {
             {/* Second row: Composition and Sector */}
             <div className="col-span-12 lg:col-span-8">
               {holdings && holdings.length > 0 ? (
-                <PortfolioComposition assets={nonCashHoldings} />
+                <PortfolioComposition assets={nonCashHoldings} isLoading={isLoading} />
               ) : (
                 <EmptyPlaceholder
                   icon={<Icons.BarChart className="h-10 w-10" />}
@@ -140,7 +145,7 @@ export const HoldingsPage = () => {
               </CardHeader>
               <CardContent className="w-full">
                 {holdings && holdings.length > 0 ? (
-                  <SectorsChart assets={nonCashHoldings} />
+                  <SectorsChart assets={nonCashHoldings} isLoading={isLoading} />
                 ) : (
                   <EmptyPlaceholder
                     icon={<Icons.PieChart className="h-10 w-10" />}

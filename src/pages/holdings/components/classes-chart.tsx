@@ -1,7 +1,7 @@
 import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding } from '@/lib/types';
 import { useMemo, useState } from 'react';
-import { useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
@@ -21,23 +21,22 @@ function getClassData(holdings: Holding[]) {
     .map(([name, value]) => ({ name, value }));
 }
 
-export function ClassesChart({ holdings }: { holdings: Holding[] }) {
+interface ClassesChartProps {
+  holdings: Holding[];
+  isLoading?: boolean;
+}
+
+export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const data = useMemo(() => getClassData(holdings), [holdings]);
 
-  useEffect(() => {
-    const totalHolding = holdings.reduce(
-      (acc, holding) => acc + Number(holding.marketValueConverted),
-      0,
+  if (isLoading) {
+    return (
+      <div className="flex h-[300px] items-center justify-center">
+        <Skeleton className="h-[250px] w-[250px] rounded-full" />
+      </div>
     );
-    const totalCash = holdings
-      .filter((holding) => holding.symbol.startsWith('$CASH-'))
-      .reduce((acc, holding) => acc + Number(holding.marketValueConverted), 0);
-    const totalNonCash = totalHolding - totalCash;
-    console.log(
-      `Total Holding: ${totalHolding}, Total Cash: ${totalCash}, Total Non-Cash: ${totalNonCash}`,
-    );
-  }, [holdings]);
+  }
 
   const onPieEnter = (_: React.MouseEvent, index: number) => {
     setActiveIndex(index);
