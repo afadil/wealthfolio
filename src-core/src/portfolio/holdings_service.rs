@@ -3,7 +3,7 @@ use crate::activity::activity_service::ActivityService;
 use crate::asset::asset_service::AssetService;
 use crate::errors::{AssetError, CurrencyError, Error, Result, ValidationError};
 use crate::fx::fx_service::CurrencyExchangeService;
-use crate::models::{Account, Activity, Asset, Holding, Performance, Quote};
+use crate::models::{Account, Activity, ActivityType, Asset, Holding, Performance, Quote};
 use bigdecimal::BigDecimal;
 use diesel::SqliteConnection;
 use log::error;
@@ -16,32 +16,60 @@ const QUANTITY_THRESHOLD: &str = "0.000001";
 const PORTFOLIO_ACCOUNT_ID: &str = "PORTFOLIO";
 
 impl Holding {
-    pub fn add_position(&mut self, quantity: BigDecimal, price: BigDecimal, fx_rate: BigDecimal) {
-        let position_value = (&quantity * &price).round(ROUNDING_SCALE);
-        let old_value =
-            (&self.quantity * self.average_cost.clone().unwrap_or_default()).round(ROUNDING_SCALE);
-        let new_value = (&old_value + &position_value).round(ROUNDING_SCALE);
+    pub fn add_position(&mut self, quantity: BigDecimal, price: BigDecimal) {
+        let position_value = &quantity * &price;
+        let old_value = &self.quantity * self.average_cost.clone().unwrap_or_default();
+        let new_value = &old_value + &position_value;
 
-        self.quantity = (&self.quantity + quantity).round(ROUNDING_SCALE);
+        self.quantity = &self.quantity + &quantity;
+
+        // Only update average cost if quantity is non-zero
         if self.quantity != BigDecimal::from(0) {
-            self.average_cost = Some((&new_value / &self.quantity).round(ROUNDING_SCALE));
+            self.average_cost = Some(&new_value / &self.quantity);
         }
 
-        self.book_value = (&self.book_value + &position_value).round(ROUNDING_SCALE);
-        self.book_value_converted =
-            (&self.book_value_converted + &position_value * &fx_rate).round(ROUNDING_SCALE);
+        self.book_value = &self.book_value + &position_value;
+        self.book_value_converted = self.book_value.clone();
+
+        // Round only at the end
+        self.quantity = self.quantity.round(ROUNDING_SCALE);
+        if let Some(avg_cost) = self.average_cost.as_mut() {
+            *avg_cost = avg_cost.round(ROUNDING_SCALE);
+        }
+        self.book_value = self.book_value.round(ROUNDING_SCALE);
+        self.book_value_converted = self.book_value_converted.round(ROUNDING_SCALE);
     }
 
-    pub fn reduce_position(&mut self, quantity: BigDecimal) {
-        let sell_ratio = (&quantity / &self.quantity).round(ROUNDING_SCALE);
-        let book_value_reduction = (&sell_ratio * &self.book_value).round(ROUNDING_SCALE);
-        let book_value_converted_reduction =
-            (&sell_ratio * &self.book_value_converted).round(ROUNDING_SCALE);
+    pub fn reduce_position(&mut self, quantity: BigDecimal) -> Result<()> {
+        // Only validate if current quantity is zero to prevent division by zero
+        if self.quantity == BigDecimal::from(0) {
+            return Err(Error::Validation(ValidationError::InvalidInput(
+                "Cannot reduce position with zero quantity".to_string(),
+            )));
+        }
 
-        self.quantity = (&self.quantity - quantity).round(ROUNDING_SCALE);
-        self.book_value = (&self.book_value - &book_value_reduction).round(ROUNDING_SCALE);
-        self.book_value_converted =
-            (&self.book_value_converted - &book_value_converted_reduction).round(ROUNDING_SCALE);
+        // Calculate sell ratio and reductions without intermediate rounding
+        let sell_ratio = &quantity / &self.quantity;
+        let book_value_reduction = &self.book_value * &sell_ratio;
+
+        // Update values without intermediate rounding
+        self.quantity = &self.quantity - &quantity;
+        self.book_value = &self.book_value - &book_value_reduction;
+        self.book_value_converted = self.book_value.clone();
+
+        // Handle zero quantity case
+        if self.quantity == BigDecimal::from(0) {
+            self.average_cost = None;
+            self.book_value = BigDecimal::from(0);
+            self.book_value_converted = BigDecimal::from(0);
+        }
+
+        // Round only at the end
+        self.quantity = self.quantity.round(ROUNDING_SCALE);
+        self.book_value = self.book_value.round(ROUNDING_SCALE);
+        self.book_value_converted = self.book_value_converted.round(ROUNDING_SCALE);
+
+        Ok(())
     }
 }
 
@@ -91,7 +119,12 @@ impl Portfolio {
         let balance = account_cash
             .entry(currency.to_string())
             .or_insert(BigDecimal::from(0));
-        *balance = (balance.clone() + amount).round(ROUNDING_SCALE);
+
+        // Add without rounding
+        *balance = balance.clone() + amount;
+
+        // Round only at the end
+        *balance = balance.round(ROUNDING_SCALE);
 
         // Remove zero balances
         if !Self::is_quantity_significant(balance) {
@@ -112,16 +145,21 @@ impl Portfolio {
         let quantity = BigDecimal::from_str(&activity.quantity.to_string())?;
 
         // Skip processing for insignificant quantities except for cash-related activities
+        let activity_type = match ActivityType::from_str(&activity.activity_type) {
+            Ok(t) => t,
+            Err(e) => return Err(Error::Validation(ValidationError::InvalidInput(e))),
+        };
+
         if !matches!(
-            activity.activity_type.as_str(),
-            "DEPOSIT"
-                | "WITHDRAWAL"
-                | "INTEREST"
-                | "DIVIDEND"
-                | "CONVERSION_IN"
-                | "CONVERSION_OUT"
-                | "FEE"
-                | "TAX"
+            activity_type,
+            ActivityType::Deposit
+                | ActivityType::Withdrawal
+                | ActivityType::Interest
+                | ActivityType::Dividend
+                | ActivityType::ConversionIn
+                | ActivityType::ConversionOut
+                | ActivityType::Fee
+                | ActivityType::Tax
         ) && !Self::is_quantity_significant(&quantity)
         {
             return Ok(());
@@ -131,8 +169,8 @@ impl Portfolio {
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let activity_amount = &quantity * &unit_price;
 
-        match activity.activity_type.as_str() {
-            "BUY" => self.process_buy(
+        match activity_type {
+            ActivityType::Buy => self.process_buy(
                 activity,
                 asset,
                 account,
@@ -141,7 +179,7 @@ impl Portfolio {
                 fee,
                 activity_amount,
             ),
-            "SELL" => self.process_sell(
+            ActivityType::Sell => self.process_sell(
                 activity,
                 asset,
                 account,
@@ -150,7 +188,7 @@ impl Portfolio {
                 fee,
                 activity_amount,
             ),
-            "TRANSFER_IN" => self.process_transfer_in(
+            ActivityType::TransferIn => self.process_transfer_in(
                 activity,
                 asset,
                 account,
@@ -159,19 +197,24 @@ impl Portfolio {
                 fee,
                 activity_amount,
             ),
-            "TRANSFER_OUT" => {
+            ActivityType::TransferOut => {
                 self.process_transfer_out(activity, asset, account, quantity, fee, activity_amount)
             }
-            "DEPOSIT" => self.process_deposit(activity, account, activity_amount, fee),
-            "WITHDRAWAL" => self.process_withdrawal(activity, account, activity_amount, fee),
-            "INTEREST" | "DIVIDEND" => self.process_income(activity, account, activity_amount, fee),
-            "CONVERSION_IN" => self.process_conversion_in(activity, account, activity_amount, fee),
-            "CONVERSION_OUT" => {
+            ActivityType::Deposit => self.process_deposit(activity, account, activity_amount, fee),
+            ActivityType::Withdrawal => {
+                self.process_withdrawal(activity, account, activity_amount, fee)
+            }
+            ActivityType::Interest | ActivityType::Dividend => {
+                self.process_income(activity, account, activity_amount, fee)
+            }
+            ActivityType::ConversionIn => {
+                self.process_conversion_in(activity, account, activity_amount, fee)
+            }
+            ActivityType::ConversionOut => {
                 self.process_conversion_out(activity, account, activity_amount, fee)
             }
-            "FEE" | "TAX" => self.process_expense(activity, account, fee),
-            "SPLIT" => self.process_split(activity, account, unit_price),
-            _ => Ok(()),
+            ActivityType::Fee | ActivityType::Tax => self.process_expense(activity, account, fee),
+            ActivityType::Split => self.process_split(activity, account, unit_price),
         }
     }
 
@@ -192,7 +235,7 @@ impl Portfolio {
         // Update or create holding
         let holding =
             self.get_or_create_holding(&account.id, &activity.asset_id, activity, asset, account);
-        holding.add_position(quantity, unit_price, BigDecimal::from(1));
+        holding.add_position(quantity, unit_price);
 
         Ok(())
     }
@@ -203,7 +246,7 @@ impl Portfolio {
         _asset: &Asset,
         account: &Account,
         quantity: BigDecimal,
-        unit_price: BigDecimal,
+        _unit_price: BigDecimal,
         fee: BigDecimal,
         activity_amount: BigDecimal,
     ) -> Result<()> {
@@ -213,7 +256,7 @@ impl Portfolio {
 
         // Update holding
         if let Some(holding) = self.get_holding_mut(&account.id, &activity.asset_id) {
-            holding.reduce_position(quantity);
+            holding.reduce_position(quantity)?;
 
             // Remove holding if quantity becomes zero
             if holding.quantity == BigDecimal::from(0) {
@@ -245,7 +288,7 @@ impl Portfolio {
                 asset,
                 account,
             );
-            holding.add_position(quantity, unit_price, BigDecimal::from(1));
+            holding.add_position(quantity, unit_price);
         }
         Ok(())
     }
@@ -263,7 +306,7 @@ impl Portfolio {
             let total_amount = &activity_amount + &fee;
             self.adjust_cash(&account.id, &activity.currency, -total_amount);
         } else if let Some(holding) = self.get_holding_mut(&account.id, &activity.asset_id) {
-            holding.reduce_position(quantity);
+            holding.reduce_position(quantity)?;
 
             if holding.quantity == BigDecimal::from(0) {
                 self.remove_holding(&account.id, &activity.asset_id);
