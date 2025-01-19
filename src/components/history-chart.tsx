@@ -5,6 +5,7 @@ import { formatAmount, formatDate } from '@/lib/utils';
 import { ChartConfig, ChartContainer } from './ui/chart';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { GainPercent } from '@/components/gain-percent';
+import { Separator } from '@radix-ui/react-separator';
 
 type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
   isBalanceHidden: boolean;
@@ -16,12 +17,13 @@ const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps)
     return (
       <div className="center-items space-y-1">
         <p className="font-thin">{formatDate(data.date)}</p>
-        <p className="label">
+        <div className="label flex items-center">
           {isBalanceHidden
             ? `•••• `
             : `${formatAmount(Number(payload[0].value), data.currency, false)} `}
-          <GainPercent value={data.totalGainPercentage} />
-        </p>
+          <Separator orientation="vertical" className="mx-1 h-4 w-px bg-secondary" />
+          <GainPercent value={data.totalGainPercentage} className="items-start text-left text-xs" />
+        </div>
       </div>
     );
   }

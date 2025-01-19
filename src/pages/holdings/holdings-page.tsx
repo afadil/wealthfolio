@@ -12,14 +12,14 @@ import { PortfolioComposition } from './components/composition-chart';
 import { SectorsChart } from './components/sectors-chart';
 import { computeHoldings } from '@/commands/portfolio';
 import { useQuery } from '@tanstack/react-query';
-import { Holding } from '@/lib/types';
+import { Holding, HoldingType } from '@/lib/types';
 import { HoldingCurrencyChart } from './components/currency-chart';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { QueryKeys } from '@/lib/query-keys';
-import { PortfolioHistory } from '@/lib/types';
-import { getHistory } from '@/commands/portfolio';
 import { useLocation } from 'react-router-dom';
 import { CountryChart } from './components/country-chart';
+
+const PORTFOLIO_ACCOUNT_ID = 'PORTFOLIO';
 
 export const HoldingsPage = () => {
   const location = useLocation();
@@ -32,16 +32,13 @@ export const HoldingsPage = () => {
     queryFn: computeHoldings,
   });
 
-  const { data: portfolioHistory } = useQuery<PortfolioHistory[], Error>({
-    queryKey: QueryKeys.accountHistory('TOTAL'),
-    queryFn: () => getHistory('TOTAL'),
-  });
-
-  const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
-
   const holdings = useMemo(() => {
-    return data?.filter((holding) => holding.account?.id === 'TOTAL') || [];
+    return data?.filter((holding) => holding.account?.id === PORTFOLIO_ACCOUNT_ID) || [];
   }, [data]);
+
+  const nonCashHoldings = useMemo(() => {
+    return holdings.filter((holding) => holding.holdingType !== HoldingType.CASH);
+  }, [holdings]);
 
   return (
     <ApplicationShell className="p-6">
@@ -66,10 +63,7 @@ export const HoldingsPage = () => {
         </ApplicationHeader>
 
         <TabsContent value="holdings" className="space-y-4">
-          <HoldingsTable
-            holdings={(holdings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}
-            isLoading={isLoading}
-          />
+          <HoldingsTable holdings={holdings} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-12 gap-4">
@@ -80,7 +74,7 @@ export const HoldingsPage = () => {
               </CardHeader>
               <CardContent>
                 {holdings && holdings.length > 0 ? (
-                  <ClassesChart assets={holdings} cash={todayValue?.availableCash || 0} />
+                  <ClassesChart holdings={holdings} />
                 ) : (
                   <EmptyPlaceholder
                     icon={<Icons.PieChart className="h-10 w-10" />}
@@ -99,7 +93,6 @@ export const HoldingsPage = () => {
                 {holdings && holdings.length > 0 ? (
                   <HoldingCurrencyChart
                     holdings={holdings}
-                    cash={todayValue?.availableCash || 0}
                     baseCurrency={settings?.baseCurrency || 'USD'}
                   />
                 ) : (
@@ -118,7 +111,7 @@ export const HoldingsPage = () => {
               </CardHeader>
               <CardContent className="w-full">
                 {holdings && holdings.length > 0 ? (
-                  <CountryChart holdings={holdings} />
+                  <CountryChart holdings={nonCashHoldings} />
                 ) : (
                   <EmptyPlaceholder
                     icon={<Icons.Globe className="h-10 w-10" />}
@@ -132,7 +125,7 @@ export const HoldingsPage = () => {
             {/* Second row: Composition and Sector */}
             <div className="col-span-12 lg:col-span-8">
               {holdings && holdings.length > 0 ? (
-                <PortfolioComposition assets={holdings} />
+                <PortfolioComposition assets={nonCashHoldings} />
               ) : (
                 <EmptyPlaceholder
                   icon={<Icons.BarChart className="h-10 w-10" />}
@@ -147,7 +140,7 @@ export const HoldingsPage = () => {
               </CardHeader>
               <CardContent className="w-full">
                 {holdings && holdings.length > 0 ? (
-                  <SectorsChart assets={holdings} />
+                  <SectorsChart assets={nonCashHoldings} />
                 ) : (
                   <EmptyPlaceholder
                     icon={<Icons.PieChart className="h-10 w-10" />}

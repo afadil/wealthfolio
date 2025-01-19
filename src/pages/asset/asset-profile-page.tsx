@@ -50,6 +50,8 @@ interface AssetDetailData {
   } | null;
 }
 
+const PORTFOLIO_ACCOUNT_ID = 'PORTFOLIO';
+
 export const AssetProfilePage = () => {
   const { symbol = '' } = useParams<{ symbol: string }>();
   const location = useLocation();
@@ -78,7 +80,7 @@ export const AssetProfilePage = () => {
 
   const holding = useMemo(() => {
     if (location.state?.holding) return location.state.holding;
-    return allHoldings?.find((h) => h.account?.id === 'TOTAL' && h.symbol === symbol);
+    return allHoldings?.find((h) => h.account?.id === PORTFOLIO_ACCOUNT_ID && h.symbol === symbol);
   }, [location.state?.holding, allHoldings, symbol]);
 
   const quote = useMemo(() => {

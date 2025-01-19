@@ -5,6 +5,7 @@ use diesel::Queryable;
 use diesel::Selectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
 #[diesel(table_name= crate::schema::platforms)]
@@ -361,7 +362,7 @@ pub struct Country {
     pub weight: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Holding {
     pub id: String,
@@ -800,4 +801,64 @@ pub struct CumulativeReturns {
     pub cumulative_returns: Vec<CumulativeReturn>,
     pub total_return: f64,
     pub annualized_return: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ActivityType {
+    Buy,
+    Sell,
+    Dividend,
+    Interest,
+    Deposit,
+    Withdrawal,
+    TransferIn,
+    TransferOut,
+    ConversionIn,
+    ConversionOut,
+    Fee,
+    Tax,
+    Split,
+}
+
+impl ActivityType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ActivityType::Buy => "BUY",
+            ActivityType::Sell => "SELL",
+            ActivityType::Dividend => "DIVIDEND",
+            ActivityType::Interest => "INTEREST",
+            ActivityType::Deposit => "DEPOSIT",
+            ActivityType::Withdrawal => "WITHDRAWAL",
+            ActivityType::TransferIn => "TRANSFER_IN",
+            ActivityType::TransferOut => "TRANSFER_OUT",
+            ActivityType::ConversionIn => "CONVERSION_IN",
+            ActivityType::ConversionOut => "CONVERSION_OUT",
+            ActivityType::Fee => "FEE",
+            ActivityType::Tax => "TAX",
+            ActivityType::Split => "SPLIT",
+        }
+    }
+}
+
+impl FromStr for ActivityType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "BUY" => Ok(ActivityType::Buy),
+            "SELL" => Ok(ActivityType::Sell),
+            "DIVIDEND" => Ok(ActivityType::Dividend),
+            "INTEREST" => Ok(ActivityType::Interest),
+            "DEPOSIT" => Ok(ActivityType::Deposit),
+            "WITHDRAWAL" => Ok(ActivityType::Withdrawal),
+            "TRANSFER_IN" => Ok(ActivityType::TransferIn),
+            "TRANSFER_OUT" => Ok(ActivityType::TransferOut),
+            "CONVERSION_IN" => Ok(ActivityType::ConversionIn),
+            "CONVERSION_OUT" => Ok(ActivityType::ConversionOut),
+            "FEE" => Ok(ActivityType::Fee),
+            "TAX" => Ok(ActivityType::Tax),
+            "SPLIT" => Ok(ActivityType::Split),
+            _ => Err(format!("Unknown activity type: {}", s)),
+        }
+    }
 }

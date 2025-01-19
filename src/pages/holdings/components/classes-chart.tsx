@@ -1,47 +1,47 @@
 import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding } from '@/lib/types';
 import { useMemo, useState } from 'react';
+import { useEffect } from 'react';
 
-function getClassesData(assets: Holding[], cash: number) {
-  if (!assets) return cash > 0 ? [{ name: 'Cash', value: cash }] : [];
+function getClassData(holdings: Holding[]) {
+  if (!holdings?.length) return [];
 
-  const types = assets.reduce(
-    (acc, asset) => {
-      const assetType =
-        asset.assetSubClass === 'Cryptocurrency' ? 'Crypto' : asset.assetSubClass || 'Others';
-
-      const current = acc[assetType] || 0;
-      acc[assetType] = Number(current) + Number(asset.marketValueConverted);
+  const classes = holdings.reduce(
+    (acc, holding) => {
+      const assetSubClass = holding.assetSubClass || 'Other';
+      const current = acc[assetSubClass] || 0;
+      acc[assetSubClass] = Number(current) + Number(holding.marketValueConverted);
       return acc;
     },
-    cash > 0 ? { Cash: cash } : ({} as Record<string, number>),
+    {} as Record<string, number>,
   );
 
-  const totalValue = Object.values(types).reduce((sum, value) => sum + value, 0);
-  const threshold = 0.01; // 5% threshold
-
-  return Object.entries(types)
-    .map(([name, value]) => ({ name, value }))
-    .filter(({ value }) => value / totalValue >= threshold)
-    .sort((a, b) => b.value - a.value);
+  return Object.entries(classes)
+    .filter(([_, value]) => value > 0)
+    .map(([name, value]) => ({ name, value }));
 }
 
-export function ClassesChart({ assets, cash }: { assets: Holding[]; cash: number }) {
+export function ClassesChart({ holdings }: { holdings: Holding[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const data = useMemo(() => getClassesData(assets, cash), [assets, cash]);
+  const data = useMemo(() => getClassData(holdings), [holdings]);
+
+  useEffect(() => {
+    const totalHolding = holdings.reduce(
+      (acc, holding) => acc + Number(holding.marketValueConverted),
+      0,
+    );
+    const totalCash = holdings
+      .filter((holding) => holding.symbol.startsWith('$CASH-'))
+      .reduce((acc, holding) => acc + Number(holding.marketValueConverted), 0);
+    const totalNonCash = totalHolding - totalCash;
+    console.log(
+      `Total Holding: ${totalHolding}, Total Cash: ${totalCash}, Total Non-Cash: ${totalNonCash}`,
+    );
+  }, [holdings]);
+
   const onPieEnter = (_: React.MouseEvent, index: number) => {
     setActiveIndex(index);
   };
-  const onPieLeave = (_: React.MouseEvent, index: number) => {
-    setActiveIndex(index);
-  };
 
-  return (
-    <CustomPieChart
-      data={data}
-      activeIndex={activeIndex}
-      onPieEnter={onPieEnter}
-      onPieLeave={onPieLeave}
-    />
-  );
+  return <CustomPieChart data={data} activeIndex={activeIndex} onPieEnter={onPieEnter} />;
 }

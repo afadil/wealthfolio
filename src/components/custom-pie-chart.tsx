@@ -141,31 +141,29 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   );
 
   return (
-    <ChartContainer config={chartConfig} className="h-[200px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={40}
-            outerRadius={65}
-            paddingAngle={2}
-            animationDuration={100}
-            dataKey="value"
-            nameKey="name"
-            activeIndex={activeIndex}
-            activeShape={renderActiveShape}
-            inactiveShape={renderInactiveActiveShape}
-            onMouseEnter={onPieEnter}
-            onMouseLeave={onPieLeave}
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={chartConfig[entry.name].color} />
-            ))}
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
+    <ChartContainer config={chartConfig}>
+      <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={40}
+          outerRadius={65}
+          paddingAngle={2}
+          animationDuration={100}
+          dataKey="value"
+          nameKey="name"
+          activeIndex={activeIndex}
+          activeShape={renderActiveShape}
+          inactiveShape={renderInactiveActiveShape}
+          onMouseEnter={onPieEnter}
+          onMouseLeave={onPieLeave}
+        >
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={chartConfig[entry.name].color} />
+          ))}
+        </Pie>
+      </PieChart>
     </ChartContainer>
   );
 };

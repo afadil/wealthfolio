@@ -141,6 +141,15 @@ export interface Tag {
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
 
+export enum HoldingType {
+  CASH = 'CASH',
+  STOCK = 'STOCK',
+  MUTUAL_FUND = 'MUTUAL_FUND',
+  ETF = 'ETF',
+  BOND = 'BOND',
+  OTHER = 'OTHER',
+}
+
 export interface Holding {
   id: string;
   symbol: string;
