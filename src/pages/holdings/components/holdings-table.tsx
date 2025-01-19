@@ -5,7 +5,6 @@ import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { formatAmount } from '@/lib/utils';
 import type { ColumnDef, SortingFn } from '@tanstack/react-table';
-import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 import { PrivacyAmount } from '@/components/privacy-amount';
 
@@ -74,7 +73,12 @@ export const HoldingsTable = ({
         columns={getColumns(isBalanceHidden)}
         searchBy="symbol"
         filters={filters}
-        defaultColumnVisibility={{ currency: false, symbolName: false, holdingType: false }}
+        defaultColumnVisibility={{
+          currency: false,
+          symbolName: false,
+          holdingType: false,
+          bookValue: false,
+        }}
         defaultSorting={[{ id: 'symbol', desc: false }]}
         scrollable={true}
       />
@@ -89,6 +93,9 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
     id: 'symbol',
     accessorKey: 'symbol',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
+    meta: {
+      label: 'Position',
+    },
     cell: ({ row }) => {
       const navigate = useNavigate();
       let ogSymbol = row.getValue('symbol') as string;
@@ -126,23 +133,30 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
         symbolName.toLowerCase().includes(value.toLowerCase())
       );
     },
-
     enableHiding: false,
   },
   {
     id: 'symbolName',
     accessorKey: 'symbolName',
+    meta: {
+      label: 'Position Name',
+    },
+    enableHiding: false,
   },
   {
     id: 'quantity',
     accessorKey: 'quantity',
-    enableHiding: false,
+    enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
     ),
+    meta: {
+      label: 'Shares',
+    },
     cell: ({ row }) => (
-      <div className="text-right">
+      <div className="flex min-h-[40px] flex-col items-end justify-center">
         <QuantityDisplay value={row.getValue('quantity')} isHidden={isHidden} />
+        <div className="text-xs text-transparent">-</div>
       </div>
     ),
     sortingFn: numericSortFunction,
@@ -150,7 +164,7 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
   {
     id: 'marketPrice',
     accessorKey: 'marketPrice',
-    enableHiding: false,
+    enableHiding: true,
     enableSorting: false,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -159,27 +173,43 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
         title="Today's Price"
       />
     ),
+    meta: {
+      label: "Today's Price",
+    },
     cell: ({ row }) => {
       const marketPrice = row.getValue('marketPrice') as number;
       const currency = row.getValue('currency') as string;
-      return <div className="text-right">{formatAmount(marketPrice, currency)}</div>;
+      const performance = row.getValue('performance') as any;
+      return (
+        <div className="flex min-h-[40px] flex-col items-end justify-center">
+          <div>{formatAmount(marketPrice, currency)}</div>
+          <GainPercent
+            className="text-xs text-muted-foreground"
+            value={performance?.dayGainPercent}
+          ></GainPercent>
+        </div>
+      );
     },
     sortingFn: numericSortFunction,
   },
   {
     id: 'bookValue',
     accessorKey: 'bookValue',
-    enableHiding: false,
+    enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
     ),
+    meta: {
+      label: 'Book Cost',
+    },
     cell: ({ row }) => {
       const bookValue = row.getValue('bookValue') as number;
       const currency = row.getValue('currency') as string;
 
       return (
-        <div className="pr-4 text-right">
+        <div className="flex min-h-[40px] flex-col items-end justify-center pr-4">
           <PrivacyAmount value={bookValue} currency={currency} />
+          <div className="text-xs text-transparent">-</div>
         </div>
       );
     },
@@ -192,13 +222,17 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
     ),
+    meta: {
+      label: 'Total Value',
+    },
     cell: ({ row }) => (
-      <div className="text-right">
+      <div className="flex min-h-[40px] flex-col items-end justify-center">
         <AmountDisplay
           value={row.getValue('marketValue')}
           currency={row.getValue('currency')}
           isHidden={isHidden}
         />
+        <div className="text-xs text-muted-foreground">{row.getValue('currency')}</div>
       </div>
     ),
     sortingFn: numericSortFunction,
@@ -211,22 +245,28 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Performance" />
     ),
+    meta: {
+      label: 'Performance',
+    },
     cell: ({ row }) => {
       const performance = row.getValue('performance') as any;
       const currency = row.getValue('currency') as string;
 
       return (
-        <div className="pr-4">
-          <GainAmount
-            className="text-sm"
+        <div className="flex min-h-[40px] flex-col items-end justify-center pr-4">
+          <AmountDisplay
             value={performance?.totalGainAmount}
             currency={currency}
-          ></GainAmount>
-          <GainPercent className="text-sm" value={performance?.totalGainPercent}></GainPercent>
+            colorFormat={true}
+          />
+          <GainPercent
+            className="text-xs text-muted-foreground"
+            value={performance?.totalGainPercent}
+          />
         </div>
       );
     },
-    filterFn: (row, id, value: string) => {
+    filterFn: (row, id, value) => {
       const account = row.getValue(id) as any;
       return value.includes(account.id);
     },
@@ -239,26 +279,23 @@ const getColumns = (isHidden: boolean): ColumnDef<Holding>[] => [
   {
     id: 'holdingType',
     accessorKey: 'holdingType',
-    // header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-    // cell: ({ row }) => <div>{row.getValue('holdingType')}</div>,
-    // filterFn: (row, id, value: string) => {
-    //   return value.includes(row.getValue(id));
-    // },
-    // sortingFn: (rowA, rowB, id) => {
-    //   const typeA = rowA.getValue(id) as any;
-    //   const typeB = rowB.getValue(id) as any;
-    //   return typeA.localeCompare(typeB);
-    // },
+    meta: {
+      label: 'Asset Type',
+    },
   },
   {
     id: 'currency',
     accessorKey: 'currency',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+    meta: {
+      label: 'Currency',
+    },
     cell: ({ row }) => <div>{row.getValue('currency')}</div>,
   },
 
   {
     id: 'actions',
+    enableHiding: false,
     cell: ({ row }) => {
       const navigate = useNavigate();
       const symbol = row.getValue('symbol') as String;

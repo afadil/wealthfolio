@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, Sector, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Sector } from 'recharts';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { ChartContainer } from '@/components/ui/chart';
