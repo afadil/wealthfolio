@@ -4,6 +4,7 @@ use crate::schema::{assets, quotes};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use log::{debug, error};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct AssetService {
@@ -195,10 +196,16 @@ impl AssetService {
                     Ok(fetched_profile) => {
                         let inserted_asset = self.insert_new_asset(conn, fetched_profile).await?;
 
-                        // Sync the quotes for the new asset
-                        self.sync_asset_quotes(conn, &vec![inserted_asset.clone()])
+                        // Sync the quotes for the new asset but don't fail if sync fails
+                        if let Err(e) = self
+                            .sync_asset_quotes(conn, &vec![inserted_asset.clone()])
                             .await
-                            .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
+                        {
+                            error!(
+                                "Failed to sync quotes for new asset {}: {}",
+                                inserted_asset.id, e
+                            );
+                        }
                         Ok(inserted_asset)
                     }
                     Err(_) => {
@@ -233,5 +240,24 @@ impl AssetService {
         self.market_data_service
             .sync_asset_quotes(conn, asset_list)
             .await
+    }
+
+    pub fn update_asset_data_source(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_id: &str,
+        data_source: String,
+    ) -> Result<Asset, diesel::result::Error> {
+        diesel::update(assets::table.filter(assets::id.eq(asset_id)))
+            .set(assets::data_source.eq(data_source))
+            .get_result::<Asset>(conn)
+    }
+
+    pub fn get_latest_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        symbols: &[String],
+    ) -> QueryResult<HashMap<String, Quote>> {
+        self.market_data_service.get_latest_quotes(conn, symbols)
     }
 }

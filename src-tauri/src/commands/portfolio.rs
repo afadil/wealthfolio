@@ -1,12 +1,11 @@
 use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
-use crate::portfolio::portfolio_service::PortfolioService;
 use crate::AppState;
 
 use chrono::NaiveDate;
 use log::debug;
 use tauri::State;
 use wealthfolio_core::models::CumulativeReturns;
-use wealthfolio_core::portfolio::portfolio_service::ReturnMethod;
+use wealthfolio_core::portfolio::portfolio_service::{PortfolioService, ReturnMethod};
 
 async fn create_portfolio_service(state: &State<'_, AppState>) -> Result<PortfolioService, String> {
     let base_currency = state.base_currency.read().unwrap().clone();

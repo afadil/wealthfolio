@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { PrivacyAmount } from '@/components/privacy-amount';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -23,7 +24,9 @@ function getSectorsData(assets: Holding[]) {
         const current = acc[sector.name] || 0;
         //@ts-ignore
         acc[sector.name] =
-          Number(current) + Number(asset.marketValueConverted) * Number(sector.weight);
+          Number(current) +
+          Number(asset.marketValueConverted) *
+            (Number(sector.weight) > 1 ? Number(sector.weight) / 100 : Number(sector.weight));
       });
       return acc;
     },
@@ -53,8 +56,26 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function SectorsChart({ assets }: { assets: Holding[] }) {
+interface SectorsChartProps {
+  assets: Holding[];
+  isLoading?: boolean;
+}
+
+export function SectorsChart({ assets, isLoading }: SectorsChartProps) {
   const sectors = useMemo(() => getSectorsData(assets), [assets]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-[90%]" />
+        <Skeleton className="h-8 w-[80%]" />
+        <Skeleton className="h-8 w-[70%]" />
+        <Skeleton className="h-8 w-[60%]" />
+        <Skeleton className="h-8 w-[50%]" />
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height={330}>

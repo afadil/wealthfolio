@@ -1,4 +1,4 @@
-use crate::models::{Activity, Asset, ExchangeRate, NewAsset, Quote, QuoteSummary};
+use crate::models::{Activity, Asset, ExchangeRate, NewAsset, Quote, QuoteSummary, QuoteUpdate};
 use crate::providers::market_data_factory::MarketDataFactory;
 use crate::providers::market_data_provider::{
     MarketDataError, MarketDataProvider, MarketDataProviderType,
@@ -308,7 +308,7 @@ impl MarketDataService {
                             from_currency: rate.from_currency,
                             to_currency: rate.to_currency,
                             rate: new_rate,
-                            source: "YAHOO".to_string(),
+                            source: rate.source,
                             created_at: rate.created_at,
                             updated_at: Utc::now().naive_utc(),
                         });
@@ -472,5 +472,75 @@ impl MarketDataService {
             }
             Err(e) => Err(format!("Failed to fetch history for {}: {}", symbol, e)),
         }
+    }
+
+    pub fn update_quote(
+        &self,
+        conn: &mut SqliteConnection,
+        quote_update: QuoteUpdate,
+    ) -> Result<(), String> {
+        use crate::schema::quotes;
+
+        // Convert the date string to NaiveDateTime
+        let date = NaiveDateTime::parse_from_str(
+            &format!("{} 00:00:00", quote_update.date),
+            "%Y-%m-%d %H:%M:%S",
+        )
+        .map_err(|e| format!("Failed to parse date: {}", e))?;
+
+        // Create a new Quote from QuoteUpdate
+        let quote = Quote {
+            id: format!(
+                "{}_{}",
+                quote_update.date.replace("-", ""),
+                quote_update.symbol
+            ),
+            created_at: chrono::Utc::now().naive_utc(),
+            data_source: "MANUAL".to_string(),
+            date,
+            symbol: quote_update.symbol,
+            open: quote_update.open,
+            high: quote_update.high,
+            low: quote_update.low,
+            volume: quote_update.volume,
+            close: quote_update.close,
+            adjclose: quote_update.close, // Set adjclose equal to close for manual quotes
+        };
+
+        diesel::replace_into(quotes::table)
+            .values(&quote)
+            .execute(conn)
+            .map_err(|e| format!("Failed to update quote: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn delete_quote(&self, conn: &mut SqliteConnection, quote_id: &str) -> Result<(), String> {
+        use crate::schema::quotes::dsl::*;
+
+        diesel::delete(quotes.filter(id.eq(quote_id)))
+            .execute(conn)
+            .map_err(|e| format!("Failed to delete quote: {}", e))?;
+
+        Ok(())
+    }
+
+    pub fn get_latest_quotes(
+        &self,
+        conn: &mut SqliteConnection,
+        symbols: &[String],
+    ) -> QueryResult<HashMap<String, Quote>> {
+        let quotes = quotes::table
+            .filter(quotes::symbol.eq_any(symbols))
+            .order_by((quotes::symbol.asc(), quotes::date.desc()))
+            .load::<Quote>(conn)?;
+
+        // Group by symbol and take the latest quote for each
+        let mut latest_quotes = HashMap::new();
+        for quote in quotes {
+            latest_quotes.entry(quote.symbol.clone()).or_insert(quote);
+        }
+
+        Ok(latest_quotes)
     }
 }

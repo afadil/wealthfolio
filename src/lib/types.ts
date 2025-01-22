@@ -141,6 +141,15 @@ export interface Tag {
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
 
+export enum HoldingType {
+  CASH = 'CASH',
+  STOCK = 'STOCK',
+  MUTUAL_FUND = 'MUTUAL_FUND',
+  ETF = 'ETF',
+  BOND = 'BOND',
+  OTHER = 'OTHER',
+}
+
 export interface Holding {
   id: string;
   symbol: string;
@@ -211,9 +220,9 @@ export interface Asset {
 
 export interface Quote {
   id: string;
-  createdAt: string; // ISO date string
+  createdAt: string;
   dataSource: string;
-  date: string; // ISO date string
+  date: string;
   symbol: string;
   open: number;
   high: number;
@@ -221,6 +230,17 @@ export interface Quote {
   volume: number;
   close: number;
   adjclose: number;
+}
+
+export interface QuoteUpdate {
+  date: string;
+  symbol: string;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  close: number;
+  dataSource: string;
 }
 
 export interface AssetData {
@@ -382,3 +402,19 @@ export interface CumulativeReturns {
   totalReturn: number;
   annualizedReturn: number;
 }
+
+export interface UpdateAssetProfile {
+  symbol: string;
+  sectors: string;
+  countries: string;
+  comment: string;
+  assetClass: string;
+  assetSubClass: string;
+}
+
+export const DataSource = {
+  MANUAL: 'MANUAL',
+  YAHOO: 'YAHOO',
+} as const;
+
+export type DataSource = (typeof DataSource)[keyof typeof DataSource];

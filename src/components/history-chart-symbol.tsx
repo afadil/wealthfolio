@@ -52,8 +52,8 @@ export default function HistoryChart({
           >
             <defs>
               <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#cbd492" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#cad38c" stopOpacity={0.4} />
+                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.1} />
               </linearGradient>
             </defs>
             {/* @ts-ignore */}
@@ -68,7 +68,7 @@ export default function HistoryChart({
               connectNulls={true}
               type="monotone"
               dataKey="totalValue"
-              stroke="#a2b35e"
+              stroke="hsl(var(--success))"
               fillOpacity={1}
               fill="url(#colorUv)"
             />

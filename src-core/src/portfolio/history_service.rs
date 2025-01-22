@@ -511,7 +511,12 @@ impl HistoryService {
                     );
 
                 let market_value = updated_market_value;
-                let total_value = &cumulative_cash + &market_value;
+
+                let total_value = if cumulative_cash > BigDecimal::from(0) {
+                    &cumulative_cash + &market_value
+                } else {
+                    market_value.clone()
+                };
 
                 let day_gain_percentage = if opening_market_value != BigDecimal::from(0) {
                     (&day_gain_value / &opening_market_value) * BigDecimal::from(100)

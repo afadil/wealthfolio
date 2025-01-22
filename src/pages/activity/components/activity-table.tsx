@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
+import { QueryKeys } from '@/lib/query-keys';
 
 const fetchSize = 25;
 
@@ -300,7 +301,7 @@ export const ActivityTable = ({
     ActivitySearchResponse,
     Error
   >({
-    queryKey: ['activity-data', columnFilters, globalFilter, sorting],
+    queryKey: [QueryKeys.ACTIVITY_DATA, columnFilters, globalFilter, sorting],
     queryFn: async ({ pageParam = 0 }: { pageParam?: any }) => {
       // convert columnFilters to an object
       const columnFiltersObj = columnFilters.reduce((acc, curr) => {

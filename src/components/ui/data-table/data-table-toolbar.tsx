@@ -2,10 +2,20 @@ import { Table } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icons } from '@/components/icons';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 import { DataTableFacetedFilter } from './data-table-faceted-filter';
 import type { DataTableFacetedFilterProps } from './data-table-faceted-filter';
 import { useEffect, useState } from 'react';
+
+interface ColumnMeta {
+  label?: string;
+}
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
@@ -19,6 +29,7 @@ export function DataTableToolbar<TData>({
   filters,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0 || table.getState().globalFilter;
+  const hideableColumns = table.getAllColumns().filter((column) => column.getCanHide());
 
   return (
     <div className="flex items-center justify-between">
@@ -54,6 +65,30 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
+      {hideableColumns.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="ml-auto">
+              Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {hideableColumns.map((column) => {
+              const meta = column.columnDef.meta as ColumnMeta | undefined;
+              return (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  className="capitalize"
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                >
+                  {meta?.label ?? column.id}
+                </DropdownMenuCheckboxItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type ReturnType = 'daily' | 'total';
 
@@ -44,16 +45,24 @@ interface ColorScale {
 function getColorScale(gain: number, maxGain: number, minGain: number): ColorScale {
   const isGain = gain >= 0;
 
+  // Handle edge cases
+  if (isNaN(gain) || isNaN(maxGain) || isNaN(minGain)) {
+    return {
+      opacity: 0.4,
+      className: isGain ? 'fill-success' : 'fill-destructive',
+    };
+  }
+
   // Calculate relative position in the range
   let relativePosition: number;
   if (isGain) {
-    relativePosition = maxGain === 0 ? 0 : gain / maxGain;
+    relativePosition = maxGain === 0 ? 0 : Math.min(1, gain / maxGain);
   } else {
-    relativePosition = minGain === 0 ? 0 : gain / minGain;
+    relativePosition = minGain === 0 ? 0 : Math.min(1, gain / minGain);
   }
 
-  // Scale opacity between 0.4 and 1.0 based on relative position
-  const opacity = 0.4 + Math.abs(relativePosition) * 0.6;
+  // Ensure opacity is between 0.4 and 1.0
+  const opacity = Math.max(0.4, Math.min(1, 0.4 + Math.abs(relativePosition) * 0.6));
 
   return {
     opacity,
@@ -120,7 +129,12 @@ const CustomizedContent = (props: any) => {
   );
 };
 
-export function PortfolioComposition({ assets }: { assets: Holding[] }) {
+interface PortfolioCompositionProps {
+  assets: Holding[];
+  isLoading?: boolean;
+}
+
+export function PortfolioComposition({ assets, isLoading }: PortfolioCompositionProps) {
   const [returnType, setReturnType] = useState<ReturnType>('daily');
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
@@ -174,6 +188,26 @@ export function PortfolioComposition({ assets }: { assets: Holding[] }) {
 
     return dataArray;
   }, [assets, returnType]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center space-x-2">
+            <BarChart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+          </div>
+          <div className="flex space-x-1 rounded-full bg-secondary p-1">
+            <Skeleton className="h-8 w-24 rounded-full" />
+            <Skeleton className="h-8 w-24 rounded-full" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[500px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

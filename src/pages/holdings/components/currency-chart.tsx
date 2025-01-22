@@ -1,37 +1,45 @@
 import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding } from '@/lib/types';
 import { useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
-function getCurrencyData(assets: Holding[], cash: number, baseCurrency: string) {
-  if (!assets) return cash > 0 ? [{ name: baseCurrency, value: cash }] : [];
-  const totalAssets = [...assets];
-  if (cash > 0) {
-    // @ts-ignore
-    totalAssets.push({ symbol: 'CASH', currency: baseCurrency, marketValueConverted: cash });
-  }
-  const currencies = totalAssets.reduce(
-    (acc, asset) => {
-      const currency = asset.currency || baseCurrency;
+function getCurrencyData(holdings: Holding[], baseCurrency: string) {
+  if (!holdings?.length) return [];
+
+  const currencies = holdings.reduce(
+    (acc, holding) => {
+      const currency = holding.currency || baseCurrency;
       const current = acc[currency] || 0;
-      acc[currency] = Number(current) + Number(asset.marketValueConverted);
+      acc[currency] = Number(current) + Number(holding.marketValueConverted);
       return acc;
     },
     {} as Record<string, number>,
   );
+
   return Object.entries(currencies).map(([name, value]) => ({ name, value }));
+}
+
+interface HoldingCurrencyChartProps {
+  holdings: Holding[];
+  baseCurrency: string;
+  isLoading?: boolean;
 }
 
 export function HoldingCurrencyChart({
   holdings,
-  cash,
   baseCurrency,
-}: {
-  holdings: Holding[];
-  cash: number;
-  baseCurrency: string;
-}) {
+  isLoading,
+}: HoldingCurrencyChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const data = useMemo(() => getCurrencyData(holdings, cash, baseCurrency), [holdings, cash]);
+  const data = useMemo(() => getCurrencyData(holdings, baseCurrency), [holdings, baseCurrency]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[300px] items-center justify-center">
+        <Skeleton className="h-[250px] w-[250px] rounded-full" />
+      </div>
+    );
+  }
 
   const onPieEnter = (_: React.MouseEvent, index: number) => {
     setActiveIndex(index);
