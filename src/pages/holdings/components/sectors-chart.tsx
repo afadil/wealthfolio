@@ -24,7 +24,9 @@ function getSectorsData(assets: Holding[]) {
         const current = acc[sector.name] || 0;
         //@ts-ignore
         acc[sector.name] =
-          Number(current) + Number(asset.marketValueConverted) * Number(sector.weight);
+          Number(current) +
+          Number(asset.marketValueConverted) *
+            (Number(sector.weight) > 1 ? Number(sector.weight) / 100 : Number(sector.weight));
       });
       return acc;
     },
