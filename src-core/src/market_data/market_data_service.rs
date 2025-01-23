@@ -1,7 +1,7 @@
 use crate::models::{Activity, Asset, ExchangeRate, NewAsset, Quote, QuoteSummary, QuoteUpdate};
 use crate::providers::market_data_factory::MarketDataFactory;
 use crate::providers::market_data_provider::{
-    MarketDataError, MarketDataProvider, MarketDataProviderType,
+    AssetProfiler, MarketDataError, MarketDataProvider, MarketDataProviderType,
 };
 use crate::schema::{activities, exchange_rates, quotes};
 use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
@@ -15,6 +15,7 @@ use std::time::SystemTime;
 pub struct MarketDataService {
     public_data_provider: Arc<dyn MarketDataProvider>,
     private_data_provider: Arc<dyn MarketDataProvider>,
+    private_asset_profiler: Arc<dyn AssetProfiler>,
 }
 
 impl MarketDataService {
@@ -23,6 +24,8 @@ impl MarketDataService {
             public_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Yahoo)
                 .await,
             private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Manual)
+                .await,
+            private_asset_profiler: MarketDataFactory::get_private_asset_profiler()
                 .await,
         }
     }
@@ -261,8 +264,8 @@ impl MarketDataService {
         match self.public_data_provider.get_symbol_profile(symbol).await {
             Ok(asset) => Ok(asset),
             Err(_) => self
-                .private_data_provider
-                .get_symbol_profile(symbol)
+                .private_asset_profiler
+                .get_asset_profile(symbol)
                 .await
                 .map_err(|e| format!("Failed to get symbol profile for {}: {}", symbol, e)),
         }

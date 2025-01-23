@@ -2,6 +2,7 @@ use super::market_data_provider::MarketDataProvider;
 use super::yahoo_provider::YahooProvider;
 use crate::providers::manual_provider;
 use crate::providers::market_data_provider::MarketDataProviderType;
+use crate::providers::market_data_provider::AssetProfiler;
 use std::sync::Arc;
 
 pub struct MarketDataFactory;
@@ -21,5 +22,12 @@ impl MarketDataFactory {
                     .expect("Failed to initialize Manual Market Data Provider"),
             ),
         }
+    }
+
+    pub async fn get_private_asset_profiler() -> Arc<dyn AssetProfiler> {
+        Arc::new(
+            manual_provider::ManualProvider::new()
+                .expect("Failed to initialize Manual Market Data Provider"),
+        )
     }
 }
