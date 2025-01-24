@@ -257,9 +257,11 @@ impl MarketDataService {
         Ok(())
     }
 
-    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, String> {
+    pub async fn get_asset_info(&self, symbol: &str) -> Result<NewAsset, String> {
+        // Assume the asset is public and try to get the profile
         match self.public_data_provider.get_symbol_profile(symbol).await {
             Ok(asset) => Ok(asset),
+            // Build a manual asset profile if the public provider fails
             Err(_) => self
                 .private_asset_profiler
                 .get_asset_profile(symbol)
