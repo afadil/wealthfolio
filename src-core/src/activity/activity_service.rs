@@ -93,13 +93,13 @@ impl ActivityService {
 
         // Handle the database transaction
         let inserted_activity = self
-            .insert_activity_transation(conn, activity, &asset, &account_currency)
+            .insert_activity_transaction(conn, activity, &asset, &account_currency)
             .await?;
 
         return Ok(inserted_activity);
     }
 
-    async fn insert_activity_transation(
+    async fn insert_activity_transaction(
         &self,
         conn: &mut SqliteConnection,
         mut activity: NewActivity,
