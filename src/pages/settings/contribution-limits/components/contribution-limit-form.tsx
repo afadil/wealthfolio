@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { newContributionLimitSchema } from '@/lib/schemas';
 import { useContributionLimitMutations } from '../useContributionLimitMutations';
 import { MoneyInput } from '@/components/ui/money-input';
+import { useTranslation } from 'react-i18next';
 
 type NewContributionLimit = z.infer<typeof newContributionLimitSchema>;
 
@@ -37,6 +38,7 @@ export function ContributionLimitForm({
   defaultValues,
   onSuccess = () => {},
 }: ContributionLimitFormProps) {
+  const { t } = useTranslation();
   const { addContributionLimitMutation, updateContributionLimitMutation } =
     useContributionLimitMutations();
 
@@ -59,12 +61,12 @@ export function ContributionLimitForm({
         <DialogHeader>
           <DialogTitle>
             {' '}
-            {defaultValues?.id ? 'Update Contribution Limit' : 'Add Contribution Limit'}
+            {defaultValues?.id ? t('Update Contribution Limit') : t('Add Contribution Limit')}
           </DialogTitle>
           <DialogDescription>
             {defaultValues?.id
-              ? 'Update contribution limit information'
-              : ' Add a new contribution limit.'}
+              ? t('Update contribution limit information')
+              : t(' Add a new contribution limit.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -76,9 +78,9 @@ export function ContributionLimitForm({
             name="groupName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Group Name</FormLabel>
+                <FormLabel>{t('Group Name')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="Group name" {...field} />
+                  <Input placeholder={t("Group name")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -89,11 +91,11 @@ export function ContributionLimitForm({
             name="contributionYear"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Contribution Year</FormLabel>
+                <FormLabel>{t('Contribution Year')}</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
-                    placeholder="Contribution year"
+                    placeholder={t("Contribution year")}
                     {...field}
                     onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                   />
@@ -107,9 +109,9 @@ export function ContributionLimitForm({
             name="limitAmount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Limit Amount</FormLabel>
+                <FormLabel>{t('Limit Amount')}</FormLabel>
                 <FormControl>
-                  <MoneyInput placeholder="Limit amount" {...field} />
+                  <MoneyInput placeholder={t("Limit amount")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -118,12 +120,12 @@ export function ContributionLimitForm({
         </div>
         <DialogFooter>
           <DialogTrigger asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">{t('Cancel')}</Button>
           </DialogTrigger>
           <Button type="submit">
             <Icons.Plus className="h-4 w-4" />
             <span className="hidden sm:ml-2 sm:inline">
-              {defaultValues?.id ? 'Update Limit' : 'Add Limit'}
+              {defaultValues?.id ? t('Update Limit') : t('Add Limit')}
             </span>
           </Button>
         </DialogFooter>

@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { newGoalSchema } from '@/lib/schemas';
 import { useGoalMutations } from '@/pages/settings/goals/useGoalMutations';
 import { MoneyInput } from '@/components/ui/money-input';
+import { useTranslation } from 'react-i18next';
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
@@ -36,6 +37,7 @@ interface GoalFormlProps {
 }
 
 export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps) {
+  const { t } = useTranslation();
   const { addGoalMutation, updateGoalMutation } = useGoalMutations();
 
   const form = useForm<NewGoal>({
@@ -55,9 +57,9 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle> {defaultValues?.id ? 'Update Goal' : 'Add Goal'}</DialogTitle>
+          <DialogTitle> {defaultValues?.id ? t('Update Goal') : t('Add Goal')}</DialogTitle>
           <DialogDescription>
-            {defaultValues?.id ? 'Update goal information' : ' Add an investment goal to track.'}
+            {defaultValues?.id ? t('Update goal information') : t(' Add an investment goal to track.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -70,7 +72,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
             name="title"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Goal Name</FormLabel>
+                <FormLabel>{t('Goal Name')}</FormLabel>
                 <FormControl>
                   <Input placeholder="Goal display title" {...field} />
                 </FormControl>
@@ -83,7 +85,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
             name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Goal description</FormLabel>
+                <FormLabel>{t('Goal description')}</FormLabel>
                 <FormControl>
                   <Input placeholder="Goal short description" {...field} />
                 </FormControl>
@@ -96,7 +98,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
             name="targetAmount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Target amount</FormLabel>
+                <FormLabel>{t('Target amount')}</FormLabel>
                 <FormControl>
                   <MoneyInput placeholder="Target amount" {...field} />
                 </FormControl>
@@ -122,12 +124,12 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
         </div>
         <DialogFooter>
           <DialogTrigger asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">{t('Cancel')}</Button>
           </DialogTrigger>
           <Button type="submit">
             <Icons.Plus className="h-4 w-4" />
             <span className="hidden sm:ml-2 sm:inline">
-              {defaultValues?.id ? 'Update Goal' : 'Add Goal'}
+              {defaultValues?.id ? t('Update Goal') : t('Add Goal')}
             </span>
           </Button>
         </DialogFooter>

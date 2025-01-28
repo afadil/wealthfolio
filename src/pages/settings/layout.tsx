@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { SidebarNav } from './sidebar-nav';
+import { useTranslation } from 'react-i18next';
 
 const sidebarNavItems = [
   {
@@ -30,11 +31,12 @@ const sidebarNavItems = [
 ];
 
 export default function SettingsLayout() {
+  const { t } = useTranslation();
   return (
     <>
       <div className="block p-6">
         <div className="space-y-0.5">
-          <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{t('Settings')}</h2>
           {/* <p className="text-muted-foreground">Manage the application settings and preferences.</p> */}
         </div>
         <Separator className="my-6" />

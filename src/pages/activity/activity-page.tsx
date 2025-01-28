@@ -12,8 +12,10 @@ import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { QueryKeys } from '@/lib/query-keys';
 import { useActivityMutations } from './hooks/useActivityMutations';
 import { ActivityForm } from './components/activity-form';
+import { useTranslation } from 'react-i18next';
 
 const ActivityPage = () => {
+  const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<ActivityDetails | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -53,12 +55,12 @@ const ActivityPage = () => {
           <Button size="sm" title="Import" asChild>
             <Link to={'/import'}>
               <Icons.Import className="mr-2 h-4 w-4" />
-              Upload CSV
+              {t('Upload CSV')}
             </Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add Manually
+            {t('Add Manually')}
           </Button>
         </div>
       </ApplicationHeader>

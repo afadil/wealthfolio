@@ -14,8 +14,10 @@ import GoalsAllocations from './components/goal-allocations';
 import { useAccounts } from '@/pages/account/useAccounts';
 import { QueryKeys } from '@/lib/query-keys';
 import { useGoalMutations } from './useGoalMutations';
+import { useTranslation } from 'react-i18next';
 
 const SettingsGoalsPage = () => {
+  const { t } = useTranslation();
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
     queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
@@ -63,10 +65,10 @@ const SettingsGoalsPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <SettingsHeader heading="Goals" text=" Manage your investment and saving goals.">
+        <SettingsHeader heading="Goals" text="Manage your investment and saving goals.">
           <Button onClick={() => handleAddGoal()}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add goal
+            {t('Add goal')}
           </Button>
         </SettingsHeader>
         <Separator />
@@ -100,13 +102,13 @@ const SettingsGoalsPage = () => {
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="Goal" />
-              <EmptyPlaceholder.Title>No goal added!</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Title>{t('No goal added')}!</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any goal yet. Start adding your investment goals.
+                {t('You don&apos;t have any goal yet. Start adding your investment goals.')}
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddGoal()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
-                Add an goal
+                {t('Add an goal')}
               </Button>
             </EmptyPlaceholder>
           )}

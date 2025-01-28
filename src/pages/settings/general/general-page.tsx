@@ -7,8 +7,8 @@ export default function GeneralSettingsPage() {
   return (
     <div className="space-y-6">
       <SettingsHeader
-        heading="General"
-        text="Manage the general application settings and preferences."
+        heading='general.title'
+        text='general.description'
       />
       <Separator />
       <BaseCurrencySettings />

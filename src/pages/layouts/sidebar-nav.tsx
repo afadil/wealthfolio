@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 export interface NavLink {
   title: string;
@@ -23,6 +24,7 @@ export interface NavigationProps {
 }
 
 export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(true);
   return (
@@ -67,7 +69,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                       },
                     )}
                   >
-                    Wealthfolio
+                    {t('Wealthfolio')}
                   </span>
                 </div>
 
@@ -109,6 +111,8 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     className?: string;
     onClick?: () => void;
   }) {
+    const { t } = useTranslation();
+
     return (
       <Button
         key={item.title}
@@ -126,7 +130,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               'block opacity-100': !collapsed,
             })}
           >
-            {item.title}
+            {t(item.title)}
           </span>
         </Link>
       </Button>

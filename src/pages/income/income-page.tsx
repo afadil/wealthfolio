@@ -36,6 +36,7 @@ import { useBalancePrivacy } from '@/context/privacy-context';
 import { formatAmount } from '@/lib/utils';
 import { format } from 'date-fns';
 import { AmountDisplay } from '@/components/amount-display';
+import { useTranslation } from 'react-i18next';
 
 const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [
   { code: 'TOTAL', label: 'All Time' },
@@ -46,8 +47,10 @@ const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [
 const IncomePeriodSelector: React.FC<{
   selectedPeriod: 'TOTAL' | 'YTD' | 'LAST_YEAR';
   onPeriodSelect: (period: 'TOTAL' | 'YTD' | 'LAST_YEAR') => void;
-}> = ({ selectedPeriod, onPeriodSelect }) => (
-  <div className="flex justify-end">
+}> = ({ selectedPeriod, onPeriodSelect }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex justify-end">
     <div className="flex space-x-1 rounded-full bg-secondary p-1">
       {periods.map(({ code, label }) => (
         <Button
@@ -57,14 +60,16 @@ const IncomePeriodSelector: React.FC<{
           variant={selectedPeriod === code ? 'default' : 'ghost'}
           onClick={() => onPeriodSelect(code)}
         >
-          {label}
+          {t(label)}
         </Button>
       ))}
     </div>
   </div>
-);
+  );
+};
 
 export default function IncomePage() {
+  const { t } = useTranslation();
   const [selectedPeriod, setSelectedPeriod] = useState<'TOTAL' | 'YTD' | 'LAST_YEAR'>('TOTAL');
 
   const {
@@ -183,10 +188,10 @@ export default function IncomePage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {selectedPeriod === 'TOTAL'
-                  ? 'All Time Income'
+                  ? t('All Time Income')
                   : selectedPeriod === 'LAST_YEAR'
-                    ? 'Last Year Income'
-                    : 'This Year Income'}
+                    ? t('Last Year Income')
+                    : t('This Year Income')}
               </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -209,12 +214,12 @@ export default function IncomePage() {
                           animated={true}
                         />
                         <span className="ml-2 text-xs text-muted-foreground">
-                          Year-over-year growth
+                          {t('Year-over-year growth')}
                         </span>
                       </div>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        Cumulative income since inception
+                        {t('Cumulative income since inception')}
                       </p>
                     )}
                   </div>
@@ -323,12 +328,12 @@ export default function IncomePage() {
               <CardTitle className="text-xl">Income History</CardTitle>
               <CardDescription>
                 {selectedPeriod === 'TOTAL'
-                  ? 'All Time'
+                  ? t('All Time')
                   : selectedPeriod === 'YTD'
-                    ? 'Year to Date'
+                    ? t('Year to Date')
                     : selectedPeriod === 'LAST_YEAR'
-                      ? 'Last Year'
-                      : 'Two Years Ago'}
+                      ? t('Last Year')
+                      : t('Two Years Ago')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -397,9 +402,9 @@ export default function IncomePage() {
                                 <div className="flex flex-1 items-center justify-between">
                                   <span className="text-muted-foreground">
                                     {name === 'income'
-                                      ? 'Monthly Income'
+                                      ? t('Monthly Income')
                                       : name === 'previousIncome'
-                                        ? 'Previous Period'
+                                        ? t('Previous Period')
                                         : name}
                                   </span>
                                   <span className="ml-2 font-mono font-medium tabular-nums text-foreground">

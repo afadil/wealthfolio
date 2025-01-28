@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
@@ -12,6 +13,7 @@ interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
 
 export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
   const location = useLocation();
+  const { t } = useTranslation();
 
   return (
     <nav
@@ -30,7 +32,7 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
             'justify-start',
           )}
         >
-          {item.title}
+          {t("settings." + item.title)}
         </NavLink>
       ))}
     </nav>
