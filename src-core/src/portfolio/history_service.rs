@@ -9,7 +9,7 @@ use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel::sql_types::Text;
 use diesel::SqliteConnection;
-use log::warn;
+use log::{debug,warn};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::default::Default;
@@ -149,10 +149,14 @@ impl HistoryService {
             .map(|(summary, _)| summary.clone())
             .collect();
 
+        debug!("Calculated summaries: {:?}", summaries);
+
         let account_histories: Vec<PortfolioHistory> = summaries_and_histories
             .into_iter()
             .flat_map(|(_, histories)| histories)
             .collect();
+
+        debug!("Calculated histories: {:?}", account_histories);
 
         // If force_full_calculation is true, delete existing history for the accounts and TOTAL
         if force_full_calculation {
@@ -305,7 +309,7 @@ impl HistoryService {
         &self,
         account: &Account,
         account_activities: &HashMap<String, Vec<Activity>>,
-        quotes: &Arc<HashMap<(String, NaiveDate), Quote>>,
+        quotes: &Arc<HashMap<String, Vec<(NaiveDate, Quote)>>>,
         start_dates: &HashMap<String, NaiveDate>,
         last_histories: &HashMap<String, Option<PortfolioHistory>>,
         end_date: NaiveDate,
@@ -452,7 +456,7 @@ impl HistoryService {
         &self,
         account_id: &str,
         activities: &[Activity],
-        quotes: &HashMap<(String, NaiveDate), Quote>,
+        quotes: &Arc<HashMap<String, Vec<(NaiveDate, Quote)>>>,
         start_date: NaiveDate,
         end_date: NaiveDate,
         account_currency: String,
@@ -632,6 +636,7 @@ impl HistoryService {
         book_cost: &mut BigDecimal,
         account_currency: &str,
     ) {
+
         // Get exchange rate if activity currency is different from account currency
         let exchange_rate = BigDecimal::from_f64(
             self.fx_service
@@ -794,7 +799,7 @@ impl HistoryService {
     fn calculate_holdings_value(
         &self,
         holdings: &HashMap<String, BigDecimal>,
-        quotes: &HashMap<(String, NaiveDate), Quote>,
+        quotes: &Arc<HashMap<String, Vec<(NaiveDate, Quote)>>>,
         date: NaiveDate,
         asset_currencies: &HashMap<String, String>,
         account_currency: &str,
@@ -840,13 +845,16 @@ impl HistoryService {
         &self,
         asset_id: &str,
         date: NaiveDate,
-        quotes: &'a HashMap<(String, NaiveDate), Quote>,
+        quotes: &'a Arc<HashMap<String, Vec<(NaiveDate, Quote)>>>,
     ) -> Option<&'a Quote> {
-        quotes.get(&(asset_id.to_string(), date)).or_else(|| {
-            (1..=30).find_map(|days_back| {
-                let lookup_date = date - Duration::days(days_back);
-                quotes.get(&(asset_id.to_string(), lookup_date))
-            })
+
+        quotes
+            .get(asset_id)
+            .and_then(|alt_quotes| {
+                alt_quotes
+                    .iter()
+                    .find(|(quote_date, _)| *quote_date <= date)
+                    .map(|(_, quote)| quote)
         })
     }
 
