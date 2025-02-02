@@ -1,7 +1,7 @@
 use crate::models::{Activity, Asset, ExchangeRate, NewAsset, Quote, QuoteSummary, QuoteUpdate};
 use crate::providers::market_data_factory::MarketDataFactory;
 use crate::providers::market_data_provider::{
-    MarketDataError, MarketDataProvider, MarketDataProviderType,
+    AssetProfiler, MarketDataError, MarketDataProvider,
 };
 use crate::schema::{activities, exchange_rates, quotes};
 use chrono::{Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
@@ -14,15 +14,15 @@ use std::time::SystemTime;
 
 pub struct MarketDataService {
     public_data_provider: Arc<dyn MarketDataProvider>,
-    private_data_provider: Arc<dyn MarketDataProvider>,
+    private_asset_profiler: Arc<dyn AssetProfiler>,
 }
 
 impl MarketDataService {
     pub async fn new() -> Self {
         MarketDataService {
-            public_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Yahoo)
+            public_data_provider: MarketDataFactory::get_public_data_provider()
                 .await,
-            private_data_provider: MarketDataFactory::get_provider(MarketDataProviderType::Manual)
+            private_asset_profiler: MarketDataFactory::get_private_asset_profiler()
                 .await,
         }
     }
@@ -257,12 +257,14 @@ impl MarketDataService {
         Ok(())
     }
 
-    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, String> {
+    pub async fn get_asset_info(&self, symbol: &str) -> Result<NewAsset, String> {
+        // Assume the asset is public and try to get the profile
         match self.public_data_provider.get_symbol_profile(symbol).await {
             Ok(asset) => Ok(asset),
+            // Build a manual asset profile if the public provider fails
             Err(_) => self
-                .private_data_provider
-                .get_symbol_profile(symbol)
+                .private_asset_profiler
+                .get_asset_profile(symbol)
                 .await
                 .map_err(|e| format!("Failed to get symbol profile for {}: {}", symbol, e)),
         }
@@ -463,13 +465,6 @@ impl MarketDataService {
             .await
         {
             Ok(quotes) => Ok(quotes),
-            Err(MarketDataError::NotFound(_)) => {
-                // If not found in public provider, try private provider
-                self.private_data_provider
-                    .get_stock_history(symbol, start_time, end_time)
-                    .await
-                    .map_err(|e| format!("Failed to fetch history for {}: {}", symbol, e))
-            }
             Err(e) => Err(format!("Failed to fetch history for {}: {}", symbol, e)),
         }
     }

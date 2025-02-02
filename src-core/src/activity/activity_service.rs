@@ -86,20 +86,21 @@ impl ActivityService {
         // Get or create the asset profile
         let asset = asset_service.get_or_create_asset(conn, &asset_id).await?;
 
-        println!("asset created: {:?}", asset);
-        let account_currency = account_service
-            .get_account_by_id(conn, &activity.account_id)?
-            .currency;
+        println!("asset created: {:?}\n", asset);
+
+        let account = account_service.get_account_by_id(conn, &activity.account_id).expect("Account not found");
+
+        let account_currency = account.currency;
 
         // Handle the database transaction
         let inserted_activity = self
-            .insert_activity_transation(conn, activity, &asset, &account_currency)
+            .insert_activity_transaction(conn, activity, &asset, &account_currency)
             .await?;
 
         return Ok(inserted_activity);
     }
 
-    async fn insert_activity_transation(
+    async fn insert_activity_transaction(
         &self,
         conn: &mut SqliteConnection,
         mut activity: NewActivity,

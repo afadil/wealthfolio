@@ -191,7 +191,7 @@ impl AssetService {
             Err(diesel::NotFound) => {
                 error!("No asset found in database for asset_id: {}", asset_id);
                 // Symbol not found in database. Try fetching info from market data service.
-                match self.market_data_service.get_symbol_profile(asset_id).await {
+                match self.market_data_service.get_asset_info(asset_id).await {
                     // Info found. Create and return a new asset based on this info.
                     Ok(fetched_profile) => {
                         let inserted_asset = self.insert_new_asset(conn, fetched_profile).await?;
