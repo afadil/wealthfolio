@@ -42,22 +42,31 @@ impl MarketDataService {
             .first::<Quote>(conn)
     }
 
-    pub fn load_quotes(&self, conn: &mut SqliteConnection) -> HashMap<(String, NaiveDate), Quote> {
+    pub fn load_quotes(&self, conn: &mut SqliteConnection) -> HashMap<String, Vec<(NaiveDate, Quote)>> {
         let quotes_result: QueryResult<Vec<Quote>> = quotes::table.load::<Quote>(conn);
 
+        let mut quotes_map: HashMap<String, Vec<(NaiveDate, Quote)>> = HashMap::new();
+
         match quotes_result {
-            Ok(quotes) => quotes
-                .into_iter()
-                .map(|quote| {
+            Ok(quotes) => {
+                for quote in quotes {
                     let quote_date = quote.date.date();
-                    ((quote.symbol.clone(), quote_date), quote)
-                })
-                .collect(),
+                    quotes_map
+                        .entry(quote.symbol.clone())
+                        .or_insert_with(Vec::new)
+                        .push((quote_date, quote));
+                }
+
+                for symbol_quotes in quotes_map.values_mut() {
+                    symbol_quotes.sort_by(|a, b| b.0.cmp(&a.0)); // Sort quote dates in descending order
+                }
+            }
             Err(e) => {
                 error!("Error loading quotes: {}", e);
-                HashMap::new()
             }
         }
+
+        quotes_map
     }
 
     pub async fn sync_asset_quotes(
@@ -155,7 +164,7 @@ impl MarketDataService {
                     close: current_price,
                     adjclose: current_price,
                     volume: 0.0, // Set to 0 since volume isn't meaningful for manual quotes
-                    data_source: "MANUAL".to_string(),
+                    data_source: "CALCULATED".to_string(),
                     created_at: Utc::now().naive_utc(),
                 });
                 date += Duration::days(1);
