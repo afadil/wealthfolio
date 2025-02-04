@@ -1,19 +1,20 @@
-
+use chrono::NaiveDate;
 use wealthfolio_core::account::account_service::AccountService;
-use wealthfolio_core::models::NewAccount;
 use wealthfolio_core::activity::activity_service::ActivityService;
-use wealthfolio_core::models::NewActivity;
+use wealthfolio_core::asset::asset_service::AssetService;
 use wealthfolio_core::market_data::market_data_service::MarketDataService;
-use wealthfolio_core::models::QuoteUpdate;
+use wealthfolio_core::models::{NewAccount, NewActivity, QuoteUpdate};
 use wealthfolio_core::portfolio::portfolio_service::PortfolioService;
 mod common;
 
 #[test]
 fn test_historical_private_asset_portfolio_value(){
 	
+	// Build a distintive DB path for this test
+	let db_path = common::get_test_db_path("test_historical_private_asset_portfolio_value".to_string());
+	
 	// Get a connection to the DB
-	let pool = common::get_db_connection_pool().unwrap();
-	let mut conn = pool.get().unwrap();
+	let mut conn = common::get_db_connection(db_path.clone()).unwrap();
 
 	// Set a base currency
 	let base_currency = "CAD";
@@ -55,7 +56,7 @@ fn test_historical_private_asset_portfolio_value(){
 		.create_activity(&mut conn, activity)).unwrap();
 
 	// Add a manual quote for the private asset, valuing it a month after purchase at $1M
-	let market_data_service = MarketDataService::new();
+	let market_data_service = tokio_test::block_on(MarketDataService::new());
 
 	let quote_update = QuoteUpdate {
 		date: "2024-03-01".to_string(),
@@ -68,7 +69,7 @@ fn test_historical_private_asset_portfolio_value(){
 		data_source: "MANUAL".to_string(),
 	};
 
-	tokio_test::block_on(market_data_service).update_quote(&mut conn, quote_update).unwrap();
+	market_data_service.update_quote(&mut conn, quote_update).unwrap();
 
 	// Calculate the historical portfolio value
 	let portfolio_service = tokio_test::block_on( PortfolioService::new(base_currency.to_string())).unwrap();
@@ -88,4 +89,94 @@ fn test_historical_private_asset_portfolio_value(){
 
 	// Check that the portfolio value is $1M
 	assert_eq!(portfolio_value_on_day.market_value, 1000000.0);
+	
+	// Clean up the database
+	common::delete_db_file(db_path.clone());
+
 }
+
+#[test]
+fn test_manual_quotes(){
+	
+	// Build a distintive DB path for this test
+	let db_path = common::get_test_db_path("test_manual_quotes".to_string());
+	
+	// Get a connection to the DB
+	let mut conn = common::get_db_connection(db_path.clone()).unwrap();
+
+	// Set a base currency
+	let base_currency = "CAD";
+	let account_service = AccountService::new(base_currency.to_string());
+
+	// Create a new account
+	let account =  NewAccount {
+		id: Some("RealEstate".to_string()),
+		name: "Real Estate".to_string(),
+		account_type: "CASH".to_string(),
+		group: None,
+		currency: base_currency.to_string(),
+		is_default: false,
+		is_active: true,
+		platform_id: None,
+	};
+	
+	let account = tokio_test::block_on(account_service.
+		create_account(&mut conn, account)).unwrap();
+
+	// Create a new activity for a new private asset with a value of $900K
+	let activity_service = ActivityService::new(base_currency.to_string());
+
+	let activity =  NewActivity {
+		id: None,
+		account_id: account.id.clone(),
+		asset_id: "Condo".to_string(),
+		activity_type: "BUY".to_string(),
+		activity_date: chrono::DateTime::parse_from_rfc3339("2024-02-01T00:00:00Z").unwrap().to_string(),
+		quantity: 1.0,
+		unit_price: 900000.0,
+		currency: base_currency.to_string(),
+		fee: 0.0,
+		is_draft: false,
+		comment: Some("New condo purchase".to_string()),
+	};
+
+	tokio_test::block_on(activity_service
+		.create_activity(&mut conn, activity)).unwrap();
+
+	// Add a manual quote for the private asset, valuing it a month after purchase at $1M
+	let market_data_service = tokio_test::block_on(MarketDataService::new());
+
+	let quote_update = QuoteUpdate {
+		date: "2024-03-01".to_string(),
+		symbol: "Condo".to_string(),
+		open: 1000000.0,
+		high: 1000000.0,
+		low: 1000000.0,
+		volume: 1.0,
+		close: 1000000.0,
+		data_source: "MANUAL".to_string(),
+	};
+
+	market_data_service.update_quote(&mut conn, quote_update).unwrap();
+
+	let asset_service = tokio_test::block_on(AssetService::new());
+	let asset_list = asset_service.get_assets(&mut conn).unwrap();
+
+	tokio_test::block_on(market_data_service.sync_asset_quotes(&mut conn, &asset_list)).unwrap();
+
+	let asset_profile = asset_service.get_asset_data(&mut conn, "Condo").unwrap();
+	
+	let quote_date = NaiveDate::parse_from_str(
+		"2024-03-01",
+		"%Y-%m-%d"
+	).unwrap();
+
+	let quote = asset_profile.quote_history.iter().find(|x| x.date.date() == quote_date).unwrap();
+
+	// Check that the we found is the one we added above $1M
+	assert_eq!(quote.close, 1000000.0);
+
+	// Clean up the database
+	common::delete_db_file(db_path.clone());
+}
+
