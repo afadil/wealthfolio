@@ -147,26 +147,52 @@ impl MarketDataService {
             .collect();
         activity_changes.push((today, activity_changes.last().unwrap().1));
 
+        // Load manual quotes for the asset, which can override activity prices
+        let mut manual_quotes = quotes::table
+            .filter(quotes::symbol.eq(asset.symbol.as_str()))
+            .filter(quotes::data_source.eq("MANUAL"))
+            .order(quotes::date.asc())
+            .load::<Quote>(conn)
+            .map_err(|e| format!("Failed to load manual quotes for {}: {}", asset.symbol, e))?;
+
+        // Pop the next manual quote from the list for checking against activity dates and prices
+        let mut next_manual_quote = manual_quotes.pop();
+
         // Generate quotes for each day between activities
         for window in activity_changes.windows(2) {
-            let (current_date, current_price) = window[0];
+            let (current_date, mut current_price) = window[0];
             let next_date = window[1].0;
             let mut date = current_date;
 
             while date <= next_date {
-                quotes.push(Quote {
-                    id: format!("{}_{}", date.format("%Y%m%d"), asset.symbol),
-                    symbol: asset.symbol.clone(),
-                    date: date.and_hms_opt(2, 0, 0).unwrap(),
-                    open: current_price,
-                    high: current_price,
-                    low: current_price,
-                    close: current_price,
-                    adjclose: current_price,
-                    volume: 0.0, // Set to 0 since volume isn't meaningful for manual quotes
-                    data_source: "CALCULATED".to_string(),
-                    created_at: Utc::now().naive_utc(),
-                });
+                // Check if we have a manual quote for this date, and if so:
+                // 1. Don't add another quote
+                // 2. Update the current price for future quotes in this window
+                // 3. Pop the next manual quote
+                match next_manual_quote {
+                    Some(quote) if quote.date.date() == date => {
+                        quotes.push(quote.clone());
+                        current_price = quote.close;
+                        next_manual_quote = manual_quotes.pop();
+                    }
+                    // Otherwise, fabricate a quote based on the current price
+                    _ => {
+                        quotes.push(Quote {
+                            id: format!("{}_{}", date.format("%Y%m%d"), asset.symbol),
+                            symbol: asset.symbol.clone(),
+                            date: date.and_hms_opt(2, 0, 0).unwrap(),
+                            open: current_price,
+                            high: current_price,
+                            low: current_price,
+                            close: current_price,
+                            adjclose: current_price,
+                            volume: 0.0, // Set to 0 since volume isn't meaningful for manual quotes
+                            data_source: "CALCULATED".to_string(),
+                            created_at: Utc::now().naive_utc(),
+                        });
+                    }
+                }
+                // Move to the next date
                 date += Duration::days(1);
             }
         }
