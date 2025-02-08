@@ -10,8 +10,10 @@ import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { AddExchangeRateForm } from './add-exchange-rate-form';
 import { Icons } from '@/components/icons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
 
 export function ExchangeRatesSettings() {
+  const { t } = useTranslation();
   const { exchangeRates, isLoadingRates, updateExchangeRate, addExchangeRate, deleteExchangeRate } =
     useExchangeRates();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -62,16 +64,16 @@ export function ExchangeRatesSettings() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Exchange Rates</CardTitle>
+            <CardTitle className="text-lg">{t('Exchange Rates')}</CardTitle>
             <CardDescription>
-              Manage exchange rates for currencies in your portfolio.
+              {t('Manage exchange rates for currencies in your portfolio.')}
             </CardDescription>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Icons.PlusCircle className="mr-2 h-4 w-4" />
-                Add rate
+                {t('Add rate')}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -98,11 +100,11 @@ export function ExchangeRatesSettings() {
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <Icons.DollarSign className="h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">No exchange rates defined yet</h3>
+            <h3 className="mt-4 text-lg font-semibold">{t('No exchange rates defined yet')}</h3>
 
             <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>
               <Icons.PlusCircle className="mr-2 h-4 w-4" />
-              Add rate
+              {t('Add rate')}
             </Button>
           </div>
         )}

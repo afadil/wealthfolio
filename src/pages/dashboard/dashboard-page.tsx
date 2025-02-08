@@ -18,6 +18,7 @@ import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyToggle } from '@/components/privacy-toggle';
+import { useTranslation } from 'react-i18next';
 
 function DashboardSkeleton() {
   return (
@@ -35,10 +36,11 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
   const updatePortfolioMutation = useCalculateHistoryMutation({
-    successTitle: 'Portfolio recalculated successfully',
-    errorTitle: 'Failed to recalculate portfolio',
+    successTitle: t('Portfolio recalculated successfully'),
+    errorTitle: t('Failed to recalculate portfolio'),
   });
 
   const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
@@ -124,7 +126,7 @@ export default function DashboardPage() {
                 ) : (
                   <Icons.Refresh className="mr-2 h-4 w-4" />
                 )}
-                {updatePortfolioMutation.isPending ? 'Updating portfolio...' : 'Update Portfolio'}
+                {updatePortfolioMutation.isPending ? t('Updating portfolio...') : t('Update Portfolio')}
               </Button>
             </div>
           </HoverCardContent>

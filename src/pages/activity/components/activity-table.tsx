@@ -29,6 +29,7 @@ import {
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
+import { useTranslation } from 'react-i18next';
 
 const fetchSize = 25;
 
@@ -58,6 +59,7 @@ export const ActivityTable = ({
   handleEdit: (activity?: ActivityDetails) => void;
   handleDelete: (activity: ActivityDetails) => void;
 }) => {
+  const { t } = useTranslation();
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -428,7 +430,7 @@ export const ActivityTable = ({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No activity found.
+                  {t('No activity found.')}
                 </TableCell>
               </TableRow>
             )}

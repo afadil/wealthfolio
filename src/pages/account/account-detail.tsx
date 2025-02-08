@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatPercent } from '@/lib/utils';
 import { PortfolioHistory } from '@/lib/types';
 import { PrivacyAmount } from '@/components/privacy-amount';
+import { useTranslation } from 'react-i18next';
 
 interface AccountDetailProps {
   data?: PortfolioHistory;
@@ -31,6 +32,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
     allocationPercentage,
     currency,
   } = data;
+  const { t } = useTranslation();
 
   const rows = [
     { label: 'Investments', value: <PrivacyAmount value={marketValue} currency={currency} /> },
@@ -73,7 +75,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
         <div className="space-y-4 text-sm">
           {rows.map(({ label, value, color }, idx) => (
             <div key={idx} className="flex justify-between">
-              <span className="text-muted-foreground">{label}</span>
+              <span className="text-muted-foreground">{t(label)}</span>
               <span className={`font-medium ${color || ''}`}>{value}</span>
             </div>
           ))}

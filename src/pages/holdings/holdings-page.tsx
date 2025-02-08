@@ -19,10 +19,12 @@ import { QueryKeys } from '@/lib/query-keys';
 import { useLocation } from 'react-router-dom';
 import { CountryChart } from './components/country-chart';
 import { CashHoldingsWidget } from './components/cash-holdings-widget';
+import { useTranslation } from 'react-i18next';
 
 const PORTFOLIO_ACCOUNT_ID = 'PORTFOLIO';
 
 export const HoldingsPage = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = queryParams.get('tab') || 'overview';
@@ -52,13 +54,13 @@ export const HoldingsPage = () => {
                   className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
                   value="overview"
                 >
-                  Analytics
+                  {t('Analytics')}
                 </TabsTrigger>
                 <TabsTrigger
                   className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
                   value="holdings"
                 >
-                  Positions
+                  {t('Positions')}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -73,7 +75,7 @@ export const HoldingsPage = () => {
           <div className="grid grid-cols-12 gap-4">
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">By Class</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('By Class')}</CardTitle>
                 <Icons.DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -90,7 +92,7 @@ export const HoldingsPage = () => {
             </Card>
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">By Currency</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('By Currency')}</CardTitle>
                 <Icons.WalletCards className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent className="p-0">
@@ -111,7 +113,7 @@ export const HoldingsPage = () => {
             </Card>
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">By Country</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('By Country')}</CardTitle>
                 <Icons.Globe className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent className="w-full">
@@ -141,7 +143,7 @@ export const HoldingsPage = () => {
             </div>
             <Card className="col-span-12 lg:col-span-4">
               <CardHeader>
-                <CardTitle className="text-md font-medium">By Sector</CardTitle>
+                <CardTitle className="text-md font-medium">{t('By Sector')}</CardTitle>
               </CardHeader>
               <CardContent className="w-full">
                 {holdings && holdings.length > 0 ? (

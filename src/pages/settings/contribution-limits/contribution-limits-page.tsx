@@ -13,8 +13,10 @@ import { useContributionLimitMutations } from './useContributionLimitMutations';
 import { ContributionLimitItem } from './components/contribution-limit-item';
 import { ContributionLimitEditModal } from './components/contribution-limit-edit-modal';
 import { useAccounts } from '@/pages/account/useAccounts';
+import { useTranslation } from 'react-i18next';
 
 const SettingsContributionLimitPage = () => {
+  const { t } = useTranslation();
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedLimit, setSelectedLimit] = useState<ContributionLimit | null>(null);
   const [showPreviousYears, setShowPreviousYears] = useState(false);
@@ -61,13 +63,13 @@ const SettingsContributionLimitPage = () => {
         <SettingsHeader heading="Contribution Limits" text="Manage your contribution limits.">
           <Button onClick={() => handleAddLimit()}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add limit
+            {t('Add limit')}
           </Button>
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">
           <h2 className="text-md mb-3 font-semibold text-muted-foreground">
-            Current Year ({currentYear})
+            {t('Current Year')} ({currentYear})
           </h2>
           {currentYearLimits.length ? (
             <>
@@ -85,15 +87,14 @@ const SettingsContributionLimitPage = () => {
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="CircleGauge" />
               <EmptyPlaceholder.Title>
-                No contribution limits for {currentYear}!
+                {t('No contribution limits for')} {currentYear}!
               </EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any contribution limits for the current year. Start adding your
-                contribution limits.
+                {t('You don&apos;t have any contribution limits for the current year. Start adding your contribution limits.')}
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddLimit()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
-                Add a contribution limit
+                {t('Add a contribution limit')}
               </Button>
             </EmptyPlaceholder>
           )}

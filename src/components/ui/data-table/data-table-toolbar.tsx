@@ -12,6 +12,7 @@ import {
 import { DataTableFacetedFilter } from './data-table-faceted-filter';
 import type { DataTableFacetedFilterProps } from './data-table-faceted-filter';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ColumnMeta {
   label?: string;
@@ -28,6 +29,7 @@ export function DataTableToolbar<TData>({
   searchBy,
   filters,
 }: DataTableToolbarProps<TData>) {
+  const { t } = useTranslation();
   const isFiltered = table.getState().columnFilters.length > 0 || table.getState().globalFilter;
   const hideableColumns = table.getAllColumns().filter((column) => column.getCanHide());
 
@@ -60,7 +62,7 @@ export function DataTableToolbar<TData>({
             }}
             className="h-8 px-2 lg:px-3"
           >
-            Reset
+            {t('Reset')}
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         )}

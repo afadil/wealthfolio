@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Icons } from '@/components/icons';
 import { ExportDataType, ExportedFileFormat } from '@/lib/types';
 import { useExportData } from './useExportData';
+import { useTranslation } from 'react-i18next';
 
 const dataFormats = [
   {
@@ -104,10 +105,12 @@ export const ExportForm = () => {
     });
   };
 
+  const { t } = useTranslation();
+
   return (
     <>
       <div className="mt-8 px-2">
-        <h3 className="pb-3 pt-5 font-semibold">Choose Your Preferred Format</h3>
+        <h3 className="pb-3 pt-5 font-semibold">{t('settings.' + 'Choose Your Preferred Format')}</h3>
         <RadioGroup
           onValueChange={setSelectedFormat}
           className="grid grid-cols-1 gap-4 md:grid-cols-3"
@@ -122,7 +125,7 @@ export const ExportForm = () => {
                 <format.icon className="mb-3 h-6 w-6" />
                 <div className="text-center">
                   <h3 className="font-semibold">{format.name}</h3>
-                  <p className="text-sm font-light text-muted-foreground">{format.description}</p>
+                  <p className="text-sm font-light text-muted-foreground">{t(format.description)}</p>
                 </div>
               </Label>
             </div>
@@ -132,15 +135,15 @@ export const ExportForm = () => {
 
       {selectedFormat && (
         <div className="px-2 pt-4">
-          <h3 className="pb-3 pt-5 font-semibold">Customize Your Export</h3>
+          <h3 className="pb-3 pt-5 font-semibold">{t('Customize Your Export')}</h3>
           {dataTypes[selectedFormat as keyof typeof dataTypes].map((item) => (
             <Card key={item.key} className="mb-4">
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center">
                   <item.icon className="mr-2 h-5 w-5" />
                   <div>
-                    <span className="font-medium">{item.name}</span>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                    <span className="font-medium">{t(item.name)}</span>
+                    <p className="text-sm text-muted-foreground">{t(item.description)}</p>
                   </div>
                 </div>
                 <Button

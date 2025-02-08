@@ -12,8 +12,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
 import { useAccountMutations } from './components/useAccountMutations';
+import { useTranslation } from 'react-i18next';
 
 const SettingsAccountsPage = () => {
+  const { t } = useTranslation();
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
@@ -50,10 +52,10 @@ const SettingsAccountsPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <SettingsHeader heading="Accounts" text=" Manage your investment and saving accounts.">
+        <SettingsHeader heading="Accounts" text="Manage your investment and saving accounts.">
           <Button onClick={() => handleAddAccount()}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add account
+            {t('Add account')}
           </Button>
         </SettingsHeader>
         <Separator />

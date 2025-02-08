@@ -40,6 +40,7 @@ const accountTypes = [
 
 import { newAccountSchema } from '@/lib/schemas';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { useTranslation } from 'react-i18next';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -49,6 +50,7 @@ interface AccountFormlProps {
 }
 
 export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountFormlProps) {
+  const { t } = useTranslation();
   const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
   const form = useForm<NewAccount>({
@@ -68,11 +70,11 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle> {defaultValues?.id ? 'Update Account' : 'Add Account'}</DialogTitle>
+          <DialogTitle> {defaultValues?.id ? t('Update Account') : t('Add Account')}</DialogTitle>
           <DialogDescription>
             {defaultValues?.id
-              ? 'Update account information'
-              : ' Add an investment account to track.'}
+              ? t('Update account information')
+              : t(' Add an investment account to track.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -83,9 +85,9 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Account Name</FormLabel>
+                <FormLabel>{t('Account Name')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="Account display name" {...field} />
+                  <Input placeholder={t("Account display name")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -96,9 +98,9 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
             name="group"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Account Group</FormLabel>
+                <FormLabel>{t('Account Group')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="Retirement, 401K, RRSP, TFSA,..." {...field} />
+                  <Input placeholder={t("Retirement, 401K, RRSP, TFSA,...")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -110,17 +112,17 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
             name="accountType"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Account Type</FormLabel>
+                <FormLabel>{t('Account Type')}</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select an account type" />
+                      <SelectValue placeholder={t("Select an account type")} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {accountTypes.map((type) => (
                       <SelectItem value={type.value} key={type.value}>
-                        {type.label}
+                        {t(type.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -135,7 +137,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               name="currency"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Currency</FormLabel>
+                  <FormLabel>{t('Currency')}</FormLabel>
                   <FormControl>
                     <CurrencyInput
                       value={field.value}
@@ -156,7 +158,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="space-y-0 pl-2"> Default Account</FormLabel>
+                <FormLabel className="space-y-0 pl-2"> {t('Default Account')}</FormLabel>
                 <FormMessage />
               </FormItem>
             )}
@@ -169,7 +171,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="space-y-0 pl-2"> Is Active</FormLabel>
+                <FormLabel className="space-y-0 pl-2"> {t('Is Active')}</FormLabel>
                 <FormMessage />
               </FormItem>
             )}
@@ -177,12 +179,12 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
         </div>
         <DialogFooter>
           <DialogTrigger asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">{t('Cancel')}</Button>
           </DialogTrigger>
           <Button type="submit">
             <Icons.Plus className="h-4 w-4" />
             <span className="hidden sm:ml-2 sm:inline">
-              {defaultValues?.id ? 'Update Account' : 'Add Account'}
+              {defaultValues?.id ? t('Update Account') : t('Add Account')}
             </span>
           </Button>
         </DialogFooter>

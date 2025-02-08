@@ -5,14 +5,16 @@ import { Settings } from './types';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { QueryKeys } from './query-keys';
 import { logger } from '@/adapters';
+import { useTranslation } from 'react-i18next';
 export function useSettingsMutation(
   setSettings: React.Dispatch<React.SetStateAction<Settings | null>>,
   applySettingsToDocument: (newSettings: Settings) => void,
   currentSettings: Settings | null,
 ) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Base currency updated successfully.',
+    successTitle: t('Base currency updated successfully.'),
   });
 
   return useMutation({
@@ -22,7 +24,7 @@ export function useSettingsMutation(
       applySettingsToDocument(updatedSettings);
       queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
       toast({
-        title: 'Settings updated successfully.',
+        title: t('Settings updated successfully.'),
         variant: 'success',
       });
       if (currentSettings?.baseCurrency !== updatedSettings.baseCurrency) {
@@ -35,8 +37,8 @@ export function useSettingsMutation(
     onError: (error) => {
       logger.error(`Error updating settings: ${error}`);
       toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem updating your settings.',
+        title: t('Uh oh! Something went wrong.'),
+        description: t('There was a problem updating your settings.'),
         variant: 'destructive',
       });
     },

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { Icons } from '@/components/icons';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -22,8 +23,9 @@ export function DataTableColumnHeader<TData, TValue>({
   title,
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
+  const { t } = useTranslation();
   if (!column.getCanSort()) {
-    return <div className={cn(className)}>{title}</div>;
+    return <div className={cn(className)}>{t(title)}</div>;
   }
 
   return (
@@ -31,7 +33,7 @@ export function DataTableColumnHeader<TData, TValue>({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="-ml-3 h-8 data-[state=open]:bg-accent">
-            <span>{title}</span>
+            <span>{t(title)}</span>
             {column.getIsSorted() === 'desc' ? (
               <Icons.ArrowDown className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === 'asc' ? (

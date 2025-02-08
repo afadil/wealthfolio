@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 const exchangeRateSchema = z.object({
   fromCurrency: z.string().min(1, 'From Currency is required'),
@@ -49,6 +50,7 @@ interface AddExchangeRateFormProps {
 }
 
 export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormProps) {
+  const { t } = useTranslation();
   const form = useForm<ExchangeRateFormData>({
     resolver: zodResolver(exchangeRateSchema),
     defaultValues: {
@@ -86,7 +88,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
         name={fieldName}
         render={({ field }) => (
           <FormItem className="flex flex-col">
-            <FormLabel>{fieldName === 'fromCurrency' ? 'From Currency' : 'To Currency'}</FormLabel>
+            <FormLabel>{fieldName === 'fromCurrency' ? t('From Currency') : t('To Currency')}</FormLabel>
             <Popover modal={true}>
               <PopoverTrigger asChild>
                 <FormControl>
@@ -170,8 +172,8 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle>Add Exchange Rate</DialogTitle>
-          <DialogDescription>Add a new exchange rate to the system.</DialogDescription>
+          <DialogTitle>{t('Add Exchange Rate')}</DialogTitle>
+          <DialogDescription>{t('Add a new exchange rate to the system.')}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-10 p-4">
@@ -183,7 +185,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
             name="rate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Exchange Rate</FormLabel>
+                <FormLabel>{t('Exchange Rate')}</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -202,12 +204,12 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
         <DialogFooter>
           <DialogTrigger asChild>
             <Button variant="outline" onClick={onCancel}>
-              Cancel
+              {t('Cancel')}
             </Button>
           </DialogTrigger>
           <Button type="submit">
             <Icons.Plus className="h-4 w-4" />
-            <span className="hidden sm:ml-2 sm:inline">Add Exchange Rate</span>
+            <span className="hidden sm:ml-2 sm:inline">{t('Add Exchange Rate')}</span>
           </Button>
         </DialogFooter>
       </form>

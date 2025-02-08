@@ -17,6 +17,7 @@ import { getAccounts } from '@/commands/account';
 import { getActivities } from '@/commands/activity';
 import { getGoals } from '@/commands/goal';
 import { getHistory } from '@/commands/portfolio';
+import { useTranslation } from 'react-i18next';
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -24,6 +25,7 @@ interface ExportParams {
 }
 
 export function useExportData() {
+  const { t } = useTranslation();
   const { refetch: fetchAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
@@ -86,14 +88,14 @@ export function useExportData() {
     },
     onSuccess: () => {
       toast({
-        title: 'File saved successfully.',
+        title: t('File saved successfully.'),
         variant: 'success',
       });
     },
     onError: (e) => {
       logger.error(`Error while exporting: ${e}`);
       toast({
-        title: 'Something went wrong.',
+        title: t('Something went wrong.'),
         variant: 'destructive',
       });
     },

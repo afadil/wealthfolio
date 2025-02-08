@@ -2,6 +2,7 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 import { Icons } from '@/components/icons';
+import { useTranslation } from 'react-i18next';
 
 interface EmptyPlaceholderProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
@@ -17,6 +18,7 @@ export function EmptyPlaceholder({
   description,
   ...props
 }: EmptyPlaceholderProps) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -31,8 +33,8 @@ export function EmptyPlaceholder({
             {icon}
           </div>
         )}
-        {title && <EmptyPlaceholder.Title>{title}</EmptyPlaceholder.Title>}
-        {description && <EmptyPlaceholder.Description>{description}</EmptyPlaceholder.Description>}
+        {title && <EmptyPlaceholder.Title>{t(title)}</EmptyPlaceholder.Title>}
+        {description && <EmptyPlaceholder.Description>{t(description)}</EmptyPlaceholder.Description>}
         {children}
       </div>
     </div>

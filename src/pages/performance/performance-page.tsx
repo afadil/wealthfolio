@@ -20,6 +20,7 @@ import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { ReturnMethod, usePerformanceData } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
+import { useTranslation } from 'react-i18next';
 
 const PORTFOLIO_TOTAL: ComparisonItem = {
   id: 'TOTAL',
@@ -64,6 +65,7 @@ function PerformanceContent({
 }
 
 export default function PerformancePage() {
+  const { t } = useTranslation();
   const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subMonths(new Date(), 12),
@@ -148,7 +150,7 @@ export default function PerformancePage() {
                 }
               }}
             >
-              {item.name}
+              {t(item.name)}
               <X className="ml-2 h-4 w-4" />
             </Button>
           ))}
@@ -159,8 +161,8 @@ export default function PerformancePage() {
           <CardHeader className="flex flex-col space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-xl">Cumulative Returns</CardTitle>
-                <CardDescription>Compare account performance over time</CardDescription>
+                <CardTitle className="text-xl">{t('Cumulative Returns')}</CardTitle>
+                <CardDescription>{t('Compare account performance over time')}</CardDescription>
               </div>
               <ReturnMethodSelector
                 selectedMethod={returnMethod}
@@ -201,25 +203,28 @@ function PerformanceDashboardSkeleton() {
 const ReturnMethodSelector: React.FC<{
   selectedMethod: ReturnMethod;
   onMethodSelect: (method: ReturnMethod) => void;
-}> = ({ selectedMethod, onMethodSelect }) => (
-  <div className="flex justify-end">
-    <div className="flex space-x-1 rounded-full bg-secondary p-1">
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedMethod === 'TWR' ? 'default' : 'ghost'}
-        onClick={() => onMethodSelect('TWR')}
-      >
-        Time-Weighted
-      </Button>
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedMethod === 'MWR' ? 'default' : 'ghost'}
-        onClick={() => onMethodSelect('MWR')}
-      >
-        Money-Weighted
-      </Button>
+}> = ({ selectedMethod, onMethodSelect }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex justify-end">
+      <div className="flex space-x-1 rounded-full bg-secondary p-1">
+        <Button
+          size="sm"
+          className="h-8 rounded-full px-2 text-xs"
+          variant={selectedMethod === 'TWR' ? 'default' : 'ghost'}
+          onClick={() => onMethodSelect('TWR')}
+        >
+          {t('Time-Weighted')}
+        </Button>
+        <Button
+          size="sm"
+          className="h-8 rounded-full px-2 text-xs"
+          variant={selectedMethod === 'MWR' ? 'default' : 'ghost'}
+          onClick={() => onMethodSelect('MWR')}
+        >
+          {t('Money-Weighted')}
+        </Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
