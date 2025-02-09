@@ -8,14 +8,13 @@ use bigdecimal::BigDecimal;
 use chrono::{Duration, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
-use log::info;
+use log::warn;
 use num_traits::{FromPrimitive, ToPrimitive};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::default::Default;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Instant;
 
 pub struct HistoryService {
     base_currency: String,
@@ -125,8 +124,7 @@ impl HistoryService {
         // Parallel calculations without database access
         let summaries_and_histories: Vec<_> = if accounts.len() > 10 {
             accounts.par_iter().map(|account| {
-                let account_calc_start = Instant::now();
-                    let result = self.calculate_account_history(
+                let result = self.calculate_account_history(
                         account,
                         &account_activities,
                         &quotes,
@@ -136,11 +134,6 @@ impl HistoryService {
                         &account_currencies,
                         &asset_currencies,
                 );
-                    info!(
-                        "Calculating history for account {} took {:?}",
-                        account.id,
-                        account_calc_start.elapsed()
-                    );
                     result
             }).collect()
         } else {
@@ -281,16 +274,13 @@ impl HistoryService {
         account_currencies: &HashMap<String, String>,
         asset_currencies: &HashMap<String, String>,
     ) -> (HistorySummary, Vec<PortfolioHistory>) {
-        let start_time = Instant::now();
-        info!("Starting history calculation for account {}", account.id);
-
         let activities = account_activities
             .get(&account.id)
             .cloned()
             .unwrap_or_default();
 
         if activities.is_empty() {
-            info!("No activities found for account {}, returning empty history", account.id);
+            warn!("No activities found for account {}, returning empty history", account.id);
             return self.create_empty_summary_and_history(&account.id);
         }
 
@@ -301,7 +291,6 @@ impl HistoryService {
             .unwrap_or_else(|| account.currency.clone());
         let last_history = last_histories.get(&account.id).cloned().unwrap_or(None);
 
-        let calc_start = Instant::now();
         let new_history = self.calculate_historical_value(
             &account.id,
             &activities,
@@ -312,18 +301,10 @@ impl HistoryService {
             asset_currencies,
             last_history,
         );
-        info!(
-            "Calculating historical value for account {} took {:?}",
-            account.id,
-            calc_start.elapsed()
-        );
+     
 
         let summary = self.create_summary(&account.id, &new_history);
-        info!(
-            "Total history calculation for account {} took {:?}",
-            account.id,
-            start_time.elapsed()
-        );
+       
 
         (summary, new_history)
     }
