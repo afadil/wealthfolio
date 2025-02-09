@@ -7,7 +7,7 @@ use tauri::State;
 #[tauri::command]
 pub async fn get_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, String> {
     debug!("Fetching active accounts...");
-    let base_currency = state.base_currency.read().unwrap().clone();
+    let base_currency = state.get_base_currency();
     let service = AccountService::new(base_currency);
     let mut conn = state
         .pool
@@ -28,7 +28,7 @@ pub async fn create_account(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
+    let base_currency = state.get_base_currency();
     let service = AccountService::new(base_currency);
     service
         .create_account(&mut conn, account)
@@ -46,7 +46,7 @@ pub async fn update_account(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
+    let base_currency = state.get_base_currency();
     let service = AccountService::new(base_currency);
     service
         .update_account(&mut conn, account)
@@ -59,7 +59,7 @@ pub async fn delete_account(
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
     debug!("Deleting account...");
-    let base_currency = state.base_currency.read().unwrap().clone();
+    let base_currency = state.get_base_currency();
     let service = AccountService::new(base_currency);
     let mut conn = state
         .pool

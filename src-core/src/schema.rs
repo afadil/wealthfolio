@@ -88,18 +88,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    exchange_rates (id) {
-        id -> Text,
-        from_currency -> Text,
-        to_currency -> Text,
-        rate -> Double,
-        source -> Text,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     goals (id) {
         id -> Text,
         title -> Text,
@@ -179,7 +167,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     app_settings,
     assets,
     contribution_limits,
-    exchange_rates,
     goals,
     goals_allocation,
     platforms,

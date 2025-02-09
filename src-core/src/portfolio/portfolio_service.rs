@@ -3,12 +3,12 @@ use crate::activity::activity_service::ActivityService;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{
-    AccountSummary, CumulativeReturn, CumulativeReturns, HistorySummary, Holding, IncomeSummary,
-    PortfolioHistory,
+    AccountSummary, CumulativeReturn, CumulativeReturns, HistorySummary, Holding, IncomeSummary, PortfolioHistory
 };
+use crate::errors::{Error, Result, ValidationError};
 
 use diesel::prelude::*;
-use log::debug;
+use log::info;
 
 use std::sync::Arc;
 
@@ -33,38 +33,48 @@ impl Default for ReturnMethod {
 }
 
 pub struct PortfolioService {
-    account_service: AccountService,
-    activity_service: ActivityService,
+    account_service: Arc<AccountService>,
+    activity_service: Arc<ActivityService>,
     market_data_service: Arc<MarketDataService>,
-    income_service: IncomeService,
-    holdings_service: HoldingsService,
-    history_service: HistoryService,
+    income_service: Arc<IncomeService>,
+    holdings_service: Arc<HoldingsService>,
+    history_service: Arc<HistoryService>,
 }
 
 impl PortfolioService {
-    pub async fn new(base_currency: String) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(base_currency: String) -> Result<Self> {
+        // Initialize services that require async initialization first
         let market_data_service = Arc::new(MarketDataService::new().await);
+        let activity_service = Arc::new(ActivityService::new(base_currency.clone()).await);
+        let holdings_service = Arc::new(HoldingsService::new(base_currency.clone()).await?);
 
-        Ok(PortfolioService {
-            account_service: AccountService::new(base_currency.clone()),
-            activity_service: ActivityService::new(base_currency.clone()),
-            market_data_service: market_data_service.clone(),
-            income_service: IncomeService::new(
-                CurrencyExchangeService::new(),
-                base_currency.clone(),
-            ),
-            holdings_service: HoldingsService::new(base_currency.clone()).await,
-            history_service: HistoryService::new(base_currency.clone(), market_data_service),
+        // Initialize synchronous services
+        let account_service = Arc::new(AccountService::new(base_currency.clone()));
+        let income_service = Arc::new(IncomeService::new(
+            Arc::new(CurrencyExchangeService::new()),
+            base_currency.clone(),
+        ));
+        let history_service = Arc::new(HistoryService::new(
+            base_currency,
+            CurrencyExchangeService::new(),
+            market_data_service.clone(),
+        ));
+
+        Ok(Self {
+            account_service,
+            activity_service,
+            market_data_service,
+            income_service,
+            holdings_service,
+            history_service,
         })
     }
 
     pub async fn compute_holdings(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<Vec<Holding>, Box<dyn std::error::Error>> {
-        self.holdings_service
-            .compute_holdings(conn)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    ) -> Result<Vec<Holding>> {
+        self.holdings_service.compute_holdings(conn).await
     }
 
     pub async fn calculate_historical_data(
@@ -72,9 +82,12 @@ impl PortfolioService {
         conn: &mut SqliteConnection,
         account_ids: Option<Vec<String>>,
         force_full_calculation: bool,
-    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<HistorySummary>> {
         // First, sync quotes
-        self.market_data_service.sync_exchange_rates(conn).await?;
+        self.market_data_service
+            .initialize_and_sync_quotes(conn)
+            .await
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
 
         let accounts = match &account_ids {
             Some(ids) => self.account_service.get_accounts_by_ids(conn, ids)?,
@@ -88,42 +101,31 @@ impl PortfolioService {
             None => self.activity_service.get_activities(conn)?,
         };
 
-        let results = conn.transaction(|conn| {
-            self.history_service.calculate_historical_data(
-                conn,
-                &accounts,
-                &activities,
-                force_full_calculation,
-            )
-        })?;
-
-        Ok(results)
+        self.history_service
+            .calculate_historical_data(conn, &accounts, &activities, force_full_calculation)
+            .await
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
     }
 
     pub fn get_income_summary(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<Vec<IncomeSummary>, diesel::result::Error> {
-        self.income_service.get_income_summary(conn)
+    ) -> Result<Vec<IncomeSummary>> {
+        self.income_service.get_income_summary(conn).map_err(Error::from)
     }
 
     pub async fn update_portfolio(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<Vec<HistorySummary>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<HistorySummary>> {
         use std::time::Instant;
         let start = Instant::now();
 
-        // First, sync quotes
-        self.market_data_service
-            .initialize_and_sync_quotes(conn)
-            .await?;
-
-        // Then, calculate historical data
+        // Calculate historical data with specified performance mode
         let result = self.calculate_historical_data(conn, None, false).await;
 
         let duration = start.elapsed();
-        debug!(
+        info!(
             "update_portfolio completed in: {:?} seconds",
             duration.as_secs_f64()
         );
@@ -134,41 +136,35 @@ impl PortfolioService {
     pub fn get_all_accounts_history(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PortfolioHistory>> {
         self.history_service
             .get_all_accounts_history(conn)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
     }
 
     pub fn get_portfolio_history(
         &self,
         conn: &mut SqliteConnection,
         account_id: Option<&str>,
-    ) -> Result<Vec<PortfolioHistory>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PortfolioHistory>> {
         self.history_service
             .get_portfolio_history(conn, account_id)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>) // Convert PortfolioError to Box<dyn std::error::Error>
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
     }
 
     pub fn get_accounts_summary(
         &self,
         conn: &mut SqliteConnection,
-    ) -> Result<Vec<AccountSummary>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<AccountSummary>> {
         let accounts = self.account_service.get_active_accounts(conn)?;
         let mut account_summaries = Vec::new();
 
         // First, get the total portfolio value
-        let total_portfolio_value = if let Ok(total_history) = self
+        let total_portfolio_value = self
             .history_service
             .get_latest_account_history(conn, "TOTAL")
-        {
-            total_history.market_value
-        } else {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Total portfolio history not found",
-            )));
-        };
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?
+            .market_value;
 
         // Then, calculate the allocation percentage for each account
         for account in accounts {
@@ -202,10 +198,11 @@ impl PortfolioService {
         start_date: NaiveDate,
         end_date: NaiveDate,
         method: ReturnMethod,
-    ) -> Result<CumulativeReturns, Box<dyn std::error::Error>> {
+    ) -> Result<CumulativeReturns> {
         let portfolio_history = self
             .history_service
-            .get_portfolio_history(conn, Some(account_id))?;
+            .get_portfolio_history(conn, Some(account_id))
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
 
         // Parse dates and filter history
         let mut sorted_history: Vec<_> = portfolio_history
@@ -296,11 +293,12 @@ impl PortfolioService {
         symbol: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
-    ) -> Result<CumulativeReturns, Box<dyn std::error::Error>> {
+    ) -> Result<CumulativeReturns> {
         let quote_history = self
             .market_data_service
             .get_symbol_history_from_provider(symbol, start_date, end_date)
-            .await?;
+            .await
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
 
         // Create a complete date range
         let mut all_dates: Vec<NaiveDate> = Vec::new();

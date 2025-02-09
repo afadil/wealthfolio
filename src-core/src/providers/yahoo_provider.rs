@@ -57,6 +57,7 @@ impl YahooProvider {
 
     pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, yahoo::YahooError> {
         let result = self.provider.search_ticker(query).await?;
+        
 
         let asset_profiles = result.quotes.iter().map(QuoteSummary::from).collect();
 
@@ -515,6 +516,57 @@ impl YahooProvider {
             _ => a_string.to_string(),
         }
     }
+
+    async fn get_stock_history_bulk(
+        &self,
+        symbols: &[String],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        use futures::future::try_join_all;
+        use rayon::prelude::*;
+
+        // Filter out cash symbols as they don't need processing
+        let valid_symbols: Vec<_> = symbols
+            .par_iter()
+            .filter(|symbol| !symbol.starts_with("$CASH-"))
+            .collect();
+
+        if valid_symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Create a vector of futures for parallel processing
+        let futures: Vec<_> = valid_symbols
+            .into_par_iter()
+            .map(|symbol| {
+                let provider = &self.provider;
+                async move {
+                    let response = provider
+                        .get_quote_history(symbol, start.into(), end.into())
+                        .await
+                        .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+                    
+                    let quotes = response
+                        .quotes()
+                        .map_err(|e| MarketDataError::ProviderError(e.to_string()))?
+                        .into_iter()
+                        .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
+                        .collect::<Vec<_>>();
+
+                    Ok::<Vec<ModelQuote>, MarketDataError>(quotes)
+                }
+            })
+            .collect();
+
+        // Execute all futures concurrently and collect results
+        let results = try_join_all(futures)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+
+        // Combine all quotes into a single vector
+        Ok(results.into_iter().flatten().collect())
+    }
 }
 
 #[async_trait::async_trait]
@@ -546,6 +598,16 @@ impl MarketDataProvider for YahooProvider {
     }
     async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError> {
         self.get_exchange_rate(from, to)
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+    async fn get_stock_history_bulk(
+        &self,
+        symbols: &[String],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        self.get_stock_history_bulk(symbols, start, end)
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }

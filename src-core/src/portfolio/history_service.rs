@@ -2,25 +2,26 @@ use crate::errors::{CurrencyError, Error, Result};
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{Account, Activity, HistorySummary, PortfolioHistory, Quote};
-use chrono::{Duration, NaiveDate, Utc};
-use diesel::result::Error as DieselError;
+use crate::portfolio::history_repository::HistoryRepository;
 
 use bigdecimal::BigDecimal;
+use chrono::{Duration, NaiveDate, Utc};
 use diesel::prelude::*;
-use diesel::sql_types::Text;
 use diesel::SqliteConnection;
-use log::{debug,warn};
+use log::info;
+use num_traits::{FromPrimitive, ToPrimitive};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::default::Default;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Instant;
 
-use num_traits::FromPrimitive;
-use num_traits::ToPrimitive;
 pub struct HistoryService {
     base_currency: String,
-    market_data_service: Arc<MarketDataService>,
     fx_service: CurrencyExchangeService,
+    market_data_service: Arc<MarketDataService>,
+    repository: HistoryRepository,
 }
 
 impl Default for HistorySummary {
@@ -35,11 +36,22 @@ impl Default for HistorySummary {
 }
 
 impl HistoryService {
-    pub fn new(base_currency: String, market_data_service: Arc<MarketDataService>) -> Self {
+    const QUANTITY_THRESHOLD: &'static str = "0.0000001";
+
+    fn is_quantity_significant(quantity: &BigDecimal) -> bool {
+        quantity.abs() >= BigDecimal::from_str(Self::QUANTITY_THRESHOLD).unwrap_or_default()
+    }
+
+    pub fn new(
+        base_currency: String,
+        fx_service: CurrencyExchangeService,
+        market_data_service: Arc<MarketDataService>,
+    ) -> Self {
         Self {
             base_currency,
+            fx_service,
             market_data_service,
-            fx_service: CurrencyExchangeService::new(),
+            repository: HistoryRepository::new(),
         }
     }
 
@@ -47,10 +59,7 @@ impl HistoryService {
         &self,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<PortfolioHistory>> {
-        use crate::schema::portfolio_history::dsl::*;
-
-        let result = portfolio_history.load::<PortfolioHistory>(conn)?;
-        Ok(result)
+        self.repository.get_all(conn)
     }
 
     pub fn get_portfolio_history(
@@ -58,16 +67,7 @@ impl HistoryService {
         conn: &mut SqliteConnection,
         input_account_id: Option<&str>,
     ) -> Result<Vec<PortfolioHistory>> {
-        use crate::schema::portfolio_history::dsl::*;
-
-        let mut query = portfolio_history.into_boxed();
-
-        if let Some(other_id) = input_account_id {
-            query = query.filter(account_id.eq(other_id));
-        }
-
-        let result = query.order(date.asc()).load::<PortfolioHistory>(conn)?;
-        Ok(result)
+        self.repository.get_by_account(conn, input_account_id)
     }
 
     pub fn get_latest_account_history(
@@ -75,30 +75,26 @@ impl HistoryService {
         conn: &mut SqliteConnection,
         input_account_id: &str,
     ) -> Result<PortfolioHistory> {
-        use crate::schema::portfolio_history::dsl::*;
-
-        let result = portfolio_history
-            .filter(account_id.eq(input_account_id))
-            .order(date.desc())
-            .first(conn)?;
-
-        Ok(result)
+        self.repository.get_latest_by_account(conn, input_account_id)
     }
 
-    pub fn calculate_historical_data(
+    pub async fn calculate_historical_data(
         &self,
         conn: &mut SqliteConnection,
         accounts: &[Account],
         activities: &[Activity],
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>> {
-        self.initialize_fx_service(conn)?;
 
-        // Load and prepare all required data
-        let end_date = Utc::now().naive_utc().date();
+        // Initialize FX service
+        self.initialize_fx_service(conn).await?;
+        let end_date=Utc::now().naive_utc().date();
+
+        // Load and prepare all required data 
         let quotes = Arc::new(self.market_data_service.load_quotes(conn));
         let account_currencies = self.get_account_currencies(accounts)?;
-        let asset_currencies = self.get_asset_currencies(conn, activities);
+        let asset_currencies = self.market_data_service
+            .get_asset_currencies(conn);
 
         // Calculate split factors for all activities
         let split_factors = self.calculate_split_factors(
@@ -127,10 +123,29 @@ impl HistoryService {
         );
 
         // Parallel calculations without database access
-        let summaries_and_histories: Vec<(HistorySummary, Vec<PortfolioHistory>)> = accounts
-            .par_iter()
-            .map(|account| {
-                self.calculate_account_history(
+        let summaries_and_histories: Vec<_> = if accounts.len() > 10 {
+            accounts.par_iter().map(|account| {
+                let account_calc_start = Instant::now();
+                    let result = self.calculate_account_history(
+                        account,
+                        &account_activities,
+                        &quotes,
+                        &start_dates,
+                        &last_histories,
+                        end_date,
+                        &account_currencies,
+                        &asset_currencies,
+                );
+                    info!(
+                        "Calculating history for account {} took {:?}",
+                        account.id,
+                        account_calc_start.elapsed()
+                    );
+                    result
+            }).collect()
+        } else {
+            accounts.iter().map(|account| {
+                 self.calculate_account_history(
                     account,
                     &account_activities,
                     &quotes,
@@ -140,8 +155,8 @@ impl HistoryService {
                     &account_currencies,
                     &asset_currencies,
                 )
-            })
-            .collect();
+            }).collect()
+        };
 
         // Process results
         let mut summaries: Vec<HistorySummary> = summaries_and_histories
@@ -149,14 +164,11 @@ impl HistoryService {
             .map(|(summary, _)| summary.clone())
             .collect();
 
-        debug!("Calculated summaries: {:?}", summaries);
 
         let account_histories: Vec<PortfolioHistory> = summaries_and_histories
             .into_iter()
             .flat_map(|(_, histories)| histories)
             .collect();
-
-        debug!("Calculated histories: {:?}", account_histories);
 
         // If force_full_calculation is true, delete existing history for the accounts and TOTAL
         if force_full_calculation {
@@ -164,10 +176,11 @@ impl HistoryService {
         }
 
         // Save data
-        self.save_historical_data(&account_histories, conn)?;
+        self.repository.save_batch(conn, &account_histories)?;
 
         let total_history = self.calculate_total_portfolio_history(conn)?;
-        self.save_historical_data(&total_history, conn)?;
+
+        self.repository.save_batch(conn, &total_history)?;
 
         let total_summary = self.create_total_summary(&total_history);
         summaries.push(total_summary);
@@ -175,10 +188,11 @@ impl HistoryService {
         Ok(summaries)
     }
 
-    fn initialize_fx_service(&self, conn: &mut SqliteConnection) -> Result<()> {
-        self.fx_service
-            .initialize(conn)
-            .map_err(|e| Error::Currency(CurrencyError::ConversionFailed(e.to_string())))
+    async fn initialize_fx_service(&self, conn: &mut SqliteConnection) -> Result<()> {
+        match self.fx_service.initialize(conn).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error::Currency(CurrencyError::ConversionFailed(e.to_string())))
+        }
     }
 
     fn group_activities_by_account(
@@ -199,16 +213,6 @@ impl HistoryService {
             .iter()
             .map(|account| (account.id.clone(), account.currency.clone()))
             .collect())
-    }
-
-    fn get_asset_currencies(
-        &self,
-        conn: &mut SqliteConnection,
-        activities: &[Activity],
-    ) -> HashMap<String, String> {
-        let asset_ids: Vec<String> = activities.iter().map(|a| a.asset_id.clone()).collect();
-        self.market_data_service
-            .get_asset_currencies(conn, asset_ids)
     }
 
     fn calculate_start_dates_and_last_histories(
@@ -263,46 +267,7 @@ impl HistoryService {
         accounts: &[Account],
     ) -> Result<HashMap<String, Option<PortfolioHistory>>> {
         let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
-
-        let query = "
-        SELECT ph.*
-        FROM portfolio_history ph
-        INNER JOIN (
-            SELECT account_id, MAX(date) as max_date
-            FROM portfolio_history
-            WHERE account_id = ?
-            GROUP BY account_id
-        ) latest
-        ON ph.account_id = latest.account_id AND ph.date = latest.max_date
-    ";
-
-        let mut last_histories = Vec::new();
-
-        for account_id in &account_ids {
-            let history = diesel::sql_query(query)
-                .bind::<Text, _>(account_id)
-                .get_result::<PortfolioHistory>(conn);
-
-            match history {
-                Ok(history) => {
-                    last_histories.push(history);
-                }
-                Err(DieselError::NotFound) => {
-                    // Skip if no history found for this account
-                    warn!("No history found for account {}", account_id);
-                }
-                Err(e) => {
-                    return Err(Error::from(e));
-                }
-            }
-        }
-
-        let result: HashMap<String, Option<PortfolioHistory>> = last_histories
-            .into_iter()
-            .map(|history| (history.account_id.clone(), Some(history)))
-            .collect();
-
-        Ok(result)
+        self.repository.get_all_last_histories(conn, &account_ids)
     }
 
     fn calculate_account_history(
@@ -316,12 +281,16 @@ impl HistoryService {
         account_currencies: &HashMap<String, String>,
         asset_currencies: &HashMap<String, String>,
     ) -> (HistorySummary, Vec<PortfolioHistory>) {
+        let start_time = Instant::now();
+        info!("Starting history calculation for account {}", account.id);
+
         let activities = account_activities
             .get(&account.id)
             .cloned()
             .unwrap_or_default();
 
         if activities.is_empty() {
+            info!("No activities found for account {}, returning empty history", account.id);
             return self.create_empty_summary_and_history(&account.id);
         }
 
@@ -329,9 +298,10 @@ impl HistoryService {
         let account_currency = account_currencies
             .get(&account.id)
             .cloned()
-            .unwrap_or(self.base_currency.clone());
+            .unwrap_or_else(|| account.currency.clone());
         let last_history = last_histories.get(&account.id).cloned().unwrap_or(None);
 
+        let calc_start = Instant::now();
         let new_history = self.calculate_historical_value(
             &account.id,
             &activities,
@@ -342,8 +312,18 @@ impl HistoryService {
             asset_currencies,
             last_history,
         );
+        info!(
+            "Calculating historical value for account {} took {:?}",
+            account.id,
+            calc_start.elapsed()
+        );
 
         let summary = self.create_summary(&account.id, &new_history);
+        info!(
+            "Total history calculation for account {} took {:?}",
+            account.id,
+            start_time.elapsed()
+        );
 
         (summary, new_history)
     }
@@ -418,9 +398,12 @@ impl HistoryService {
                 };
 
                 for history in histories {
-                    let currency_exchange_rate = self
-                        .fx_service
-                        .get_latest_exchange_rate(&history.currency, &self.base_currency)
+                    let currency_exchange_rate = self.fx_service
+                        .get_exchange_rate_for_date(
+                            &history.currency,
+                            &self.base_currency,
+                            NaiveDate::parse_from_str(&history.date, "%Y-%m-%d").unwrap_or_default(),
+                        )
                         .unwrap_or(1.0);
 
                     total.total_value += history.total_value * currency_exchange_rate;
@@ -501,6 +484,7 @@ impl HistoryService {
                         &mut net_deposit,
                         &mut book_cost,
                         &account_currency,
+                        date,
                     );
                 }
 
@@ -537,7 +521,7 @@ impl HistoryService {
 
                 let exchange_rate = BigDecimal::from_f64(
                     self.fx_service
-                        .get_latest_exchange_rate(&account_currency, &self.base_currency)
+                        .get_exchange_rate_for_date(account_currency.as_str(), &self.base_currency, date)
                         .unwrap_or(1.0),
                 )
                 .unwrap();
@@ -635,12 +619,13 @@ impl HistoryService {
         net_deposit: &mut BigDecimal,
         book_cost: &mut BigDecimal,
         account_currency: &str,
+        date: NaiveDate,
     ) {
 
         // Get exchange rate if activity currency is different from account currency
         let exchange_rate = BigDecimal::from_f64(
             self.fx_service
-                .get_latest_exchange_rate(&activity.currency, account_currency)
+                .get_exchange_rate_for_date(&activity.currency, account_currency, date)
                 .unwrap_or(1.0),
         )
         .unwrap();
@@ -654,40 +639,42 @@ impl HistoryService {
         match activity.activity_type.as_str() {
             "BUY" => {
                 let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
-                let price = BigDecimal::from_f64(activity.unit_price).unwrap();
-                let amount = &quantity * &price * &exchange_rate;
+                let price = BigDecimal::from_f64(activity.unit_price).unwrap() * &exchange_rate;
+                let total_cost = &quantity * &price + &activity_fee;
 
-                let buy_cost = &amount + &activity_fee;
-                *cumulative_cash -= &buy_cost;
-                *book_cost += &buy_cost;
-                *holdings
+                holdings
                     .entry(activity.asset_id.clone())
-                    .or_insert(BigDecimal::from(0)) += &quantity;
+                    .and_modify(|e| *e += &quantity)
+                    .or_insert(quantity);
+
+                *cumulative_cash -= &total_cost;
+                *book_cost += total_cost;
             }
             "SELL" => {
                 let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
-                let price = BigDecimal::from_f64(activity.unit_price).unwrap();
-                let amount = &quantity * &price * &exchange_rate;
+                let quantity_clone = quantity.clone();
+                let price = BigDecimal::from_f64(activity.unit_price).unwrap() * &exchange_rate;
+                let total_amount = &quantity * &price - &activity_fee;
 
-                let sell_profit = &amount - &activity_fee;
-                *cumulative_cash += &sell_profit;
-                let old_quantity = holdings
+                // Calculate the average cost per share before updating holdings
+                let avg_cost_per_share = holdings
                     .get(&activity.asset_id)
-                    .cloned()
+                    .map(|h| &*book_cost / h)
                     .unwrap_or_default();
-                if old_quantity != BigDecimal::from(0) {
-                    let sell_ratio = (&quantity / &old_quantity).round(6);
-                    let adjustment = sell_ratio * book_cost.clone();
-                    *book_cost -= adjustment;
-                }
-                *holdings
+
+                holdings
                     .entry(activity.asset_id.clone())
-                    .or_insert(BigDecimal::from(0)) -= &quantity;
+                    .and_modify(|e| *e -= &quantity)
+                    .or_insert(-quantity);
+
+                *cumulative_cash += &total_amount;
+                *book_cost -= &quantity_clone * &avg_cost_per_share;
             }
             "TRANSFER_IN" => {
                 if activity.asset_id.starts_with("$CASH") {
+                    // For cash transfers, both cumulative_cash and net_deposit should include the full amount
                     *cumulative_cash += &activity_amount - &activity_fee;
-                    *net_deposit += &activity_amount - &activity_fee;
+                    *net_deposit += &activity_amount;
                 } else {
                     let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
                     *holdings
@@ -698,8 +685,9 @@ impl HistoryService {
             }
             "TRANSFER_OUT" => {
                 if activity.asset_id.starts_with("$CASH") {
+                    // For cash transfers, both cumulative_cash and net_deposit should be reduced by the full amount
                     *cumulative_cash -= &activity_amount + &activity_fee;
-                    *net_deposit -= &activity_amount + &activity_fee;
+                    *net_deposit -= &activity_amount;
                 } else {
                     let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
                     let old_quantity = holdings
@@ -724,76 +712,30 @@ impl HistoryService {
                 *cumulative_cash -= &activity_amount + &activity_fee;
                 *net_deposit -= &activity_amount;
             }
-            "CONVERSION_IN" => {
-                *cumulative_cash += &activity_amount - &activity_fee;
-                *net_deposit += &activity_amount - &activity_fee;
-            }
-            "CONVERSION_OUT" => {
-                *cumulative_cash -= &activity_amount + &activity_fee;
-                *net_deposit -= &activity_amount + &activity_fee;
-            }
-            "DIVIDEND" | "INTEREST" => {
+            "INTEREST" | "DIVIDEND" => {
                 *cumulative_cash += &activity_amount - &activity_fee;
             }
             "FEE" | "TAX" => {
                 *cumulative_cash -= &activity_fee;
             }
+          
+            "CONVERSION_IN" => {
+                // For CONVERSION_IN, we're receiving currency from another account
+                let total_amount = &activity_amount - &activity_fee;
+                *cumulative_cash += &total_amount;
+                *net_deposit += &total_amount;
+            }
+            "CONVERSION_OUT" => {
+                // For CONVERSION_OUT, we're sending currency to another account
+                let total_amount = &activity_amount + &activity_fee;
+                *cumulative_cash -= &total_amount;
+                *net_deposit -= &total_amount;
+            }
             _ => {}
         }
-    }
 
-    fn save_historical_data(
-        &self,
-        history_data: &[PortfolioHistory],
-        conn: &mut SqliteConnection,
-    ) -> Result<()> {
-        use crate::schema::portfolio_history::dsl::*;
-
-        for record in history_data {
-            diesel::insert_into(portfolio_history)
-                .values((
-                    id.eq(&record.id),
-                    account_id.eq(&record.account_id),
-                    date.eq(&record.date),
-                    total_value.eq(record.total_value),
-                    market_value.eq(record.market_value),
-                    book_cost.eq(record.book_cost),
-                    available_cash.eq(record.available_cash),
-                    net_deposit.eq(record.net_deposit),
-                    currency.eq(&record.currency),
-                    base_currency.eq(&record.base_currency),
-                    total_gain_value.eq(record.total_gain_value),
-                    total_gain_percentage.eq(record.total_gain_percentage),
-                    day_gain_percentage.eq(record.day_gain_percentage),
-                    day_gain_value.eq(record.day_gain_value),
-                    allocation_percentage.eq(record.allocation_percentage),
-                    exchange_rate.eq(record.exchange_rate),
-                    holdings.eq(&record.holdings),
-                    calculated_at.eq(record.calculated_at),
-                ))
-                .on_conflict(id)
-                .do_update()
-                .set((
-                    total_value.eq(record.total_value),
-                    market_value.eq(record.market_value),
-                    book_cost.eq(record.book_cost),
-                    available_cash.eq(record.available_cash),
-                    net_deposit.eq(record.net_deposit),
-                    currency.eq(&record.currency),
-                    base_currency.eq(&record.base_currency),
-                    total_gain_value.eq(record.total_gain_value),
-                    total_gain_percentage.eq(record.total_gain_percentage),
-                    day_gain_percentage.eq(record.day_gain_percentage),
-                    day_gain_value.eq(record.day_gain_value),
-                    allocation_percentage.eq(record.allocation_percentage),
-                    exchange_rate.eq(record.exchange_rate),
-                    holdings.eq(&record.holdings),
-                    calculated_at.eq(record.calculated_at),
-                ))
-                .execute(conn)?;
-        }
-
-        Ok(())
+        // Remove holdings with zero quantity
+        holdings.retain(|_, quantity| Self::is_quantity_significant(quantity));
     }
 
     fn calculate_holdings_value(
@@ -817,7 +759,7 @@ impl HistoryService {
 
                 let exchange_rate = BigDecimal::from_f64(
                     self.fx_service
-                        .get_latest_exchange_rate(asset_currency, account_currency)
+                        .get_exchange_rate_for_date(asset_currency, account_currency, date)
                         .unwrap_or(1.0),
                 )
                 .unwrap();
@@ -890,14 +832,6 @@ impl HistoryService {
         conn: &mut SqliteConnection,
         accounts: &[Account],
     ) -> Result<()> {
-        use crate::schema::portfolio_history::dsl::*;
-        use diesel::delete;
-
-        let mut account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
-        account_ids.push("TOTAL".to_string());
-
-        delete(portfolio_history.filter(account_id.eq_any(account_ids))).execute(conn)?;
-
-        Ok(())
+        self.repository.delete_by_accounts(conn, accounts)
     }
 }

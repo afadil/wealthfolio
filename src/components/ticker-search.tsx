@@ -137,7 +137,7 @@ function SearchResults({
                 selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
               )}
             />
-            {ticker.symbol} - {ticker.longName}
+            {ticker.symbol} - {ticker.longName} ({ticker.exchange})
           </CommandItem>
         );
       })}

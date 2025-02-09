@@ -6,6 +6,7 @@ use diesel::sqlite::SqliteConnection;
 pub struct SettingsRepository;
 
 impl SettingsRepository {
+
     pub fn get_settings(conn: &mut SqliteConnection) -> Result<Settings, diesel::result::Error> {
         let all_settings: Vec<(String, String)> = app_settings
             .select((setting_key, setting_value))
@@ -61,7 +62,7 @@ impl SettingsRepository {
         diesel::replace_into(app_settings)
             .values(&settings_to_insert)
             .execute(conn)?;
-
+            
         Ok(())
     }
 
@@ -69,10 +70,24 @@ impl SettingsRepository {
         conn: &mut SqliteConnection,
         setting_key_param: &str,
     ) -> Result<String, diesel::result::Error> {
-        app_settings
+        let result = app_settings
             .filter(setting_key.eq(setting_key_param))
             .select(setting_value)
-            .first(conn)
+            .first(conn);
+        
+        match result {
+            Ok(value) => Ok(value),
+            Err(diesel::result::Error::NotFound) => {
+                // Return default values for known settings
+                let default_value = match setting_key_param {
+                    "theme" => "light",
+                    "font" => "font-mono",
+                    _ => return Err(diesel::result::Error::NotFound),
+                };
+                Ok(default_value.to_string())
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn update_setting(

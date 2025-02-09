@@ -14,8 +14,8 @@ pub async fn get_activities(state: State<'_, AppState>) -> Result<Vec<Activity>,
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
 
     service
         .get_activities(&mut conn)
@@ -37,8 +37,8 @@ pub async fn search_activities(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
 
     service
         .search_activities(
@@ -63,8 +63,9 @@ pub async fn create_activity(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
+
     service
         .create_activity(&mut conn, activity)
         .await
@@ -81,8 +82,9 @@ pub async fn update_activity(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
+
     service
         .update_activity(&mut conn, activity)
         .await
@@ -100,8 +102,9 @@ pub async fn check_activities_import(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
+
     service
         .check_activities_import(&mut conn, account_id, activities)
         .await
@@ -118,8 +121,9 @@ pub async fn create_activities(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
+
     service
         .create_activities(&mut conn, activities)
         .map_err(|err| format!("Failed to import activities: {}", err))
@@ -135,8 +139,9 @@ pub async fn delete_activity(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
+
     service
         .delete_activity(&mut conn, activity_id)
         .map_err(|e| format!("Failed to delete activity: {}", e))
@@ -152,8 +157,8 @@ pub async fn get_account_import_mapping(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
 
     service
         .get_import_mapping(&mut conn, account_id)
@@ -170,8 +175,8 @@ pub async fn save_account_import_mapping(
         .pool
         .get()
         .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let base_currency = state.base_currency.read().unwrap().clone();
-    let service = activity_service::ActivityService::new(base_currency);
+    let base_currency = state.get_base_currency();
+    let service = activity_service::ActivityService::new(base_currency).await;
 
     service
         .save_import_mapping(&mut conn, mapping)

@@ -12,20 +12,25 @@ type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
 };
 
 const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="center-items space-y-1">
-        <p className="font-thin">{formatDate(data.date)}</p>
-        <div className="label flex items-center">
-          {isBalanceHidden
-            ? `•••• `
-            : `${formatAmount(Number(payload[0].value), data.currency, false)} `}
-          <Separator orientation="vertical" className="mx-1 h-4 w-px bg-secondary" />
-          <GainPercent value={data.totalGainPercentage} className="items-start text-left text-xs" />
+  if (active && payload && payload.length > 0) {
+    const data = payload[0]?.payload;
+    if (data) {
+      return (
+        <div className="center-items space-y-1">
+          <p className="font-thin">{formatDate(data.date)}</p>
+          <div className="label flex items-center">
+            {isBalanceHidden
+              ? `•••• `
+              : `${formatAmount(Number(payload[0]?.value), data.currency, false)} `}
+            <Separator orientation="vertical" className="mx-1 h-4 w-px bg-secondary" />
+            <GainPercent
+              value={data.totalGainPercentage}
+              className="items-start text-left text-xs"
+            />
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   return null;

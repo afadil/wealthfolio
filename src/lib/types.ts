@@ -333,6 +333,7 @@ export interface AccountSummary {
   performance: PortfolioHistory;
 }
 
+
 export interface ExchangeRate {
   id: string;
   fromCurrency: string;
@@ -342,6 +343,8 @@ export interface ExchangeRate {
   rate: number;
   source: string;
   isLoading?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-history';

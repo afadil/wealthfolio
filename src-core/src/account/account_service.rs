@@ -1,8 +1,8 @@
 use crate::account::AccountRepository;
 use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{Account, AccountUpdate, NewAccount};
-use diesel::Connection;
 use diesel::SqliteConnection;
+use diesel::Connection;
 use log::debug;
 pub struct AccountService {
     account_repo: AccountRepository,
@@ -49,20 +49,19 @@ impl AccountService {
             "Creating account..., base_currency: {}, new_account.currency: {}",
             base_currency, new_account.currency
         );
-        conn.transaction(|conn| {
+
+        let fx_service = CurrencyExchangeService::new();
+        conn.transaction::<_, Box<dyn std::error::Error>, _>(|tx_conn| {
             if new_account.currency != base_currency {
-                let fx_service = CurrencyExchangeService::new();
-                fx_service.add_exchange_rate(
-                    conn,
+                futures::executor::block_on(fx_service.register_currency(
+                    tx_conn,
                     base_currency.clone(),
                     new_account.currency.clone(),
-                    None,
-                )?;
+                ))?;
             }
 
-            // Insert new account
             self.account_repo
-                .insert_new_account(conn, new_account)
+                .insert_new_account(tx_conn, new_account)
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
         })
     }

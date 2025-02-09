@@ -7,6 +7,66 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 
+pub const ROUNDING_SCALE: i64 = 6;
+pub const PORTFOLIO_PERCENT_SCALE: i64 = 2;
+
+// Custom serializer/deserializer for BigDecimal (rounds on serialization)
+mod bigdecimal_serde {
+    use bigdecimal::BigDecimal;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::de::Error;
+
+    pub fn serialize<S>(value: &BigDecimal, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let rounded = value.round(super::ROUNDING_SCALE);
+        serializer.serialize_str(&rounded.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<BigDecimal, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = String::deserialize(deserializer)?;
+        BigDecimal::parse_bytes(s.as_bytes(), 10).ok_or_else(|| D::Error::custom("Invalid BigDecimal"))
+    }
+}
+
+// Custom serializer/deserializer for Option<BigDecimal>
+mod bigdecimal_serde_option {
+    use bigdecimal::BigDecimal;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::de::Error;
+
+    pub fn serialize<S>(value: &Option<BigDecimal>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            Some(bd) => {
+                let rounded = bd.round(super::ROUNDING_SCALE);
+                serializer.serialize_str(&rounded.to_string())
+            },
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<BigDecimal>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Option<String> = Option::deserialize(deserializer)?;
+        match s {
+            Some(s) => {
+                let bd = BigDecimal::parse_bytes(s.as_bytes(), 10).ok_or_else(|| D::Error::custom("Invalid BigDecimal"))?;
+                Ok(Some(bd))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
 #[diesel(table_name= crate::schema::platforms)]
 #[serde(rename_all = "camelCase")]
@@ -216,21 +276,33 @@ pub struct NewActivity {
     Deserialize,
     Debug,
     Clone,
+    QueryableByName,
 )]
 #[diesel(belongs_to(Asset, foreign_key = symbol))]
 #[diesel(table_name= crate::schema::quotes)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub id: String,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
     pub created_at: chrono::NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub data_source: String,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
     pub date: chrono::NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol: String,
+    #[diesel(sql_type = diesel::sql_types::Double)]
     pub open: f64,
+    #[diesel(sql_type = diesel::sql_types::Double)]
     pub high: f64,
+    #[diesel(sql_type = diesel::sql_types::Double)]
     pub low: f64,
+    #[diesel(sql_type = diesel::sql_types::Double)]
     pub volume: f64,
+    #[diesel(sql_type = diesel::sql_types::Double)]
     pub close: f64,
+    #[diesel(sql_type = diesel::sql_types::Double)]
     pub adjclose: f64,
 }
 
@@ -327,11 +399,17 @@ pub struct ActivityImport {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Performance {
+    #[serde(with = "bigdecimal_serde")]
     pub total_gain_percent: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
     pub total_gain_amount: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
     pub total_gain_amount_converted: BigDecimal,
+    #[serde(with = "bigdecimal_serde_option")]
     pub day_gain_percent: Option<BigDecimal>,
+    #[serde(with = "bigdecimal_serde_option")]
     pub day_gain_amount: Option<BigDecimal>,
+    #[serde(with = "bigdecimal_serde_option")]
     pub day_gain_amount_converted: Option<BigDecimal>,
 }
 
@@ -369,14 +447,21 @@ pub struct Holding {
     pub symbol: String,
     pub symbol_name: Option<String>,
     pub holding_type: String,
+    #[serde(with = "bigdecimal_serde")]
     pub quantity: BigDecimal,
     pub currency: String,
     pub base_currency: String,
+    #[serde(with = "bigdecimal_serde_option")]
     pub market_price: Option<BigDecimal>,
+    #[serde(with = "bigdecimal_serde_option")]
     pub average_cost: Option<BigDecimal>,
+    #[serde(with = "bigdecimal_serde")]
     pub market_value: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
     pub book_value: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
     pub market_value_converted: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
     pub book_value_converted: BigDecimal,
     pub performance: Performance,
     pub account: Option<Account>,
@@ -385,8 +470,38 @@ pub struct Holding {
     pub asset_data_source: Option<String>,
     pub sectors: Option<Vec<Sector>>,
     pub countries: Option<Vec<Country>>,
+    #[serde(with = "bigdecimal_serde_option")]
     pub portfolio_percent: Option<BigDecimal>,
 }
+
+impl Default for Holding {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            symbol: String::new(),
+            symbol_name: None,
+            holding_type: String::new(),
+            quantity: BigDecimal::from(0),
+            currency: String::new(),
+            base_currency: String::new(),
+            market_price: None,
+            average_cost: None,
+            market_value: BigDecimal::from(0),
+            book_value: BigDecimal::from(0),
+            market_value_converted: BigDecimal::from(0),
+            book_value_converted: BigDecimal::from(0),
+            performance: Performance::default(),
+            account: None,
+            asset_class: None,
+            asset_sub_class: None,
+            asset_data_source: None,
+            sectors: None,
+            countries: None,
+            portfolio_percent: None,
+        }
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -460,6 +575,18 @@ pub struct Settings {
     pub font: String,
     pub base_currency: String,
     pub instance_id: String,
+}
+
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            theme: "light".to_string(),
+            font: "default".to_string(),
+            base_currency: "USD".to_string(),
+            instance_id: "".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -635,9 +762,8 @@ pub struct AccountSummary {
 }
 
 #[derive(
-    Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Debug, Clone,
+    Serialize, Deserialize, Debug, Clone,
 )]
-#[diesel(table_name = crate::schema::exchange_rates)]
 #[serde(rename_all = "camelCase")]
 pub struct ExchangeRate {
     pub id: String,
@@ -649,8 +775,49 @@ pub struct ExchangeRate {
     pub updated_at: chrono::NaiveDateTime,
 }
 
-#[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
-#[diesel(table_name = crate::schema::exchange_rates)]
+impl ExchangeRate {
+    pub fn from_quote(quote: &Quote) -> Self {
+        let (from_currency, to_currency) = if quote.symbol.ends_with("=X") {
+            let symbol = &quote.symbol[..quote.symbol.len() - 2];
+            (symbol[..3].to_string(), symbol[3..].to_string())
+        } else {
+            (
+                quote.symbol[..3].to_string(),
+                quote.symbol[3..6].to_string(),
+            )
+        };
+
+        ExchangeRate {
+            id: quote.symbol.clone(),
+            from_currency,
+            to_currency,
+            rate: quote.close,
+            source: quote.data_source.clone(),
+            created_at: quote.date,
+            updated_at: quote.date,
+        }
+    }
+}
+
+impl Quote {
+    pub fn from_exchange_rate(rate: &ExchangeRate) -> Self {
+        Quote {
+            id: rate.id.clone(),
+            symbol: rate.id.clone(),
+            date: rate.updated_at,
+            open: rate.rate,
+            high: rate.rate,
+            low: rate.rate,
+            close: rate.rate,
+            volume: 0.0,
+            data_source: rate.source.clone(),
+            created_at: rate.created_at,
+            adjclose: rate.rate,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewExchangeRate {
     pub from_currency: String,

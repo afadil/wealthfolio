@@ -1,4 +1,3 @@
-use crate::fx::fx_service::CurrencyExchangeService;
 use crate::models::{
     ContributionLimit, ExchangeRate, NewContributionLimit, NewExchangeRate, Settings,
     SettingsUpdate,
@@ -9,6 +8,7 @@ use diesel::r2d2::ConnectionManager;
 use diesel::SqliteConnection;
 use log::debug;
 use tauri::State;
+use wealthfolio_core::fx::fx_service::CurrencyExchangeService;
 use wealthfolio_core::models::DepositsCalculation;
 
 fn get_connection(
@@ -39,12 +39,17 @@ pub async fn update_settings(
     debug!("Updating settings...");
     let mut conn = get_connection(&state)?;
     let service = settings_service::SettingsService::new();
+
+    // Update settings
     service
         .update_settings(&mut conn, &settings)
+        .await
         .map_err(|e| format!("Failed to update settings: {}", e))?;
-    // Update the app state
-    let mut base_currency = state.base_currency.write().map_err(|e| e.to_string())?;
-    *base_currency = settings.base_currency;
+
+    // Update the app state with the new base currency
+    state.update_base_currency(settings.base_currency);
+
+    // Return updated settings
     service
         .get_settings(&mut conn)
         .map_err(|e| format!("Failed to load settings: {}", e))
@@ -57,18 +62,20 @@ pub async fn update_exchange_rate(
 ) -> Result<ExchangeRate, String> {
     debug!("Updating exchange rate...");
     let mut conn = get_connection(&state)?;
-    let fx_service = CurrencyExchangeService::new();
-    fx_service
+    let service = CurrencyExchangeService::new();
+    service
         .update_exchange_rate(&mut conn, &rate)
+        .await
         .map_err(|e| format!("Failed to update exchange rate: {}", e))
 }
+
 
 #[tauri::command]
 pub async fn get_exchange_rates(state: State<'_, AppState>) -> Result<Vec<ExchangeRate>, String> {
     debug!("Fetching exchange rates...");
     let mut conn = get_connection(&state)?;
-    let fx_service = CurrencyExchangeService::new();
-    fx_service
+    let service = CurrencyExchangeService::new();
+    service
         .get_exchange_rates(&mut conn)
         .map_err(|e| format!("Failed to load exchange rates: {}", e))
 }
@@ -80,14 +87,16 @@ pub async fn add_exchange_rate(
 ) -> Result<ExchangeRate, String> {
     debug!("Adding new exchange rate...");
     let mut conn = get_connection(&state)?;
-    let fx_service = CurrencyExchangeService::new();
-    fx_service
+    let service = CurrencyExchangeService::new();
+    service
         .add_exchange_rate(
             &mut conn,
             new_rate.from_currency,
             new_rate.to_currency,
+            new_rate.source,
             Some(new_rate.rate),
         )
+        .await
         .map_err(|e| format!("Failed to add exchange rate: {}", e))
 }
 
@@ -98,8 +107,8 @@ pub async fn delete_exchange_rate(
 ) -> Result<(), String> {
     debug!("Deleting exchange rate...");
     let mut conn = get_connection(&state)?;
-    let fx_service = CurrencyExchangeService::new();
-    fx_service
+    let service = CurrencyExchangeService::new();
+    service
         .delete_exchange_rate(&mut conn, &rate_id)
         .map_err(|e| format!("Failed to delete exchange rate: {}", e))
 }
@@ -171,7 +180,7 @@ pub async fn calculate_deposits_for_accounts(
     debug!("Calculating deposits for accounts...");
     let mut conn = get_connection(&state)?;
     let service = ContributionLimitService::new();
-    let base_currency = state.base_currency.read().map_err(|e| e.to_string())?;
+    let base_currency = state.get_base_currency();
     service
         .calculate_deposits_for_accounts(&mut conn, &account_ids, year, &base_currency)
         .map_err(|e| format!("Failed to calculate deposits for accounts: {}", e))

@@ -25,9 +25,10 @@ use commands::portfolio::{
 };
 use commands::settings::{
     add_exchange_rate, calculate_deposits_for_accounts, create_contribution_limit,
-    delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,
-    get_settings, update_contribution_limit, update_exchange_rate, update_settings,
+    delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,update_exchange_rate,
+    get_settings, update_contribution_limit, update_settings,
 };
+
 
 use log::error;
 use updater::check_for_update;
@@ -40,7 +41,6 @@ use wealthfolio_core::asset;
 use wealthfolio_core::goal;
 use wealthfolio_core::market_data;
 
-use wealthfolio_core::fx;
 use wealthfolio_core::portfolio;
 use wealthfolio_core::settings;
 
@@ -64,6 +64,17 @@ use tauri::{AppHandle, Emitter};
 struct AppState {
     pool: Arc<DbPool>,
     base_currency: Arc<RwLock<String>>,
+}
+
+impl AppState {
+    fn get_base_currency(&self) -> String {
+        self.base_currency.read().unwrap().clone()
+    }
+
+
+    fn update_base_currency(&self, new_currency: String) {
+        *self.base_currency.write().unwrap() = new_currency;
+    }
 }
 
 pub fn main() {
@@ -182,10 +193,7 @@ pub fn main() {
 
 fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     spawn(async move {
-        let base_currency = {
-            let currency = state.base_currency.read().unwrap().clone();
-            currency
-        };
+        let base_currency = state.get_base_currency();
         let portfolio_service = match portfolio::PortfolioService::new(base_currency).await {
             Ok(service) => service,
             Err(e) => {
@@ -221,6 +229,7 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
         }
     });
 }
+
 
 #[tauri::command]
 async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {

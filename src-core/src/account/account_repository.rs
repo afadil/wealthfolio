@@ -39,20 +39,20 @@ impl AccountRepository {
     pub fn insert_new_account(
         &self,
         conn: &mut SqliteConnection,
-        mut new_account: NewAccount, // Assuming NewAccount is the struct for new account data
+        mut new_account: NewAccount,
     ) -> Result<Account, diesel::result::Error> {
         new_account.id = Some(Uuid::new_v4().to_string());
 
         diesel::insert_into(accounts::table)
             .values(&new_account)
-            .returning(accounts::all_columns) // Adjust this based on your table columns
+            .returning(accounts::all_columns) 
             .get_result(conn)
     }
 
     pub fn update_account(
         &self,
         conn: &mut SqliteConnection,
-        account_update: AccountUpdate, // Assuming AccountUpdate is the struct for updating account data
+        account_update: AccountUpdate,
     ) -> Result<Account, diesel::result::Error> {
         use crate::schema::accounts::dsl::*;
 
@@ -71,7 +71,7 @@ impl AccountRepository {
     pub fn delete_account(
         &self,
         conn: &mut SqliteConnection,
-        account_id: String, // ID of the account to delete
+        account_id: String,
     ) -> Result<usize, diesel::result::Error> {
         use crate::schema::accounts::dsl::*;
 

@@ -36,7 +36,7 @@ fn test_historical_private_asset_portfolio_value(){
 		create_account(&mut conn, account)).unwrap();
 
 	// Create a new activity for a new private asset with a value of $900K
-	let activity_service = ActivityService::new(base_currency.to_string());
+	let activity_service = tokio_test::block_on(ActivityService::new(base_currency.to_string()));
 
 	let activity =  NewActivity {
 		id: None,
@@ -124,7 +124,7 @@ fn test_manual_quotes(){
 		create_account(&mut conn, account)).unwrap();
 
 	// Create a new activity for a new private asset with a value of $900K
-	let activity_service = ActivityService::new(base_currency.to_string());
+	let activity_service = tokio_test::block_on(ActivityService::new(base_currency.to_string()));
 
 	let activity =  NewActivity {
 		id: None,

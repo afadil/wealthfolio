@@ -7,13 +7,15 @@ use chrono::{Datelike, NaiveDate, NaiveDateTime, Utc};
 use diesel::dsl::min;
 use diesel::prelude::*;
 use log::{debug, error};
+use std::sync::Arc;
+
 pub struct IncomeService {
-    fx_service: CurrencyExchangeService,
+    fx_service: Arc<CurrencyExchangeService>,
     base_currency: String,
 }
 
 impl IncomeService {
-    pub fn new(fx_service: CurrencyExchangeService, base_currency: String) -> Self {
+    pub fn new(fx_service: Arc<CurrencyExchangeService>, base_currency: String) -> Self {
         IncomeService {
             fx_service,
             base_currency,

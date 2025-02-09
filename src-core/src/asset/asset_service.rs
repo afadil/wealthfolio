@@ -138,37 +138,75 @@ impl AssetService {
             .get_result::<Asset>(conn)
     }
 
-    pub fn create_rate_exchange_asset(
+    pub fn create_fx_asset(
         &self,
         conn: &mut SqliteConnection,
         base_currency: &str,
         target_currency: &str,
+        source: &str,
     ) -> Result<Asset, diesel::result::Error> {
         let asset_id = format!("{}{}=X", base_currency, target_currency);
+        let readable_name = format!("{}/{} Exchange Rate", base_currency, target_currency);
+        let comment = format!("Currency pair for converting from {} to {}", base_currency, target_currency);
 
         let new_asset = NewAsset {
             id: asset_id.to_string(),
             isin: None,
-            name: None,
+            name: Some(readable_name),
             asset_type: Some("Currency".to_string()),
             symbol: asset_id.to_string(),
             symbol_mapping: None,
             asset_class: Some("CASH".to_string()),
             asset_sub_class: Some("CASH".to_string()),
-            comment: None,
+            comment: Some(comment),
             countries: None,
             categories: None,
             classes: None,
             attributes: None,
             currency: base_currency.to_string(),
-            data_source: "MANUAL".to_string(),
+            data_source: source.to_string(),
             sectors: None,
             url: None,
         };
 
         diesel::insert_into(assets::table)
             .values(&new_asset)
+            .on_conflict(assets::id)
+            .do_update()
+            .set(assets::data_source.eq(source))
             .get_result::<Asset>(conn)
+    }
+
+    pub fn get_fx_asset(
+        &self,
+        conn: &mut SqliteConnection,
+        from: &str,
+        to: &str,
+    ) -> QueryResult<Option<(Asset, bool)>> {
+        use crate::schema::assets::dsl::*;
+
+        let direct_symbol = format!("{}{}=X", from, to);
+
+        // Try to find direct asset first
+        if let Some(asset) = assets
+            .filter(symbol.eq(&direct_symbol))
+            .first::<Asset>(conn)
+            .optional()?
+        {
+            return Ok(Some((asset, true)));
+        }
+
+        // If direct not found, try inverse
+        let inverse_symbol = format!("{}{}=X", to, from);
+        if let Some(asset) = assets
+            .filter(symbol.eq(&inverse_symbol))
+            .first::<Asset>(conn)
+            .optional()?
+        {
+            return Ok(Some((asset, false)));
+        }
+
+        Ok(None)
     }
 
     pub fn get_latest_quote(

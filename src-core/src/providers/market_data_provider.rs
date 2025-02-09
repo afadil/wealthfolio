@@ -1,4 +1,4 @@
-use crate::models::{NewAsset, Quote, QuoteSummary};
+use crate::models::{NewAsset, Quote as ModelQuote, QuoteSummary};
 use async_trait::async_trait;
 use std::time::SystemTime;
 use thiserror::Error;
@@ -31,14 +31,22 @@ pub enum MarketDataProviderType {
 pub trait MarketDataProvider: Send + Sync {
     async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError>;
     async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, MarketDataError>;
-    async fn get_latest_quote(&self, symbol: &str) -> Result<Quote, MarketDataError>;
+    async fn get_latest_quote(&self, symbol: &str) -> Result<ModelQuote, MarketDataError>;
     async fn get_stock_history(
         &self,
         symbol: &str,
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<Quote>, MarketDataError>;
+    ) -> Result<Vec<ModelQuote>, MarketDataError>;
     async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError>;
+    
+    /// Fetch historical quotes for multiple symbols in parallel
+    async fn get_stock_history_bulk(
+        &self,
+        symbols: &[String],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> ;
 }
 
 #[async_trait]

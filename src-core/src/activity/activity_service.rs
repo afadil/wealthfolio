@@ -10,20 +10,38 @@ use crate::schema::activities;
 use log::error;
 
 use diesel::prelude::*;
-use diesel::sql_types::{Double, Text};
 
 use uuid::Uuid;
 
 pub struct ActivityService {
     repo: ActivityRepository,
-    base_currency: String,
+    asset_service: AssetService,
+    account_service: AccountService,
+    fx_service: CurrencyExchangeService,
 }
 
 impl ActivityService {
-    pub fn new(base_currency: String) -> Self {
+    pub async fn new(base_currency: String) -> Self {
         ActivityService {
             repo: ActivityRepository::new(),
-            base_currency,
+            asset_service: AssetService::new().await,
+            account_service: AccountService::new(base_currency.clone()),
+            fx_service: CurrencyExchangeService::new(),
+        }
+    }
+
+    // For testing purposes
+    #[cfg(test)]
+    pub fn new_with_mocks(
+        asset_service: AssetService,
+        account_service: AccountService,
+        fx_service: CurrencyExchangeService,
+    ) -> Self {
+        ActivityService {
+            repo: ActivityRepository::new(),
+            asset_service,
+            account_service,
+            fx_service,
         }
     }
 
@@ -74,82 +92,54 @@ impl ActivityService {
     pub async fn create_activity(
         &self,
         conn: &mut SqliteConnection,
-        activity: NewActivity,
+        mut activity: NewActivity,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
-        // Instantiate services
-        let asset_service = AssetService::new().await;
-        let account_service = AccountService::new(self.base_currency.clone());
-
         // Fetch the asset profile for the activity
         let asset_id = activity.asset_id.clone();
+        let asset = self.asset_service.get_or_create_asset(conn, &asset_id).await?;
 
-        // Get or create the asset profile
-        let asset = asset_service.get_or_create_asset(conn, &asset_id).await?;
-
-        println!("asset created: {:?}\n", asset);
-
-        let account = account_service.get_account_by_id(conn, &activity.account_id).expect("Account not found");
-
+        let account = self.account_service.get_account_by_id(conn, &activity.account_id)?;
         let account_currency = account.currency;
 
-        // Handle the database transaction
-        let inserted_activity = self
-            .insert_activity_transaction(conn, activity, &asset, &account_currency)
-            .await?;
-
-        return Ok(inserted_activity);
-    }
-
-    async fn insert_activity_transaction(
-        &self,
-        conn: &mut SqliteConnection,
-        mut activity: NewActivity,
-        asset: &Asset,
-        account_currency: &str,
-    ) -> Result<Activity, Box<dyn std::error::Error>> {
-        conn.transaction(|conn| {
-            // Update activity currency if empty/undefined
-            if activity.currency.is_empty() {
-                if !asset.currency.is_empty() {
-                    activity.currency = asset.currency.clone();
-                } else {
-                    activity.currency = account_currency.to_string();
-                }
+        // Set activity currency if empty/undefined
+        if activity.currency.is_empty() {
+            if !asset.currency.is_empty() {
+                activity.currency = asset.currency.clone();
+            } else {
+                activity.currency = account_currency.to_string();
             }
+        }
 
-            // Handle different activity types
-            match activity.activity_type.as_str() {
-                "TRANSFER_OUT" => {
-                    // Calculate the current average cost for the asset in this account
-                    let current_avg_cost = self.calculate_average_cost(
-                        conn,
-                        &activity.account_id,
-                        &activity.asset_id,
-                    )?;
-                    activity.unit_price = current_avg_cost;
-                }
-                "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "DIVIDEND" => {
-                    activity.quantity = 1.0;
-                }
-                _ => {}
-            }
+        // Register currency if different from account currency
+        if activity.currency != account_currency {
+            self.fx_service.register_currency(
+                conn,
+                account_currency.to_string(),
+                activity.currency.clone(),
+            ).await?;
+        }
 
-            // Create exchange rate if asset currency is different from account currency
-            if activity.currency != account_currency {
-                let fx_service = CurrencyExchangeService::new();
-                fx_service.add_exchange_rate(
+        // Handle different activity types
+        match activity.activity_type.as_str() {
+            "TRANSFER_OUT" => {
+                // Calculate the current average cost for the asset in this account
+                let current_avg_cost = self.repo.calculate_average_cost(
                     conn,
-                    account_currency.to_string(),
-                    activity.currency.clone(),
-                    None,
-                )?;
+                    &activity.account_id,
+                    &activity.asset_id,
+                ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                activity.unit_price = current_avg_cost;
             }
+            "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "DIVIDEND" => {
+                activity.quantity = 1.0;
+            }
+            _ => {}
+        }
 
-            // Insert the new activity into the database
-            let inserted_activity = self.repo.insert_new_activity(conn, activity)?;
+        // Insert the new activity into the database
+        let inserted_activity = self.repo.insert_new_activity(conn, activity)?;
 
-            Ok(inserted_activity)
-        })
+        Ok(inserted_activity)
     }
 
     // update an activity
@@ -158,13 +148,11 @@ impl ActivityService {
         conn: &mut SqliteConnection,
         mut activity: ActivityUpdate,
     ) -> Result<Activity, Box<dyn std::error::Error>> {
-        let asset_service = AssetService::new().await;
-        let account_service = AccountService::new(self.base_currency.clone());
-        let asset = asset_service
+        let asset = self.asset_service
             .get_or_create_asset(conn, &activity.asset_id)
             .await?;
 
-        if let Err(e) = asset_service
+        if let Err(e) = self.asset_service
             .sync_asset_quotes(conn, &vec![asset.clone()])
             .await
         {
@@ -174,8 +162,9 @@ impl ActivityService {
             );
         }
 
-        let account = account_service.get_account_by_id(conn, &activity.account_id)?;
+        let account = self.account_service.get_account_by_id(conn, &activity.account_id)?;
 
+        // Set activity currency first if empty
         if activity.currency.is_empty() {
             if !asset.currency.is_empty() {
                 activity.currency = asset.currency.clone();
@@ -184,33 +173,31 @@ impl ActivityService {
             }
         }
 
+        // Register currency if different from account currency after currency is finalized
+        if activity.currency != account.currency {
+            self.fx_service.register_currency(
+                conn,
+                account.currency.clone(),
+                activity.currency.clone(),
+            ).await?;
+        }
+
         conn.transaction(|conn| {
             // Handle different activity types
             match activity.activity_type.as_str() {
                 "TRANSFER_OUT" => {
                     // Calculate the current average cost for the asset in this account
-                    let current_avg_cost = self.calculate_average_cost(
+                    let current_avg_cost = self.repo.calculate_average_cost(
                         conn,
                         &activity.account_id,
                         &activity.asset_id,
-                    )?;
+                    ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                     activity.unit_price = current_avg_cost;
                 }
                 "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "DIVIDEND" => {
                     activity.quantity = 1.0;
                 }
                 _ => {}
-            }
-
-            // Create exchange rate if asset currency is different from account currency
-            if activity.currency != account.currency {
-                let fx_service = CurrencyExchangeService::new();
-                fx_service.add_exchange_rate(
-                    conn,
-                    account.currency.clone(),
-                    activity.currency.clone(),
-                    None,
-                )?;
             }
 
             // Update the activity in the database
@@ -227,10 +214,7 @@ impl ActivityService {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>, String> {
-        let asset_service = AssetService::new().await;
-        let account_service = AccountService::new(self.base_currency.clone());
-        let fx_service = CurrencyExchangeService::new();
-        let account = account_service
+        let account = self.account_service
             .get_account_by_id(conn, &account_id)
             .map_err(|e| e.to_string())?;
 
@@ -242,7 +226,7 @@ impl ActivityService {
             activity.account_name = Some(account.name.clone());
 
             // Load the symbol profile
-            let symbol_profile_result = asset_service
+            let symbol_profile_result = self.asset_service
                 .get_or_create_asset(conn, &activity.symbol)
                 .await;
 
@@ -259,30 +243,19 @@ impl ActivityService {
                     };
                     assets_to_sync.push(asset_copy);
 
-                    // Add exchange rate if the activity currency is different from the account currency
-                    let currency = &activity.currency;
-                    if currency != &account.currency {
-                        match fx_service.add_exchange_rate(
+                    // Create exchange rate if asset currency is different from account currency
+                    if activity.currency != account.currency {
+                        match self.fx_service.register_currency(
                             conn,
                             account.currency.clone(),
-                            currency.clone(),
-                            None,
-                        ) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                let error_msg = format!(
-                                    "Failed to add exchange rate for {}/{}. Error: {}. Line: {}",
-                                    &account.currency,
-                                    currency,
-                                    e,
-                                    activity.line_number.unwrap()
-                                );
-                                return Err(error_msg);
-                            }
+                            activity.currency.clone(),
+                        ).await {
+                            Ok(_) => (true, None),
+                            Err(e) => (false, Some(format!("Failed to register currency: {}", e)))
                         }
+                    } else {
+                        (true, None)
                     }
-
-                    (true, None)
                 }
                 Err(_) => {
                     let error_msg = format!(
@@ -301,7 +274,7 @@ impl ActivityService {
 
         // Sync quotes for all valid assets
         if !assets_to_sync.is_empty() {
-            match asset_service.sync_asset_quotes(conn, &assets_to_sync).await {
+            match self.asset_service.sync_asset_quotes(conn, &assets_to_sync).await {
                 Ok(_) => (),
                 Err(e) => {
                     return Err(format!("Failed to sync quotes for assets: {}", e));
@@ -347,47 +320,6 @@ impl ActivityService {
         account_ids: &[String],
     ) -> Result<Vec<Activity>, diesel::result::Error> {
         self.repo.get_activities_by_account_ids(conn, account_ids)
-    }
-
-    fn calculate_average_cost(
-        &self,
-        conn: &mut SqliteConnection,
-        account_id: &str,
-        asset_id: &str,
-    ) -> Result<f64, Box<dyn std::error::Error>> {
-        #[derive(QueryableByName, Debug)]
-        struct AverageCost {
-            #[diesel(sql_type = Double)]
-            average_cost: f64,
-        }
-
-        let result: AverageCost = diesel::sql_query(
-            r#"
-            WITH running_totals AS (
-                SELECT
-                    quantity,
-                    unit_price,
-                    quantity AS quantity_change,
-                    quantity * unit_price AS value_change,
-                    SUM(quantity) OVER (ORDER BY activity_date, id) AS running_quantity,
-                    SUM(quantity * unit_price) OVER (ORDER BY activity_date, id) AS running_value
-                FROM activities
-                WHERE account_id = ?1 AND asset_id = ?2
-                  AND activity_type IN ('BUY', 'TRANSFER_IN')
-            )
-            SELECT
-                CASE
-                    WHEN SUM(quantity_change) > 0 THEN SUM(value_change) / SUM(quantity_change)
-                    ELSE 0
-                END AS average_cost
-            FROM running_totals
-            "#,
-        )
-        .bind::<Text, _>(account_id)
-        .bind::<Text, _>(asset_id)
-        .get_result(conn)?;
-
-        Ok(result.average_cost)
     }
 
     pub fn get_import_mapping(

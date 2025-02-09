@@ -7,6 +7,7 @@ use crate::{
 };
 use chrono::NaiveDate;
 use diesel::prelude::*;
+use diesel::sql_types::{Double, Text};
 use uuid::Uuid;
 
 pub struct ActivityRepository;
@@ -270,5 +271,46 @@ impl ActivityRepository {
             ))
             .execute(conn)?;
         Ok(())
+    }
+
+    pub fn calculate_average_cost(
+        &self,
+        conn: &mut SqliteConnection,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<f64, diesel::result::Error> {
+        #[derive(QueryableByName, Debug)]
+        struct AverageCost {
+            #[diesel(sql_type = Double)]
+            average_cost: f64,
+        }
+
+        let result: AverageCost = diesel::sql_query(
+            r#"
+            WITH running_totals AS (
+                SELECT
+                    quantity,
+                    unit_price,
+                    quantity AS quantity_change,
+                    quantity * unit_price AS value_change,
+                    SUM(quantity) OVER (ORDER BY activity_date, id) AS running_quantity,
+                    SUM(quantity * unit_price) OVER (ORDER BY activity_date, id) AS running_value
+                FROM activities
+                WHERE account_id = ?1 AND asset_id = ?2
+                  AND activity_type IN ('BUY', 'TRANSFER_IN')
+            )
+            SELECT
+                CASE
+                    WHEN SUM(quantity_change) > 0 THEN SUM(value_change) / SUM(quantity_change)
+                    ELSE 0
+                END AS average_cost
+            FROM running_totals
+            "#,
+        )
+        .bind::<Text, _>(account_id)
+        .bind::<Text, _>(asset_id)
+        .get_result(conn)?;
+
+        Ok(result.average_cost)
     }
 }
