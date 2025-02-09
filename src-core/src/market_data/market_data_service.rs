@@ -121,9 +121,6 @@ impl MarketDataService {
                 Ok(quotes) => all_quotes.extend(quotes),
                 Err(e) => {
                     error!("Failed to sync public quotes batch: {}", e);
-                    for symbol in public_symbols {
-                        failed_assets.push((symbol, e.to_string()));
-                    }
                 }
             }
         }

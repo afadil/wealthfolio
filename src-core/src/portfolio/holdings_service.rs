@@ -156,6 +156,18 @@ impl Portfolio {
                     .countries
                     .clone()
                     .and_then(|c| serde_json::from_str(&c).ok()),
+                account: Some(Account {
+                    id: account_id.to_string(),
+                    name: format!("Account {}", account_id),
+                    account_type: "UNKNOWN".to_string(),
+                    group: None,
+                    currency: activity.currency.clone(),
+                    is_default: false,
+                    is_active: true,
+                    created_at: chrono::Utc::now().naive_utc(),
+                    updated_at: chrono::Utc::now().naive_utc(),
+                    platform_id: None,
+                }),
                 ..Default::default()
             })
     }
@@ -478,7 +490,6 @@ impl HoldingsService {
 
         // Create lookup maps for better performance
         let assets_map: HashMap<_, _> = assets.iter().map(|a| (&a.id, a)).collect();
-        let accounts_map: HashMap<_, _> = accounts.iter().map(|a| (&a.id, a)).collect();
 
         // Initialize FX service
         self.fx_service.initialize(conn).await?;
@@ -497,13 +508,7 @@ impl HoldingsService {
                     }
                 };
 
-                match self.get_account_for_activity(&accounts_map, activity) {
-                    Ok(account) => account,
-                    Err(e) => {
-                        error!("Error getting account for activity: {}", e);
-                        continue;
-                    }
-                };
+            
 
                 if let Err(e) = portfolio.process_activity(activity, asset) {
                     error!("Error processing activity: {}", e);
@@ -559,17 +564,6 @@ impl HoldingsService {
             .get(&activity.asset_id)
             .copied()
             .ok_or_else(|| Error::Asset(AssetError::NotFound(activity.asset_id.clone())))
-    }
-
-    fn get_account_for_activity<'a>(
-        &self,
-        accounts_map: &'a HashMap<&String, &'a Account>,
-        activity: &Activity,
-    ) -> Result<&'a Account> {
-        accounts_map
-            .get(&activity.account_id)
-            .copied()
-            .ok_or_else(|| Error::Asset(AssetError::NotFound(activity.account_id.clone())))
     }
 
     fn load_quotes(

@@ -523,7 +523,7 @@ impl YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        use futures::future::try_join_all;
+        use futures::future::join_all;
         use rayon::prelude::*;
 
         // Filter out cash symbols as they don't need processing
@@ -542,30 +542,56 @@ impl YahooProvider {
             .map(|symbol| {
                 let provider = &self.provider;
                 async move {
-                    let response = provider
+                    let result = provider
                         .get_quote_history(symbol, start.into(), end.into())
                         .await
-                        .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
-                    
-                    let quotes = response
-                        .quotes()
-                        .map_err(|e| MarketDataError::ProviderError(e.to_string()))?
-                        .into_iter()
-                        .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
-                        .collect::<Vec<_>>();
+                        .and_then(|response| {
+                            response.quotes().map_err(|e| {
+                                yahoo::YahooError::FetchFailed(e.to_string())
+                            })
+                        });
 
-                    Ok::<Vec<ModelQuote>, MarketDataError>(quotes)
+                    match result {
+                        Ok(quotes) => {
+                            let model_quotes = quotes
+                                .into_iter()
+                                .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
+                                .collect::<Vec<_>>();
+                            Ok((symbol.to_string(), model_quotes))
+                        }
+                        Err(e) => {
+                            log::error!("Failed to fetch history for symbol {}: {}", symbol, e);
+                            Err((symbol.to_string(), e.to_string()))
+                        }
+                    }
                 }
             })
             .collect();
 
-        // Execute all futures concurrently and collect results
-        let results = try_join_all(futures)
-            .await
-            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        // Execute all futures concurrently
+        let results = join_all(futures).await;
 
-        // Combine all quotes into a single vector
-        Ok(results.into_iter().flatten().collect())
+        // Separate successful and failed results
+        let mut all_quotes = Vec::new();
+        let mut failed_symbols = Vec::new();
+
+        for result in results {
+            match result {
+                Ok((_, quotes)) => all_quotes.extend(quotes),
+                Err((symbol, error)) => failed_symbols.push((symbol, error)),
+            }
+        }
+
+        // Log failed symbols if any
+        if !failed_symbols.is_empty() {
+            log::warn!(
+                "Failed to fetch history for {} symbols: {:?}",
+                failed_symbols.len(),
+                failed_symbols
+            );
+        }
+
+        Ok(all_quotes)
     }
 }
 
