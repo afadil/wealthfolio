@@ -63,7 +63,7 @@ Ensure you have the following installed on your machine:
 - [Rust](https://www.rust-lang.org/)
 - [Tauri](https://tauri.app/)
 
-### Installation
+### Building from Source
 
 1. **Clone the repository**:
 
@@ -78,9 +78,7 @@ Ensure you have the following installed on your machine:
    pnpm install
    ```
 
-### Running the Application
-
-- **Development Mode**:
+3. **Run in Development Mode**:
 
   Build and run the desktop application using Tauri:
 
@@ -88,13 +86,59 @@ Ensure you have the following installed on your machine:
   pnpm tauri dev
   ```
 
-- **Build for Production**:
+4. **Build for Production**:
 
   Build the application for production:
 
   ```bash
   pnpm tauri build
   ```
+
+### Development with DevContainer
+
+For a consistent development environment across all platforms, you can use the provided DevContainer configuration. This method requires fewer manual setup steps and provides an isolated environment with all necessary dependencies.
+
+#### Prerequisites
+
+- [Docker](https://www.docker.com/)
+- [Visual Studio Code](https://code.visualstudio.com/)
+- [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) VS Code extension
+
+#### Features
+
+- Pre-configured Tauri development environment
+- X11 virtual display with VNC access (port 5900)
+- Complete Rust development setup
+- GPU support (via Docker's --gpus=all flag)
+- Persistent data and build caches
+- Essential VS Code extensions pre-installed
+
+#### Starting Development with DevContainer
+
+1. **Clone the repository** (if you haven't already):
+   ```bash
+   git clone https://github.com/afadil/wealthfolio.git
+   cd wealthfolio
+   ```
+   
+2. **Open in VS Code**:
+   - Open VS Code
+   - Go to File > Open Folder
+   - Select the wealthfolio directory
+
+3. **Launch DevContainer**:
+   - Press `F1` or `Ctrl+Shift+P`
+   - Type "Remote-Containers: Reopen in Container"
+   - Press Enter
+
+4. **Wait for container build**:
+   - VS Code will build and configure the development container
+   - This may take a few minutes on first run
+
+5. **Start Development**:
+   - Once the container is ready, you can start development
+   - All necessary tools and dependencies will be available
+
 
 ## Technologies Used
 
