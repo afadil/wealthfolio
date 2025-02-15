@@ -261,13 +261,30 @@ export const AssetProfilePage = () => {
                   )}
                   placeholder="sector:weight"
                   onChange={(values) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      sectors: (values as string[]).map((value) => {
+                    setFormData((prev) => {
+                      const newSectors = [...prev.sectors];
+                      // Iterate over the new values entered by the user
+                      (values as string[]).forEach((value) => {
                         const [name, weight] = value.split(':');
-                        return { name, weight: parseFloat(weight) || 0 };
-                      }),
-                    }))
+                        const parsedWeight = parseFloat(weight) || 0;
+                      
+                        // Check if the sector already exists
+                        const existingSectorIndex = newSectors.findIndex((s) => s.name === name);
+                      
+                        if (existingSectorIndex !== -1) {
+                          // If it exists, update the weight
+                          newSectors[existingSectorIndex].weight = parsedWeight;
+                        } else {
+                          // If it doesn't exist, add a new sector
+                          newSectors.push({ name, weight: parsedWeight });
+                        }
+                      });
+                      // Return the updated formData
+                      return {
+                        ...prev,
+                        sectors: newSectors,
+                      };
+                    })
                   }
                 />
               ) : (
@@ -294,13 +311,30 @@ export const AssetProfilePage = () => {
                     (c) => `${c.code}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
                   )}
                   onChange={(values) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      countries: (values as string[]).map((value) => {
-                        const [code, weight] = value.split(':');
-                        return { code, weight: parseFloat(weight) || 0 };
-                      }),
-                    }))
+                    setFormData((prev) => {
+                      const newCountries = [...prev.countries];
+                      // Iterate over the new values entered by the user
+                      (values as string[]).forEach((value) => {
+                        const [name, weight] = value.split(':');
+                        const parsedWeight = parseFloat(weight) || 0;
+                      
+                        // Check if the country already exists
+                        const existingCountryIndex = newCountries.findIndex((s) => s.name === name);
+                      
+                        if (existingCountryIndex !== -1) {
+                          // If it exists, update the weight
+                          newCountries[existingCountryIndex].weight = parsedWeight;
+                        } else {
+                          // If it doesn't exist, add a new country
+                          newCountries.push({ name, weight: parsedWeight });
+                        }
+                      });
+                      // Return the updated formData
+                      return {
+                        ...prev,
+                        countries: newCountries,
+                      };
+                    })
                   }
                 />
               ) : (
