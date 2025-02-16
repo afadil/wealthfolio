@@ -262,27 +262,32 @@ export const AssetProfilePage = () => {
                   placeholder="sector:weight"
                   onChange={(values) =>
                     setFormData((prev) => {
-                      const newSectors = [...prev.sectors];
-                      // Iterate over the new values entered by the user
+                      const filteredSectors = prev.sectors.filter((sector) =>
+                        (values as string[]).some((value) => {
+                          const [name] = value.split(":"); // Extract the name from each value
+                          return sector.name === name; // Keep only those sectors whose names exist in `values`
+                        })
+                      );
+                      // Iterate over the values entered by the user
                       (values as string[]).forEach((value) => {
                         const [name, weight] = value.split(':');
                         const parsedWeight = parseFloat(weight) || 0;
                       
                         // Check if the sector already exists
-                        const existingSectorIndex = newSectors.findIndex((s) => s.name === name);
+                        const existingSectorIndex = filteredSectors.findIndex((s) => s.name === name);
                       
                         if (existingSectorIndex !== -1) {
                           // If it exists, update the weight
-                          newSectors[existingSectorIndex].weight = parsedWeight;
+                          filteredSectors[existingSectorIndex].weight = parsedWeight;
                         } else {
                           // If it doesn't exist, add a new sector
-                          newSectors.push({ name, weight: parsedWeight });
+                          filteredSectors.push({ name, weight: parsedWeight });
                         }
                       });
                       // Return the updated formData
                       return {
                         ...prev,
-                        sectors: newSectors,
+                        sectors: filteredSectors,
                       };
                     })
                   }
@@ -312,27 +317,32 @@ export const AssetProfilePage = () => {
                   )}
                   onChange={(values) =>
                     setFormData((prev) => {
-                      const newCountries = [...prev.countries];
-                      // Iterate over the new values entered by the user
+                      const filteredCountries = prev.countries.filter((country) =>
+                        (values as string[]).some((value) => {
+                          const [code] = value.split(":"); // Extract the code from each value
+                          return country.code === code; // Keep only those sectors whose codes exist in `values`
+                        })
+                      );
+                      // Iterate over the values entered by the user
                       (values as string[]).forEach((value) => {
-                        const [name, weight] = value.split(':');
+                        const [code, weight] = value.split(':');
                         const parsedWeight = parseFloat(weight) || 0;
                       
                         // Check if the country already exists
-                        const existingCountryIndex = newCountries.findIndex((s) => s.name === name);
+                        const existingCountryIndex = filteredCountries.findIndex((s) => s.code === code);
                       
                         if (existingCountryIndex !== -1) {
                           // If it exists, update the weight
-                          newCountries[existingCountryIndex].weight = parsedWeight;
+                          filteredCountries[existingCountryIndex].weight = parsedWeight;
                         } else {
-                          // If it doesn't exist, add a new country
-                          newCountries.push({ name, weight: parsedWeight });
+                          // If it doesn't exist, add a new sector
+                          filteredCountries.push({ code, weight: parsedWeight });
                         }
                       });
                       // Return the updated formData
                       return {
                         ...prev,
-                        countries: newCountries,
+                        countries: filteredCountries,
                       };
                     })
                   }
