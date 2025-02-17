@@ -12,3 +12,6 @@ pub mod portfolio;
 pub mod providers;
 pub mod schema;
 pub mod settings;
+
+pub use models::*;
+pub use portfolio::*;

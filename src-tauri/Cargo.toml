@@ -10,11 +10,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.0.3", features = [] }
+tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
 wealthfolio_core = { path = "../src-core" }
-tauri = { version = "2.1", features = [] }
+tauri = { version = "2.2", features = [] }
 diesel = { version = "2.2", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15.7"
 csv = "1.1"
@@ -33,4 +33,4 @@ log = "0.4"
 custom-protocol = ["tauri/custom-protocol"]
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2"
+tauri-plugin-updater = "2.5"

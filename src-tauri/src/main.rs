@@ -194,7 +194,7 @@ pub fn main() {
 fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     spawn(async move {
         let base_currency = state.get_base_currency();
-        let portfolio_service = match portfolio::PortfolioService::new(base_currency).await {
+        let portfolio_service = match portfolio::portfolio_service::PortfolioService::new(base_currency).await {
             Ok(service) => service,
             Err(e) => {
                 error!("Failed to create PortfolioService: {}", e);

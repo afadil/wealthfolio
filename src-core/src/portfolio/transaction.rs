@@ -51,7 +51,7 @@ impl Transaction for SellTransaction {
 pub struct DepositTransaction;
 impl Transaction for DepositTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let amount = BigDecimal::from_str(&activity.quantity.to_string())?;
+        let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let net_amount = &amount - &fee;
         portfolio.adjust_cash(&activity.account_id, &activity.currency, net_amount);
@@ -62,7 +62,7 @@ impl Transaction for DepositTransaction {
 pub struct WithdrawalTransaction;
 impl Transaction for WithdrawalTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let amount = BigDecimal::from_str(&activity.quantity.to_string())?;
+        let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let total_amount = &amount + &fee;
         portfolio.adjust_cash(&activity.account_id, &activity.currency, -total_amount);
@@ -73,7 +73,7 @@ impl Transaction for WithdrawalTransaction {
 pub struct DividendTransaction;
 impl Transaction for DividendTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let amount = BigDecimal::from_str(&activity.quantity.to_string())?;
+        let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let net_amount = &amount - &fee;
         portfolio.adjust_cash(&activity.account_id, &activity.currency, net_amount);
@@ -84,7 +84,7 @@ impl Transaction for DividendTransaction {
 pub struct InterestTransaction;
 impl Transaction for InterestTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let amount = BigDecimal::from_str(&activity.quantity.to_string())?;
+        let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let net_amount = &amount - &fee;
         portfolio.adjust_cash(&activity.account_id, &activity.currency, net_amount);
@@ -95,15 +95,14 @@ impl Transaction for InterestTransaction {
 pub struct TransferInTransaction;
 impl Transaction for TransferInTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, asset: &Asset) -> Result<()> {
-        let quantity = BigDecimal::from_str(&activity.quantity.to_string())?;
-        let unit_price = BigDecimal::from_str(&activity.unit_price.to_string())?;
-        let fee = BigDecimal::from_str(&activity.fee.to_string())?;
-        let activity_amount = &quantity * &unit_price;
-        let net_amount = &activity_amount - &fee;
-
         if activity.asset_id.starts_with("$CASH") {
+            let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
+            let fee = BigDecimal::from_str(&activity.fee.to_string())?;
+            let net_amount = &amount - &fee;
             portfolio.adjust_cash(&activity.account_id, &activity.currency, net_amount);
         } else {
+            let quantity = BigDecimal::from_str(&activity.quantity.to_string())?;
+            let unit_price = BigDecimal::from_str(&activity.unit_price.to_string())?;
             let holding = portfolio.get_or_create_holding(&activity.account_id, &activity.asset_id, activity, asset);
             holding.add_position(quantity, unit_price);
         }
@@ -114,19 +113,19 @@ impl Transaction for TransferInTransaction {
 pub struct TransferOutTransaction;
 impl Transaction for TransferOutTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let quantity = BigDecimal::from_str(&activity.quantity.to_string())?;
-        let unit_price = BigDecimal::from_str(&activity.unit_price.to_string())?;
-        let fee = BigDecimal::from_str(&activity.fee.to_string())?;
-        let activity_amount = &quantity * &unit_price;
-        let total_amount = &activity_amount + &fee;
-
         if activity.asset_id.starts_with("$CASH") {
+            let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
+            let fee = BigDecimal::from_str(&activity.fee.to_string())?;
+            let total_amount = &amount + &fee;
             portfolio.adjust_cash(&activity.account_id, &activity.currency, -total_amount);
-        } else if let Some(holding) = portfolio.get_holding_mut(&activity.account_id, &activity.asset_id) {
-            holding.reduce_position(quantity)?;
+        } else {
+            let quantity = BigDecimal::from_str(&activity.quantity.to_string())?;
+            if let Some(holding) = portfolio.get_holding_mut(&activity.account_id, &activity.asset_id) {
+                holding.reduce_position(quantity)?;
 
-            if !Portfolio::is_quantity_significant(&holding.quantity) {
-                portfolio.remove_holding(&activity.account_id, &activity.asset_id);
+                if !Portfolio::is_quantity_significant(&holding.quantity) {
+                    portfolio.remove_holding(&activity.account_id, &activity.asset_id);
+                }
             }
         }
         Ok(())
@@ -151,7 +150,7 @@ impl Transaction for SplitTransaction {
 pub struct ConversionInTransaction;
 impl Transaction for ConversionInTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let amount = BigDecimal::from_str(&activity.quantity.to_string())?;
+        let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let net_amount = &amount - &fee;
         portfolio.adjust_cash(&activity.account_id, &activity.currency, net_amount);
@@ -162,7 +161,7 @@ impl Transaction for ConversionInTransaction {
 pub struct ConversionOutTransaction;
 impl Transaction for ConversionOutTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
-        let amount = BigDecimal::from_str(&activity.quantity.to_string())?;
+        let amount = BigDecimal::from_str(&activity.unit_price.to_string())?;
         let fee = BigDecimal::from_str(&activity.fee.to_string())?;
         let total_amount = &amount + &fee;
         portfolio.adjust_cash(&activity.account_id, &activity.currency, -total_amount);
