@@ -161,7 +161,6 @@ export const ActivityTable = ({
       {
         id: 'unitPrice',
         accessorKey: 'unitPrice',
-        enableHiding: false,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader
@@ -187,7 +186,7 @@ export const ActivityTable = ({
       {
         id: 'fee',
         accessorKey: 'fee',
-        enableHiding: false,
+        enableHiding: true,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
@@ -208,6 +207,7 @@ export const ActivityTable = ({
         id: 'value',
         accessorKey: 'value',
         enableSorting: false,
+        enableHiding: true,
         header: ({ column }) => (
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Value" />
         ),
@@ -237,16 +237,18 @@ export const ActivityTable = ({
         enableSorting: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
         cell: ({ row }) => <div>{row.getValue('currency')}</div>,
+        enableHiding: false,
       },
       {
-        id: 'accountName',
+        id: 'account',
         accessorKey: 'accountName',
         enableSorting: false,
+        enableHiding: true,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
         cell: ({ row }) => {
           return (
             <div className="ml-2 flex min-w-[150px] flex-col">
-              <span>{row.getValue('accountName')}</span>
+              <span>{row.getValue('account')}</span>
               <span className="text-xs font-light">{row.getValue('accountCurrency')}</span>
             </div>
           );
@@ -255,10 +257,12 @@ export const ActivityTable = ({
       {
         id: 'assetName',
         accessorKey: 'assetName',
+        enableHiding: false,
       },
       {
         id: 'accountCurrency',
         accessorKey: 'accountCurrency',
+        enableHiding: false,
       },
       {
         id: 'accountId',
@@ -266,12 +270,14 @@ export const ActivityTable = ({
         filterFn: (row, id, value: string) => {
           return value.includes(row.getValue(id));
         },
+        enableHiding: false,
       },
       {
         id: 'actions',
         cell: ({ row }) => {
           return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} />;
         },
+        enableHiding: false,
       },
     ],
     [handleEdit, handleDelete],
@@ -366,16 +372,18 @@ export const ActivityTable = ({
     onGlobalFilterChange: setGlobalFilter,
     onColumnFiltersChange: setColumnFilters,
     onSortingChange: setSorting,
-    state: {
-      sorting,
-      columnFilters,
-      globalFilter,
+    initialState: {
       columnVisibility: {
         accountId: false,
         accountCurrency: false,
         assetName: false,
         currency: false,
-      },
+      }
+    },
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
     },
 
     getCoreRowModel: getCoreRowModel(),
