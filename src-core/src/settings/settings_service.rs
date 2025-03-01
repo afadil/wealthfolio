@@ -1,19 +1,21 @@
 use super::settings_repository::SettingsRepository;
 use crate::models::{Settings, SettingsUpdate};
-use crate::fx::fx_service::CurrencyExchangeService;
+use crate::fx::fx_service::FxService;
 use crate::schema::{assets, accounts};
 use diesel::prelude::*;
+use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use log::{debug, error};
+use std::sync::Arc;
 
 pub struct SettingsService {
-    fx_service: CurrencyExchangeService,
+    fx_service: FxService,
 }
 
 impl SettingsService {
-    pub fn new() -> Self {
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
         SettingsService {
-            fx_service: CurrencyExchangeService::new(),
+            fx_service: FxService::new(pool),
         }
     }
 
@@ -24,7 +26,7 @@ impl SettingsService {
         SettingsRepository::get_settings(conn)
     }
 
-    pub async fn update_settings(
+    pub fn update_settings(
         &self,
         conn: &mut SqliteConnection,
         new_settings: &SettingsUpdate,
@@ -32,7 +34,7 @@ impl SettingsService {
         // Check if base currency is different from current
         let current_base_currency = self.get_base_currency(conn)?;
         if current_base_currency.as_deref() != Some(new_settings.base_currency.as_str()) {
-            self.update_base_currency(conn, &new_settings.base_currency).await?;
+            self.update_base_currency(conn, &new_settings.base_currency)?;
             return Ok(());
         }
 
@@ -52,7 +54,7 @@ impl SettingsService {
         }
     }
 
-    pub async fn update_base_currency(
+    pub fn update_base_currency(
         &self,
         conn: &mut SqliteConnection,
         new_base_currency: &str,
@@ -84,12 +86,10 @@ impl SettingsService {
         // Create currency pairs between new base currency and all existing currencies
         for currency_code in all_currencies {
             if let Err(e) = self.fx_service
-                .register_currency(
-                    conn,
-                    new_base_currency.to_string(),
-                    currency_code.clone(),
+                .register_currency_pair(
+                    currency_code.as_str(),
+                    new_base_currency,
                 )
-                .await
             {
                 error!("Failed to register currency pair {}{}: {}", new_base_currency, currency_code, e);
             }

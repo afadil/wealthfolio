@@ -1,24 +1,29 @@
-use crate::errors::{CurrencyError, Error, Result};
-use crate::fx::fx_service::CurrencyExchangeService;
+use crate::errors::{ Error, Result};
+use crate::fx::fx_service::FxService;
 use crate::market_data::market_data_service::MarketDataService;
-use crate::models::{Account, Activity, HistorySummary, PortfolioHistory, Quote};
+use crate::models::{ HistorySummary, PortfolioHistory};
 use crate::portfolio::history_repository::HistoryRepository;
+use crate::accounts::Account;
+use crate::activities::Activity;
+use crate::market_data::market_data_model::Quote;
+use diesel::r2d2::{Pool, ConnectionManager};
 
 use bigdecimal::BigDecimal;
 use chrono::{Duration, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
-use log::warn;
+use log::{error, info, warn};
 use num_traits::{FromPrimitive, ToPrimitive};
-use rayon::prelude::*;
 use std::collections::HashMap;
 use std::default::Default;
 use std::str::FromStr;
 use std::sync::Arc;
+use rayon::prelude::*;
 
 pub struct HistoryService {
+    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
     base_currency: String,
-    fx_service: CurrencyExchangeService,
+    fx_service: FxService,
     market_data_service: Arc<MarketDataService>,
     repository: HistoryRepository,
 }
@@ -42,58 +47,54 @@ impl HistoryService {
     }
 
     pub fn new(
+        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
         base_currency: String,
-        fx_service: CurrencyExchangeService,
+        fx_service: FxService,
         market_data_service: Arc<MarketDataService>,
     ) -> Self {
+        let repository = HistoryRepository::new(Arc::clone(&pool));
         Self {
+            pool,
             base_currency,
             fx_service,
             market_data_service,
-            repository: HistoryRepository::new(),
+            repository,
         }
     }
 
-    pub fn get_all_accounts_history(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<PortfolioHistory>> {
-        self.repository.get_all(conn)
+    pub fn get_all_accounts_history(&self) -> Result<Vec<PortfolioHistory>> {
+        self.repository.get_all()
     }
 
     pub fn get_portfolio_history(
         &self,
-        conn: &mut SqliteConnection,
         input_account_id: Option<&str>,
     ) -> Result<Vec<PortfolioHistory>> {
-        self.repository.get_by_account(conn, input_account_id)
+        self.repository.get_by_account(input_account_id)
     }
 
     pub fn get_latest_account_history(
         &self,
-        conn: &mut SqliteConnection,
         input_account_id: &str,
     ) -> Result<PortfolioHistory> {
-        self.repository.get_latest_by_account(conn, input_account_id)
+        self.repository.get_latest_by_account(input_account_id)
     }
 
     pub async fn calculate_historical_data(
         &self,
-        conn: &mut SqliteConnection,
         accounts: &[Account],
         activities: &[Activity],
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>> {
-
+   
         // Initialize FX service
-        self.initialize_fx_service(conn).await?;
-        let end_date=Utc::now().naive_utc().date();
+        self.fx_service.initialize()?;
+        let end_date = Utc::now().naive_utc().date();
 
         // Load and prepare all required data 
-        let quotes = Arc::new(self.market_data_service.load_quotes(conn));
+        let quotes = Arc::new(self.market_data_service.get_all_quotes()?);
         let account_currencies = self.get_account_currencies(accounts)?;
-        let asset_currencies = self.market_data_service
-            .get_asset_currencies(conn);
+        let asset_currencies = self.market_data_service.get_asset_currencies()?;
 
         // Calculate split factors for all activities
         let split_factors = self.calculate_split_factors(
@@ -109,7 +110,7 @@ impl HistoryService {
         let account_activities = self.group_activities_by_account(&adjusted_activities);
 
         let all_last_histories = if !force_full_calculation {
-            self.get_all_last_portfolio_histories(conn, accounts)?
+            self.get_all_last_portfolio_histories(&accounts)?
         } else {
             HashMap::new()
         };
@@ -157,7 +158,6 @@ impl HistoryService {
             .map(|(summary, _)| summary.clone())
             .collect();
 
-
         let account_histories: Vec<PortfolioHistory> = summaries_and_histories
             .into_iter()
             .flat_map(|(_, histories)| histories)
@@ -165,27 +165,20 @@ impl HistoryService {
 
         // If force_full_calculation is true, delete existing history for the accounts and TOTAL
         if force_full_calculation {
-            self.delete_existing_history(conn, accounts)?;
+            self.repository.delete_by_accounts(&accounts)?;
         }
 
         // Save data
-        self.repository.save_batch(conn, &account_histories)?;
+        self.repository.save_batch(&account_histories)?;
 
-        let total_history = self.calculate_total_portfolio_history(conn)?;
+        let total_history = self.calculate_total_portfolio_history()?;
 
-        self.repository.save_batch(conn, &total_history)?;
+        self.repository.save_batch(&total_history)?;
 
         let total_summary = self.create_total_summary(&total_history);
         summaries.push(total_summary);
 
         Ok(summaries)
-    }
-
-    async fn initialize_fx_service(&self, conn: &mut SqliteConnection) -> Result<()> {
-        match self.fx_service.initialize(conn).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Currency(CurrencyError::ConversionFailed(e.to_string())))
-        }
     }
 
     fn group_activities_by_account(
@@ -225,7 +218,7 @@ impl HistoryService {
             let start_date = if force_full_calculation {
                 account_activities
                     .get(&account.id)
-                    .and_then(|activities| activities.iter().map(|a| a.activity_date.date()).min())
+                    .and_then(|activities| activities.iter().map(|a| a.activity_date.naive_utc().date()).min())
                     .unwrap_or_else(|| Utc::now().naive_utc().date())
             } else {
                 match all_last_histories.get(&account.id) {
@@ -235,7 +228,7 @@ impl HistoryService {
                     _ => account_activities
                         .get(&account.id)
                         .and_then(|activities| {
-                            activities.iter().map(|a| a.activity_date.date()).min()
+                            activities.iter().map(|a| a.activity_date.naive_utc().date()).min()
                         })
                         .unwrap_or_else(|| Utc::now().naive_utc().date()),
                 }
@@ -256,11 +249,10 @@ impl HistoryService {
 
     fn get_all_last_portfolio_histories(
         &self,
-        conn: &mut SqliteConnection,
         accounts: &[Account],
     ) -> Result<HashMap<String, Option<PortfolioHistory>>> {
         let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
-        self.repository.get_all_last_histories(conn, &account_ids)
+        self.repository.get_all_last_histories(&account_ids)
     }
 
     fn calculate_account_history(
@@ -329,22 +321,25 @@ impl HistoryService {
 
     fn calculate_total_portfolio_history(
         &self,
-        conn: &mut SqliteConnection,
     ) -> Result<Vec<PortfolioHistory>> {
         use crate::schema::accounts::dsl as accounts_dsl;
         use crate::schema::portfolio_history::dsl::*;
 
         // Get active account IDs
+        let mut conn = self.pool.get().map_err(|e| {
+            error!("Failed to get database connection: {}", e);
+            Error::Database(e.into())
+        })?;
         let active_account_ids: Vec<String> = accounts_dsl::accounts
             .filter(accounts_dsl::is_active.eq(true))
             .select(accounts_dsl::id)
-            .load::<String>(conn)?;
+            .load::<String>(&mut conn)?;
 
         let all_histories: Vec<PortfolioHistory> = portfolio_history
             .filter(account_id.ne("TOTAL"))
             .filter(account_id.eq_any(active_account_ids))
             .order(date.asc())
-            .load::<PortfolioHistory>(conn)?;
+            .load::<PortfolioHistory>(&mut conn)?;
 
         let mut grouped_histories: HashMap<String, Vec<PortfolioHistory>> = HashMap::new();
         for history in all_histories {
@@ -457,7 +452,7 @@ impl HistoryService {
             .iter()
             .map(|&date| {
                 // Process activities for the current date
-                for activity in activities.iter().filter(|a| a.activity_date.date() == date) {
+                for activity in activities.iter().filter(|a| a.activity_date.naive_utc().date() == date) {
                     self.process_activity(
                         activity,
                         &mut holdings,
@@ -488,14 +483,14 @@ impl HistoryService {
                 };
 
                 let day_gain_percentage = if opening_market_value != BigDecimal::from(0) {
-                    (&day_gain_value / &opening_market_value) * BigDecimal::from(100)
+                    (&day_gain_value / &opening_market_value * BigDecimal::from(100))
                 } else {
                     BigDecimal::from(0)
                 };
 
                 let total_gain_value = &total_value - &net_deposit;
                 let total_gain_percentage = if net_deposit != BigDecimal::from(0) {
-                    (&total_gain_value / &net_deposit) * BigDecimal::from(100)
+                    (&total_gain_value / &net_deposit * BigDecimal::from(100))
                 } else {
                     BigDecimal::from(0)
                 };
@@ -543,14 +538,14 @@ impl HistoryService {
 
         for activity in activities.iter().filter(|a| {
             a.activity_type == "SPLIT"
-                && a.activity_date.date() >= start_date
-                && a.activity_date.date() <= end_date
+                && a.activity_date.naive_utc().date() >= start_date
+                && a.activity_date.naive_utc().date() <= end_date
         }) {
             let split_ratio = BigDecimal::from_f64(activity.unit_price).unwrap();
             split_factors
                 .entry(activity.asset_id.clone())
                 .or_default()
-                .push((activity.activity_date.date(), split_ratio));
+                .push((activity.activity_date.naive_utc().date(), split_ratio));
         }
 
         split_factors
@@ -574,7 +569,7 @@ impl HistoryService {
 
                     // Apply splits that occur after the activity date
                     for &(split_date, ref split_factor) in &future_splits {
-                        if split_date > activity.activity_date.date() {
+                        if split_date > activity.activity_date.naive_utc().date() {
                             cumulative_factor *= split_factor;
                         }
                     }
@@ -806,13 +801,5 @@ impl HistoryService {
                 .unwrap_or_default(),
             entries_count: total_history.len(),
         }
-    }
-
-    fn delete_existing_history(
-        &self,
-        conn: &mut SqliteConnection,
-        accounts: &[Account],
-    ) -> Result<()> {
-        self.repository.delete_by_accounts(conn, accounts)
     }
 }

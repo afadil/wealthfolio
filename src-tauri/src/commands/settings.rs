@@ -1,5 +1,5 @@
 use crate::models::{
-    ContributionLimit, ExchangeRate, NewContributionLimit, NewExchangeRate, Settings,
+    ContributionLimit, NewContributionLimit, Settings,
     SettingsUpdate,
 };
 use crate::settings::settings_service;
@@ -8,8 +8,9 @@ use diesel::r2d2::ConnectionManager;
 use diesel::SqliteConnection;
 use log::debug;
 use tauri::State;
-use wealthfolio_core::fx::fx_service::CurrencyExchangeService;
+use wealthfolio_core::fx::fx_service::FxService;
 use wealthfolio_core::models::DepositsCalculation;
+use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 
 fn get_connection(
     state: &State<AppState>,
@@ -25,7 +26,7 @@ fn get_connection(
 pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
     debug!("Fetching active settings...");
     let mut conn = get_connection(&state)?;
-    let service = settings_service::SettingsService::new();
+    let service = settings_service::SettingsService::new(state.pool.clone());
     service
         .get_settings(&mut conn)
         .map_err(|e| format!("Failed to load settings: {}", e))
@@ -38,12 +39,11 @@ pub async fn update_settings(
 ) -> Result<Settings, String> {
     debug!("Updating settings...");
     let mut conn = get_connection(&state)?;
-    let service = settings_service::SettingsService::new();
+    let service = settings_service::SettingsService::new(state.pool.clone());
 
     // Update settings
     service
         .update_settings(&mut conn, &settings)
-        .await
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
     // Update the app state with the new base currency
@@ -61,22 +61,18 @@ pub async fn update_exchange_rate(
     state: State<'_, AppState>,
 ) -> Result<ExchangeRate, String> {
     debug!("Updating exchange rate...");
-    let mut conn = get_connection(&state)?;
-    let service = CurrencyExchangeService::new();
+    let service = FxService::new(state.pool.clone());
     service
-        .update_exchange_rate(&mut conn, &rate)
-        .await
+        .update_exchange_rate(&rate.from_currency, &rate.to_currency, rate.rate)
         .map_err(|e| format!("Failed to update exchange rate: {}", e))
 }
-
 
 #[tauri::command]
 pub async fn get_exchange_rates(state: State<'_, AppState>) -> Result<Vec<ExchangeRate>, String> {
     debug!("Fetching exchange rates...");
-    let mut conn = get_connection(&state)?;
-    let service = CurrencyExchangeService::new();
+    let service = FxService::new(state.pool.clone());
     service
-        .get_exchange_rates(&mut conn)
+        .get_exchange_rates()
         .map_err(|e| format!("Failed to load exchange rates: {}", e))
 }
 
@@ -86,17 +82,9 @@ pub async fn add_exchange_rate(
     state: State<'_, AppState>,
 ) -> Result<ExchangeRate, String> {
     debug!("Adding new exchange rate...");
-    let mut conn = get_connection(&state)?;
-    let service = CurrencyExchangeService::new();
+    let service = FxService::new(state.pool.clone());
     service
-        .add_exchange_rate(
-            &mut conn,
-            new_rate.from_currency,
-            new_rate.to_currency,
-            new_rate.source,
-            Some(new_rate.rate),
-        )
-        .await
+        .add_exchange_rate(new_rate)
         .map_err(|e| format!("Failed to add exchange rate: {}", e))
 }
 
@@ -106,10 +94,9 @@ pub async fn delete_exchange_rate(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     debug!("Deleting exchange rate...");
-    let mut conn = get_connection(&state)?;
-    let service = CurrencyExchangeService::new();
+    let service = FxService::new(state.pool.clone());
     service
-        .delete_exchange_rate(&mut conn, &rate_id)
+        .delete_exchange_rate(&rate_id)
         .map_err(|e| format!("Failed to delete exchange rate: {}", e))
 }
 
@@ -124,7 +111,7 @@ pub async fn get_contribution_limits(
 ) -> Result<Vec<ContributionLimit>, String> {
     debug!("Fetching contribution limits...");
     let mut conn = get_connection(&state)?;
-    let service = ContributionLimitService::new();
+    let service = ContributionLimitService::new(state.pool.clone());
     service
         .get_contribution_limits(&mut conn)
         .map_err(|e| format!("Failed to load contribution limits: {}", e))
@@ -137,7 +124,7 @@ pub async fn create_contribution_limit(
 ) -> Result<ContributionLimit, String> {
     debug!("Creating new contribution limit...");
     let mut conn = get_connection(&state)?;
-    let service = ContributionLimitService::new();
+    let service = ContributionLimitService::new(state.pool.clone());
     service
         .create_contribution_limit(&mut conn, new_limit)
         .map_err(|e| format!("Failed to create contribution limit: {}", e))
@@ -151,7 +138,7 @@ pub async fn update_contribution_limit(
 ) -> Result<ContributionLimit, String> {
     debug!("Updating contribution limit...");
     let mut conn = get_connection(&state)?;
-    let service = ContributionLimitService::new();
+    let service = ContributionLimitService::new(state.pool.clone());
     service
         .update_contribution_limit(&mut conn, &id, updated_limit)
         .map_err(|e| format!("Failed to update contribution limit: {}", e))
@@ -164,13 +151,12 @@ pub async fn delete_contribution_limit(
 ) -> Result<(), String> {
     debug!("Deleting contribution limit...");
     let mut conn = get_connection(&state)?;
-    let service = ContributionLimitService::new();
+    let service = ContributionLimitService::new(state.pool.clone());
     service
         .delete_contribution_limit(&mut conn, &id)
         .map_err(|e| format!("Failed to delete contribution limit: {}", e))
 }
 
-// Add this new command
 #[tauri::command]
 pub async fn calculate_deposits_for_accounts(
     account_ids: Vec<String>,
@@ -179,7 +165,7 @@ pub async fn calculate_deposits_for_accounts(
 ) -> Result<DepositsCalculation, String> {
     debug!("Calculating deposits for accounts...");
     let mut conn = get_connection(&state)?;
-    let service = ContributionLimitService::new();
+    let service = ContributionLimitService::new(state.pool.clone());
     let base_currency = state.get_base_currency();
     service
         .calculate_deposits_for_accounts(&mut conn, &account_ids, year, &base_currency)

@@ -1,6 +1,7 @@
+use crate::assets::Asset;
 use crate::errors::Result;
-use crate::models::{Activity, ActivityType, Asset};
 use crate::portfolio::holdings_service::Portfolio;
+use crate::activities::{ActivityType, Activity};
 use bigdecimal::BigDecimal;
 use std::str::FromStr;
 

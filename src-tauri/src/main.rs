@@ -25,22 +25,18 @@ use commands::portfolio::{
 };
 use commands::settings::{
     add_exchange_rate, calculate_deposits_for_accounts, create_contribution_limit,
-    delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,update_exchange_rate,
-    get_settings, update_contribution_limit, update_settings,
+    delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,
+    update_exchange_rate, get_settings, update_contribution_limit, update_settings,
 };
-
 
 use log::error;
 use updater::check_for_update;
 use wealthfolio_core::db;
 use wealthfolio_core::models;
 
-use wealthfolio_core::account;
-use wealthfolio_core::activity;
-use wealthfolio_core::asset;
+// Remove unused imports
 use wealthfolio_core::goal;
 use wealthfolio_core::market_data;
-
 use wealthfolio_core::portfolio;
 use wealthfolio_core::settings;
 
@@ -71,7 +67,6 @@ impl AppState {
         self.base_currency.read().unwrap().clone()
     }
 
-
     fn update_base_currency(&self, new_currency: String) {
         *self.base_currency.write().unwrap() = new_currency;
     }
@@ -99,16 +94,20 @@ pub fn main() {
                 .expect("failed to convert path to string")
                 .to_string();
 
-            let db_path = db::init(&app_data_dir).expect("Failed to initialize database");
-
+            let db_path = db::get_db_path(&app_data_dir);
+            
+            // Create the database pool
             let pool = db::create_pool(&db_path).expect("Failed to create database pool");
+            
+            // Run migrations using the pool
+            db::run_migrations(&pool).expect("Failed to run database migrations");
 
             let menu = menu::create_menu(&app.handle())?;
             app.set_menu(menu)?;
 
             // Get initial base_currency from settings
             let mut conn = pool.get().expect("Failed to get database connection");
-            let settings_service = settings::SettingsService::new();
+            let settings_service = settings::SettingsService::new(pool.clone());
 
             // Get instance_id from settings
             let settings = settings_service.get_settings(&mut conn)?;
@@ -116,7 +115,7 @@ pub fn main() {
 
             // Initialize state
             let state = AppState {
-                pool,
+                pool: pool.clone(),
                 base_currency: Arc::new(RwLock::new(settings.base_currency)),
             };
             app.manage(state.clone());
@@ -194,7 +193,7 @@ pub fn main() {
 fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     spawn(async move {
         let base_currency = state.get_base_currency();
-        let portfolio_service = match portfolio::portfolio_service::PortfolioService::new(base_currency).await {
+        let portfolio_service = match portfolio::portfolio_service::PortfolioService::new(state.pool.clone(), base_currency).await {
             Ok(service) => service,
             Err(e) => {
                 error!("Failed to create PortfolioService: {}", e);
@@ -212,9 +211,7 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
             .emit("PORTFOLIO_UPDATE_START", ())
             .expect("Failed to emit event");
 
-        let mut conn = state.pool.get().expect("Failed to get database connection");
-
-        match portfolio_service.update_portfolio(&mut conn).await {
+        match portfolio_service.update_portfolio().await {
             Ok(_) => {
                 if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_COMPLETE", ()) {
                     error!("Failed to emit PORTFOLIO_UPDATE_COMPLETE event: {}", e);
@@ -229,7 +226,6 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
         }
     });
 }
-
 
 #[tauri::command]
 async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {

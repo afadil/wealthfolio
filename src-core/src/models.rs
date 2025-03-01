@@ -5,7 +5,9 @@ use diesel::Queryable;
 use diesel::Selectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::str::FromStr;
+
+use crate::accounts::Account;
+use crate::assets::Asset;
 
 pub const ROUNDING_SCALE: i64 = 6;
 pub const PORTFOLIO_PERCENT_SCALE: i64 = 2;
@@ -13,8 +15,8 @@ pub const PORTFOLIO_PERCENT_SCALE: i64 = 2;
 // Custom serializer/deserializer for BigDecimal (rounds on serialization)
 mod bigdecimal_serde {
     use bigdecimal::BigDecimal;
-    use serde::{Deserialize, Deserializer, Serializer};
     use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &BigDecimal, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -29,15 +31,16 @@ mod bigdecimal_serde {
         D: Deserializer<'de>,
     {
         let s: String = String::deserialize(deserializer)?;
-        BigDecimal::parse_bytes(s.as_bytes(), 10).ok_or_else(|| D::Error::custom("Invalid BigDecimal"))
+        BigDecimal::parse_bytes(s.as_bytes(), 10)
+            .ok_or_else(|| D::Error::custom("Invalid BigDecimal"))
     }
 }
 
 // Custom serializer/deserializer for Option<BigDecimal>
 mod bigdecimal_serde_option {
     use bigdecimal::BigDecimal;
-    use serde::{Deserialize, Deserializer, Serializer};
     use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &Option<BigDecimal>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -47,7 +50,7 @@ mod bigdecimal_serde_option {
             Some(bd) => {
                 let rounded = bd.round(super::ROUNDING_SCALE);
                 serializer.serialize_str(&rounded.to_string())
-            },
+            }
             None => serializer.serialize_none(),
         }
     }
@@ -59,211 +62,13 @@ mod bigdecimal_serde_option {
         let s: Option<String> = Option::deserialize(deserializer)?;
         match s {
             Some(s) => {
-                let bd = BigDecimal::parse_bytes(s.as_bytes(), 10).ok_or_else(|| D::Error::custom("Invalid BigDecimal"))?;
+                let bd = BigDecimal::parse_bytes(s.as_bytes(), 10)
+                    .ok_or_else(|| D::Error::custom("Invalid BigDecimal"))?;
                 Ok(Some(bd))
             }
             None => Ok(None),
         }
     }
-}
-
-#[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
-#[diesel(table_name= crate::schema::platforms)]
-#[serde(rename_all = "camelCase")]
-pub struct Platform {
-    pub id: String,
-    pub name: Option<String>,
-    pub url: String,
-}
-
-#[derive(
-    Queryable,
-    Identifiable,
-    Associations,
-    AsChangeset,
-    Selectable,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-)]
-#[diesel(belongs_to(Platform))]
-#[diesel(table_name= crate::schema::accounts)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-#[serde(rename_all = "camelCase")]
-pub struct Account {
-    pub id: String,
-    pub name: String,
-    pub account_type: String,
-    pub group: Option<String>,
-    pub currency: String,
-    pub is_default: bool,
-    pub is_active: bool,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
-    pub platform_id: Option<String>,
-}
-
-#[derive(Insertable, Serialize, Deserialize, Debug, Clone)]
-#[diesel(table_name = crate::schema::accounts)]
-#[serde(rename_all = "camelCase")]
-pub struct NewAccount {
-    pub id: Option<String>,
-    pub name: String,
-    pub account_type: String,
-    pub group: Option<String>,
-    pub currency: String,
-    pub is_default: bool,
-    pub is_active: bool,
-    pub platform_id: Option<String>,
-}
-#[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
-#[diesel(table_name = crate::schema::accounts)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountUpdate {
-    pub id: Option<String>,
-    pub name: String,
-    pub account_type: String,
-    pub group: Option<String>,
-    pub is_default: bool,
-    pub is_active: bool,
-    pub platform_id: Option<String>,
-}
-
-#[derive(
-    Queryable,
-    Selectable,
-    Identifiable,
-    PartialEq,
-    AsChangeset,
-    Serialize,
-    Deserialize,
-    Clone,
-    Debug,
-    Default,
-)]
-#[diesel(table_name = crate::schema::assets)]
-#[serde(rename_all = "camelCase")]
-pub struct Asset {
-    pub id: String,
-    pub isin: Option<String>,
-    pub name: Option<String>,
-    pub asset_type: Option<String>,
-    pub symbol: String,
-    pub symbol_mapping: Option<String>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-    pub comment: Option<String>,
-    pub countries: Option<String>,
-    pub categories: Option<String>,
-    pub classes: Option<String>,
-    pub attributes: Option<String>,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
-    pub currency: String,
-    pub data_source: String,
-    pub sectors: Option<String>,
-    pub url: Option<String>,
-}
-#[derive(Insertable, Serialize, Deserialize, Debug, Default, Clone)]
-#[diesel(table_name = crate::schema::assets)]
-#[serde(rename_all = "camelCase")]
-pub struct NewAsset {
-    pub id: String,
-    pub isin: Option<String>,
-    pub name: Option<String>,
-    pub asset_type: Option<String>,
-    pub symbol: String,
-    pub symbol_mapping: Option<String>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-    pub comment: Option<String>,
-    pub countries: Option<String>,
-    pub categories: Option<String>,
-    pub classes: Option<String>,
-    pub attributes: Option<String>,
-    pub currency: String,
-    pub data_source: String,
-    pub sectors: Option<String>,
-    pub url: Option<String>,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateAssetProfile {
-    pub symbol: String,
-    pub sectors: Option<String>,
-    pub countries: Option<String>,
-    pub comment: String,
-    pub asset_sub_class: Option<String>,
-    pub asset_class: Option<String>,
-}
-
-#[derive(
-    Queryable,
-    Selectable,
-    Identifiable,
-    Associations,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-)]
-#[diesel(table_name = crate::schema::activities)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-#[diesel(belongs_to(Account))]
-#[diesel(belongs_to(Asset))]
-#[serde(rename_all = "camelCase")]
-pub struct Activity {
-    pub id: String,
-    pub account_id: String,
-    pub asset_id: String,
-    pub activity_type: String,
-    pub activity_date: chrono::NaiveDateTime,
-    pub quantity: f64,
-    pub unit_price: f64,
-    pub currency: String,
-    pub fee: f64,
-    pub is_draft: bool,
-    pub comment: Option<String>,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
-}
-
-#[derive(PartialEq, Serialize, Deserialize, AsChangeset, Debug, Clone)]
-#[diesel(table_name = crate::schema::activities)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-#[serde(rename_all = "camelCase")]
-pub struct ActivityUpdate {
-    pub id: String,
-    pub account_id: String,
-    pub asset_id: String,
-    pub activity_type: String,
-    pub activity_date: String,
-    pub quantity: f64,
-    pub unit_price: f64,
-    pub currency: String,
-    pub fee: f64,
-    pub is_draft: bool,
-    pub comment: Option<String>,
-}
-#[derive(Insertable, Serialize, Deserialize, AsChangeset, Debug, Clone)]
-#[diesel(table_name = crate::schema::activities)]
-#[serde(rename_all = "camelCase")]
-pub struct NewActivity {
-    pub id: Option<String>,
-    pub account_id: String,
-    pub asset_id: String,
-    pub activity_type: String,
-    pub activity_date: String,
-    pub quantity: f64,
-    pub unit_price: f64,
-    pub currency: String,
-    pub fee: f64,
-    pub is_draft: bool,
-    pub comment: Option<String>,
 }
 
 #[derive(
@@ -281,7 +86,7 @@ pub struct NewActivity {
 #[diesel(belongs_to(Asset, foreign_key = symbol))]
 #[diesel(table_name= crate::schema::quotes)]
 #[serde(rename_all = "camelCase")]
-pub struct Quote {
+pub struct QuoteOLD {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub id: String,
     #[diesel(sql_type = diesel::sql_types::Timestamp)]
@@ -306,95 +111,9 @@ pub struct Quote {
     pub adjclose: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct QuoteUpdate {
-    pub date: String,
-    pub symbol: String,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub volume: f64,
-    pub close: f64,
-    pub data_source: String,
-}
-
 //********************************** */
 // Custom models
 //********************************** */
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct QuoteSummary {
-    pub exchange: String,
-    // pub exchange_display: String,
-    pub short_name: String,
-    pub quote_type: String,
-    pub symbol: String,
-    pub index: String,
-    pub score: f64,
-    pub type_display: String,
-    pub long_name: String,
-    // pub sector: String,
-    // pub industry: String,
-    // pub data_source: bool,
-}
-
-#[derive(Queryable, Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ActivityDetails {
-    pub id: String,
-    pub account_id: String,
-    pub asset_id: String,
-    pub activity_type: String,
-    pub date: String,
-    pub quantity: f64,
-    pub unit_price: f64,
-    pub currency: String,
-    pub fee: f64,
-    pub is_draft: bool,
-    pub comment: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub account_name: String,
-    pub account_currency: String,
-    pub asset_symbol: String,
-    pub asset_name: Option<String>,
-    pub asset_data_source: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ActivitySearchResponseMeta {
-    pub total_row_count: i64, // Assuming totalRowCount is a 64-bit integer
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ActivitySearchResponse {
-    pub data: Vec<ActivityDetails>,
-    pub meta: ActivitySearchResponseMeta,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ActivityImport {
-    pub id: Option<String>,
-    pub date: String,
-    pub symbol: String,
-    pub activity_type: String,
-    pub quantity: f64,
-    pub unit_price: f64,
-    pub currency: String,
-    pub fee: f64,
-    pub comment: Option<String>,
-    pub account_id: Option<String>,
-    pub account_name: Option<String>,
-    pub symbol_name: Option<String>,
-    pub error: Option<String>,
-    pub is_draft: bool,
-    pub is_valid: bool,
-    pub line_number: Option<i32>,
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -502,55 +221,11 @@ impl Default for Holding {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FinancialHistory {
     pub account: Account,
     pub history: Vec<PortfolioHistory>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetProfile {
-    pub asset: Asset,
-    pub quote_history: Vec<Quote>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CrumbData {
-    pub cookie: String,
-    pub crumb: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct YahooAssetProfile {
-    pub address1: String,
-    pub city: String,
-    pub state: String,
-    pub zip: String,
-    pub country: String,
-    pub phone: String,
-    pub website: String,
-    pub industry: String,
-    pub sector: String,
-    pub long_business_summary: String,
-    pub full_time_employees: i64,
-    pub audit_risk: i64,
-    pub board_risk: i64,
-    pub compensation_risk: i64,
-    pub share_holder_rights_risk: i64,
-    pub overall_risk: i64,
-    pub governance_epoch_date: String, // Handling dates as strings for simplicity
-    pub compensation_as_of_epoch_date: String,
-    pub max_age: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct YahooFinanceResponse {
-    pub asset_profile: AssetProfile,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -576,7 +251,6 @@ pub struct Settings {
     pub base_currency: String,
     pub instance_id: String,
 }
-
 
 impl Default for Settings {
     fn default() -> Self {
@@ -761,70 +435,6 @@ pub struct AccountSummary {
     pub performance: PortfolioHistory,
 }
 
-#[derive(
-    Serialize, Deserialize, Debug, Clone,
-)]
-#[serde(rename_all = "camelCase")]
-pub struct ExchangeRate {
-    pub id: String,
-    pub from_currency: String,
-    pub to_currency: String,
-    pub rate: f64,
-    pub source: String,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
-}
-
-impl ExchangeRate {
-    pub fn from_quote(quote: &Quote) -> Self {
-        let (from_currency, to_currency) = if quote.symbol.ends_with("=X") {
-            let symbol = &quote.symbol[..quote.symbol.len() - 2];
-            (symbol[..3].to_string(), symbol[3..].to_string())
-        } else {
-            (
-                quote.symbol[..3].to_string(),
-                quote.symbol[3..6].to_string(),
-            )
-        };
-
-        ExchangeRate {
-            id: quote.symbol.clone(),
-            from_currency,
-            to_currency,
-            rate: quote.close,
-            source: quote.data_source.clone(),
-            created_at: quote.date,
-            updated_at: quote.date,
-        }
-    }
-}
-
-impl Quote {
-    pub fn from_exchange_rate(rate: &ExchangeRate) -> Self {
-        Quote {
-            id: rate.id.clone(),
-            symbol: rate.id.clone(),
-            date: rate.updated_at,
-            open: rate.rate,
-            high: rate.rate,
-            low: rate.rate,
-            close: rate.rate,
-            volume: 0.0,
-            data_source: rate.source.clone(),
-            created_at: rate.created_at,
-            adjclose: rate.rate,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct NewExchangeRate {
-    pub from_currency: String,
-    pub to_currency: String,
-    pub rate: f64,
-    pub source: String,
-}
 
 #[derive(Queryable, Insertable, Identifiable, Serialize, Deserialize, Debug, Clone)]
 #[diesel(table_name = crate::schema::contribution_limits)]
@@ -866,95 +476,7 @@ pub struct DepositsCalculation {
     pub by_account: HashMap<String, AccountDeposit>,
 }
 
-#[derive(
-    Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
-)]
-#[diesel(primary_key(account_id))]
-#[diesel(table_name = crate::schema::activity_import_profiles)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-#[serde(rename_all = "camelCase")]
-pub struct ImportMapping {
-    pub account_id: String,
-    pub field_mappings: String,
-    pub activity_mappings: String,
-    pub symbol_mappings: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportMappingData {
-    pub account_id: String,
-    pub field_mappings: HashMap<String, String>,
-    pub activity_mappings: HashMap<String, Vec<String>>,
-    pub symbol_mappings: HashMap<String, String>,
-}
-
-impl Default for ImportMappingData {
-    fn default() -> Self {
-        let mut field_mappings = HashMap::new();
-        field_mappings.insert("date".to_string(), "date".to_string());
-        field_mappings.insert("symbol".to_string(), "symbol".to_string());
-        field_mappings.insert("quantity".to_string(), "quantity".to_string());
-        field_mappings.insert("activityType".to_string(), "activityType".to_string());
-        field_mappings.insert("unitPrice".to_string(), "unitPrice".to_string());
-        field_mappings.insert("currency".to_string(), "currency".to_string());
-        field_mappings.insert("fee".to_string(), "fee".to_string());
-
-        let mut activity_mappings = HashMap::new();
-        activity_mappings.insert("BUY".to_string(), vec!["BUY".to_string()]);
-        activity_mappings.insert("SELL".to_string(), vec!["SELL".to_string()]);
-        activity_mappings.insert("DIVIDEND".to_string(), vec!["DIVIDEND".to_string()]);
-        activity_mappings.insert("INTEREST".to_string(), vec!["INTEREST".to_string()]);
-        activity_mappings.insert("DEPOSIT".to_string(), vec!["DEPOSIT".to_string()]);
-        activity_mappings.insert("WITHDRAWAL".to_string(), vec!["WITHDRAWAL".to_string()]);
-        activity_mappings.insert("TRANSFER_IN".to_string(), vec!["TRANSFER_IN".to_string()]);
-        activity_mappings.insert("TRANSFER_OUT".to_string(), vec!["TRANSFER_OUT".to_string()]);
-        activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
-        activity_mappings.insert(
-            "CONVERSION_IN".to_string(),
-            vec!["CONVERSION_IN".to_string()],
-        );
-        activity_mappings.insert(
-            "CONVERSION_OUT".to_string(),
-            vec!["CONVERSION_OUT".to_string()],
-        );
-        activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
-        activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
-
-        ImportMappingData {
-            account_id: String::new(),
-            field_mappings,
-            activity_mappings,
-            symbol_mappings: HashMap::new(),
-        }
-    }
-}
-
-impl ImportMapping {
-    pub fn to_mapping_data(&self) -> Result<ImportMappingData, serde_json::Error> {
-        let mut mapping_data = ImportMappingData::default();
-        mapping_data.account_id = self.account_id.clone();
-        mapping_data.field_mappings = serde_json::from_str(&self.field_mappings)?;
-        mapping_data.activity_mappings = serde_json::from_str(&self.activity_mappings)?;
-        mapping_data.symbol_mappings = serde_json::from_str(&self.symbol_mappings)?;
-        Ok(mapping_data)
-    }
-
-    pub fn from_mapping_data(data: &ImportMappingData) -> Result<Self, serde_json::Error> {
-        Ok(Self {
-            account_id: data.account_id.clone(),
-            field_mappings: serde_json::to_string(&data.field_mappings)?,
-            activity_mappings: serde_json::to_string(&data.activity_mappings)?,
-            symbol_mappings: serde_json::to_string(&data.symbol_mappings)?,
-            created_at: chrono::Utc::now().naive_utc(),
-            updated_at: chrono::Utc::now().naive_utc(),
-        })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CumulativeReturn {
     pub date: String,
@@ -968,64 +490,4 @@ pub struct CumulativeReturns {
     pub cumulative_returns: Vec<CumulativeReturn>,
     pub total_return: f64,
     pub annualized_return: f64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ActivityType {
-    Buy,
-    Sell,
-    Dividend,
-    Interest,
-    Deposit,
-    Withdrawal,
-    TransferIn,
-    TransferOut,
-    ConversionIn,
-    ConversionOut,
-    Fee,
-    Tax,
-    Split,
-}
-
-impl ActivityType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ActivityType::Buy => "BUY",
-            ActivityType::Sell => "SELL",
-            ActivityType::Dividend => "DIVIDEND",
-            ActivityType::Interest => "INTEREST",
-            ActivityType::Deposit => "DEPOSIT",
-            ActivityType::Withdrawal => "WITHDRAWAL",
-            ActivityType::TransferIn => "TRANSFER_IN",
-            ActivityType::TransferOut => "TRANSFER_OUT",
-            ActivityType::ConversionIn => "CONVERSION_IN",
-            ActivityType::ConversionOut => "CONVERSION_OUT",
-            ActivityType::Fee => "FEE",
-            ActivityType::Tax => "TAX",
-            ActivityType::Split => "SPLIT",
-        }
-    }
-}
-
-impl FromStr for ActivityType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "BUY" => Ok(ActivityType::Buy),
-            "SELL" => Ok(ActivityType::Sell),
-            "DIVIDEND" => Ok(ActivityType::Dividend),
-            "INTEREST" => Ok(ActivityType::Interest),
-            "DEPOSIT" => Ok(ActivityType::Deposit),
-            "WITHDRAWAL" => Ok(ActivityType::Withdrawal),
-            "TRANSFER_IN" => Ok(ActivityType::TransferIn),
-            "TRANSFER_OUT" => Ok(ActivityType::TransferOut),
-            "CONVERSION_IN" => Ok(ActivityType::ConversionIn),
-            "CONVERSION_OUT" => Ok(ActivityType::ConversionOut),
-            "FEE" => Ok(ActivityType::Fee),
-            "TAX" => Ok(ActivityType::Tax),
-            "SPLIT" => Ok(ActivityType::Split),
-            _ => Err(format!("Unknown activity type: {}", s)),
-        }
-    }
 }

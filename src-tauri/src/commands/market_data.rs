@@ -1,15 +1,15 @@
-use crate::asset::asset_service::AssetService;
-use crate::market_data::market_data_service::MarketDataService;
+use crate::market_data::MarketDataService;
 
-use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
 use crate::AppState;
 use log::debug;
 use tauri::State;
-use wealthfolio_core::models::{Asset, QuoteUpdate};
+use wealthfolio_core::assets::{Asset, AssetProfile, AssetService, UpdateAssetProfile};
+use wealthfolio_core::market_data::{QuoteSummary, QuoteUpdate};
+
 
 #[tauri::command]
-pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
-    let service = MarketDataService::new().await;
+pub async fn search_symbol(query: String, state: State<'_, AppState>) -> Result<Vec<QuoteSummary>, String> {
+    let service = MarketDataService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
 
     service
         .search_symbol(&query)
@@ -22,13 +22,9 @@ pub async fn get_asset_data(
     asset_id: String,
     state: State<'_, AppState>,
 ) -> Result<AssetProfile, String> {
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new().await;
+    let service = AssetService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     service
-        .get_asset_data(&mut conn, &asset_id)
+        .get_asset_data(&asset_id)
         .map_err(|e| e.to_string())
 }
 
@@ -38,26 +34,19 @@ pub async fn update_asset_profile(
     payload: UpdateAssetProfile,
     state: State<'_, AppState>,
 ) -> Result<Asset, String> {
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new().await;
+    let service = AssetService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     service
-        .update_asset_profile(&mut conn, &id, payload)
+        .update_asset_profile( &id, payload)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
     debug!("Synching quotes history");
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
-    service
-        .initialize_and_sync_quotes(&mut conn)
+    let service = MarketDataService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
+    
+   service
+        .sync_all_quotes()
         .await
         .map_err(|e| e.to_string())
 }
@@ -68,13 +57,9 @@ pub async fn refresh_quotes_for_symbols(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     debug!("Refreshing quotes for symbols: {:?}", symbols);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
+    let service = MarketDataService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     service
-        .refresh_quotes_for_symbols(&mut conn, &symbols)
+        .refresh_quotes_for_symbols(&symbols)
         .await
         .map_err(|e| e.to_string())
 }
@@ -82,26 +67,18 @@ pub async fn refresh_quotes_for_symbols(
 #[tauri::command]
 pub async fn update_quote(quote: QuoteUpdate, state: State<'_, AppState>) -> Result<(), String> {
     debug!("Updating quote: {:?}", quote);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
+    let service = MarketDataService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     service
-        .update_quote(&mut conn, quote)
+        .update_quote(quote)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_quote(id: String, state: State<'_, AppState>) -> Result<(), String> {
     debug!("Deleting quote: {}", id);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
+    let service = MarketDataService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     service
-        .delete_quote(&mut conn, &id)
+        .delete_quote(&id)
         .map_err(|e| e.to_string())
 }
 
@@ -111,19 +88,15 @@ pub async fn update_asset_data_source(
     data_source: String,
     state: State<'_, AppState>,
 ) -> Result<Asset, String> {
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new().await;
+    let service = AssetService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     let asset = service
-        .update_asset_data_source(&mut conn, &id, data_source)
+        .update_asset_data_source(&id, data_source)
         .map_err(|e| e.to_string())?;
 
     // After updating data source, refresh quotes for this asset but don't fail if it errors
-    let service = MarketDataService::new().await;
+    let service = MarketDataService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     if let Err(e) = service
-        .refresh_quotes_for_symbols(&mut conn, &vec![id.clone()])
+        .refresh_quotes_for_symbols(&vec![id.clone()])
         .await
     {
         log::error!("Failed to refresh quotes after data source update: {}", e);

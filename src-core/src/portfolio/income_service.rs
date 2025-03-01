@@ -1,4 +1,4 @@
-use crate::fx::fx_service::CurrencyExchangeService;
+use crate::fx::fx_service::FxService;
 use crate::{
     models::{IncomeData, IncomeSummary},
     schema::activities,
@@ -10,12 +10,12 @@ use log::{debug, error};
 use std::sync::Arc;
 
 pub struct IncomeService {
-    fx_service: Arc<CurrencyExchangeService>,
+    fx_service: Arc<FxService>,
     base_currency: String,
 }
 
 impl IncomeService {
-    pub fn new(fx_service: Arc<CurrencyExchangeService>, base_currency: String) -> Self {
+    pub fn new(fx_service: Arc<FxService>, base_currency: String) -> Self {
         IncomeService {
             fx_service,
             base_currency,
@@ -117,7 +117,7 @@ impl IncomeService {
         let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
-        let _ = self.fx_service.initialize(conn);
+        let _ = self.fx_service.initialize();
 
         for activity in activities {
             let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")

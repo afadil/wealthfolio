@@ -1,20 +1,15 @@
-use crate::account::account_service::AccountService;
-use crate::models::{Account, AccountUpdate, NewAccount};
 use crate::AppState;
 use log::debug;
 use tauri::State;
+use wealthfolio_core::accounts::{Account, AccountService, AccountUpdate, NewAccount};
 
 #[tauri::command]
 pub async fn get_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, String> {
     debug!("Fetching active accounts...");
     let base_currency = state.get_base_currency();
-    let service = AccountService::new(base_currency);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = AccountService::new(state.pool.clone(), base_currency);
     service
-        .get_accounts(&mut conn)
+        .get_all_accounts()
         .map_err(|e| format!("Failed to load accounts: {}", e))
 }
 
@@ -24,14 +19,10 @@ pub async fn create_account(
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
     debug!("Adding new account...");
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.get_base_currency();
-    let service = AccountService::new(base_currency);
+    let service = AccountService::new(state.pool.clone(), base_currency);
     service
-        .create_account(&mut conn, account)
+        .create_account(account)
         .await
         .map_err(|e| format!("Failed to add new account: {}", e))
 }
@@ -42,14 +33,10 @@ pub async fn update_account(
     state: State<'_, AppState>,
 ) -> Result<Account, String> {
     debug!("Updating account...");
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
     let base_currency = state.get_base_currency();
-    let service = AccountService::new(base_currency);
+    let service = AccountService::new(state.pool.clone(), base_currency);
     service
-        .update_account(&mut conn, account)
+        .update_account(account)
         .map_err(|e| format!("Failed to update account: {}", e))
 }
 
@@ -57,15 +44,11 @@ pub async fn update_account(
 pub async fn delete_account(
     account_id: String,
     state: State<'_, AppState>,
-) -> Result<usize, String> {
+) -> Result<(), String> {
     debug!("Deleting account...");
     let base_currency = state.get_base_currency();
-    let service = AccountService::new(base_currency);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
+    let service = AccountService::new(state.pool.clone(), base_currency);
     service
-        .delete_account(&mut conn, account_id)
+        .delete_account(&account_id)
         .map_err(|e| format!("Failed to delete account: {}", e))
 }

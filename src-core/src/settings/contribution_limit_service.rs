@@ -1,20 +1,26 @@
 use crate::schema::{accounts, activities};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
 use log::error;
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::fx::fx_service::CurrencyExchangeService;
+use crate::fx::fx_service::FxService;
 use crate::models::{AccountDeposit, ContributionLimit, DepositsCalculation, NewContributionLimit};
 use crate::schema::contribution_limits;
 
-pub struct ContributionLimitService;
+pub struct ContributionLimitService {
+    fx_service: FxService,
+}
 
 impl ContributionLimitService {
-    pub fn new() -> Self {
-        ContributionLimitService
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
+        ContributionLimitService {
+            fx_service: FxService::new(pool),
+        }
     }
 
     pub fn get_contribution_limits(
@@ -91,8 +97,11 @@ impl ContributionLimitService {
             NaiveDateTime::parse_from_str(&format!("{}-12-31 23:59:59", year), "%Y-%m-%d %H:%M:%S")
                 .unwrap();
 
-        let fx_service = CurrencyExchangeService::new();
-        let _ = fx_service.initialize(conn);
+        // Initialize FX service before using it
+        if let Err(e) = self.fx_service.initialize() {
+            error!("Failed to initialize FX service: {:?}", e);
+            // Continue execution as the FX service might still work with cached rates
+        }
 
         let deposits: Vec<(String, f64, f64, String)> = activities::table
             .inner_join(accounts::table)
@@ -113,7 +122,7 @@ impl ContributionLimitService {
 
         for (account_id, quantity, unit_price, currency) in deposits {
             let amount = quantity * unit_price;
-            let converted_amount = fx_service
+            let converted_amount = self.fx_service
                 .convert_currency(amount, &currency, base_currency)
                 .unwrap_or_else(|e| {
                     error!("Currency conversion error: {:?}", e);

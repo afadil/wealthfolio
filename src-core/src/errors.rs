@@ -3,6 +3,12 @@ use diesel::result::Error as DieselError;
 use std::num::ParseFloatError;
 use thiserror::Error;
 
+use crate::market_data::MarketDataError;
+use crate::activities::ActivityError;
+use crate::accounts::AccountError;
+use crate::fx::FxError;
+use crate::assets::assets_errors::AssetError;
+
 // Create a type alias for Result using our Error type
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -13,7 +19,7 @@ pub enum Error {
     Database(#[from] DatabaseError),
 
     #[error("Asset operation failed: {0}")]
-    Asset(#[from] AssetError),
+    Asset(String),
 
     #[error("Currency operation failed: {0}")]
     Currency(#[from] CurrencyError),
@@ -23,6 +29,15 @@ pub enum Error {
 
     #[error("App Configuration failed: {0}")]
     Config(#[from] ConfigError),
+
+    #[error("Market data operation failed: {0}")]
+    MarketData(#[from] MarketDataError),
+
+    #[error("Activity error: {0}")]
+    Activity(#[from] ActivityError),
+
+    #[error("Account error: {0}")]
+    Account(#[from] AccountError),
 }
 
 #[derive(Error, Debug)]
@@ -44,18 +59,6 @@ pub enum DatabaseError {
 
     #[error("Database restore failed: {0}")]
     RestoreFailed(String),
-}
-
-#[derive(Error, Debug)]
-pub enum AssetError {
-    #[error("Asset '{0}' not found")]
-    NotFound(String),
-
-    #[error("Invalid asset data: {0}")]
-    InvalidData(String),
-
-    #[error("Asset '{0}' already exists")]
-    AlreadyExists(String),
 }
 
 #[derive(Error, Debug)]
@@ -138,3 +141,31 @@ impl From<serde_json::Error> for Error {
         Error::Validation(ValidationError::InvalidInput(err.to_string()))
     }
 }
+
+// Add this implementation
+impl From<r2d2::Error> for Error {
+    fn from(e: r2d2::Error) -> Self {
+        Error::Database(DatabaseError::PoolCreationFailed(e))
+    }
+}
+
+// Add From implementation for FxError
+impl From<FxError> for Error {
+    fn from(err: FxError) -> Self {
+        Error::Currency(CurrencyError::ConversionFailed(err.to_string()))
+    }
+}
+
+// Add From implementation for AssetError
+impl From<AssetError> for Error {
+    fn from(err: AssetError) -> Self {
+        Error::Asset(err.to_string())
+    }
+}
+
+
+
+
+
+
+
