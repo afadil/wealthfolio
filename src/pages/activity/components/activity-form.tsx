@@ -45,7 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ActivityType, ActivityTypeSelector } from './activity-type-selector';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Card, CardContent } from '@/components/ui/card';
-
+import { DataSource } from '@/lib/constants';
 type ActivityFormValues = z.infer<typeof newActivitySchema> & {
   showCurrencySelect?: boolean;
 };
@@ -82,7 +82,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     ...activity,
     activityDate: activity?.date ? new Date(activity.date) : new Date(),
     currency: activity?.currency || '',
-    assetDataSource: activity?.assetDataSource || 'Yahoo',
+    assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
   };
 
   const form = useForm<ActivityFormValues>({
@@ -108,11 +108,12 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const submissionData = { ...data, isDraft: false } as NewActivity;
       const { id, ...submitData } = submissionData;
 
-      // For cash activities and fees, set assetId to $CASH-accountCurrency
+      // For cash activities and fees, set assetId to $CASH-accountCurrency and currency
       if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE'].includes(submitData.activityType)) {
         const account = accounts.find((a) => a.value === submitData.accountId);
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
+          submitData.currency = account.currency;
         }
       }
 
@@ -535,11 +536,11 @@ const ConfigurationCheckbox = ({
                   </label>
                   <Checkbox
                     id="use-lookup-checkbox"
-                    checked={field.value === 'MANUAL'}
+                    checked={field.value === DataSource.MANUAL}
                     onCheckedChange={(checked) => {
-                      field.onChange(checked ? 'MANUAL' : 'Yahoo');
+                      field.onChange(checked ? DataSource.MANUAL : DataSource.YAHOO);
                     }}
-                    defaultChecked={field.value === 'MANUAL'}
+                    defaultChecked={field.value === DataSource.MANUAL}
                     className="h-4 w-4"
                   />
                 </div>

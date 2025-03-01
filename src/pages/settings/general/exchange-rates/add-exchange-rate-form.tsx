@@ -62,8 +62,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
     onSubmit({
       ...data,
       source: 'MANUAL',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     });
   };
 

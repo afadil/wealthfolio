@@ -28,12 +28,12 @@ export function isImportMapComplete(
 ): boolean {
   // Define required fields
   const requiredFields = [
-    ImportFormat.Date,
-    ImportFormat.ActivityType,
-    ImportFormat.Symbol,
-    ImportFormat.Quantity,
-    ImportFormat.UnitPrice,
-  ];
+    ImportFormat.DATE,
+    ImportFormat.ACTIVITY_TYPE,
+    ImportFormat.SYMBOL,
+    ImportFormat.QUANTITY,
+    ImportFormat.UNIT_PRICE,
+  ] as const;
 
   // Check if all required columns are mapped
   const columnsComplete = requiredFields.every(
@@ -46,7 +46,7 @@ export function isImportMapComplete(
   const uniqueCsvTypes = new Set(
     csvData
       .slice(1)
-      .map((row) => getMappedValue(row, ImportFormat.ActivityType))
+      .map((row) => getMappedValue(row, ImportFormat.ACTIVITY_TYPE))
       .filter(Boolean)
       .map((type) => type.trim().toUpperCase()),
   );
@@ -61,7 +61,7 @@ export function isImportMapComplete(
   const uniqueSymbols = new Set(
     csvData
       .slice(1)
-      .map((row) => getMappedValue(row, ImportFormat.Symbol))
+      .map((row) => getMappedValue(row, ImportFormat.SYMBOL))
       .filter(Boolean)
       .map((symbol) => symbol.trim()),
   );
@@ -73,12 +73,25 @@ export function isImportMapComplete(
   return columnsComplete && activityTypesComplete && symbolsComplete;
 }
 
-const CASH_ACTIVITY_TYPES = new Set([
+const CASH_ACTIVITY_TYPES = [
   ActivityType.DIVIDEND,
   ActivityType.DEPOSIT,
   ActivityType.WITHDRAWAL,
   ActivityType.TAX,
-]);
+] as const;
+
+const TRADE_ACTIVITY_TYPES = [
+  ActivityType.BUY,
+  ActivityType.SELL,
+] as const;
+
+function isCashActivityType(type: ActivityType): boolean {
+  return CASH_ACTIVITY_TYPES.includes(type as typeof CASH_ACTIVITY_TYPES[number]);
+}
+
+function isTradeActivityType(type: ActivityType): boolean {
+  return TRADE_ACTIVITY_TYPES.includes(type as typeof TRADE_ACTIVITY_TYPES[number]);
+}
 
 // Add a simple regex for ticker validation
 const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([\.-][A-Z0-9]+){0,2})$/;
@@ -103,7 +116,7 @@ export const activityImportValidationSchema = z
   })
   .refine(
     (data) => {
-      if (CASH_ACTIVITY_TYPES.has(data.activityType)) {
+      if (isCashActivityType(data.activityType)) {
         return Boolean(data.amount && data.amount > 0) || data.unitPrice > 0;
       }
       return true;
@@ -133,7 +146,7 @@ export const activityImportValidationSchema = z
   )
   .refine(
     (data) => {
-      if ([ActivityType.BUY, ActivityType.SELL].includes(data.activityType)) {
+      if (isTradeActivityType(data.activityType)) {
         return data.unitPrice > 0;
       }
       return true;
@@ -145,7 +158,7 @@ export const activityImportValidationSchema = z
   )
   .refine(
     (data) => {
-      if (!CASH_ACTIVITY_TYPES.has(data.activityType) && data.activityType !== ActivityType.FEE) {
+      if (!isCashActivityType(data.activityType) && !isTradeActivityType(data.activityType)) {
         return data.quantity > 0;
       }
       return true;
@@ -195,7 +208,7 @@ export function validateActivities(activities: ActivityImport[]): Record<string,
 
 // Helper function to check if an activity is a cash activity
 export function isCashActivity(activityType: ActivityType): boolean {
-  return CASH_ACTIVITY_TYPES.has(activityType);
+  return isCashActivityType(activityType);
 }
 
 export function validateTickerSymbol(symbol: string): boolean {

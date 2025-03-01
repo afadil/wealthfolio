@@ -22,7 +22,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
 
   const distinctSymbols = useMemo(() => {
     return Array.from(
-      new Set(props.csvData.slice(1).map((row) => props.getMappedValue(row, ImportFormat.Symbol))),
+      new Set(props.csvData.slice(1).map((row) => props.getMappedValue(row, ImportFormat.SYMBOL))),
     ).filter(Boolean);
   }, [props.csvData, props.getMappedValue]);
 
@@ -35,7 +35,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
     let total = 0;
 
     props.csvData.slice(1).forEach((row, index) => {
-      const csvType = props.getMappedValue(row, ImportFormat.ActivityType);
+      const csvType = props.getMappedValue(row, ImportFormat.ACTIVITY_TYPE);
       if (!activityTypeMap.has(csvType)) {
         activityTypeMap.set(csvType, {
           row: [...row, (index + 2).toString()],
@@ -66,7 +66,7 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
     const symbolMap = new Map<string, { row: string[]; count: number }>();
 
     props.csvData.slice(1).forEach((row, index) => {
-      const symbol = props.getMappedValue(row, ImportFormat.Symbol);
+      const symbol = props.getMappedValue(row, ImportFormat.SYMBOL);
       if (!symbol) return;
 
       if (!symbolMap.has(symbol)) {

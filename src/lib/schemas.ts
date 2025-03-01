@@ -1,4 +1,11 @@
 import * as z from 'zod';
+import {
+  ActivityType,
+  activityTypeSchema,
+  DataSource,
+  dataSourceSchema,
+  accountTypeSchema,
+} from './constants';
 
 export const importMappingSchema = z.object({
   accountId: z.string(),
@@ -20,7 +27,7 @@ export const newAccountSchema = z.object({
   group: z.string().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
-  accountType: z.enum(['SECURITIES', 'CASH', 'CRYPTOCURRENCY']),
+  accountType: accountTypeSchema,
   currency: z.string({ required_error: 'Please select a currency.' }),
 });
 
@@ -49,7 +56,7 @@ const baseActivitySchema = z.object({
 });
 
 const feeActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('FEE'),
+  activityType: z.literal(ActivityType.FEE),
   assetId: z.string().optional(),
   fee: z.coerce
     .number({
@@ -60,7 +67,7 @@ const feeActivitySchema = baseActivitySchema.extend({
 });
 
 const cashActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum(['DEPOSIT', 'WITHDRAWAL', 'INTEREST']),
+  activityType: z.enum([ActivityType.DEPOSIT, ActivityType.WITHDRAWAL, ActivityType.INTEREST]),
   assetId: z.string().optional(),
   quantity: z.number().default(1),
   unitPrice: z.coerce.number().min(0),
@@ -74,7 +81,7 @@ const cashActivitySchema = baseActivitySchema.extend({
 });
 
 const dividendActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('DIVIDEND'),
+  activityType: z.literal(ActivityType.DIVIDEND),
   assetId: z.string().min(1, { message: 'Please select a security' }),
   quantity: z.number().default(1),
   unitPrice: z.coerce.number().min(0),
@@ -129,7 +136,7 @@ const transferOutActivitySchema = baseActivitySchema.extend({
 });
 
 const tradeActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum(['BUY', 'SELL']),
+  activityType: z.enum([ActivityType.BUY, ActivityType.SELL]),
   assetId: z.string().min(1, { message: 'Please select a security' }),
   quantity: z.coerce
     .number({
@@ -145,7 +152,7 @@ const tradeActivitySchema = baseActivitySchema.extend({
     })
     .min(0, { message: 'Fee must be a non-negative number.' })
     .default(0),
-  assetDataSource: z.enum(['Yahoo', 'MANUAL']).default('Yahoo'),
+  assetDataSource: dataSourceSchema.default(DataSource.YAHOO),
 });
 
 export const newActivitySchema = z.discriminatedUnion('activityType', [
@@ -164,28 +171,7 @@ export const importActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
   currency: z.string().optional(),
-  activityType: z.enum(
-    [
-      'BUY',
-      'SELL',
-      'DIVIDEND',
-      'INTEREST',
-      'DEPOSIT',
-      'WITHDRAWAL',
-      'TRANSFER_IN',
-      'TRANSFER_OUT',
-      'CONVERSION_IN',
-      'CONVERSION_OUT',
-      'FEE',
-      'TAX',
-      'SPLIT',
-    ],
-    {
-      errorMap: () => {
-        return { message: 'Please select an activity type.' };
-      },
-    },
-  ),
+  activityType: activityTypeSchema,
   date: z.union([z.date(), z.string().datetime()]).optional(),
   symbol: z.string().min(1, { message: 'Symbol is required' }),
   amount: z.coerce

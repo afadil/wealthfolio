@@ -1,28 +1,21 @@
 import * as z from 'zod';
 import { importActivitySchema, importMappingSchema, newActivitySchema } from '@/lib/schemas';
+import {
+  ActivityType,
+  DataSource,
+  AccountType,
+  HoldingType,
+} from './constants';
 
-export enum AccountType {
-  SECURITIES = 'SECURITIES',
-  SAVINGS = 'SAVINGS',
-  CHECKING = 'CHECKING',
-  // Add more types as needed
-}
-
-export enum ActivityType {
-  BUY = 'BUY',
-  SELL = 'SELL',
-  DIVIDEND = 'DIVIDEND',
-  INTEREST = 'INTEREST',
-  DEPOSIT = 'DEPOSIT',
-  WITHDRAWAL = 'WITHDRAWAL',
-  TRANSFER_IN = 'TRANSFER_IN',
-  TRANSFER_OUT = 'TRANSFER_OUT',
-  CONVERSION_IN = 'CONVERSION_IN',
-  CONVERSION_OUT = 'CONVERSION_OUT',
-  FEE = 'FEE',
-  TAX = 'TAX',
-  SPLIT = 'SPLIT',
-}
+export {
+  ActivityType,
+  DataSource,
+  AccountType,
+  ImportFormat,
+  ExportDataType,
+  ExportedFileFormat,
+  HoldingType,
+} from './constants';
 
 export type Account = {
   id: string;
@@ -40,7 +33,7 @@ export type Account = {
 
 export type Activity = {
   id: string;
-  type: string;
+  type: ActivityType;
   date: Date | string;
   quantity: number;
   unitPrice: number;
@@ -56,7 +49,7 @@ export type Activity = {
 
 export interface ActivityDetails {
   id: string;
-  activityType: string;
+  activityType: ActivityType;
   date: Date;
   quantity: number;
   unitPrice: number;
@@ -72,7 +65,7 @@ export interface ActivityDetails {
   accountCurrency: string;
   assetSymbol: string;
   assetName?: string;
-  assetDataSource?: 'Yahoo' | 'MANUAL';
+  assetDataSource?: DataSource;
 }
 
 export type ActivitySearchResponse = {
@@ -141,20 +134,11 @@ export interface Tag {
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
 
-export enum HoldingType {
-  CASH = 'CASH',
-  STOCK = 'STOCK',
-  MUTUAL_FUND = 'MUTUAL_FUND',
-  ETF = 'ETF',
-  BOND = 'BOND',
-  OTHER = 'OTHER',
-}
-
 export interface Holding {
   id: string;
   symbol: string;
   symbolName: string;
-  holdingType: string;
+  holdingType: HoldingType;
   quantity: number;
   currency: string;
   baseCurrency: string;
@@ -333,7 +317,6 @@ export interface AccountSummary {
   performance: PortfolioHistory;
 }
 
-
 export interface ExchangeRate {
   id: string;
   fromCurrency: string;
@@ -343,13 +326,8 @@ export interface ExchangeRate {
   rate: number;
   source: string;
   isLoading?: boolean;
-  createdAt: string;
-  updatedAt: string;
+  timestamp: string;
 }
-
-export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-history';
-
-export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';
 
 export interface ContributionLimit {
   id: string;
@@ -372,24 +350,6 @@ export interface DepositsCalculation {
   baseCurrency: string;
   byAccount: Record<string, AccountDeposit>;
 }
-
-export enum ImportFormat {
-  Date = 'date',
-  ActivityType = 'activityType',
-  Symbol = 'symbol',
-  Quantity = 'quantity',
-  UnitPrice = 'unitPrice',
-  Amount = 'amount',
-  Currency = 'currency',
-  Fee = 'fee',
-}
-
-// export interface ImportMappingData {
-//   accountId: string;
-//   fieldMappings: Record<string, string>;
-//   activityMappings: Record<string, string[]>;
-//   symbolMappings: Record<string, string>;
-// }
 
 export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
 
@@ -415,9 +375,3 @@ export interface UpdateAssetProfile {
   assetSubClass: string;
 }
 
-export const DataSource = {
-  MANUAL: 'MANUAL',
-  YAHOO: 'YAHOO',
-} as const;
-
-export type DataSource = (typeof DataSource)[keyof typeof DataSource];

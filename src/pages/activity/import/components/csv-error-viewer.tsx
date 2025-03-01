@@ -123,9 +123,9 @@ export function ErrorViewer({
                                       <span className="flex cursor-help items-center space-x-1">
                                         <AlertCircle className="h-4 w-4 text-destructive" />
                                         <span className="underline decoration-dotted underline-offset-2">
-                                          {mappedHeader === ImportFormat.ActivityType
+                                          {mappedHeader === ImportFormat.ACTIVITY_TYPE
                                             ? getMappedActivityType(cell)
-                                            : mappedHeader === ImportFormat.Symbol
+                                            : mappedHeader === ImportFormat.SYMBOL
                                               ? getMappedSymbol(cell)
                                               : cell}
                                         </span>
@@ -138,9 +138,9 @@ export function ErrorViewer({
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
-                              ) : mappedHeader === ImportFormat.ActivityType ? (
+                              ) : mappedHeader === ImportFormat.ACTIVITY_TYPE ? (
                                 getMappedActivityType(cell)
-                              ) : mappedHeader === ImportFormat.Symbol ? (
+                              ) : mappedHeader === ImportFormat.SYMBOL ? (
                                 getMappedSymbol(cell)
                               ) : (
                                 cell

@@ -15,12 +15,14 @@ import { useState } from 'react';
 
 const SKIP_FIELD_VALUE = '__skip__';
 const REQUIRED_FIELDS = [
-  ImportFormat.Date,
-  ImportFormat.ActivityType,
-  ImportFormat.Symbol,
-  ImportFormat.Quantity,
-  ImportFormat.UnitPrice,
-];
+  ImportFormat.DATE,
+  ImportFormat.ACTIVITY_TYPE,
+  ImportFormat.SYMBOL,
+  ImportFormat.QUANTITY,
+  ImportFormat.UNIT_PRICE,
+] as const;
+
+type RequiredField = typeof REQUIRED_FIELDS[number];
 
 export function renderHeaderCell({
   field,
@@ -37,7 +39,7 @@ export function renderHeaderCell({
   const mappedHeader = mapping.fieldMappings[field];
   const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
   const isEditing = editingHeader === field || !isMapped;
-  const isRequired = REQUIRED_FIELDS.includes(field);
+  const isRequired = REQUIRED_FIELDS.includes(field as RequiredField);
 
   return (
     <div>
@@ -60,7 +62,7 @@ export function renderHeaderCell({
             {!isRequired && (
               <>
                 <SelectItem value={SKIP_FIELD_VALUE}>
-                  {field === ImportFormat.Currency ? 'Account Currency' : 'Ignore'}
+                  {field === ImportFormat.CURRENCY ? 'Account Currency' : 'Ignore'}
                 </SelectItem>
                 <SelectSeparator />
               </>
@@ -236,7 +238,7 @@ export function renderCell({
 }) {
   const value = getMappedValue(row, field);
 
-  if (field === ImportFormat.Symbol && mapping.fieldMappings[ImportFormat.Symbol]) {
+  if (field === ImportFormat.SYMBOL && mapping.fieldMappings[ImportFormat.SYMBOL]) {
     return renderSymbolCell({
       csvSymbol: value,
       mappedSymbol: mapping.symbolMappings?.[value],
@@ -245,7 +247,7 @@ export function renderCell({
     });
   }
 
-  if (field === ImportFormat.ActivityType) {
+  if (field === ImportFormat.ACTIVITY_TYPE) {
     return renderActivityTypeCell({
       csvType: value,
       appType: findAppTypeForCsvType(value, mapping.activityMappings),

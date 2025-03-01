@@ -10,13 +10,13 @@ import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { AddExchangeRateForm } from './add-exchange-rate-form';
 import { Icons } from '@/components/icons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { formatDate } from '@/lib/utils';
 
 export function ExchangeRatesSettings() {
   const { exchangeRates, isLoadingRates, updateExchangeRate, addExchangeRate, deleteExchangeRate } =
@@ -64,7 +64,7 @@ export function ExchangeRatesSettings() {
       enableHiding: false,
       cell: ({ row }) => (
         <div className="text-sm text-muted-foreground">
-          {format(new Date(row.original.updatedAt), 'MMM d, yyyy HH:mm')}
+          {formatDate(row.original.timestamp)}
         </div>
       ),
     },

@@ -1,5 +1,5 @@
 import { CustomPieChart } from '@/components/custom-pie-chart';
-import { Holding } from '@/lib/types';
+import { Holding, HoldingType } from '@/lib/types';
 import { useMemo, useState } from 'react';
 
 function toPascalCase(input: string) {
@@ -14,7 +14,7 @@ function getTypesData(assets: Holding[], cash: number) {
   const types = assets.reduce(
     (acc, asset) => {
       const assetType =
-        asset.holdingType === 'Cryptocurrency' ? 'Crypto' : asset.holdingType || 'Others'; // Use 'Others' as the default type if not provided
+        asset.holdingType === HoldingType.CRYPTOCURRENCY ? 'Crypto' : asset.holdingType || 'Others'; // Use 'Others' as the default type if not provided
       const pascalCaseType = toPascalCase(assetType); // Convert to PascalCase
       const current = acc[pascalCaseType] || 0;
       acc[pascalCaseType] = current + asset.marketValue;
