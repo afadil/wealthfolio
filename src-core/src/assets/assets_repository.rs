@@ -4,10 +4,10 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use crate::db::get_connection;
-use crate::schema::{assets, quotes};
+use crate::schema::assets;
 
 use super::assets_errors::Result;
-use super::assets_model::{Asset, AssetDB, NewAsset, Quote, QuoteDB, UpdateAssetProfile};
+use super::assets_model::{Asset, AssetDB, NewAsset, UpdateAssetProfile};
 
 /// Repository for managing asset data in the database
 pub struct AssetRepository {
@@ -79,14 +79,14 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
-            .filter(assets::asset_type.ne("Currency"))
+            // .filter(assets::asset_type.ne("Currency"))
             .load::<AssetDB>(&mut conn)?;
 
         Ok(results.into_iter().map(Asset::from).collect())
     }
 
     /// Lists currency assets for a given base currency
-    pub fn list_currency_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
+    pub fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
@@ -97,65 +97,4 @@ impl AssetRepository {
         Ok(results.into_iter().map(Asset::from).collect())
     }
 
-    /// Retrieves the latest quote for a symbol
-    pub fn get_latest_quote(&self, symbol: &str) -> Result<Quote> {
-        let mut conn = get_connection(&self.pool)?;
-
-        let result = quotes::table
-            .filter(quotes::symbol.eq(symbol))
-            .order(quotes::date.desc())
-            .first::<QuoteDB>(&mut conn)?;
-
-        Ok(result.into())
-    }
-
-    /// Retrieves the latest quotes for multiple symbols
-    pub fn get_latest_quotes(&self, symbols: &[String]) -> Result<Vec<Quote>> {
-        let mut conn = get_connection(&self.pool)?;
-
-        let results = quotes::table
-            .filter(quotes::symbol.eq_any(symbols))
-            .order(quotes::date.desc())
-            .load::<QuoteDB>(&mut conn)?;
-
-        Ok(results.into_iter().map(Quote::from).collect())
-    }
-
-    /// Retrieves quote history for an asset
-    pub fn get_quote_history(&self, symbol: &str) -> Result<Vec<Quote>> {
-        let mut conn = get_connection(&self.pool)?;
-
-        let results = quotes::table
-            .filter(quotes::symbol.eq(symbol))
-            .order(quotes::date.desc())
-            .load::<QuoteDB>(&mut conn)?;
-
-        Ok(results.into_iter().map(Quote::from).collect())
-    }
-
-    /// Saves a quote in the database
-    pub fn save_quote(&self, quote: Quote) -> Result<Quote> {
-        let mut conn = get_connection(&self.pool)?;
-
-        let quote_db: QuoteDB = quote.into();
-
-        let result = diesel::insert_into(quotes::table)
-            .values(&quote_db)
-            .get_result::<QuoteDB>(&mut conn)?;
-
-        Ok(result.into())
-    }
-
-    /// Saves multiple quotes in the database
-    pub fn save_quotes(&self, quotes: Vec<Quote>) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-
-        let quotes_db: Vec<QuoteDB> = quotes.into_iter().map(QuoteDB::from).collect();
-
-        diesel::insert_into(quotes::table)
-            .values(&quotes_db)
-            .execute(&mut conn)?;
-
-        Ok(())
-    }
 } 

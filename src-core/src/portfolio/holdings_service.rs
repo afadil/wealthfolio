@@ -1,14 +1,19 @@
-use crate::accounts::{Account, AccountService};
-use crate::activities::{Activity, ActivityService, ActivityType};
-use crate::assets::{Asset, AssetService, Quote};
-use crate::errors::{Error, Result, ValidationError, DatabaseError, CurrencyError};
-use crate::fx::fx_service::FxService;
+use crate::accounts::Account;
+use crate::accounts::AccountService;
+use crate::activities::ActivityService;
+use crate::assets::AssetError;
+use crate::assets::AssetService;
+use crate::assets::Asset;
+use crate::errors::{ Error, Result, ValidationError};
+use crate::fx::FxService;
+use crate::market_data::Quote;
+use crate::models::{ Holding, Performance};
 use crate::portfolio::transaction::get_transaction_handler;
-use crate::models::{Performance, Holding};
+use crate::{Activity, ActivityType};
 use bigdecimal::BigDecimal;
-use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::SqliteConnection;
-use log::{error, info};
+use diesel::r2d2::{Pool, ConnectionManager};
+use log::error;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -19,7 +24,6 @@ const QUANTITY_THRESHOLD: &str = "0.000001";
 const PORTFOLIO_ACCOUNT_ID: &str = "PORTFOLIO";
 
 impl Holding {
-
     pub fn add_position(&mut self, quantity: BigDecimal, price: BigDecimal) {
         let position_value = &quantity * &price;
         let old_value = &self.quantity * self.average_cost.clone().unwrap_or_default();
@@ -31,6 +35,7 @@ impl Holding {
             self.average_cost = Some(&new_value / &self.quantity);
         }
         self.book_value = &self.book_value + &position_value;
+        self.book_value_converted = self.book_value.clone();
     }
 
     pub fn reduce_position(&mut self, quantity: BigDecimal) -> Result<()> {
@@ -71,7 +76,6 @@ pub struct Portfolio {
 }
 
 pub struct HoldingsService {
-    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
     account_service: AccountService,
     activity_service: ActivityService,
     asset_service: AssetService,
@@ -191,7 +195,7 @@ impl Portfolio {
                         .to_string(),
                 )?;
 
-                if holding.holding_type == "CASH" {
+                if holding.holding_type.to_uppercase() == "CASH" {
                     holding.market_value = holding.quantity.clone();
                     holding.book_value = holding.quantity.clone();
                     holding.market_value_converted = &holding.market_value * &exchange_rate;
@@ -200,34 +204,31 @@ impl Portfolio {
                 }
 
                 if let Some(quote) = quotes.get(&holding.symbol) {
-                    // Log if quote is more than 24 hours old
-                    let now = chrono::Utc::now().naive_utc();
-                    let quote_age = now.signed_duration_since(quote.date);
-                    if quote_age > chrono::Duration::hours(24) {
-                        error!("Quote for {} is too old: {} hours old", holding.symbol, quote_age.num_hours());
-                    }
-
                     let market_price = BigDecimal::from_str(&quote.close.to_string())?;
                     holding.market_price = Some(market_price.clone());
-                    holding.market_value = (&holding.quantity * &market_price).round(ROUNDING_SCALE);
-                    holding.market_value_converted = (&holding.market_value * &exchange_rate).round(ROUNDING_SCALE);
-                    holding.book_value_converted = (&holding.book_value * &exchange_rate).round(ROUNDING_SCALE);
+                    holding.market_value =
+                        (&holding.quantity * &market_price).round(ROUNDING_SCALE);
+                    holding.market_value_converted =
+                        (&holding.market_value * &exchange_rate).round(ROUNDING_SCALE);
+                    holding.book_value_converted =
+                        (&holding.book_value * &exchange_rate).round(ROUNDING_SCALE);
 
-                    // Calculate day gain using previous day's close price (stored in adjclose)
-                    let previous_close = BigDecimal::from_str(&quote.adjclose.to_string())?;
-                    let previous_value = (&holding.quantity * &previous_close).round(ROUNDING_SCALE);
-                    let current_value = &holding.market_value;
-
-                    holding.performance.day_gain_amount = Some((current_value - &previous_value).round(ROUNDING_SCALE));
+                    let opening_value = (&holding.quantity
+                        * BigDecimal::from_str(&quote.open.to_string())?)
+                    .round(ROUNDING_SCALE);
+                    let closing_value = &holding.market_value;
+                    holding.performance.day_gain_amount =
+                        Some((closing_value - &opening_value).round(ROUNDING_SCALE));
                     holding.performance.day_gain_amount_converted = Some(
                         (&holding.performance.day_gain_amount.clone().unwrap() * &exchange_rate)
                             .round(ROUNDING_SCALE),
                     );
 
-                    if previous_value != BigDecimal::from(0) {
+                    if opening_value != BigDecimal::from(0) {
                         holding.performance.day_gain_percent = Some(
-                            ((current_value - &previous_value) / &previous_value * BigDecimal::from(100))
-                                .round(ROUNDING_SCALE),
+                            ((closing_value - &opening_value) / &opening_value
+                                * BigDecimal::from(100))
+                            .round(ROUNDING_SCALE),
                         );
                     }
 
@@ -242,8 +243,6 @@ impl Portfolio {
                             * BigDecimal::from(100))
                         .round(ROUNDING_SCALE);
                     }
-                } else {
-                    error!("No quote found for symbol: {}", holding.symbol);
                 }
             }
         }
@@ -418,9 +417,9 @@ impl Portfolio {
             }
 
             if let Some(day_gain) = &total.performance.day_gain_amount {
-                if &total.market_value.clone() - day_gain != BigDecimal::from(0) {
+                if total.market_value != BigDecimal::from(0) {
                     total.performance.day_gain_percent =
-                        Some(day_gain / (&total.market_value.clone() - day_gain) * BigDecimal::from(100));
+                        Some((day_gain / (&total.market_value - day_gain)) * BigDecimal::from(100));
                 }
             }
         }
@@ -478,7 +477,7 @@ impl Portfolio {
 }
 
 impl HoldingsService {
-    pub async fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, base_currency: String) -> Result<Self> {
+     pub async fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, base_currency: String) -> Result<Self> {
         let fx_service = FxService::new(pool.clone());
         let account_service = AccountService::new(pool.clone(), base_currency.clone());
         let activity_service = ActivityService::new(pool.clone(), base_currency.clone()).await
@@ -487,7 +486,6 @@ impl HoldingsService {
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
         
         Ok(HoldingsService {
-            pool,
             account_service,
             activity_service,
             asset_service,
@@ -497,19 +495,15 @@ impl HoldingsService {
     }
 
     /// Computes all holdings including totals
-    pub fn compute_holdings(&self) -> Result<Vec<Holding>> {
-        let mut conn = self.pool.get()
-            .map_err(|e| Error::Database(DatabaseError::PoolCreationFailed(e.into())))?;
-
-        // Load and validate required data
-        let (_accounts, activities, assets) = self.load_required_data(&mut conn)?;
+    pub async fn compute_holdings(&self) -> Result<Vec<Holding>> {
+    
+        let (_accounts, activities, assets) = self.load_required_data()?;
 
         // Create lookup maps for better performance
         let assets_map: HashMap<_, _> = assets.iter().map(|a| (&a.id, a)).collect();
 
         // Initialize FX service
-        self.fx_service.initialize()
-            .map_err(|e| Error::Currency(CurrencyError::ConversionFailed(e.to_string())))?;
+        self.fx_service.initialize()?;
 
         // Create portfolio
         let mut portfolio = Portfolio::new(self.base_currency.clone());
@@ -517,7 +511,7 @@ impl HoldingsService {
         // Process activities in batches for better performance
         for activities_chunk in activities.chunks(1000) {
             for activity in activities_chunk {
-                let asset = match self.get_asset_for_activity(&assets_map, &activity) {
+                let asset = match self.get_asset_for_activity(&assets_map, activity) {
                     Ok(asset) => asset,
                     Err(e) => {
                         error!("Error getting asset for activity: {}", e);
@@ -525,7 +519,9 @@ impl HoldingsService {
                     }
                 };
 
-                if let Err(e) = portfolio.process_activity(&activity, asset) {
+            
+
+                if let Err(e) = portfolio.process_activity(activity, asset) {
                     error!("Error processing activity: {}", e);
                 }
             }
@@ -537,9 +533,7 @@ impl HoldingsService {
         // Skip price update if no holdings
         if !holdings.is_empty() {
             // Update market prices
-            let quotes = self.load_quotes(&mut conn, &holdings)?;
-
-            info!("Updating market prices for {:?} holdings", quotes);
+            let quotes = self.load_quotes(&holdings)?;
             portfolio.update_market_prices(&quotes, &self.fx_service)?;
         }
 
@@ -554,16 +548,12 @@ impl HoldingsService {
     }
 
     fn load_required_data(
-        &self,
-        _conn: &mut SqliteConnection,
+        &self
     ) -> Result<(Vec<Account>, Vec<Activity>, Vec<Asset>)> {
         // Load data in parallel using rayon
-        let accounts = self.account_service.get_active_accounts()
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
-        let activities = self.activity_service.get_activities()
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
-        let assets = self.asset_service.get_assets()
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
+        let accounts = self.account_service.get_active_accounts()?;
+        let activities = self.activity_service.get_activities()?;
+        let assets = self.asset_service.get_assets()?;
 
         // Pre-validate data
         if accounts.is_empty() {
@@ -575,20 +565,19 @@ impl HoldingsService {
         Ok((accounts, activities, assets))
     }
 
-    fn get_asset_for_activity<'b>(
+    fn get_asset_for_activity<'a>(
         &self,
-        assets_map: &'b HashMap<&String, &'b Asset>,
+        assets_map: &'a HashMap<&String, &'a Asset>,
         activity: &Activity,
-    ) -> Result<&'b Asset> {
+    ) -> Result<&'a Asset> {
         assets_map
             .get(&activity.asset_id)
             .copied()
-            .ok_or_else(|| Error::Validation(ValidationError::MissingField(format!("Asset '{}' not found", activity.asset_id))))
+            .ok_or_else(|| Error::from(AssetError::NotFound(activity.asset_id.clone())))
     }
 
     fn load_quotes(
         &self,
-        _conn: &mut SqliteConnection,
         holdings: &[Holding],
     ) -> Result<HashMap<String, Quote>> {
         // Collect unique symbols and filter out cash positions
@@ -602,12 +591,12 @@ impl HoldingsService {
             return Ok(HashMap::new());
         }
 
-        let quotes = self.asset_service.get_latest_quotes(&asset_ids.into_iter().collect::<Vec<_>>())
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?
+        let quotes = self
+            .asset_service
+            .get_latest_quotes(&asset_ids.into_iter().collect::<Vec<_>>())?
             .into_iter()
             .map(|q| (q.symbol.clone(), q))
-            .collect();
-
+            .collect::<HashMap<String, Quote>>();
         Ok(quotes)
     }
 }

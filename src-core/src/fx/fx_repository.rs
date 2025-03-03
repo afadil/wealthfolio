@@ -14,6 +14,7 @@ use super::fx_errors::FxError;
 use super::fx_model::ExchangeRate;
 use log::error;
 
+#[derive(Clone)]
 pub struct FxRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
 }
@@ -78,7 +79,7 @@ impl FxRepository {
         
         let latest_quotes = sql_query(
             "SELECT q.* FROM quotes q
-             INNER JOIN assets a ON q.symbol = a.symbol AND a.asset_type = 'CURRENCY'
+             INNER JOIN assets a ON q.symbol = a.symbol AND a.asset_type = 'Currency'
              INNER JOIN (
                  SELECT symbol, MAX(date) as max_date
                  FROM quotes

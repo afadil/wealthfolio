@@ -604,7 +604,6 @@ impl YahooProvider {
             );
         }
 
-        info!("Fetched {} quotes", all_quotes.len());
         Ok(all_quotes)
     }
 }

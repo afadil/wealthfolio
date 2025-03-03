@@ -3,6 +3,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::market_data::market_data_model::DataSource;
+use crate::market_data::Quote;
 
 use super::assets_errors::Result;
 use super::assets_errors::AssetError;
@@ -227,88 +228,6 @@ impl From<NewAsset> for AssetDB {
     }
 }
 
-/// Domain model representing a quote in the system
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Quote {
-    pub id: String,
-    pub created_at: NaiveDateTime,
-    pub data_source: String,
-    pub date: NaiveDateTime,
-    pub symbol: String,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub volume: f64,
-    pub close: f64,
-    pub adjclose: f64,
-}
-
-/// Database model for quotes
-#[derive(
-    Queryable,
-    Identifiable,
-    Insertable,
-    Associations,
-    Serialize,
-    AsChangeset,
-    Deserialize,
-    Debug,
-    Clone,
-    QueryableByName,
-)]
-#[diesel(belongs_to(AssetDB, foreign_key = symbol))]
-#[diesel(table_name = crate::schema::quotes)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct QuoteDB {
-    pub id: String,
-    pub created_at: NaiveDateTime,
-    pub data_source: String,
-    pub date: NaiveDateTime,
-    pub symbol: String,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub volume: f64,
-    pub close: f64,
-    pub adjclose: f64,
-}
-
-impl From<QuoteDB> for Quote {
-    fn from(db: QuoteDB) -> Self {
-        Self {
-            id: db.id,
-            created_at: db.created_at,
-            data_source: db.data_source,
-            date: db.date,
-            symbol: db.symbol,
-            open: db.open,
-            high: db.high,
-            low: db.low,
-            volume: db.volume,
-            close: db.close,
-            adjclose: db.adjclose,
-        }
-    }
-}
-
-impl From<Quote> for QuoteDB {
-    fn from(domain: Quote) -> Self {
-        Self {
-            id: domain.id,
-            created_at: domain.created_at,
-            data_source: domain.data_source,
-            date: domain.date,
-            symbol: domain.symbol,
-            open: domain.open,
-            high: domain.high,
-            low: domain.low,
-            volume: domain.volume,
-            close: domain.close,
-            adjclose: domain.adjclose,
-        }
-    }
-}
 
 /// Domain model representing an asset profile with its quote history
 #[derive(Debug, Serialize, Deserialize)]

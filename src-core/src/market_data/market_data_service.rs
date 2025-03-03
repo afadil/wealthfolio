@@ -81,13 +81,11 @@ impl MarketDataService {
         }
     }
 
-    pub fn get_quote_history(
+    pub async fn get_quote_history(
         &self,
-        symbol: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        symbol: &str
     ) -> Result<Vec<Quote>> {
-        self.repository.get_quote_history(symbol, start_date, end_date)
+        self.repository.get_quote_history(symbol)
     }
 
     pub async fn refresh_quotes_for_symbols(&self, symbols: &[String]) -> Result<()> {

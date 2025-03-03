@@ -12,7 +12,7 @@ use bigdecimal::BigDecimal;
 use chrono::{Duration, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::SqliteConnection;
-use log::{error, info, warn};
+use log::{error, warn};
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::collections::HashMap;
 use std::default::Default;
@@ -388,6 +388,7 @@ impl HistoryService {
                     total.available_cash += history.available_cash * currency_exchange_rate;
                     total.net_deposit += history.net_deposit * currency_exchange_rate;
                     total.day_gain_value += history.day_gain_value * currency_exchange_rate;
+                    total.exchange_rate = currency_exchange_rate;
                 }
 
                 // Recalculate percentages
@@ -422,7 +423,7 @@ impl HistoryService {
         asset_currencies: &HashMap<String, String>,
         last_history: Option<PortfolioHistory>,
     ) -> Vec<PortfolioHistory> {
-        let max_history_days = 36500; // For example, 100 years
+        let max_history_days = 36500; // 100 years
         let today = Utc::now().naive_utc().date();
         let start_date = start_date.max(today - Duration::days(max_history_days));
         let end_date = end_date.min(today);
@@ -483,18 +484,18 @@ impl HistoryService {
                 };
 
                 let day_gain_percentage = if opening_market_value != BigDecimal::from(0) {
-                    (&day_gain_value / &opening_market_value * BigDecimal::from(100))
+                    &day_gain_value / &opening_market_value * BigDecimal::from(100)
                 } else {
                     BigDecimal::from(0)
                 };
 
                 let total_gain_value = &total_value - &net_deposit;
                 let total_gain_percentage = if net_deposit != BigDecimal::from(0) {
-                    (&total_gain_value / &net_deposit * BigDecimal::from(100))
+                    &total_gain_value / &net_deposit * BigDecimal::from(100)
                 } else {
                     BigDecimal::from(0)
                 };
-
+                
                 let exchange_rate = BigDecimal::from_f64(
                     self.fx_service
                         .get_exchange_rate_for_date(account_currency.as_str(), &self.base_currency, date)

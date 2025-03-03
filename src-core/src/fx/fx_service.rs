@@ -1,120 +1,66 @@
-use chrono::{Utc, Duration, NaiveDateTime, NaiveDate};
+use chrono::{Utc, NaiveDate};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use super::fx_errors::FxError;
 use super::fx_model::{ExchangeRate, NewExchangeRate};
 use crate::market_data::market_data_model::{Quote, DataSource};
 use super::fx_repository::FxRepository;
+use super::currency_converter::CurrencyConverter;
 
-/// Cache entry with timestamp to track staleness
 #[derive(Clone)]
-struct CacheEntry {
-    rate: f64,
-    timestamp: NaiveDateTime,
-}
-
-type RateCache = HashMap<String, CacheEntry>;
-type HistoricalCache = HashMap<String, Vec<Quote>>;
-
 pub struct FxService {
     repository: FxRepository,
-    rate_cache: Arc<RwLock<RateCache>>,
-    historical_cache: Arc<RwLock<HistoricalCache>>,
-    cache_ttl: Duration, // Time-to-live for cache entries
+    converter: Arc<RwLock<Option<CurrencyConverter>>>, // Currency converter for conversion operations
 }
 
 impl FxService {
     const DEFAULT_DATA_SOURCE: DataSource = DataSource::Manual;
-    const CACHE_TTL_HOURS: i64 = 24; // Cache TTL of 24 hours
 
     pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
         Self {
             repository: FxRepository::new(pool.clone()),
-            rate_cache: Arc::new(RwLock::new(HashMap::new())),
-            historical_cache: Arc::new(RwLock::new(HashMap::new())),
-            cache_ttl: Duration::hours(Self::CACHE_TTL_HOURS),
+            converter: Arc::new(RwLock::new(None)),
         }
     }
 
     pub fn initialize(&self) -> Result<(), FxError> {
-        // Initialize latest rates cache
-        let latest_rates = self.repository.get_latest_currency_rates()?;
-        let mut cache = self.rate_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
-        *cache = latest_rates.into_iter().map(|(k, v)| (
-            k,
-            CacheEntry {
-                rate: v,
-                timestamp: Utc::now().naive_utc(),
-            }
-        )).collect();
-
-        // Initialize historical quotes cache
-        let historical_quotes = self.repository.get_all_currency_quotes()?;
-        let mut historical_cache = self.historical_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
-        *historical_cache = historical_quotes;
-
+        // Initialize currency converter with all exchange rates
+        self.initialize_converter()?;
         Ok(())
     }
 
-    /// Update the rate cache with a new quote
-    fn update_rate_cache(&self, quote: &Quote) -> Result<(), FxError> {
-        let mut cache = self.rate_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
+    /// Initialize the currency converter with all exchange rates
+    fn initialize_converter(&self) -> Result<(), FxError> {
+        let exchange_rates = self.get_exchange_rates()?;
         
-        cache.insert(
-            quote.symbol.clone(),
-            CacheEntry {
-                rate: quote.close,
-                timestamp: quote.date,
+        // Only initialize the converter if we have exchange rates
+        if exchange_rates.is_empty() {
+            log::warn!("No exchange rates available, converter not initialized");
+            let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
+            *converter_lock = None;
+            return Ok(());
+        }
+        
+        match CurrencyConverter::new(exchange_rates) {
+            Ok(converter) => {
+                let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
+                *converter_lock = Some(converter);
+                Ok(())
             },
-        );
-        
-        Ok(())
-    }
-
-    /// Update the historical cache with a new quote
-    fn update_historical_cache(&self, quote: &Quote) -> Result<(), FxError> {
-        let mut cache = self.historical_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
-        
-        let entries = cache.entry(quote.symbol.clone()).or_insert_with(Vec::new);
-        entries.push(quote.clone());
-        entries.sort_by_key(|q| q.date);
-        
-        Ok(())
-    }
-
-    /// Check if a cache entry is stale
-    fn is_cache_stale(&self, entry: &CacheEntry) -> bool {
-        let now = Utc::now().naive_utc();
-        now.signed_duration_since(entry.timestamp) > self.cache_ttl
-    }
-
-    pub fn get_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate, FxError> {
-        let symbol = ExchangeRate::make_fx_symbol(from, to);
-        
-        // Check cache first
-        if let Ok(cache) = self.rate_cache.read() {
-            if let Some(entry) = cache.get(&symbol) {
-                if !self.is_cache_stale(entry) {
-                    return Ok(ExchangeRate {
-                        id: ExchangeRate::make_fx_symbol(from, to),
-                        from_currency: from.to_string(),
-                        to_currency: to.to_string(),
-                        rate: entry.rate,
-                        source: Self::DEFAULT_DATA_SOURCE,
-                        timestamp: entry.timestamp,
-                    });
-                }
+            Err(e) => {
+                log::error!("Failed to initialize currency converter: {}", e);
+                let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
+                *converter_lock = None;
+                Err(e)
             }
         }
+    }
 
-        // Cache miss or stale, fetch from repository
+    fn get_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate, FxError> {
+        // Fetch from repository
         match self.repository.get_exchange_rate(from, to)? {
             Some(rate) => {
-                // Update cache
-                let quote = rate.to_quote();
-                self.update_rate_cache(&quote)?;
                 Ok(rate)
             },
             None => {
@@ -130,10 +76,6 @@ impl FxService {
                             source: inverse_rate.source,
                             timestamp: inverse_rate.timestamp,
                         };
-                        
-                        // Update cache with inverted rate
-                        let quote = direct_rate.to_quote();
-                        self.update_rate_cache(&quote)?;
                         
                         Ok(direct_rate)
                     },
@@ -157,10 +99,9 @@ impl FxService {
 
         match self.repository.upsert_exchange_rate(rate) {
             Ok(saved_rate) => {
-                // Update both caches
-                let quote = saved_rate.to_quote();
-                self.update_rate_cache(&quote)?;
-                self.update_historical_cache(&quote)?;
+                // Reinitialize the converter with updated rates
+                self.initialize_converter()?;
+                
                 Ok(saved_rate)
             },
             Err(e) => Err(FxError::SaveError(format!(
@@ -177,34 +118,11 @@ impl FxService {
     ) -> Result<Vec<ExchangeRate>, FxError> {
         let symbol = ExchangeRate::make_fx_symbol(from, to);
         let end = Utc::now();
-        let start = end - Duration::days(days);
+        let start = end - chrono::Duration::days(days);
 
-        // Check cache first
-        if let Ok(cache) = self.historical_cache.read() {
-            if let Some(quotes) = cache.get(&symbol) {
-                let filtered: Vec<_> = quotes
-                    .iter()
-                    .filter(|q| {
-                        q.date >= start.naive_utc() && q.date <= end.naive_utc()
-                    })
-                    .collect();
-                
-                if !filtered.is_empty() {
-                    return Ok(filtered
-                        .into_iter()
-                        .map(|q| ExchangeRate::from_quote(q))
-                        .collect());
-                }
-            }
-        }
-
-        // Cache miss, fetch from repository
+        // Fetch from repository
         match self.repository.get_historical_quotes(&symbol, start.naive_utc(), end.naive_utc()) {
             Ok(quotes) => {
-                // Update cache with all quotes
-                for quote in &quotes {
-                    self.update_historical_cache(quote)?;
-                }
                 Ok(quotes.into_iter().map(|q| ExchangeRate::from_quote(&q)).collect())
             },
             Err(e) => Err(FxError::FetchError(format!(
@@ -237,28 +155,29 @@ impl FxService {
             return Ok(1.0);
         }
 
-        let key = format!("{}{}=X", from_currency, to_currency);
-        let cache = self.rate_cache.read().map_err(|e| FxError::CacheError(e.to_string()))?;
-
-        if let Some(entry) = cache.get(&key) {
-            return Ok(entry.rate);
+        // Try to get the converter
+        if let Ok(converter_lock) = self.converter.read() {
+            if let Some(converter) = &*converter_lock {
+                // Use the converter to get the latest rate
+                let today = Utc::now().naive_utc().date();
+                match converter.get_rate_nearest(from_currency, to_currency, today) {
+                    Ok(rate) => return Ok(rate),
+                    Err(e) => {
+                        log::warn!("Converter failed to get rate for {}/{}: {}", from_currency, to_currency, e);
+                        // Fall through to direct repository access
+                    }
+                }
+            }
         }
 
-        // If not found, try the inverse rate
-        let inverse_key = format!("{}{}=X", to_currency, from_currency);
-        if let Some(entry) = cache.get(&inverse_key) {
-            return Ok(1.0 / entry.rate);
+        // Fallback to direct repository access
+        match self.get_exchange_rate(from_currency, to_currency) {
+            Ok(rate) => Ok(rate.rate),
+            Err(e) => {
+                log::error!("Failed to get exchange rate for {}/{}: {}", from_currency, to_currency, e);
+                Err(e)
+            }
         }
-
-        // If still not found, try USD conversion
-        let from_usd = cache
-            .get(&format!("{}USD=X", from_currency))
-            .ok_or_else(|| FxError::RateNotFound(format!("No USD rate found for {}", from_currency)))?;
-        let to_usd = cache
-            .get(&format!("{}USD=X", to_currency))
-            .ok_or_else(|| FxError::RateNotFound(format!("No USD rate found for {}", to_currency)))?;
-
-        Ok(from_usd.rate / to_usd.rate)
     }
 
     pub fn get_exchange_rate_for_date(
@@ -271,45 +190,24 @@ impl FxService {
             return Ok(1.0);
         }
 
-        let symbol = format!("{}{}=X", from_currency, to_currency);
-        let inverse_symbol = format!("{}{}=X", to_currency, from_currency);
-        let cache = self.historical_cache.read().map_err(|e| FxError::CacheError(e.to_string()))?;
-
-        // Try direct rate
-        if let Some(quotes) = cache.get(&symbol) {
-            if let Some(quote) = Self::find_closest_quote(quotes, date) {
-                let days_diff = (quote.date.date().signed_duration_since(date))
-                    .num_days()
-                    .abs();
-                if days_diff <= 30 {
-                    return Ok(quote.close);
+        // Try to get the converter
+        if let Ok(converter_lock) = self.converter.read() {
+            if let Some(converter) = &*converter_lock {
+                // Use the converter to get the rate for the specific date
+                match converter.get_rate_nearest(from_currency, to_currency, date) {
+                    Ok(rate) => return Ok(rate),
+                    Err(e) => {
+                        log::warn!("Converter failed to get rate for {}/{} on {}: {}", 
+                            from_currency, to_currency, date, e);
+                        // Fall through to fallback
+                    }
                 }
             }
         }
 
-        // Try inverse rate
-        if let Some(quotes) = cache.get(&inverse_symbol) {
-            if let Some(quote) = Self::find_closest_quote(quotes, date) {
-                let days_diff = (quote.date.date().signed_duration_since(date))
-                    .num_days()
-                    .abs();
-                if days_diff <= 30 {
-                    return Ok(1.0 / quote.close);
-                }
-            }
-        }
-
-        // Fallback to latest rate if historical rate not found
+        // Fallback to latest rate if converter not available or failed
+        log::info!("Falling back to latest rate for {}/{}", from_currency, to_currency);
         self.get_latest_exchange_rate(from_currency, to_currency)
-    }
-
-    fn find_closest_quote(quotes: &[Quote], target_date: NaiveDate) -> Option<&Quote> {
-        quotes.iter().min_by_key(|quote| {
-            let quote_date = quote.date.date();
-            (quote_date.signed_duration_since(target_date))
-                .num_days()
-                .abs()
-        })
     }
 
     pub fn convert_currency(
@@ -322,7 +220,59 @@ impl FxService {
             return Ok(amount);
         }
 
+        // Try to get the converter
+        if let Ok(converter_lock) = self.converter.read() {
+            if let Some(converter) = &*converter_lock {
+                // Use the converter to convert the amount
+                let today = Utc::now().naive_utc().date();
+                match converter.convert_amount(amount, from_currency, to_currency, today) {
+                    Ok(converted) => return Ok(converted),
+                    Err(e) => {
+                        log::warn!("Converter failed to convert {}{} to {}: {}", 
+                            amount, from_currency, to_currency, e);
+                        // Fall through to fallback
+                    }
+                }
+            }
+        }
+
+        // Fallback to direct rate lookup
+        log::info!("Falling back to direct rate lookup for converting {}{} to {}", 
+            amount, from_currency, to_currency);
         let rate = self.get_latest_exchange_rate(from_currency, to_currency)?;
+        Ok(amount * rate)
+    }
+
+    pub fn convert_currency_for_date(
+        &self,
+        amount: f64,
+        from_currency: &str,
+        to_currency: &str,
+        date: NaiveDate,
+    ) -> Result<f64, FxError> {
+        if from_currency.eq(to_currency) {
+            return Ok(amount);
+        }
+
+        // Try to get the converter
+        if let Ok(converter_lock) = self.converter.read() {
+            if let Some(converter) = &*converter_lock {
+                // Use the converter to convert the amount for the specific date
+                match converter.convert_amount_nearest(amount, from_currency, to_currency, date) {
+                    Ok(converted) => return Ok(converted),
+                    Err(e) => {
+                        log::warn!("Converter failed to convert {}{} to {} on {}: {}", 
+                            amount, from_currency, to_currency, date, e);
+                        // Fall through to fallback
+                    }
+                }
+            }
+        }
+
+        // Fallback to direct rate lookup
+        log::info!("Falling back to direct rate lookup for converting {}{} to {} on {}", 
+            amount, from_currency, to_currency, date);
+        let rate = self.get_exchange_rate_for_date(from_currency, to_currency, date)?;
         Ok(amount * rate)
     }
 
@@ -336,9 +286,8 @@ impl FxService {
     ) -> Result<(), FxError> {
         self.repository.delete_exchange_rate(rate_id)?;
 
-        // Remove from cache
-        let mut cache = self.rate_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
-        cache.remove(rate_id);
+        // Reinitialize the converter with updated rates
+        self.initialize_converter()?;
 
         Ok(())
     }
@@ -367,15 +316,6 @@ impl FxService {
             self.add_exchange_rate(exchange_rate)?;
         }
         
-        Ok(())
-    }
-
-    pub fn clear_cache(&self) -> Result<(), FxError> {
-        let mut rate_cache = self.rate_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
-        let mut historical_cache = self.historical_cache.write().map_err(|e| FxError::CacheError(e.to_string()))?;
-        
-        rate_cache.clear();
-        historical_cache.clear();
         Ok(())
     }
 }

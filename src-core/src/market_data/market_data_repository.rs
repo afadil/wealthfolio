@@ -79,9 +79,7 @@ impl MarketDataRepository {
 
     pub fn get_quote_history(
         &self,
-        symbol: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        symbol: &str
     ) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -90,12 +88,8 @@ impl MarketDataRepository {
              FROM quotes q
              INNER JOIN assets a ON q.symbol = a.symbol
              WHERE q.symbol = '{}'
-             AND q.date >= '{}'
-             AND q.date <= '{}'
-             ORDER BY q.date ASC",
-            symbol,
-            start_date.and_hms_opt(0, 0, 0).unwrap(),
-            end_date.and_hms_opt(23, 59, 59).unwrap()
+             ORDER BY q.date DESC",
+            symbol
         ))
         .load::<QuoteWithCurrency>(&mut conn)
         .map(|quotes| quotes.into_iter().map(Quote::from).collect())

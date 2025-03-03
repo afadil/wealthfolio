@@ -6,7 +6,7 @@ import { ResponsiveContainer, Treemap } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type ReturnType = 'daily' | 'total';
@@ -194,7 +194,7 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
-            <BarChart className="h-4 w-4 text-muted-foreground" />
+            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
           </div>
           <div className="flex space-x-1 rounded-full bg-secondary p-1">
@@ -213,7 +213,7 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center space-x-2">
-          <BarChart className="h-4 w-4 text-muted-foreground" />
+          <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
           <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
         </div>
         <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />

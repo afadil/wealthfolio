@@ -2,12 +2,14 @@ use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::{debug, error};
 use std::sync::Arc;
+use chrono::{Utc, Duration};
 
 use crate::market_data::market_data_service::MarketDataService;
 use crate::market_data::market_data_model::{QuoteRequest, DataSource};
+use crate::market_data::Quote;
 
 use super::assets_errors::{AssetError, Result};
-use super::assets_model::{Asset, AssetProfile, NewAsset, Quote, UpdateAssetProfile};
+use super::assets_model::{Asset, AssetProfile, NewAsset, UpdateAssetProfile};
 use super::assets_repository::AssetRepository;
 
 /// Service for managing assets
@@ -37,11 +39,14 @@ impl AssetService {
     }
 
     /// Retrieves an asset profile with quote history
-    pub fn get_asset_data(&self, asset_id: &str) -> Result<AssetProfile> {
+    pub async fn get_asset_data(&self, asset_id: &str) -> Result<AssetProfile> {
         debug!("Fetching asset data for asset_id: {}", asset_id);
 
         let asset = self.repository.get_by_id(asset_id)?;
-        let quote_history = self.repository.get_quote_history(&asset.symbol)?;
+        
+        let quote_history = self.market_data_service.get_quote_history(
+            &asset.symbol
+        ).await?;
 
         Ok(AssetProfile {
             asset,
@@ -55,8 +60,8 @@ impl AssetService {
     }
 
     /// Lists currency assets for a given base currency
-    pub fn load_currency_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
-        self.repository.list_currency_assets(base_currency)
+    pub fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
+        self.repository.list_cash_assets(base_currency)
     }
 
     /// Creates a new cash asset
@@ -116,7 +121,9 @@ impl AssetService {
 
     /// Retrieves the latest quotes for multiple symbols
     pub fn get_latest_quotes(&self, symbols: &[String]) -> Result<Vec<Quote>> {
-        self.repository.get_latest_quotes(symbols)
+        self.market_data_service.get_latest_quotes(symbols)
+            .map(|quotes_map| quotes_map.into_values().collect())
+            .map_err(|e| AssetError::MarketDataError(e.to_string()))
     }
 
     /// Synchronizes quotes for a list of assets

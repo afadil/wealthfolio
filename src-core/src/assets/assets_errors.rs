@@ -1,6 +1,7 @@
 use diesel::result::Error as DieselError;
 use thiserror::Error;
 use crate::db::DatabaseError;
+use crate::market_data::MarketDataError;
 
 /// Custom error type for asset-related operations
 #[derive(Debug, Error)]
@@ -39,6 +40,12 @@ impl From<DatabaseError> for AssetError {
             DatabaseError::BackupFailed(e) => AssetError::DatabaseError(format!("Backup failed: {}", e)),
             DatabaseError::RestoreFailed(e) => AssetError::DatabaseError(format!("Restore failed: {}", e)),
         }
+    }
+}
+
+impl From<MarketDataError> for AssetError {
+    fn from(err: MarketDataError) -> Self {
+        AssetError::MarketDataError(err.to_string())
     }
 }
 

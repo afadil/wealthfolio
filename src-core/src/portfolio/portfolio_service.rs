@@ -41,7 +41,6 @@ pub struct PortfolioService {
     income_service: Arc<IncomeService>,
     holdings_service: Arc<HoldingsService>,
     history_service: Arc<HistoryService>,
-    base_currency: String,
 }
 
 impl PortfolioService {
@@ -74,12 +73,11 @@ impl PortfolioService {
             income_service,
             holdings_service,
             history_service,
-            base_currency,
         })
     }
 
     pub async fn compute_holdings(&self) -> Result<Vec<Holding>> {
-        self.holdings_service.compute_holdings()
+        self.holdings_service.compute_holdings().await
     }
 
     pub async fn calculate_historical_data(

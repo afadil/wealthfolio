@@ -25,6 +25,7 @@ pub async fn get_asset_data(
     let service = AssetService::new(state.pool.clone()).await.map_err(|e| e.to_string())?;
     service
         .get_asset_data(&asset_id)
+        .await
         .map_err(|e| e.to_string())
 }
 
