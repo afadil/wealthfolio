@@ -34,10 +34,12 @@ pub struct QuoteWithCurrency {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum DataSource {
     Yahoo,
     Manual,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

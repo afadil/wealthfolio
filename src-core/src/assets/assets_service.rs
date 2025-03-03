@@ -2,7 +2,6 @@ use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::{debug, error};
 use std::sync::Arc;
-use chrono::{Utc, Duration};
 
 use crate::market_data::market_data_service::MarketDataService;
 use crate::market_data::market_data_model::{QuoteRequest, DataSource};

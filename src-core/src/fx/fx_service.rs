@@ -1,10 +1,11 @@
 use chrono::{Utc, NaiveDate};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
+use log::info;
 use std::sync::{Arc, RwLock};
 use super::fx_errors::FxError;
 use super::fx_model::{ExchangeRate, NewExchangeRate};
-use crate::market_data::market_data_model::{Quote, DataSource};
+use crate::market_data::market_data_model::DataSource;
 use super::fx_repository::FxRepository;
 use super::currency_converter::CurrencyConverter;
 
@@ -88,6 +89,10 @@ impl FxService {
     }
 
     pub fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate, FxError> {
+
+        // First register the currency pair
+        self.register_currency_pair_manual(&new_rate.from_currency, &new_rate.to_currency)?;
+
         let rate = ExchangeRate {
             id: ExchangeRate::make_fx_symbol(&new_rate.from_currency, &new_rate.to_currency),
             from_currency: new_rate.from_currency,
@@ -206,7 +211,7 @@ impl FxService {
         }
 
         // Fallback to latest rate if converter not available or failed
-        log::info!("Falling back to latest rate for {}/{}", from_currency, to_currency);
+        log::warn!("Falling back to latest rate for {}/{} on {}", from_currency, to_currency, date);
         self.get_latest_exchange_rate(from_currency, to_currency)
     }
 
@@ -302,6 +307,7 @@ impl FxService {
         // Try to get existing rate first
         let existing_rate = self.get_exchange_rate(from, to).ok();
 
+
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository.create_fx_asset(from, to, DataSource::Yahoo.as_str())?;
@@ -314,6 +320,23 @@ impl FxService {
             };
 
             self.add_exchange_rate(exchange_rate)?;
+        }
+        
+        Ok(())
+    }
+
+     /// Register a new currency pair and create necessary FX assets
+    pub fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<(), FxError> {
+        // Return early if trying to register the same currency
+        if from == to {
+            return Ok(());
+        }
+        // Try to get existing rate first
+        let existing_rate = self.get_exchange_rate(from, to).ok();
+
+        // Create FX asset and add default rate if no rate exists
+        if existing_rate.is_none() {
+            self.repository.create_fx_asset(from, to, DataSource::Manual.as_str())?;
         }
         
         Ok(())

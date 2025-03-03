@@ -79,7 +79,7 @@ impl FxRepository {
         
         let latest_quotes = sql_query(
             "SELECT q.* FROM quotes q
-             INNER JOIN assets a ON q.symbol = a.symbol AND a.asset_type = 'Currency'
+             INNER JOIN assets a ON q.symbol = a.symbol AND a.asset_type = 'CURRENCY'
              INNER JOIN (
                  SELECT symbol, MAX(date) as max_date
                  FROM quotes

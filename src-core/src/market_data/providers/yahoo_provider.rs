@@ -8,7 +8,7 @@ use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::{Quote as ModelQuote, QuoteSummary};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::debug;
 use reqwest::{header, Client};
 use serde_json::json;
 use yahoo::{YQuoteItem, YahooError};

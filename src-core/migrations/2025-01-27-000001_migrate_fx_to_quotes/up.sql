@@ -5,7 +5,7 @@ SET
         WHEN length(e.id) >= 6 THEN substr(e.id, 1, 3) || '/' || substr(e.id, 4, 3) || ' Exchange Rate'
         ELSE e.id || ' Exchange Rate'
     END,
-    asset_type = 'Currency',
+    asset_type = 'CURRENCY',
     data_source = e.source,
     currency = CASE 
         WHEN length(e.id) >= 3 THEN substr(e.id, 1, 3)
@@ -38,7 +38,7 @@ SELECT
         WHEN length(id) >= 6 THEN substr(id, 1, 3) || '/' || substr(id, 4, 3) || ' Exchange Rate'
         ELSE id || ' Exchange Rate'
     END as name,
-    'Currency' as asset_type,
+    'CURRENCY' as asset_type,
     source as data_source,
     CASE 
         WHEN length(id) >= 3 THEN substr(id, 1, 3)
@@ -90,4 +90,8 @@ DROP TABLE exchange_rates;
 -- Add performance optimizing indexes
 CREATE INDEX IF NOT EXISTS idx_quotes_symbol_date ON quotes(symbol, date);
 CREATE INDEX IF NOT EXISTS idx_quotes_date ON quotes(date);
-CREATE INDEX IF NOT EXISTS idx_assets_type_currency ON assets(asset_type) WHERE asset_type = 'Currency'; 
+CREATE INDEX IF NOT EXISTS idx_assets_type_currency ON assets(asset_type); 
+
+
+-- Capitalize all asset types
+UPDATE assets SET asset_type = UPPER(asset_type);
