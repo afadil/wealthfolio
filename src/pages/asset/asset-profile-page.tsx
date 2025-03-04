@@ -261,13 +261,35 @@ export const AssetProfilePage = () => {
                   )}
                   placeholder="sector:weight"
                   onChange={(values) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      sectors: (values as string[]).map((value) => {
+                    setFormData((prev) => {
+                      const filteredSectors = prev.sectors.filter((sector) =>
+                        (values as string[]).some((value) => {
+                          const [name] = value.split(":"); // Extract the name from each value
+                          return sector.name === name; // Keep only those sectors whose names exist in `values`
+                        })
+                      );
+                      // Iterate over the values entered by the user
+                      (values as string[]).forEach((value) => {
                         const [name, weight] = value.split(':');
-                        return { name, weight: parseFloat(weight) || 0 };
-                      }),
-                    }))
+                        const parsedWeight = parseFloat(weight) || 0;
+                      
+                        // Check if the sector already exists
+                        const existingSectorIndex = filteredSectors.findIndex((s) => s.name === name);
+                      
+                        if (existingSectorIndex !== -1) {
+                          // If it exists, update the weight
+                          filteredSectors[existingSectorIndex].weight = parsedWeight;
+                        } else {
+                          // If it doesn't exist, add a new sector
+                          filteredSectors.push({ name, weight: parsedWeight });
+                        }
+                      });
+                      // Return the updated formData
+                      return {
+                        ...prev,
+                        sectors: filteredSectors,
+                      };
+                    })
                   }
                 />
               ) : (
@@ -294,13 +316,35 @@ export const AssetProfilePage = () => {
                     (c) => `${c.code}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
                   )}
                   onChange={(values) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      countries: (values as string[]).map((value) => {
+                    setFormData((prev) => {
+                      const filteredCountries = prev.countries.filter((country) =>
+                        (values as string[]).some((value) => {
+                          const [code] = value.split(":"); // Extract the code from each value
+                          return country.code === code; // Keep only those sectors whose codes exist in `values`
+                        })
+                      );
+                      // Iterate over the values entered by the user
+                      (values as string[]).forEach((value) => {
                         const [code, weight] = value.split(':');
-                        return { code, weight: parseFloat(weight) || 0 };
-                      }),
-                    }))
+                        const parsedWeight = parseFloat(weight) || 0;
+                      
+                        // Check if the country already exists
+                        const existingCountryIndex = filteredCountries.findIndex((s) => s.code === code);
+                      
+                        if (existingCountryIndex !== -1) {
+                          // If it exists, update the weight
+                          filteredCountries[existingCountryIndex].weight = parsedWeight;
+                        } else {
+                          // If it doesn't exist, add a new sector
+                          filteredCountries.push({ code, weight: parsedWeight });
+                        }
+                      });
+                      // Return the updated formData
+                      return {
+                        ...prev,
+                        countries: filteredCountries,
+                      };
+                    })
                   }
                 />
               ) : (
