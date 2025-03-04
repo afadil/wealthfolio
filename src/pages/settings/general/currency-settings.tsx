@@ -20,6 +20,7 @@ import {
 import { useSettingsContext } from '@/lib/settings-provider';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
 
 const baseCurrencyFormSchema = z.object({
   baseCurrency: z.string({ required_error: 'Please select a base currency.' }),
@@ -28,6 +29,7 @@ const baseCurrencyFormSchema = z.object({
 type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
 
 export function BaseCurrencySettings() {
+  const { t } = useTranslation();
   const { settings, updateSettings } = useSettingsContext();
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || 'USD',
@@ -50,8 +52,8 @@ export function BaseCurrencySettings() {
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="text-lg">Base Currency</CardTitle>
-          <CardDescription>Select your portfolio base currency.</CardDescription>
+          <CardTitle className="text-lg">{t('Base Currency')}</CardTitle>
+          <CardDescription>{t('Select your portfolio base currency.')}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -73,7 +75,7 @@ export function BaseCurrencySettings() {
                           {field.value
                             ? worldCurrencies.find((currency) => currency.value === field.value)
                                 ?.label
-                            : 'Select account currency'}
+                            : t('Select account currency')}
                           <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
@@ -113,7 +115,7 @@ export function BaseCurrencySettings() {
               )}
             />
 
-            <Button type="submit">Save</Button>
+            <Button type="submit">{t('Save')}</Button>
           </form>
         </Form>
       </CardContent>

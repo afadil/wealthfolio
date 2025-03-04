@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { getCurrentWindow, Theme } from '@tauri-apps/api/window';
+import { useTranslation } from 'react-i18next';
 
 import { Settings, SettingsContextType } from './types';
 import { useSettings } from './useSettings';
@@ -11,10 +12,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { data, isLoading, isError } = useSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
+  const { i18n } = useTranslation();
 
   const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument, settings);
 
   const updateSettings = (newSettings: Settings) => {
+    if (newSettings.language !== settings?.language) {
+      i18n.changeLanguage(newSettings.language);
+    }
     updateMutation.mutate(newSettings);
   };
 
@@ -22,8 +27,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (data) {
       setSettings(data);
       applySettingsToDocument(data);
+      i18n.changeLanguage(data.language);
     }
-  }, [data]);
+  }, [data, i18n]);
 
   const contextValue: SettingsContextType = {
     settings,

@@ -6,6 +6,7 @@ import { formatAmount, formatPercent } from '@/lib/utils';
 import { AmountDisplay } from '@/components/amount-display';
 import { QuantityDisplay } from '@/components/quantity-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
+import { useTranslation } from 'react-i18next';
 
 interface AssetDetail {
   numShares: number;
@@ -50,6 +51,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
     currency,
     quote,
   } = assetData;
+  const { t } = useTranslation();
 
   const holdingRows = [
     {
@@ -110,7 +112,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
         <div className="space-y-4 text-sm">
           {holdingRows.map(({ label, value, color }, idx) => (
             <div key={idx} className="flex justify-between">
-              <span className="text-muted-foreground">{label}</span>
+              <span className="text-muted-foreground">{t(label)}</span>
               <span className={`font-medium ${color || ''}`}>{value}</span>
             </div>
           ))}

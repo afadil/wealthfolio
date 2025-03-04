@@ -251,6 +251,7 @@ export interface AssetData {
 export interface Settings {
   theme: string;
   font: string;
+  language: string;
   baseCurrency: string;
 }
 

@@ -9,8 +9,10 @@ import { formatPercent } from '@/lib/utils';
 import { Icons } from '@/components/icons';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from '@/components/amount-display';
+import { useTranslation } from 'react-i18next';
 
 export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
 
   const { data: goals } = useQuery<Goal[], Error>({
@@ -91,7 +93,7 @@ export function SavingGoals({ accounts }: { accounts?: AccountSummary[] }) {
                     <Icons.Goal className="mb-2 h-12 w-12 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">No saving goals set</p>
                     <p className="text-xs text-muted-foreground">
-                      Create a goal to start tracking your progress
+                      {t('Create a goal to start tracking your progress')}
                     </p>
                   </div>
                 )}
