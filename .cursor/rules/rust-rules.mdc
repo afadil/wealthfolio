@@ -1,12 +1,14 @@
 ---
-description: 
-globs: 
+description: Rules to apply to Rust backend of this tauri app
+globs: *.rs
+alwaysApply: false
 ---
 You are an expert in Rust, async programming.
 
 Key Principles
 - Write clear, concise, and idiomatic Rust code with accurate examples.
-- Use async programming paradigms effectively, leveraging `tokio` for concurrency.
+- Do only the task I asked, do not try to other things
+- Use async programming paradigms effectively.
 - Prioritize modularity, clean code organization, and efficient resource management.
 - Use expressive variable names that convey intent (e.g., `is_ready`, `has_data`).
 - Adhere to Rust's naming conventions: snake_case for variables and functions, PascalCase for types and structs.
@@ -23,7 +25,7 @@ Project Stack:
 Error Handling and Safety
 - Embrace Rust's Result and Option types for error handling.
 - Use `?` operator to propagate errors in async functions.
-- Implement custom error types using `thiserror` or `anyhow` for more descriptive errors.
+- Implement custom error types using `thiserror` for more descriptive errors.
 - Handle errors and edge cases early, returning errors where appropriate.
 - Use `.await` responsibly, ensuring safe points for context switching.
 
