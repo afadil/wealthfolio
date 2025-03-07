@@ -1,7 +1,7 @@
+use bigdecimal::BigDecimal;
 use chrono::{Utc, NaiveDate};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-use log::info;
 use std::sync::{Arc, RwLock};
 use super::fx_errors::FxError;
 use super::fx_model::{ExchangeRate, NewExchangeRate};
@@ -73,7 +73,7 @@ impl FxService {
                             id: ExchangeRate::make_fx_symbol(from, to),
                             from_currency: from.to_string(),
                             to_currency: to.to_string(),
-                            rate: 1.0 / inverse_rate.rate,
+                            rate: BigDecimal::from(1) / inverse_rate.rate,
                             source: inverse_rate.source,
                             timestamp: inverse_rate.timestamp,
                         };
@@ -102,7 +102,7 @@ impl FxService {
             timestamp: Utc::now().naive_utc(),
         };
 
-        match self.repository.upsert_exchange_rate(rate) {
+        match self.repository.save_exchange_rate(rate) {
             Ok(saved_rate) => {
                 // Reinitialize the converter with updated rates
                 self.initialize_converter()?;
@@ -140,7 +140,7 @@ impl FxService {
         &self,
         from: &str,
         to: &str,
-        rate: f64,
+        rate: BigDecimal,
     ) -> Result<ExchangeRate, FxError> {
         let new_rate = NewExchangeRate {
             from_currency: from.to_string(),
@@ -155,9 +155,9 @@ impl FxService {
         &self,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency == to_currency {
-            return Ok(1.0);
+            return Ok(BigDecimal::from(1));
         }
 
         // Try to get the converter
@@ -190,9 +190,24 @@ impl FxService {
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
+        // Check for valid currency codes
+        if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
+            // log::error!("Invalid from_currency code: {}", from_currency);
+            return Err(FxError::InvalidCurrencyCode(format!(
+                "Invalid currency code: {}", from_currency
+            )));
+        }
+        
+        if to_currency.len() != 3 || !to_currency.chars().all(|c| c.is_alphabetic()) {
+            // log::error!("Invalid to_currency code: {}", to_currency);
+            return Err(FxError::InvalidCurrencyCode(format!(
+                "Invalid currency code: {}", to_currency
+            )));
+        }
+        
         if from_currency == to_currency {
-            return Ok(1.0);
+            return Ok(BigDecimal::from(1));
         }
 
         // Try to get the converter
@@ -217,10 +232,10 @@ impl FxService {
 
     pub fn convert_currency(
         &self,
-        amount: f64,
+        amount: BigDecimal,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency.eq(to_currency) {
             return Ok(amount);
         }
@@ -230,11 +245,11 @@ impl FxService {
             if let Some(converter) = &*converter_lock {
                 // Use the converter to convert the amount
                 let today = Utc::now().naive_utc().date();
-                match converter.convert_amount(amount, from_currency, to_currency, today) {
+                match converter.convert_amount(amount.clone(), from_currency, to_currency, today) {
                     Ok(converted) => return Ok(converted),
                     Err(e) => {
                         log::warn!("Converter failed to convert {}{} to {}: {}", 
-                            amount, from_currency, to_currency, e);
+                            amount.clone(), from_currency, to_currency, e);
                         // Fall through to fallback
                     }
                 }
@@ -243,18 +258,18 @@ impl FxService {
 
         // Fallback to direct rate lookup
         log::info!("Falling back to direct rate lookup for converting {}{} to {}", 
-            amount, from_currency, to_currency);
+            amount.clone(), from_currency, to_currency);
         let rate = self.get_latest_exchange_rate(from_currency, to_currency)?;
         Ok(amount * rate)
     }
 
     pub fn convert_currency_for_date(
         &self,
-        amount: f64,
+        amount: BigDecimal,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency.eq(to_currency) {
             return Ok(amount);
         }
@@ -263,11 +278,11 @@ impl FxService {
         if let Ok(converter_lock) = self.converter.read() {
             if let Some(converter) = &*converter_lock {
                 // Use the converter to convert the amount for the specific date
-                match converter.convert_amount_nearest(amount, from_currency, to_currency, date) {
+                match converter.convert_amount_nearest(amount.clone(), from_currency, to_currency, date) {
                     Ok(converted) => return Ok(converted),
                     Err(e) => {
                         log::warn!("Converter failed to convert {}{} to {} on {}: {}", 
-                            amount, from_currency, to_currency, date, e);
+                            amount.clone(), from_currency, to_currency, date, e);
                         // Fall through to fallback
                     }
                 }
@@ -315,7 +330,7 @@ impl FxService {
             let exchange_rate = NewExchangeRate {
                 from_currency: from.to_string(),
                 to_currency: to.to_string(),
-                rate: 1.0,
+                rate: BigDecimal::from(1),
                 source: DataSource::Yahoo,
             };
 

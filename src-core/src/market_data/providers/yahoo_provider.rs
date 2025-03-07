@@ -1,14 +1,15 @@
 use std::{sync::RwLock, time::SystemTime};
 
-use super::models::{AssetClass, AssetSubClass, PriceDetail, YahooResult};
-use crate::assets::assets_model::NewAsset;
-use crate::market_data::market_data_model::DataSource;
-use crate::market_data::market_data_provider::{MarketDataProvider, AssetProfiler};
+use super::models::{AssetClass, AssetProfile, AssetSubClass, PriceDetail, YahooResult};
 use crate::market_data::market_data_errors::MarketDataError;
+use crate::market_data::market_data_model::DataSource;
+use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketDataProvider};
 use crate::market_data::{Quote as ModelQuote, QuoteSummary};
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, info};
+use num_traits::FromPrimitive;
 use reqwest::{header, Client};
 use serde_json::json;
 use yahoo::{YQuoteItem, YahooError};
@@ -35,16 +36,16 @@ impl From<&YQuoteItem> for QuoteSummary {
     }
 }
 
-impl From<&YQuoteItem> for NewAsset {
+impl From<&YQuoteItem> for AssetProfile {
     fn from(item: &YQuoteItem) -> Self {
-        NewAsset {
+        AssetProfile {
             id: Some(item.symbol.clone()),
             isin: None, // TODO: Implement isin
             name: Some(item.long_name.clone()),
             asset_type: Some(item.quote_type.clone()),
             symbol: item.symbol.clone(),
             data_source: DataSource::Yahoo.as_str().to_string(),
-            ..Default::default() // Use default for the rest
+            ..Default::default()
         }
     }
 }
@@ -67,21 +68,23 @@ impl YahooProvider {
 
     pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, yahoo::YahooError> {
         let result = self.provider.search_ticker(query).await?;
-        
 
         let asset_profiles = result.quotes.iter().map(QuoteSummary::from).collect();
 
         Ok(asset_profiles)
     }
 
-    pub async fn get_symbol_profile(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
-        // Handle the cash asset case
-        if let Some(currency) = symbol.strip_prefix("$CASH-") {
-            return Ok(self.build_cash_asset(symbol, currency));
-        }
+    pub async fn get_symbol_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<AssetProfile, yahoo::YahooError> {
         match self.get_symbol_full_profile(symbol).await {
             Ok(asset) => Ok(asset),
-            Err(_) => {
+            Err(err) => {
+                debug!(
+                    "Failed to get full profile for {}: {}, trying short profile",
+                    symbol, err
+                );
                 // If full profile fails, try to get short profile
                 match self.get_symbol_short_profile(symbol).await? {
                     Some(asset) => Ok(asset),
@@ -91,13 +94,21 @@ impl YahooProvider {
         }
     }
 
-    pub async fn get_latest_quote(&self, symbol: &str) -> Result<ModelQuote, yahoo::YahooError> {
+    pub async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, yahoo::YahooError> {
         match self.provider.get_latest_quotes(symbol, "1d").await {
             Ok(response) => {
                 let yahoo_quote = response
                     .last_quote()
                     .map_err(|_| yahoo::YahooError::EmptyDataSet)?;
-                let model_quote = self.yahoo_quote_to_model_quote(symbol.to_string(), yahoo_quote);
+                let model_quote = self.yahoo_quote_to_model_quote(
+                    symbol.to_string(),
+                    yahoo_quote,
+                    fallback_currency.clone(),
+                );
                 Ok(model_quote)
             }
             Err(_) => {
@@ -108,12 +119,13 @@ impl YahooProvider {
     }
 
     /// Fetch historic quotes between start and end date
-    pub async fn get_stock_history(
+    pub async fn get_historical_quotes(
         &self,
         symbol: &str,
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<ModelQuote>, yahoo::YahooError> {
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
         if symbol.starts_with("$CASH-") {
             return Ok(vec![]);
         }
@@ -129,7 +141,9 @@ impl YahooProvider {
         let quotes = response
             .quotes()?
             .into_iter()
-            .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
+            .map(|q| {
+                self.yahoo_quote_to_model_quote(symbol.to_string(), q, fallback_currency.clone())
+            })
             .collect();
 
         Ok(quotes)
@@ -157,33 +171,50 @@ impl YahooProvider {
             data_source: DataSource::Yahoo,
             date,
             symbol: symbol.to_string(),
-            open: price
-                .regular_market_open
-                .as_ref()
-                .and_then(|p| p.raw)
-                .unwrap_or(0.0),
-            high: price
-                .regular_market_day_high
-                .as_ref()
-                .and_then(|p| p.raw)
-                .unwrap_or(0.0),
-            low: price
-                .regular_market_day_low
-                .as_ref()
-                .and_then(|p| p.raw)
-                .unwrap_or(0.0),
-            volume: price
-                .regular_market_volume
-                .as_ref()
-                .and_then(|p| p.raw)
-                .unwrap_or(0.0),
-            close: regular_market_price.raw.unwrap_or(0.0),
-            adjclose: regular_market_price.raw.unwrap_or(0.0),
-            currency: price.currency.clone(),
+            open: BigDecimal::from_f64(
+                price
+                    .regular_market_open
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap(),
+            high: BigDecimal::from_f64(
+                price
+                    .regular_market_day_high
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap(),
+            low: BigDecimal::from_f64(
+                price
+                    .regular_market_day_low
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap(),
+            volume: BigDecimal::from_f64(
+                price
+                    .regular_market_volume
+                    .as_ref()
+                    .and_then(|p| p.raw)
+                    .unwrap_or(0.0),
+            )
+            .unwrap(),
+            close: BigDecimal::from_f64(regular_market_price.raw.unwrap_or(0.0)).unwrap(),
+            adjclose: BigDecimal::from_f64(regular_market_price.raw.unwrap_or(0.0)).unwrap(),
+            currency: price.currency.clone().unwrap_or_default(),
         })
     }
 
-    fn yahoo_quote_to_model_quote(&self, symbol: String, yahoo_quote: yahoo::Quote) -> ModelQuote {
+    fn yahoo_quote_to_model_quote(
+        &self,
+        symbol: String,
+        yahoo_quote: yahoo::Quote,
+        fallback_currency: String,
+    ) -> ModelQuote {
         let date = DateTime::<Utc>::from_timestamp(yahoo_quote.timestamp as i64, 0)
             .unwrap_or_default()
             .naive_utc();
@@ -194,25 +225,25 @@ impl YahooProvider {
             data_source: DataSource::Yahoo,
             date,
             symbol: symbol,
-            open: yahoo_quote.open,
-            high: yahoo_quote.high,
-            low: yahoo_quote.low,
-            volume: yahoo_quote.volume as f64,
-            close: yahoo_quote.close,
-            adjclose: yahoo_quote.adjclose,
-            currency: None,
+            open: BigDecimal::from_f64(yahoo_quote.open).unwrap_or_default(),
+            high: BigDecimal::from_f64(yahoo_quote.high).unwrap_or_default(),
+            low: BigDecimal::from_f64(yahoo_quote.low).unwrap_or_default(),
+            volume: BigDecimal::from_u64(yahoo_quote.volume).unwrap_or_default(),
+            close: BigDecimal::from_f64(yahoo_quote.close).unwrap_or_default(),
+            adjclose: BigDecimal::from_f64(yahoo_quote.adjclose).unwrap_or_default(),
+            currency: fallback_currency,
         }
     }
 
     async fn get_symbol_short_profile(
         &self,
         symbol: &str,
-    ) -> Result<Option<NewAsset>, yahoo::YahooError> {
+    ) -> Result<Option<AssetProfile>, yahoo::YahooError> {
         let search_results = self.search_ticker(symbol).await?;
 
         for result in search_results {
             if result.symbol == symbol {
-                return Ok(Some(NewAsset {
+                return Ok(Some(AssetProfile {
                     id: Some(result.symbol.clone()),
                     isin: None,
                     name: Some(self.format_name(
@@ -280,7 +311,10 @@ impl YahooProvider {
         Ok(())
     }
 
-    async fn get_symbol_full_profile(&self, symbol: &str) -> Result<NewAsset, yahoo::YahooError> {
+    async fn get_symbol_full_profile(
+        &self,
+        symbol: &str,
+    ) -> Result<AssetProfile, yahoo::YahooError> {
         self.set_crumb().await?;
 
         let response = self.fetch_asset_profile(symbol).await?;
@@ -326,7 +360,7 @@ impl YahooProvider {
                             if let Ok(weight) =
                                 serde_json::from_value::<PriceDetail>(weight_value.clone())
                             {
-                                sector_data.push(json!({ "weight": weight.raw, "name": self.parse_sector(sector) }));
+                                sector_data.push(json!({"name": self.format_sector(sector), "weight": weight.raw }));
                             }
                         }
                     }
@@ -337,17 +371,21 @@ impl YahooProvider {
                 if let Some(summary_profile) = &asset_profile.summary_profile {
                     let country = &summary_profile.country;
                     countries =
-                        serde_json::to_string(&[json!({ "code": country, "weight": 1 })]).ok();
+                        serde_json::to_string(&[json!({ "name": country, "weight": 1 })]).ok();
 
-                    let sector = &summary_profile.sector;
-                    sectors = serde_json::to_string(&[json!({ "name": sector, "weight": 1 })]).ok();
+                    if let Some(sector) = &summary_profile.sector {
+                        sectors = serde_json::to_string(&[
+                            json!({ "name": self.format_sector(sector), "weight": 1 }),
+                        ])
+                        .ok();
+                    }
                 }
             }
             // Handle other asset sub-classes
             _ => { /* ... */ }
         }
 
-        let new_asset = NewAsset {
+        let new_asset = AssetProfile {
             id: Some(symbol.to_string()),
             isin: None,
             name: Some(formatted_name),
@@ -362,7 +400,7 @@ impl YahooProvider {
             data_source: DataSource::Yahoo.as_str().to_string(),
             asset_class: Some(asset_class.to_string()), // Convert enum to String
             asset_sub_class: Some(asset_sub_class.to_string()), // Convert enum to String
-            comment: asset_profile
+            notes: asset_profile
                 .summary_profile
                 .as_ref()
                 .and_then(|sp| sp.long_business_summary.clone().or(sp.description.clone())),
@@ -381,34 +419,14 @@ impl YahooProvider {
         Ok(new_asset)
     }
 
-    fn build_cash_asset(&self, symbol: &str, currency: &str) -> NewAsset {
-        NewAsset {
-            id: Some(symbol.to_string()),
-            isin: None,
-            name: None,
-            asset_type: None,
-            symbol: symbol.to_string(),
-            symbol_mapping: None,
-            asset_class: Some("CASH".to_string()),
-            asset_sub_class: Some("CASH".to_string()),
-            comment: None,
-            countries: None,
-            categories: None,
-            classes: None,
-            attributes: None,
-            currency: currency.to_string(),
-            data_source: DataSource::Manual.as_str().to_string(),
-            sectors: None,
-            url: None,
-        }
-    }
-
     async fn fetch_asset_profile(&self, symbol: &str) -> Result<YahooResult, yahoo::YahooError> {
         let crumb_data = {
             let guard = YAHOO_CRUMB.read().unwrap();
             guard
                 .as_ref()
-                .ok_or_else(|| YahooError::FetchFailed("Crumb data not found".into()))?
+                .ok_or_else(|| {
+                    YahooError::FetchFailed("Yahoo authentication crumb not initialized".into())
+                })?
                 .clone()
         };
 
@@ -512,95 +530,93 @@ impl YahooProvider {
         name
     }
 
-    fn parse_sector(&self, a_string: &str) -> String {
-        match a_string {
-            "basic_materials" => "Basic Materials".to_string(),
-            "communication_services" => "Communication Services".to_string(),
-            "consumer_cyclical" => "Consumer Cyclical".to_string(),
-            "consumer_defensive" => "Consumer Staples".to_string(),
-            "energy" => "Energy".to_string(),
-            "financial_services" => "Financial Services".to_string(),
-            "healthcare" => "Healthcare".to_string(),
-            "industrials" => "Industrials".to_string(),
-            "realestate" => "Real Estate".to_string(),
-            "technology" => "Technology".to_string(),
-            "utilities" => "Utilities".to_string(),
-            _ => a_string.to_string(),
-        }
+    /// Converts an underscore-separated sector string into a properly capitalized format
+    ///
+    /// # Arguments
+    /// * `sector` - The sector string in snake_case format (e.g., "basic_materials")
+    ///
+    /// # Returns
+    /// A String with each word capitalized and separated by spaces (e.g., "Basic Materials")
+    ///
+    /// # Examples
+    /// ```
+    /// let sector = provider.parse_sector("consumer_defensive");
+    /// assert_eq!(sector, "Consumer Defensive");
+    /// ```
+    fn format_sector(&self, sector: &str) -> String {
+        sector
+            .split('_')
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().chain(chars).collect(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
-    async fn get_stock_history_bulk(
+    async fn get_historical_quotes_bulk(
         &self,
-        symbols: &[String],
+        symbols_with_currencies: &[(String, String)],
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        debug!("Fetching stock history for {} symbols", symbols.len());
-        use futures::future::join_all;
-        use rayon::prelude::*;
+        debug!(
+            "Fetching stock history for {} symbols",
+            symbols_with_currencies.len()
+        );
 
-        // Filter out cash symbols as they don't need processing
-        let valid_symbols: Vec<_> = symbols
-            .par_iter()
-            .filter(|symbol| !symbol.starts_with("$CASH-"))
-            .collect();
-
-        if valid_symbols.is_empty() {
+        if symbols_with_currencies.is_empty() {
             return Ok(Vec::new());
         }
 
-        // Create a vector of futures for parallel processing
-        let futures: Vec<_> = valid_symbols
-            .into_par_iter()
-            .map(|symbol| {
-                let provider = &self.provider;
-                async move {
-                    let result = provider
-                        .get_quote_history(symbol, start.into(), end.into())
-                        .await
-                        .and_then(|response| {
-                            response.quotes().map_err(|e| {
-                                yahoo::YahooError::FetchFailed(e.to_string())
-                            })
-                        });
+        // Use a more efficient batching approach
+        const BATCH_SIZE: usize = 10; // Adjust based on API limits
 
-                    match result {
-                        Ok(quotes) => {
-                            let model_quotes = quotes
-                                .into_iter()
-                                .map(|q| self.yahoo_quote_to_model_quote(symbol.to_string(), q))
-                                .collect::<Vec<_>>();
-                            Ok((symbol.to_string(), model_quotes))
-                        }
-                        Err(e) => {
-                            log::error!("Failed to fetch history for symbol {}: {}", symbol, e);
-                            Err((symbol.to_string(), e.to_string()))
+        let mut all_quotes = Vec::new();
+        let mut errors = Vec::new();
+
+        for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|(symbol, currency)| {
+                    let symbol_clone = symbol.clone();
+                    let currency_clone = currency.clone();
+                    async move {
+                        match self
+                            .get_historical_quotes(
+                                &symbol_clone,
+                                start,
+                                end,
+                                currency_clone.clone(),
+                            )
+                            .await
+                        {
+                            Ok(quotes) => Ok((symbol_clone, quotes)),
+                            Err(e) => Err((symbol_clone, e.to_string())),
                         }
                     }
+                })
+                .collect();
+
+            let results = futures::future::join_all(futures).await;
+
+            for result in results {
+                match result {
+                    Ok((_, quotes)) => all_quotes.extend(quotes),
+                    Err((symbol, error)) => errors.push((symbol, error)),
                 }
-            })
-            .collect();
-
-        // Execute all futures concurrently
-        let results = join_all(futures).await;
-
-        // Separate successful and failed results
-        let mut all_quotes = Vec::new();
-        let mut failed_symbols = Vec::new();
-
-        for result in results {
-            match result {
-                Ok((_, quotes)) => all_quotes.extend(quotes),
-                Err((symbol, error)) => failed_symbols.push((symbol, error)),
             }
         }
 
-        // Log failed symbols if any
-        if !failed_symbols.is_empty() {
+        // Log errors but don't fail the entire operation
+        if !errors.is_empty() {
             log::warn!(
                 "Failed to fetch history for {} symbols: {:?}",
-                failed_symbols.len(),
-                failed_symbols
+                errors.len(),
+                errors
             );
         }
 
@@ -610,7 +626,7 @@ impl YahooProvider {
 
 #[async_trait::async_trait]
 impl AssetProfiler for YahooProvider {
-    async fn get_asset_profile(&self, symbol: &str) -> Result<NewAsset, MarketDataError> {
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
         self.get_symbol_profile(symbol)
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
@@ -625,36 +641,41 @@ impl MarketDataProvider for YahooProvider {
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
 
-    async fn get_latest_quote(&self, symbol: &str) -> Result<ModelQuote, MarketDataError> {
-        self.get_latest_quote(symbol)
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        self.get_latest_quote(symbol, fallback_currency)
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
 
-    async fn get_stock_history(
+    async fn get_historical_quotes(
         &self,
         symbol: &str,
         start: SystemTime,
         end: SystemTime,
+        fallback_currency: String,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        self.get_stock_history(symbol, start, end)
+        self.get_historical_quotes(symbol, start, end, fallback_currency)
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
 
-    async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError> {
-        self.get_exchange_rate(from, to)
-            .await
-            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
-    }
+    // async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError> {
+    //     self.get_exchange_rate(from, to)
+    //         .await
+    //         .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    // }
 
-    async fn get_stock_history_bulk(
+    async fn get_historical_quotes_bulk(
         &self,
-        symbols: &[String],
+        symbols_with_currencies: &[(String, String)],
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        self.get_stock_history_bulk(symbols, start, end)
+        self.get_historical_quotes_bulk(symbols_with_currencies, start, end)
             .await
     }
 }

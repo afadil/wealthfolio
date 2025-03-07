@@ -1,12 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use chrono::NaiveDate;
 use crate::fx::fx_errors::FxError;
 use crate::fx::fx_model::ExchangeRate;
+use bigdecimal::BigDecimal;
+use chrono::NaiveDate;
+use std::collections::{HashMap, HashSet};
 
 /// A calculator for currency conversions, supporting historical rates.
 pub struct CurrencyConverter {
     // Date -> (From, To) -> Rate
-    historical_rates: HashMap<NaiveDate, HashMap<(String, String), f64>>,
+    historical_rates: HashMap<NaiveDate, HashMap<(String, String), BigDecimal>>,
     sorted_dates: Vec<NaiveDate>, // Keep track of dates in sorted order
 }
 
@@ -16,7 +17,7 @@ impl CurrencyConverter {
     pub fn new(exchange_rates: Vec<ExchangeRate>) -> Result<Self, FxError> {
         let mut converter = CurrencyConverter {
             historical_rates: HashMap::new(),
-            sorted_dates: Vec::new() //init the dates
+            sorted_dates: Vec::new(), //init the dates
         };
         converter.add_historical_rates(exchange_rates)?;
         Ok(converter)
@@ -43,7 +44,7 @@ impl CurrencyConverter {
                 }
             }
 
-            let mut rate_map: HashMap<(String, String), f64> = HashMap::new();
+            let mut rate_map: HashMap<(String, String), BigDecimal> = HashMap::new();
             let mut currencies: HashSet<String> = HashSet::new();
 
             // Add direct and inverse rates.
@@ -51,13 +52,16 @@ impl CurrencyConverter {
                 currencies.insert(rate.from_currency.clone());
                 currencies.insert(rate.to_currency.clone());
 
+                let forward_rate = rate.rate;
+                let inverse_rate = BigDecimal::from(1) / forward_rate.clone();
+                
                 rate_map.insert(
                     (rate.from_currency.clone(), rate.to_currency.clone()),
-                    rate.rate,
+                    forward_rate,
                 );
                 rate_map.insert(
                     (rate.to_currency.clone(), rate.from_currency.clone()),
-                    1.0 / rate.rate,
+                    inverse_rate,
                 );
             }
 
@@ -104,21 +108,25 @@ impl CurrencyConverter {
     pub fn get_rate(
         &self,
         from_currency: &str,
-        to_currency: &str,    
+        to_currency: &str,
         date: NaiveDate,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency == to_currency {
-            return Ok(1.0);
+            return Ok(BigDecimal::from(1));
         }
 
         self.historical_rates
             .get(&date)
-            .and_then(|rate_map| rate_map.get(&(from_currency.to_string(), to_currency.to_string())))
+            .and_then(|rate_map| {
+                rate_map.get(&(from_currency.to_string(), to_currency.to_string()))
+            })
             .cloned()
-            .ok_or_else(|| FxError::RateNotFound(format!(
-                "No exchange rate found for {}/{} on {}", 
-                from_currency, to_currency, date
-            )))
+            .ok_or_else(|| {
+                FxError::RateNotFound(format!(
+                    "No exchange rate found for {}/{} on {}",
+                    from_currency, to_currency, date
+                ))
+            })
     }
 
     /// Gets the exchange rate between two currencies on the nearest available date.
@@ -127,15 +135,15 @@ impl CurrencyConverter {
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency == to_currency {
-            return Ok(1.0);
+            return Ok(BigDecimal::from(1));
         }
 
         // Check if we have any dates at all
         if self.sorted_dates.is_empty() {
             return Err(FxError::RateNotFound(format!(
-                "No exchange rates available for any date for {}/{}", 
+                "No exchange rates available for any date for {}/{}",
                 from_currency, to_currency
             )));
         }
@@ -172,15 +180,15 @@ impl CurrencyConverter {
     /// Converts an amount from one currency to another on a specific date.
     pub fn convert_amount(
         &self,
-        amount: f64,
+        amount: BigDecimal,
         from_currency: &str,
-        to_currency: &str,  
+        to_currency: &str,
         date: NaiveDate,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency == to_currency {
             return Ok(amount);
         }
-        
+
         let rate = self.get_rate(from_currency, to_currency, date)?;
         Ok(amount * rate)
     }
@@ -188,15 +196,15 @@ impl CurrencyConverter {
     /// Converts an amount from one currency to another on the nearest available date.
     pub fn convert_amount_nearest(
         &self,
-        amount: f64,
+        amount: BigDecimal,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<f64, FxError> {
+    ) -> Result<BigDecimal, FxError> {
         if from_currency == to_currency {
             return Ok(amount);
         }
-        
+
         let rate = self.get_rate_nearest(from_currency, to_currency, date)?;
         Ok(amount * rate)
     }
@@ -205,20 +213,29 @@ impl CurrencyConverter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
     use crate::market_data::market_data_model::DataSource;
+    use chrono::NaiveDate;
 
     fn test_exchange_rates() -> Vec<ExchangeRate> {
-        let date1 = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap().and_hms_opt(0, 0, 0).unwrap();
-        let date2 = NaiveDate::from_ymd_opt(2023, 10, 27).unwrap().and_hms_opt(0, 0, 0).unwrap();
-        let date3 = NaiveDate::from_ymd_opt(2023, 10, 28).unwrap().and_hms_opt(0, 0, 0).unwrap();
-        
+        let date1 = NaiveDate::from_ymd_opt(2023, 10, 26)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let date2 = NaiveDate::from_ymd_opt(2023, 10, 27)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let date3 = NaiveDate::from_ymd_opt(2023, 10, 28)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+
         vec![
             ExchangeRate {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: 0.85,
+                rate: BigDecimal::from(85),
                 source: DataSource::Manual,
                 timestamp: date1,
             },
@@ -226,7 +243,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: 0.90,
+                rate: BigDecimal::from(90),
                 source: DataSource::Manual,
                 timestamp: date1,
             },
@@ -234,7 +251,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: 0.86,
+                rate: BigDecimal::from(86),
                 source: DataSource::Manual,
                 timestamp: date2,
             },
@@ -242,7 +259,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: 0.91,
+                rate: BigDecimal::from(91),
                 source: DataSource::Manual,
                 timestamp: date2,
             },
@@ -250,7 +267,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: 0.87,
+                rate: BigDecimal::from(87),
                 source: DataSource::Manual,
                 timestamp: date3,
             },
@@ -258,7 +275,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: 0.92,
+                rate: BigDecimal::from(92),
                 source: DataSource::Manual,
                 timestamp: date3,
             },
@@ -270,10 +287,12 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = 100.0;
+        let amount = BigDecimal::from(100);
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
-        let converted_amount = converter.convert_amount(amount, "USD", "EUR", date).unwrap();
-        assert_eq!(converted_amount, 85.0);
+        let converted_amount = converter
+            .convert_amount(amount, "USD", "EUR", date)
+            .unwrap();
+        assert_eq!(converted_amount, BigDecimal::from(85));
     }
 
     #[test]
@@ -281,10 +300,12 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = 85.0;
+        let amount = BigDecimal::from(85);
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
-        let converted_amount = converter.convert_amount(amount, "EUR", "USD", date).unwrap();
-        assert_eq!(converted_amount, 100.0);
+        let converted_amount = converter
+            .convert_amount(amount, "EUR", "USD", date)
+            .unwrap();
+        assert_eq!(converted_amount, BigDecimal::from(100));
     }
 
     #[test]
@@ -292,17 +313,19 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = 100.0;
+        let amount = BigDecimal::from(100);
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
-        let converted_amount = converter.convert_amount(amount, "USD", "GBP", date).unwrap();
-        assert_eq!(converted_amount, 100.0 * 0.85 * 0.90);
+        let converted_amount = converter
+            .convert_amount(amount, "USD", "GBP", date)
+            .unwrap();
+        assert_eq!(converted_amount, BigDecimal::from(100) * BigDecimal::from(85) * BigDecimal::from(90));
     }
 
     #[test]
     fn test_no_rate_available() {
         let rates = vec![]; // Empty rates
         let converter = CurrencyConverter::new(rates).unwrap();
-        let amount = 100.0;
+        let amount = BigDecimal::from(100);
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
         let result = converter.convert_amount(amount, "USD", "EUR", date);
         assert!(matches!(result, Err(FxError::RateNotFound(_))));
@@ -313,9 +336,11 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = 100.0;
+        let amount = BigDecimal::from(100);
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
-        let converted_amount = converter.convert_amount(amount, "USD", "USD", date).unwrap();
+        let converted_amount = converter
+            .convert_amount(amount.clone(), "USD", "USD", date)
+            .unwrap();
         assert_eq!(converted_amount, amount);
     }
 
@@ -325,25 +350,25 @@ mod tests {
         let converter = CurrencyConverter::new(rates).unwrap();
 
         // Test with a date that exists
-        let amount = 100.0;
+        let amount = BigDecimal::from(100);
         let date_exact = NaiveDate::from_ymd_opt(2023, 10, 27).unwrap();
         let converted_amount = converter
-            .convert_amount_nearest(amount, "USD", "EUR", date_exact)
+            .convert_amount_nearest(amount.clone(), "USD", "EUR", date_exact)
             .unwrap();
-        assert_eq!(converted_amount, 86.0); // Rate on 2023-10-27
+        assert_eq!(converted_amount, BigDecimal::from(86)); // Rate on 2023-10-27
 
         // Test with a date before the first date
         let date_before = NaiveDate::from_ymd_opt(2023, 10, 25).unwrap();
         let converted_amount = converter
-            .convert_amount_nearest(amount, "USD", "EUR", date_before)
+            .convert_amount_nearest(amount.clone(), "USD", "EUR", date_before)
             .unwrap();
-        assert_eq!(converted_amount, 85.0); // Should use 2023-10-26
+        assert_eq!(converted_amount, BigDecimal::from(85)); // Should use 2023-10-26
 
         // Test with a date after the last date
         let date_after = NaiveDate::from_ymd_opt(2023, 10, 29).unwrap();
         let converted_amount = converter
-            .convert_amount_nearest(amount, "USD", "EUR", date_after)
+            .convert_amount_nearest(amount.clone(), "USD", "EUR", date_after)
             .unwrap();
-        assert_eq!(converted_amount, 87.0); // Should use 2023-10-28
+        assert_eq!(converted_amount, BigDecimal::from(87)); // Should use 2023-10-28
     }
 }

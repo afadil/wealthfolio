@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::market_data::market_data_provider::{MarketDataProvider, AssetProfiler};
+use crate::market_data::providers::market_data_provider::{MarketDataProvider, AssetProfiler};
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::DataSource;
 use super::{yahoo_provider::YahooProvider, manual_provider::ManualProvider};

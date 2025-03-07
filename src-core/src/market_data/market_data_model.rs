@@ -1,93 +1,112 @@
-use chrono::NaiveDateTime;
+use crate::schema::quotes;
 use diesel::prelude::*;
+use diesel::{
+    sql_types::Text,
+    expression::AsExpression,
+};
+use bigdecimal::BigDecimal;
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL};
 
-/// Domain model representing a market quote
-
-#[derive(QueryableByName, Debug)]
-pub struct QuoteWithCurrency {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub id: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub date: NaiveDateTime,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub open: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub high: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub low: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub close: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub adjclose: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub volume: f64,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub data_source: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub created_at: NaiveDateTime,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub currency: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum DataSource {
-    Yahoo,
-    Manual,
-}
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+#[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
     pub id: String,
     pub symbol: String,
     pub date: NaiveDateTime,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub close: f64,
-    pub adjclose: f64,
-    pub volume: f64,
+    pub open: BigDecimal,
+    pub high: BigDecimal,
+    pub low: BigDecimal,
+    pub close: BigDecimal,
+    pub adjclose: BigDecimal,
+    pub volume: BigDecimal,
+    pub currency: String,
     pub data_source: DataSource,
     pub created_at: NaiveDateTime,
-    pub currency: Option<String>,
 }
 
-/// Input model for updating an existing quote
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Queryable, Identifiable, Selectable, Insertable, AsChangeset, Debug, Clone, Serialize, Deserialize, PartialEq, QueryableByName)]
+#[diesel(table_name = quotes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
-pub struct QuoteUpdate {
+pub struct QuoteDb {
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub id: String,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub close: f64,
-    pub adjclose: f64,
-    pub volume: f64,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub symbol: String,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub date: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub open: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub high: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub low: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub close: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub adjclose: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub volume: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub currency: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub data_source: String,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub created_at: NaiveDateTime,
 }
 
-/// Summary model for quote search results
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct QuoteSummary {
-//     pub symbol: String,
-//     pub name: String,
-//     pub exchange: String,
-//     pub asset_type: String,
-//     pub currency: String,
-// }
+
+// Conversion implementations
+impl From<QuoteDb> for Quote {
+    fn from(db: QuoteDb) -> Self {
+        Quote {
+            id: db.id,
+            symbol: db.symbol,
+            date: db.date,
+            open: BigDecimal::from_str(&db.open).unwrap_or_default(),
+            high: BigDecimal::from_str(&db.high).unwrap_or_default(),
+            low: BigDecimal::from_str(&db.low).unwrap_or_default(),
+            close: BigDecimal::from_str(&db.close).unwrap_or_default(),
+            adjclose: BigDecimal::from_str(&db.adjclose).unwrap_or_default(),
+            volume: BigDecimal::from_str(&db.volume).unwrap_or_default(),
+            data_source: DataSource::from(db.data_source.as_ref()),
+            created_at: db.created_at,
+            currency: db.currency,
+        }
+    }
+}
+
+
+impl From<&Quote> for QuoteDb {
+    fn from(quote: &Quote) -> Self {
+        QuoteDb {
+            id: quote.id.clone(),  // String needs cloning
+            symbol: quote.symbol.clone(),  // String needs cloning
+            date: quote.date,          // NaiveDateTime is Copy
+            open: quote.open.to_string(),   // BigDecimal -> String
+            high: quote.high.to_string(),  // BigDecimal -> String
+            low: quote.low.to_string(),   // BigDecimal -> String
+            close: quote.close.to_string(),  // BigDecimal -> String
+            adjclose: quote.adjclose.to_string(),
+            volume: quote.volume.to_string(), //BigDecimal -> String
+            currency: quote.currency.clone(),  //String needs cloning
+            data_source: quote.data_source.as_str().to_string(),
+            created_at: quote.created_at, // NaiveDateTime is copy
+        }
+    }
+}
 
 /// Summary model for quote search results
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteSummary {
     pub exchange: String,
-    // pub exchange_display: String,
     pub short_name: String,
     pub quote_type: String,
     pub symbol: String,
@@ -97,88 +116,19 @@ pub struct QuoteSummary {
     pub long_name: String,
 }
 
-/// Database model for quotes
-#[derive(
-    Queryable,
-    Identifiable,
-    Insertable,
-    AsChangeset,
-    Selectable,
-    QueryableByName,
-    Debug,
-    Clone,
-)]
-#[diesel(table_name = crate::schema::quotes)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct QuoteDB {
-    pub id: String,
-    pub created_at: NaiveDateTime,
-    pub data_source: String,
-    pub date: NaiveDateTime,
+#[derive(Debug, Clone)]
+pub struct QuoteRequest {
     pub symbol: String,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub volume: f64,
-    pub close: f64,
-    pub adjclose: f64,
+    pub data_source: DataSource,
+    pub currency: String,
 }
 
-// Conversion implementations
-impl From<QuoteDB> for Quote {
-    fn from(db: QuoteDB) -> Self {
-        Quote {
-            id: db.id,
-            symbol: db.symbol,
-            date: db.date,
-            open: db.open,
-            high: db.high,
-            low: db.low,
-            close: db.close,
-            adjclose: db.adjclose,
-            volume: db.volume,
-            data_source: DataSource::from(db.data_source.as_ref()),
-            created_at: db.created_at,
-            currency: None, // Currency will be set from asset data when needed
-        }
-    }
-}
-
-impl From<QuoteWithCurrency> for Quote {
-    fn from(q: QuoteWithCurrency) -> Self {
-        Quote {
-            id: q.id,
-            symbol: q.symbol,
-            date: q.date,
-            open: q.open,
-            high: q.high,
-            low: q.low,
-            close: q.close,
-            adjclose: q.adjclose,
-            volume: q.volume,
-            data_source: DataSource::from(q.data_source.as_str()),
-            created_at: q.created_at,
-            currency: Some(q.currency),
-        }
-    }
-}
-
-impl From<Quote> for QuoteDB {
-    fn from(domain: Quote) -> Self {
-        Self {
-            id: domain.id,
-            symbol: domain.symbol,
-            date: domain.date,
-            open: domain.open,
-            high: domain.high,
-            low: domain.low,
-            close: domain.close,
-            adjclose: domain.adjclose,
-            volume: domain.volume,
-            data_source: domain.data_source.as_str().to_string(),
-            created_at: domain.created_at,
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsExpression)]
+#[diesel(sql_type = Text)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum DataSource {
+    Yahoo,
+    Manual,
 }
 
 impl DataSource {
@@ -204,45 +154,3 @@ impl From<&str> for DataSource {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct QuoteRequest {
-    pub symbol: String,
-    pub data_source: DataSource,
-}
-
-impl QuoteRequest {
-    pub fn new(symbol: String, data_source: DataSource) -> Self {
-        Self {
-            symbol,
-            data_source,
-        }
-    }
-
-    pub fn to_asset(&self) -> crate::assets::assets_model::Asset {
-        use chrono::Utc;
-        let now = Utc::now().naive_utc();
-        
-        crate::assets::assets_model::Asset {
-            id: self.symbol.clone(),
-            symbol: self.symbol.clone(),
-            data_source: self.data_source.as_str().to_string(),
-            currency: String::new(), // Default value
-            created_at: now,
-            updated_at: now,
-            isin: None,
-            name: None,
-            asset_type: None,
-            symbol_mapping: None,
-            asset_class: None,
-            asset_sub_class: None,
-            comment: None,
-            countries: None,
-            categories: None,
-            classes: None,
-            attributes: None,
-            sectors: None,
-            url: None,
-        }
-    }
-} 

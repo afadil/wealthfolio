@@ -191,3 +191,26 @@ impl fmt::Display for AssetSubClass {
         write!(f, "{}", display_string)
     }
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetProfile {
+    pub id: Option<String>,
+    pub isin: Option<String>,
+    pub name: Option<String>,
+    pub asset_type: Option<String>,
+    pub symbol: String,
+    pub symbol_mapping: Option<String>,
+    pub asset_class: Option<String>,
+    pub asset_sub_class: Option<String>,
+    pub notes: Option<String>,
+    pub countries: Option<String>,
+    pub categories: Option<String>,
+    pub classes: Option<String>,
+    pub attributes: Option<String>,
+    pub currency: String,
+    pub data_source: String,
+    pub sectors: Option<String>,
+    pub url: Option<String>,
+}
