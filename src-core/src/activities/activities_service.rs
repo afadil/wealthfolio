@@ -1,9 +1,8 @@
 use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use log::{error, info};
+use log::{debug, error, info};
 use chrono::Utc;
 use std::sync::Arc;
-use std::str::FromStr;
 
 use crate::accounts::AccountService;
 use crate::activities::{ActivityError, Result};
@@ -94,7 +93,6 @@ impl ActivityService {
         &self,
         mut activity: NewActivity,
     ) -> Result<Activity> {
-
         info!("Creating activity: {:?}", activity);
         // Fetch the asset profile
         let asset = self.asset_service
@@ -124,27 +122,6 @@ impl ActivityService {
         }
 
         let repo = ActivityRepository::new(self.pool.clone());
-
-        // Handle different activity types
-        let activity_type = ActivityType::from_str(&activity.activity_type).unwrap_or_else(|_| panic!("Invalid activity type"));
-        match activity_type {
-            ActivityType::TransferOut => {
-                // Calculate the current average cost for the asset in this account
-                activity.unit_price = repo.calculate_average_cost(
-                    &activity.account_id,
-                    &activity.asset_id,
-                )?;
-            }
-            ActivityType::Deposit | 
-            ActivityType::Withdrawal | 
-            ActivityType::Interest | 
-            ActivityType::Fee | 
-            ActivityType::Dividend => {
-                activity.quantity = 1.0;
-            }
-            _ => {}
-        }
-
         repo.create_activity(activity)
     }
 
@@ -159,7 +136,7 @@ impl ActivityService {
             .map_err(|e| ActivityError::AssetError(e.to_string()))?;
 
         if let Err(e) = self.asset_service
-            .sync_asset_quotes( &vec![asset.clone()])
+            .sync_asset_quotes( &vec![asset.clone()], true)
             .await
         {
             error!(
@@ -190,27 +167,6 @@ impl ActivityService {
         }
 
         let repo = ActivityRepository::new(self.pool.clone());
-
-        // Handle different activity types
-        let activity_type = ActivityType::from_str(&activity.activity_type).unwrap_or_else(|_| panic!("Invalid activity type"));
-        match activity_type {
-            ActivityType::TransferOut => {
-                // Calculate the current average cost for the asset in this account
-                activity.unit_price = repo.calculate_average_cost(
-                    &activity.account_id,
-                    &activity.asset_id,
-                )?;
-            }
-            ActivityType::Deposit | 
-            ActivityType::Withdrawal | 
-            ActivityType::Interest | 
-            ActivityType::Fee | 
-            ActivityType::Dividend => {
-                activity.quantity = 1.0;
-            }
-            _ => {}
-        }
-
         repo.update_activity(activity)
     }
 
@@ -287,7 +243,7 @@ impl ActivityService {
 
         // Sync quotes for all valid assets
         if !assets_to_sync.is_empty() {
-            if let Err(e) = self.asset_service.sync_asset_quotes(&assets_to_sync).await {
+            if let Err(e) = self.asset_service.sync_asset_quotes(&assets_to_sync, true).await {
                 error!("Failed to sync quotes for assets: {}", e);
             }
         }
@@ -351,4 +307,5 @@ impl ActivityService {
         let repo = ActivityRepository::new(self.pool.clone());
         repo.get_first_activity_date(account_ids)
     }
+
 } 

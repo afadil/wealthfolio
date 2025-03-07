@@ -1,9 +1,14 @@
 use diesel::prelude::*;
 use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
+use diesel::expression_methods::ExpressionMethods;
+use log::info;
 use uuid::Uuid;
 use chrono::NaiveDate;
+use chrono::NaiveDateTime;
 use std::sync::Arc;
+use bigdecimal::BigDecimal;
+use std::str::FromStr;
 
 use crate::activities::activities_constants::*;
 use crate::activities::activities_errors::{ActivityError, Result};
@@ -156,6 +161,7 @@ impl ActivityRepository {
                 activities::unit_price,
                 activities::currency,
                 activities::fee,
+                activities::amount,
                 activities::is_draft,
                 activities::comment,
                 activities::created_at,
@@ -164,7 +170,7 @@ impl ActivityRepository {
                 accounts::currency,
                 assets::symbol,
                 assets::name,
-                assets::data_source,
+                assets::data_source
             ))
             .limit(page_size)
             .offset(offset)
@@ -185,6 +191,8 @@ impl ActivityRepository {
 
         let mut activity_db: ActivityDB = new_activity.into();
         activity_db.id = Uuid::new_v4().to_string();
+
+        info!("Creating activity in DB: {:?}", activity_db);
 
         diesel::insert_into(activities::table)
             .values(&activity_db)
@@ -267,34 +275,35 @@ impl ActivityRepository {
         &self,
         account_id: &str,
         asset_id: &str,
-    ) -> Result<f64> {
+    ) -> Result<BigDecimal> {
         let mut conn = get_connection(&self.pool)
             .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
 
         #[derive(QueryableByName, Debug)]
         struct AverageCost {
-            #[diesel(sql_type = diesel::sql_types::Double)]
-            average_cost: f64,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            average_cost: String,
         }
 
         let result: AverageCost = diesel::sql_query(
             r#"
             WITH running_totals AS (
                 SELECT
-                    quantity,
-                    unit_price,
-                    quantity AS quantity_change,
-                    quantity * unit_price AS value_change,
-                    SUM(quantity) OVER (ORDER BY activity_date, id) AS running_quantity,
-                    SUM(quantity * unit_price) OVER (ORDER BY activity_date, id) AS running_value
+                    CAST(quantity AS TEXT) as quantity,
+                    CAST(unit_price AS TEXT) as unit_price,
+                    CAST(quantity AS TEXT) AS quantity_change,
+                    CAST(CAST(quantity AS DECIMAL) * CAST(unit_price AS DECIMAL) AS TEXT) AS value_change,
+                    CAST(SUM(CAST(quantity AS DECIMAL)) OVER (ORDER BY activity_date, id) AS TEXT) AS running_quantity,
+                    CAST(SUM(CAST(quantity AS DECIMAL) * CAST(unit_price AS DECIMAL)) OVER (ORDER BY activity_date, id) AS TEXT) AS running_value
                 FROM activities
                 WHERE account_id = ?1 AND asset_id = ?2
                   AND activity_type IN ('BUY', 'TRANSFER_IN')
             )
             SELECT
                 CASE
-                    WHEN SUM(quantity_change) > 0 THEN SUM(value_change) / SUM(quantity_change)
-                    ELSE 0
+                    WHEN SUM(CAST(quantity_change AS DECIMAL)) > 0 
+                    THEN CAST(CAST(SUM(CAST(value_change AS DECIMAL)) AS DECIMAL) / CAST(SUM(CAST(quantity_change AS DECIMAL)) AS DECIMAL) AS TEXT)
+                    ELSE '0'
                 END AS average_cost
             FROM running_totals
             "#,
@@ -303,7 +312,7 @@ impl ActivityRepository {
         .bind::<diesel::sql_types::Text, _>(asset_id)
         .get_result(&mut conn)?;
 
-        Ok(result.average_cost)
+        Ok(BigDecimal::from_str(&result.average_cost).unwrap_or_default())
     }
 
     /// Gets the first activity date for given account IDs
@@ -394,5 +403,32 @@ impl ActivityRepository {
                 .execute(conn)
                 .map_err(ActivityError::from)
         })
+    }
+
+    /// Retrieves deposit activities for specified accounts within a year as raw data
+    pub fn get_deposit_activities(
+        &self,
+        conn: &mut SqliteConnection,
+        account_ids: &[String],
+        start_date: NaiveDateTime,
+        end_date: NaiveDateTime,
+    ) -> Result<Vec<(String, String, String, String)>> {
+        // Use a proper join with explicit ON condition
+        let results = activities::table
+            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
+            .filter(accounts::id.eq_any(account_ids))
+            .filter(accounts::is_active.eq(true))
+            .filter(activities::activity_type.eq("DEPOSIT"))
+            .filter(activities::activity_date.between(start_date, end_date))
+            .select((
+                activities::account_id,
+                activities::quantity,
+                activities::unit_price,
+                activities::currency,
+            ))
+            .load::<(String, String, String, String)>(conn)
+            .map_err(ActivityError::from)?;
+
+        Ok(results)
     }
 } 

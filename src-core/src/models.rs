@@ -5,12 +5,14 @@ use diesel::Queryable;
 use diesel::Selectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
+use diesel::sql_types::Text;
 
 use crate::accounts::Account;
-use crate::assets::Asset;
+use num_traits::Zero;
 
-pub const ROUNDING_SCALE: i64 = 6;
-pub const PORTFOLIO_PERCENT_SCALE: i64 = 2;
+pub const ROUNDING_SCALE: i64 = 18;
+pub const PORTFOLIO_PERCENT_SCALE: i64 = 4;
 
 // Custom serializer/deserializer for BigDecimal (rounds on serialization)
 mod bigdecimal_serde {
@@ -71,45 +73,7 @@ mod bigdecimal_serde_option {
     }
 }
 
-#[derive(
-    Queryable,
-    Identifiable,
-    Insertable,
-    Associations,
-    Serialize,
-    AsChangeset,
-    Deserialize,
-    Debug,
-    Clone,
-    QueryableByName,
-)]
-#[diesel(belongs_to(Asset, foreign_key = symbol))]
-#[diesel(table_name= crate::schema::quotes)]
-#[serde(rename_all = "camelCase")]
-pub struct QuoteOLD {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub id: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub created_at: chrono::NaiveDateTime,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub data_source: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub date: chrono::NaiveDateTime,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub open: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub high: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub low: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub volume: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub close: f64,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub adjclose: f64,
-}
+
 
 //********************************** */
 // Custom models
@@ -149,14 +113,16 @@ impl Default for Performance {
 #[serde(rename_all = "camelCase")]
 pub struct Sector {
     pub name: String,
-    pub weight: f64,
+    #[serde(with = "bigdecimal_serde")]
+    pub weight: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Country {
     pub code: String,
-    pub weight: f64,
+    #[serde(with = "bigdecimal_serde")]
+    pub weight: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -343,22 +309,22 @@ pub struct IncomeData {
     pub symbol_name: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
-    #[diesel(sql_type = diesel::sql_types::Double)]
-    pub amount: f64,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub amount: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeSummary {
     pub period: String,
-    pub by_month: HashMap<String, f64>,
-    pub by_type: HashMap<String, f64>,
-    pub by_symbol: HashMap<String, f64>,
-    pub by_currency: HashMap<String, f64>,
-    pub total_income: f64,
+    pub by_month: HashMap<String, BigDecimal>,
+    pub by_type: HashMap<String, BigDecimal>,
+    pub by_symbol: HashMap<String, BigDecimal>,
+    pub by_currency: HashMap<String, BigDecimal>,
+    pub total_income: BigDecimal,
     pub currency: String,
-    pub monthly_average: f64,
-    pub yoy_growth: Option<f64>,
+    pub monthly_average: BigDecimal,
+    pub yoy_growth: Option<BigDecimal>,
 }
 
 impl IncomeSummary {
@@ -369,54 +335,159 @@ impl IncomeSummary {
             by_type: HashMap::new(),
             by_symbol: HashMap::new(),
             by_currency: HashMap::new(),
-            total_income: 0.0,
+            total_income: BigDecimal::zero(),
             currency,
-            monthly_average: 0.0,
+            monthly_average: BigDecimal::zero(),
             yoy_growth: None,
         }
     }
 
-    pub fn add_income(&mut self, data: &IncomeData, converted_amount: f64) {
-        *self.by_month.entry(data.date.to_string()).or_insert(0.0) += converted_amount;
-        *self.by_type.entry(data.income_type.clone()).or_insert(0.0) += converted_amount;
+    pub fn add_income(&mut self, data: &IncomeData, converted_amount: BigDecimal) {
+        *self.by_month.entry(data.date.to_string()).or_insert_with(BigDecimal::zero) += &converted_amount;
+        *self.by_type.entry(data.income_type.clone()).or_insert_with(BigDecimal::zero) += &converted_amount;
         *self
             .by_symbol
             .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
-            .or_insert(0.0) += converted_amount;
-        *self.by_currency.entry(data.currency.clone()).or_insert(0.0) += data.amount;
-        self.total_income += converted_amount;
+            .or_insert_with(BigDecimal::zero) += &converted_amount;
+        *self.by_currency.entry(data.currency.clone()).or_insert_with(BigDecimal::zero) += &data.amount;
+        self.total_income += &converted_amount;
     }
 
     pub fn calculate_monthly_average(&mut self, num_months: Option<u32>) {
         let months = num_months.unwrap_or_else(|| self.by_month.len() as u32);
         if months > 0 {
-            self.monthly_average = self.total_income / (months as f64);
+            self.monthly_average = &self.total_income / BigDecimal::from(months);
         }
     }
 }
 
-#[derive(Debug, Clone, Queryable, QueryableByName, Insertable, Serialize, Deserialize)]
-#[diesel(table_name = crate::schema::portfolio_history)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioHistory {
     pub id: String,
     pub account_id: String,
     pub date: String,
-    pub total_value: f64,
-    pub market_value: f64,
-    pub book_cost: f64,
-    pub available_cash: f64,
-    pub net_deposit: f64,
+    #[serde(rename = "currency")]
     pub currency: String,
+    #[serde(rename = "baseCurrency")]
     pub base_currency: String,
-    pub total_gain_value: f64,
-    pub total_gain_percentage: f64,
-    pub day_gain_percentage: f64,
-    pub day_gain_value: f64,
-    pub allocation_percentage: f64,
-    pub exchange_rate: f64,
+    #[serde(with = "bigdecimal_serde")]
+    pub total_value: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub market_value: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub book_cost: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub available_cash: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub net_deposit: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub total_gain_value: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub total_gain_percentage: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub day_gain_percentage: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub day_gain_value: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub allocation_percentage: BigDecimal,
+    #[serde(with = "bigdecimal_serde")]
+    pub exchange_rate: BigDecimal,
     pub holdings: Option<String>,
     pub calculated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = crate::schema::portfolio_history)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioHistoryDB {
+    #[diesel(sql_type = Text)]
+    pub id: String,
+    #[diesel(sql_type = Text)]
+    pub account_id: String,
+    #[diesel(sql_type = Text)]
+    pub date: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub total_value: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub market_value: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub book_cost: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub available_cash: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub net_deposit: String,
+    #[diesel(sql_type = Text)]
+    pub currency: String,
+    #[diesel(sql_type = Text)]
+    pub base_currency: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub total_gain_value: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub total_gain_percentage: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub day_gain_percentage: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub day_gain_value: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub allocation_percentage: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub exchange_rate: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<Text>)]
+    pub holdings: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub calculated_at: NaiveDateTime,
+}
+
+impl From<PortfolioHistoryDB> for PortfolioHistory {
+    fn from(db: PortfolioHistoryDB) -> Self {
+        Self {
+            id: db.id,
+            account_id: db.account_id,
+            date: db.date,
+            currency: db.currency,
+            base_currency: db.base_currency,
+            total_value: BigDecimal::from_str(&db.total_value).unwrap_or_default(),
+            market_value: BigDecimal::from_str(&db.market_value).unwrap_or_default(),
+            book_cost: BigDecimal::from_str(&db.book_cost).unwrap_or_default(),
+            available_cash: BigDecimal::from_str(&db.available_cash).unwrap_or_default(),
+            net_deposit: BigDecimal::from_str(&db.net_deposit).unwrap_or_default(),
+            total_gain_value: BigDecimal::from_str(&db.total_gain_value).unwrap_or_default(),
+            total_gain_percentage: BigDecimal::from_str(&db.total_gain_percentage).unwrap_or_default(),
+            day_gain_percentage: BigDecimal::from_str(&db.day_gain_percentage).unwrap_or_default(),
+            day_gain_value: BigDecimal::from_str(&db.day_gain_value).unwrap_or_default(),
+            allocation_percentage: BigDecimal::from_str(&db.allocation_percentage).unwrap_or_default(),
+            exchange_rate: BigDecimal::from_str(&db.exchange_rate).unwrap_or_default(),
+            holdings: db.holdings,
+            calculated_at: db.calculated_at,
+        }
+    }
+}
+
+impl From<PortfolioHistory> for PortfolioHistoryDB {
+    fn from(domain: PortfolioHistory) -> Self {
+        Self {
+            id: domain.id,
+            account_id: domain.account_id,
+            date: domain.date,
+            currency: domain.currency,
+            base_currency: domain.base_currency,
+            total_value: domain.total_value.with_scale(ROUNDING_SCALE).to_string(),
+            market_value: domain.market_value.with_scale(ROUNDING_SCALE).to_string(),
+            book_cost: domain.book_cost.with_scale(ROUNDING_SCALE).to_string(),
+            available_cash: domain.available_cash.with_scale(ROUNDING_SCALE).to_string(),
+            net_deposit: domain.net_deposit.with_scale(ROUNDING_SCALE).to_string(),
+            total_gain_value: domain.total_gain_value.with_scale(ROUNDING_SCALE).to_string(),
+            total_gain_percentage: domain.total_gain_percentage.with_scale(ROUNDING_SCALE).to_string(),
+            day_gain_percentage: domain.day_gain_percentage.with_scale(ROUNDING_SCALE).to_string(),
+            day_gain_value: domain.day_gain_value.with_scale(ROUNDING_SCALE).to_string(),
+            allocation_percentage: domain.allocation_percentage.with_scale(PORTFOLIO_PERCENT_SCALE).to_string(),
+            exchange_rate: domain.exchange_rate.with_scale(ROUNDING_SCALE).to_string(),
+            holdings: domain.holdings,
+            calculated_at: domain.calculated_at,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -463,15 +534,15 @@ pub struct NewContributionLimit {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountDeposit {
-    pub amount: f64,
+    pub amount: BigDecimal,
     pub currency: String,
-    pub converted_amount: f64,
+    pub converted_amount: BigDecimal,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositsCalculation {
-    pub total: f64,
+    pub total: BigDecimal,
     pub base_currency: String,
     pub by_account: HashMap<String, AccountDeposit>,
 }
@@ -480,7 +551,7 @@ pub struct DepositsCalculation {
 #[serde(rename_all = "camelCase")]
 pub struct CumulativeReturn {
     pub date: String,
-    pub value: f64,
+    pub value: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -488,6 +559,6 @@ pub struct CumulativeReturn {
 pub struct CumulativeReturns {
     pub id: String,
     pub cumulative_returns: Vec<CumulativeReturn>,
-    pub total_return: f64,
-    pub annualized_return: f64,
+    pub total_return: Option<BigDecimal>,
+    pub annualized_return: Option<BigDecimal>,
 }

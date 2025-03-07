@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use bigdecimal::BigDecimal;
 
 use crate::accounts::Account;
 
@@ -15,10 +16,11 @@ pub struct Activity {
     pub activity_type: String,
     #[serde(with = "timestamp_format")]
     pub activity_date: DateTime<Utc>,
-    pub quantity: f64,
-    pub unit_price: f64,
+    pub quantity: BigDecimal,
+    pub unit_price: BigDecimal,
     pub currency: String,
-    pub fee: f64,
+    pub fee: BigDecimal,
+    pub amount: Option<BigDecimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
     #[serde(with = "timestamp_format")]
@@ -49,10 +51,11 @@ pub struct ActivityDB {
     pub asset_id: String,
     pub activity_type: String,
     pub activity_date: NaiveDateTime,
-    pub quantity: f64,
-    pub unit_price: f64,
+    pub quantity: String,
+    pub unit_price: String,
     pub currency: String,
-    pub fee: f64,
+    pub fee: String,
+    pub amount: Option<String>,
     pub is_draft: bool,
     pub comment: Option<String>,
     pub created_at: NaiveDateTime,
@@ -68,10 +71,11 @@ pub struct NewActivity {
     pub asset_id: String,
     pub activity_type: String,
     pub activity_date: String,
-    pub quantity: f64,
-    pub unit_price: f64,
+    pub quantity: Option<BigDecimal>,
+    pub unit_price: Option<BigDecimal>,
     pub currency: String,
-    pub fee: f64,
+    pub fee: Option<BigDecimal>,
+    pub amount: Option<BigDecimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
 }
@@ -116,10 +120,11 @@ pub struct ActivityUpdate {
     pub asset_id: String,
     pub activity_type: String,
     pub activity_date: String,
-    pub quantity: f64,
-    pub unit_price: f64,
+    pub quantity: Option<BigDecimal>,
+    pub unit_price: Option<BigDecimal>,
     pub currency: String,
-    pub fee: f64,
+    pub fee: Option<BigDecimal>,
+    pub amount: Option<BigDecimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
 }
@@ -152,27 +157,78 @@ impl ActivityUpdate {
 }
 
 /// Model for activity details including related data
-#[derive(Queryable, Serialize, Deserialize, Clone, Debug)]
+#[derive(Queryable, QueryableByName, Serialize, Deserialize, Clone, Debug)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityDetails {
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub id: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_id: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_id: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub activity_type: String,
-    pub date: String,
-    pub quantity: f64,
-    pub unit_price: f64,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub date: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub quantity: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub unit_price: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
-    pub fee: f64,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub fee: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub amount: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Bool)]
     pub is_draft: bool,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub comment: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub created_at: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub updated_at: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_name: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_currency: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_symbol: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_name: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub asset_data_source: String,
+}
+
+impl ActivityDetails {
+    pub fn get_quantity(&self) -> BigDecimal {
+        BigDecimal::from_str(&self.quantity).unwrap_or_else(|e| {
+            log::error!("Failed to parse quantity '{}': {}", self.quantity, e);
+            BigDecimal::from(0)
+        })
+    }
+
+    pub fn get_unit_price(&self) -> BigDecimal {
+        BigDecimal::from_str(&self.unit_price).unwrap_or_else(|e| {
+            log::error!("Failed to parse unit_price '{}': {}", self.unit_price, e);
+            BigDecimal::from(0)
+        })
+    }
+
+    pub fn get_fee(&self) -> BigDecimal {
+        BigDecimal::from_str(&self.fee).unwrap_or_else(|e| {
+            log::error!("Failed to parse fee '{}': {}", self.fee, e);
+            BigDecimal::from(0)
+        })
+    }
+
+    pub fn get_amount(&self) -> Option<BigDecimal> {
+        self.amount.as_ref().map(|s| BigDecimal::from_str(s).unwrap_or_else(|e| {
+            log::error!("Failed to parse amount '{}': {}", s, e);
+            BigDecimal::from(0)
+        }))
+    }
 }
 
 /// Model for activity search response metadata
@@ -198,10 +254,11 @@ pub struct ActivityImport {
     pub date: String,
     pub symbol: String,
     pub activity_type: String,
-    pub quantity: f64,
-    pub unit_price: f64,
+    pub quantity: BigDecimal,
+    pub unit_price: BigDecimal,
     pub currency: String,
-    pub fee: f64,
+    pub fee: BigDecimal,
+    pub amount: Option<BigDecimal>,
     pub comment: Option<String>,
     pub account_id: Option<String>,
     pub account_name: Option<String>,
@@ -326,6 +383,8 @@ pub enum ActivityType {
     Fee,
     Tax,
     Split,
+    AddHolding,
+    RemoveHolding,
 }
 
 impl ActivityType {
@@ -345,6 +404,8 @@ impl ActivityType {
             ActivityType::Fee => ACTIVITY_TYPE_FEE,
             ActivityType::Tax => ACTIVITY_TYPE_TAX,
             ActivityType::Split => ACTIVITY_TYPE_SPLIT,
+            ActivityType::AddHolding => ACTIVITY_TYPE_ADD_HOLDING,
+            ActivityType::RemoveHolding => ACTIVITY_TYPE_REMOVE_HOLDING,
         }
     }
 }
@@ -368,6 +429,8 @@ impl FromStr for ActivityType {
             s if s == ACTIVITY_TYPE_FEE => Ok(ActivityType::Fee),
             s if s == ACTIVITY_TYPE_TAX => Ok(ActivityType::Tax),
             s if s == ACTIVITY_TYPE_SPLIT => Ok(ActivityType::Split),
+            s if s == ACTIVITY_TYPE_ADD_HOLDING => Ok(ActivityType::AddHolding),
+            s if s == ACTIVITY_TYPE_REMOVE_HOLDING => Ok(ActivityType::RemoveHolding),
             _ => Err(format!("Unknown activity type: {}", s)),
         }
     }
@@ -419,10 +482,23 @@ impl From<ActivityDB> for Activity {
             asset_id: db.asset_id,
             activity_type: db.activity_type,
             activity_date: DateTime::from_naive_utc_and_offset(db.activity_date, Utc),
-            quantity: db.quantity,
-            unit_price: db.unit_price,
+            quantity: BigDecimal::from_str(&db.quantity).unwrap_or_else(|e| {
+                log::error!("Failed to parse quantity '{}': {}", db.quantity, e);
+                BigDecimal::from(0)
+            }),
+            unit_price: BigDecimal::from_str(&db.unit_price).unwrap_or_else(|e| {
+                log::error!("Failed to parse unit_price '{}': {}", db.unit_price, e);
+                BigDecimal::from(0)
+            }),
             currency: db.currency,
-            fee: db.fee,
+            fee: BigDecimal::from_str(&db.fee).unwrap_or_else(|e| {
+                log::error!("Failed to parse fee '{}': {}", db.fee, e);
+                BigDecimal::from(0)
+            }),
+            amount: db.amount.map(|s| BigDecimal::from_str(&s).unwrap_or_else(|e| {
+                log::error!("Failed to parse amount '{}': {}", s, e);
+                BigDecimal::from(0)
+            })),
             is_draft: db.is_draft,
             comment: db.comment,
             created_at: DateTime::from_naive_utc_and_offset(db.created_at, Utc),
@@ -449,16 +525,47 @@ impl From<NewActivity> for ActivityDB {
                 now.date().and_hms_opt(12, 0, 0).unwrap_or(now)
             });
 
+        // Handle cash activities and splits
+        let activity_type = domain.activity_type.as_str();
+        let is_cash_or_split = activity_type == "DEPOSIT" || 
+                              activity_type == "WITHDRAWAL" || 
+                              activity_type == "FEE" || 
+                              activity_type == "INTEREST" ||
+                              activity_type == "DIVIDEND" ||
+                              activity_type == "SPLIT" ||
+                              activity_type == "CONVERSION_IN" ||
+                              activity_type == "CONVERSION_OUT" ||
+                              activity_type == "TRANSFER_IN" ||
+                              activity_type == "TRANSFER_OUT";
+
+        let (quantity, unit_price, amount) = if is_cash_or_split {
+            // For cash activities and splits, set quantity and unit_price to 0
+            // Use amount if provided, otherwise use quantity
+            let amount_str = match &domain.amount {
+                Some(amount) => amount.to_string(),
+                None => domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string()
+            };
+            ("0".to_string(), "0".to_string(), Some(amount_str))
+        } else {
+            // For other activities, use the provided values
+            (
+                domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+                domain.unit_price.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+                domain.amount.as_ref().map(|a| a.to_string())
+            )
+        };
+
         Self {
             id: domain.id.unwrap_or_default(),
             account_id: domain.account_id,
             asset_id: domain.asset_id,
             activity_type: domain.activity_type,
             activity_date,
-            quantity: domain.quantity,
-            unit_price: domain.unit_price,
+            quantity,
+            unit_price,
             currency: domain.currency,
-            fee: domain.fee,
+            fee: domain.fee.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+            amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
             created_at: now,
@@ -483,16 +590,47 @@ impl From<ActivityUpdate> for ActivityDB {
                 now.date().and_hms_opt(12, 0, 0).unwrap_or(now)
             });
 
+        // Handle cash activities and splits
+        let activity_type = domain.activity_type.as_str();
+        let is_cash_or_split = activity_type == "DEPOSIT" || 
+                              activity_type == "WITHDRAWAL" || 
+                              activity_type == "FEE" || 
+                              activity_type == "INTEREST" ||
+                              activity_type == "DIVIDEND" ||
+                              activity_type == "SPLIT" ||
+                              activity_type == "CONVERSION_IN" ||
+                              activity_type == "CONVERSION_OUT" ||
+                              activity_type == "TRANSFER_IN" ||
+                              activity_type == "TRANSFER_OUT";
+
+        let (quantity, unit_price, amount) = if is_cash_or_split {
+            // For cash activities and splits, set quantity and unit_price to 0
+            // Use amount if provided, otherwise use quantity
+            let amount_str = match &domain.amount {
+                Some(amount) => amount.to_string(),
+                None => domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string()
+            };
+            ("0".to_string(), "0".to_string(), Some(amount_str))
+        } else {
+            // For other activities, use the provided values
+            (
+                domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+                domain.unit_price.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+                domain.amount.as_ref().map(|a| a.to_string())
+            )
+        };
+
         Self {
             id: domain.id,
             account_id: domain.account_id,
             asset_id: domain.asset_id,
             activity_type: domain.activity_type,
             activity_date,
-            quantity: domain.quantity,
-            unit_price: domain.unit_price,
+            quantity,
+            unit_price,
             currency: domain.currency,
-            fee: domain.fee,
+            fee: domain.fee.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+            amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
             created_at: now,
