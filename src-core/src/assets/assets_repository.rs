@@ -43,7 +43,7 @@ impl AssetRepository {
             .set((
                 assets::sectors.eq(&payload.sectors),
                 assets::countries.eq(&payload.countries),
-                assets::comment.eq(payload.comment),
+                assets::notes.eq(&payload.notes),
                 assets::asset_sub_class.eq(&payload.asset_sub_class),
                 assets::asset_class.eq(&payload.asset_class),
             ))
@@ -97,4 +97,14 @@ impl AssetRepository {
         Ok(results.into_iter().map(Asset::from).collect())
     }
 
+    pub fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let results = assets::table
+            .filter(assets::id.eq_any(symbols))
+            .load::<AssetDB>(&mut conn)?;
+
+        Ok(results.into_iter().map(Asset::from).collect())
+    }
+    
 } 

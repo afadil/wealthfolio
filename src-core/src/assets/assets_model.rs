@@ -21,7 +21,7 @@ pub struct Asset {
     pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
-    pub comment: Option<String>,
+    pub notes: Option<String>,
     pub countries: Option<String>,
     pub categories: Option<String>,
     pub classes: Option<String>,
@@ -46,7 +46,7 @@ pub struct NewAsset {
     pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
-    pub comment: Option<String>,
+    pub notes: Option<String>,
     pub countries: Option<String>,
     pub categories: Option<String>,
     pub classes: Option<String>,
@@ -92,7 +92,7 @@ impl NewAsset {
     pub fn new_fx_asset(base_currency: &str, target_currency: &str, source: &str) -> Self {
         let asset_id = format!("{}{}=X", base_currency, target_currency);
         let readable_name = format!("{}/{} Exchange Rate", base_currency, target_currency);
-        let comment = format!(
+        let notes = format!(
             "Currency pair for converting from {} to {}",
             base_currency, target_currency
         );
@@ -102,12 +102,36 @@ impl NewAsset {
             name: Some(readable_name),
             symbol: asset_id,
             currency: base_currency.to_string(),
-            asset_type: Some(CURRENCY_ASSET_TYPE.to_string()),
+            asset_type: Some(FOREX_ASSET_TYPE.to_string()),
             asset_class: Some(CASH_ASSET_CLASS.to_string()),
             asset_sub_class: Some(CASH_ASSET_CLASS.to_string()),
-            comment: Some(comment),
+            notes: Some(notes),
             data_source: source.to_string(),
             ..Default::default()
+        }
+    }
+}
+
+impl From<crate::market_data::providers::models::AssetProfile> for NewAsset {
+    fn from(profile: crate::market_data::providers::models::AssetProfile) -> Self {
+        Self {
+            id: profile.id,
+            isin: profile.isin,
+            name: profile.name,
+            asset_type: profile.asset_type,
+            symbol: profile.symbol,
+            symbol_mapping: profile.symbol_mapping,
+            asset_class: profile.asset_class,
+            asset_sub_class: profile.asset_sub_class,
+            notes: profile.notes,
+            countries: profile.countries,
+            categories: profile.categories,
+            classes: profile.classes,
+            attributes: profile.attributes,
+            currency: profile.currency,
+            data_source: profile.data_source,
+            sectors: profile.sectors,
+            url: profile.url,
         }
     }
 }
@@ -119,7 +143,7 @@ pub struct UpdateAssetProfile {
     pub symbol: String,
     pub sectors: Option<String>,
     pub countries: Option<String>,
-    pub comment: String,
+    pub notes: String,
     pub asset_sub_class: Option<String>,
     pub asset_class: Option<String>,
 }
@@ -161,7 +185,7 @@ pub struct AssetDB {
     pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
-    pub comment: Option<String>,
+    pub notes: Option<String>,
     pub countries: Option<String>,
     pub categories: Option<String>,
     pub classes: Option<String>,
@@ -186,7 +210,7 @@ impl From<AssetDB> for Asset {
             symbol_mapping: db.symbol_mapping,
             asset_class: db.asset_class,
             asset_sub_class: db.asset_sub_class,
-            comment: db.comment,
+            notes: db.notes,
             countries: db.countries,
             categories: db.categories,
             classes: db.classes,
@@ -213,7 +237,7 @@ impl From<NewAsset> for AssetDB {
             symbol_mapping: domain.symbol_mapping,
             asset_class: domain.asset_class,
             asset_sub_class: domain.asset_sub_class,
-            comment: domain.comment,
+            notes: domain.notes,
             countries: domain.countries,
             categories: domain.categories,
             classes: domain.classes,
@@ -232,7 +256,7 @@ impl From<NewAsset> for AssetDB {
 /// Domain model representing an asset profile with its quote history
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AssetProfile {
+pub struct AssetData {
     pub asset: Asset,
     pub quote_history: Vec<Quote>,
 }

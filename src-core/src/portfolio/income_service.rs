@@ -8,6 +8,9 @@ use diesel::dsl::min;
 use diesel::prelude::*;
 use log::{debug, error};
 use std::sync::Arc;
+use bigdecimal::BigDecimal;
+use std::str::FromStr;
+use num_traits::Zero;
 
 pub struct IncomeService {
     fx_service: Arc<FxService>,
@@ -31,7 +34,7 @@ impl IncomeService {
              a.asset_id as symbol,
              COALESCE(ast.name, 'Unknown') as symbol_name,
              a.currency,
-             a.quantity * a.unit_price as amount
+             a.amount
              FROM activities a
              LEFT JOIN assets ast ON a.asset_id = ast.id
              INNER JOIN accounts acc ON a.account_id = acc.id
@@ -39,9 +42,44 @@ impl IncomeService {
              AND acc.is_active = 1
              ORDER BY a.activity_date";
 
-        let result = diesel::sql_query(query).load::<IncomeData>(conn);
+        // Define a struct to hold the raw query results including quantity and unit_price
+        #[derive(QueryableByName, Debug)]
+        struct RawIncomeData {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub income_type: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub symbol: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub symbol_name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub currency: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub amount: String,
+        }
 
-        result
+        let raw_results = diesel::sql_query(query).load::<RawIncomeData>(conn)?;
+        
+        // Transform raw results into IncomeData, using amount directly from the database
+        let results = raw_results
+            .into_iter()
+            .map(|raw| {
+                // Parse the TEXT value into BigDecimal
+                let amount = BigDecimal::from_str(&raw.amount).unwrap_or_else(|_| BigDecimal::zero());
+                
+                IncomeData {
+                    date: raw.date,
+                    income_type: raw.income_type,
+                    symbol: raw.symbol,
+                    symbol_name: raw.symbol_name,
+                    currency: raw.currency,
+                    amount,
+                }
+            })
+            .collect();
+
+        Ok(results)
     }
 
     fn get_first_transaction_date(
@@ -56,11 +94,11 @@ impl IncomeService {
             .and_then(|opt| opt.ok_or(diesel::NotFound))
     }
 
-    fn calculate_yoy_growth(current: f64, previous: f64) -> f64 {
-        if previous > 0.0 {
-            ((current - previous) / previous) * 100.0
+    fn calculate_yoy_growth(current: BigDecimal, previous: BigDecimal) -> BigDecimal {
+        if previous > BigDecimal::zero() {
+            ((&current - &previous) / &previous) * BigDecimal::from(100)
         } else {
-            0.0
+            BigDecimal::zero()
         }
     }
 
@@ -128,26 +166,37 @@ impl IncomeService {
                     continue;
                 }
             };
+            
             let converted_amount = match self.fx_service.convert_currency(
-                activity.amount,
+                activity.amount.clone(),
                 &activity.currency,
                 &base_currency,
             ) {
                 Ok(amount) => amount,
                 Err(e) => {
                     error!("Error converting currency: {:?}", e);
-                    activity.amount
+                    activity.amount.clone()
                 }
             };
 
-            total_summary.add_income(&activity, converted_amount);
+            // Create a copy of the activity with cloned fields to avoid ownership issues
+            let activity_copy = IncomeData {
+                date: activity.date.clone(),
+                income_type: activity.income_type.clone(),
+                symbol: activity.symbol.clone(),
+                symbol_name: activity.symbol_name.clone(),
+                currency: activity.currency.clone(),
+                amount: activity.amount.clone(),
+            };
+
+            total_summary.add_income(&activity_copy, converted_amount.clone());
 
             if date.year() == current_year {
-                ytd_summary.add_income(&activity, converted_amount);
+                ytd_summary.add_income(&activity_copy, converted_amount.clone());
             } else if date.year() == last_year {
-                last_year_summary.add_income(&activity, converted_amount);
+                last_year_summary.add_income(&activity_copy, converted_amount.clone());
             } else if date.year() == two_years_ago {
-                two_years_ago_summary.add_income(&activity, converted_amount);
+                two_years_ago_summary.add_income(&activity_copy, converted_amount.clone());
             }
         }
 
@@ -158,10 +207,10 @@ impl IncomeService {
 
         // Calculate Year-over-Year Growth
         let ytd_yoy_growth =
-            Self::calculate_yoy_growth(ytd_summary.total_income, last_year_summary.total_income);
+            Self::calculate_yoy_growth(ytd_summary.total_income.clone(), last_year_summary.total_income.clone());
         let last_year_yoy_growth = Self::calculate_yoy_growth(
-            last_year_summary.total_income,
-            two_years_ago_summary.total_income,
+            last_year_summary.total_income.clone(),
+            two_years_ago_summary.total_income.clone(),
         );
 
         ytd_summary.yoy_growth = Some(ytd_yoy_growth);

@@ -22,7 +22,7 @@ SELECT
     quotes.date as updated_at
 FROM quotes
 JOIN assets ON quotes.symbol = assets.symbol
-WHERE assets.asset_type = 'Currency'
+WHERE assets.asset_type = 'FOREX'
 AND quotes.date = (
     SELECT MAX(date)
     FROM quotes AS q2
@@ -34,14 +34,33 @@ DELETE FROM quotes
 WHERE symbol IN (
     SELECT symbol 
     FROM assets 
-    WHERE asset_type = 'Currency'
+    WHERE asset_type = 'FOREX'
 );
 
 -- Clean up the currency assets
 DELETE FROM assets 
-WHERE asset_type = 'Currency';
+WHERE asset_type = 'FOREX';
 
 -- Drop the indexes created in the up migration
 DROP INDEX IF EXISTS idx_quotes_symbol_date;
 DROP INDEX IF EXISTS idx_quotes_date;
 DROP INDEX IF EXISTS idx_assets_type_currency; 
+
+
+-- Revert the countries JSON field back from "name" to "code"
+UPDATE assets 
+SET countries = REPLACE(countries, '"name":', '"code":')
+WHERE countries IS NOT NULL;
+
+-- Revert the capitalization of asset types and data sources
+UPDATE assets 
+SET asset_type = CASE 
+    WHEN asset_type = 'EQUITY' THEN 'Equity'
+    WHEN asset_type = 'CRYPTOCURRENCY' THEN 'Cryptocurrency'
+    WHEN asset_type = 'CURRENCY' THEN 'Currency'
+    WHEN asset_type = 'FOREX' THEN 'Currency'
+    ELSE LOWER(asset_type)
+END
+WHERE asset_type != 'CASH';
+
+

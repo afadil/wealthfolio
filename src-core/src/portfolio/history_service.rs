@@ -1,4 +1,4 @@
-use crate::errors::{ Error, Result};
+use crate::errors::Result;
 use crate::fx::fx_service::FxService;
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{ HistorySummary, PortfolioHistory};
@@ -10,10 +10,8 @@ use diesel::r2d2::{Pool, ConnectionManager};
 
 use bigdecimal::BigDecimal;
 use chrono::{Duration, NaiveDate, Utc};
-use diesel::prelude::*;
 use diesel::SqliteConnection;
-use log::{error, warn};
-use num_traits::{FromPrimitive, ToPrimitive};
+use log::warn;
 use std::collections::HashMap;
 use std::default::Default;
 use std::str::FromStr;
@@ -21,7 +19,6 @@ use std::sync::Arc;
 use rayon::prelude::*;
 
 pub struct HistoryService {
-    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
     base_currency: String,
     fx_service: FxService,
     market_data_service: Arc<MarketDataService>,
@@ -54,7 +51,6 @@ impl HistoryService {
     ) -> Self {
         let repository = HistoryRepository::new(Arc::clone(&pool));
         Self {
-            pool,
             base_currency,
             fx_service,
             market_data_service,
@@ -92,9 +88,8 @@ impl HistoryService {
         let end_date = Utc::now().naive_utc().date();
 
         // Load and prepare all required data 
-        let quotes = Arc::new(self.market_data_service.get_all_quotes()?);
+        let quotes = Arc::new(self.market_data_service.get_all_historical_quotes()?);
         let account_currencies = self.get_account_currencies(accounts)?;
-        let asset_currencies = self.market_data_service.get_asset_currencies()?;
 
         // Calculate split factors for all activities
         let split_factors = self.calculate_split_factors(
@@ -133,7 +128,6 @@ impl HistoryService {
                         &last_histories,
                         end_date,
                         &account_currencies,
-                        &asset_currencies,
                 );
                     result
             }).collect()
@@ -147,7 +141,6 @@ impl HistoryService {
                     &last_histories,
                     end_date,
                     &account_currencies,
-                    &asset_currencies,
                 )
             }).collect()
         };
@@ -264,7 +257,6 @@ impl HistoryService {
         last_histories: &HashMap<String, Option<PortfolioHistory>>,
         end_date: NaiveDate,
         account_currencies: &HashMap<String, String>,
-        asset_currencies: &HashMap<String, String>,
     ) -> (HistorySummary, Vec<PortfolioHistory>) {
         let activities = account_activities
             .get(&account.id)
@@ -290,7 +282,6 @@ impl HistoryService {
             start_date,
             end_date,
             account_currency,
-            asset_currencies,
             last_history,
         );
      
@@ -322,24 +313,9 @@ impl HistoryService {
     fn calculate_total_portfolio_history(
         &self,
     ) -> Result<Vec<PortfolioHistory>> {
-        use crate::schema::accounts::dsl as accounts_dsl;
-        use crate::schema::portfolio_history::dsl::*;
+         // Get all histories for active accounts using the repository
+        let all_histories = self.repository.get_all_active_account_histories()?;
 
-        // Get active account IDs
-        let mut conn = self.pool.get().map_err(|e| {
-            error!("Failed to get database connection: {}", e);
-            Error::Database(e.into())
-        })?;
-        let active_account_ids: Vec<String> = accounts_dsl::accounts
-            .filter(accounts_dsl::is_active.eq(true))
-            .select(accounts_dsl::id)
-            .load::<String>(&mut conn)?;
-
-        let all_histories: Vec<PortfolioHistory> = portfolio_history
-            .filter(account_id.ne("TOTAL"))
-            .filter(account_id.eq_any(active_account_ids))
-            .order(date.asc())
-            .load::<PortfolioHistory>(&mut conn)?;
 
         let mut grouped_histories: HashMap<String, Vec<PortfolioHistory>> = HashMap::new();
         for history in all_histories {
@@ -356,19 +332,19 @@ impl HistoryService {
                     id: format!("TOTAL_{}", history_date),
                     account_id: "TOTAL".to_string(),
                     date: history_date,
-                    total_value: 0.0,
-                    market_value: 0.0,
-                    book_cost: 0.0,
-                    available_cash: 0.0,
-                    net_deposit: 0.0,
+                    total_value: BigDecimal::from(0),
+                    market_value: BigDecimal::from(0),
+                    book_cost: BigDecimal::from(0),
+                    available_cash: BigDecimal::from(0),
+                    net_deposit: BigDecimal::from(0),
                     currency: self.base_currency.clone(),
                     base_currency: self.base_currency.clone(),
-                    total_gain_value: 0.0,
-                    total_gain_percentage: 0.0,
-                    day_gain_percentage: 0.0,
-                    day_gain_value: 0.0,
-                    allocation_percentage: 100.0,
-                    exchange_rate: 1.0,
+                    total_gain_value: BigDecimal::from(0),
+                    total_gain_percentage: BigDecimal::from(0),
+                    day_gain_percentage: BigDecimal::from(0),
+                    day_gain_value: BigDecimal::from(0),
+                    allocation_percentage: BigDecimal::from(100),
+                    exchange_rate: BigDecimal::from(1),
                     holdings: Some("{}".to_string()),
                     calculated_at: Utc::now().naive_utc(),
                 };
@@ -380,29 +356,35 @@ impl HistoryService {
                             &self.base_currency,
                             NaiveDate::parse_from_str(&history.date, "%Y-%m-%d").unwrap_or_default(),
                         )
-                        .unwrap_or(1.0);
+                        .unwrap_or(BigDecimal::from(1));
 
-                    total.total_value += history.total_value * currency_exchange_rate;
-                    total.market_value += history.market_value * currency_exchange_rate;
-                    total.book_cost += history.book_cost * currency_exchange_rate;
-                    total.available_cash += history.available_cash * currency_exchange_rate;
-                    total.net_deposit += history.net_deposit * currency_exchange_rate;
-                    total.day_gain_value += history.day_gain_value * currency_exchange_rate;
-                    total.exchange_rate = currency_exchange_rate;
+                    let exchange_rate_bd = currency_exchange_rate;
+                    total.total_value += history.total_value * &exchange_rate_bd;
+                    total.market_value += history.market_value * &exchange_rate_bd;
+                    total.book_cost += history.book_cost * &exchange_rate_bd;
+                    total.available_cash += history.available_cash * &exchange_rate_bd;
+                    total.net_deposit += history.net_deposit * &exchange_rate_bd;
+                    total.day_gain_value += history.day_gain_value * &exchange_rate_bd;
+                    total.exchange_rate = exchange_rate_bd;
                 }
 
                 // Recalculate percentages
-                total.total_gain_value = total.total_value - total.net_deposit;
-                total.total_gain_percentage = if total.net_deposit != 0.0 {
-                    (total.total_gain_value / total.net_deposit) * 100.0
+                // Calculate total gain value
+                total.total_gain_value = &total.total_value - &total.net_deposit;
+                
+                // Calculate total gain percentage
+                if total.net_deposit != BigDecimal::from(0) {
+                    total.total_gain_percentage = (&total.total_gain_value * BigDecimal::from(100)) / &total.net_deposit;
                 } else {
-                    0.0
-                };
-                total.day_gain_percentage = if total.market_value != 0.0 {
-                    (total.day_gain_value / total.market_value) * 100.0
+                    total.total_gain_percentage = BigDecimal::from(0);
+                }
+                
+                // Calculate day gain percentage
+                if total.market_value != BigDecimal::from(0) {
+                    total.day_gain_percentage = (&total.day_gain_value * BigDecimal::from(100)) / &total.market_value;
                 } else {
-                    0.0
-                };
+                    total.day_gain_percentage = BigDecimal::from(0);
+                }
 
                 total
             })
@@ -420,7 +402,6 @@ impl HistoryService {
         start_date: NaiveDate,
         end_date: NaiveDate,
         account_currency: String,
-        asset_currencies: &HashMap<String, String>,
         last_history: Option<PortfolioHistory>,
     ) -> Vec<PortfolioHistory> {
         let max_history_days = 36500; // 100 years
@@ -430,14 +411,14 @@ impl HistoryService {
 
         // Initialize values from the last PortfolioHistory or use default values
         let mut cumulative_cash = last_history.as_ref().map_or(BigDecimal::from(0), |h| {
-            BigDecimal::from_f64(h.available_cash).unwrap()
+            h.available_cash.clone()
         });
 
         let mut net_deposit = last_history.as_ref().map_or(BigDecimal::from(0), |h| {
-            BigDecimal::from_f64(h.net_deposit).unwrap()
+            h.net_deposit.clone()
         });
         let mut book_cost = last_history.as_ref().map_or(BigDecimal::from(0), |h| {
-            BigDecimal::from_f64(h.book_cost).unwrap()
+            h.book_cost.clone()
         });
 
         // Initialize holdings based on the last history or use an empty HashMap
@@ -471,7 +452,6 @@ impl HistoryService {
                         &holdings,
                         quotes,
                         date,
-                        asset_currencies,
                         &account_currency,
                     );
 
@@ -496,30 +476,27 @@ impl HistoryService {
                     BigDecimal::from(0)
                 };
                 
-                let exchange_rate = BigDecimal::from_f64(
-                    self.fx_service
-                        .get_exchange_rate_for_date(account_currency.as_str(), &self.base_currency, date)
-                        .unwrap_or(1.0),
-                )
-                .unwrap();
+                let exchange_rate = self.fx_service
+                    .get_exchange_rate_for_date(account_currency.as_str(), &self.base_currency, date)
+                    .unwrap_or(BigDecimal::from(1));
 
                 PortfolioHistory {
                     id: format!("{}_{}", account_id, date.format("%Y-%m-%d")),
                     account_id: account_id.to_string(),
                     date: date.format("%Y-%m-%d").to_string(),
-                    total_value: total_value.to_f64().unwrap(),
-                    market_value: market_value.to_f64().unwrap(),
-                    book_cost: book_cost.to_f64().unwrap(),
-                    available_cash: cumulative_cash.to_f64().unwrap(),
-                    net_deposit: net_deposit.to_f64().unwrap(),
+                    total_value: total_value,
+                    market_value: market_value,
+                    book_cost: book_cost.clone(),
+                    available_cash: cumulative_cash.clone(),
+                    net_deposit: net_deposit.clone(),
                     currency: account_currency.clone(),
                     base_currency: self.base_currency.clone(),
-                    total_gain_value: total_gain_value.to_f64().unwrap(),
-                    total_gain_percentage: total_gain_percentage.to_f64().unwrap(),
-                    day_gain_percentage: day_gain_percentage.to_f64().unwrap(),
-                    day_gain_value: day_gain_value.to_f64().unwrap(),
-                    allocation_percentage: 100.0,
-                    exchange_rate: exchange_rate.to_f64().unwrap(),
+                    total_gain_value: total_gain_value,
+                    total_gain_percentage: total_gain_percentage,
+                    day_gain_percentage: day_gain_percentage,
+                    day_gain_value: day_gain_value,
+                    allocation_percentage: BigDecimal::from(100),
+                    exchange_rate: exchange_rate,
                     holdings: Some(serde_json::to_string(&holdings).unwrap_or_default()),
                     calculated_at: Utc::now().naive_utc(),
                 }
@@ -535,18 +512,19 @@ impl HistoryService {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> HashMap<String, Vec<(NaiveDate, BigDecimal)>> {
+        use crate::activities::activities_constants::ACTIVITY_TYPE_SPLIT;
         let mut split_factors: HashMap<String, Vec<(NaiveDate, BigDecimal)>> = HashMap::new();
 
         for activity in activities.iter().filter(|a| {
-            a.activity_type == "SPLIT"
+            a.activity_type == ACTIVITY_TYPE_SPLIT
                 && a.activity_date.naive_utc().date() >= start_date
                 && a.activity_date.naive_utc().date() <= end_date
         }) {
-            let split_ratio = BigDecimal::from_f64(activity.unit_price).unwrap();
+           let split_ratio = activity.amount.clone();
             split_factors
                 .entry(activity.asset_id.clone())
                 .or_default()
-                .push((activity.activity_date.naive_utc().date(), split_ratio));
+                .push((activity.activity_date.naive_utc().date(), split_ratio.unwrap_or_default()));
         }
 
         split_factors
@@ -557,35 +535,50 @@ impl HistoryService {
         activities: &[Activity],
         split_factors: &HashMap<String, Vec<(NaiveDate, BigDecimal)>>,
     ) -> Vec<Activity> {
+        use crate::activities::activities_constants::ACTIVITY_TYPE_SPLIT;
         let mut adjusted_activities = activities.to_vec();
 
         for (asset_id, splits) in split_factors {
+            if splits.is_empty() {
+                continue;
+            }
+
             // Reverse the splits to apply future splits to past activities
             let mut future_splits = splits.clone();
             future_splits.sort_by(|a, b| b.0.cmp(&a.0)); // Sort in descending order
 
             for activity in adjusted_activities.iter_mut() {
-                if activity.asset_id == *asset_id && activity.activity_type != "SPLIT" {
+                if activity.asset_id == *asset_id && activity.activity_type != ACTIVITY_TYPE_SPLIT {
                     let mut cumulative_factor = BigDecimal::from(1);
 
                     // Apply splits that occur after the activity date
                     for &(split_date, ref split_factor) in &future_splits {
                         if split_date > activity.activity_date.naive_utc().date() {
-                            cumulative_factor *= split_factor;
+                            cumulative_factor = &cumulative_factor * split_factor;
                         }
                     }
 
                     // Adjust quantity and unit price
-                    let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
-                    let unit_price = BigDecimal::from_f64(activity.unit_price).unwrap();
-
-                    activity.quantity = (quantity * &cumulative_factor).to_f64().unwrap();
-                    activity.unit_price = (unit_price / &cumulative_factor).to_f64().unwrap();
+            
+                    activity.quantity = &activity.quantity * &cumulative_factor;
+                    activity.unit_price = &activity.unit_price / &cumulative_factor;
                 }
             }
         }
 
         adjusted_activities
+    }
+
+    /// Gets the amount for a cash activity, applying exchange rate and handling missing values
+    fn get_amount(&self, activity: &Activity, exchange_rate: &BigDecimal) -> BigDecimal {
+        match &activity.amount {
+            Some(amt) => amt.clone() * exchange_rate,
+            None => {
+                warn!("Amount not provided for {} activity ID: {}, using zero", 
+                      activity.activity_type, activity.id);
+                BigDecimal::from(0)
+            }
+        }
     }
 
     fn process_activity(
@@ -598,25 +591,30 @@ impl HistoryService {
         account_currency: &str,
         date: NaiveDate,
     ) {
+        use crate::activities::ActivityType;
+        use std::str::FromStr;
 
         // Get exchange rate if activity currency is different from account currency
-        let exchange_rate = BigDecimal::from_f64(
-            self.fx_service
-                .get_exchange_rate_for_date(&activity.currency, account_currency, date)
-                .unwrap_or(1.0),
-        )
-        .unwrap();
+        let exchange_rate = self.fx_service
+            .get_exchange_rate_for_date(&activity.currency, account_currency, date)
+            .unwrap_or(BigDecimal::from(1));
 
-        let activity_fee = BigDecimal::from_f64(activity.fee).unwrap() * &exchange_rate;
+        let activity_fee = &activity.fee * &exchange_rate;
+        
+        // Parse the activity type string to enum
+        let activity_type = match ActivityType::from_str(&activity.activity_type) {
+            Ok(t) => t,
+            Err(e) => {
+                warn!("Unknown activity type: {} for activity ID: {}, skipping processing", 
+                      activity.activity_type, activity.id);
+                return;
+            }
+        };
 
-        let activity_amount = BigDecimal::from_f64(activity.quantity).unwrap()
-            * BigDecimal::from_f64(activity.unit_price).unwrap()
-            * &exchange_rate;
-
-        match activity.activity_type.as_str() {
-            "BUY" => {
-                let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
-                let price = BigDecimal::from_f64(activity.unit_price).unwrap() * &exchange_rate;
+        match activity_type {
+            ActivityType::Buy => {
+                let quantity = activity.quantity.clone();
+                let price = &activity.unit_price * &exchange_rate;
                 let total_cost = &quantity * &price + &activity_fee;
 
                 holdings
@@ -627,10 +625,10 @@ impl HistoryService {
                 *cumulative_cash -= &total_cost;
                 *book_cost += total_cost;
             }
-            "SELL" => {
-                let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
+            ActivityType::Sell => {
+                let quantity = activity.quantity.clone();
                 let quantity_clone = quantity.clone();
-                let price = BigDecimal::from_f64(activity.unit_price).unwrap() * &exchange_rate;
+                let price = &activity.unit_price * &exchange_rate;
                 let total_amount = &quantity * &price - &activity_fee;
 
                 // Calculate the average cost per share before updating holdings
@@ -647,64 +645,111 @@ impl HistoryService {
                 *cumulative_cash += &total_amount;
                 *book_cost -= &quantity_clone * &avg_cost_per_share;
             }
-            "TRANSFER_IN" => {
+            ActivityType::TransferIn => {
                 if activity.asset_id.starts_with("$CASH") {
+                    // For cash transfers, get amount from the amount field
+                    let amount = self.get_amount(activity, &exchange_rate);
+                    
                     // For cash transfers, both cumulative_cash and net_deposit should include the full amount
-                    *cumulative_cash += &activity_amount - &activity_fee;
-                    *net_deposit += &activity_amount;
+                    *cumulative_cash += &amount - &activity_fee;
+                    *net_deposit += &amount;
                 } else {
-                    let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
+                    // For backward compatibility, handle non-cash transfers as ADD_HOLDING
+                    warn!("Using TransferIn for non-cash asset in history calculation. Consider using AddHolding instead for asset ID: {}", activity.asset_id);
+                    let amount = &activity.quantity * &activity.unit_price * &exchange_rate;
                     *holdings
                         .entry(activity.asset_id.clone())
-                        .or_insert(BigDecimal::from(0)) += &quantity;
-                    *book_cost += &activity_amount;
+                        .or_insert(BigDecimal::from(0)) += &activity.quantity;
+                    *book_cost += &amount;
                 }
             }
-            "TRANSFER_OUT" => {
+            ActivityType::TransferOut => {
                 if activity.asset_id.starts_with("$CASH") {
+                    // For cash transfers, get amount from the amount field
+                    let amount = self.get_amount(activity, &exchange_rate);
+                    
                     // For cash transfers, both cumulative_cash and net_deposit should be reduced by the full amount
-                    *cumulative_cash -= &activity_amount + &activity_fee;
-                    *net_deposit -= &activity_amount;
+                    *cumulative_cash -= &amount + &activity_fee;
+                    *net_deposit -= &amount;
                 } else {
-                    let quantity = BigDecimal::from_f64(activity.quantity).unwrap();
+                    // For backward compatibility, handle non-cash transfers as REMOVE_HOLDING
+                    warn!("Using TransferOut for non-cash asset in history calculation. Consider using RemoveHolding instead for asset ID: {}", activity.asset_id);
+                    let quantity = &activity.quantity;
                     let old_quantity = holdings
                         .get(&activity.asset_id)
                         .cloned()
                         .unwrap_or_default();
                     if old_quantity != BigDecimal::from(0) {
-                        let transfer_ratio = (&quantity / &old_quantity).round(6);
+                        let transfer_ratio = (quantity / &old_quantity).round(6);
                         let adjustment = transfer_ratio * book_cost.clone();
                         *book_cost -= adjustment;
                     }
                     *holdings
                         .entry(activity.asset_id.clone())
-                        .or_insert(BigDecimal::from(0)) -= &quantity;
+                        .or_insert(BigDecimal::from(0)) -= quantity;
                 }
             }
-            "DEPOSIT" => {
-                *cumulative_cash += &activity_amount - &activity_fee;
-                *net_deposit += &activity_amount;
+            ActivityType::AddHolding => {
+                let amount = &activity.quantity * &activity.unit_price * &exchange_rate;
+                *holdings
+                    .entry(activity.asset_id.clone())
+                    .or_insert(BigDecimal::from(0)) += &activity.quantity;
+                *book_cost += &amount;
             }
-            "WITHDRAWAL" => {
-                *cumulative_cash -= &activity_amount + &activity_fee;
-                *net_deposit -= &activity_amount;
+            ActivityType::RemoveHolding => {
+                let quantity = &activity.quantity;
+                let old_quantity = holdings
+                    .get(&activity.asset_id)
+                    .cloned()
+                    .unwrap_or_default();
+                if old_quantity != BigDecimal::from(0) {
+                    let transfer_ratio = (quantity / &old_quantity).round(6);
+                    let adjustment = transfer_ratio * book_cost.clone();
+                    *book_cost -= adjustment;
+                }
+                *holdings
+                    .entry(activity.asset_id.clone())
+                    .or_insert(BigDecimal::from(0)) -= quantity;
             }
-            "INTEREST" | "DIVIDEND" => {
-                *cumulative_cash += &activity_amount - &activity_fee;
+            ActivityType::Deposit => {
+                // For deposits, get amount from the amount field
+                let amount = self.get_amount(activity, &exchange_rate);
+                
+                *cumulative_cash += &amount - &activity_fee;
+                *net_deposit += &amount;
             }
-            "FEE" | "TAX" => {
+            ActivityType::Withdrawal => {
+                // For withdrawals, get amount from the amount field
+                let amount = self.get_amount(activity, &exchange_rate);
+                
+                *cumulative_cash -= &amount + &activity_fee;
+                *net_deposit -= &amount;
+            }
+            ActivityType::Interest | ActivityType::Dividend => {
+                // For interest and dividends, get amount from the amount field
+                let amount = self.get_amount(activity, &exchange_rate);
+                
+                *cumulative_cash += &amount - &activity_fee;
+            }
+            ActivityType::Fee | ActivityType::Tax => {
                 *cumulative_cash -= &activity_fee;
             }
           
-            "CONVERSION_IN" => {
-                // For CONVERSION_IN, we're receiving currency from another account
-                let total_amount = &activity_amount - &activity_fee;
+            ActivityType::ConversionIn => {
+                // For ConversionIn, get amount from the amount field
+                let amount = self.get_amount(activity, &exchange_rate);
+                
+                // For ConversionIn, we're receiving currency from another account
+                let total_amount = &amount - &activity_fee;
                 *cumulative_cash += &total_amount;
                 *net_deposit += &total_amount;
             }
-            "CONVERSION_OUT" => {
-                // For CONVERSION_OUT, we're sending currency to another account
-                let total_amount = &activity_amount + &activity_fee;
+            ActivityType::ConversionOut => {
+                // For ConversionOut, get amount from the amount field
+                let amount = self.get_amount(activity, &exchange_rate);
+                
+                // For ConversionOut, we're sending currency to another account
+                let total_amount = &amount + &activity_fee;
                 *cumulative_cash -= &total_amount;
                 *net_deposit -= &total_amount;
             }
@@ -720,7 +765,6 @@ impl HistoryService {
         holdings: &HashMap<String, BigDecimal>,
         quotes: &Arc<HashMap<String, Vec<(NaiveDate, Quote)>>>,
         date: NaiveDate,
-        asset_currencies: &HashMap<String, String>,
         account_currency: &str,
     ) -> (BigDecimal, BigDecimal, BigDecimal) {
         let mut holdings_value = BigDecimal::from(0);
@@ -729,26 +773,17 @@ impl HistoryService {
 
         for (asset_id, quantity) in holdings {
             if let Some(quote) = self.get_last_available_quote(asset_id, date, quotes) {
-                let asset_currency = asset_currencies
-                    .get(asset_id)
-                    .map(String::as_str)
-                    .unwrap_or(account_currency);
-
-                let exchange_rate = BigDecimal::from_f64(
-                    self.fx_service
-                        .get_exchange_rate_for_date(asset_currency, account_currency, date)
-                        .unwrap_or(1.0),
-                )
-                .unwrap();
+                let exchange_rate = self.fx_service
+                    .get_exchange_rate_for_date(&quote.currency, account_currency, date)
+                    .unwrap_or(BigDecimal::from(1));
 
                 // No need to adjust quantity here, as it's already adjusted in process_activity
                 let holding_value =
-                    quantity * BigDecimal::from_f64(quote.close).unwrap() * &exchange_rate;
+                    quantity * quote.close.clone() * &exchange_rate;
                 let opening_value =
-                    quantity * BigDecimal::from_f64(quote.open).unwrap() * &exchange_rate;
+                    quantity * quote.open.clone() * &exchange_rate;
                 let day_gain = quantity
-                    * (BigDecimal::from_f64(quote.close).unwrap()
-                        - BigDecimal::from_f64(quote.open).unwrap())
+                    * (quote.close.clone() - quote.open.clone())
                     * &exchange_rate;
 
                 holdings_value += &holding_value;

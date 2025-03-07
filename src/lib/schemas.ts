@@ -69,8 +69,7 @@ const feeActivitySchema = baseActivitySchema.extend({
 const cashActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.DEPOSIT, ActivityType.WITHDRAWAL, ActivityType.INTEREST]),
   assetId: z.string().optional(),
-  quantity: z.number().default(1),
-  unitPrice: z.coerce.number().min(0),
+  amount: z.coerce.number().min(0),
   fee: z.coerce
     .number({
       invalid_type_error: 'Fee must be a positive number.',
@@ -84,7 +83,7 @@ const dividendActivitySchema = baseActivitySchema.extend({
   activityType: z.literal(ActivityType.DIVIDEND),
   assetId: z.string().min(1, { message: 'Please select a security' }),
   quantity: z.number().default(1),
-  unitPrice: z.coerce.number().min(0),
+  amount: z.coerce.number().min(0),
   fee: z.coerce
     .number({
       invalid_type_error: 'Fee must be a positive number.',
@@ -97,7 +96,7 @@ const dividendActivitySchema = baseActivitySchema.extend({
 const splitActivitySchema = baseActivitySchema.extend({
   activityType: z.literal('SPLIT'),
   assetId: z.string().min(1, { message: 'Please select a security' }),
-  unitPrice: z.coerce.number().positive('Split ratio must be greater than 0'),
+  amount: z.coerce.number().positive('Split ratio must be greater than 0'),
   quantity: z.number().default(1),
   fee: z.coerce
     .number({
@@ -155,7 +154,7 @@ const tradeActivitySchema = baseActivitySchema.extend({
   assetDataSource: dataSourceSchema.default(DataSource.YAHOO),
 });
 
-export const newActivitySchema = z.discriminatedUnion('activityType', [
+export const newActivitySchema2 = z.discriminatedUnion('activityType', [
   cashActivitySchema,
   feeActivitySchema,
   dividendActivitySchema,
@@ -165,7 +164,6 @@ export const newActivitySchema = z.discriminatedUnion('activityType', [
   tradeActivitySchema,
 ]);
 
-export type ActivityFormValues = z.infer<typeof newActivitySchema>;
 
 export const importActivitySchema = z.object({
   id: z.string().uuid().optional(),

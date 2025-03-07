@@ -29,6 +29,7 @@ import {
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
+import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity } from '@/lib/activity-utils';
 
 const fetchSize = 25;
 
@@ -47,7 +48,6 @@ const activityTypeOptions = [
   { label: 'Interest', value: 'INTEREST' },
 ];
 
-const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
 
 export const ActivityTable = ({
   accounts,
@@ -151,7 +151,7 @@ export const ActivityTable = ({
           const activityType = row.getValue('activityType') as string;
           const quantity = row.getValue('quantity') as number;
 
-          if (CASH_ACTIVITY_TYPES.includes(activityType) || activityType === 'SPLIT') {
+          if (isCashActivity(activityType) || isIncomeActivity(activityType) || activityType === 'SPLIT') {
             return <div className="pr-4 text-right">-</div>;
           }
 
@@ -173,14 +173,20 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activityType = row.getValue('activityType') as string;
           const unitPrice = row.getValue('unitPrice') as number;
+          const amount = row.original.amount as number;
           const currency = (row.getValue('currency') as string) || 'USD';
+          const assetSymbol = row.getValue('assetSymbol') as string;
 
-          if (activityType === 'SPLIT') {
-            return <div className="text-right">{unitPrice.toFixed(0)} : 1</div>;
-          }
           if (activityType === 'FEE') {
             return <div className="pr-4 text-right">-</div>;
           }
+          if (activityType === 'SPLIT') {
+            return <div className="text-right">{Number(amount).toFixed(0)} : 1</div>;
+          }
+          if (isCashActivity(activityType) || isCashTransfer(activityType, assetSymbol) || isIncomeActivity(activityType)) {
+            return <div className="text-right">{formatAmount(amount, currency)}</div>;
+          }
+
           return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },
@@ -212,23 +218,16 @@ export const ActivityTable = ({
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Value" />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType') as string;
-          const unitPrice = row.getValue('unitPrice') as number;
-          const quantity = row.getValue('quantity') as number;
-          const currency = (row.getValue('currency') as string) || 'USD';
-          const fee = row.getValue('fee') as number;
+          const activity = row.original;
+          const activityType = activity.activityType;
+          const currency = activity.currency || 'USD';
 
           if (activityType === 'SPLIT') {
             return <div className="pr-4 text-right">-</div>;
           }
 
-          if (activityType === 'FEE') {
-            return <div className="pr-4 text-right">{formatAmount(fee, currency)}</div>;
-          }
-
-          return (
-            <div className="pr-4 text-right">{formatAmount(unitPrice * quantity, currency)}</div>
-          );
+          const displayValue = calculateActivityValue(activity);
+          return <div className="pr-4 text-right">{formatAmount(displayValue, currency)}</div>;
         },
       },
       {

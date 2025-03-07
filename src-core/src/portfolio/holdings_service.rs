@@ -6,6 +6,7 @@ use crate::assets::AssetService;
 use crate::assets::Asset;
 use crate::errors::{ Error, Result, ValidationError};
 use crate::fx::FxService;
+use crate::market_data::MarketDataService;
 use crate::market_data::Quote;
 use crate::models::{ Holding, Performance};
 use crate::portfolio::transaction::get_transaction_handler;
@@ -80,6 +81,7 @@ pub struct HoldingsService {
     activity_service: ActivityService,
     asset_service: AssetService,
     fx_service: FxService,
+    market_data_service: MarketDataService,
     base_currency: String,
 }
 
@@ -188,12 +190,9 @@ impl Portfolio {
         for (_, account_holdings) in self.holdings.iter_mut() {
             for (_, holding) in account_holdings.iter_mut() {
                 // Update FX rates and converted values
-                let exchange_rate = BigDecimal::from_str(
-                    &fx_service
-                        .get_latest_exchange_rate(&holding.currency, &self.base_currency)
-                        .unwrap_or(1.0)
-                        .to_string(),
-                )?;
+                let exchange_rate = fx_service
+                    .get_latest_exchange_rate(&holding.currency, &self.base_currency)
+                    .unwrap_or(BigDecimal::from(1));
 
                 if holding.holding_type.to_uppercase() == "CASH" {
                     holding.market_value = holding.quantity.clone();
@@ -484,12 +483,14 @@ impl HoldingsService {
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
         let asset_service = AssetService::new(pool.clone()).await
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
-        
+        let market_data_service = MarketDataService::new(pool.clone()).await?;
+
         Ok(HoldingsService {
             account_service,
             activity_service,
             asset_service,
             fx_service,
+            market_data_service,
             base_currency,
         })
     }
@@ -533,7 +534,7 @@ impl HoldingsService {
         // Skip price update if no holdings
         if !holdings.is_empty() {
             // Update market prices
-            let quotes = self.load_quotes(&holdings)?;
+            let quotes = self.market_data_service.get_latest_quotes_for_symbols(&holdings.iter().map(|h| h.symbol.clone()).collect::<Vec<_>>())?;
             portfolio.update_market_prices(&quotes, &self.fx_service)?;
         }
 
@@ -576,27 +577,4 @@ impl HoldingsService {
             .ok_or_else(|| Error::from(AssetError::NotFound(activity.asset_id.clone())))
     }
 
-    fn load_quotes(
-        &self,
-        holdings: &[Holding],
-    ) -> Result<HashMap<String, Quote>> {
-        // Collect unique symbols and filter out cash positions
-        let asset_ids: HashSet<String> = holdings
-            .iter()
-            .filter(|h| h.holding_type != "CASH")
-            .map(|h| h.symbol.clone())
-            .collect();
-
-        if asset_ids.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        let quotes = self
-            .asset_service
-            .get_latest_quotes(&asset_ids.into_iter().collect::<Vec<_>>())?
-            .into_iter()
-            .map(|q| (q.symbol.clone(), q))
-            .collect::<HashMap<String, Quote>>();
-        Ok(quotes)
-    }
 }

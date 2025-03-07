@@ -45,7 +45,7 @@ fn test_basic_holding_calculations() {
         classes: None,
         attributes: None,
         url: None,
-        comment: None,
+        notes: None,
         created_at: chrono::Utc::now().naive_utc(),
         updated_at: chrono::Utc::now().naive_utc(),
     };

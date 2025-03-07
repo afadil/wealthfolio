@@ -2,11 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import { createActivity, updateActivity, deleteActivity } from '@/commands/activity';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
-import { newActivitySchema } from '@/lib/schemas';
-import * as z from 'zod';
 import { QueryKeys } from '@/lib/query-keys';
 import { logger } from '@/adapters';
-type ActivityFormValues = z.infer<typeof newActivitySchema>;
+import { NewActivityFormValues } from '../components/forms/schemas';
 
 export function useActivityMutations(onSuccess?: () => void) {
   const queryClient = useQueryClient();
@@ -48,7 +46,7 @@ export function useActivityMutations(onSuccess?: () => void) {
     ...createMutationOptions('deleting'),
   });
 
-  const submitActivity = async (data: ActivityFormValues) => {
+  const submitActivity = async (data: NewActivityFormValues) => {
     const { id, ...rest } = data;
     if (id) {
       return await updateActivityMutation.mutateAsync({ id, ...rest });

@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { importActivitySchema, importMappingSchema, newActivitySchema } from '@/lib/schemas';
+import { importActivitySchema, importMappingSchema } from '@/lib/schemas';
 import {
   ActivityType,
   DataSource,
@@ -53,6 +53,7 @@ export interface ActivityDetails {
   date: Date;
   quantity: number;
   unitPrice: number;
+  amount: number;
   fee: number;
   currency: string;
   isDraft: boolean;
@@ -75,7 +76,21 @@ export type ActivitySearchResponse = {
   };
 };
 
-export type NewActivity = z.infer<typeof newActivitySchema>;
+export type ActivityCreate = {
+  accountId: string;
+  activityType: string;
+  activityDate: string | Date;
+  assetId?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  currency?: string;
+  fee?: number;
+  isDraft: boolean;
+  comment?: string | null;
+}
+
+export type ActivityUpdate = ActivityCreate & { id: string };
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
 
@@ -88,7 +103,7 @@ export interface AssetProfile {
   symbolMapping: string | null;
   assetClass: string | null;
   assetSubClass: string | null;
-  comment: string | null;
+  notes: string | null;
   countries: string | null;
   categories: string | null;
   classes: string | null;
@@ -189,7 +204,7 @@ export interface Asset {
   symbolMapping?: string | null;
   assetClass?: string | null;
   assetSubClass?: string | null;
-  comment?: string | null;
+  notes?: string | null;
   countries?: string | null;
   categories?: string | null;
   classes?: string | null;
@@ -370,7 +385,7 @@ export interface UpdateAssetProfile {
   symbol: string;
   sectors: string;
   countries: string;
-  comment: string;
+  notes: string;
   assetClass: string;
   assetSubClass: string;
 }

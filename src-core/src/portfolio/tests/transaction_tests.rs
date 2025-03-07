@@ -46,7 +46,7 @@ fn create_test_asset() -> Asset {
         symbol_mapping: None,
         asset_class: Some("Equity".to_string()),
         asset_sub_class: Some("Stock".to_string()),
-        comment: None,
+        notes: None,
         countries: None,
         categories: None,
         classes: None,

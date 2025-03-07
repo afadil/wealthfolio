@@ -109,6 +109,8 @@ export const ActivityType = {
   INTEREST: 'INTEREST',
   DEPOSIT: 'DEPOSIT',
   WITHDRAWAL: 'WITHDRAWAL',
+  ADD_HOLDING: 'ADD_HOLDING',
+  REMOVE_HOLDING: 'REMOVE_HOLDING',
   TRANSFER_IN: 'TRANSFER_IN',
   TRANSFER_OUT: 'TRANSFER_OUT',
   CONVERSION_IN: 'CONVERSION_IN',
@@ -124,8 +126,8 @@ export const TRADING_ACTIVITY_TYPES = [
   ActivityType.BUY,
   ActivityType.SELL,
   ActivityType.SPLIT,
-  ActivityType.TRANSFER_IN,
-  ActivityType.TRANSFER_OUT,
+  ActivityType.ADD_HOLDING,
+  ActivityType.REMOVE_HOLDING,
 ] as const;
 
 export const CASH_ACTIVITY_TYPES = [
@@ -133,6 +135,10 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.WITHDRAWAL,
   ActivityType.FEE,
   ActivityType.INTEREST,
+  ActivityType.TRANSFER_IN,
+  ActivityType.TRANSFER_OUT,
+  ActivityType.CONVERSION_IN,
+  ActivityType.CONVERSION_OUT,
 ] as const;
 
 export const INCOME_ACTIVITY_TYPES = [
@@ -150,6 +156,8 @@ export const activityTypeSchema = z.enum([
   ActivityType.WITHDRAWAL,
   ActivityType.TRANSFER_IN,
   ActivityType.TRANSFER_OUT,
+  ActivityType.ADD_HOLDING,
+  ActivityType.REMOVE_HOLDING,
   ActivityType.CONVERSION_IN,
   ActivityType.CONVERSION_OUT,
   ActivityType.FEE,

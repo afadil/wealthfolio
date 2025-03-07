@@ -1,25 +1,28 @@
-use crate::schema::{accounts, activities};
-use chrono::NaiveDateTime;
-use diesel::prelude::*;
-use diesel::r2d2::{Pool, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
-use log::error;
-use std::collections::HashMap;
-use std::sync::Arc;
-use uuid::Uuid;
-
+use crate::activities::ActivityRepository;
 use crate::fx::fx_service::FxService;
 use crate::models::{AccountDeposit, ContributionLimit, DepositsCalculation, NewContributionLimit};
 use crate::schema::contribution_limits;
+use bigdecimal::BigDecimal;
+use chrono::NaiveDateTime;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sqlite::SqliteConnection;
+use log::error;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct ContributionLimitService {
     fx_service: FxService,
+    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
 }
 
 impl ContributionLimitService {
     pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
         ContributionLimitService {
-            fx_service: FxService::new(pool),
+            fx_service: FxService::new(pool.clone()),
+            pool,
         }
     }
 
@@ -90,56 +93,72 @@ impl ContributionLimitService {
         year: i32,
         base_currency: &str,
     ) -> Result<DepositsCalculation, diesel::result::Error> {
-        let start_date =
-            NaiveDateTime::parse_from_str(&format!("{}-01-01 00:00:00", year), "%Y-%m-%d %H:%M:%S")
-                .unwrap();
-        let end_date =
-            NaiveDateTime::parse_from_str(&format!("{}-12-31 23:59:59", year), "%Y-%m-%d %H:%M:%S")
-                .unwrap();
-
         // Initialize FX service before using it
         if let Err(e) = self.fx_service.initialize() {
             error!("Failed to initialize FX service: {:?}", e);
             // Continue execution as the FX service might still work with cached rates
         }
 
-        let deposits: Vec<(String, f64, f64, String)> = activities::table
-            .inner_join(accounts::table)
-            .filter(accounts::id.eq_any(account_ids))
-            .filter(accounts::is_active.eq(true))
-            .filter(activities::activity_type.eq("DEPOSIT"))
-            .filter(activities::activity_date.between(start_date, end_date))
-            .select((
-                activities::account_id,
-                activities::quantity,
-                activities::unit_price,
-                activities::currency,
-            ))
-            .load::<(String, f64, f64, String)>(conn)?;
+        let start_date =
+            NaiveDateTime::parse_from_str(&format!("{}-01-01 00:00:00", year), "%Y-%m-%d %H:%M:%S")
+                .unwrap();
 
-        let mut total_deposits = 0.0;
+        let end_date =
+            NaiveDateTime::parse_from_str(&format!("{}-12-31 23:59:59", year), "%Y-%m-%d %H:%M:%S")
+                .unwrap();
+
+        // Use the activity repository directly to get deposit activities
+        let repo = ActivityRepository::new(self.pool.clone());
+        let deposit_activities =
+            match repo.get_deposit_activities(conn, account_ids, start_date, end_date) {
+                Ok(activities) => activities,
+                Err(e) => {
+                    error!("Failed to get deposit activities: {:?}", e);
+                    return Err(diesel::result::Error::RollbackTransaction);
+                }
+            };
+
+        let mut total_deposits = BigDecimal::from(0);
         let mut deposits_by_account: HashMap<String, AccountDeposit> = HashMap::new();
 
-        for (account_id, quantity, unit_price, currency) in deposits {
+        for (account_id, quantity_str, unit_price_str, currency) in deposit_activities {
+            // Parse strings to f64 for calculations
+            let quantity = match quantity_str.parse::<f64>() {
+                Ok(val) => val,
+                Err(e) => {
+                    error!("Failed to parse quantity '{}': {}", quantity_str, e);
+                    continue;
+                }
+            };
+
+            let unit_price = match unit_price_str.parse::<f64>() {
+                Ok(val) => val,
+                Err(e) => {
+                    error!("Failed to parse unit_price '{}': {}", unit_price_str, e);
+                    continue;
+                }
+            };
+
             let amount = quantity * unit_price;
-            let converted_amount = self.fx_service
-                .convert_currency(amount, &currency, base_currency)
+
+            let converted_amount = self
+                .fx_service
+                .convert_currency(BigDecimal::from_str(&amount.to_string()).unwrap(), &currency, base_currency)
                 .unwrap_or_else(|e| {
                     error!("Currency conversion error: {:?}", e);
-                    amount // Use original amount if conversion fails
+                    BigDecimal::from_str(&amount.to_string()).unwrap() // Use original amount if conversion fails
                 });
 
-            total_deposits += converted_amount;
+            total_deposits += &converted_amount;
             deposits_by_account
-                .entry(account_id.clone())
+                .entry(account_id)
                 .and_modify(|e| {
-                    e.amount += amount;
-                    e.converted_amount += converted_amount;
+                    e.converted_amount += &converted_amount;
                 })
                 .or_insert(AccountDeposit {
-                    amount,
-                    currency: currency.clone(),
-                    converted_amount,
+                    amount: BigDecimal::from_str(&amount.to_string()).unwrap(),
+                    currency,
+                    converted_amount: converted_amount.clone(),
                 });
         }
 

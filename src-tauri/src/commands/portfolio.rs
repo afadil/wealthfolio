@@ -1,7 +1,6 @@
 use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
 use crate::AppState;
 
-use chrono::NaiveDate;
 use log::debug;
 use tauri::async_runtime::{block_on, spawn_blocking};
 use tauri::State;
@@ -123,25 +122,34 @@ pub async fn calculate_account_cumulative_returns(
     end_date: String,
     method: Option<String>,
 ) -> Result<CumulativeReturns, String> {
-    let base_currency = state.get_base_currency();
-    let pool = state.pool.clone();
 
-    let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid start date: {}", e))?;
-    let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid end date: {}", e))?;
+     Ok(CumulativeReturns {
+        id: "".to_string(),
+        cumulative_returns: vec![],
+        total_return: None,
+        annualized_return: None,
+     })
 
-    let return_method = match method.as_deref() {
-        Some("MWR") => ReturnMethod::MoneyWeighted,
-        _ => ReturnMethod::TimeWeighted,
-    };
+    // let base_currency = state.get_base_currency();
+    // let pool = state.pool.clone();
 
-    spawn_blocking_with_service(pool, base_currency, move |service| {
-        service
-            .calculate_account_cumulative_returns(&account_id, start, end, return_method)
-            .map_err(|e| e.to_string())
-    })
-    .await
+    // let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
+    //     .map_err(|e| format!("Invalid start date: {}", e))?;
+    // let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
+    //     .map_err(|e| format!("Invalid end date: {}", e))?;
+
+    // let return_method = match method.as_deref() {
+    //     Some("MWR") => ReturnMethod::MoneyWeighted,
+    //     _ => ReturnMethod::TimeWeighted,
+    // };
+
+    
+    // spawn_blocking_with_service(pool, base_currency, move |service| {
+    //     service
+    //         .calculate_account_cumulative_returns(&account_id, start, end, return_method)
+    //         .map_err(|e| e.to_string())
+    // })
+    // .await
 }
 
 #[tauri::command]
@@ -151,17 +159,25 @@ pub async fn calculate_symbol_cumulative_returns(
     start_date: String,
     end_date: String,
 ) -> Result<CumulativeReturns, String> {
-    let base_currency = state.get_base_currency();
-    let pool = state.pool.clone();
 
-    let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid start date: {}", e))?;
-    let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid end date: {}", e))?;
+    Ok(CumulativeReturns {
+        id: "".to_string(),
+        cumulative_returns: vec![],
+        total_return: None,
+        annualized_return: None,
+     })
 
-    let service = create_portfolio_service(pool, base_currency).await?;
-    service
-        .calculate_symbol_cumulative_returns(&symbol, start, end)
-        .await
-        .map_err(|e| e.to_string())
+    // let base_currency = state.get_base_currency();
+    // let pool = state.pool.clone();
+
+    // let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
+    //     .map_err(|e| format!("Invalid start date: {}", e))?;
+    // let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
+    //     .map_err(|e| format!("Invalid end date: {}", e))?;
+
+    // let service = create_portfolio_service(pool, base_currency).await?;
+    // service
+    //     .calculate_symbol_cumulative_returns(&symbol, start, end)
+    //     .await
+    //     .map_err(|e| e.to_string())
 }

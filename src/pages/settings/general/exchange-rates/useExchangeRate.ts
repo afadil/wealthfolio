@@ -27,6 +27,7 @@ export function useExchangeRates() {
     queryKey: [QueryKeys.EXCHANGE_RATES],
     queryFn: async () => {
       const rates = await getExchangeRates();
+      console.log('rates', rates);
       const processedRates = rates.map((rate) => ({
         ...rate,
         fromCurrencyName: getCurrencyName(rate.fromCurrency),

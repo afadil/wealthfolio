@@ -24,7 +24,7 @@ import AssetHistoryTable from './asset-history-table';
 interface AssetProfileFormData {
   sectors: Array<{ name: string; weight: number }>;
   countries: Array<{ code: string; weight: number }>;
-  comment: string;
+  notes: string;
   assetClass: string;
   assetSubClass: string;
   dataSource: DataSource;
@@ -62,7 +62,7 @@ export const AssetProfilePage = () => {
   const [formData, setFormData] = useState<AssetProfileFormData>({
     sectors: [],
     countries: [],
-    comment: '',
+    notes: '',
     assetClass: '',
     assetSubClass: '',
     dataSource: DataSource.MANUAL,
@@ -96,7 +96,7 @@ export const AssetProfilePage = () => {
       setFormData({
         sectors: JSON.parse(assetData.asset.sectors || '[]'),
         countries: JSON.parse(assetData.asset.countries || '[]'),
-        comment: assetData.asset.comment || '',
+        notes: assetData.asset.notes || '',
         assetSubClass: assetData.asset.assetSubClass || '',
         assetClass: assetData.asset.assetClass || '',
         dataSource: (assetData.asset.dataSource as DataSource) || DataSource.YAHOO,
@@ -153,7 +153,7 @@ export const AssetProfilePage = () => {
       symbol,
       sectors: JSON.stringify(formData.sectors),
       countries: JSON.stringify(formData.countries),
-      comment: formData.comment,
+      notes: formData.notes,
       assetSubClass: formData.assetSubClass,
       assetClass: formData.assetClass,
     });
@@ -166,7 +166,7 @@ export const AssetProfilePage = () => {
       setFormData({
         sectors: JSON.parse(assetData.asset.sectors || '[]'),
         countries: JSON.parse(assetData.asset.countries || '[]'),
-        comment: assetData.asset.comment || '',
+        notes: assetData.asset.notes || '',
         assetSubClass: assetData.asset.assetSubClass || '',
         assetClass: assetData.asset.assetClass || '',
         dataSource: (assetData.asset.dataSource as DataSource) || DataSource.YAHOO,
@@ -343,13 +343,13 @@ export const AssetProfilePage = () => {
               {isEditing ? (
                 <textarea
                   className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
-                  value={formData.comment}
+                  value={formData.notes}
                   placeholder="Symbol/Company description"
                   rows={6}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                 />
               ) : (
-                <p className="text-sm font-light text-muted-foreground">{formData.comment}</p>
+                <p className="text-sm font-light text-muted-foreground">{formData.notes}</p>
               )}
             </div>
           </div>

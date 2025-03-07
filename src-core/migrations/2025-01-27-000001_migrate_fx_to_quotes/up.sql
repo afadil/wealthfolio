@@ -5,7 +5,9 @@ SET
         WHEN length(e.id) >= 6 THEN substr(e.id, 1, 3) || '/' || substr(e.id, 4, 3) || ' Exchange Rate'
         ELSE e.id || ' Exchange Rate'
     END,
-    asset_type = 'CURRENCY',
+    asset_type = 'FOREX',
+    asset_class = 'FOREX',
+    asset_sub_class = 'FOREX',
     data_source = e.source,
     currency = CASE 
         WHEN length(e.id) >= 3 THEN substr(e.id, 1, 3)
@@ -38,7 +40,7 @@ SELECT
         WHEN length(id) >= 6 THEN substr(id, 1, 3) || '/' || substr(id, 4, 3) || ' Exchange Rate'
         ELSE id || ' Exchange Rate'
     END as name,
-    'CURRENCY' as asset_type,
+    'FOREX' as asset_type,
     source as data_source,
     CASE 
         WHEN length(id) >= 3 THEN substr(id, 1, 3)
@@ -94,4 +96,12 @@ CREATE INDEX IF NOT EXISTS idx_assets_type_currency ON assets(asset_type);
 
 
 -- Capitalize all asset types
-UPDATE assets SET asset_type = UPPER(asset_type);
+UPDATE assets SET asset_type = UPPER(asset_type), data_source = UPPER(data_source), symbol_mapping = symbol;
+UPDATE assets SET asset_type = 'CASH' WHERE asset_class = 'CASH';
+UPDATE assets SET asset_type = 'FOREX' WHERE asset_type = 'CURRENCY';
+UPDATE assets SET asset_class = 'FOREX', asset_sub_class = 'FOREX' WHERE asset_type = 'FOREX';
+-- Update the countries JSON field to rename "code" to "name"
+UPDATE assets 
+SET countries = REPLACE(countries, '"code":', '"name":')
+WHERE countries IS NOT NULL;
+
