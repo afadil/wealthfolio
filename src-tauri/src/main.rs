@@ -4,30 +4,7 @@
 mod commands;
 mod menu;
 mod updater;
-use commands::account::{create_account, delete_account, get_accounts, update_account};
-use commands::activity::{
-    check_activities_import, create_activities, create_activity, delete_activity,
-    get_account_import_mapping, get_activities, save_account_import_mapping, search_activities,
-    update_activity,
-};
-use commands::goal::{
-    create_goal, delete_goal, get_goals, load_goals_allocations, update_goal,
-    update_goal_allocations,
-};
-use commands::market_data::{
-    delete_quote, get_asset_data, refresh_quotes_for_symbols, search_symbol, synch_quotes,
-    update_asset_data_source, update_asset_profile, update_quote,
-};
-use commands::portfolio::{
-    calculate_account_cumulative_returns, calculate_historical_data,
-    calculate_symbol_cumulative_returns, compute_holdings, get_accounts_summary,
-    get_income_summary, get_portfolio_history, recalculate_portfolio,
-};
-use commands::settings::{
-    add_exchange_rate, calculate_deposits_for_accounts, create_contribution_limit,
-    delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,
-    update_exchange_rate, get_settings, update_contribution_limit, update_settings,
-};
+
 
 use log::error;
 use updater::check_for_update;
@@ -42,9 +19,6 @@ use wealthfolio_core::settings;
 
 use dotenvy::dotenv;
 use std::env;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use diesel::r2d2::{self, ConnectionManager};
@@ -136,53 +110,53 @@ pub fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_accounts,
-            create_account,
-            update_account,
-            delete_account,
-            search_activities,
-            get_activities,
-            create_activity,
-            update_activity,
-            delete_activity,
-            search_symbol,
-            check_activities_import,
-            create_activities,
-            calculate_historical_data,
-            compute_holdings,
-            get_asset_data,
-            synch_quotes,
-            get_settings,
-            update_settings,
-            get_exchange_rates,
-            update_exchange_rate,
-            add_exchange_rate,
-            delete_exchange_rate,
-            update_asset_profile,
-            update_asset_data_source,
-            create_goal,
-            update_goal,
-            delete_goal,
-            get_goals,
-            update_goal_allocations,
-            load_goals_allocations,
-            get_income_summary,
-            get_portfolio_history,
-            get_accounts_summary,
-            recalculate_portfolio,
-            calculate_account_cumulative_returns,
-            calculate_symbol_cumulative_returns,
-            backup_database,
-            get_contribution_limits,
-            create_contribution_limit,
-            update_contribution_limit,
-            delete_contribution_limit,
-            calculate_deposits_for_accounts,
-            get_account_import_mapping,
-            save_account_import_mapping,
-            refresh_quotes_for_symbols,
-            update_quote,
-            delete_quote,
+            commands::account::get_accounts,
+            commands::account::create_account,
+            commands::account::update_account,
+            commands::account::delete_account,
+            commands::activity::search_activities,
+            commands::activity::get_activities,
+            commands::activity::create_activity,
+            commands::activity::update_activity,
+            commands::activity::delete_activity,
+            commands::activity::check_activities_import,
+            commands::activity::create_activities,
+            commands::activity::get_account_import_mapping,
+            commands::activity::save_account_import_mapping,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::settings::get_exchange_rates,
+            commands::settings::update_exchange_rate,
+            commands::settings::add_exchange_rate,
+            commands::settings::delete_exchange_rate,
+            commands::goal::create_goal,
+            commands::goal::update_goal,
+            commands::goal::delete_goal,
+            commands::goal::get_goals,
+            commands::goal::update_goal_allocations,
+            commands::goal::load_goals_allocations,
+            commands::portfolio::calculate_historical_data,
+            commands::portfolio::compute_holdings,
+            commands::portfolio::get_income_summary,
+            commands::portfolio::get_portfolio_history,
+            commands::portfolio::get_accounts_summary,
+            commands::portfolio::recalculate_portfolio,
+            commands::portfolio::calculate_account_cumulative_returns,
+            commands::portfolio::calculate_symbol_cumulative_returns,
+            commands::settings::get_contribution_limits,
+            commands::settings::create_contribution_limit,
+            commands::settings::update_contribution_limit,
+            commands::settings::delete_contribution_limit,
+            commands::settings::calculate_deposits_for_accounts,
+            commands::utilities::backup_database,
+            commands::asset::get_asset_data,
+            commands::asset::update_asset_profile,
+            commands::asset::update_asset_data_source,
+            commands::market_data::search_symbol,
+            commands::market_data::synch_quotes,
+            commands::market_data::refresh_quotes_for_symbols,
+            commands::market_data::update_quote,
+            commands::market_data::delete_quote,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
@@ -227,31 +201,3 @@ fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
     });
 }
 
-#[tauri::command]
-async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {
-    let app_data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .expect("failed to get app data dir")
-        .to_str()
-        .expect("failed to convert path to string")
-        .to_string();
-
-    let backup_path = db::backup_database(&app_data_dir).map_err(|e| e.to_string())?;
-
-    // Read the backup file
-    let mut file =
-        File::open(&backup_path).map_err(|e| format!("Failed to open backup file: {}", e))?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .map_err(|e| format!("Failed to read backup file: {}", e))?;
-
-    // Get the filename
-    let filename = Path::new(&backup_path)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| "Failed to get backup filename".to_string())?
-        .to_string();
-
-    Ok((filename, buffer))
-}

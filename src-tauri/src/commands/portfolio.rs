@@ -1,15 +1,21 @@
+// Project imports
 use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
 use crate::AppState;
 
+// External imports
 use log::debug;
-use tauri::async_runtime::{block_on, spawn_blocking};
 use tauri::State;
-use wealthfolio_core::models::CumulativeReturns;
-use wealthfolio_core::portfolio::portfolio_service::{PortfolioService, ReturnMethod};
-
+use tauri::async_runtime::{block_on, spawn_blocking};
 use std::sync::Arc;
 use diesel::SqliteConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
+use std::collections::HashMap;
+use serde_json;
+use chrono::Utc;
+
+// Wealthfolio core imports
+use wealthfolio_core::models::CumulativeReturns;
+use wealthfolio_core::portfolio::portfolio_service::{PortfolioService, ReturnMethod};
 
 async fn create_portfolio_service(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, base_currency: String) -> Result<PortfolioService, String> {
     PortfolioService::new(pool, base_currency)
@@ -181,3 +187,5 @@ pub async fn calculate_symbol_cumulative_returns(
     //     .await
     //     .map_err(|e| e.to_string())
 }
+
+

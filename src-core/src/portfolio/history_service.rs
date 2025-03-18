@@ -604,7 +604,7 @@ impl HistoryService {
         // Parse the activity type string to enum
         let activity_type = match ActivityType::from_str(&activity.activity_type) {
             Ok(t) => t,
-            Err(e) => {
+            Err(_e) => {
                 warn!("Unknown activity type: {} for activity ID: {}, skipping processing", 
                       activity.activity_type, activity.id);
                 return;

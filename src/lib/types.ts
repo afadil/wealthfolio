@@ -189,7 +189,7 @@ export interface Holding {
   ];
   countries?: [
     {
-      code: string;
+      name: string;
       weight: number;
     },
   ];

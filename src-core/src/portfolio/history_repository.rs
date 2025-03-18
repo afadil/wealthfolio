@@ -6,7 +6,6 @@ use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::SqliteConnection;
 use diesel::connection::Connection;
 use diesel::result::Error as DieselError;
-use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
 

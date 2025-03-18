@@ -69,13 +69,13 @@ const dataTypes = {
     {
       key: 'goals',
       name: 'Goals',
-      icon: Icons.Goal,
+      icon: Icons.Goals,
       description: 'Financial objectives and progress tracking',
     },
     {
       key: 'portfolio-history',
       name: 'Portfolio History',
-      icon: Icons.ScrollText,
+      icon: Icons.Files,
       description:
         "Your portfolio's performance over time, including valuations, gains, and cash flow activities.",
     },

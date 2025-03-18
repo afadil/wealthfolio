@@ -16,11 +16,11 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
     holdings.forEach((holding) => {
       if (holding.countries && holding.countries.length > 0) {
         holding.countries.forEach((country) => {
-          const currentValue = countryMap.get(country.code) || 0;
+          const currentValue = countryMap.get(country.name) || 0;
           const weightedValue =
             holding.marketValueConverted *
             (country.weight > 1 ? country.weight / 100 : country.weight);
-          countryMap.set(country.code, currentValue + weightedValue);
+          countryMap.set(country.name, currentValue + weightedValue);
         });
       }
     });

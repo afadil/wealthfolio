@@ -79,7 +79,6 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
-            // .filter(assets::asset_type.ne("Currency"))
             .load::<AssetDB>(&mut conn)?;
 
         Ok(results.into_iter().map(Asset::from).collect())
@@ -90,7 +89,7 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
-            .filter(assets::asset_type.eq("Currency"))
+            .filter(assets::asset_type.eq("CASH"))
             .filter(assets::symbol.like(format!("{}%", base_currency)))
             .load::<AssetDB>(&mut conn)?;
 

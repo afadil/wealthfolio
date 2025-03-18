@@ -11,6 +11,22 @@ SET
     unit_price = 0
 WHERE activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX', 'SPLIT');
 
+UPDATE activities 
+SET 
+    amount = unit_price * quantity,
+    quantity = 0,
+    unit_price = 0
+WHERE activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT') AND asset_id LIKE '$CASH-%';
+
+-- Update TRANSFER_IN to ADD_HOLDING and TRANSFER_OUT to REMOVE_HOLDING for non-cash assets
+UPDATE activities
+SET activity_type = 'ADD_HOLDING'
+WHERE activity_type = 'TRANSFER_IN' AND asset_id NOT LIKE '$CASH-%';
+
+UPDATE activities
+SET activity_type = 'REMOVE_HOLDING'
+WHERE activity_type = 'TRANSFER_OUT' AND asset_id NOT LIKE '$CASH-%';
+
 -- Rename comment column to notes in assets table
 ALTER TABLE assets RENAME COLUMN comment TO notes;
 

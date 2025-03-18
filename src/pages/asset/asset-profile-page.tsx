@@ -23,7 +23,7 @@ import AssetHistoryTable from './asset-history-table';
 
 interface AssetProfileFormData {
   sectors: Array<{ name: string; weight: number }>;
-  countries: Array<{ code: string; weight: number }>;
+  countries: Array<{ name: string; weight: number }>;
   notes: string;
   assetClass: string;
   assetSubClass: string;
@@ -292,14 +292,14 @@ export const AssetProfilePage = () => {
                 <InputTags
                   placeholder="country:weight"
                   value={formData.countries.map(
-                    (c) => `${c.code}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
+                    (c) => `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
                   )}
                   onChange={(values) =>
                     setFormData((prev) => ({
                       ...prev,
                       countries: (values as string[]).map((value) => {
-                        const [code, weight] = value.split(':');
-                        return { code, weight: parseFloat(weight) || 0 };
+                        const [name, weight] = value.split(':');
+                        return { name, weight: parseFloat(weight) || 0 };
                       }),
                     }))
                   }
@@ -308,11 +308,11 @@ export const AssetProfilePage = () => {
                 formData.countries.map((country) => (
                   <Badge
                     variant="secondary"
-                    key={country.code}
+                    key={country.name}
                     className="bg-purple-100 uppercase dark:text-primary-foreground"
-                    title={`${country.code}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
+                    title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
                   >
-                    {country.code}
+                    {country.name}
                   </Badge>
                 ))
               )}

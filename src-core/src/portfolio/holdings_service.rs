@@ -1,5 +1,4 @@
 use crate::accounts::Account;
-use crate::accounts::AccountService;
 use crate::activities::ActivityService;
 use crate::assets::AssetError;
 use crate::assets::AssetService;
@@ -15,13 +14,13 @@ use bigdecimal::BigDecimal;
 use diesel::SqliteConnection;
 use diesel::r2d2::{Pool, ConnectionManager};
 use log::error;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
 const ROUNDING_SCALE: i64 = 6;
 const PORTFOLIO_PERCENT_SCALE: i64 = 2;
-const QUANTITY_THRESHOLD: &str = "0.000001";
+const QUANTITY_THRESHOLD: &str = "0.0000001";
 const PORTFOLIO_ACCOUNT_ID: &str = "PORTFOLIO";
 
 impl Holding {
@@ -77,7 +76,6 @@ pub struct Portfolio {
 }
 
 pub struct HoldingsService {
-    account_service: AccountService,
     activity_service: ActivityService,
     asset_service: AssetService,
     fx_service: FxService,
@@ -157,7 +155,7 @@ impl Portfolio {
                 asset_class: asset.asset_class.clone(),
                 asset_sub_class: asset.asset_sub_class.clone(),
                 asset_data_source: Some(asset.data_source.clone()),
-                sectors: asset
+                 sectors: asset
                     .sectors
                     .clone()
                     .and_then(|s| serde_json::from_str(&s).ok()),
@@ -478,7 +476,6 @@ impl Portfolio {
 impl HoldingsService {
      pub async fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, base_currency: String) -> Result<Self> {
         let fx_service = FxService::new(pool.clone());
-        let account_service = AccountService::new(pool.clone(), base_currency.clone());
         let activity_service = ActivityService::new(pool.clone(), base_currency.clone()).await
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?;
         let asset_service = AssetService::new(pool.clone()).await
@@ -486,7 +483,6 @@ impl HoldingsService {
         let market_data_service = MarketDataService::new(pool.clone()).await?;
 
         Ok(HoldingsService {
-            account_service,
             activity_service,
             asset_service,
             fx_service,
@@ -498,7 +494,9 @@ impl HoldingsService {
     /// Computes all holdings including totals
     pub async fn compute_holdings(&self) -> Result<Vec<Holding>> {
     
-        let (_accounts, activities, assets) = self.load_required_data()?;
+        // Load data
+        let activities = self.activity_service.get_activities()?;
+        let assets = self.asset_service.get_assets()?;
 
         // Create lookup maps for better performance
         let assets_map: HashMap<_, _> = assets.iter().map(|a| (&a.id, a)).collect();
@@ -519,8 +517,6 @@ impl HoldingsService {
                         continue;
                     }
                 };
-
-            
 
                 if let Err(e) = portfolio.process_activity(activity, asset) {
                     error!("Error processing activity: {}", e);
@@ -548,23 +544,6 @@ impl HoldingsService {
         Ok(final_holdings)
     }
 
-    fn load_required_data(
-        &self
-    ) -> Result<(Vec<Account>, Vec<Activity>, Vec<Asset>)> {
-        // Load data in parallel using rayon
-        let accounts = self.account_service.get_active_accounts()?;
-        let activities = self.activity_service.get_activities()?;
-        let assets = self.asset_service.get_assets()?;
-
-        // Pre-validate data
-        if accounts.is_empty() {
-            return Err(Error::Validation(ValidationError::MissingField(
-                "No active accounts found".to_string(),
-            )));
-        }
-
-        Ok((accounts, activities, assets))
-    }
 
     fn get_asset_for_activity<'a>(
         &self,

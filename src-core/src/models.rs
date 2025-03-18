@@ -113,16 +113,14 @@ impl Default for Performance {
 #[serde(rename_all = "camelCase")]
 pub struct Sector {
     pub name: String,
-    #[serde(with = "bigdecimal_serde")]
-    pub weight: BigDecimal,
+    pub weight: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Country {
-    pub code: String,
-    #[serde(with = "bigdecimal_serde")]
-    pub weight: BigDecimal,
+    pub name: String,
+    pub weight: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

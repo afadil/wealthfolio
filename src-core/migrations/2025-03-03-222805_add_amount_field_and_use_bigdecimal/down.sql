@@ -1,5 +1,14 @@
 -- This file should undo anything in `up.sql`
 
+-- Revert ADD_HOLDING back to TRANSFER_IN and REMOVE_HOLDING back to TRANSFER_OUT for non-cash assets
+UPDATE activities
+SET activity_type = 'TRANSFER_IN'
+WHERE activity_type = 'ADD_HOLDING' AND asset_id NOT LIKE '$CASH-%';
+
+UPDATE activities
+SET activity_type = 'TRANSFER_OUT'
+WHERE activity_type = 'REMOVE_HOLDING' AND asset_id NOT LIKE '$CASH-%';
+
 -- Rename notes column back to comment in assets table
 ALTER TABLE assets RENAME COLUMN notes TO comment;
 
@@ -30,11 +39,13 @@ INSERT INTO activities_old (
 SELECT 
     id, account_id, asset_id, activity_type, activity_date,
     CASE 
-        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX', 'SPLIT') THEN 1.0
+        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX', 'SPLIT') 
+             OR (activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT') AND asset_id LIKE '$CASH-%') THEN 1.0
         ELSE CAST(quantity AS DOUBLE)
     END as quantity,
     CASE 
-        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX', 'SPLIT') THEN 
+        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX', 'SPLIT')
+             OR (activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT') AND asset_id LIKE '$CASH-%') THEN 
             CASE 
                 WHEN amount IS NULL THEN 0.0
                 ELSE CAST(amount AS DOUBLE)

@@ -8,7 +8,7 @@ use crate::market_data::{Quote as ModelQuote, QuoteSummary};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::debug;
 use num_traits::FromPrimitive;
 use reqwest::{header, Client};
 use serde_json::json;
