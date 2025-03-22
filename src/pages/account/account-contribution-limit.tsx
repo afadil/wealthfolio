@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getContributionLimit, calculateDepositsForAccounts } from '@/commands/contribution-limits';
+import { calculateDepositsForLimit, getContributionLimit } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
 import { ContributionLimit, DepositsCalculation } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -19,19 +19,13 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
     queryFn: getContributionLimit,
   });
 
-  const limitsForAccount =
-    allLimits?.filter(
-      (limit) => limit.accountIds?.includes(accountId) && limit.contributionYear === currentYear,
-    ) || [];
-
-  const accountIdsToQuery =
-    limitsForAccount.length > 0
-      ? limitsForAccount.flatMap((limit) => limit.accountIds?.split(',') || [])
-      : [accountId];
+  const limitForAccount = allLimits?.find(
+    (limit) => limit.accountIds?.includes(accountId) && limit.contributionYear === currentYear,
+  );
 
   const { data: deposits, isLoading: isDepositsLoading } = useQuery<DepositsCalculation, Error>({
-    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountIdsToQuery, currentYear],
-    queryFn: () => calculateDepositsForAccounts(accountIdsToQuery, currentYear),
+    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountId, currentYear],
+    queryFn: () => calculateDepositsForLimit(limitForAccount?.id || ''),
     enabled: !isLimitsLoading,
   });
 
@@ -39,14 +33,9 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
     return <AccountContributionLimit.Skeleton />;
   }
 
-  const accountLimits =
-    allLimits?.filter(
-      (limit) => limit.accountIds?.includes(accountId) && limit.contributionYear === currentYear,
-    ) || [];
-
   const accountDeposit = deposits?.byAccount[accountId];
 
-  if (accountLimits.length === 0) {
+  if (!limitForAccount) {
     return (
       <Card className="border-none bg-indigo-100 p-6 shadow-sm dark:border-primary/20 dark:bg-primary/20">
         <div className="flex items-center justify-between text-sm">
@@ -67,15 +56,13 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   return (
     <div className="space-y-4">
-      {accountLimits.map((limit) => (
-        <AccountContributionLimitItem
-          key={limit.id}
-          limit={limit}
-          deposit={accountDeposit}
-          totalDeposits={deposits?.total || 0}
-          baseCurrency={deposits?.baseCurrency || 'USD'}
-        />
-      ))}
+      <AccountContributionLimitItem
+        key={limitForAccount.id}
+        limit={limitForAccount}
+        deposit={accountDeposit}
+        totalDeposits={deposits?.total || 0}
+        baseCurrency={deposits?.baseCurrency || 'USD'}
+      />
     </div>
   );
 }

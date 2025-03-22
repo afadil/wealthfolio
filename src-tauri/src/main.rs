@@ -147,7 +147,7 @@ pub fn main() {
             commands::settings::create_contribution_limit,
             commands::settings::update_contribution_limit,
             commands::settings::delete_contribution_limit,
-            commands::settings::calculate_deposits_for_accounts,
+            commands::settings::calculate_deposits_for_contribution_limit,
             commands::utilities::backup_database,
             commands::asset::get_asset_data,
             commands::asset::update_asset_profile,

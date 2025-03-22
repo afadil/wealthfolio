@@ -83,6 +83,8 @@ diesel::table! {
         contribution_year -> Integer,
         limit_amount -> Double,
         account_ids -> Nullable<Text>,
+        start_date -> Nullable<Timestamp>,
+        end_date -> Nullable<Timestamp>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
     }

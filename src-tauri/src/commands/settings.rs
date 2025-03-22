@@ -157,17 +157,18 @@ pub async fn delete_contribution_limit(
         .map_err(|e| format!("Failed to delete contribution limit: {}", e))
 }
 
+
 #[tauri::command]
-pub async fn calculate_deposits_for_accounts(
-    account_ids: Vec<String>,
-    year: i32,
+pub async fn calculate_deposits_for_contribution_limit(
+    limit_id: String,
     state: State<'_, AppState>,
 ) -> Result<DepositsCalculation, String> {
-    debug!("Calculating deposits for accounts...");
+    debug!("Calculating deposits for contribution limit...");
     let mut conn = get_connection(&state)?;
     let service = ContributionLimitService::new(state.pool.clone());
     let base_currency = state.get_base_currency();
     service
-        .calculate_deposits_for_accounts(&mut conn, &account_ids, year, &base_currency)
-        .map_err(|e| format!("Failed to calculate deposits for accounts: {}", e))
+        .calculate_deposits_for_contribution_limit(&mut conn, &limit_id, &base_currency)
+        .map_err(|e| format!("Failed to calculate deposits for contribution limit: {}", e))
 }
+

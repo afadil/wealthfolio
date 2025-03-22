@@ -412,7 +412,7 @@ impl ActivityRepository {
         account_ids: &[String],
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
-    ) -> Result<Vec<(String, String, String, String)>> {
+    ) -> Result<Vec<(String, String, String, String, Option<String>)>> {
         // Use a proper join with explicit ON condition
         let results = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
@@ -425,8 +425,9 @@ impl ActivityRepository {
                 activities::quantity,
                 activities::unit_price,
                 activities::currency,
+                activities::amount,
             ))
-            .load::<(String, String, String, String)>(conn)
+            .load::<(String, String, String, String, Option<String>)>(conn)
             .map_err(ActivityError::from)?;
 
         Ok(results)

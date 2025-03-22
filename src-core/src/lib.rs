@@ -12,6 +12,5 @@ pub mod models;
 pub mod portfolio;
 pub mod schema;
 pub mod settings;
-
 pub use portfolio::*;
 pub use activities::*;

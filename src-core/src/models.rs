@@ -513,7 +513,9 @@ pub struct ContributionLimit {
     pub group_name: String,
     pub contribution_year: i32,
     pub limit_amount: f64,
-    pub account_ids: Option<String>, // New field to store account IDs
+    pub account_ids: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
 }
@@ -526,7 +528,9 @@ pub struct NewContributionLimit {
     pub group_name: String,
     pub contribution_year: i32,
     pub limit_amount: f64,
-    pub account_ids: Option<String>, // New field to store account IDs
+    pub account_ids: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
 }
 
 #[derive(Serialize, Debug)]

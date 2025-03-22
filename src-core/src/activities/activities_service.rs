@@ -1,6 +1,6 @@
 use diesel::r2d2::{Pool, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use log::{debug, error, info};
+use log::{error, info};
 use chrono::Utc;
 use std::sync::Arc;
 
