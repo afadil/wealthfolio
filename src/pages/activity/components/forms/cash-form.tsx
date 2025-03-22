@@ -17,6 +17,8 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const cashTypes: ActivityTypeUI[] = [
     { value: 'DEPOSIT', label: 'Deposit', icon: 'ArrowDown' },
     { value: 'WITHDRAWAL', label: 'Withdrawal', icon: 'ArrowUp' },
+    { value: 'TRANSFER_IN', label: 'Transfer In', icon: 'ArrowDown' },
+    { value: 'TRANSFER_OUT', label: 'Transfer Out', icon: 'ArrowUp' },
   ];
 
   return (

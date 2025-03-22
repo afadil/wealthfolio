@@ -14,20 +14,17 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
 
   const otherTypes: ActivityTypeUI[] = [
     { value: 'SPLIT', label: 'Split', icon: 'Split' },
-    { value: 'TRANSFER_IN', label: 'Transfer In', icon: 'ArrowLeftRight' },
-    { value: 'TRANSFER_OUT', label: 'Transfer Out', icon: 'ArrowRightLeft' },
     { value: 'FEE', label: 'Fee', icon: 'Receipt' },
   ];
 
   const shouldShowSymbolLookup = activityType !== 'FEE';
   const isSplitType = activityType === 'SPLIT';
-  const isTransferType = activityType === 'TRANSFER_IN' || activityType === 'TRANSFER_OUT';
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <ActivityTypeSelector control={control} types={otherTypes} columns={4} />
+          <ActivityTypeSelector control={control} types={otherTypes} columns={2} />
         </div>
       </div>
       <Card>
@@ -50,35 +47,6 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
                 </FormItem>
               )}
             />
-          ) : isTransferType ? (
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <MoneyInput {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={control}
-                name="fee"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fee</FormLabel>
-                    <FormControl>
-                      <MoneyInput {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           ) : (
             <>
               <FormField

@@ -33,6 +33,23 @@ export default function DatePickerInput({ onChange, value, disabled }: DatePicke
     return undefined;
   });
 
+  // Sync internal state with external value changes
+  React.useEffect(() => {
+    if (value instanceof Date && isValid(value)) {
+      setDate(value);
+      setInputValue(format(value, 'y-MM-dd'));
+    } else if (typeof value === 'string') {
+      const parsedDate = parse(value, 'y-MM-dd', new Date());
+      if (isValid(parsedDate)) {
+        setDate(parsedDate);
+        setInputValue(format(parsedDate, 'y-MM-dd'));
+      }
+    } else if (value === undefined) {
+      setDate(undefined);
+      setInputValue('');
+    }
+  }, [value]);
+
   const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     setInputValue(e.currentTarget.value);
     const parsedDate = parse(e.currentTarget.value, 'y-MM-dd', new Date());

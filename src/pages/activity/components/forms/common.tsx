@@ -13,7 +13,7 @@ import { SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import DatePickerInput from '@/components/ui/data-picker-input';
+import DatePickerInput from '@/components/ui/date-picker-input';
 import TickerSearchInput from '@/components/ticker-search';
 import { DataSource } from '@/lib/constants';
 
@@ -127,7 +127,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
           <FormItem className="flex flex-col">
             <FormLabel>Date</FormLabel>
             <DatePickerInput
-              onChange={(date) => field.onChange(date)}
+              onChange={(date: Date | undefined) => field.onChange(date)}
               value={field.value}
               disabled={field.disabled}
             />

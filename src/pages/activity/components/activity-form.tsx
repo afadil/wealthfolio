@@ -47,8 +47,8 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   INTEREST: 'income',
   DIVIDEND: 'income',
   SPLIT: 'other',
-  TRANSFER_IN: 'other',
-  TRANSFER_OUT: 'other',
+  TRANSFER_IN: 'cash',
+  TRANSFER_OUT: 'cash',
   FEE: 'other',
   ADD_HOLDING: 'holdings',
   REMOVE_HOLDING: 'holdings',
@@ -101,11 +101,11 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const { id, ...submitData } = submissionData;
 
       // For cash activities and fees, set assetId to $CASH-accountCurrency and currency
-      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE'].includes(submitData.activityType)) {
+      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(submitData.activityType)) {
         const account = accounts.find((a) => a.value === submitData.accountId);
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
-          submitData.currency = account.currency;
+          submitData.currency = submitData.currency || account.currency;
         }
       }
 

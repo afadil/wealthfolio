@@ -216,4 +216,6 @@ export const newContributionLimitSchema = z.object({
     })
     .min(0, { message: 'Price must be a non-negative number.' }),
   accountIds: z.string().nullable().optional(),
+  startDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
+  endDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
 });
