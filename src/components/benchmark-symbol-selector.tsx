@@ -9,7 +9,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Check, ChevronsUpDown, PlusCircle } from 'lucide-react';
+import { Check, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BENCHMARKS = [
@@ -53,10 +53,15 @@ export function BenchmarkSymbolSelector({ onSelect }: BenchmarkSymbolSelectorPro
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="gap-2" size="sm">
+        <Button 
+          variant="outline" 
+          role="combobox" 
+          aria-expanded={open} 
+          className="gap-2 rounded-md h-8 px-3 py-1" 
+          size="sm"
+        >
           <PlusCircle className="h-4 w-4" />
           Add Benchmark
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0">

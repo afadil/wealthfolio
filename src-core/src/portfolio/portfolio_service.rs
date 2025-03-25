@@ -1,16 +1,16 @@
 use crate::accounts::AccountService;
 use crate::activities::ActivityService;
 use crate::assets::AssetService;
+use crate::errors::{Error, Result as ServiceResult, ValidationError};
 use crate::fx::fx_service::FxService;
 use crate::market_data::market_data_model::{DataSource, QuoteRequest};
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{
-    AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory,
-    PORTFOLIO_PERCENT_SCALE
+    AccountSummary, HistorySummary, Holding, IncomeSummary,
+    PortfolioHistory, PORTFOLIO_PERCENT_SCALE,
 };
-use crate::errors::{Error, Result, ValidationError};
 
-use diesel::r2d2::{Pool, ConnectionManager};
+use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::info;
 
@@ -20,23 +20,9 @@ use crate::portfolio::history_service::HistoryService;
 use crate::portfolio::holdings_service::HoldingsService;
 use crate::portfolio::income_service::IncomeService;
 
-
 use bigdecimal::BigDecimal;
-use std::str::FromStr;
 use num_traits::Zero;
-
-
-#[derive(Debug, Clone, Copy)]
-pub enum ReturnMethod {
-    TimeWeighted,
-    MoneyWeighted,
-}
-
-impl Default for ReturnMethod {
-    fn default() -> Self {
-        ReturnMethod::TimeWeighted
-    }
-}
+use std::str::FromStr;
 
 pub struct PortfolioService {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -50,24 +36,29 @@ pub struct PortfolioService {
 }
 
 impl PortfolioService {
-    pub async fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, base_currency: String) -> Result<Self> {
+    pub async fn new(
+        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        base_currency: String,
+    ) -> ServiceResult<Self> {
         let base_currency = base_currency.clone();
         // Initialize services that require async initialization first
         let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await?);
-        let activity_service = Arc::new(ActivityService::new(pool.clone(), base_currency.clone()).await?);
-        let holdings_service = Arc::new(HoldingsService::new(pool.clone(), base_currency.clone()).await?);
+        let activity_service =
+            Arc::new(ActivityService::new(pool.clone(), base_currency.clone()).await?);
+        let holdings_service =
+            Arc::new(HoldingsService::new(pool.clone(), base_currency.clone()).await?);
 
         // Initialize synchronous services
         let account_service = Arc::new(AccountService::new(pool.clone(), base_currency.clone()));
         let fx_service = FxService::new(pool.clone());
         let income_service = Arc::new(IncomeService::new(
-            Arc::new(fx_service),
+            Arc::new(fx_service.clone()),
             base_currency.clone(),
         ));
         let history_service = Arc::new(HistoryService::new(
             pool.clone(),
             base_currency.clone(),
-            FxService::new(pool.clone()),
+            fx_service,
             market_data_service.clone(),
         ));
         let assets_service = Arc::new(AssetService::new(pool.clone()).await?);
@@ -84,7 +75,7 @@ impl PortfolioService {
         })
     }
 
-    pub async fn compute_holdings(&self) -> Result<Vec<Holding>> {
+    pub async fn compute_holdings(&self) -> ServiceResult<Vec<Holding>> {
         self.holdings_service.compute_holdings().await
     }
 
@@ -92,11 +83,11 @@ impl PortfolioService {
         &self,
         account_ids: Option<Vec<String>>,
         force_full_calculation: bool,
-    ) -> Result<Vec<HistorySummary>> {
-
+    ) -> ServiceResult<Vec<HistorySummary>> {
         let assets = self.assets_service.get_assets()?;
         // First, sync quotes
-        let quote_requests: Vec<_> = assets.iter()
+        let quote_requests: Vec<_> = assets
+            .iter()
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
                 data_source: DataSource::from(asset.data_source.as_str()),
@@ -123,12 +114,14 @@ impl PortfolioService {
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
     }
 
-    pub fn get_income_summary(&self) -> Result<Vec<IncomeSummary>> {
+    pub fn get_income_summary(&self) -> ServiceResult<Vec<IncomeSummary>> {
         let mut conn = self.pool.get()?;
-        self.income_service.get_income_summary(&mut conn).map_err(Error::from)
+        self.income_service
+            .get_income_summary(&mut conn)
+            .map_err(Error::from)
     }
 
-    pub async fn update_portfolio(&self) -> Result<Vec<HistorySummary>> {
+    pub async fn update_portfolio(&self) -> ServiceResult<Vec<HistorySummary>> {
         use std::time::Instant;
         let start = Instant::now();
 
@@ -144,19 +137,22 @@ impl PortfolioService {
         result
     }
 
-    pub fn get_all_accounts_history(&self) -> Result<Vec<PortfolioHistory>> {
+    pub fn get_all_accounts_history(&self) -> ServiceResult<Vec<PortfolioHistory>> {
         self.history_service
             .get_all_accounts_history()
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
     }
 
-    pub fn get_portfolio_history(&self, account_id: Option<&str>) -> Result<Vec<PortfolioHistory>> {
+    pub fn get_portfolio_history(
+        &self,
+        account_id: Option<&str>,
+    ) -> ServiceResult<Vec<PortfolioHistory>> {
         self.history_service
             .get_portfolio_history(account_id)
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
     }
 
-    pub fn get_accounts_summary(&self) -> Result<Vec<AccountSummary>> {
+    pub fn get_accounts_summary(&self) -> ServiceResult<Vec<AccountSummary>> {
         let accounts = self.account_service.get_active_accounts()?;
         let mut account_summaries = Vec::new();
 
@@ -169,10 +165,7 @@ impl PortfolioService {
 
         // Then, calculate the allocation percentage for each account
         for account in accounts {
-            if let Ok(history) = self
-                .history_service
-                .get_latest_account_history(&account.id)
-            {
+            if let Ok(history) = self.history_service.get_latest_account_history(&account.id) {
                 let allocation_percentage = if total_portfolio_value > BigDecimal::zero() {
                     let hundred = BigDecimal::from_str("100").unwrap();
                     ((&history.market_value / &total_portfolio_value) * hundred)
@@ -194,5 +187,5 @@ impl PortfolioService {
         Ok(account_summaries)
     }
 
-
+   
 }

@@ -28,7 +28,9 @@ r2d2 = "0.8"
 dashmap = "6.1"
 async-trait = "0.1"
 bigdecimal = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.37", features = ["maths"] }
 num-traits = "0.2"
+rust_decimal_macros = "1.37"
 log = "0.4"
 futures = "0.3"
 

@@ -1,67 +1,72 @@
-import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { DateRange } from 'react-day-picker';
-import {
-  calculateAccountCumulativeReturns,
-  calculateSymbolCumulativeReturns,
-} from '@/commands/portfolio';
+import { useQueries } from '@tanstack/react-query';
+import { calculateCumulativeReturns } from '@/commands/portfolio';
 
-export type ReturnMethod = 'TWR' | 'MWR';
+type ComparisonItem = {
+  id: string;
+  type: 'account' | 'symbol';
+  name: string;
+};
 
-interface UsePerformanceDataProps {
-  selectedItems: Array<{
-    id: string;
-    type: 'account' | 'symbol';
-    name: string;
-  }>;
-  dateRange: DateRange | undefined;
-  returnMethod: ReturnMethod;
-}
-
-export function usePerformanceData({
+/**
+ * Hook to calculate cumulative returns for a list of comparison items.
+ * 
+ * @param selectedItems List of comparison items to calculate cumulative returns for.
+ * @param startDate Start date for the calculation period.
+ * @param endDate End date for the calculation period.
+ * 
+ * @returns An object containing the calculated cumulative returns data, 
+ *          a boolean indicating whether the data is loading, 
+ *          a boolean indicating whether there are any errors, 
+ *          an array of error messages, and 
+ *          an array of query objects.
+ */
+export function useCalculateCumulativeReturns({
   selectedItems,
-  dateRange,
-  returnMethod,
-}: UsePerformanceDataProps) {
-  return useQuery({
-    queryKey: ['performance', selectedItems, dateRange, returnMethod],
-    queryFn: async () => {
-      if (!selectedItems.length || !dateRange?.from || !dateRange?.to) return [];
-
-      const results = await Promise.allSettled(
-        selectedItems.map(async (item) => {
-          try {
-            if (item.type === 'account') {
-              const data = await calculateAccountCumulativeReturns(
-                item.id,
-                format(dateRange.from!, 'yyyy-MM-dd'),
-                format(dateRange.to!, 'yyyy-MM-dd'),
-                returnMethod,
-              );
-              return { ...data, name: item.name };
-            } else {
-              const data = await calculateSymbolCumulativeReturns(
-                item.id,
-                format(dateRange.from!, 'yyyy-MM-dd'),
-                format(dateRange.to!, 'yyyy-MM-dd'),
-              );
-              return { ...data, name: `${item.name} (${item.id})` };
-            }
-          } catch (error) {
-            console.error(`Failed to calculate returns for ${item.name}:`, error);
-            throw error;
-          }
-        }),
-      );
-
-      // Filter out failed calculations and return successful ones
-      return results
-        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-        .map((result) => result.value);
-    },
-    enabled: selectedItems.length > 0 && !!dateRange?.from && !!dateRange?.to,
-    placeholderData: (previousData) => previousData,
-    staleTime: 30 * 1000,
-    refetchInterval: false,
+  startDate,
+  endDate,
+}: {
+  selectedItems: ComparisonItem[];
+  startDate: string;
+  endDate: string;
+}) {
+  const performanceQueries = useQueries({
+    queries: selectedItems.map((item) => ({
+      queryKey: ['calculate_cumulative_returns', item.type, item.id, startDate, endDate],
+      queryFn: () => calculateCumulativeReturns(item.type, item.id, startDate, endDate),
+      enabled: !!item.id && !!startDate && !!endDate,
+      staleTime: 30 * 1000,
+      retry: false, // Don't retry on error
+    })),
   });
+
+  const isLoading = performanceQueries.some((query) => query.isLoading);
+  const hasErrors = performanceQueries.some((query) => query.isError);
+  const errorMessages = performanceQueries
+    .filter((query) => query.isError)
+    .map((query) => query.error)
+    .filter(Boolean)
+    .map((error) => (error instanceof Error ? error.message : String(error)));
+
+  // Format chart data directly from query results
+  const chartData = performanceQueries
+    .map((query, index) => {
+      if (query.isError || !query.data) return null;
+
+      const item = selectedItems[index];
+      return {
+        ...query.data,
+        id: item.id,
+        type: item.type,
+        name: item.type === 'symbol' ? `${item.name} (${item.id})` : item.name,
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    data: chartData,
+    isLoading,
+    hasErrors,
+    errorMessages,
+    queries: performanceQueries,
+  };
 }

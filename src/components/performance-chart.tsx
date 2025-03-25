@@ -1,5 +1,5 @@
 import { CumulativeReturn } from '@/lib/types';
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
 import { formatPercent } from '@/lib/utils';
 import {
@@ -16,18 +16,15 @@ interface PerformanceChartProps {
   data: {
     id: string;
     name: string;
-    cumulativeReturns: CumulativeReturn[];
-    totalReturn: number;
-    annualizedReturn: number;
+    returns: CumulativeReturn[];
   }[];
-  height?: number;
 }
 
-export function PerformanceChart({ data, height = 360 }: PerformanceChartProps) {
-  const formattedData = data[0]?.cumulativeReturns?.map((item) => {
+export function PerformanceChart({ data }: PerformanceChartProps) {
+  const formattedData = data[0]?.returns?.map((item) => {
     const dataPoint: Record<string, any> = { date: item.date };
     data.forEach((series) => {
-      const matchingPoint = series.cumulativeReturns?.find((p) => p.date === item.date);
+      const matchingPoint = series.returns?.find((p) => p.date === item.date);
       if (matchingPoint) {
         dataPoint[series.id] = matchingPoint.value * 100;
       }
@@ -104,48 +101,52 @@ export function PerformanceChart({ data, height = 360 }: PerformanceChartProps) 
   const tooltipLabelFormatter = (label: string) => format(parseISO(label), 'PPP');
 
   return (
-    <ChartContainer config={chartConfig}>
-      <LineChart
-        data={formattedData}
-        height={height}
-        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-      >
-        <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="date"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          tickFormatter={formatXAxis}
-          interval={getTickInterval()}
-        />
-        <YAxis
-          tickFormatter={(value) => formatPercent(value)}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-        />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              formatter={tooltipFormatter}
-              labelFormatter={tooltipLabelFormatter}
+    <div className="w-full h-full">
+      <ChartContainer config={chartConfig} className="w-full h-full">
+        <ResponsiveContainer width="100%" height="100%" aspect={undefined}>
+          <LineChart
+            data={formattedData}
+            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          >
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              tickFormatter={formatXAxis}
+              interval={getTickInterval()}
             />
-          }
-        />
-        <ChartLegend content={<ChartLegendContent />} />
-        {data.map((series, index) => (
-          <Line
-            key={series.id}
-            type="linear"
-            dataKey={series.id}
-            stroke={CHART_COLORS[index % CHART_COLORS.length]}
-            strokeWidth={2}
-            dot={false}
-            name={series.name}
-          />
-        ))}
-      </LineChart>
-    </ChartContainer>
+            <YAxis
+              tickFormatter={(value) => formatPercent(value)}
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+            />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  formatter={tooltipFormatter}
+                  labelFormatter={tooltipLabelFormatter}
+                />
+              }
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            {data.map((series, seriesIndex) => (
+              <Line
+                key={series.id}
+                type="linear"
+                dataKey={series.id}
+                stroke={CHART_COLORS[seriesIndex % CHART_COLORS.length]}
+                strokeWidth={2}
+                dot={false}
+                name={series.name}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+    </div>
   );
 }

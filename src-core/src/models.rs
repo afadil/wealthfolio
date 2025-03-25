@@ -308,6 +308,7 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
+     #[serde(with = "bigdecimal_serde")]
     pub amount: BigDecimal,
 }
 
@@ -317,11 +318,14 @@ pub struct IncomeSummary {
     pub period: String,
     pub by_month: HashMap<String, BigDecimal>,
     pub by_type: HashMap<String, BigDecimal>,
-    pub by_symbol: HashMap<String, BigDecimal>,
+    pub by_symbol: HashMap<String, BigDecimal>,     
     pub by_currency: HashMap<String, BigDecimal>,
+    #[serde(with = "bigdecimal_serde")]
     pub total_income: BigDecimal,
     pub currency: String,
+    #[serde(with = "bigdecimal_serde")]
     pub monthly_average: BigDecimal,
+    #[serde(with = "bigdecimal_serde_option")]
     pub yoy_growth: Option<BigDecimal>,
 }
 
@@ -536,31 +540,18 @@ pub struct NewContributionLimit {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountDeposit {
+    #[serde(with = "bigdecimal_serde")]
     pub amount: BigDecimal,
     pub currency: String,
+    #[serde(with = "bigdecimal_serde")]
     pub converted_amount: BigDecimal,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositsCalculation {
+    #[serde(with = "bigdecimal_serde")]
     pub total: BigDecimal,
     pub base_currency: String,
     pub by_account: HashMap<String, AccountDeposit>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CumulativeReturn {
-    pub date: String,
-    pub value: BigDecimal,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CumulativeReturns {
-    pub id: String,
-    pub cumulative_returns: Vec<CumulativeReturn>,
-    pub total_return: Option<BigDecimal>,
-    pub annualized_return: Option<BigDecimal>,
 }

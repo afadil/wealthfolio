@@ -22,6 +22,26 @@ export default {
       fontFamily: {
         mono: ['IBM Plex Mono', ...fontFamily.mono],
       },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "progress-bar": {
+          "0%": { transform: "translateX(-100%)" },
+          "50%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        "progress-bar": "progress-bar 1.5s ease-in-out infinite",
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -62,6 +82,25 @@ export default {
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        blue: {
+          50: '#E1ECEB',
+          100: '#C6DDE8',
+          150: '#ABCFE2',
+          200: '#92BFDB',
+          300: '#66A0C8',
+          400: '#4385BE',
+          500: '#3171B2',
+          600: '#205EA6',
+          700: '#1A4F8C',
+          800: '#163B66',
+          850: '#133051',
+          900: '#12253B',
+          950: '#101A24',
         },
         cyan: {
           50: '#DDF1E4',
@@ -143,20 +182,6 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
-      },
-      keyframes: {
-        'accordion-down': {
-          from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' },
-        },
-        'accordion-up': {
-          from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' },
-        },
-      },
-      animation: {
-        'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out',
       },
       gridTemplateColumns: {
         sidebar: '200px auto',

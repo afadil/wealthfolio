@@ -95,38 +95,29 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
   }
 };
 
-export const calculateAccountCumulativeReturns = async (
-  accountId: string,
+export const calculateCumulativeReturns = async (
+  itemType: 'account' | 'symbol',
+  itemId: string,
   startDate: string,
   endDate: string,
-  method: 'TWR' | 'MWR' = 'TWR',
 ): Promise<CumulativeReturns> => {
   try {
-    return invokeTauri('calculate_account_cumulative_returns', {
-      accountId,
+    const response = await invokeTauri('calculate_cumulative_returns', {
+      itemType,
+      itemId,
       startDate,
       endDate,
-      method,
     });
+    
+    // Check if the response is an error message (string) instead of the expected object
+    if (typeof response === 'string' || !response || Object.keys(response).length === 0) {
+      throw new Error(typeof response === 'string' ? response : 'Failed to calculate cumulative returns');
+    }
+    
+    return response as CumulativeReturns;
   } catch (error) {
+    console.error('Error calculating cumulative returns:', error);
     logger.error('Error calculating cumulative returns.');
-    throw error;
-  }
-};
-
-export const calculateSymbolCumulativeReturns = async (
-  symbol: string,
-  startDate: string,
-  endDate: string,
-): Promise<CumulativeReturns> => {
-  try {
-    return invokeTauri('calculate_symbol_cumulative_returns', {
-      symbol,
-      startDate,
-      endDate,
-    });
-  } catch (error) {
-    logger.error('Error calculating symbol cumulative returns.');
     throw error;
   }
 };

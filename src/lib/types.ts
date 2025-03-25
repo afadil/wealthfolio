@@ -380,7 +380,7 @@ export interface CumulativeReturn {
 export interface CumulativeReturns {
   id: string;
   name: string;
-  cumulativeReturns: CumulativeReturn[];
+  returns: CumulativeReturn[];
   totalReturn: number;
   annualizedReturn: number;
 }
