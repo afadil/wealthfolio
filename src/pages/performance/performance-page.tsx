@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format, subMonths } from 'date-fns';
 import { PerformanceChart } from '@/components/performance-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,23 +11,26 @@ import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { useCalculateCumulativeReturns } from './hooks/use-performance-data';
+import { usecalculatePerformance } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
 import { AccountSelector } from '@/components/account-selector';
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-
-const PORTFOLIO_TOTAL: ComparisonItem = {
-  id: 'TOTAL',
-  type: 'account',
-  name: 'All Portfolio',
-};
+import { PerformanceData } from '@/lib/types';
+import { formatPercent } from '@/lib/utils';
+import { GainPercent } from '@/components/gain-percent';
 
 type ComparisonItem = {
   id: string;
   type: 'account' | 'symbol';
   name: string;
+};
+
+const PORTFOLIO_TOTAL: ComparisonItem = {
+  id: 'TOTAL',
+  type: 'account',
+  name: 'All Portfolio',
 };
 
 function PerformanceContent({
@@ -36,16 +39,18 @@ function PerformanceContent({
   hasErrors,
   errorMessages,
 }: {
-  performanceData: any[] | undefined;
+  performanceData: (PerformanceData | null)[] | undefined;
   isLoading: boolean;
   hasErrors: boolean;
   errorMessages: string[];
 }) {
   return (
-    <div className="relative flex flex-col h-full w-full">
+    <div className="relative flex h-full w-full flex-col">
       {performanceData && performanceData.length > 0 && (
-        <div className="flex-1 min-h-0 w-full">
-          <PerformanceChart data={performanceData} />
+        <div className="min-h-0 w-full flex-1">
+          <PerformanceChart
+            data={performanceData.filter((item): item is PerformanceData => item !== null)}
+          />
         </div>
       )}
 
@@ -60,14 +65,14 @@ function PerformanceContent({
 
       {/* Modern horizontal loader with improved UX */}
       {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <div className="absolute inset-0 border-2 border-transparent animate-subtle-pulse">
-            <div className="absolute top-0 left-0 h-[2px] bg-primary animate-progress-border"></div>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
+            <div className="animate-progress-border absolute left-0 top-0 h-[2px] bg-primary"></div>
           </div>
           <div className="absolute bottom-4 right-4">
-            <div className="bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-sm border">
-              <p className="text-xs font-medium text-muted-foreground flex items-center">
-                <span className="inline-block h-2 w-2 rounded-full bg-primary mr-2 animate-pulse"></span>
+            <div className="rounded-md border bg-background/80 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+              <p className="flex items-center text-xs font-medium text-muted-foreground">
+                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-primary"></span>
                 Calculating...
               </p>
             </div>
@@ -105,6 +110,7 @@ function PerformanceContent({
 
 export default function PerformancePage() {
   const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subMonths(new Date(), 12),
     to: new Date(),
@@ -114,15 +120,35 @@ export default function PerformancePage() {
 
   // Use the custom hook for parallel data fetching
   const {
-    data: chartData,
+    data: performanceData,
     isLoading: isLoadingPerformance,
     hasErrors,
     errorMessages,
-  } = useCalculateCumulativeReturns({
+  } = usecalculatePerformance({
     selectedItems,
     startDate: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
     endDate: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
   });
+
+  // Calculate selected item data
+  const selectedItemData = useMemo(() => {
+    if (!performanceData?.length) return null;
+
+    // If no item is selected, use the first one
+    const targetId = selectedItemId || performanceData[0]?.id;
+    const found = performanceData.find((item) => item?.id === targetId);
+
+    if (!found) return null;
+
+    return {
+      id: found.id,
+      name: found.name,
+      totalReturn: Number(found.totalReturn) * 100,
+      annualizedReturn: Number(found.annualizedReturn) * 100,
+      volatility: Number(found.volatility) * 100,
+      maxDrawdown: Number(found.maxDrawdown) * 100,
+    };
+  }, [selectedItemId, performanceData]);
 
   const handleAccountSelect = (account: { id: string; name: string }) => {
     setSelectedItems((prev) => {
@@ -157,6 +183,22 @@ export default function PerformancePage() {
     });
   };
 
+  const handleBadgeSelect = (item: ComparisonItem) => {
+    setSelectedItemId(selectedItemId === item.id ? null : item.id);
+  };
+
+  const handleBadgeDelete = (e: React.MouseEvent, item: ComparisonItem) => {
+    e.stopPropagation();
+    if (item.type === 'account') {
+      handleAccountSelect({ id: item.id, name: item.name });
+    } else {
+      setSelectedItems((prev) => prev.filter((i) => i.id !== item.id));
+    }
+    if (selectedItemId === item.id) {
+      setSelectedItemId(null);
+    }
+  };
+
   const accountOptions = accounts ? [PORTFOLIO_TOTAL, ...accounts] : [PORTFOLIO_TOTAL];
   const selectedAccountIds = selectedItems
     .filter((item) => item.type === 'account')
@@ -179,25 +221,35 @@ export default function PerformancePage() {
           {selectedItems.map((item) => (
             <Badge
               key={item.id}
-              variant="default"
-              className="group flex cursor-pointer items-center gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:shadow-sm"
-              onClick={() => {
-                if (item.type === 'account') {
-                  handleAccountSelect({ id: item.id, name: item.name });
-                } else {
-                  setSelectedItems((prev) => prev.filter((i) => i.id !== item.id));
+              className={`group border flex items-center gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:shadow-sm ${
+                selectedItemId === item.id ? 'ring-2 ring-primary ring-offset-2' : ''
+              }`}
+              onClick={() => handleBadgeSelect(item)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleBadgeSelect(item);
                 }
               }}
+              aria-pressed={selectedItemId === item.id}
+              aria-label={`Select ${item.name}`}
             >
               {item.type === 'account' ? (
-                <Wallet className="mr-1 h-3.5 w-3.5 text-secondary" />
+                <Wallet className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
               ) : (
-                <LineChart className="mr-1 h-3.5 w-3.5 text-secondary" />
+                <LineChart className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
               )}
               <span className="font-medium">{item.name}</span>
-              <span className="ml-1 flex items-center justify-center rounded-full bg-muted/30 p-0.5 transition-all duration-300 group-hover:scale-125 group-hover:bg-muted/80">
-                <X className="h-3 w-3" />
-              </span>
+              <button
+                type="button"
+                onClick={(e) => handleBadgeDelete(e, item)}
+                className="ml-1 flex items-center justify-center rounded-full bg-muted/30 p-0.5 transition-all duration-300 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-primary group-hover:bg-muted/80"
+                aria-label={`Remove ${item.name}`}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
             </Badge>
           ))}
 
@@ -212,21 +264,88 @@ export default function PerformancePage() {
         </div>
 
         <Card className="flex min-h-0 flex-1 flex-col">
-          <CardHeader className="flex flex-col space-y-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl">Cumulative Returns</CardTitle>
-                <CardDescription>
-                  {dateRange?.from && dateRange?.to
-                    ? `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-                    : 'Compare account performance over time'}
-                </CardDescription>
+          <CardHeader className="pb-1">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Performance</CardTitle>
+                  <CardDescription>
+                    {dateRange?.from && dateRange?.to
+                      ? `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+                      : 'Compare account performance over time'}
+                  </CardDescription>
+                </div>
+                {performanceData && performanceData.length > 0 && (
+                  <div className="grid grid-cols-2 gap-6 rounded-lg bg-muted/40 p-2 backdrop-blur-sm md:grid-cols-4">
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-light text-muted-foreground">
+                          Total Return
+                        </span>
+                      </div>
+                      <div className="flex items-baseline">
+                        <span
+                          className={`text-lg ${
+                            selectedItemData && selectedItemData.totalReturn >= 0
+                              ? 'text-success'
+                              : 'text-destructive'
+                          }`}
+                        >
+                          <GainPercent value={selectedItemData?.totalReturn || 0} animated={true} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-light text-muted-foreground">
+                          Annualized Return
+                        </span>
+                      </div>
+                      <div className="flex items-baseline">
+                        <span
+                          className={`text-lg ${
+                            selectedItemData && selectedItemData.annualizedReturn >= 0
+                              ? 'text-success'
+                              : 'text-destructive'
+                          }`}
+                        >
+                          <GainPercent value={selectedItemData?.annualizedReturn || 0} animated={true} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-light text-muted-foreground">Volatility</span>
+                      </div>
+                      <div className="flex items-baseline">
+                        <span className="text-lg text-foreground">
+                          {formatPercent(selectedItemData?.volatility)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-light text-muted-foreground">
+                          Max Drawdown
+                        </span>
+                      </div>
+                      <div className="flex items-baseline">
+                        <span className="text-lg text-destructive">
+                          {formatPercent(selectedItemData?.maxDrawdown)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 p-6">
             <PerformanceContent
-              performanceData={chartData}
+              performanceData={performanceData}
               isLoading={isLoadingPerformance}
               hasErrors={hasErrors}
               errorMessages={errorMessages}
@@ -260,7 +379,7 @@ function PerformanceDashboardSkeleton() {
             <Skeleton className="h-4 w-[240px]" />
           </CardHeader>
           <CardContent className="min-h-[400px]">
-            <div className="h-full w-full flex items-center justify-center">
+            <div className="flex h-full w-full items-center justify-center">
               <Skeleton className="h-[300px] w-full" />
             </div>
           </CardContent>

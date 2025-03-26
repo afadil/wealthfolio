@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
-import { calculateCumulativeReturns } from '@/commands/portfolio';
+import { calculatePerformance } from '@/commands/portfolio';
 
 type ComparisonItem = {
   id: string;
@@ -20,7 +20,7 @@ type ComparisonItem = {
  *          an array of error messages, and 
  *          an array of query objects.
  */
-export function useCalculateCumulativeReturns({
+export function usecalculatePerformance({
   selectedItems,
   startDate,
   endDate,
@@ -32,7 +32,7 @@ export function useCalculateCumulativeReturns({
   const performanceQueries = useQueries({
     queries: selectedItems.map((item) => ({
       queryKey: ['calculate_cumulative_returns', item.type, item.id, startDate, endDate],
-      queryFn: () => calculateCumulativeReturns(item.type, item.id, startDate, endDate),
+      queryFn: () => calculatePerformance(item.type, item.id, startDate, endDate),
       enabled: !!item.id && !!startDate && !!endDate,
       staleTime: 30 * 1000,
       retry: false, // Don't retry on error

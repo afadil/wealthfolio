@@ -141,7 +141,7 @@ pub fn main() {
             commands::portfolio::get_portfolio_history,
             commands::portfolio::get_accounts_summary,
             commands::portfolio::recalculate_portfolio,
-            commands::portfolio::calculate_cumulative_returns,
+            commands::portfolio::calculate_performance,
             commands::settings::get_contribution_limits,
             commands::settings::create_contribution_limit,
             commands::settings::update_contribution_limit,

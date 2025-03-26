@@ -5,7 +5,7 @@ import {
   HistorySummary,
   PortfolioHistory,
   AccountSummary,
-  CumulativeReturns,
+  PerformanceData,
 } from '@/lib/types';
 
 export const calculateHistoricalData = async (params: {
@@ -95,14 +95,14 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
   }
 };
 
-export const calculateCumulativeReturns = async (
+export const calculatePerformance = async (
   itemType: 'account' | 'symbol',
   itemId: string,
   startDate: string,
   endDate: string,
-): Promise<CumulativeReturns> => {
+): Promise<PerformanceData> => {
   try {
-    const response = await invokeTauri('calculate_cumulative_returns', {
+    const response = await invokeTauri('calculate_performance', {
       itemType,
       itemId,
       startDate,
@@ -114,7 +114,7 @@ export const calculateCumulativeReturns = async (
       throw new Error(typeof response === 'string' ? response : 'Failed to calculate cumulative returns');
     }
     
-    return response as CumulativeReturns;
+    return response as PerformanceData;
   } catch (error) {
     console.error('Error calculating cumulative returns:', error);
     logger.error('Error calculating cumulative returns.');

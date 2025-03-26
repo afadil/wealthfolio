@@ -132,7 +132,7 @@ pub async fn get_income_summary(state: State<'_, AppState>) -> Result<Vec<Income
 }
 
 #[tauri::command]
-pub async fn calculate_cumulative_returns(
+pub async fn calculate_performance(
     state: State<'_, AppState>,
     item_type: String,
     item_id: String,
@@ -148,6 +148,6 @@ pub async fn calculate_cumulative_returns(
         .map_err(|e| format!("Invalid end date: {}", e))?;
 
     let service = create_performance_service(pool).await?;
-    let result = service.calculate_cumulative_returns(&item_type, &item_id, start, end).await;
+    let result = service.calculate_performance(&item_type, &item_id, start, end).await;
     result.map_err(|e| format!("Failed to calculate cumulative returns: {}", e.to_string()))
 }

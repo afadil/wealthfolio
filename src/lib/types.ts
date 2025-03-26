@@ -377,12 +377,14 @@ export interface CumulativeReturn {
   value: number;
 }
 
-export interface CumulativeReturns {
+export interface PerformanceData {
   id: string;
   name: string;
   returns: CumulativeReturn[];
   totalReturn: number;
   annualizedReturn: number;
+  volatility: number;
+  maxDrawdown: number;
 }
 
 export interface UpdateAssetProfile {

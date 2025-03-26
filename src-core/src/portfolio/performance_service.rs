@@ -54,11 +54,15 @@ pub struct ReturnData {
 
 /// API response structure for cumulative returns
 #[derive(Debug, Serialize, Deserialize)]
+
+#[serde(rename_all = "camelCase")]
 pub struct CumulativeReturnsResponse {
     pub id: String,
     pub returns: Vec<ReturnData>,
     pub total_return: Decimal,
     pub annualized_return: Decimal,
+    pub volatility: Decimal,
+    pub max_drawdown: Decimal,
 }
 
 /// Service for calculating portfolio performance metrics
@@ -90,7 +94,7 @@ impl PerformanceService {
     }
 
     /// Calculates cumulative returns for a given item (account or symbol)
-    pub async fn calculate_cumulative_returns(
+    pub async fn calculate_performance(
         &self,
         item_type: &str,
         item_id: &str,
@@ -99,14 +103,14 @@ impl PerformanceService {
     ) -> ServiceResult<CumulativeReturnsResponse> {
         info!("Calculating returns for {} {} from {} to {}", item_type, item_id, start_date, end_date);
         match item_type {
-            "account" => self.calculate_account_cumulative_returns(item_id, start_date, end_date, ReturnMethod::TimeWeighted).await,
-            "symbol" => self.calculate_symbol_cumulative_returns(item_id, start_date, end_date).await,
+            "account" => self.calculate_account_performance(item_id, start_date, end_date, ReturnMethod::TimeWeighted).await,
+            "symbol" => self.calculate_symbol_performance(item_id, start_date, end_date).await,
             _ => Err(errors::Error::Validation(ValidationError::InvalidInput("Invalid item type".to_string()))),
         }
     }
 
     /// Calculates cumulative returns for an account
-    pub async fn calculate_account_cumulative_returns(
+    pub async fn calculate_account_performance(
         &self,
         account_id: &str,
         start_date: NaiveDate,
@@ -132,6 +136,7 @@ impl PerformanceService {
         sorted_history.sort_by_key(|(date, _)| *date);
 
         let mut returns = Vec::new();
+        let mut daily_returns = Vec::new();
 
         // Handle empty history gracefully.
         if sorted_history.is_empty() {
@@ -140,6 +145,8 @@ impl PerformanceService {
                 returns: Vec::new(),
                 total_return: dec!(0),
                 annualized_return: dec!(0),
+                volatility: dec!(0),
+                max_drawdown: dec!(0),
             });
         }
 
@@ -198,6 +205,9 @@ impl PerformanceService {
                 }
             };
 
+            // Store daily return for volatility calculation
+            daily_returns.push(daily_return);
+
             // Update cumulative return
             cumulative_value = cumulative_value * (one + daily_return);
             let cumulative_return_for_period = cumulative_value - one;
@@ -214,6 +224,10 @@ impl PerformanceService {
 
         let total_return = returns.last().map(|r| r.value).unwrap_or(dec!(0));
         let annualized_return = Self::calculate_annualized_return(start_date, end_date, &total_return);
+        
+        // Calculate volatility and max drawdown
+        let volatility = Self::calculate_volatility(&daily_returns);
+        let max_drawdown = Self::calculate_max_drawdown(&returns);
 
         info!(
             "Account returns calculation completed in: {:.4} seconds with {} data points",
@@ -226,11 +240,13 @@ impl PerformanceService {
             returns,
             total_return,
             annualized_return,
+            volatility,
+            max_drawdown,
         })
     }
 
     /// Calculates cumulative returns for a symbol
-    pub async fn calculate_symbol_cumulative_returns(
+    pub async fn calculate_symbol_performance(
         &self,
         symbol: &str,
         start_date: NaiveDate,
@@ -250,6 +266,8 @@ impl PerformanceService {
                 returns: Vec::new(),
                 total_return: dec!(0),
                 annualized_return: dec!(0),
+                volatility: dec!(0),
+                max_drawdown: dec!(0),
             });
         }
 
@@ -287,7 +305,9 @@ impl PerformanceService {
 
         // Calculate returns
         let mut returns = Vec::new();
+        let mut daily_returns = Vec::new();
         returns.reserve(filled_quotes.len().saturating_sub(1));
+        daily_returns.reserve(filled_quotes.len().saturating_sub(1));
 
         let mut cumulative_return = dec!(1);
         let one = dec!(1);
@@ -303,6 +323,9 @@ impl PerformanceService {
                 (curr_value / prev_value) - one
             };
             
+            // Store daily return for volatility calculation
+            daily_returns.push(daily_return);
+            
             // Update cumulative return
             cumulative_return = cumulative_return * (one + daily_return);
             let cumulative_return_for_period = cumulative_return - one;
@@ -316,6 +339,10 @@ impl PerformanceService {
         let total_return = returns.last().map(|r| r.value).unwrap_or(dec!(0));
         let annualized_return = Self::calculate_annualized_return(start_date, end_date, &total_return);
         
+        // Calculate volatility and max drawdown
+        let volatility = Self::calculate_volatility(&daily_returns);
+        let max_drawdown = Self::calculate_max_drawdown(&returns);
+        
         info!(
             "Symbol returns calculation completed in: {:.4} seconds with {} data points",
             start_time.elapsed().as_secs_f64(),
@@ -327,6 +354,8 @@ impl PerformanceService {
             returns,
             total_return,
             annualized_return,
+            volatility,
+            max_drawdown,
         })
     }
 
@@ -382,5 +411,90 @@ impl PerformanceService {
         
         // Fallback if all calculations fail
         dec!(0)
+    }
+
+    /// Calculates the volatility (standard deviation of returns) annualized
+    /// 
+    /// Volatility is a measure of the dispersion of returns and is typically annualized
+    /// Formula: Standard Deviation of Daily Returns * sqrt(trading days per year)
+    fn calculate_volatility(daily_returns: &[Decimal]) -> Decimal {
+        if daily_returns.is_empty() {
+            return dec!(0);
+        }
+
+        // Calculate mean of daily returns
+        let sum: Decimal = daily_returns.iter().sum();
+        let count = Decimal::from(daily_returns.len());
+        let mean = sum / count;
+
+        // Calculate sum of squared differences
+        let sum_squared_diff: Decimal = daily_returns
+            .iter()
+            .map(|&r| {
+                let diff = r - mean;
+                diff * diff
+            })
+            .sum();
+
+        // Calculate variance
+        let variance = if count > dec!(1) {
+            sum_squared_diff / (count - dec!(1))
+        } else {
+            dec!(0)
+        };
+
+        // Calculate standard deviation (daily volatility)
+        let daily_volatility = match variance.sqrt() {
+            Some(value) => value,
+            None => {
+                // Fallback to f64 if Decimal sqrt fails
+                if let Some(variance_f64) = variance.to_f64() {
+                    let std_dev_f64 = variance_f64.sqrt();
+                    Decimal::from_f64(std_dev_f64).unwrap_or(dec!(0))
+                } else {
+                    dec!(0)
+                }
+            }
+        };
+
+        // Annualize volatility (standard market practice: multiply by sqrt(252) for trading days)
+        let trading_days_sqrt = match Decimal::from_str("15.87") { // sqrt(252) ≈ 15.87
+            Ok(value) => value,
+            Err(_) => dec!(15.87),
+        };
+        
+        let annualized_volatility = daily_volatility * trading_days_sqrt;
+        Self::round_decimal(&annualized_volatility, 6)
+    }
+
+    /// Calculates the maximum drawdown from a series of cumulative returns
+    /// 
+    /// Maximum drawdown measures the largest peak-to-trough decline in the value of a portfolio
+    /// Formula: (Trough Value - Peak Value) / Peak Value
+    fn calculate_max_drawdown(returns: &[ReturnData]) -> Decimal {
+        if returns.is_empty() {
+            return dec!(0);
+        }
+
+        let mut max_drawdown = dec!(0);
+        let mut peak_value = dec!(1) + returns[0].value;
+
+        for return_data in returns {
+            let current_value = dec!(1) + return_data.value;
+            
+            // Update peak if we reach a new high
+            if current_value > peak_value {
+                peak_value = current_value;
+            } 
+            // Calculate drawdown if we're below the peak
+            else if !peak_value.is_zero() {
+                let drawdown = (peak_value - current_value) / peak_value;
+                if drawdown > max_drawdown {
+                    max_drawdown = drawdown;
+                }
+            }
+        }
+
+        Self::round_decimal(&max_drawdown, 6)
     }
 }
