@@ -117,7 +117,7 @@ export const activityImportValidationSchema = z
   .refine(
     (data) => {
       if (isCashActivityType(data.activityType)) {
-        return Boolean(data.amount && data.amount > 0) || data.unitPrice > 0;
+        return Boolean(data.amount && data.amount > 0) || Number(data.unitPrice) > 0;
       }
       return true;
     },

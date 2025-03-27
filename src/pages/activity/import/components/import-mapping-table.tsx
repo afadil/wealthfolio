@@ -178,8 +178,8 @@ export function ImportMappingTable(props: ImportMappingTableProps) {
         </CardHeader>
 
         <CardContent className="flex-1 p-0">
-          <TabsContent value="preview" className="m-0 flex h-[500px] flex-col border-0">
-            <div className="flex-1 overflow-hidden">
+          <TabsContent value="preview" className="m-0 flex flex-col border-0">
+            <div className="h-[calc(100vh-25rem)] w-full flex-1 overflow-hidden">
               <ImportMappingPreviewTable
                 {...props}
                 rowsToShow={rowsToShow}

@@ -175,7 +175,13 @@ export function ActivityImportForm({
 
         // Get the raw symbol and use the mapped symbol if available
         const rawSymbol = getMappedValue(row, ImportFormat.SYMBOL).trim();
-        const symbol = mapping.symbolMappings[rawSymbol] || rawSymbol;
+        let symbol = mapping.symbolMappings[rawSymbol] || rawSymbol;
+
+        // For cash activities and fees, set both symbol and assetId to $CASH-Currency format
+        if (isCash || activityType === ActivityType.FEE) {
+          const cashSymbol = `$CASH-${currency}`;
+          symbol = cashSymbol;
+        }
 
         return {
           date: getMappedValue(row, ImportFormat.DATE),
@@ -257,7 +263,7 @@ export function ActivityImportForm({
         </AccordionItem>
       </Accordion>
 
-      <div className="max-w-[1200px]">
+      <div className="max-w-[calc(100vw-10rem)]">
         <PreviewContent
           accountId={mapping.accountId}
           selectedFile={selectedFile}
