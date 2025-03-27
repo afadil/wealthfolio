@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 
 use crate::accounts::Account;
 
@@ -16,11 +16,11 @@ pub struct Activity {
     pub activity_type: String,
     #[serde(with = "timestamp_format")]
     pub activity_date: DateTime<Utc>,
-    pub quantity: BigDecimal,
-    pub unit_price: BigDecimal,
+    pub quantity: Decimal,
+    pub unit_price: Decimal,
     pub currency: String,
-    pub fee: BigDecimal,
-    pub amount: Option<BigDecimal>,
+    pub fee: Decimal,
+    pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
     #[serde(with = "timestamp_format")]
@@ -71,11 +71,11 @@ pub struct NewActivity {
     pub asset_id: String,
     pub activity_type: String,
     pub activity_date: String,
-    pub quantity: Option<BigDecimal>,
-    pub unit_price: Option<BigDecimal>,
+    pub quantity: Option<Decimal>,
+    pub unit_price: Option<Decimal>,
     pub currency: String,
-    pub fee: Option<BigDecimal>,
-    pub amount: Option<BigDecimal>,
+    pub fee: Option<Decimal>,
+    pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
 }
@@ -120,11 +120,11 @@ pub struct ActivityUpdate {
     pub asset_id: String,
     pub activity_type: String,
     pub activity_date: String,
-    pub quantity: Option<BigDecimal>,
-    pub unit_price: Option<BigDecimal>,
+    pub quantity: Option<Decimal>,
+    pub unit_price: Option<Decimal>,
     pub currency: String,
-    pub fee: Option<BigDecimal>,
-    pub amount: Option<BigDecimal>,
+    pub fee: Option<Decimal>,
+    pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
 }
@@ -202,31 +202,31 @@ pub struct ActivityDetails {
 }
 
 impl ActivityDetails {
-    pub fn get_quantity(&self) -> BigDecimal {
-        BigDecimal::from_str(&self.quantity).unwrap_or_else(|e| {
+    pub fn get_quantity(&self) -> Decimal {
+        Decimal::from_str(&self.quantity).unwrap_or_else(|e| {
             log::error!("Failed to parse quantity '{}': {}", self.quantity, e);
-            BigDecimal::from(0)
+            Decimal::ZERO
         })
     }
 
-    pub fn get_unit_price(&self) -> BigDecimal {
-        BigDecimal::from_str(&self.unit_price).unwrap_or_else(|e| {
+    pub fn get_unit_price(&self) -> Decimal {
+        Decimal::from_str(&self.unit_price).unwrap_or_else(|e| {
             log::error!("Failed to parse unit_price '{}': {}", self.unit_price, e);
-            BigDecimal::from(0)
+            Decimal::ZERO
         })
     }
 
-    pub fn get_fee(&self) -> BigDecimal {
-        BigDecimal::from_str(&self.fee).unwrap_or_else(|e| {
+    pub fn get_fee(&self) -> Decimal {
+        Decimal::from_str(&self.fee).unwrap_or_else(|e| {
             log::error!("Failed to parse fee '{}': {}", self.fee, e);
-            BigDecimal::from(0)
+            Decimal::ZERO
         })
     }
 
-    pub fn get_amount(&self) -> Option<BigDecimal> {
-        self.amount.as_ref().map(|s| BigDecimal::from_str(s).unwrap_or_else(|e| {
+    pub fn get_amount(&self) -> Option<Decimal> {
+        self.amount.as_ref().map(|s| Decimal::from_str(s).unwrap_or_else(|e| {
             log::error!("Failed to parse amount '{}': {}", s, e);
-            BigDecimal::from(0)
+            Decimal::ZERO
         }))
     }
 }
@@ -254,11 +254,11 @@ pub struct ActivityImport {
     pub date: String,
     pub symbol: String,
     pub activity_type: String,
-    pub quantity: BigDecimal,
-    pub unit_price: BigDecimal,
+    pub quantity: Decimal,
+    pub unit_price: Decimal,
     pub currency: String,
-    pub fee: BigDecimal,
-    pub amount: Option<BigDecimal>,
+    pub fee: Decimal,
+    pub amount: Option<Decimal>,
     pub comment: Option<String>,
     pub account_id: Option<String>,
     pub account_name: Option<String>,
@@ -482,22 +482,22 @@ impl From<ActivityDB> for Activity {
             asset_id: db.asset_id,
             activity_type: db.activity_type,
             activity_date: DateTime::from_naive_utc_and_offset(db.activity_date, Utc),
-            quantity: BigDecimal::from_str(&db.quantity).unwrap_or_else(|e| {
+            quantity: Decimal::from_str(&db.quantity).unwrap_or_else(|e| {
                 log::error!("Failed to parse quantity '{}': {}", db.quantity, e);
-                BigDecimal::from(0)
+                Decimal::ZERO
             }),
-            unit_price: BigDecimal::from_str(&db.unit_price).unwrap_or_else(|e| {
+            unit_price: Decimal::from_str(&db.unit_price).unwrap_or_else(|e| {
                 log::error!("Failed to parse unit_price '{}': {}", db.unit_price, e);
-                BigDecimal::from(0)
+                Decimal::ZERO
             }),
             currency: db.currency,
-            fee: BigDecimal::from_str(&db.fee).unwrap_or_else(|e| {
+            fee: Decimal::from_str(&db.fee).unwrap_or_else(|e| {
                 log::error!("Failed to parse fee '{}': {}", db.fee, e);
-                BigDecimal::from(0)
+                Decimal::ZERO
             }),
-            amount: db.amount.map(|s| BigDecimal::from_str(&s).unwrap_or_else(|e| {
+            amount: db.amount.map(|s| Decimal::from_str(&s).unwrap_or_else(|e| {
                 log::error!("Failed to parse amount '{}': {}", s, e);
-                BigDecimal::from(0)
+                Decimal::ZERO
             })),
             is_draft: db.is_draft,
             comment: db.comment,
@@ -543,14 +543,14 @@ impl From<NewActivity> for ActivityDB {
             // Use amount if provided, otherwise use quantity
             let amount_str = match &domain.amount {
                 Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string()
+                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string()
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
         } else {
             // For other activities, use the provided values
             (
-                domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
-                domain.unit_price.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+                domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
+                domain.unit_price.unwrap_or_else(|| Decimal::ZERO).to_string(),
                 domain.amount.as_ref().map(|a| a.to_string())
             )
         };
@@ -564,7 +564,7 @@ impl From<NewActivity> for ActivityDB {
             quantity,
             unit_price,
             currency: domain.currency,
-            fee: domain.fee.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+            fee: domain.fee.unwrap_or_else(|| Decimal::ZERO).to_string(),
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
@@ -608,14 +608,14 @@ impl From<ActivityUpdate> for ActivityDB {
             // Use amount if provided, otherwise use quantity
             let amount_str = match &domain.amount {
                 Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string()
+                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string()
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
         } else {
             // For other activities, use the provided values
             (
-                domain.quantity.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
-                domain.unit_price.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+                domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
+                domain.unit_price.unwrap_or_else(|| Decimal::ZERO).to_string(),
                 domain.amount.as_ref().map(|a| a.to_string())
             )
         };
@@ -629,7 +629,7 @@ impl From<ActivityUpdate> for ActivityDB {
             quantity,
             unit_price,
             currency: domain.currency,
-            fee: domain.fee.unwrap_or_else(|| BigDecimal::from(0)).to_string(),
+            fee: domain.fee.unwrap_or_else(|| Decimal::ZERO).to_string(),
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
@@ -637,4 +637,4 @@ impl From<ActivityUpdate> for ActivityDB {
             updated_at: now,
         }
     }
-} 
+}

@@ -5,8 +5,7 @@ use log::{debug, error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use bigdecimal::BigDecimal;
-use std::str::FromStr;
+use rust_decimal::Decimal;
 
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::ProviderRegistry;
@@ -295,7 +294,7 @@ impl MarketDataService {
         let mut quotes = Vec::with_capacity(days_between);
 
         // Create an iterator over quote dates and prices
-        let mut quote_changes: Vec<(NaiveDate, BigDecimal)> = vec![(
+        let mut quote_changes: Vec<(NaiveDate, Decimal)> = vec![(
             first_quote_date,
             manual_quotes[0].close.clone(),
         )];
@@ -328,7 +327,7 @@ impl MarketDataService {
                         low: current_price.clone(),
                         close: current_price.clone(),
                         adjclose: current_price.clone(),
-                        volume: BigDecimal::from_str("0").unwrap(),
+                        volume: Decimal::ZERO,
                         data_source: DataSource::Manual,
                         created_at: Utc::now().naive_utc(),
                         currency: request.currency.clone(),

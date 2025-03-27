@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, subMonths } from 'date-fns';
+import { subMonths } from 'date-fns';
 import { PerformanceChart } from '@/components/performance-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { usecalculatePerformance } from './hooks/use-performance-data';
+import { useCalculatePerformance } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
 import { AccountSelector } from '@/components/account-selector';
 import { AlertFeedback } from '@/components/alert-feedback';
@@ -118,16 +118,28 @@ export default function PerformancePage() {
 
   const { data: accounts, isLoading: isLoadingAccounts } = useAccounts();
 
-  // Use the custom hook for parallel data fetching
+  // Helper function to sort comparison items (accounts first, then symbols)
+  const sortComparisonItems = (items: ComparisonItem[]): ComparisonItem[] => {
+    return [...items].sort((a, b) => {
+      // Sort by type first (accounts before symbols)
+      if (a.type !== b.type) {
+        return a.type === 'account' ? -1 : 1;
+      }
+      // If same type, maintain original order
+      return 0;
+    });
+  };
+
+  // Use the custom hook for parallel data fetching with effective date calculation
   const {
     data: performanceData,
     isLoading: isLoadingPerformance,
     hasErrors,
     errorMessages,
-  } = usecalculatePerformance({
+    displayDateRange
+  } = useCalculatePerformance({
     selectedItems,
-    startDate: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
-    endDate: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
+    dateRange
   });
 
   // Calculate selected item data
@@ -154,7 +166,7 @@ export default function PerformancePage() {
     setSelectedItems((prev) => {
       const exists = prev.some((item) => item.id === account.id);
       if (exists) {
-        return prev.filter((item) => item.id !== account.id);
+        return sortComparisonItems(prev.filter((item) => item.id !== account.id));
       }
 
       // Create a proper ComparisonItem
@@ -164,14 +176,14 @@ export default function PerformancePage() {
         name: account.name,
       };
 
-      return [...prev, newItem];
+      return sortComparisonItems([...prev, newItem]);
     });
   };
 
   const handleSymbolSelect = (symbol: { id: string; name: string }) => {
     setSelectedItems((prev) => {
       const exists = prev.some((item) => item.id === symbol.id);
-      if (exists) return prev;
+      if (exists) return sortComparisonItems(prev);
 
       const newSymbol: ComparisonItem = {
         id: symbol.id,
@@ -179,7 +191,7 @@ export default function PerformancePage() {
         name: symbol.name,
       };
 
-      return [...prev, newSymbol];
+      return sortComparisonItems([...prev, newSymbol]);
     });
   };
 
@@ -192,14 +204,16 @@ export default function PerformancePage() {
     if (item.type === 'account') {
       handleAccountSelect({ id: item.id, name: item.name });
     } else {
-      setSelectedItems((prev) => prev.filter((i) => i.id !== item.id));
+      setSelectedItems((prev) => sortComparisonItems(prev.filter((i) => i.id !== item.id)));
     }
     if (selectedItemId === item.id) {
       setSelectedItemId(null);
     }
   };
 
-  const accountOptions = accounts ? [PORTFOLIO_TOTAL, ...accounts] : [PORTFOLIO_TOTAL];
+  const accountOptions = accounts
+    ? [PORTFOLIO_TOTAL, ...accounts.filter((account) => account.isActive)]
+    : [PORTFOLIO_TOTAL];
   const selectedAccountIds = selectedItems
     .filter((item) => item.type === 'account')
     .map((item) => item.id);
@@ -219,40 +233,39 @@ export default function PerformancePage() {
       <div className="flex h-[calc(100vh-12rem)] flex-col space-y-6">
         <div className="flex flex-wrap items-center gap-2">
           {selectedItems.map((item) => (
-            <Badge
-              key={item.id}
-              className={`group border flex items-center gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:shadow-sm ${
-                selectedItemId === item.id ? 'ring-2 ring-primary ring-offset-2' : ''
-              }`}
-              onClick={() => handleBadgeSelect(item)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleBadgeSelect(item);
-                }
-              }}
-              aria-pressed={selectedItemId === item.id}
-              aria-label={`Select ${item.name}`}
-            >
-              {item.type === 'account' ? (
-                <Wallet className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
-              ) : (
-                <LineChart className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
-              )}
-              <span className="font-medium">{item.name}</span>
-              <button
-                type="button"
-                onClick={(e) => handleBadgeDelete(e, item)}
-                className="ml-1 flex items-center justify-center rounded-full bg-muted/30 p-0.5 transition-all duration-300 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-primary group-hover:bg-muted/80"
-                aria-label={`Remove ${item.name}`}
+              <Badge
+                key={item.id}
+                className={`group border flex items-center gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:shadow-sm ${
+                  selectedItemId === item.id ? 'ring-2 ring-primary ring-offset-2' : ''
+                }`}
+                onClick={() => handleBadgeSelect(item)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleBadgeSelect(item);
+                  }
+                }}
+                aria-pressed={selectedItemId === item.id}
+                aria-label={`Select ${item.name}`}
               >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </Badge>
-          ))}
-
+                {item.type === 'account' ? (
+                  <Wallet className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
+                ) : (
+                  <LineChart className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
+                )}
+                <span className="font-medium">{item.name}</span>
+                <button
+                  type="button"
+                  onClick={(e) => handleBadgeDelete(e, item)}
+                  className="ml-1 flex items-center justify-center rounded-full bg-muted/30 p-0.5 transition-all duration-300 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-primary group-hover:bg-muted/80"
+                  aria-label={`Remove ${item.name}`}
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </Badge>
+            ))}
           {selectedItems.length > 0 && <Separator orientation="vertical" className="mx-2 h-6" />}
 
           <AccountSelector
@@ -270,9 +283,7 @@ export default function PerformancePage() {
                 <div>
                   <CardTitle className="text-xl">Performance</CardTitle>
                   <CardDescription>
-                    {dateRange?.from && dateRange?.to
-                      ? `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-                      : 'Compare account performance over time'}
+                    {displayDateRange}
                   </CardDescription>
                 </div>
                 {performanceData && performanceData.length > 0 && (

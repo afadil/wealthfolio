@@ -1,4 +1,3 @@
-use bigdecimal::ParseBigDecimalError;
 use diesel::result::Error as DieselError;
 use std::num::ParseFloatError;
 use thiserror::Error;
@@ -85,7 +84,7 @@ pub enum ValidationError {
     MissingField(String),
 
     #[error("Failed to parse decimal number: {0}")]
-    DecimalParse(#[from] ParseBigDecimalError),
+    DecimalParse(#[from] rust_decimal::Error),
 }
 
 #[derive(Error, Debug)]
@@ -107,9 +106,9 @@ impl From<DieselError> for Error {
     }
 }
 
-// Add From implementation for ParseBigDecimalError
-impl From<ParseBigDecimalError> for Error {
-    fn from(err: ParseBigDecimalError) -> Self {
+// Add From implementation for rust_decimal::Error
+impl From<rust_decimal::Error> for Error {
+    fn from(err: rust_decimal::Error) -> Self {
         Error::Validation(ValidationError::DecimalParse(err))
     }
 }

@@ -7,22 +7,21 @@ use crate::market_data::market_data_model::{DataSource, QuoteRequest};
 use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{
     AccountSummary, HistorySummary, Holding, IncomeSummary,
-    PortfolioHistory, PORTFOLIO_PERCENT_SCALE,
+    HistoryRecord, PORTFOLIO_PERCENT_SCALE,
 };
 
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::info;
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::portfolio::history_service::HistoryService;
 use crate::portfolio::holdings_service::HoldingsService;
 use crate::portfolio::income_service::IncomeService;
 
-use bigdecimal::BigDecimal;
-use num_traits::Zero;
-use std::str::FromStr;
+use rust_decimal::Decimal;
 
 pub struct PortfolioService {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -137,7 +136,7 @@ impl PortfolioService {
         result
     }
 
-    pub fn get_all_accounts_history(&self) -> ServiceResult<Vec<PortfolioHistory>> {
+    pub fn get_all_accounts_history(&self) -> ServiceResult<Vec<HistoryRecord>> {
         self.history_service
             .get_all_accounts_history()
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
@@ -146,7 +145,7 @@ impl PortfolioService {
     pub fn get_portfolio_history(
         &self,
         account_id: Option<&str>,
-    ) -> ServiceResult<Vec<PortfolioHistory>> {
+    ) -> ServiceResult<Vec<HistoryRecord>> {
         self.history_service
             .get_portfolio_history(account_id)
             .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
@@ -166,17 +165,17 @@ impl PortfolioService {
         // Then, calculate the allocation percentage for each account
         for account in accounts {
             if let Ok(history) = self.history_service.get_latest_account_history(&account.id) {
-                let allocation_percentage = if total_portfolio_value > BigDecimal::zero() {
-                    let hundred = BigDecimal::from_str("100").unwrap();
+                let allocation_percentage = if total_portfolio_value > Decimal::ZERO {
+                    let hundred = Decimal::from_str("100").unwrap();
                     ((&history.market_value / &total_portfolio_value) * hundred)
-                        .with_scale(PORTFOLIO_PERCENT_SCALE)
+                        .round_dp(PORTFOLIO_PERCENT_SCALE)
                 } else {
-                    BigDecimal::zero().with_scale(PORTFOLIO_PERCENT_SCALE)
+                    Decimal::ZERO
                 };
 
                 account_summaries.push(AccountSummary {
                     account,
-                    performance: PortfolioHistory {
+                    performance: HistoryRecord {
                         allocation_percentage,
                         ..history
                     },
@@ -186,6 +185,4 @@ impl PortfolioService {
 
         Ok(account_summaries)
     }
-
-   
 }

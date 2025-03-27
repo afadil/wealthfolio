@@ -5,13 +5,10 @@ import { Icons } from '@/components/icons';
 import { formatAmount } from '@/lib/utils';
 import { AccountSelection } from './account-selection';
 import { Button } from '@/components/ui/button';
-import { calculateDepositsForLimit } from '@/commands/contribution-limits';
 import { Progress } from '@/components/ui/progress';
-import { useQuery } from '@tanstack/react-query';
 import { Account, ContributionLimit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { QueryKeys } from '@/lib/query-keys';
-import { DepositsCalculation } from '@/lib/types';
+import { useContributionLimitProgress } from '../useContributionLimitMutations';
 
 type ContributionLimitItemProps = {
   limit: ContributionLimit;
@@ -39,22 +36,7 @@ export function ContributionLimitItem({
     setIsExpanded(!isExpanded);
   };
 
-  const { data: progress, isLoading } = useQuery<DepositsCalculation>({
-    queryKey: [
-      QueryKeys.CONTRIBUTION_LIMIT_PROGRESS,
-      limit.id,
-      limit.accountIds,
-      limit.contributionYear,
-      limit.startDate,
-      limit.endDate,
-    ],
-    queryFn: async () => {
-      if (!limit.accountIds || limit.accountIds.length === 0) {
-        return { total: 0, baseCurrency: 'USD', byAccount: {} };
-      }
-      return calculateDepositsForLimit(limit.id);
-    },
-  });
+  const { data: progress, isLoading } = useContributionLimitProgress(limit.id);
 
   const progressValue = progress ? progress.total : 0;
   const progressPercentageNumber =

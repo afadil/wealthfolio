@@ -1,13 +1,13 @@
 use crate::fx::fx_errors::FxError;
 use crate::fx::fx_model::ExchangeRate;
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
 
 /// A calculator for currency conversions, supporting historical rates.
 pub struct CurrencyConverter {
     // Date -> (From, To) -> Rate
-    historical_rates: HashMap<NaiveDate, HashMap<(String, String), BigDecimal>>,
+    historical_rates: HashMap<NaiveDate, HashMap<(String, String), Decimal>>,
     sorted_dates: Vec<NaiveDate>, // Keep track of dates in sorted order
 }
 
@@ -44,7 +44,7 @@ impl CurrencyConverter {
                 }
             }
 
-            let mut rate_map: HashMap<(String, String), BigDecimal> = HashMap::new();
+            let mut rate_map: HashMap<(String, String), Decimal> = HashMap::new();
             let mut currencies: HashSet<String> = HashSet::new();
 
             // Add direct and inverse rates.
@@ -53,7 +53,7 @@ impl CurrencyConverter {
                 currencies.insert(rate.to_currency.clone());
 
                 let forward_rate = rate.rate;
-                let inverse_rate = BigDecimal::from(1) / forward_rate.clone();
+                let inverse_rate = Decimal::ONE / forward_rate;
                 
                 rate_map.insert(
                     (rate.from_currency.clone(), rate.to_currency.clone()),
@@ -110,9 +110,9 @@ impl CurrencyConverter {
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency == to_currency {
-            return Ok(BigDecimal::from(1));
+            return Ok(Decimal::ONE);
         }
 
         self.historical_rates
@@ -135,9 +135,9 @@ impl CurrencyConverter {
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency == to_currency {
-            return Ok(BigDecimal::from(1));
+            return Ok(Decimal::ONE);
         }
 
         // Check if we have any dates at all
@@ -180,11 +180,11 @@ impl CurrencyConverter {
     /// Converts an amount from one currency to another on a specific date.
     pub fn convert_amount(
         &self,
-        amount: BigDecimal,
+        amount: Decimal,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency == to_currency {
             return Ok(amount);
         }
@@ -196,11 +196,11 @@ impl CurrencyConverter {
     /// Converts an amount from one currency to another on the nearest available date.
     pub fn convert_amount_nearest(
         &self,
-        amount: BigDecimal,
+        amount: Decimal,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency == to_currency {
             return Ok(amount);
         }
@@ -235,7 +235,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: BigDecimal::from(85),
+                rate: Decimal::from(85),
                 source: DataSource::Manual,
                 timestamp: date1,
             },
@@ -243,7 +243,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: BigDecimal::from(90),
+                rate: Decimal::from(90),
                 source: DataSource::Manual,
                 timestamp: date1,
             },
@@ -251,7 +251,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: BigDecimal::from(86),
+                rate: Decimal::from(86),
                 source: DataSource::Manual,
                 timestamp: date2,
             },
@@ -259,7 +259,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: BigDecimal::from(91),
+                rate: Decimal::from(91),
                 source: DataSource::Manual,
                 timestamp: date2,
             },
@@ -267,7 +267,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: BigDecimal::from(87),
+                rate: Decimal::from(87),
                 source: DataSource::Manual,
                 timestamp: date3,
             },
@@ -275,7 +275,7 @@ mod tests {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: BigDecimal::from(92),
+                rate: Decimal::from(92),
                 source: DataSource::Manual,
                 timestamp: date3,
             },
@@ -287,12 +287,12 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = BigDecimal::from(100);
+        let amount = Decimal::ONE_HUNDRED;
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
         let converted_amount = converter
             .convert_amount(amount, "USD", "EUR", date)
             .unwrap();
-        assert_eq!(converted_amount, BigDecimal::from(85));
+        assert_eq!(converted_amount, Decimal::from(85));
     }
 
     #[test]
@@ -300,12 +300,12 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = BigDecimal::from(85);
+        let amount = Decimal::from(85);
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
         let converted_amount = converter
             .convert_amount(amount, "EUR", "USD", date)
             .unwrap();
-        assert_eq!(converted_amount, BigDecimal::from(100));
+        assert_eq!(converted_amount, Decimal::ONE_HUNDRED);
     }
 
     #[test]
@@ -313,19 +313,19 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = BigDecimal::from(100);
+        let amount = Decimal::ONE_HUNDRED;
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
         let converted_amount = converter
             .convert_amount(amount, "USD", "GBP", date)
             .unwrap();
-        assert_eq!(converted_amount, BigDecimal::from(100) * BigDecimal::from(85) * BigDecimal::from(90));
+        assert_eq!(converted_amount, Decimal::ONE_HUNDRED * Decimal::from(85) * Decimal::from(90));
     }
 
     #[test]
     fn test_no_rate_available() {
         let rates = vec![]; // Empty rates
         let converter = CurrencyConverter::new(rates).unwrap();
-        let amount = BigDecimal::from(100);
+        let amount = Decimal::ONE_HUNDRED;
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
         let result = converter.convert_amount(amount, "USD", "EUR", date);
         assert!(matches!(result, Err(FxError::RateNotFound(_))));
@@ -336,7 +336,7 @@ mod tests {
         let rates = test_exchange_rates();
         let converter = CurrencyConverter::new(rates).unwrap();
 
-        let amount = BigDecimal::from(100);
+        let amount = Decimal::ONE_HUNDRED;
         let date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
         let converted_amount = converter
             .convert_amount(amount.clone(), "USD", "USD", date)
@@ -350,25 +350,25 @@ mod tests {
         let converter = CurrencyConverter::new(rates).unwrap();
 
         // Test with a date that exists
-        let amount = BigDecimal::from(100);
+        let amount = Decimal::ONE_HUNDRED;
         let date_exact = NaiveDate::from_ymd_opt(2023, 10, 27).unwrap();
         let converted_amount = converter
             .convert_amount_nearest(amount.clone(), "USD", "EUR", date_exact)
             .unwrap();
-        assert_eq!(converted_amount, BigDecimal::from(86)); // Rate on 2023-10-27
+        assert_eq!(converted_amount, Decimal::from(86)); // Rate on 2023-10-27
 
         // Test with a date before the first date
         let date_before = NaiveDate::from_ymd_opt(2023, 10, 25).unwrap();
         let converted_amount = converter
             .convert_amount_nearest(amount.clone(), "USD", "EUR", date_before)
             .unwrap();
-        assert_eq!(converted_amount, BigDecimal::from(85)); // Should use 2023-10-26
+        assert_eq!(converted_amount, Decimal::from(85)); // Should use 2023-10-26
 
         // Test with a date after the last date
         let date_after = NaiveDate::from_ymd_opt(2023, 10, 29).unwrap();
         let converted_amount = converter
             .convert_amount_nearest(amount.clone(), "USD", "EUR", date_after)
             .unwrap();
-        assert_eq!(converted_amount, BigDecimal::from(87)); // Should use 2023-10-28
+        assert_eq!(converted_amount, Decimal::from(87)); // Should use 2023-10-28
     }
 }

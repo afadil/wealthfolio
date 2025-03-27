@@ -2,7 +2,7 @@ use crate::errors::{Result};
 use crate::{Activity, ActivityType};
 use crate::assets::Asset;
 use crate::portfolio::holdings_service::Portfolio;
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 use log::warn;
 
 pub trait Transaction {
@@ -10,29 +10,29 @@ pub trait Transaction {
 }
 
 // Helper functions to reduce code duplication
-fn get_fee(activity: &Activity) -> BigDecimal {
-    activity.fee.clone()
+fn get_fee(activity: &Activity) -> Decimal {
+    activity.fee
 }
 
-fn get_amount(activity: &Activity) -> BigDecimal {
-    match &activity.amount {
-        Some(amt) => amt.clone(),
+fn get_amount(activity: &Activity) -> Decimal {
+    match activity.amount {
+        Some(amt) => amt,
         None => {
             warn!("Amount not provided for cash activity ID: {}, using zero", activity.id);
-            BigDecimal::from(0)
+            Decimal::ZERO
         }
     }
 }
 
-fn get_quantity(activity: &Activity) -> BigDecimal {
-    activity.quantity.clone()
+fn get_quantity(activity: &Activity) -> Decimal {
+    activity.quantity
 }
 
-fn get_unit_price(activity: &Activity) -> BigDecimal {
-    activity.unit_price.clone()
+fn get_unit_price(activity: &Activity) -> Decimal {
+    activity.unit_price
 }
 
-fn adjust_cash_with_amount(portfolio: &mut Portfolio, activity: &Activity, amount_modifier: impl Fn(BigDecimal, BigDecimal) -> BigDecimal) -> Result<()> {
+fn adjust_cash_with_amount(portfolio: &mut Portfolio, activity: &Activity, amount_modifier: impl Fn(Decimal, Decimal) -> Decimal) -> Result<()> {
     let fee = get_fee(activity);
     let amount = get_amount(activity);
     let adjusted_amount = amount_modifier(amount, fee);
@@ -47,8 +47,8 @@ impl Transaction for BuyTransaction {
         let quantity = get_quantity(activity);
         let unit_price = get_unit_price(activity);
         let fee = get_fee(activity);
-        let activity_amount = &quantity * &unit_price;
-        let buy_cost = &activity_amount + &fee;
+        let activity_amount = quantity * unit_price;
+        let buy_cost = activity_amount + fee;
 
         portfolio.adjust_cash(&activity.account_id, &activity.currency, -buy_cost);
         let holding = portfolio.get_or_create_holding(&activity.account_id, &activity.asset_id, activity, asset);
@@ -64,8 +64,8 @@ impl Transaction for SellTransaction {
         let quantity = get_quantity(activity);
         let unit_price = get_unit_price(activity);
         let fee = get_fee(activity);
-        let activity_amount = &quantity * &unit_price;
-        let sell_profit = &activity_amount - &fee;
+        let activity_amount = quantity * unit_price;
+        let sell_profit = activity_amount - fee;
 
         portfolio.adjust_cash(&activity.account_id, &activity.currency, sell_profit);
 
@@ -143,9 +143,9 @@ impl Transaction for SplitTransaction {
         let split_ratio = get_amount(activity);
 
         if let Some(holding) = portfolio.get_holding_mut(&activity.account_id, &activity.asset_id) {
-            holding.quantity = &holding.quantity * &split_ratio;
+            holding.quantity = holding.quantity * split_ratio;
             if let Some(avg_cost) = holding.average_cost.as_mut() {
-                *avg_cost = avg_cost.clone() / &split_ratio;
+                *avg_cost = *avg_cost / split_ratio;
             }
         }
         Ok(())
@@ -199,16 +199,13 @@ pub struct RemoveHoldingTransaction;
 impl Transaction for RemoveHoldingTransaction {
     fn process(&self, portfolio: &mut Portfolio, activity: &Activity, _asset: &Asset) -> Result<()> {
         if let Some(holding) = portfolio.get_holding_mut(&activity.account_id, &activity.asset_id) {
-            let quantity = get_quantity(activity);
-            holding.reduce_position(quantity)?;
+            holding.reduce_position(get_quantity(activity))?;
 
             if !Portfolio::is_quantity_significant(&holding.quantity) {
                 portfolio.remove_holding(&activity.account_id, &activity.asset_id);
             }
-            Ok(())
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -230,4 +227,4 @@ pub fn get_transaction_handler(activity_type: ActivityType) -> Box<dyn Transacti
         ActivityType::AddHolding => Box::new(AddHoldingTransaction),
         ActivityType::RemoveHolding => Box::new(RemoveHoldingTransaction),
     }
-} 
+}

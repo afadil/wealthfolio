@@ -10,7 +10,7 @@ use crate::market_data::Quote;
 use crate::models::{ Holding, Performance};
 use crate::portfolio::transaction::get_transaction_handler;
 use crate::{Activity, ActivityType};
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 use diesel::SqliteConnection;
 use diesel::r2d2::{Pool, ConnectionManager};
 use log::error;
@@ -18,28 +18,28 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
-const ROUNDING_SCALE: i64 = 6;
-const PORTFOLIO_PERCENT_SCALE: i64 = 2;
+const ROUNDING_SCALE: u32 = 6;
+const PORTFOLIO_PERCENT_SCALE: u32 = 2;
 const QUANTITY_THRESHOLD: &str = "0.0000001";
 const PORTFOLIO_ACCOUNT_ID: &str = "PORTFOLIO";
 
 impl Holding {
-    pub fn add_position(&mut self, quantity: BigDecimal, price: BigDecimal) {
-        let position_value = &quantity * &price;
-        let old_value = &self.quantity * self.average_cost.clone().unwrap_or_default();
-        let new_value = &old_value + &position_value;
+    pub fn add_position(&mut self, quantity: Decimal, price: Decimal) {
+        let position_value = quantity * price;
+        let old_value = self.quantity * self.average_cost.unwrap_or_default();
+        let new_value = old_value + position_value;
 
-        self.quantity = &self.quantity + &quantity;
+        self.quantity = self.quantity + quantity;
 
-        if self.quantity != BigDecimal::from(0) {
-            self.average_cost = Some(&new_value / &self.quantity);
+        if self.quantity != Decimal::ZERO {
+            self.average_cost = Some(new_value / self.quantity);
         }
-        self.book_value = &self.book_value + &position_value;
-        self.book_value_converted = self.book_value.clone();
+        self.book_value = self.book_value + position_value;
+        self.book_value_converted = self.book_value;
     }
 
-    pub fn reduce_position(&mut self, quantity: BigDecimal) -> Result<()> {
-        if quantity <= BigDecimal::from(0) {
+    pub fn reduce_position(&mut self, quantity: Decimal) -> Result<()> {
+        if quantity <= Decimal::ZERO {
             return Err(Error::Validation(ValidationError::InvalidInput(
                 "Quantity to reduce must be positive".to_string(),
             )));
@@ -50,18 +50,18 @@ impl Holding {
             )));
         }
 
-        let sell_ratio = &quantity / &self.quantity;
-        let book_value_reduction = &self.book_value * &sell_ratio;
+        let sell_ratio = quantity / self.quantity;
+        let book_value_reduction = self.book_value * sell_ratio;
 
-        self.quantity = &self.quantity - &quantity;
-        self.book_value = &self.book_value - &book_value_reduction;
-        self.book_value_converted = self.book_value.clone();
+        self.quantity = self.quantity - quantity;
+        self.book_value = self.book_value - book_value_reduction;
+        self.book_value_converted = self.book_value;
 
         if !Portfolio::is_quantity_significant(&self.quantity) {
-            self.quantity = BigDecimal::from(0);
+            self.quantity = Decimal::ZERO;
             self.average_cost = None;
-            self.book_value = BigDecimal::from(0);
-            self.book_value_converted = BigDecimal::from(0);
+            self.book_value = Decimal::ZERO;
+            self.book_value_converted = Decimal::ZERO;
         }
 
         Ok(())
@@ -71,7 +71,7 @@ impl Holding {
 #[derive(Debug)]
 pub struct Portfolio {
     pub holdings: HashMap<String, HashMap<String, Holding>>, // account_id -> asset_id -> Holding
-    pub cash_positions: HashMap<String, HashMap<String, BigDecimal>>, // account_id -> currency -> amount
+    pub cash_positions: HashMap<String, HashMap<String, Decimal>>, // account_id -> currency -> amount
     pub base_currency: String,
 }
 
@@ -92,8 +92,8 @@ impl Portfolio {
         }
     }
 
-    pub fn is_quantity_significant(quantity: &BigDecimal) -> bool {
-        quantity.abs() >= BigDecimal::from_str(QUANTITY_THRESHOLD).unwrap_or_default()
+    pub fn is_quantity_significant(quantity: &Decimal) -> bool {
+        quantity.abs() >= Decimal::from_str(QUANTITY_THRESHOLD).unwrap_or_default()
     }
 
     pub fn remove_holding(&mut self, account_id: &str, asset_id: &str) {
@@ -106,15 +106,15 @@ impl Portfolio {
         }
     }
 
-    pub fn adjust_cash(&mut self, account_id: &str, currency: &str, amount: BigDecimal) {
+    pub fn adjust_cash(&mut self, account_id: &str, currency: &str, amount: Decimal) {
         let account_cash = self
             .cash_positions
             .entry(account_id.to_string())
             .or_default();
         let balance = account_cash
             .entry(currency.to_string())
-            .or_insert(BigDecimal::from(0));
-        *balance = balance.clone() + amount;
+            .or_insert(Decimal::ZERO);
+        *balance = *balance + amount;
     }
 
     pub fn process_activity(
@@ -155,7 +155,7 @@ impl Portfolio {
                 asset_class: asset.asset_class.clone(),
                 asset_sub_class: asset.asset_sub_class.clone(),
                 asset_data_source: Some(asset.data_source.clone()),
-                 sectors: asset
+                sectors: asset
                     .sectors
                     .clone()
                     .and_then(|s| serde_json::from_str(&s).ok()),
@@ -190,55 +190,38 @@ impl Portfolio {
                 // Update FX rates and converted values
                 let exchange_rate = fx_service
                     .get_latest_exchange_rate(&holding.currency, &self.base_currency)
-                    .unwrap_or(BigDecimal::from(1));
+                    .unwrap_or(Decimal::ONE);
 
                 if holding.holding_type.to_uppercase() == "CASH" {
-                    holding.market_value = holding.quantity.clone();
-                    holding.book_value = holding.quantity.clone();
-                    holding.market_value_converted = &holding.market_value * &exchange_rate;
-                    holding.book_value_converted = &holding.book_value * &exchange_rate;
+                    holding.market_value = holding.quantity;
+                    holding.book_value = holding.quantity;
+                    holding.market_value_converted = holding.market_value * exchange_rate;
+                    holding.book_value_converted = holding.book_value * exchange_rate;
                     continue;
                 }
 
                 if let Some(quote) = quotes.get(&holding.symbol) {
-                    let market_price = BigDecimal::from_str(&quote.close.to_string())?;
-                    holding.market_price = Some(market_price.clone());
-                    holding.market_value =
-                        (&holding.quantity * &market_price).round(ROUNDING_SCALE);
-                    holding.market_value_converted =
-                        (&holding.market_value * &exchange_rate).round(ROUNDING_SCALE);
-                    holding.book_value_converted =
-                        (&holding.book_value * &exchange_rate).round(ROUNDING_SCALE);
+                    let market_price = Decimal::from_str(&quote.close.to_string())?;
+                    holding.market_price = Some(market_price);
+                    
+                    // Calculate without intermediate rounding
+                    holding.market_value = holding.quantity * market_price;
+                    holding.market_value_converted = holding.market_value * exchange_rate;
+                    holding.book_value_converted = holding.book_value * exchange_rate;
 
-                    let opening_value = (&holding.quantity
-                        * BigDecimal::from_str(&quote.open.to_string())?)
-                    .round(ROUNDING_SCALE);
-                    let closing_value = &holding.market_value;
-                    holding.performance.day_gain_amount =
-                        Some((closing_value - &opening_value).round(ROUNDING_SCALE));
-                    holding.performance.day_gain_amount_converted = Some(
-                        (&holding.performance.day_gain_amount.clone().unwrap() * &exchange_rate)
-                            .round(ROUNDING_SCALE),
-                    );
+                    let opening_value = holding.quantity * Decimal::from_str(&quote.open.to_string())?;
+                    let closing_value = holding.market_value;
+                    holding.performance.day_gain_amount = Some(closing_value - opening_value);
+                    holding.performance.day_gain_amount_converted = Some(holding.performance.day_gain_amount.unwrap() * exchange_rate);
 
-                    if opening_value != BigDecimal::from(0) {
-                        holding.performance.day_gain_percent = Some(
-                            ((closing_value - &opening_value) / &opening_value
-                                * BigDecimal::from(100))
-                            .round(ROUNDING_SCALE),
-                        );
+                    if opening_value != Decimal::ZERO {
+                        holding.performance.day_gain_percent = Some((closing_value - opening_value) / opening_value * Decimal::ONE_HUNDRED);
                     }
 
-                    if holding.book_value != BigDecimal::from(0) {
-                        holding.performance.total_gain_amount =
-                            (&holding.market_value - &holding.book_value).round(ROUNDING_SCALE);
-                        holding.performance.total_gain_amount_converted =
-                            (&holding.market_value_converted - &holding.book_value_converted)
-                                .round(ROUNDING_SCALE);
-                        holding.performance.total_gain_percent = ((&holding.market_value / &holding.book_value
-                            - BigDecimal::from(1))
-                            * BigDecimal::from(100))
-                        .round(ROUNDING_SCALE);
+                    if holding.book_value != Decimal::ZERO {
+                        holding.performance.total_gain_amount = holding.market_value - holding.book_value;
+                        holding.performance.total_gain_amount_converted = holding.market_value_converted - holding.book_value_converted;
+                        holding.performance.total_gain_percent = (holding.market_value / holding.book_value - Decimal::ONE) * Decimal::ONE_HUNDRED;
                     }
                 }
             }
@@ -260,7 +243,7 @@ impl Portfolio {
     }
 
     #[allow(dead_code)]
-    pub fn get_cash_positions(&self) -> &HashMap<String, HashMap<String, BigDecimal>> {
+    pub fn get_cash_positions(&self) -> &HashMap<String, HashMap<String, Decimal>> {
         &self.cash_positions
     }
 
@@ -300,39 +283,23 @@ impl Portfolio {
                         ..Default::default()
                     });
 
-                total.quantity = (&total.quantity + &holding.quantity).round(ROUNDING_SCALE);
-                total.market_value = (&total.market_value + &holding.market_value).round(ROUNDING_SCALE);
-                total.book_value = (&total.book_value + &holding.book_value).round(ROUNDING_SCALE);
-                total.market_value_converted = (&total.market_value_converted + &holding.market_value_converted).round(ROUNDING_SCALE);
-                total.book_value_converted = (&total.book_value_converted + &holding.book_value_converted).round(ROUNDING_SCALE);
+                total.quantity = (total.quantity + holding.quantity).round_dp(ROUNDING_SCALE);
+                total.market_value = (total.market_value + holding.market_value).round_dp(ROUNDING_SCALE);
+                total.book_value = (total.book_value + holding.book_value).round_dp(ROUNDING_SCALE);
+                total.market_value_converted = (total.market_value_converted + holding.market_value_converted).round_dp(ROUNDING_SCALE);
+                total.book_value_converted = (total.book_value_converted + holding.book_value_converted).round_dp(ROUNDING_SCALE);
 
                 if let Some(day_gain) = &holding.performance.day_gain_amount {
-                    total.performance.day_gain_amount = Some(
-                        (&total
-                            .performance
-                            .day_gain_amount
-                            .clone()
-                            .unwrap_or_default()
-                            + day_gain)
-                            .round(ROUNDING_SCALE),
-                    );
+                    total.performance.day_gain_amount = Some((total.performance.day_gain_amount.unwrap_or_default() + day_gain).round_dp(ROUNDING_SCALE));
                 }
                 if let Some(day_gain_converted) = &holding.performance.day_gain_amount_converted {
-                    total.performance.day_gain_amount_converted = Some(
-                        (&total
-                            .performance
-                            .day_gain_amount_converted
-                            .clone()
-                            .unwrap_or_default()
-                            + day_gain_converted)
-                            .round(ROUNDING_SCALE),
-                    );
+                    total.performance.day_gain_amount_converted = Some((total.performance.day_gain_amount_converted.unwrap_or_default() + day_gain_converted).round_dp(ROUNDING_SCALE));
                 }
             }
         }
 
         // Add cash positions
-        let mut total_cash: HashMap<String, BigDecimal> = HashMap::new();
+        let mut total_cash: HashMap<String, Decimal> = HashMap::new();
         for currencies in self.cash_positions.values() {
             for (currency, amount) in currencies {
                 *total_cash.entry(currency.clone()).or_default() += amount;
@@ -348,14 +315,14 @@ impl Portfolio {
                     symbol: format!("$CASH-{}", currency),
                     symbol_name: Some(format!("Cash {}", currency)),
                     holding_type: "CASH".to_string(),
-                    quantity: amount.clone(),
+                    quantity: amount,
                     currency: currency.clone(),
                     base_currency: self.base_currency.clone(),
-                    market_price: Some(BigDecimal::from(1)),
-                    average_cost: Some(BigDecimal::from(1)),
-                    market_value: amount.clone(),
-                    book_value: amount.clone(),
-                    market_value_converted: amount.clone(),
+                    market_price: Some(Decimal::ONE),
+                    average_cost: Some(Decimal::ONE),
+                    market_value: amount,
+                    book_value: amount,
+                    market_value_converted: amount,
                     book_value_converted: amount,
                     performance: Performance::default(),
                     account: Some(Account {
@@ -382,41 +349,32 @@ impl Portfolio {
 
         // Calculate performance metrics for each total holding
         let mut total_holdings: Vec<Holding> = total_by_symbol.into_values().collect();
-        let total_portfolio_value: BigDecimal = total_holdings
+        let total_portfolio_value: Decimal = total_holdings
             .iter()
             .map(|h| &h.market_value_converted)
             .sum();
 
         for total in &mut total_holdings {
             // Calculate portfolio percentage
-            if total_portfolio_value != BigDecimal::from(0) {
-                total.portfolio_percent = Some(
-                    (&total.market_value_converted / &total_portfolio_value
-                        * BigDecimal::from(100))
-                    .round(PORTFOLIO_PERCENT_SCALE),
-                );
+            if total_portfolio_value != Decimal::ZERO {
+                total.portfolio_percent = Some((total.market_value_converted / total_portfolio_value * Decimal::ONE_HUNDRED).round_dp(PORTFOLIO_PERCENT_SCALE));
             }
 
             // Calculate average cost
-            if total.quantity != BigDecimal::from(0) {
-                total.average_cost = Some((&total.book_value / &total.quantity).round(ROUNDING_SCALE));
+            if total.quantity != Decimal::ZERO {
+                total.average_cost = Some((total.book_value / total.quantity).round_dp(ROUNDING_SCALE));
             }
 
             // Calculate performance metrics
-            if total.book_value != BigDecimal::from(0) {
-                total.performance.total_gain_amount = &total.market_value - &total.book_value;
-                total.performance.total_gain_amount_converted =
-                    &total.market_value_converted - &total.book_value_converted;
-                total.performance.total_gain_percent = ((&total.market_value / &total.book_value
-                    - BigDecimal::from(1))
-                    * BigDecimal::from(100))
-                .round(ROUNDING_SCALE);
+            if total.book_value != Decimal::ZERO {
+                total.performance.total_gain_amount = total.market_value - total.book_value;
+                total.performance.total_gain_amount_converted = total.market_value_converted - total.book_value_converted;
+                total.performance.total_gain_percent = ((total.market_value / total.book_value - Decimal::ONE) * Decimal::ONE_HUNDRED).round_dp(ROUNDING_SCALE);
             }
 
             if let Some(day_gain) = &total.performance.day_gain_amount {
-                if total.market_value != BigDecimal::from(0) {
-                    total.performance.day_gain_percent =
-                        Some((day_gain / (&total.market_value - day_gain)) * BigDecimal::from(100));
+                if total.market_value != Decimal::ZERO {
+                    total.performance.day_gain_percent = Some((day_gain / (total.market_value - day_gain)) * Decimal::ONE_HUNDRED);
                 }
             }
         }
@@ -439,8 +397,8 @@ impl Portfolio {
                     quantity: amount.clone(),
                     currency: currency.clone(),
                     base_currency: self.base_currency.clone(),
-                    market_price: Some(BigDecimal::from(1)),
-                    average_cost: Some(BigDecimal::from(1)),
+                    market_price: Some(Decimal::ONE),
+                    average_cost: Some(Decimal::ONE),
                     market_value: amount.clone(),
                     book_value: amount.clone(),
                     market_value_converted: amount.clone(),

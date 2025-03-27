@@ -1,4 +1,4 @@
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 use chrono::{Utc, NaiveDate};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
@@ -73,7 +73,7 @@ impl FxService {
                             id: ExchangeRate::make_fx_symbol(from, to),
                             from_currency: from.to_string(),
                             to_currency: to.to_string(),
-                            rate: BigDecimal::from(1) / inverse_rate.rate,
+                            rate: Decimal::ONE / inverse_rate.rate,
                             source: inverse_rate.source,
                             timestamp: inverse_rate.timestamp,
                         };
@@ -140,7 +140,7 @@ impl FxService {
         &self,
         from: &str,
         to: &str,
-        rate: BigDecimal,
+        rate: Decimal,
     ) -> Result<ExchangeRate, FxError> {
         let new_rate = NewExchangeRate {
             from_currency: from.to_string(),
@@ -155,9 +155,9 @@ impl FxService {
         &self,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency == to_currency {
-            return Ok(BigDecimal::from(1));
+            return Ok(Decimal::ONE);
         }
 
         // Try to get the converter
@@ -190,7 +190,7 @@ impl FxService {
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         // Check for valid currency codes
         if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
             // log::error!("Invalid from_currency code: {}", from_currency);
@@ -207,7 +207,7 @@ impl FxService {
         }
         
         if from_currency == to_currency {
-            return Ok(BigDecimal::from(1));
+            return Ok(Decimal::ONE);
         }
 
         // Try to get the converter
@@ -232,10 +232,10 @@ impl FxService {
 
     pub fn convert_currency(
         &self,
-        amount: BigDecimal,
+        amount: Decimal,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency.eq(to_currency) {
             return Ok(amount);
         }
@@ -265,11 +265,11 @@ impl FxService {
 
     pub fn convert_currency_for_date(
         &self,
-        amount: BigDecimal,
+        amount: Decimal,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<BigDecimal, FxError> {
+    ) -> Result<Decimal, FxError> {
         if from_currency.eq(to_currency) {
             return Ok(amount);
         }
@@ -330,7 +330,7 @@ impl FxService {
             let exchange_rate = NewExchangeRate {
                 from_currency: from.to_string(),
                 to_currency: to.to_string(),
-                rate: BigDecimal::from(1),
+                rate: Decimal::ONE,
                 source: DataSource::Yahoo,
             };
 

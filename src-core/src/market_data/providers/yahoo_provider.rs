@@ -3,9 +3,8 @@ use std::{sync::RwLock, time::SystemTime};
 use super::models::{AssetClass, AssetProfile, AssetSubClass, PriceDetail, YahooResult};
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::DataSource;
-use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketDataProvider};
-use crate::market_data::{Quote as ModelQuote, QuoteSummary};
-use bigdecimal::BigDecimal;
+use crate::market_data::{AssetProfiler, MarketDataProvider, Quote as ModelQuote, QuoteSummary};
+use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::debug;
@@ -171,41 +170,51 @@ impl YahooProvider {
             data_source: DataSource::Yahoo,
             date,
             symbol: symbol.to_string(),
-            open: BigDecimal::from_f64(
+            open: Decimal::from_f64_retain(
                 price
                     .regular_market_open
                     .as_ref()
                     .and_then(|p| p.raw)
                     .unwrap_or(0.0),
             )
-            .unwrap(),
-            high: BigDecimal::from_f64(
+            .unwrap_or_default(),
+            high: Decimal::from_f64_retain(
                 price
                     .regular_market_day_high
                     .as_ref()
                     .and_then(|p| p.raw)
                     .unwrap_or(0.0),
             )
-            .unwrap(),
-            low: BigDecimal::from_f64(
+            .unwrap_or_default(),
+            low: Decimal::from_f64_retain(
                 price
                     .regular_market_day_low
                     .as_ref()
                     .and_then(|p| p.raw)
                     .unwrap_or(0.0),
             )
-            .unwrap(),
-            volume: BigDecimal::from_f64(
+            .unwrap_or_default(),
+            volume: Decimal::from_f64_retain(
                 price
                     .regular_market_volume
                     .as_ref()
                     .and_then(|p| p.raw)
                     .unwrap_or(0.0),
             )
-            .unwrap(),
-            close: BigDecimal::from_f64(regular_market_price.raw.unwrap_or(0.0)).unwrap(),
-            adjclose: BigDecimal::from_f64(regular_market_price.raw.unwrap_or(0.0)).unwrap(),
-            currency: price.currency.clone().unwrap_or_default(),
+            .unwrap_or_default(),
+            close: Decimal::from_f64_retain(
+                regular_market_price
+                    .raw
+                    .unwrap_or(0.0),
+            )
+            .unwrap_or_default(),
+            adjclose: Decimal::from_f64_retain(
+                regular_market_price
+                    .raw
+                    .unwrap_or(0.0),
+            )
+            .unwrap_or_default(),
+            currency: price.currency.clone().unwrap_or_else(|| "USD".to_string()),
         })
     }
 
@@ -225,12 +234,12 @@ impl YahooProvider {
             data_source: DataSource::Yahoo,
             date,
             symbol: symbol,
-            open: BigDecimal::from_f64(yahoo_quote.open).unwrap_or_default(),
-            high: BigDecimal::from_f64(yahoo_quote.high).unwrap_or_default(),
-            low: BigDecimal::from_f64(yahoo_quote.low).unwrap_or_default(),
-            volume: BigDecimal::from_u64(yahoo_quote.volume).unwrap_or_default(),
-            close: BigDecimal::from_f64(yahoo_quote.close).unwrap_or_default(),
-            adjclose: BigDecimal::from_f64(yahoo_quote.adjclose).unwrap_or_default(),
+            open: Decimal::from_f64_retain(yahoo_quote.open).unwrap_or_default(),
+            high: Decimal::from_f64_retain(yahoo_quote.high).unwrap_or_default(),
+            low: Decimal::from_f64_retain(yahoo_quote.low).unwrap_or_default(),
+            volume: Decimal::from_u64(yahoo_quote.volume).unwrap_or_default(),
+            close: Decimal::from_f64_retain(yahoo_quote.close).unwrap_or_default(),
+            adjclose: Decimal::from_f64_retain(yahoo_quote.adjclose).unwrap_or_default(),
             currency: fallback_currency,
         }
     }
@@ -662,12 +671,6 @@ impl MarketDataProvider for YahooProvider {
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
-
-    // async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError> {
-    //     self.get_exchange_rate(from, to)
-    //         .await
-    //         .map_err(|e| MarketDataError::ProviderError(e.to_string()))
-    // }
 
     async fn get_historical_quotes_bulk(
         &self,

@@ -57,7 +57,6 @@ export function ContributionLimitForm({
     },
   });
 
-  console.log('form values', form.getValues());
   // Function to update dates based on year
   const updateDatesBasedOnYear = (year: number) => {
     if (!year || isNaN(year)) return;
@@ -66,8 +65,6 @@ export function ContributionLimitForm({
     const startDate = new Date(Date.UTC(year, 0, 1, 12, 0, 0));
     const endDate = new Date(Date.UTC(year, 11, 31, 12, 0, 0));
     
-    console.log(' setting startDate and endDate', startDate, endDate);
-
     form.setValue('startDate', startDate);
     form.setValue('endDate', endDate);
   };

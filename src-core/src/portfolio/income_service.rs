@@ -8,8 +8,8 @@ use diesel::dsl::min;
 use diesel::prelude::*;
 use log::{debug, error};
 use std::sync::Arc;
-use bigdecimal::BigDecimal;
-use std::str::FromStr;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use num_traits::Zero;
 
 pub struct IncomeService {
@@ -65,8 +65,8 @@ impl IncomeService {
         let results = raw_results
             .into_iter()
             .map(|raw| {
-                // Parse the TEXT value into BigDecimal
-                let amount = BigDecimal::from_str(&raw.amount).unwrap_or_else(|_| BigDecimal::zero());
+                // Parse the TEXT value into Decimal
+                let amount = Decimal::from_str(&raw.amount).unwrap_or_else(|_| Decimal::zero());
                 
                 IncomeData {
                     date: raw.date,
@@ -94,11 +94,11 @@ impl IncomeService {
             .and_then(|opt| opt.ok_or(diesel::NotFound))
     }
 
-    fn calculate_yoy_growth(current: BigDecimal, previous: BigDecimal) -> BigDecimal {
-        if previous > BigDecimal::zero() {
-            ((&current - &previous) / &previous) * BigDecimal::from(100)
+    fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
+        if previous > Decimal::zero() {
+            ((&current - &previous) / &previous) * Decimal::ONE_HUNDRED
         } else {
-            BigDecimal::zero()
+            Decimal::zero()
         }
     }
 

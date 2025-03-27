@@ -31,5 +31,16 @@ impl From<ActivityError> for String {
     }
 }
 
+impl From<ActivityError> for diesel::result::Error {
+    fn from(err: ActivityError) -> Self {
+        // Convert ActivityError to a diesel error
+        // Using DatabaseError as it's the most appropriate for general errors
+        diesel::result::Error::DatabaseError(
+            diesel::result::DatabaseErrorKind::SerializationFailure,
+            Box::new(format!("{}", err))
+        )
+    }
+}
+
 /// Result type for activity operations
 pub type Result<T> = std::result::Result<T, ActivityError>; 

@@ -15,3 +15,4 @@ pub use holdings_service::*;
 pub use history_service::*;
 pub use transaction::*;
 pub use performance_service::*;
+pub use portfolio_service::*;

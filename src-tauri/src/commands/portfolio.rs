@@ -1,20 +1,19 @@
 // Project imports
-use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, PortfolioHistory};
+use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, HistoryRecord};
 use crate::AppState;
 
 // External imports
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::debug;
-use wealthfolio_core::market_data::MarketDataService;
+use wealthfolio_core::PerformanceResponse;
 use std::sync::Arc;
 use tauri::async_runtime::{block_on, spawn_blocking};
 use tauri::State;
 
 // Wealthfolio core imports
-use wealthfolio_core::portfolio::portfolio_service::PortfolioService;
-use wealthfolio_core::portfolio::performance_service::{CumulativeReturnsResponse, PerformanceService};
-use wealthfolio_core::portfolio::history_repository::HistoryRepository;
+use wealthfolio_core::PortfolioService;
+use wealthfolio_core::PerformanceService;
 
 async fn create_portfolio_service(
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -28,14 +27,9 @@ async fn create_portfolio_service(
 async fn create_performance_service(
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
 ) -> Result<PerformanceService, String> {
-    let history_repository = Arc::new(HistoryRepository::new(pool.clone()));
-    let market_data_service = Arc::new(
-        MarketDataService::new(pool)
-            .await
-            .map_err(|e| e.to_string())?
-    );
-    
-    Ok(PerformanceService::new(history_repository, market_data_service))
+    PerformanceService::new(pool)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 async fn spawn_blocking_with_service<T, F>(
@@ -84,7 +78,7 @@ pub async fn compute_holdings(state: State<'_, AppState>) -> Result<Vec<Holding>
 pub async fn get_portfolio_history(
     state: State<'_, AppState>,
     account_id: Option<String>,
-) -> Result<Vec<PortfolioHistory>, String> {
+) -> Result<Vec<HistoryRecord>, String> {
     let base_currency = state.get_base_currency();
     let pool = state.pool.clone();
     let account_id_ref = account_id.as_deref();
@@ -138,7 +132,7 @@ pub async fn calculate_performance(
     item_id: String,
     start_date: String,
     end_date: String,
-) -> Result<CumulativeReturnsResponse, String> {
+) -> Result<PerformanceResponse, String> {
     debug!("Calculating cumulative returns...");
     let pool = state.pool.clone();
 

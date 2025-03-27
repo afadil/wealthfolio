@@ -68,8 +68,6 @@ export const createActivity = async (activity: ActivityCreate): Promise<Activity
 };
 
 export const updateActivity = async (activity: ActivityUpdate): Promise<Activity> => {
-
-  console.log('activity update', activity);
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

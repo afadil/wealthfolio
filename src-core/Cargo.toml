@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio_core"
-version = "1.0.24"
+version = "1.1.0"
 description = "An Open Source Desktop Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "AGPL-3.0"
@@ -27,8 +27,7 @@ rayon = "1.10"
 r2d2 = "0.8"
 dashmap = "6.1"
 async-trait = "0.1"
-bigdecimal = { version = "0.4", features = ["serde"] }
-rust_decimal = { version = "1.37", features = ["maths"] }
+rust_decimal = { version = "1.37", features = ["maths","serde-with-str"] }
 num-traits = "0.2"
 rust_decimal_macros = "1.37"
 log = "0.4"

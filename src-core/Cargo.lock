@@ -147,7 +147,6 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -2458,10 +2457,9 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio_core"
-version = "1.0.24"
+version = "1.1.0"
 dependencies = [
  "async-trait",
- "bigdecimal",
  "chrono",
  "csv",
  "dashmap",

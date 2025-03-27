@@ -3,39 +3,31 @@ use crate::market_data::market_data_service::MarketDataService;
 use crate::portfolio::history_repository::HistoryRepository;
 
 use chrono::NaiveDate;
-use log::info;
+use diesel::r2d2::ConnectionManager;
+use diesel::SqliteConnection;
+use r2d2::Pool;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
 use rust_decimal::Decimal;
-use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use rust_decimal::MathematicalOps;
-use std::str::FromStr;
-use num_traits::ToPrimitive;
+use rust_decimal_macros::dec;
+use log::info;
 
-/// Represents a single data point for cumulative returns
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CumulativeReturn {
     pub date: NaiveDate,
+    #[serde(with = "rust_decimal::serde::str")]
     pub value: Decimal,
 }
 
-/// Represents a portfolio history record with date, total value, and net deposits
-pub struct HistoryRecord {
-    pub date: NaiveDate,
-    pub total_value: Decimal,
-    pub net_deposits: Decimal,
-}
 
-/// Method for calculating returns
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ReturnMethod {
-    /// Time-weighted return - adjusts for the timing and size of cash flows
     TimeWeighted,
-    /// Money-weighted return - accounts for the size and timing of all cash flows
     MoneyWeighted,
 }
 
@@ -45,52 +37,49 @@ impl Default for ReturnMethod {
     }
 }
 
-/// Single return data point with date and value
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReturnData {
     pub date: NaiveDate,
+    #[serde(with = "rust_decimal::serde::str")]
     pub value: Decimal,
 }
 
-/// API response structure for cumulative returns
-#[derive(Debug, Serialize, Deserialize)]
-
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct CumulativeReturnsResponse {
+pub struct PerformanceResponse {
     pub id: String,
     pub returns: Vec<ReturnData>,
+    #[serde(with = "rust_decimal::serde::str")]
     pub total_return: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
     pub annualized_return: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
     pub volatility: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
     pub max_drawdown: Decimal,
 }
 
-/// Service for calculating portfolio performance metrics
 pub struct PerformanceService {
     history_repository: Arc<HistoryRepository>,
     market_data_service: Arc<MarketDataService>,
 }
 
+const TRADING_DAYS_PER_YEAR: u32 = 252;
+const DAYS_PER_YEAR_DECIMAL: Decimal = dec!(365.25);
+const SQRT_TRADING_DAYS_APPROX: Decimal = dec!(15.874507866); // sqrt(252)
+const DECIMAL_PRECISION: u32 = 6;
+
 impl PerformanceService {
-    /// Creates a new PerformanceService instance
-    pub fn new(
-        history_repository: Arc<HistoryRepository>,
-        market_data_service: Arc<MarketDataService>,
-    ) -> Self {
-        Self {
+    pub async fn new(
+        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    ) -> ServiceResult<Self> {
+        let history_repository = Arc::new(HistoryRepository::new(pool.clone()));
+        let market_data_service = Arc::new(MarketDataService::new(pool).await?);
+
+        Ok(Self {
             history_repository,
             market_data_service,
-        }
-    }
-
-    /// Rounds a Decimal value to the specified number of decimal places
-    fn round_decimal(value: &Decimal, places: u32) -> Decimal {
-        value.round_dp(places)
-    }
-
-    /// Safely converts a string to a Decimal, returning zero if conversion fails
-    fn parse_decimal(value: &str) -> Decimal {
-        Decimal::from_str(value).unwrap_or_else(|_| Decimal::ZERO)
+        })
     }
 
     /// Calculates cumulative returns for a given item (account or symbol)
@@ -100,401 +89,347 @@ impl PerformanceService {
         item_id: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
-    ) -> ServiceResult<CumulativeReturnsResponse> {
-        info!("Calculating returns for {} {} from {} to {}", item_type, item_id, start_date, end_date);
+    ) -> ServiceResult<PerformanceResponse> {
         match item_type {
-            "account" => self.calculate_account_performance(item_id, start_date, end_date, ReturnMethod::TimeWeighted).await,
-            "symbol" => self.calculate_symbol_performance(item_id, start_date, end_date).await,
-            _ => Err(errors::Error::Validation(ValidationError::InvalidInput("Invalid item type".to_string()))),
+            "account" => {
+                self.calculate_account_performance(
+                    item_id,
+                    start_date,
+                    end_date,
+                    ReturnMethod::TimeWeighted,
+                )
+                .await
+            }
+            "symbol" => {
+                self.calculate_symbol_performance(item_id, start_date, end_date)
+                    .await
+            }
+            _ => Err(errors::Error::Validation(ValidationError::InvalidInput(
+                "Invalid item type".to_string(),
+            ))),
         }
     }
 
-    /// Calculates cumulative returns for an account
-    pub async fn calculate_account_performance(
+    /// Internal function for calculating account performance (Refactored Logic)
+    async fn calculate_account_performance(
         &self,
         account_id: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
         method: ReturnMethod,
-    ) -> ServiceResult<CumulativeReturnsResponse> {
-        let start_time = Instant::now();
-
-        let portfolio_history = self.history_repository.get_by_account(Some(account_id))?;
-
-        // Parse dates and filter history
-        let mut sorted_history: Vec<_> = portfolio_history
-            .iter()
-            .filter_map(|h| {
-                NaiveDate::parse_from_str(&h.date, "%Y-%m-%d")
-                    .ok()
-                    .filter(|date| date >= &start_date && date <= &end_date)
-                    .map(|date| (date, h))
-            })
-            .collect();
-
-        // Sort by parsed date
-        sorted_history.sort_by_key(|(date, _)| *date);
-
-        let mut returns = Vec::new();
-        let mut daily_returns = Vec::new();
-
-        // Handle empty history gracefully.
-        if sorted_history.is_empty() {
-            return Ok(CumulativeReturnsResponse {
-                id: account_id.to_string(),
-                returns: Vec::new(),
-                total_return: dec!(0),
-                annualized_return: dec!(0),
-                volatility: dec!(0),
-                max_drawdown: dec!(0),
-            });
+    ) -> ServiceResult<PerformanceResponse> {
+        if start_date > end_date {
+            return Err(errors::Error::Validation(ValidationError::InvalidInput(
+                "Start date must be before end date".to_string(),
+            )));
         }
 
-        // Use helper method for conversion
-        let mut prev_total_value =
-            Self::parse_decimal(&sorted_history[0].1.total_value.to_string());
-        let mut prev_net_deposit =
-            Self::parse_decimal(&sorted_history[0].1.net_deposit.to_string());
-        let mut cumulative_value = dec!(1);
+        let full_history = self.history_repository.get_by_account(Some(account_id), Some(start_date), Some(end_date))?;
 
-        // Reuse these constants
-        let one = dec!(1);
-        let two = dec!(2);
+        // The repository already returns history sorted by date, so we can use it directly
+        // We just need to ensure we have enough data points
+        if full_history.len() < 2 {
+            return Ok(PerformanceService::empty_response(account_id));
+        }
 
-        for (date, history) in sorted_history.iter() {
-            // Use helper method for conversion
-            let current_total_value = Self::parse_decimal(&history.total_value.to_string());
-            let current_net_deposit = Self::parse_decimal(&history.net_deposit.to_string());
+        let capacity = full_history.len();  
+        let mut returns = Vec::with_capacity(capacity);
+        let mut daily_returns = Vec::with_capacity(capacity - 1);
 
-            // Avoid cloning by using references where possible
-            let deposit_change = current_net_deposit - prev_net_deposit;
+        // Add initial point with zero value at the start date
+        let first_date = NaiveDate::parse_from_str(&full_history[0].date, "%Y-%m-%d")
+            .unwrap_or(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
+        
+        // Add the initial zero point
+        returns.push(ReturnData {
+            date: first_date,
+            value: Decimal::ZERO,
+        });
 
-            // Calculate daily return based on the method
-            let daily_return = match method {
+        // Cache frequently used decimals
+        let one = Decimal::ONE;
+        let two = dec!(2.0);
+        let mut cumulative_value = one;
+
+        for window in full_history.windows(2) {
+            let prev_point = &window[0];
+            let curr_point = &window[1];
+
+            // Validate values
+            if prev_point.total_value.is_sign_negative() || curr_point.total_value.is_sign_negative() {
+                return Err(errors::Error::Validation(ValidationError::InvalidInput(
+                    "Negative values found in history records".to_string(),
+                )));
+            }
+
+            let prev_total_value = prev_point.total_value;
+            let prev_net_deposit = prev_point.net_deposit;
+            let current_total_value = curr_point.total_value;
+            let current_net_deposit = curr_point.net_deposit;
+
+            let cash_flow = (current_net_deposit - prev_net_deposit).round_dp(DECIMAL_PRECISION);
+
+            let period_return = match method {
                 ReturnMethod::TimeWeighted => {
-                    if prev_total_value.is_zero() {
-                        dec!(0)
+                    let denominator = (prev_total_value + cash_flow).round_dp(DECIMAL_PRECISION);
+                    if denominator.is_zero() {
+                        Decimal::ZERO
                     } else {
-                        // Adjust for deposits/withdrawals
-                        let adjusted_prev_value = prev_total_value + deposit_change;
-                        if adjusted_prev_value.is_zero() {
-                            dec!(0)
-                        } else {
-                            (current_total_value / adjusted_prev_value) - one
-                        }
+                        ((current_total_value / denominator) - one).round_dp(DECIMAL_PRECISION)
                     }
                 }
                 ReturnMethod::MoneyWeighted => {
-                    // For money-weighted, we need to handle deposits differently
-                    if prev_total_value.is_zero() {
-                        dec!(0)
+                    let numerator = (current_total_value - prev_total_value - cash_flow).round_dp(DECIMAL_PRECISION);
+                    let denominator = (prev_total_value + (cash_flow / two)).round_dp(DECIMAL_PRECISION);
+                    if denominator.is_zero() {
+                        Decimal::ZERO
                     } else {
-                        // If there was a deposit/withdrawal, use the midpoint formula
-                        if !deposit_change.is_zero() {
-                            let denominator = prev_total_value + (deposit_change / two);
-                            if denominator.is_zero() {
-                                dec!(0)
-                            } else {
-                                (current_total_value - prev_total_value - deposit_change) / denominator
-                            }
-                        } else {
-                            // No deposit/withdrawal, simple return calculation
-                            (current_total_value / prev_total_value) - one
-                        }
+                        (numerator / denominator).round_dp(DECIMAL_PRECISION)
                     }
                 }
             };
 
-            // Store daily return for volatility calculation
-            daily_returns.push(daily_return);
-
-            // Update cumulative return
-            cumulative_value = cumulative_value * (one + daily_return);
-            let cumulative_return_for_period = cumulative_value - one;
+            daily_returns.push(period_return);
+            cumulative_value *= one + period_return;
+            let cumulative_return_to_date = (cumulative_value - one).round_dp(DECIMAL_PRECISION);
 
             returns.push(ReturnData {
-                date: *date,
-                value: Self::round_decimal(&cumulative_return_for_period, 6),
+                date: NaiveDate::parse_from_str(&curr_point.date, "%Y-%m-%d")
+                    .unwrap_or(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
+                value: cumulative_return_to_date,
             });
-
-            // Update previous values for next iteration
-            prev_total_value = current_total_value;
-            prev_net_deposit = current_net_deposit;
         }
 
-        let total_return = returns.last().map(|r| r.value).unwrap_or(dec!(0));
-        let annualized_return = Self::calculate_annualized_return(start_date, end_date, &total_return);
-        
-        // Calculate volatility and max drawdown
+        let total_return = returns.last().map_or(Decimal::ZERO, |r| r.value);
+        let annualized_return =
+            Self::calculate_annualized_return(start_date, end_date, total_return);
         let volatility = Self::calculate_volatility(&daily_returns);
-        let max_drawdown = Self::calculate_max_drawdown(&returns);
+        let max_drawdown = Self::calculate_max_drawdown(&daily_returns);
 
-        info!(
-            "Account returns calculation completed in: {:.4} seconds with {} data points",
-            start_time.elapsed().as_secs_f64(),
-            returns.len()
-        );
-
-        Ok(CumulativeReturnsResponse {
+        let result = PerformanceResponse {
             id: account_id.to_string(),
             returns,
             total_return,
             annualized_return,
             volatility,
             max_drawdown,
-        })
+        };
+
+        Ok(result)
     }
 
-    /// Calculates cumulative returns for a symbol
-    pub async fn calculate_symbol_performance(
+    /// Internal function for calculating symbol performance (Refactored Logic)
+    async fn calculate_symbol_performance(
         &self,
         symbol: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
-    ) -> ServiceResult<CumulativeReturnsResponse> {
+    ) -> ServiceResult<PerformanceResponse> {
+        if start_date > end_date {
+            return Err(errors::Error::Validation(ValidationError::InvalidInput(
+                "Start date must be before end date".to_string(),
+            )));
+        }
+
         let start_time = Instant::now();
-        
-        // Fetch historical quotes
+        info!("Starting symbol performance calculation for symbol={}, start_date={}, end_date={}", 
+            symbol, start_date, end_date);
+
+        let mut fetch_start_date = start_date;
         let quote_history = self
             .market_data_service
-            .get_historical_quotes_from_provider(symbol, start_date, end_date)
+            .get_historical_quotes_from_provider(symbol, fetch_start_date, end_date)
             .await?;
 
-        if quote_history.is_empty() {
-            return Ok(CumulativeReturnsResponse {
-                id: symbol.to_string(),
-                returns: Vec::new(),
-                total_return: dec!(0),
-                annualized_return: dec!(0),
-                volatility: dec!(0),
-                max_drawdown: dec!(0),
-            });
-        }
-
-        // Create quote map and fill missing dates
         let quote_map: HashMap<NaiveDate, Decimal> = quote_history
             .into_iter()
-            .map(|quote| {
-                let decimal_value = Decimal::from_str(&quote.close.to_string())
-                    .unwrap_or(dec!(0));
-                (quote.date.date(), decimal_value)
-            })
+            .map(|quote| (quote.date.date(), quote.close.round_dp(DECIMAL_PRECISION)))
             .collect();
 
-        let mut filled_quotes = Vec::new();
-        let mut current_date = start_date;
-        let mut last_value: Option<Decimal> = None;
+        let mut prev_price = match quote_map.get(&fetch_start_date).copied() {
+            Some(price) => price,
+            None => {
+                let first_price = loop {
+                    if fetch_start_date >= end_date {
+                        if !quote_map.contains_key(&end_date) {
+                            return Ok(PerformanceService::empty_response(symbol));
+                        }
+                        break *quote_map.get(&fetch_start_date).unwrap();
+                    }
 
-        // Pre-allocate with capacity
-        filled_quotes.reserve((end_date - start_date).num_days() as usize + 1);
+                    if let (Some(p1), Some(_p2)) = (
+                        quote_map.get(&fetch_start_date),
+                        quote_map.get(&fetch_start_date.succ_opt().unwrap_or(end_date)),
+                    ) {
+                        break *p1;
+                    }
+                    fetch_start_date = fetch_start_date.succ_opt().unwrap_or(end_date);
+                };
+                first_price
+            }
+        };
+
+        let capacity = (end_date - start_date).num_days().max(0) as usize + 1;
+        let mut returns = Vec::with_capacity(capacity);
+        let mut daily_returns = Vec::with_capacity(capacity);
+        let mut cumulative_value = Decimal::ONE;
+        let mut current_date = start_date;
+        let mut last_known_price = prev_price;
 
         while current_date <= end_date {
-            match quote_map.get(&current_date) {
-                Some(value) => {
-                    filled_quotes.push((current_date, *value));
-                    last_value = Some(*value);
+            let current_price = match quote_map.get(&current_date) {
+                Some(price) => {
+                    last_known_price = *price;
+                    *price
                 }
-                None => {
-                    if let Some(last) = last_value {
-                        filled_quotes.push((current_date, last));
-                    }
-                }
-            }
-            current_date = current_date.succ_opt().unwrap_or(current_date);
-        }
-
-        // Calculate returns
-        let mut returns = Vec::new();
-        let mut daily_returns = Vec::new();
-        returns.reserve(filled_quotes.len().saturating_sub(1));
-        daily_returns.reserve(filled_quotes.len().saturating_sub(1));
-
-        let mut cumulative_return = dec!(1);
-        let one = dec!(1);
-        
-        for window in filled_quotes.windows(2) {
-            let (_, prev_value) = window[0];
-            let (curr_date, curr_value) = window[1];
-            
-            // Skip division if previous value is zero to avoid NaN
-            let daily_return = if prev_value.is_zero() {
-                dec!(0)
-            } else {
-                (curr_value / prev_value) - one
+                None => last_known_price,
             };
-            
-            // Store daily return for volatility calculation
+
+            let daily_return = if prev_price.is_zero() {
+                Decimal::ZERO
+            } else {
+                ((current_price / prev_price) - Decimal::ONE).round_dp(DECIMAL_PRECISION)
+            };
             daily_returns.push(daily_return);
-            
-            // Update cumulative return
-            cumulative_return = cumulative_return * (one + daily_return);
-            let cumulative_return_for_period = cumulative_return - one;
-            
+            cumulative_value *= Decimal::ONE + daily_return;
+            let cumulative_return_to_date = (cumulative_value - Decimal::ONE).round_dp(DECIMAL_PRECISION);
+
             returns.push(ReturnData {
-                date: curr_date,
-                value: Self::round_decimal(&cumulative_return_for_period, 6),
+                date: current_date,
+                value: cumulative_return_to_date,
             });
+
+            prev_price = current_price;
+            if let Some(next_date) = current_date.succ_opt() {
+                current_date = next_date;
+            } else {
+                break;
+            }
         }
 
-        let total_return = returns.last().map(|r| r.value).unwrap_or(dec!(0));
-        let annualized_return = Self::calculate_annualized_return(start_date, end_date, &total_return);
-        
-        // Calculate volatility and max drawdown
-        let volatility = Self::calculate_volatility(&daily_returns);
-        let max_drawdown = Self::calculate_max_drawdown(&returns);
-        
-        info!(
-            "Symbol returns calculation completed in: {:.4} seconds with {} data points",
-            start_time.elapsed().as_secs_f64(),
-            returns.len()
-        );
+        if returns.is_empty() {
+            return Ok(PerformanceService::empty_response(symbol));
+        }
 
-        Ok(CumulativeReturnsResponse {
+        let total_return = returns.last().map_or(Decimal::ZERO, |r| r.value);
+        let annualized_return =
+            Self::calculate_annualized_return(start_date, end_date, total_return);
+        let volatility = Self::calculate_volatility(&daily_returns);
+        let max_drawdown = Self::calculate_max_drawdown(&daily_returns);
+
+        let result = PerformanceResponse {
             id: symbol.to_string(),
             returns,
             total_return,
             annualized_return,
             volatility,
             max_drawdown,
-        })
+        };
+
+        let duration = start_time.elapsed();
+        info!("Completed symbol performance calculation for symbol={} in {:?}", symbol, duration);
+        Ok(result)
     }
 
-    /// Calculates the annualized return from a total return over a period
-    /// 
-    /// Formula: (1 + total_return)^(1/years) - 1
+    fn empty_response(id: &str) -> PerformanceResponse {
+        PerformanceResponse {
+            id: id.to_string(),
+            returns: Vec::new(),
+            total_return: Decimal::ZERO,
+            annualized_return: Decimal::ZERO,
+            volatility: Decimal::ZERO,
+            max_drawdown: Decimal::ZERO,
+        }
+    }
+
+    // --- Calculation Helper Functions (Unchanged logic, only rounding and constants) ---
+
+    /// Calculates the annualized return from a total return over a period.
     fn calculate_annualized_return(
         start_date: NaiveDate,
         end_date: NaiveDate,
-        total_return: &Decimal,
+        total_return: Decimal,
     ) -> Decimal {
-        // Handle edge cases and invalid inputs
-        if total_return <= &dec!(-1) {
-            return dec!(0); // Return 0 if total_return is -100% or worse.
+        if start_date > end_date {
+            return Decimal::ZERO;
+        }
+
+        if total_return <= dec!(-1.0) {
+            return Decimal::ZERO.round_dp(DECIMAL_PRECISION);
         }
 
         let days = (end_date - start_date).num_days();
         if days <= 0 {
-            return *total_return; // Return total_return if duration is zero or negative
+            return total_return.round_dp(DECIMAL_PRECISION);
         }
 
-        // Convert days to years using Decimal
-        let years = Decimal::from_i64(days).unwrap_or(dec!(1)) / dec!(365.25);
+        let years = (Decimal::from(days) / DAYS_PER_YEAR_DECIMAL).round_dp(DECIMAL_PRECISION);
         if years < dec!(0.01) {
-            // Avoid very small time periods.
-            return *total_return;
+            return total_return.round_dp(DECIMAL_PRECISION);
         }
 
-        let base = dec!(1) + total_return;
-        
-        // Using the mathematical identity: x^y = e^(y * ln(x))
-        // Formula: (1 + total_return)^(1/years) - 1
-        let exponent = dec!(1) / years;
-        
-        // Try using Decimal math first for higher precision
-        if let Some(ln_base) = base.checked_ln() {
-            let power = ln_base * exponent;
-            
-            if let Some(result) = power.checked_exp() {
-                return Self::round_decimal(&(result - dec!(1)), 6);
-            }
+        let base = (Decimal::ONE + total_return).round_dp(DECIMAL_PRECISION);
+        if base <= Decimal::ZERO {
+            return Decimal::ZERO.round_dp(DECIMAL_PRECISION);
         }
-        
-        // Fall back to f64 if Decimal math fails
-        if let (Some(base_f64), Some(years_f64)) = (base.to_f64(), years.to_f64()) {
-            let exponent_f64 = 1.0 / years_f64;
-            let result_f64 = base_f64.powf(exponent_f64) - 1.0;
-            
-            if let Some(result) = Decimal::from_f64(result_f64) {
-                return Self::round_decimal(&result, 6);
-            }
-        }
-        
-        // Fallback if all calculations fail
-        dec!(0)
+
+        let exponent = (Decimal::ONE / years).round_dp(DECIMAL_PRECISION);
+        let ln_base = base.ln();
+        let ln_times_exp = (ln_base * exponent).round_dp(DECIMAL_PRECISION);
+        let annualized_factor = ln_times_exp.exp();
+        (annualized_factor - Decimal::ONE).round_dp(DECIMAL_PRECISION)
     }
 
-    /// Calculates the volatility (standard deviation of returns) annualized
-    /// 
-    /// Volatility is a measure of the dispersion of returns and is typically annualized
-    /// Formula: Standard Deviation of Daily Returns * sqrt(trading days per year)
+    /// Calculates the annualized volatility (sample standard deviation of daily returns).
     fn calculate_volatility(daily_returns: &[Decimal]) -> Decimal {
-        if daily_returns.is_empty() {
-            return dec!(0);
+        if daily_returns.len() < 2 {
+            return Decimal::ZERO;
         }
 
-        // Calculate mean of daily returns
-        let sum: Decimal = daily_returns.iter().sum();
         let count = Decimal::from(daily_returns.len());
-        let mean = sum / count;
+        let sum: Decimal = daily_returns.iter().sum();
+        let mean = (sum / count).round_dp(DECIMAL_PRECISION);
 
-        // Calculate sum of squared differences
         let sum_squared_diff: Decimal = daily_returns
             .iter()
             .map(|&r| {
-                let diff = r - mean;
+                let diff = (r - mean).round_dp(DECIMAL_PRECISION);
                 diff * diff
             })
             .sum();
 
-        // Calculate variance
-        let variance = if count > dec!(1) {
-            sum_squared_diff / (count - dec!(1))
-        } else {
-            dec!(0)
-        };
+        let variance = (sum_squared_diff / (count - Decimal::ONE)).round_dp(DECIMAL_PRECISION);
+        let daily_volatility = variance
+            .sqrt()
+            .unwrap_or_else(|| dec!(0.0))
+            .round_dp(DECIMAL_PRECISION);
 
-        // Calculate standard deviation (daily volatility)
-        let daily_volatility = match variance.sqrt() {
-            Some(value) => value,
-            None => {
-                // Fallback to f64 if Decimal sqrt fails
-                if let Some(variance_f64) = variance.to_f64() {
-                    let std_dev_f64 = variance_f64.sqrt();
-                    Decimal::from_f64(std_dev_f64).unwrap_or(dec!(0))
-                } else {
-                    dec!(0)
-                }
-            }
-        };
+        let annualization_factor = Decimal::from(TRADING_DAYS_PER_YEAR)
+            .sqrt()
+            .unwrap_or_else(|| SQRT_TRADING_DAYS_APPROX)
+            .round_dp(DECIMAL_PRECISION);
 
-        // Annualize volatility (standard market practice: multiply by sqrt(252) for trading days)
-        let trading_days_sqrt = match Decimal::from_str("15.87") { // sqrt(252) ≈ 15.87
-            Ok(value) => value,
-            Err(_) => dec!(15.87),
-        };
-        
-        let annualized_volatility = daily_volatility * trading_days_sqrt;
-        Self::round_decimal(&annualized_volatility, 6)
+        (daily_volatility * annualization_factor).round_dp(DECIMAL_PRECISION)
     }
 
-    /// Calculates the maximum drawdown from a series of cumulative returns
-    /// 
-    /// Maximum drawdown measures the largest peak-to-trough decline in the value of a portfolio
-    /// Formula: (Trough Value - Peak Value) / Peak Value
-    fn calculate_max_drawdown(returns: &[ReturnData]) -> Decimal {
-        if returns.is_empty() {
-            return dec!(0);
+    fn calculate_max_drawdown(daily_returns: &[Decimal]) -> Decimal {
+        if daily_returns.is_empty() {
+            return Decimal::ZERO;
         }
 
-        let mut max_drawdown = dec!(0);
-        let mut peak_value = dec!(1) + returns[0].value;
+        let mut cumulative_value = Decimal::ONE;
+        let mut peak_value = Decimal::ONE;
+        let mut max_drawdown = Decimal::ZERO;
 
-        for return_data in returns {
-            let current_value = dec!(1) + return_data.value;
-            
-            // Update peak if we reach a new high
-            if current_value > peak_value {
-                peak_value = current_value;
-            } 
-            // Calculate drawdown if we're below the peak
-            else if !peak_value.is_zero() {
-                let drawdown = (peak_value - current_value) / peak_value;
-                if drawdown > max_drawdown {
-                    max_drawdown = drawdown;
-                }
-            }
+        for &daily_return in daily_returns {
+            cumulative_value *= (Decimal::ONE + daily_return.round_dp(DECIMAL_PRECISION))
+                .round_dp(DECIMAL_PRECISION);
+            peak_value = peak_value.max(cumulative_value);
+            let drawdown = ((peak_value - cumulative_value) / peak_value)
+                .round_dp(DECIMAL_PRECISION);
+            max_drawdown = max_drawdown.max(drawdown);
         }
 
-        Self::round_decimal(&max_drawdown, 6)
+        max_drawdown.round_dp(DECIMAL_PRECISION)
     }
 }

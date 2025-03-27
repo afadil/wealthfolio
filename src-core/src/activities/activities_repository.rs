@@ -7,7 +7,7 @@ use uuid::Uuid;
 use chrono::NaiveDate;
 use chrono::NaiveDateTime;
 use std::sync::Arc;
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 use std::str::FromStr;
 
 use crate::activities::activities_constants::*;
@@ -260,7 +260,7 @@ impl ActivityRepository {
             .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
 
         activities::table
-            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq_any(account_ids))
             .select(ActivityDB::as_select())
@@ -275,7 +275,7 @@ impl ActivityRepository {
         &self,
         account_id: &str,
         asset_id: &str,
-    ) -> Result<BigDecimal> {
+    ) -> Result<Decimal> {
         let mut conn = get_connection(&self.pool)
             .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
 
@@ -312,7 +312,7 @@ impl ActivityRepository {
         .bind::<diesel::sql_types::Text, _>(asset_id)
         .get_result(&mut conn)?;
 
-        Ok(BigDecimal::from_str(&result.average_cost).unwrap_or_default())
+        Ok(Decimal::from_str(&result.average_cost).unwrap_or_default())
     }
 
     /// Gets the first activity date for given account IDs
@@ -408,11 +408,13 @@ impl ActivityRepository {
     /// Retrieves deposit activities for specified accounts within a year as raw data
     pub fn get_deposit_activities(
         &self,
-        conn: &mut SqliteConnection,
         account_ids: &[String],
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
-    ) -> Result<Vec<(String, String, String, String, Option<String>)>> {
+    ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+        let mut conn = get_connection(&self.pool)
+            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+
         // Use a proper join with explicit ON condition
         let results = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
@@ -427,9 +429,24 @@ impl ActivityRepository {
                 activities::currency,
                 activities::amount,
             ))
-            .load::<(String, String, String, String, Option<String>)>(conn)
+            .load::<(String, String, String, String, Option<String>)>(&mut conn)
             .map_err(ActivityError::from)?;
 
-        Ok(results)
+        // Convert string values to Decimal
+        let converted_results = results
+            .into_iter()
+            .map(|(account_id, quantity, unit_price, currency, amount)| {
+                Ok((
+                    account_id,
+                    Decimal::from_str(&quantity)?,
+                    Decimal::from_str(&unit_price)?,
+                    currency,
+                    amount.map(|a| Decimal::from_str(&a)).transpose()?,
+                ))
+            })
+            .collect::<std::result::Result<Vec<_>, rust_decimal::Error>>()
+            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+
+        Ok(converted_results)
     }
 } 

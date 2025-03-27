@@ -1,13 +1,34 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
   deleteContributionLimit,
   createContributionLimit,
   updateContributionLimit,
+  calculateDepositsForLimit,
 } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
 import { toast } from '@/components/ui/use-toast';
-import { ContributionLimit, NewContributionLimit } from '@/lib/types';
+import { ContributionLimit, NewContributionLimit, DepositsCalculation } from '@/lib/types';
 import { logger } from '@/adapters';
+
+export const useContributionLimitProgress = (limitId: string) => {
+  return useQuery<DepositsCalculation>({
+    queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, limitId],
+    queryFn: async () => {
+      try {
+        return await calculateDepositsForLimit(limitId);
+      } catch (e) {
+        logger.error(`Error calculating deposits for limit: ${e}`);
+        toast({
+          title: 'Error calculating deposits',
+          description: 'There was a problem calculating the deposits for this limit.',
+          variant: 'destructive',
+        });
+        throw e;
+      }
+    },
+  });
+};
+
 export const useContributionLimitMutations = () => {
   const queryClient = useQueryClient();
 

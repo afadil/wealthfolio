@@ -12,7 +12,7 @@ use wealthfolio_core::db;
 use wealthfolio_core::models;
 
 // Remove unused imports
-use wealthfolio_core::goal;
+use wealthfolio_core::goals;
 use wealthfolio_core::market_data;
 use wealthfolio_core::portfolio;
 use wealthfolio_core::settings;
@@ -142,11 +142,11 @@ pub fn main() {
             commands::portfolio::get_accounts_summary,
             commands::portfolio::recalculate_portfolio,
             commands::portfolio::calculate_performance,
-            commands::settings::get_contribution_limits,
-            commands::settings::create_contribution_limit,
-            commands::settings::update_contribution_limit,
-            commands::settings::delete_contribution_limit,
-            commands::settings::calculate_deposits_for_contribution_limit,
+            commands::limits::get_contribution_limits,
+            commands::limits::create_contribution_limit,
+            commands::limits::update_contribution_limit,
+            commands::limits::delete_contribution_limit,
+            commands::limits::calculate_deposits_for_contribution_limit,
             commands::utilities::backup_database,
             commands::asset::get_asset_data,
             commands::asset::update_asset_profile,

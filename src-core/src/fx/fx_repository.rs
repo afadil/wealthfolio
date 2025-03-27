@@ -2,7 +2,7 @@ use crate::market_data::market_data_model::{Quote, QuoteDb};
 use crate::schema::{quotes, assets};
 use crate::assets::assets_model::AssetDB;
 use crate::assets::assets_constants::FOREX_ASSET_TYPE;
-use bigdecimal::BigDecimal;
+use rust_decimal::Decimal;
 use chrono::NaiveDate;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -53,7 +53,7 @@ impl FxRepository {
         Ok(grouped_quotes)
     }
 
-    pub fn get_latest_currency_rates(&self) -> Result<HashMap<String, BigDecimal>, FxError> {
+    pub fn get_latest_currency_rates(&self) -> Result<HashMap<String, Decimal>, FxError> {
         let mut conn = get_connection(&self.pool)?;
         
         let query = "
@@ -73,7 +73,7 @@ impl FxRepository {
         let quotes: Vec<QuoteDb> = diesel::sql_query(query)
             .load(&mut conn)?;
 
-        Ok(quotes.into_iter().map(|q| (q.symbol, BigDecimal::from_str(&q.close).unwrap_or_else(|_| BigDecimal::from(0)))).collect())
+        Ok(quotes.into_iter().map(|q| (q.symbol, Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)))).collect())
     }
 
     pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>, FxError> {
@@ -151,7 +151,7 @@ impl FxRepository {
         &self,
         symbol: String,
         date: String,
-        rate: BigDecimal,
+        rate: Decimal,
         source: String,
     ) -> Result<Quote, FxError> {
         let mut conn = get_connection(&self.pool)?;
@@ -277,7 +277,7 @@ impl FxRepository {
         Ok(())
     }
 
-    /// Creates a new FX asset in the database
+    /// Creates or updates an FX asset in the database
     pub fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<(), FxError> {
         let mut conn = get_connection(&self.pool)?;
         let symbol = ExchangeRate::make_fx_symbol(from, to);
@@ -305,10 +305,21 @@ impl FxRepository {
 
         diesel::insert_into(assets::table)
             .values(&asset_db)
+            .on_conflict(assets::id)
+            .do_update()
+            .set((
+                assets::name.eq(&asset_db.name),
+                assets::asset_type.eq(&asset_db.asset_type),
+                assets::asset_class.eq(&asset_db.asset_class),
+                assets::asset_sub_class.eq(&asset_db.asset_sub_class),
+                assets::notes.eq(&asset_db.notes),
+                assets::currency.eq(&asset_db.currency),
+                assets::data_source.eq(&asset_db.data_source),
+                assets::updated_at.eq(now),
+            ))
             .execute(&mut conn)
             .map_err(|e| FxError::SaveError(e.to_string()))?;
 
         Ok(())
     }
-
 }
