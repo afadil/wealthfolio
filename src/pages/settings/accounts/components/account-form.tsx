@@ -180,7 +180,11 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
             <Button variant="outline">Cancel</Button>
           </DialogTrigger>
           <Button type="submit">
-            <Icons.Plus className="h-4 w-4" />
+            {defaultValues?.id ? (
+              <Icons.Save className="h-4 w-4" />
+            ) : (
+              <Icons.Plus className="h-4 w-4" />
+            )}
             <span className="hidden sm:ml-2 sm:inline">
               {defaultValues?.id ? 'Update Account' : 'Add Account'}
             </span>

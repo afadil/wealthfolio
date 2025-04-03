@@ -1,13 +1,13 @@
-use diesel::r2d2::{Pool, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
-use log::{error, info};
 use chrono::Utc;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sqlite::SqliteConnection;
+use log::{debug, error, info};
 use std::sync::Arc;
 
 use crate::accounts::AccountService;
-use crate::activities::{ActivityError, Result};
 use crate::activities::activities_model::*;
 use crate::activities::ActivityRepository;
+use crate::activities::{ActivityError, Result};
 use crate::assets::{Asset, AssetService};
 use crate::fx::fx_service::FxService;
 use uuid::Uuid;
@@ -22,10 +22,15 @@ pub struct ActivityService {
 
 impl ActivityService {
     /// Creates a new ActivityService instance
-    pub async fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, base_currency: String) -> Result<Self> {
+    pub async fn new(
+        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        base_currency: String,
+    ) -> Result<Self> {
         Ok(Self {
             pool: pool.clone(),
-            asset_service: AssetService::new(pool.clone()).await.map_err(|e| ActivityError::AssetError(e.to_string()))?,
+            asset_service: AssetService::new(pool.clone())
+                .await
+                .map_err(|e| ActivityError::AssetError(e.to_string()))?,
             fx_service: FxService::new(pool.clone()),
             base_currency,
         })
@@ -38,19 +43,13 @@ impl ActivityService {
     }
 
     /// Retrieves activities by account ID
-    pub fn get_activities_by_account_id(
-        &self,
-        account_id: &String,
-    ) -> Result<Vec<Activity>> {
+    pub fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>> {
         let repo = ActivityRepository::new(self.pool.clone());
         repo.get_activities_by_account_id(account_id)
     }
 
     /// Retrieves activities by account IDs
-    pub fn get_activities_by_account_ids(
-        &self,
-        account_ids: &[String],
-    ) -> Result<Vec<Activity>> {
+    pub fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>> {
         let repo = ActivityRepository::new(self.pool.clone());
         repo.get_activities_by_account_ids(account_ids)
     }
@@ -89,13 +88,11 @@ impl ActivityService {
     }
 
     /// Creates a new activity
-    pub async fn create_activity(
-        &self,
-        mut activity: NewActivity,
-    ) -> Result<Activity> {
+    pub async fn create_activity(&self, mut activity: NewActivity) -> Result<Activity> {
         info!("Creating activity: {:?}", activity);
         // Fetch the asset profile
-        let asset = self.asset_service
+        let asset = self
+            .asset_service
             .get_or_create_asset(&activity.asset_id)
             .await
             .map_err(|e| ActivityError::AssetError(e.to_string()))?;
@@ -126,17 +123,16 @@ impl ActivityService {
     }
 
     /// Updates an existing activity
-    pub async fn update_activity(
-        &self,
-        mut activity: ActivityUpdate,
-    ) -> Result<Activity> {
-        let asset = self.asset_service
+    pub async fn update_activity(&self, mut activity: ActivityUpdate) -> Result<Activity> {
+        let asset = self
+            .asset_service
             .get_or_create_asset(&activity.asset_id)
             .await
             .map_err(|e| ActivityError::AssetError(e.to_string()))?;
 
-        if let Err(e) = self.asset_service
-            .sync_asset_quotes( &vec![asset.clone()], true)
+        if let Err(e) = self
+            .asset_service
+            .sync_asset_quotes(&vec![asset.clone()], true)
             .await
         {
             error!(
@@ -196,7 +192,8 @@ impl ActivityService {
             activity.account_id = Some(account_id.clone());
 
             // Load the symbol profile
-            let symbol_profile_result = self.asset_service
+            let symbol_profile_result = self
+                .asset_service
                 .get_or_create_asset(&activity.symbol)
                 .await;
 
@@ -220,42 +217,100 @@ impl ActivityService {
                             activity.currency.as_str(),
                         ) {
                             Ok(_) => (true, None),
-                            Err(e) => (false, Some(format!("Failed to register currency: {}", e)))
+                            Err(e) => (false, Some(format!("Failed to register currency: {}", e))),
                         }
                     } else {
                         (true, None)
                     }
                 }
                 Err(_) => {
-                    let error_msg = format!(
-                        "Symbol {} not found. Line: {}",
-                        &activity.symbol,
-                        activity.line_number.unwrap_or(0)
-                    );
+                    let error_msg =
+                        format!("Market data not found for symbol: {}", &activity.symbol);
                     (false, Some(error_msg))
                 }
             };
 
             activity.is_valid = is_valid;
-            activity.error = error;
-            activities_with_status.push(activity);
-        }
-
-        // Sync quotes for all valid assets
-        if !assets_to_sync.is_empty() {
-            if let Err(e) = self.asset_service.sync_asset_quotes(&assets_to_sync, true).await {
-                error!("Failed to sync quotes for assets: {}", e);
+            if let Some(error_msg) = error {
+                let mut errors = std::collections::HashMap::new();
+                errors.insert("symbol".to_string(), vec![error_msg]);
+                activity.errors = Some(errors);
             }
+
+            activities_with_status.push(activity);
         }
 
         Ok(activities_with_status)
     }
 
-    /// Gets the import mapping for a given account ID
-    pub fn get_import_mapping(
+    /// Creates multiple activities in a single transaction
+    pub fn create_activities(&self, activities: Vec<NewActivity>) -> Result<usize> {
+        let repo = ActivityRepository::new(self.pool.clone());
+        repo.create_activities(activities)
+    }
+
+    /// Imports activities after validation
+    pub async fn import_activities(
         &self,
         account_id: String,
-    ) -> Result<ImportMappingData> {
+        activities: Vec<ActivityImport>,
+    ) -> Result<Vec<ActivityImport>> {
+        // First validate the activities
+        let validated_activities = self
+            .check_activities_import(account_id.clone(), activities)
+            .await?;
+
+        // Check if any activity has validation errors
+        let has_errors = validated_activities.iter().any(|activity| {
+            !activity.is_valid
+                || activity
+                    .errors
+                    .as_ref()
+                    .map_or(false, |errors| !errors.is_empty())
+        });
+
+        if has_errors {
+            // Return the activities with validation errors
+            return Ok(validated_activities);
+        }
+
+        // Convert to NewActivity objects
+        let new_activities: Vec<NewActivity> = validated_activities
+            .iter()
+            .map(|activity| NewActivity {
+                id: activity.id.clone(),
+                account_id: activity.account_id.clone().unwrap_or_default(),
+                asset_id: activity.symbol.clone(),
+                activity_type: activity.activity_type.clone(),
+                activity_date: activity.date.clone(),
+                quantity: Some(activity.quantity),
+                unit_price: Some(activity.unit_price),
+                currency: activity.currency.clone(),
+                fee: Some(activity.fee),
+                amount: activity.amount,
+                is_draft: activity.is_draft,
+                comment: activity.comment.clone(),
+            })
+            .collect();
+
+        // Create the activities in the database
+        let count = self.create_activities(new_activities)?;
+        debug!("Successfully imported {} activities", count);
+
+        Ok(validated_activities)
+    }
+
+    /// Gets the first activity date for given account IDs
+    pub fn get_first_activity_date(
+        &self,
+        account_ids: Option<&[String]>,
+    ) -> Result<Option<chrono::NaiveDate>> {
+        let repo = ActivityRepository::new(self.pool.clone());
+        repo.get_first_activity_date(account_ids)
+    }
+
+    /// Gets the import mapping for a given account ID
+    pub fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData> {
         let repo = ActivityRepository::new(self.pool.clone());
         let mapping = repo.get_import_mapping(&account_id)?;
 
@@ -292,20 +347,4 @@ impl ActivityService {
 
         Ok(mapping_data)
     }
-
-    /// Creates multiple activities in a single transaction
-    pub fn create_activities(
-        &self,
-        activities: Vec<NewActivity>,
-    ) -> Result<usize> {
-        let repo = ActivityRepository::new(self.pool.clone());
-        repo.create_activities(activities)
-    }
-
-    /// Gets the first activity date for given account IDs
-    pub fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<chrono::NaiveDate>> {
-        let repo = ActivityRepository::new(self.pool.clone());
-        repo.get_first_activity_date(account_ids)
-    }
-
-} 
+}

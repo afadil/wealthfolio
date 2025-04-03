@@ -25,6 +25,7 @@ import {
   Eye,
   EyeOff,
   FileText,
+  FileUp,
   GaugeCircle,
   Group,
   Home,
@@ -64,6 +65,10 @@ import {
   Percent,
   Split,
   ArrowLeftRight,
+  FileX,
+  ListChecks,
+  Tag,
+  Save,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -75,6 +80,7 @@ export const Icons = {
   Check: Check,
   CheckCircle: CheckCircle2,
   Clock: Clock,
+  ListChecks: ListChecks,
   HandCoins: HandCoins,
   Home: Home,
   HelpCircle: HelpCircle,
@@ -84,6 +90,7 @@ export const Icons = {
   ArrowUp: ArrowUp,
   Billing: CreditCard,
   Search: Search,
+  Save: Save,
   Group: Group,
   Ungroup: Ungroup,
   Globe: Globe2,
@@ -116,12 +123,14 @@ export const Icons = {
   MoreVertical: MoreVertical,
   Goal: Goal,
   Trash: Trash,
+  Tag: Tag,
   Wallet: Wallet,
   WalletCards: WalletCards,
   StretchHorizontal: StretchHorizontal,
   Menu: TableProperties,
   Import: Upload,
   FileText: FileText,
+  FileX: FileX,
   XCircle: XCircle,
   ScrollText: ScrollText,
   GaugeCircle,
@@ -132,6 +141,7 @@ export const Icons = {
   Receipt: Receipt,
   Percent: Percent,
   Split: Split,
+  FileUp: FileUp,
 
   Dashboard: ({ ...props }: LucideProps) => (
     <svg

@@ -78,14 +78,6 @@ impl AssetService {
                 match self.market_data_service.get_asset_profile(asset_id).await {
                     Ok(new_asset) => {
                         let inserted_asset = self.repository.create(new_asset.into())?;
-
-                        // Sync the quotes for the new asset but don't fail if sync fails
-                        if let Err(e) = self.sync_asset_quotes(&vec![inserted_asset.clone()], true).await {
-                            error!(
-                                "Failed to sync quotes for new asset {}: {}",
-                                inserted_asset.id, e
-                            );
-                        }
                         Ok(inserted_asset)
                     }
                     Err(e) => {

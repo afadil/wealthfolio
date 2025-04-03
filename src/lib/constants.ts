@@ -57,6 +57,7 @@ export const ImportFormat = {
   AMOUNT: 'amount',
   CURRENCY: 'currency',
   FEE: 'fee',
+  COMMENT: 'comment',
 } as const;
 
 export type ImportFormat = (typeof ImportFormat)[keyof typeof ImportFormat];
@@ -70,7 +71,19 @@ export const importFormatSchema = z.enum([
   ImportFormat.AMOUNT,
   ImportFormat.CURRENCY,
   ImportFormat.FEE,
+  ImportFormat.COMMENT,
 ]);
+
+export const IMPORT_REQUIRED_FIELDS = [
+  ImportFormat.DATE,
+  ImportFormat.ACTIVITY_TYPE,
+  ImportFormat.SYMBOL,
+  ImportFormat.QUANTITY,
+  ImportFormat.UNIT_PRICE,
+  ImportFormat.AMOUNT,
+] as const;
+
+export type ImportRequiredField = typeof IMPORT_REQUIRED_FIELDS[number];
 
 export const ExportDataType = {
   ACCOUNTS: 'accounts',
@@ -133,7 +146,6 @@ export const TRADING_ACTIVITY_TYPES = [
 export const CASH_ACTIVITY_TYPES = [
   ActivityType.DEPOSIT,
   ActivityType.WITHDRAWAL,
-  ActivityType.FEE,
   ActivityType.INTEREST,
   ActivityType.TRANSFER_IN,
   ActivityType.TRANSFER_OUT,

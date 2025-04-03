@@ -17,6 +17,8 @@ export {
   HoldingType,
 } from './constants';
 
+export type { ImportRequiredField } from './constants';
+
 export type Account = {
   id: string;
   name: string;
@@ -94,6 +96,21 @@ export type ActivityUpdate = ActivityCreate & { id: string };
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
 
+// Define a generic type for the parsed row data
+export type CsvRowData = Record<string, string> & { lineNumber: string };
+export interface CsvRowError {
+  /** Type of error that occurred */
+  type: string;
+  /** Standardized error code */
+  code: string;
+  /** Human-readable error message */
+  message: string;
+  /** Row index where the error occurred (optional) */
+  row?: number;
+  /** Column/field index where the error occurred (optional) */
+  index?: number;
+}
+
 export interface AssetProfile {
   id: string;
   isin: string | null;
@@ -145,6 +162,15 @@ export interface Tag {
   id: string;
   name: string;
   activityId: string | null;
+}
+
+export interface ImportValidationResult {
+  activities: ActivityImport[];
+  validationSummary: {
+    totalRows: number;
+    validCount: number;
+    invalidCount: number;
+  };
 }
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };

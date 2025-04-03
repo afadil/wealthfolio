@@ -116,7 +116,6 @@ export const calculatePerformance = async (
     
     return response as PerformanceData;
   } catch (error) {
-    console.error('Error calculating cumulative returns:', error);
     logger.error('Error calculating cumulative returns.');
     throw error;
   }

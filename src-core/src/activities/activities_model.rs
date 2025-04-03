@@ -263,7 +263,7 @@ pub struct ActivityImport {
     pub account_id: Option<String>,
     pub account_name: Option<String>,
     pub symbol_name: Option<String>,
-    pub error: Option<String>,
+    pub errors: Option<std::collections::HashMap<String, Vec<String>>>,
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
@@ -312,6 +312,8 @@ impl Default for ImportMappingData {
         field_mappings.insert("quantity".to_string(), "quantity".to_string());
         field_mappings.insert("activityType".to_string(), "activityType".to_string());
         field_mappings.insert("unitPrice".to_string(), "unitPrice".to_string());
+        field_mappings.insert("amount".to_string(), "amount".to_string());
+        field_mappings.insert("comment".to_string(), "comment".to_string());
         field_mappings.insert("currency".to_string(), "currency".to_string());
         field_mappings.insert("fee".to_string(), "fee".to_string());
 
@@ -324,6 +326,8 @@ impl Default for ImportMappingData {
         activity_mappings.insert("WITHDRAWAL".to_string(), vec!["WITHDRAWAL".to_string()]);
         activity_mappings.insert("TRANSFER_IN".to_string(), vec!["TRANSFER_IN".to_string()]);
         activity_mappings.insert("TRANSFER_OUT".to_string(), vec!["TRANSFER_OUT".to_string()]);
+        activity_mappings.insert("ADD_HOLDING".to_string(), vec!["ADD_HOLDING".to_string()]);
+        activity_mappings.insert("REMOVE_HOLDING".to_string(), vec!["REMOVE_HOLDING".to_string()]);
         activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
         activity_mappings.insert(
             "CONVERSION_IN".to_string(),

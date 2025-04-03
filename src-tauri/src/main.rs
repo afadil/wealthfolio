@@ -121,6 +121,7 @@ pub fn main() {
             commands::activity::delete_activity,
             commands::activity::check_activities_import,
             commands::activity::create_activities,
+            commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
             commands::settings::get_settings,

@@ -40,13 +40,12 @@
       {
         "dragDropEnabled": false,
         "fullscreen": false,
+        "maximized": true,
         "resizable": true,
         "theme": "Light",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "title": "Wealthfolio",
-        "width": 1440,
-        "height": 960,
         "center": true
       }
     ],

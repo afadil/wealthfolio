@@ -19,7 +19,7 @@ const alertVariants = cva(
           'success group border-success bg-success text-success-foreground ',
 
         warning:
-          'border-yellow-500/50 bg-yellow-50 text-yellow-800 dark:border-yellow-500 dark:bg-yellow-900/50 dark:text-yellow-300 [&>svg]:text-yellow-600 dark:text-yellow-400',
+          'border-orange-500 bg-orange-100 text-orange-800 dark:border-orange-500 dark:bg-orange-800/50 [&>svg]:text-orange-200 dark:text-orange-100',
       },
     },
     defaultVariants: {

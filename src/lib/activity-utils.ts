@@ -10,6 +10,7 @@ export const isCashActivity = (activityType: string): boolean => {
   return (CASH_ACTIVITY_TYPES as readonly string[]).includes(activityType) ;
 };
 
+
 /**
  * Determines if an activity is an income activity based on its type
  * @param activityType The activity type to check
@@ -29,6 +30,26 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
   return (activityType === ActivityType.TRANSFER_IN || 
           activityType === ActivityType.TRANSFER_OUT) && 
          assetSymbol.startsWith('$CASH');
+};
+
+// Helper to check if activity is a trade type
+export const isTradeActivity = (type: ActivityType): boolean => {
+  return type === ActivityType.BUY || type === ActivityType.SELL;
+}
+
+// Helper to check if activity is a fee type
+export const isFeeActivity = (activityType: string): boolean => {
+  return activityType === ActivityType.FEE;
+};
+
+// Helper to check if activity is a tax type
+export const isTaxActivity = (activityType: string): boolean => {
+  return activityType === ActivityType.TAX;
+};
+
+// Helper to check if activity is a split type
+export const isSplitActivity = (activityType: string): boolean => {
+  return activityType === ActivityType.SPLIT;
 };
 
 /**

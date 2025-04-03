@@ -1,101 +1,182 @@
 import { AlertFeedback } from '@/components/alert-feedback';
 import { ApplicationHeader } from '@/components/header';
 import { Separator } from '@/components/ui/separator';
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { ActivityImport } from '@/lib/types';
-import { logger } from '@/adapters';
-import { ActivityImportForm } from './import-form';
-import ValidationAlert from './import-validation-alert';
+import React, {useState } from 'react';
+import type { Account, ActivityImport, ImportMappingData } from '@/lib/types';
 import { ImportHelpPopover } from './import-help';
-import ImportedActivitiesTable from './imported-activity-table';
-import { useActivityImportMutations } from './hooks/useActivityImportMutations';
+import { StepIndicator } from './components/step-indicator';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AccountSelectionStep } from './steps/account-selection-step';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { useCsvParser } from './hooks/useCsvParser';
+import { validateActivityImport } from './utils/validation-utils';
+import { MappingStep } from './steps/mapping-step';
+import { DataPreviewStep } from './steps/preview-step';
+import { ResultStep } from './steps/result-step';
+import { logger } from '@/adapters';
+
+// Define the steps in the wizard
+const STEPS = [
+  { id: 1, title: 'Select Account & File' },
+  { id: 2, title: 'Configure Mappings' },
+  { id: 3, title: 'Preview & Import' },
+  { id: 4, title: 'Import Results' },
+];
+
 
 const ActivityImportPage = () => {
-  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [activities, setActivities] = useState<ActivityImport[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
-  const [warning, setWarning] = useState<number>(0);
+  const [processedActivities, setProcessedActivities] = useState<ActivityImport[]>([]);
 
-  const { confirmImportMutation } = useActivityImportMutations();
+  // 1. CSV Parsing Hook - Focus on parsing and structure validation
+  const { 
+    headers, 
+    data, 
+    rawData,
+    errors: parsingErrors, 
+    isParsing, 
+    selectedFile, 
+    parseCsvFile, 
+    resetParserStates 
+  } = useCsvParser();
 
-  function cancelImport() {
+  // Reset the entire import process
+  const resetImportProcess = () => {
+    setCurrentStep(1);
+    setProcessedActivities([]);
     setActivities([]);
-    setSuccess(false);
-    setError(null);
-    setWarning(0);
-  }
+    resetParserStates();
+  };
 
-  function onImportSuccess(result: ActivityImport[]) {
-    setActivities(result);
-    setSuccess(true);
-    const errors = result.filter((activity) => activity.error).length;
-    setWarning(errors);
-  }
+  console.log('parsingErrors', parsingErrors);
 
-  function confirmImport() {
-    const newActivities = activities.map((activity) => ({
-      id: activity.id,
-      accountId: activity.accountId || '',
-      activityDate: activity.date ? new Date(activity.date) : new Date(),
-      currency: activity.currency,
-      fee: activity.fee,
-      isDraft: activity?.isDraft,
-      quantity: activity.quantity,
-      assetId: activity.symbol,
-      activityType: activity.activityType as any,
-      unitPrice: activity.amount ? activity.amount : activity.unitPrice,
-      comment: activity.comment,
-    }));
+  // Handle file selection
+  const handleFileChange = (file: File | null) => {
+    if (file) {
+      parseCsvFile(file);
+    } else {
+      resetParserStates();
+    }
+  };
 
-    confirmImportMutation.mutate(newActivities, {
-      onSuccess: () => {
-        setError(null);
-        setWarning(0);
-        navigate('/activities');
-      },
-      onError: (error: any) => {
-        logger.error(`Error confirming import: ${error}`);
-        setError(error.message);
-      },
-    });
-  }
+  // Navigation functions
+  const goToNextStep = () => {
+    if (currentStep < STEPS.length) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const goToPreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // Handle mapping completion from MappingStep
+  const handleMappingComplete = async (mapping: ImportMappingData) => {
+    if (!selectedAccount?.id || !data || data.length < 2) {
+      logger.error('Missing account ID or CSV data');
+      return;
+    }
+
+    try {
+      // Validate data and store results
+      const results = validateActivityImport(data, mapping, selectedAccount.id);
+
+      // Update state with validated activities
+      setActivities(results.activities);
+
+      // Move to the next step
+      goToNextStep();
+    } catch (error) {
+      logger.error(`Validation error: ${error}`);
+    }
+  };
+
+  // Handle successful import with processed activities
+  const handlePreviewComplete = (importedActivities: ActivityImport[]) => {
+    setProcessedActivities(importedActivities);
+    goToNextStep();
+  };
+
+  // Render the current step
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <AccountSelectionStep
+            selectedAccount={selectedAccount}
+            setSelectedAccount={setSelectedAccount}
+            csvFile={selectedFile}
+            setCsvFile={handleFileChange}
+            isParsing={isParsing}
+            errors={parsingErrors}
+            onNext={goToNextStep}
+            rawData={rawData}
+          />
+        );
+      case 2:
+        return (
+          <MappingStep
+            headers={headers}
+            data={data}
+            accountId={selectedAccount?.id}
+            onNext={handleMappingComplete}
+            onBack={goToPreviousStep}
+          />
+        );
+      case 3:
+        return (
+          <DataPreviewStep
+            data={data}
+            headers={headers}
+            activities={activities}
+            onNext={handlePreviewComplete}
+            onBack={goToPreviousStep}
+          />
+        );
+      case 4:
+        return (
+          <ResultStep
+            activities={processedActivities}
+            onBack={goToPreviousStep}
+            onReset={resetImportProcess}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex flex-col p-6">
       <ApplicationHeader heading="Import Activities">
         <ImportHelpPopover />
       </ApplicationHeader>
-      <Separator className="my-6" />
+      <Separator className="my-4" />
       <ErrorBoundary>
-        <div className="p-6">
-          <ValidationAlert
-            success={success}
-            error={error}
-            warnings={warning}
-            isConfirming={confirmImportMutation.isPending}
-            onConfirm={confirmImport}
-            onCancel={cancelImport}
-          />
-          {confirmImportMutation.isPending ? (
-            <div className="relative h-2 w-full min-w-[200px] rounded-full bg-gray-200">
-              <div
-                className="absolute left-0 h-2 animate-pulse rounded-full bg-gray-800"
-                style={{ width: '40%' }}
-              ></div>
-            </div>
-          ) : null}
-          {activities?.length > 0 ? (
-            <ImportedActivitiesTable
-              accounts={[]}
-              activities={activities || []}
-              editModalVisible={false}
-              toggleEditModal={() => {}}
-            />
-          ) : (
-            <ActivityImportForm onSuccess={onImportSuccess} onError={setError} />
-          )}
+        <div className="flex-1 overflow-auto px-4 pb-6 md:px-6">
+          <Card className="w-full">
+            <CardHeader className="border-b">
+              <StepIndicator steps={STEPS} currentStep={currentStep} />
+            </CardHeader>
+            <CardContent className="overflow-hidden p-0">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="p-4 sm:p-6"
+                >
+                  {renderStep()}
+                </motion.div>
+              </AnimatePresence>
+            </CardContent>
+          </Card>
         </div>
       </ErrorBoundary>
     </div>
@@ -110,7 +191,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Caught error:', error, errorInfo);
+    logger.error(`Caught error: ${error}, errorInfo: ${errorInfo}`);
   }
 
   render() {

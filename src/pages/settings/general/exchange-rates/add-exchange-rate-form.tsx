@@ -4,7 +4,6 @@ import * as z from 'zod';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { worldCurrencies } from '@/lib/currencies';
 import { ExchangeRate } from '@/lib/types';

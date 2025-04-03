@@ -29,7 +29,7 @@ import {
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
-import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity } from '@/lib/activity-utils';
+import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';
 
 const fetchSize = 25;
 
@@ -151,7 +151,12 @@ export const ActivityTable = ({
           const activityType = row.getValue('activityType') as string;
           const quantity = row.getValue('quantity') as number;
 
-          if (isCashActivity(activityType) || isIncomeActivity(activityType) || activityType === 'SPLIT') {
+          if (
+            isCashActivity(activityType) ||
+            isIncomeActivity(activityType) ||
+            isSplitActivity(activityType) ||
+            isFeeActivity(activityType)
+          ) {
             return <div className="pr-4 text-right">-</div>;
           }
 
@@ -187,7 +192,7 @@ export const ActivityTable = ({
             return <div className="text-right">{formatAmount(amount, currency)}</div>;
           }
 
-          return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
+            return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },
       {

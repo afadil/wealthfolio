@@ -8,21 +8,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, ImportRequiredField } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 import TickerSearchInput from '@/components/ticker-search';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
 
 const SKIP_FIELD_VALUE = '__skip__';
-const REQUIRED_FIELDS = [
-  ImportFormat.DATE,
-  ImportFormat.ACTIVITY_TYPE,
-  ImportFormat.SYMBOL,
-  ImportFormat.QUANTITY,
-  ImportFormat.UNIT_PRICE,
-] as const;
-
-type RequiredField = typeof REQUIRED_FIELDS[number];
 
 export function renderHeaderCell({
   field,
@@ -39,12 +32,15 @@ export function renderHeaderCell({
   const mappedHeader = mapping.fieldMappings[field];
   const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
   const isEditing = editingHeader === field || !isMapped;
-  const isRequired = REQUIRED_FIELDS.includes(field as RequiredField);
+  const isRequired = IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField);
 
   return (
     <div>
       <div className="flex items-center gap-2 pb-0 pt-2">
-        <span className="font-bold">{field}</span>
+        <span className="font-bold">
+          {field}
+          {isRequired && !isMapped && <span className="text-amber-600 dark:text-amber-400 ml-1">*</span>}
+        </span>
       </div>
       {isEditing ? (
         <Select
@@ -55,7 +51,7 @@ export function renderHeaderCell({
           value={mappedHeader || SKIP_FIELD_VALUE}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
-          <SelectTrigger className="h-8 w-full py-2 text-sm font-normal text-muted-foreground">
+          <SelectTrigger className="h-8 w-full py-2 font-normal text-muted-foreground">
             <SelectValue placeholder={isRequired ? 'Select column' : 'Optional'} />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -122,48 +118,51 @@ function renderActivityTypeCell({
 
   if (appType) {
     return (
-      <div className="flex items-center gap-3">
-        <div title={trimmedCsvType} className="flex items-center text-sm font-medium">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full">
+        <div title={trimmedCsvType} className="font-medium truncate max-w-[180px]">
           {displayValue}
         </div>
-        <div className="flex items-center gap-3">
-          →
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="font-medium text-muted-foreground"
-            onClick={() => {
-              // Pass empty string as ActivityType to trigger removal of mapping
-              handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
-            }}
-          >
-            {appType}
-          </Button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-muted-foreground">→</span>
+          <Badge variant="secondary" className="transition-colors text-xs">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="p-0 h-auto text-xs"
+              onClick={() => {
+                handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
+              }}
+            >
+              {appType}
+            </Button>
+          </Badge>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center space-x-2">
-      {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH ? (
-        <span className="text-destructive" title={trimmedCsvType}>
-          {displayValue}
-        </span>
-      ) : (
-        <Badge variant="destructive" title={trimmedCsvType}>
-          {displayValue}
-        </Badge>
-      )}
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+      <div className="truncate max-w-[180px]">
+        {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH ? (
+          <span className="text-destructive" title={trimmedCsvType}>
+            {displayValue}
+          </span>
+        ) : (
+          <Badge variant="destructive" title={trimmedCsvType} className="whitespace-nowrap">
+            {displayValue}
+          </Badge>
+        )}
+      </div>
       <Select
         onValueChange={(newType) =>
           handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
         }
         value=""
       >
-        <SelectTrigger className="h-8 w-full">
-          <SelectValue placeholder="..." />
+        <SelectTrigger className="h-8 w-full sm:w-auto min-w-[120px]">
+          <SelectValue placeholder="Map to..." />
         </SelectTrigger>
         <SelectContent>
           {Object.values(ActivityType).map((type) => (
@@ -188,33 +187,56 @@ function renderSymbolCell({
   isInvalid: boolean;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
 }) {
+  // Don't show anything if the symbol is empty/doesn't exist AND it's not invalid
+  // We still want to show invalid empty symbols so they can be mapped
+  if ((!csvSymbol || csvSymbol.trim() === '') && !isInvalid) {
+    return null;
+  }
+
   // Show edit button if symbol is mapped or valid
   if (mappedSymbol || !isInvalid) {
     return (
-      <div className="flex items-center space-x-2">
-        <span className={isInvalid ? 'text-destructive' : undefined}>{csvSymbol}</span>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-8 py-0 font-normal text-muted-foreground"
-          onClick={() => {
-            handleSymbolMapping(csvSymbol, '');
-          }}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+        <span 
+          className={cn(
+            "truncate max-w-[120px]",
+            mappedSymbol ? "text-muted-foreground" : (isInvalid ? "text-destructive" : "text-muted-foreground")
+          )}
+          title={csvSymbol}
         >
-          {mappedSymbol || csvSymbol}
-        </Button>
+          {csvSymbol || "-"}
+        </span>
+        <Badge variant="secondary" className="transition-colors text-xs">
+          <Button
+            type="button"
+            variant="ghost"
+            className="py-0 p-0 h-auto text-xs"
+            onClick={() => {
+              handleSymbolMapping(csvSymbol, '');
+            }}
+          >
+            {mappedSymbol || csvSymbol || "-"}
+          </Button>
+        </Badge>
       </div>
     );
   }
 
   // Show search input only for invalid symbols without mapping
   return (
-    <div className="flex items-center space-x-2">
-      <span className="text-destructive">{csvSymbol}</span>
-      <TickerSearchInput
-        defaultValue={mappedSymbol || ''}
-        onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
-      />
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+      <span 
+        className="text-destructive truncate max-w-[120px]" 
+        title={csvSymbol || "Empty symbol"}
+      >
+        {csvSymbol || "-"}
+      </span>
+      <div className="w-full sm:w-auto sm:min-w-[180px]">
+        <TickerSearchInput
+          defaultValue={mappedSymbol || ''}
+          onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
+        />
+      </div>
     </div>
   );
 }
@@ -229,31 +251,42 @@ export function renderCell({
   invalidSymbols,
 }: {
   field: ImportFormat;
-  row: string[];
+  row: CsvRowData;
   mapping: ImportMappingData;
-  getMappedValue: (row: string[], field: ImportFormat) => string;
+  getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
   invalidSymbols: string[];
 }) {
+  // Get the field's value from the row
   const value = getMappedValue(row, field);
 
-  if (field === ImportFormat.SYMBOL && mapping.fieldMappings[ImportFormat.SYMBOL]) {
-    return renderSymbolCell({
-      csvSymbol: value,
-      mappedSymbol: mapping.symbolMappings?.[value],
-      isInvalid: invalidSymbols.includes(value),
-      handleSymbolMapping,
-    });
+  // Nothing to display if value is empty and not a special field
+  if (!value || value.trim() === '') {
+    return <span className="text-muted-foreground text-xs">-</span>;
   }
 
+  // Special fields with custom renderers
   if (field === ImportFormat.ACTIVITY_TYPE) {
+    const appType = findAppTypeForCsvType(value, mapping.activityMappings);
     return renderActivityTypeCell({
       csvType: value,
-      appType: findAppTypeForCsvType(value, mapping.activityMappings),
+      appType,
       handleActivityTypeMapping,
     });
   }
 
-  return value;
+  if (field === ImportFormat.SYMBOL) {
+    const isInvalid = invalidSymbols.includes(value);
+    const mappedSymbol = mapping.symbolMappings[value];
+    return renderSymbolCell({
+      csvSymbol: value,
+      mappedSymbol,
+      isInvalid,
+      handleSymbolMapping,
+    });
+  }
+
+  // Default renderer for other fields
+  return <span className="text-muted-foreground text-xs">{value}</span>;
 }

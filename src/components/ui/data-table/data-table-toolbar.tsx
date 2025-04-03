@@ -21,12 +21,14 @@ interface DataTableToolbarProps<TData> {
   table: Table<TData>;
   searchBy?: string;
   filters?: DataTableFacetedFilterProps<TData, any>[];
+  showColumnToggle?: boolean;
 }
 
 export function DataTableToolbar<TData>({
   table,
   searchBy,
   filters,
+  showColumnToggle = false,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0 || table.getState().globalFilter;
   const hideableColumns = table.getAllColumns().filter((column) => column.getCanHide());
@@ -65,7 +67,7 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      {hideableColumns.length > 0 && (
+      {showColumnToggle && hideableColumns.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="ml-auto">

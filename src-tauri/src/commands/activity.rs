@@ -117,3 +117,15 @@ pub async fn save_account_import_mapping(
     let service = ActivityService::new(state.pool.clone(), base_currency).await?;
     service.save_import_mapping(mapping).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn import_activities(
+    account_id: String,
+    activities: Vec<ActivityImport>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ActivityImport>, String> {
+    debug!("Importing activities for account: {}", account_id);
+    let base_currency = state.get_base_currency();
+    let service = ActivityService::new(state.pool.clone(), base_currency).await?;
+    service.import_activities(account_id, activities).await.map_err(|e| e.to_string())
+}

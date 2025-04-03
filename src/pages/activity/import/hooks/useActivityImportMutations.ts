@@ -1,15 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@/adapters';
-import {
-  checkActivitiesImport,
-  createActivities,
-  saveAccountImportMapping,
-} from '@/commands/activity-import';
+import { importActivities } from '@/commands/activity-import';
 import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
-import { ImportMappingData } from '@/lib/types';
-import { syncHistoryQuotes } from '@/commands/market-data';
 
 export function useActivityImportMutations({
   onSuccess,
@@ -20,83 +14,53 @@ export function useActivityImportMutations({
 } = {}) {
   const queryClient = useQueryClient();
 
-  const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Activities imported successfully.',
-  });
+  const calculateHistoryMutation = useCalculateHistoryMutation();
 
   const confirmImportMutation = useMutation({
-    mutationFn: createActivities,
-    onSuccess: async () => {
+    mutationFn: importActivities,
+    onSuccess: async (result: any) => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
 
-      // First sync the quotes
-      try {
-        await syncHistoryQuotes();
-      } catch (error) {
-        logger.error(`Error syncing quotes: ${error}`);
+      // Call the provided onSuccess callback if it exists
+      if (onSuccess) {
+        // Ensure we pass an array of activities to the callback
+        const activities = Array.isArray(result) ? result : [result];
+        onSuccess(activities);
+        // Then calculate history
+        
+        // Extract unique accountIds from the activities
+        const accountIds = [...new Set(activities.map(activity => activity.accountId)), 'TOTAL'];
+        
+        calculateHistoryMutation.mutate({
+          accountIds,
+          forceFullCalculation: true,
+        });
+      } else {
         toast({
-          title: 'Warning',
-          description: 'Failed to sync market data. Portfolio values might be incomplete.',
+          title: 'Import successful',
+          description: 'Activities have been imported successfully.',
+        });
+      }
+    },
+    onError: (error: any) => {
+      logger.error(`Error confirming import: ${error}`);
+
+      // Call the provided onError callback if it exists
+      if (onError) {
+        onError(error.message || 'An error occurred during import');
+      } else {
+        toast({
+          title: 'Uh oh! Something went wrong.',
+          description: 'Please try again or report an issue if the problem persists.',
           variant: 'destructive',
         });
       }
-
-      // Then calculate history
-      calculateHistoryMutation.mutate({
-        accountIds: undefined,
-        forceFullCalculation: true,
-      });
-
-      toast({
-        title: 'Import successful',
-        description: 'Activities have been imported successfully.',
-      });
-    },
-    onError: (error) => {
-      logger.error(`Error confirming import: ${error}`);
-      toast({
-        title: 'Uh oh! Something went wrong.',
-        description: 'Please try again or report an issue if the problem persists.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const saveAndCheckImportMutation = useMutation({
-    mutationFn: async ({
-      data,
-      activitiesToImport,
-    }: {
-      data: ImportMappingData;
-      activitiesToImport: any[];
-    }) => {
-      // Save the mapping
-      await saveAccountImportMapping(data);
-
-      // Then check the activities
-      return await checkActivitiesImport({
-        account_id: data.accountId,
-        activities: activitiesToImport,
-      });
-    },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.IMPORT_MAPPING] });
-      onSuccess?.(result);
-    },
-    onError: (error: any) => {
-      logger.error(`Error saving and checking import: ${error}`);
-      const errorMessage = `Import failed: ${error.message}`;
-      onError?.(errorMessage);
-      toast({
-        title: 'Error importing activities',
-        description: error.message,
-        variant: 'destructive',
-      });
     },
   });
 
   return {
     confirmImportMutation,
-    saveAndCheckImportMutation,
   };
 }

@@ -68,11 +68,11 @@ const AppLayout = () => {
   return (
     <div className="flex min-h-screen bg-background">
       <SidebarNav navigation={navigation} />
-      <div className="relative flex h-screen w-full overflow-hidden">
+      <div className="relative flex h-screen w-full overflow-auto">
         <ErrorBoundary>
-          <main className="flex flex-1 flex-col">
-            <div className="flex-1 overflow-y-auto">
-              <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
+          <main className="flex flex-1 flex-col w-full">
+            <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
+            <div className="flex-1 overflow-auto">
               <Outlet />
             </div>
           </main>

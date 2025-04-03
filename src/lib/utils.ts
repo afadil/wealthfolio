@@ -1,9 +1,106 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, isValid, parseISO } from 'date-fns';
+import { format, isValid, parseISO, parse } from 'date-fns';
+import { logger } from '@/adapters';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Attempts to parse a date string in multiple formats using date-fns
+ * @param dateStr The date string to parse
+ * @returns A valid Date object if parsing succeeds, null if all parsing attempts fail
+ */
+export function tryParseDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  
+  // Standardize the input - replace multiple spaces with single space and trim
+  const cleaned = dateStr.replace(/\s+/g, ' ').trim().toUpperCase();
+  
+  // First try ISO parsing since it's most common
+  try {
+    const isoDate = parseISO(cleaned);
+    if (isValid(isoDate) && isDateInRange(isoDate)) {
+      return isoDate;
+    }
+  } catch {}
+  
+  // Array of date format patterns to try
+  const formatPatterns = [
+    // North American Banking Formats
+    'MMM dd yyyy',     // "MAY 01 2024" - Common in North American banks
+    'MMMM dd yyyy',    // "MAY 01 2024" (full month)
+    'MM/dd/yyyy',      // "05/01/2024" - US Standard
+    'M/d/yyyy',        // "5/1/2024" - US Relaxed
+    
+    // European Banking Formats
+    'dd/MM/yyyy',      // "01/05/2024" - UK/EU Standard
+    'd/M/yyyy',        // "1/5/2024" - UK/EU Relaxed
+    'dd.MM.yyyy',      // "01.05.2024" - German/Swiss/Russian
+    'd.M.yyyy',        // "1.5.2024" - German/Swiss Relaxed
+    'dd-MM-yyyy',      // "01-05-2024" - Dutch/Danish
+    
+    // ISO and Technical Formats
+    'yyyy-MM-dd',      // "2024-05-01" - ISO 8601
+    'yyyyMMdd',        // "20240501" - Compact ISO
+    'yyyy/MM/dd',      // "2024/05/01" - Modified ISO
+    'yyyy.MM.dd',      // "2024.05.01" - Modified ISO
+    
+    // Asian Banking Formats
+    'yyyy年MM月dd日',   // "2024年05月01日" - Japanese
+    'yyyy년MM월dd일',   // "2024년05월01일" - Korean
+    'yyyy年M月d日',     // "2024年5月1日" - Chinese Traditional
+    
+    // Common Text Formats
+    'MMMM d, yyyy',    // "May 1, 2024" - US Formal
+    'MMM d, yyyy',     // "May 1, 2024" - US Common
+    'd MMM yyyy',      // "1 May 2024" - UK Common
+    'dd MMM yyyy',     // "01 May 2024" - UK Formal
+    'd MMMM yyyy',     // "1 May 2024" - UK Extended
+    'dd MMMM yyyy',    // "01 May 2024" - UK Extended Formal
+    
+    // Additional Banking Formats
+    'dd-MMM-yyyy',     // "01-MAY-2024" - Legacy Banking
+    'ddMMMyyyy',       // "01MAY2024" - Swift/Wire
+    'dd MMM yy',       // "01 MAY 24" - Short Year
+    'MMM dd, yy',      // "MAY 01, 24" - US Short
+    
+    // Fiscal Year Formats
+    'MMM dd FY yyyy',  // "MAY 01 FY 2024"
+    'dd MMM FY yyyy',  // "01 MAY FY 2024"
+    
+    // Quarter Formats
+    'Qn yyyy',         // "Q2 2024"
+    'yyyy-Qn',         // "2024-Q2"
+  ];
+
+  // Try each format pattern
+  for (const pattern of formatPatterns) {
+    try {
+      const parsedDate = parse(cleaned, pattern, new Date());
+      if (isValid(parsedDate) && isDateInRange(parsedDate)) {
+        return parsedDate;
+      }
+    } catch {}
+  }
+
+  // Try Unix timestamp (in seconds or milliseconds)
+  const num = parseInt(cleaned);
+  if (!isNaN(num)) {
+    const timestampDate = new Date(num > 1000000000000 ? num : num * 1000);
+    if (isValid(timestampDate) && isDateInRange(timestampDate)) {
+      return timestampDate;
+    }
+  }
+
+  return null;
+}
+
+// Helper to check if date is within reasonable range (1900-2100)
+function isDateInRange(date: Date): boolean {
+  const year = date.getFullYear();
+  return year >= 1900 && year <= 2100;
 }
 
 export function formatDate(input: string | number): string {
@@ -61,7 +158,7 @@ export function formatPercent(value: number | null | undefined) {
     }
     return `${Number(value).toFixed(2)}%`;
   } catch (error) {
-    console.error('Error formatting percent', value, error);
+    logger.error(`Error formatting percent ${value}: ${error}`);
     return String(value);
   }
 }

@@ -49,11 +49,11 @@ const ActivityPage = () => {
   return (
     <div className="flex flex-col p-6">
       <ApplicationHeader heading="Activity">
-        <div className="flex items-center space-x-2 absolute right-6">
+        <div className="absolute right-6 flex items-center space-x-2">
           <Button size="sm" title="Import" asChild>
             <Link to={'/import'}>
               <Icons.Import className="mr-2 h-4 w-4" />
-              Upload CSV
+              Import from CSV
             </Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
