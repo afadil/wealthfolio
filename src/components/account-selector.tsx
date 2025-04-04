@@ -29,11 +29,11 @@ export function AccountSelector({ accounts, selectedAccounts, onSelect }: Accoun
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button 
-          variant="outline" 
-          role="combobox" 
-          aria-expanded={open} 
-          className="gap-2 rounded-md h-8 px-3 py-1" 
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium hover:bg-muted/80"
           size="sm"
         >
           <Icons.Plus className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function AccountSelector({ accounts, selectedAccounts, onSelect }: Accoun
                   <Icons.Check
                     className={cn(
                       'ml-auto h-4 w-4',
-                      selectedAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0'
+                      selectedAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0',
                     )}
                   />
                 </CommandItem>

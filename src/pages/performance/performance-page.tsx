@@ -3,7 +3,7 @@ import { subMonths } from 'date-fns';
 import { PerformanceChart } from '@/components/performance-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, BarChart, Wallet, LineChart } from 'lucide-react';
+import { X, BarChart } from 'lucide-react';
 import { DateRangeSelector } from '@/components/date-range-selector';
 import { useAccounts } from '@/pages/account/useAccounts';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,8 +18,8 @@ import { AlertFeedback } from '@/components/alert-feedback';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { PerformanceData } from '@/lib/types';
-import { formatPercent } from '@/lib/utils';
 import { GainPercent } from '@/components/gain-percent';
+import NumberFlow from '@number-flow/react';
 
 type ComparisonItem = {
   id: string;
@@ -107,6 +107,56 @@ function PerformanceContent({
     </div>
   );
 }
+
+
+const SelectedItemBadge = ({ 
+  item, 
+  isSelected, 
+  onSelect, 
+  onDelete 
+}: { 
+  item: ComparisonItem; 
+  isSelected: boolean;
+  onSelect: () => void;
+  onDelete: (e: React.MouseEvent) => void;
+}) => {
+  return (
+    <div className="my-2 flex items-center">
+      <Badge className={`flex items-center justify-between rounded-md bg-gray-100 px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
+        isSelected ? 'ring-2 ring-primary' : ''
+      }`}
+        onClick={onSelect}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+        aria-pressed={isSelected}
+      >
+        <div className="flex items-center space-x-3">
+          <div
+            className={`h-4 w-1 rounded-full ${
+              item.type === 'account'
+                ? 'bg-zinc-500 dark:bg-zinc-400'
+                : 'bg-orange-500 dark:bg-orange-400'
+            }`}
+          ></div>
+          <span className="text-sm font-medium">{item.name}</span>
+        </div>
+        <button 
+          className="ml-3 text-gray-500 dark:text-zinc-400 transition-all duration-150 hover:scale-110 hover:text-gray-800 hover:dark:text-zinc-100"
+          onClick={onDelete}
+          aria-label={`Remove ${item.name}`}
+        >
+          <X size={18} />
+        </button>
+      </Badge>
+    </div>
+  );
+};
 
 export default function PerformancePage() {
   const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
@@ -233,39 +283,14 @@ export default function PerformancePage() {
       <div className="flex h-[calc(100vh-12rem)] flex-col space-y-6">
         <div className="flex flex-wrap items-center gap-2">
           {selectedItems.map((item) => (
-              <Badge
-                key={item.id}
-                className={`group border flex items-center gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:shadow-sm ${
-                  selectedItemId === item.id ? 'ring-2 ring-primary ring-offset-2' : ''
-                }`}
-                onClick={() => handleBadgeSelect(item)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleBadgeSelect(item);
-                  }
-                }}
-                aria-pressed={selectedItemId === item.id}
-                aria-label={`Select ${item.name}`}
-              >
-                {item.type === 'account' ? (
-                  <Wallet className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
-                ) : (
-                  <LineChart className="mr-1 h-3.5 w-3.5 text-secondary" aria-hidden="true" />
-                )}
-                <span className="font-medium">{item.name}</span>
-                <button
-                  type="button"
-                  onClick={(e) => handleBadgeDelete(e, item)}
-                  className="ml-1 flex items-center justify-center rounded-full bg-muted/30 p-0.5 transition-all duration-300 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-primary group-hover:bg-muted/80"
-                  aria-label={`Remove ${item.name}`}
-                >
-                  <X className="h-3 w-3" aria-hidden="true" />
-                </button>
-              </Badge>
-            ))}
+            <SelectedItemBadge
+              key={item.id}
+              item={item}
+              isSelected={selectedItemId === item.id}
+              onSelect={() => handleBadgeSelect(item)}
+              onDelete={(e) => handleBadgeDelete(e, item)}
+            />
+          ))}
           {selectedItems.length > 0 && <Separator orientation="vertical" className="mx-2 h-6" />}
 
           <AccountSelector
@@ -282,9 +307,7 @@ export default function PerformancePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl">Performance</CardTitle>
-                  <CardDescription>
-                    {displayDateRange}
-                  </CardDescription>
+                  <CardDescription>{displayDateRange}</CardDescription>
                 </div>
                 {performanceData && performanceData.length > 0 && (
                   <div className="grid grid-cols-2 gap-6 rounded-lg bg-muted/40 p-2 backdrop-blur-sm md:grid-cols-4">
@@ -321,7 +344,10 @@ export default function PerformancePage() {
                               : 'text-destructive'
                           }`}
                         >
-                          <GainPercent value={selectedItemData?.annualizedReturn || 0} animated={true} />
+                          <GainPercent
+                            value={selectedItemData?.annualizedReturn || 0}
+                            animated={true}
+                          />
                         </span>
                       </div>
                     </div>
@@ -332,7 +358,14 @@ export default function PerformancePage() {
                       </div>
                       <div className="flex items-baseline">
                         <span className="text-lg text-foreground">
-                          {formatPercent(selectedItemData?.volatility)}
+                          <NumberFlow
+                            value={(selectedItemData?.volatility || 0) / 100}
+                            animated={true}
+                            format={{
+                              style: 'percent',
+                              maximumFractionDigits: 2,
+                            }}
+                          />
                         </span>
                       </div>
                     </div>
@@ -345,7 +378,14 @@ export default function PerformancePage() {
                       </div>
                       <div className="flex items-baseline">
                         <span className="text-lg text-destructive">
-                          {formatPercent(selectedItemData?.maxDrawdown)}
+                          <NumberFlow
+                            value={(selectedItemData?.maxDrawdown || 0) / 100}
+                            animated={true}
+                            format={{
+                              style: 'percent',
+                              maximumFractionDigits: 2,
+                            }}
+                          />
                         </span>
                       </div>
                     </div>
@@ -399,30 +439,3 @@ function PerformanceDashboardSkeleton() {
     </ApplicationShell>
   );
 }
-
-const progressBarKeyframes = `
-@keyframes progress-border {
-  0% {
-    width: 0%;
-  }
-  100% {
-    width: 100%;
-  }
-}
-
-@keyframes subtle-pulse {
-  0% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 0.3;
-  }
-  100% {
-    opacity: 0.5;
-  }
-}
-`;
-
-export const styles = {
-  progressBarKeyframes,
-};
