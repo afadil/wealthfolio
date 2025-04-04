@@ -21,7 +21,7 @@ use std::sync::Arc;
 const ROUNDING_SCALE: u32 = 6;
 const PORTFOLIO_PERCENT_SCALE: u32 = 2;
 const QUANTITY_THRESHOLD: &str = "0.0000001";
-const PORTFOLIO_ACCOUNT_ID: &str = "PORTFOLIO";
+const PORTFOLIO_ACCOUNT_ID: &str = "TOTAL";
 
 impl Holding {
     pub fn add_position(&mut self, quantity: Decimal, price: Decimal) {
@@ -35,7 +35,7 @@ impl Holding {
             self.average_cost = Some(new_value / self.quantity);
         }
         self.book_value = self.book_value + position_value;
-        self.book_value_converted = self.book_value;
+        // Don't update book_value_converted here - will be handled by update_converted_values
     }
 
     pub fn reduce_position(&mut self, quantity: Decimal) -> Result<()> {
@@ -55,7 +55,7 @@ impl Holding {
 
         self.quantity = self.quantity - quantity;
         self.book_value = self.book_value - book_value_reduction;
-        self.book_value_converted = self.book_value;
+        // Don't update book_value_converted here - will be handled by update_converted_values
 
         if !Portfolio::is_quantity_significant(&self.quantity) {
             self.quantity = Decimal::ZERO;
@@ -65,6 +65,33 @@ impl Holding {
         }
 
         Ok(())
+    }
+    
+    // New method to centralize currency conversion
+    pub fn update_converted_values(&mut self, exchange_rate: Decimal) {
+        self.book_value_converted = self.book_value * exchange_rate;
+        
+        if self.holding_type.to_uppercase() == "CASH" {
+            self.market_value = self.quantity;
+            self.book_value = self.quantity;
+            self.market_value_converted = self.market_value * exchange_rate;
+            return;
+        }
+        
+        if let Some(market_price) = self.market_price {
+            self.market_value = self.quantity * market_price;
+            self.market_value_converted = self.market_value * exchange_rate;
+            
+            // Update performance metrics
+            if let Some(day_gain) = self.performance.day_gain_amount {
+                self.performance.day_gain_amount_converted = Some(day_gain * exchange_rate);
+            }
+            
+            if self.book_value != Decimal::ZERO {
+                self.performance.total_gain_amount = self.market_value - self.book_value;
+                self.performance.total_gain_amount_converted = self.market_value_converted - self.book_value_converted;
+            }
+        }
     }
 }
 
@@ -184,19 +211,11 @@ impl Portfolio {
         quotes: &HashMap<String, Quote>,
         fx_service: &FxService,
     ) -> Result<()> {
-        // Update FX rates for cash positions first
+        // First update all market prices
         for (_, account_holdings) in self.holdings.iter_mut() {
             for (_, holding) in account_holdings.iter_mut() {
-                // Update FX rates and converted values
-                let exchange_rate = fx_service
-                    .get_latest_exchange_rate(&holding.currency, &self.base_currency)
-                    .unwrap_or(Decimal::ONE);
-
+                // Skip market price update for cash holdings
                 if holding.holding_type.to_uppercase() == "CASH" {
-                    holding.market_value = holding.quantity;
-                    holding.book_value = holding.quantity;
-                    holding.market_value_converted = holding.market_value * exchange_rate;
-                    holding.book_value_converted = holding.book_value * exchange_rate;
                     continue;
                 }
 
@@ -204,26 +223,40 @@ impl Portfolio {
                     let market_price = Decimal::from_str(&quote.close.to_string())?;
                     holding.market_price = Some(market_price);
                     
-                    // Calculate without intermediate rounding
-                    holding.market_value = holding.quantity * market_price;
-                    holding.market_value_converted = holding.market_value * exchange_rate;
-                    holding.book_value_converted = holding.book_value * exchange_rate;
-
+                    // Calculate day gain without converted values yet
                     let opening_value = holding.quantity * Decimal::from_str(&quote.open.to_string())?;
-                    let closing_value = holding.market_value;
+                    let closing_value = holding.quantity * market_price;
                     holding.performance.day_gain_amount = Some(closing_value - opening_value);
-                    holding.performance.day_gain_amount_converted = Some(holding.performance.day_gain_amount.unwrap() * exchange_rate);
-
+                    
                     if opening_value != Decimal::ZERO {
                         holding.performance.day_gain_percent = Some((closing_value - opening_value) / opening_value * Decimal::ONE_HUNDRED);
                     }
-
-                    if holding.book_value != Decimal::ZERO {
-                        holding.performance.total_gain_amount = holding.market_value - holding.book_value;
-                        holding.performance.total_gain_amount_converted = holding.market_value_converted - holding.book_value_converted;
-                        holding.performance.total_gain_percent = (holding.market_value / holding.book_value - Decimal::ONE) * Decimal::ONE_HUNDRED;
-                    }
                 }
+            }
+        }
+        
+        // Then update all converted values in a separate pass
+        self.update_converted_values(fx_service)?;
+        
+        Ok(())
+    }
+
+    // New method to centralize all currency conversion
+    pub fn update_converted_values(&mut self, fx_service: &FxService) -> Result<()> {
+        for (_, account_holdings) in self.holdings.iter_mut() {
+            for (_, holding) in account_holdings.iter_mut() {
+                // Get the exchange rate for converting to base currency
+                let exchange_rate = fx_service
+                    .get_latest_exchange_rate(&holding.currency, &self.base_currency)
+                    .unwrap_or_else(|_| {
+                        // Log an error when exchange rate isn't found
+                        error!("Exchange rate not found for {}->{}, using 1.0", 
+                              holding.currency, self.base_currency);
+                        Decimal::ONE
+                    });
+                
+                // Use the centralized method to update all converted values
+                holding.update_converted_values(exchange_rate);
             }
         }
         Ok(())
@@ -302,7 +335,10 @@ impl Portfolio {
         let mut total_cash: HashMap<String, Decimal> = HashMap::new();
         for currencies in self.cash_positions.values() {
             for (currency, amount) in currencies {
-                *total_cash.entry(currency.clone()).or_default() += amount;
+                // Only include positive cash balances
+                if *amount > Decimal::ZERO {
+                    *total_cash.entry(currency.clone()).or_default() += amount;
+                }
             }
         }
 
@@ -389,6 +425,11 @@ impl Portfolio {
         for (account_id, currencies) in &self.cash_positions {
             for (currency, amount) in currencies {
                 let amount = amount.clone();
+                // Skip negative cash balances to match history service behavior
+                if amount <= Decimal::ZERO {
+                    continue;
+                }
+                
                 let holding = Holding {
                     id: format!("{}-$CASH-{}", account_id, currency),
                     symbol: format!("$CASH-{}", currency),

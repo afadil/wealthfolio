@@ -14,6 +14,7 @@ import { MappingStep } from './steps/mapping-step';
 import { DataPreviewStep } from './steps/preview-step';
 import { ResultStep } from './steps/result-step';
 import { logger } from '@/adapters';
+import { useNavigate } from 'react-router-dom';
 
 // Define the steps in the wizard
 const STEPS = [
@@ -25,6 +26,7 @@ const STEPS = [
 
 
 const ActivityImportPage = () => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [activities, setActivities] = useState<ActivityImport[]>([]);
@@ -48,6 +50,11 @@ const ActivityImportPage = () => {
     setProcessedActivities([]);
     setActivities([]);
     resetParserStates();
+  };
+
+  // Cancel import and navigate to activities page
+  const cancelImport = () => {
+    navigate('/activities');
   };
 
   console.log('parsingErrors', parsingErrors);
@@ -114,6 +121,7 @@ const ActivityImportPage = () => {
             isParsing={isParsing}
             errors={parsingErrors}
             onNext={goToNextStep}
+            onBack={cancelImport}
             rawData={rawData}
           />
         );

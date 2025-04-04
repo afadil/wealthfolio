@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLocation, useParams } from 'react-router-dom';
 import AssetHistoryCard from './asset-history-card';
 import { AssetData, Holding, Quote } from '@/lib/types';
-import { DataSource } from '@/lib/constants';
+import { DataSource, PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 import { getAssetData } from '@/commands/market-data';
 import { useQuery } from '@tanstack/react-query';
 import { Separator } from '@/components/ui/separator';
@@ -51,7 +51,6 @@ interface AssetDetailData {
   } | null;
 }
 
-const PORTFOLIO_ACCOUNT_ID = 'PORTFOLIO';
 
 export const AssetProfilePage = () => {
   const { symbol = '' } = useParams<{ symbol: string }>();

@@ -5,21 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { X, BarChart } from 'lucide-react';
 import { DateRangeSelector } from '@/components/date-range-selector';
-import { useAccounts } from '@/pages/account/useAccounts';
-import { Skeleton } from '@/components/ui/skeleton';
 import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { useCalculatePerformance } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
-import { AccountSelector } from '@/components/account-selector';
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { PerformanceData } from '@/lib/types';
 import { GainPercent } from '@/components/gain-percent';
 import NumberFlow from '@number-flow/react';
+import { AccountSelector } from '../../components/account-selector';
+import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 
 type ComparisonItem = {
   id: string;
@@ -28,7 +27,7 @@ type ComparisonItem = {
 };
 
 const PORTFOLIO_TOTAL: ComparisonItem = {
-  id: 'TOTAL',
+  id: PORTFOLIO_ACCOUNT_ID,
   type: 'account',
   name: 'All Portfolio',
 };
@@ -122,11 +121,12 @@ const SelectedItemBadge = ({
 }) => {
   return (
     <div className="my-2 flex items-center">
-      <Badge className={`flex items-center justify-between rounded-md bg-gray-100 px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
+      <Badge className={`rounded-md  px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
         isSelected ? 'ring-2 ring-primary' : ''
       }`}
         onClick={onSelect}
         role="button"
+        variant="secondary"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -165,8 +165,6 @@ export default function PerformancePage() {
     from: subMonths(new Date(), 12),
     to: new Date(),
   });
-
-  const { data: accounts, isLoading: isLoadingAccounts } = useAccounts();
 
   // Helper function to sort comparison items (accounts first, then symbols)
   const sortComparisonItems = (items: ComparisonItem[]): ComparisonItem[] => {
@@ -261,17 +259,6 @@ export default function PerformancePage() {
     }
   };
 
-  const accountOptions = accounts
-    ? [PORTFOLIO_TOTAL, ...accounts.filter((account) => account.isActive)]
-    : [PORTFOLIO_TOTAL];
-  const selectedAccountIds = selectedItems
-    .filter((item) => item.type === 'account')
-    .map((item) => item.id);
-
-  if (isLoadingAccounts) {
-    return <PerformanceDashboardSkeleton />;
-  }
-
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader heading="Portfolio Performance">
@@ -294,9 +281,10 @@ export default function PerformancePage() {
           {selectedItems.length > 0 && <Separator orientation="vertical" className="mx-2 h-6" />}
 
           <AccountSelector
-            accounts={accountOptions}
-            selectedAccounts={selectedAccountIds}
-            onSelect={handleAccountSelect}
+            setSelectedAccount={handleAccountSelect}
+            variant="button"
+            buttonText="Add account"
+            includePortfolio={true}
           />
           <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
         </div>
@@ -310,7 +298,7 @@ export default function PerformancePage() {
                   <CardDescription>{displayDateRange}</CardDescription>
                 </div>
                 {performanceData && performanceData.length > 0 && (
-                  <div className="grid grid-cols-2 gap-6 rounded-lg bg-muted/40 p-2 backdrop-blur-sm md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-6 rounded-lg p-2 backdrop-blur-sm md:grid-cols-4">
                     <div className="flex flex-col space-y-1">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-xs font-light text-muted-foreground">
@@ -401,38 +389,6 @@ export default function PerformancePage() {
               hasErrors={hasErrors}
               errorMessages={errorMessages}
             />
-          </CardContent>
-        </Card>
-      </div>
-    </ApplicationShell>
-  );
-}
-
-function PerformanceDashboardSkeleton() {
-  return (
-    <ApplicationShell className="p-6">
-      <ApplicationHeader heading="Portfolio Performance">
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-10 w-[160px]" />
-          <Skeleton className="h-10 w-[200px]" />
-        </div>
-      </ApplicationHeader>
-
-      <div className="space-y-6">
-        <div className="flex gap-2">
-          <Skeleton className="h-8 w-[100px]" />
-          <Skeleton className="h-8 w-[120px]" />
-        </div>
-
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-[180px]" />
-            <Skeleton className="h-4 w-[240px]" />
-          </CardHeader>
-          <CardContent className="min-h-[400px]">
-            <div className="flex h-full w-full items-center justify-center">
-              <Skeleton className="h-[300px] w-full" />
-            </div>
           </CardContent>
         </Card>
       </div>

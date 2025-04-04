@@ -3,7 +3,7 @@ import { HelpTooltip } from '../components/help-tooltip';
 import { Button } from '@/components/ui/button';
 import { Account, CsvRowError } from '@/lib/types';
 import { CSVFileViewer } from '../components/csv-file-viewer';
-import { AccountSelector } from '../components/account-selector';
+import { AccountSelector } from '../../../../components/account-selector';
 import { ImportProgressIndicator } from '../components/progress-indicator';
 import { Icons } from '@/components/icons';
 import { ImportAlert } from '../components/import-alert';
@@ -17,6 +17,7 @@ interface AccountSelectionStepProps {
   setSelectedAccount: (account: Account) => void;
   setCsvFile: (file: File | null) => void;
   onNext: () => void;
+  onBack?: () => void;
 }
 
 export const AccountSelectionStep = ({
@@ -28,6 +29,7 @@ export const AccountSelectionStep = ({
   setSelectedAccount,
   setCsvFile,
   onNext,
+  onBack,
 }: AccountSelectionStepProps) => {
   // Check if there are any errors
   const hasErrors =
@@ -166,7 +168,14 @@ export const AccountSelectionStep = ({
       </div>
 
       {/* Row 4: Next button */}
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={onBack}
+          disabled={isParsing}
+        >
+          Cancel
+        </Button>
         <Button onClick={onNext} disabled={!canProceed}>
           {isParsing ? 'Validating...' : 'Next'}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+
+export const PORTFOLIO_ACCOUNT_ID = 'TOTAL';
+
 export const HoldingType = {
   CASH: 'CASH',
   STOCK: 'STOCK',

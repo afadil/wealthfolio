@@ -6,7 +6,7 @@ import { Icons } from '@/components/icons';
 import { ImportPreviewTable } from '../import-preview-table';
 import { ImportAlert } from '../components/import-alert';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface ResultStepProps {
   activities: ActivityImport[];

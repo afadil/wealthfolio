@@ -70,6 +70,7 @@ export const HoldingsTable = ({
         columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
         searchBy="symbol"
         filters={filters}
+        showColumnToggle={true}
         defaultColumnVisibility={{
           currency: false,
           symbolName: false,
@@ -137,7 +138,7 @@ const getColumns = (
     id: 'symbolName',
     accessorKey: 'symbolName',
     meta: {
-      label: 'Position Name',
+      label: 'Symbol Name',
     },
     enableHiding: false,
   },
@@ -294,6 +295,7 @@ const getColumns = (
     meta: {
       label: 'Asset Type',
     },
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Asset Type" />,
   },
   {
     id: 'currency',

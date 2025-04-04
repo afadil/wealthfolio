@@ -222,25 +222,6 @@ export function useCsvParser() {
     [resetParserStates], // resetParserStates dependency is correct
   );
 
-  // Convert the parsed data to a 2D string array format needed by other components
-  // This is a fallback if rawCsvLines is not available
-  const processedCsvData = useMemo(() => {
-    if (!state.data || state.data.length === 0) return [];
-
-    // Create header row
-    const result: string[][] = [state.headers];
-
-    // Convert each row object to an array of values in the same order as headers
-    state.data.forEach((row) => {
-      const rowValues: string[] = state.headers.map((header) =>
-        row[header] !== undefined ? String(row[header]) : '',
-      );
-      result.push(rowValues);
-    });
-
-    return result;
-  }, [state.data, state.headers]);
-
   
   // Prepare errors for display format
   // If there's a header error (row 0), only show that and suppress other errors

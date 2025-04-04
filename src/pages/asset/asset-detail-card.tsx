@@ -119,7 +119,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
         {quote && (
           <>
             <Separator className="my-4" />
-            <div className="rounded-lg bg-muted/50">
+            <div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div className="flex flex-col">
                   <span className="text-xs text-muted-foreground">Open</span>

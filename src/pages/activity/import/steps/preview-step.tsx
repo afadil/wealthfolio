@@ -29,7 +29,6 @@ export const DataPreviewStep = ({
   onError,
 }: DataPreviewStepProps) => {
   const [importError, setImportError] = useState<string | null>(null);
-  const [isConfirmHovered, setIsConfirmHovered] = useState(false);
   const [confirmationState, setConfirmationState] = useState<'initial' | 'confirm' | 'processing'>('initial');
 
   const { confirmImportMutation } = useActivityImportMutations({
@@ -298,10 +297,9 @@ export const DataPreviewStep = ({
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.15 }}
               onMouseLeave={() => {
-                setIsConfirmHovered(false);
                 setConfirmationState('initial');
               }}
-              onMouseEnter={() => setIsConfirmHovered(true)}
+              onMouseEnter={() => {}}
             >
               <motion.div
                 variants={pulseVariants}
