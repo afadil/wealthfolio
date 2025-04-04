@@ -232,11 +232,9 @@ const ErrorCell = ({
       <Tooltip delayDuration={30}>
         <TooltipTrigger asChild>
           <div className="absolute inset-0 cursor-help bg-destructive/10">
-            <div className="relative h-full w-full flex items-center px-4 py-2">
-              <div className="w-full">{children}</div>
-              <div className="absolute right-1 top-1">
-                <Icons.AlertCircle className="h-3.5 w-3.5 text-destructive" />
-              </div>
+            <div className="relative h-full w-full flex items-center justify-between px-4 py-2">
+              <div className="flex-1 mr-2">{children}</div>
+              <Icons.AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
             </div>
           </div>
         </TooltipTrigger>
@@ -451,7 +449,9 @@ export const columns: ColumnDef<ActivityImport>[] = [
       return (
         <ErrorCell hasError={hasError} errorMessages={errorMessages}>
           <div className="text-right font-medium tabular-nums">
-            {activityType === 'SPLIT' ? '-' : safeFormatAmount(amount, currency)}
+            {activityType === 'SPLIT'
+              ? '-'
+              : safeFormatAmount(amount, currency)}
           </div>
         </ErrorCell>
       );

@@ -7,7 +7,7 @@ import {
   ImportValidationResult,
 } from '@/lib/types';
 import { importActivitySchema } from '@/lib/schemas';
-import { isCashActivity, isIncomeActivity } from '@/lib/activity-utils';
+import { isCashActivity, isIncomeActivity, isTradeActivity } from '@/lib/activity-utils';
 import { tryParseDate } from '@/lib/utils';
 import { logger } from '@/adapters';
 
@@ -123,6 +123,16 @@ function transformRowToActivity(
     if (!activity.amount || activity.amount === 0) {
       activity.amount = calculateCashActivityAmount(activity.quantity, activity.unitPrice);
     }
+  } else if (
+    activity.activityType &&
+    isTradeActivity(activity.activityType) &&
+    activity.quantity !== undefined &&
+    activity.quantity > 0 &&
+    activity.unitPrice !== undefined &&
+    activity.unitPrice > 0
+  ) {
+    // For trade activities, calculate amount as quantity * price if both are positive
+    activity.amount = activity.quantity * activity.unitPrice;
   }
 
   // For FEE activity, set the fee field if not set or zero

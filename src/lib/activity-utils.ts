@@ -33,7 +33,7 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
 };
 
 // Helper to check if activity is a trade type
-export const isTradeActivity = (type: ActivityType): boolean => {
+export const isTradeActivity = (type: string): boolean => {
   return type === ActivityType.BUY || type === ActivityType.SELL;
 }
 

@@ -145,7 +145,7 @@ export const importActivitySchema = z.object({
 ).refine(
   (data) => {
     // Trade activity unit price validations
-    if (isTradeActivity(data.activityType as ActivityType)) {
+    if (isTradeActivity(data.activityType as string)) {
       return data.unitPrice !== undefined && data.unitPrice > 0;
     }
     return true;
@@ -161,7 +161,7 @@ export const importActivitySchema = z.object({
       !isCashActivity(data.activityType as string) && 
       !isIncomeActivity(data.activityType as string) && 
       !(data.symbol && isCashTransfer(data.activityType as string, data.symbol)) &&
-      !isTradeActivity(data.activityType as ActivityType) &&
+      !isTradeActivity(data.activityType as string) &&
       !isFeeActivity(data.activityType as string) &&
       !isSplitActivity(data.activityType as string);
     
