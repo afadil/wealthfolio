@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use crate::models::HistoryRecordDB;
 use chrono::NaiveDate;
+use super::history_traits::HistoryRepositoryTrait;
 
 pub struct HistoryRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -156,5 +157,38 @@ impl HistoryRepository {
             .load::<HistoryRecordDB>(&mut conn)?;
 
         Ok(result.into_iter().map(HistoryRecord::from).collect())
+    }
+}
+
+impl HistoryRepositoryTrait for HistoryRepository {
+    fn get_by_account(&self, input_account_id: Option<&str>, start_date: Option<NaiveDate>, end_date: Option<NaiveDate>) -> Result<Vec<HistoryRecord>> {
+        self.get_by_account(input_account_id, start_date, end_date)
+    }
+
+    fn get_all(&self) -> Result<Vec<HistoryRecord>> {
+        self.get_all()
+    }
+
+    fn get_latest_by_account(&self, input_account_id: &str) -> Result<HistoryRecord> {
+        self.get_latest_by_account(input_account_id)
+    }
+
+    fn save_batch(&self, history_data: &[HistoryRecord]) -> Result<()> {
+        self.save_batch(history_data)
+    }
+
+    fn delete_by_accounts(&self, accounts: &[Account]) -> Result<()> {
+        self.delete_by_accounts(accounts)
+    }
+
+    fn get_all_last_histories(
+        &self,
+        account_ids: &[String],
+    ) -> Result<HashMap<String, Option<HistoryRecord>>> {
+        self.get_all_last_histories(account_ids)
+    }
+
+    fn get_all_active_account_histories(&self) -> Result<Vec<HistoryRecord>> {
+        self.get_all_active_account_histories()
     }
 }

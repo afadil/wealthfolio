@@ -2,6 +2,8 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::{errors::ValidationError, Error, Result};
+
 /// Domain model representing an account in the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,16 +37,16 @@ pub struct NewAccount {
 
 impl NewAccount {
     /// Validates the new account data
-    pub fn validate(&self) -> crate::accounts::Result<()> {
+      pub fn validate(&self) -> Result<()> {
         if self.name.trim().is_empty() {
-            return Err(crate::accounts::AccountError::InvalidData(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Account name cannot be empty".to_string(),
-            ));
+            )));
         }
         if self.currency.trim().is_empty() {
-            return Err(crate::accounts::AccountError::InvalidData(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Currency cannot be empty".to_string(),
-            ));
+            )));
         }
         Ok(())
     }
@@ -65,16 +67,16 @@ pub struct AccountUpdate {
 
 impl AccountUpdate {
     /// Validates the account update data
-    pub fn validate(&self) -> crate::accounts::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.id.is_none() {
-            return Err(crate::accounts::AccountError::InvalidData(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Account ID is required for updates".to_string(),
-            ));
+            )));
         }
         if self.name.trim().is_empty() {
-            return Err(crate::accounts::AccountError::InvalidData(
+             return Err(Error::Validation(ValidationError::InvalidInput(
                 "Account name cannot be empty".to_string(),
-            ));
+            )));
         }
         Ok(())
     }

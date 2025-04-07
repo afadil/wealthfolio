@@ -1,114 +1,57 @@
-use crate::fx::fx_service::FxService;
 use crate::{
-    models::{IncomeData, IncomeSummary},
-    schema::activities,
+    activities::{activities_errors::ActivityError, activities_model::IncomeData, activities_traits::ActivityRepositoryTrait}, models::IncomeSummary
 };
-use chrono::{Datelike, NaiveDate, NaiveDateTime, Utc};
-use diesel::dsl::min;
-use diesel::prelude::*;
+use chrono::{Datelike, NaiveDate, Utc};
+
 use log::{debug, error};
-use std::sync::Arc;
-use rust_decimal::Decimal;
-use rust_decimal::prelude::*;
 use num_traits::Zero;
+use rust_decimal::Decimal;
+use std::sync::Arc;
+use crate::fx::fx_traits::FxServiceTrait;
+
+// Define the trait for the income service
+pub trait IncomeServiceTrait: Send + Sync {
+    fn get_income_summary(
+        &self,
+    ) -> Result<Vec<IncomeSummary>, ActivityError>;
+}
 
 pub struct IncomeService {
-    fx_service: Arc<FxService>,
+    fx_service: Arc<dyn FxServiceTrait>,
+    activity_repository: Arc<dyn ActivityRepositoryTrait>,
     base_currency: String,
 }
 
 impl IncomeService {
-    pub fn new(fx_service: Arc<FxService>, base_currency: String) -> Self {
+    pub fn new(
+        fx_service: Arc<dyn FxServiceTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        base_currency: String,
+    ) -> Self {
         IncomeService {
             fx_service,
+            activity_repository,
             base_currency,
         }
     }
 
-    fn get_income_activities(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<IncomeData>, diesel::result::Error> {
-        let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
-             a.activity_type as income_type,
-             a.asset_id as symbol,
-             COALESCE(ast.name, 'Unknown') as symbol_name,
-             a.currency,
-             a.amount
-             FROM activities a
-             LEFT JOIN assets ast ON a.asset_id = ast.id
-             INNER JOIN accounts acc ON a.account_id = acc.id
-             WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
-             AND acc.is_active = 1
-             ORDER BY a.activity_date";
-
-        // Define a struct to hold the raw query results including quantity and unit_price
-        #[derive(QueryableByName, Debug)]
-        struct RawIncomeData {
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub date: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub income_type: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub symbol: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub symbol_name: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub currency: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub amount: String,
-        }
-
-        let raw_results = diesel::sql_query(query).load::<RawIncomeData>(conn)?;
-        
-        // Transform raw results into IncomeData, using amount directly from the database
-        let results = raw_results
-            .into_iter()
-            .map(|raw| {
-                // Parse the TEXT value into Decimal
-                let amount = Decimal::from_str(&raw.amount).unwrap_or_else(|_| Decimal::zero());
-                
-                IncomeData {
-                    date: raw.date,
-                    income_type: raw.income_type,
-                    symbol: raw.symbol,
-                    symbol_name: raw.symbol_name,
-                    currency: raw.currency,
-                    amount,
-                }
-            })
-            .collect();
-
-        Ok(results)
-    }
-
-    fn get_first_transaction_date(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<NaiveDateTime, diesel::result::Error> {
-        activities::table
-            .select(min(activities::activity_date))
-            .first::<Option<NaiveDateTime>>(conn)
-            .optional()
-            .map(|result| result.flatten())
-            .and_then(|opt| opt.ok_or(diesel::NotFound))
-    }
-
     fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
         if previous > Decimal::zero() {
-            ((&current - &previous) / &previous) * Decimal::ONE_HUNDRED
+            ((current - previous) / previous) * Decimal::ONE_HUNDRED
         } else {
             Decimal::zero()
         }
     }
+}
 
-    pub fn get_income_summary(
+// Implement the trait for IncomeService
+impl IncomeServiceTrait for IncomeService {
+    fn get_income_summary(
         &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<IncomeSummary>, diesel::result::Error> {
+    ) -> Result<Vec<IncomeSummary>, ActivityError> {
         debug!("Getting income summary...");
 
-        let activities = match self.get_income_activities(conn) {
+        let activities = match self.activity_repository.get_income_activities_data() {
             Ok(activity) => activity,
             Err(e) => {
                 error!("Error getting aggregated income data: {:?}", e);
@@ -127,7 +70,7 @@ impl IncomeService {
         let two_years_ago = current_year - 2;
         let current_month = current_date.month();
 
-        let oldest_date = match self.get_first_transaction_date(conn) {
+        let oldest_date = match self.activity_repository.get_first_activity_date_overall() {
             Ok(date) => date,
             Err(e) => {
                 error!("Error getting first transaction date: {:?}", e);
@@ -155,7 +98,6 @@ impl IncomeService {
         let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
-        let _ = self.fx_service.initialize();
 
         for activity in activities {
             let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")
@@ -166,7 +108,8 @@ impl IncomeService {
                     continue;
                 }
             };
-            
+
+            // Correctly call methods on the FxService instance within the Arc
             let converted_amount = match self.fx_service.convert_currency(
                 activity.amount.clone(),
                 &activity.currency,
@@ -175,6 +118,7 @@ impl IncomeService {
                 Ok(amount) => amount,
                 Err(e) => {
                     error!("Error converting currency: {:?}", e);
+                    // Consider if returning the original amount is the correct fallback
                     activity.amount.clone()
                 }
             };
@@ -186,7 +130,7 @@ impl IncomeService {
                 symbol: activity.symbol.clone(),
                 symbol_name: activity.symbol_name.clone(),
                 currency: activity.currency.clone(),
-                amount: activity.amount.clone(),
+                amount: activity.amount.clone(), // Keep original amount in activity_copy if needed elsewhere
             };
 
             total_summary.add_income(&activity_copy, converted_amount.clone());
@@ -205,10 +149,10 @@ impl IncomeService {
         last_year_summary.calculate_monthly_average(Some(months_in_last_year as u32));
         two_years_ago_summary.calculate_monthly_average(Some(months_two_years_ago as u32));
 
-        // Calculate Year-over-Year Growth
+        // Calculate Year-over-Year Growth using the static helper method
         let ytd_yoy_growth =
-            Self::calculate_yoy_growth(ytd_summary.total_income.clone(), last_year_summary.total_income.clone());
-        let last_year_yoy_growth = Self::calculate_yoy_growth(
+            IncomeService::calculate_yoy_growth(ytd_summary.total_income.clone(), last_year_summary.total_income.clone());
+        let last_year_yoy_growth = IncomeService::calculate_yoy_growth(
             last_year_summary.total_income.clone(),
             two_years_ago_summary.total_income.clone(),
         );

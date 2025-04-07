@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod context;
 mod commands;
 mod menu;
 mod updater;
@@ -8,43 +9,19 @@ mod updater;
 
 use log::error;
 use updater::check_for_update;
-use wealthfolio_core::db;
 use wealthfolio_core::models;
 
-// Remove unused imports
-use wealthfolio_core::goals;
-use wealthfolio_core::market_data;
-use wealthfolio_core::portfolio;
-use wealthfolio_core::settings;
 
 use dotenvy::dotenv;
 use std::env;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::SqliteConnection;
 use tauri::async_runtime::spawn;
 
 use tauri::Manager;
-type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 use tauri::{AppHandle, Emitter};
 
-// AppState
-#[derive(Clone)]
-struct AppState {
-    pool: Arc<DbPool>,
-    base_currency: Arc<RwLock<String>>,
-}
-
-impl AppState {
-    fn get_base_currency(&self) -> String {
-        self.base_currency.read().unwrap().clone()
-    }
-
-    fn update_base_currency(&self, new_currency: String) {
-        *self.base_currency.write().unwrap() = new_currency;
-    }
-}
+use context::ServiceContext;
 
 pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
@@ -60,52 +37,44 @@ pub fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .expect("failed to get app data dir")
-                .to_str()
-                .expect("failed to convert path to string")
-                .to_string();
-
-            let db_path = db::get_db_path(&app_data_dir);
-            
-            // Create the database pool
-            let pool = db::create_pool(&db_path).expect("Failed to create database pool");
-            
-            // Run migrations using the pool
-            db::run_migrations(&pool).expect("Failed to run database migrations");
-
-            let menu = menu::create_menu(&app.handle())?;
-            app.set_menu(menu)?;
-
-            // Get initial base_currency from settings
-            let mut conn = pool.get().expect("Failed to get database connection");
-            let settings_service = settings::SettingsService::new(pool.clone());
-
-            // Get instance_id from settings
-            let settings = settings_service.get_settings(&mut conn)?;
-            let instance_id = settings.instance_id.clone();
-
-            // Initialize state
-            let state = AppState {
-                pool: pool.clone(),
-                base_currency: Arc::new(RwLock::new(settings.base_currency)),
-            };
-            app.manage(state.clone());
-
             let handle = app.handle().clone();
-            // Check for updates on startup
-            spawn(async move { check_for_update(handle, &instance_id, false).await });
 
-            // Sync quotes on startup
-            spawn_quote_sync(app.handle().clone(), state);
+            // Block synchronously on the essential async setup
+            tauri::async_runtime::block_on(async {
+                let app_data_dir = handle
+                    .path()
+                    .app_data_dir()? // Use ? directly on the Result
+                    .to_str()
+                    .ok_or("Failed to convert app data dir path to string")?
+                    .to_string();
 
-            // Set up the menu event handler
-            let instance_id_clone = settings.instance_id.clone();
-            app.on_menu_event(move |app, event| {
-                menu::handle_menu_event(app, &instance_id_clone, event.id().as_ref());
-            });
+                // Initialize context asynchronously
+                let context = match context::initialize_context(&app_data_dir).await {
+                     Ok(ctx) => Arc::new(ctx),
+                     Err(e) => {
+                         error!("Failed to initialize context: {}", e);
+                         // Propagate the original boxed error
+                         return Err(e);
+                     }
+                };
+
+                // Make context available to all commands *before* setup returns
+                handle.manage(context.clone());
+
+                // Get instance_id after context is managed
+                let instance_id = context.instance_id.clone();
+
+                // --- Spawn non-critical async tasks ---
+                spawn_background_tasks(handle.clone(), context.clone(), instance_id);
+
+                Ok(())
+            })
+            // Handle potential errors from the block_on section
+            .map_err(|e: Box<dyn std::error::Error>| {
+                error!("Critical setup failed: {}", e);
+                // Convert the boxed error into Tauri's setup error type if needed, or handle otherwise
+                tauri::Error::Setup(e.into()) // Or Box::new(tauri::Error::Setup(e.into())) depending on signature needs
+            })?;
 
             Ok(())
         })
@@ -164,27 +133,51 @@ pub fn main() {
     app.run(|_app_handle, _event| {});
 }
 
-fn spawn_quote_sync(app_handle: AppHandle, state: AppState) {
-    spawn(async move {
-        let base_currency = state.get_base_currency();
-        let portfolio_service = match portfolio::portfolio_service::PortfolioService::new(state.pool.clone(), base_currency).await {
-            Ok(service) => service,
-            Err(e) => {
-                error!("Failed to create PortfolioService: {}", e);
-                if let Err(emit_err) = app_handle.emit(
-                    "PORTFOLIO_SERVICE_ERROR",
-                    "Failed to initialize PortfolioService",
-                ) {
-                    error!("Failed to emit PORTFOLIO_SERVICE_ERROR event: {}", emit_err);
+/// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
+fn spawn_background_tasks(handle: AppHandle, context: Arc<ServiceContext>, instance_id: Arc<String>) {
+    // Set up menu (can happen after state is managed)
+    let menu_handle = handle.clone();
+    let instance_id_menu = instance_id.clone();
+    tauri::async_runtime::spawn(async move {
+        match menu::create_menu(&menu_handle) {
+            Ok(menu) => {
+                if let Err(e) = menu_handle.set_menu(menu) {
+                    error!("Failed to set menu: {}", e);
                 }
-                return;
             }
-        };
+            Err(e) => {
+                error!("Failed to create menu: {}", e);
+            }
+        }
+        // Set up the menu event handler
+        menu_handle.on_menu_event(move |app, event| {
+            menu::handle_menu_event(app, &*instance_id_menu, event.id().as_ref());
+        });
+    });
 
-        app_handle
-            .emit("PORTFOLIO_UPDATE_START", ())
-            .expect("Failed to emit event");
+    // Check for updates on startup
+    let update_handle = handle.clone();
+    let instance_id_update = instance_id.clone();
+    spawn(async move {
+        check_for_update(update_handle, &*instance_id_update, false).await
+    });
 
+    // Sync quotes on startup (now called from within this function)
+    spawn_quote_sync(handle, context);
+}
+
+fn spawn_quote_sync(app_handle: AppHandle, state: Arc<ServiceContext>) {
+    spawn(async move {
+        // Get the portfolio service from the managed state
+        let portfolio_service = state.portfolio_service();
+
+        // Emit start event
+        if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_START", ()) {
+             error!("Failed to emit PORTFOLIO_UPDATE_START event: {}", e);
+        }
+
+
+        // Call update_portfolio on the existing service instance
         match portfolio_service.update_portfolio().await {
             Ok(_) => {
                 if let Err(e) = app_handle.emit("PORTFOLIO_UPDATE_COMPLETE", ()) {

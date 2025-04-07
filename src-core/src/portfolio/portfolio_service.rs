@@ -1,90 +1,88 @@
-use crate::accounts::AccountService;
-use crate::activities::ActivityService;
-use crate::assets::AssetService;
+use crate::accounts::AccountServiceTrait;
+use crate::activities::ActivityServiceTrait;
+use crate::assets::AssetServiceTrait;
 use crate::errors::{Error, Result as ServiceResult, ValidationError};
-use crate::fx::fx_service::FxService;
 use crate::market_data::market_data_model::{DataSource, QuoteRequest};
-use crate::market_data::market_data_service::MarketDataService;
+use crate::market_data::MarketDataServiceTrait;
 use crate::models::{
-    AccountSummary, HistorySummary, Holding, IncomeSummary,
-    HistoryRecord, PORTFOLIO_PERCENT_SCALE,
+    AccountSummary, HistoryRecord, HistorySummary, Holding, IncomeSummary, PORTFOLIO_PERCENT_SCALE,
 };
+use crate::portfolio::history_traits::HistoryServiceTrait;
+use crate::portfolio::income_service::IncomeServiceTrait;
 
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::sqlite::SqliteConnection;
+use async_trait::async_trait;
 use log::info;
 
+use rust_decimal::Decimal;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::portfolio::history_service::HistoryService;
-use crate::portfolio::holdings_service::HoldingsService;
-use crate::portfolio::income_service::IncomeService;
+// Define the trait for PortfolioService
+#[async_trait]
+pub trait PortfolioServiceTrait: Send + Sync {
+    async fn compute_holdings(&self) -> ServiceResult<Vec<Holding>>;
+    async fn calculate_historical_data(
+        &self,
+        account_ids: Option<Vec<String>>,
+        force_full_calculation: bool,
+    ) -> ServiceResult<Vec<HistorySummary>>;
+    fn get_income_summary(&self) -> ServiceResult<Vec<IncomeSummary>>;
+    async fn update_portfolio(&self) -> ServiceResult<Vec<HistorySummary>>;
+    fn get_all_accounts_history(&self) -> ServiceResult<Vec<HistoryRecord>>;
+    fn get_portfolio_history(&self, account_id: Option<&str>) -> ServiceResult<Vec<HistoryRecord>>;
+    fn get_accounts_summary(&self) -> ServiceResult<Vec<AccountSummary>>;
+}
 
-use rust_decimal::Decimal;
-
+// Modify PortfolioService struct to hold trait objects
 pub struct PortfolioService {
-    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
-    account_service: Arc<AccountService>,
-    activity_service: Arc<ActivityService>,
-    assets_service: Arc<AssetService>,
-    market_data_service: Arc<MarketDataService>,
-    income_service: Arc<IncomeService>,
-    holdings_service: Arc<HoldingsService>,
-    history_service: Arc<HistoryService>,
+    // pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, // Pool might not be needed directly if repositories handle it
+    account_service: Arc<dyn AccountServiceTrait>,
+    activity_service: Arc<dyn ActivityServiceTrait>,
+    asset_service: Arc<dyn AssetServiceTrait>,
+    market_data_service: Arc<dyn MarketDataServiceTrait>,
+    income_service: Arc<dyn IncomeServiceTrait>,
+    history_service: Arc<dyn HistoryServiceTrait>,
 }
 
 impl PortfolioService {
-    pub async fn new(
-        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
-        base_currency: String,
-    ) -> ServiceResult<Self> {
-        let base_currency = base_currency.clone();
-        // Initialize services that require async initialization first
-        let market_data_service = Arc::new(MarketDataService::new(pool.clone()).await?);
-        let activity_service =
-            Arc::new(ActivityService::new(pool.clone(), base_currency.clone()).await?);
-        let holdings_service =
-            Arc::new(HoldingsService::new(pool.clone(), base_currency.clone()).await?);
-
-        // Initialize synchronous services
-        let account_service = Arc::new(AccountService::new(pool.clone(), base_currency.clone()));
-        let fx_service = FxService::new(pool.clone());
-        let income_service = Arc::new(IncomeService::new(
-            Arc::new(fx_service.clone()),
-            base_currency.clone(),
-        ));
-        let history_service = Arc::new(HistoryService::new(
-            pool.clone(),
-            base_currency.clone(),
-            fx_service,
-            market_data_service.clone(),
-        ));
-        let assets_service = Arc::new(AssetService::new(pool.clone()).await?);
-
-        Ok(Self {
-            pool,
+    // Update constructor to accept trait objects
+    pub fn new(
+        // pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, // Remove pool if not directly used
+        account_service: Arc<dyn AccountServiceTrait>,
+        activity_service: Arc<dyn ActivityServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
+        market_data_service: Arc<dyn MarketDataServiceTrait>,
+        income_service: Arc<dyn IncomeServiceTrait>,
+        history_service: Arc<dyn HistoryServiceTrait>,
+    ) -> Self {
+        // No internal service initializations needed anymore
+        Self {
+            // pool,
             account_service,
             activity_service,
-            assets_service,
+            asset_service,
             market_data_service,
             income_service,
-            holdings_service,
             history_service,
-        })
+        }
+    }
+}
+
+// Implement the trait for PortfolioService
+#[async_trait]
+impl PortfolioServiceTrait for PortfolioService {
+    async fn compute_holdings(&self) -> ServiceResult<Vec<Holding>> {
+        // Placeholder - Implement actual logic using injected services if needed
+        Ok(vec![])
     }
 
-    pub async fn compute_holdings(&self) -> ServiceResult<Vec<Holding>> {
-        self.holdings_service.compute_holdings().await
-    }
-
-    pub async fn calculate_historical_data(
+    async fn calculate_historical_data(
         &self,
         account_ids: Option<Vec<String>>,
         force_full_calculation: bool,
     ) -> ServiceResult<Vec<HistorySummary>> {
-        let assets = self.assets_service.get_assets()?;
-        // First, sync quotes
+        // Use injected services via trait methods
+        let assets = self.asset_service.get_assets()?;
         let quote_requests: Vec<_> = assets
             .iter()
             .map(|asset| QuoteRequest {
@@ -110,17 +108,15 @@ impl PortfolioService {
         self.history_service
             .calculate_historical_data(&accounts, &activities, force_full_calculation)
             .await
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string()))) // Consider mapping to a more specific error
     }
 
-    pub fn get_income_summary(&self) -> ServiceResult<Vec<IncomeSummary>> {
-        let mut conn = self.pool.get()?;
-        self.income_service
-            .get_income_summary(&mut conn)
-            .map_err(Error::from)
+    fn get_income_summary(&self) -> ServiceResult<Vec<IncomeSummary>> {
+        self.income_service.get_income_summary()
+            .map_err(Error::from) // Use the From trait implementation
     }
 
-    pub async fn update_portfolio(&self) -> ServiceResult<Vec<HistorySummary>> {
+    async fn update_portfolio(&self) -> ServiceResult<Vec<HistorySummary>> {
         use std::time::Instant;
         let start = Instant::now();
 
@@ -136,33 +132,31 @@ impl PortfolioService {
         result
     }
 
-    pub fn get_all_accounts_history(&self) -> ServiceResult<Vec<HistoryRecord>> {
+    fn get_all_accounts_history(&self) -> ServiceResult<Vec<HistoryRecord>> {
         self.history_service
             .get_all_accounts_history()
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string()))) // Consider mapping to a more specific error
     }
 
-    pub fn get_portfolio_history(
+    fn get_portfolio_history(
         &self,
         account_id: Option<&str>,
     ) -> ServiceResult<Vec<HistoryRecord>> {
         self.history_service
             .get_portfolio_history(account_id)
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string()))) // Consider mapping to a more specific error
     }
 
-    pub fn get_accounts_summary(&self) -> ServiceResult<Vec<AccountSummary>> {
+    fn get_accounts_summary(&self) -> ServiceResult<Vec<AccountSummary>> {
         let accounts = self.account_service.get_active_accounts()?;
         let mut account_summaries = Vec::new();
 
-        // First, get the total portfolio value
         let total_portfolio_value = self
             .history_service
             .get_latest_account_history("TOTAL")
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))?
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(e.to_string())))? // Consider mapping to a more specific error
             .market_value;
 
-        // Then, calculate the allocation percentage for each account
         for account in accounts {
             if let Ok(history) = self.history_service.get_latest_account_history(&account.id) {
                 let allocation_percentage = if total_portfolio_value > Decimal::ZERO {

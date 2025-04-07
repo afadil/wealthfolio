@@ -11,10 +11,11 @@ use diesel::sqlite::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::db::get_connection;
-use super::fx_errors::FxError;
+use crate::errors::{Result, Error, DatabaseError};
 use super::fx_model::ExchangeRate;
 use log::error;
 use std::str::FromStr;
+use super::fx_traits::FxRepositoryTrait;
 
 #[derive(Clone)]
 pub struct FxRepository {
@@ -26,7 +27,7 @@ impl FxRepository {
         Self { pool }
     }
 
-    pub fn get_all_currency_quotes(&self) -> Result<HashMap<String, Vec<Quote>>, FxError> {
+    pub fn get_all_currency_quotes(&self) -> Result<HashMap<String, Vec<Quote>>> {
         let mut conn = get_connection(&self.pool)?;
         
         // Use a more efficient query that directly gets currency quotes
@@ -53,7 +54,7 @@ impl FxRepository {
         Ok(grouped_quotes)
     }
 
-    pub fn get_latest_currency_rates(&self) -> Result<HashMap<String, Decimal>, FxError> {
+    pub fn get_latest_currency_rates(&self) -> Result<HashMap<String, Decimal>> {
         let mut conn = get_connection(&self.pool)?;
         
         let query = "
@@ -76,7 +77,7 @@ impl FxRepository {
         Ok(quotes.into_iter().map(|q| (q.symbol, Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)))).collect())
     }
 
-    pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>, FxError> {
+    pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
         
         let latest_quotes = sql_query(
@@ -101,7 +102,7 @@ impl FxRepository {
         &self,
         from: &str,
         to: &str,
-    ) -> Result<Option<ExchangeRate>, FxError> {
+    ) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
         
         let symbol = format!("{}{}=X", from, to);
@@ -117,7 +118,7 @@ impl FxRepository {
     pub fn get_exchange_rate_by_id(
         &self,
         id: &str,
-    ) -> Result<Option<ExchangeRate>, FxError> {
+    ) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
         
         let quote = quotes::table
@@ -134,7 +135,7 @@ impl FxRepository {
         symbol: &str,
         start_date: chrono::NaiveDateTime,
         end_date: chrono::NaiveDateTime,
-    ) -> Result<Vec<Quote>, FxError> {
+    ) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
         
         let quotes = quotes::table
@@ -153,7 +154,7 @@ impl FxRepository {
         date: String,
         rate: Decimal,
         source: String,
-    ) -> Result<Quote, FxError> {
+    ) -> Result<Quote> {
         let mut conn = get_connection(&self.pool)?;
         
         let currency = symbol.split_at(3).0.to_string();
@@ -196,13 +197,13 @@ impl FxRepository {
     pub fn save_exchange_rate(
         &self,
         rate: ExchangeRate,
-    ) -> Result<ExchangeRate, FxError> {
+    ) -> Result<ExchangeRate> {
         let mut conn = get_connection(&self.pool)?;
         
         let quote = rate.to_quote();
         let quote_db = QuoteDb::from(&quote);
 
-        match diesel::insert_into(quotes::table)
+        diesel::insert_into(quotes::table)
             .values(&quote_db)
             .on_conflict(quotes::id)
             .do_update()
@@ -215,22 +216,9 @@ impl FxRepository {
                 quotes::volume.eq(quote_db.volume.clone()),
                 quotes::data_source.eq(&quote_db.data_source),
             ))
-            .execute(&mut conn) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!(
-                        "Failed to upsert exchange rate. Error: {}. Payload: id={}, symbol={}, date={}, close={}, source={}", 
-                        e,
-                        quote_db.id,
-                        quote_db.symbol, 
-                        quote_db.date, 
-                        quote_db.close, 
-                        quote_db.data_source
-                    );
-                    return Err(FxError::SaveError(e.to_string()));
-                }
-            };
+            .execute(&mut conn)?;
 
+        // Fetch the upserted record and return it or map the error
         quotes::table
             .filter(quotes::id.eq(&quote_db.id))
             .first::<QuoteDb>(&mut conn)
@@ -241,14 +229,14 @@ impl FxRepository {
                     e, 
                     quote_db.id
                 );
-                FxError::FetchError(e.to_string())
+                Error::Database(DatabaseError::QueryFailed(e))
             })
     }
 
     pub fn update_exchange_rate(
         &self,
         rate: &ExchangeRate,
-    ) -> Result<ExchangeRate, FxError> {
+    ) -> Result<ExchangeRate> {
         let mut conn = get_connection(&self.pool)?;
         
         let quote = rate.to_quote();
@@ -269,7 +257,7 @@ impl FxRepository {
     pub fn delete_exchange_rate(
         &self,
         rate_id: &str,
-    ) -> Result<(), FxError> {
+    ) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
         
         diesel::delete(quotes::table.filter(quotes::symbol.eq(rate_id)))
@@ -278,7 +266,7 @@ impl FxRepository {
     }
 
     /// Creates or updates an FX asset in the database
-    pub fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<(), FxError> {
+    pub fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
         let symbol = ExchangeRate::make_fx_symbol(from, to);
         let readable_name = format!("{}/{} Exchange Rate", from, to);
@@ -318,8 +306,82 @@ impl FxRepository {
                 assets::updated_at.eq(now),
             ))
             .execute(&mut conn)
-            .map_err(|e| FxError::SaveError(e.to_string()))?;
+            .map_err(|e| Error::Database(DatabaseError::QueryFailed(e)))?;
 
         Ok(())
+    }
+}
+
+impl FxRepositoryTrait for FxRepository {
+    fn get_all_currency_quotes(&self) -> Result<HashMap<String, Vec<Quote>>> {
+        self.get_all_currency_quotes()
+    }
+
+    fn get_latest_currency_rates(&self) -> Result<HashMap<String, Decimal>> {
+        self.get_latest_currency_rates()
+    }
+
+    fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+        self.get_exchange_rates()
+    }
+
+    fn get_exchange_rate(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<Option<ExchangeRate>> {
+        self.get_exchange_rate(from, to)
+    }
+
+    fn get_exchange_rate_by_id(
+        &self,
+        id: &str,
+    ) -> Result<Option<ExchangeRate>> {
+        self.get_exchange_rate_by_id(id)
+    }
+
+    fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        start_date: chrono::NaiveDateTime,
+        end_date: chrono::NaiveDateTime,
+    ) -> Result<Vec<Quote>> {
+        self.get_historical_quotes(symbol, start_date, end_date)
+    }
+
+    fn add_quote(
+        &self,
+        symbol: String,
+        date: String,
+        rate: Decimal,
+        source: String,
+    ) -> Result<Quote> {
+        self.add_quote(symbol, date, rate, source)
+    }
+
+    fn save_exchange_rate(
+        &self,
+        rate: ExchangeRate,
+    ) -> Result<ExchangeRate> {
+        self.save_exchange_rate(rate)
+    }
+
+    fn update_exchange_rate(
+        &self,
+        rate: &ExchangeRate,
+    ) -> Result<ExchangeRate> {
+        self.update_exchange_rate(rate)
+    }
+
+    fn delete_exchange_rate(
+        &self,
+        rate_id: &str,
+    ) -> Result<()> {
+        self.delete_exchange_rate(rate_id)
+    }
+
+    /// Creates or updates an FX asset in the database
+    fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
+        self.create_fx_asset(from, to, source)
     }
 }

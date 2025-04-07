@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rust_decimal::Decimal;
-
+use crate::utils::decimal_serde::*;
 use crate::accounts::Account;
 
 /// Domain model representing an activity in the system
@@ -641,4 +641,24 @@ impl From<ActivityUpdate> for ActivityDB {
             updated_at: now,
         }
     }
+}
+
+
+#[derive(Debug, Serialize, QueryableByName)]
+#[serde(rename_all = "camelCase")]
+#[diesel(table_name = crate::schema::activities)]
+pub struct IncomeData {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub date: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub income_type: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub symbol: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub symbol_name: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub currency: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+     #[serde(with = "decimal_serde")]
+    pub amount: Decimal,
 }

@@ -1,11 +1,9 @@
 use crate::errors::{self, Result as ServiceResult, ValidationError};
-use crate::market_data::market_data_service::MarketDataService;
-use crate::portfolio::history_repository::HistoryRepository;
+use crate::market_data::MarketDataServiceTrait;
+use crate::portfolio::HistoryRepositoryTrait;
 
+use async_trait::async_trait;
 use chrono::NaiveDate;
-use diesel::r2d2::ConnectionManager;
-use diesel::SqliteConnection;
-use r2d2::Pool;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -59,9 +57,20 @@ pub struct PerformanceResponse {
     pub max_drawdown: Decimal,
 }
 
+#[async_trait]
+pub trait PerformanceServiceTrait: Send + Sync {
+    async fn calculate_performance(
+        &self,
+        item_type: &str,
+        item_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> ServiceResult<PerformanceResponse>;
+}
+
 pub struct PerformanceService {
-    history_repository: Arc<HistoryRepository>,
-    market_data_service: Arc<MarketDataService>,
+    history_repository: Arc<dyn HistoryRepositoryTrait + Send + Sync>,
+    market_data_service: Arc<dyn MarketDataServiceTrait + Send + Sync>,
 }
 
 const TRADING_DAYS_PER_YEAR: u32 = 252;
@@ -70,20 +79,18 @@ const SQRT_TRADING_DAYS_APPROX: Decimal = dec!(15.874507866); // sqrt(252)
 const DECIMAL_PRECISION: u32 = 6;
 
 impl PerformanceService {
-    pub async fn new(
-        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
-    ) -> ServiceResult<Self> {
-        let history_repository = Arc::new(HistoryRepository::new(pool.clone()));
-        let market_data_service = Arc::new(MarketDataService::new(pool).await?);
-
-        Ok(Self {
+    pub fn new(
+        history_repository: Arc<dyn HistoryRepositoryTrait + Send + Sync>,
+        market_data_service: Arc<dyn MarketDataServiceTrait + Send + Sync>,
+    ) -> Self {
+        Self {
             history_repository,
             market_data_service,
-        })
+        }
     }
 
     /// Calculates cumulative returns for a given item (account or symbol)
-    pub async fn calculate_performance(
+    async fn calculate_performance(
         &self,
         item_type: &str,
         item_id: &str,
@@ -431,5 +438,36 @@ impl PerformanceService {
         }
 
         max_drawdown.round_dp(DECIMAL_PRECISION)
+    }
+}
+
+#[async_trait::async_trait]
+impl PerformanceServiceTrait for PerformanceService {
+    /// Calculates cumulative returns for a given item (account or symbol)
+    async fn calculate_performance(
+        &self,
+        item_type: &str,
+        item_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> ServiceResult<PerformanceResponse> {
+        match item_type {
+            "account" => {
+                self.calculate_account_performance(
+                    item_id,
+                    start_date,
+                    end_date,
+                    ReturnMethod::TimeWeighted,
+                )
+                .await
+            }
+            "symbol" => {
+                self.calculate_symbol_performance(item_id, start_date, end_date)
+                    .await
+            }
+            _ => Err(errors::Error::Validation(ValidationError::InvalidInput(
+                "Invalid item type".to_string(),
+            ))),
+        }
     }
 }

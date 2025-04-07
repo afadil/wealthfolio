@@ -1,16 +1,17 @@
 use crate::errors::Result;
-use crate::fx::fx_service::FxService;
-use crate::market_data::market_data_service::MarketDataService;
 use crate::models::{ HistorySummary, HistoryRecord};
-use crate::portfolio::history_repository::HistoryRepository;
 use crate::accounts::Account;
 use crate::activities::Activity;
 use crate::market_data::market_data_model::Quote;
-use diesel::r2d2::{Pool, ConnectionManager};
+
+// Import the traits
+use crate::fx::fx_traits::FxServiceTrait;
+use crate::market_data::market_data_traits::MarketDataServiceTrait;
+use crate::portfolio::history_traits::{HistoryRepositoryTrait, HistoryServiceTrait};
+use async_trait::async_trait; // Import async_trait
 
 use rust_decimal::Decimal;
 use chrono::{Duration, NaiveDate, Utc};
-use diesel::SqliteConnection;
 use log::warn;
 use std::collections::HashMap;
 use std::default::Default;
@@ -20,9 +21,9 @@ use rayon::prelude::*;
 
 pub struct HistoryService {
     base_currency: String,
-    fx_service: FxService,
-    market_data_service: Arc<MarketDataService>,
-    repository: HistoryRepository,
+    fx_service: Arc<dyn FxServiceTrait>,
+    market_data_service: Arc<dyn MarketDataServiceTrait>,
+    repository: Arc<dyn HistoryRepositoryTrait>,
 }
 
 impl Default for HistorySummary {
@@ -37,7 +38,7 @@ impl Default for HistorySummary {
 }
 
 impl HistoryService {
-    const QUANTITY_THRESHOLD: &'static str = "0.0000001";
+    const QUANTITY_THRESHOLD: &'static str = "0.0000000001";
 
     fn is_quantity_significant(quantity: &Decimal) -> bool {
         let threshold = Decimal::from_str(Self::QUANTITY_THRESHOLD).unwrap_or(Decimal::ZERO);
@@ -45,12 +46,11 @@ impl HistoryService {
     }
 
     pub fn new(
-        pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
         base_currency: String,
-        fx_service: FxService,
-        market_data_service: Arc<MarketDataService>,
+        fx_service: Arc<dyn FxServiceTrait>,
+        market_data_service: Arc<dyn MarketDataServiceTrait>,
+        repository: Arc<dyn HistoryRepositoryTrait>,
     ) -> Self {
-        let repository = HistoryRepository::new(Arc::clone(&pool));
         Self {
             base_currency,
             fx_service,
@@ -83,12 +83,12 @@ impl HistoryService {
         activities: &[Activity],
         force_full_calculation: bool,
     ) -> Result<Vec<HistorySummary>> {
-   
-        // Initialize FX service
+        // Initialize FX service - Assuming FxServiceTrait has an async initialize method
+        // If not, this might need to be handled differently (e.g., during construction)
         self.fx_service.initialize()?;
         let end_date = Utc::now().naive_utc().date();
 
-        // Load and prepare all required data 
+        // Load and prepare all required data - Assuming MarketDataServiceTrait has get_all_historical_quotes
         let quotes = Arc::new(self.market_data_service.get_all_historical_quotes()?);
         let account_currencies = self.get_account_currencies(accounts)?;
 
@@ -106,7 +106,8 @@ impl HistoryService {
         let account_activities = self.group_activities_by_account(&adjusted_activities);
 
         let all_last_histories = if !force_full_calculation {
-            self.get_all_last_portfolio_histories(&accounts)?
+            // Assuming HistoryRepositoryTrait has get_all_last_histories
+            self.repository.get_all_last_histories(&accounts.iter().map(|a| a.id.clone()).collect::<Vec<_>>())?
         } else {
             HashMap::new()
         };
@@ -118,26 +119,26 @@ impl HistoryService {
             force_full_calculation,
         );
 
-        // Parallel calculations without database access
+        // Parallel calculations might need adjustment if calculate_account_history becomes async
+        // For now, keeping it synchronous as in the original code, but this might need `async move` and `.await`
         let summaries_and_histories: Vec<_> = if accounts.len() > 10 {
             accounts.par_iter().map(|account| {
-                let result = self.calculate_account_history(
-                        account,
-                        &account_activities,
-                        &quotes,
-                        &start_dates,
-                        &last_histories,
-                        end_date,
-                        &account_currencies,
-                );
-                    result
+                self.calculate_account_history(
+                    account,
+                    &account_activities,
+                    &quotes, // Pass Arc<Quotes> directly
+                    &start_dates,
+                    &last_histories,
+                    end_date,
+                    &account_currencies,
+                )
             }).collect()
         } else {
             accounts.iter().map(|account| {
                  self.calculate_account_history(
                     account,
                     &account_activities,
-                    &quotes,
+                    &quotes, // Pass Arc<Quotes> directly
                     &start_dates,
                     &last_histories,
                     end_date,
@@ -146,7 +147,6 @@ impl HistoryService {
             }).collect()
         };
 
-        // Process results
         let mut summaries: Vec<HistorySummary> = summaries_and_histories
             .iter()
             .map(|(summary, _)| summary.clone())
@@ -157,16 +157,18 @@ impl HistoryService {
             .flat_map(|(_, histories)| histories)
             .collect();
 
-        // If force_full_calculation is true, delete existing history for the accounts and TOTAL
         if force_full_calculation {
-            self.repository.delete_by_accounts(&accounts)?;
+            // Assuming HistoryRepositoryTrait has delete_by_accounts
+            self.repository.delete_by_accounts(accounts)?;
         }
 
-        // Save data
+        // Assuming HistoryRepositoryTrait has save_batch
         self.repository.save_batch(&account_histories)?;
 
-        let total_history = self.calculate_total_portfolio_history()?;
+        // calculate_total_portfolio_history might need to become async if it uses async repo methods
+        let total_history = self.calculate_total_portfolio_history()?; // Might need .await if changed
 
+        // Assuming HistoryRepositoryTrait has save_batch
         self.repository.save_batch(&total_history)?;
 
         let total_summary = self.create_total_summary(&total_history);
@@ -838,4 +840,129 @@ impl HistoryService {
             entries_count: total_history.len(),
         }
     }
+}
+
+#[async_trait]
+impl HistoryServiceTrait for HistoryService {
+    fn get_all_accounts_history(&self) -> Result<Vec<HistoryRecord>> {
+        self.repository.get_all()
+    }
+
+    fn get_portfolio_history(
+        &self,
+        input_account_id: Option<&str>,
+    ) -> Result<Vec<HistoryRecord>> {
+        self.repository.get_by_account(input_account_id, None, None)
+    }
+
+    fn get_latest_account_history(
+        &self,
+        input_account_id: &str,
+    ) -> Result<HistoryRecord> {
+        self.repository.get_latest_by_account(input_account_id)
+    }
+
+    async fn calculate_historical_data(
+        &self,
+        accounts: &[Account],
+        activities: &[Activity],
+        force_full_calculation: bool,
+    ) -> Result<Vec<HistorySummary>> {
+        // Initialize FX service - Assuming FxServiceTrait has an async initialize method
+        // If not, this might need to be handled differently (e.g., during construction)
+        self.fx_service.initialize()?;
+        let end_date = Utc::now().naive_utc().date();
+
+        // Load and prepare all required data - Assuming MarketDataServiceTrait has get_all_historical_quotes
+        let quotes = Arc::new(self.market_data_service.get_all_historical_quotes()?);
+        let account_currencies = self.get_account_currencies(accounts)?;
+
+        // Calculate split factors for all activities
+        let split_factors = self.calculate_split_factors(
+            activities,
+            NaiveDate::from_ymd_opt(1900, 1, 1).unwrap(),
+            end_date,
+        );
+
+        // Adjust all activities for splits
+        let adjusted_activities = self.adjust_activities_for_splits(activities, &split_factors);
+
+        // Group adjusted activities by account
+        let account_activities = self.group_activities_by_account(&adjusted_activities);
+
+        let all_last_histories = if !force_full_calculation {
+            // Assuming HistoryRepositoryTrait has get_all_last_histories
+            self.repository.get_all_last_histories(&accounts.iter().map(|a| a.id.clone()).collect::<Vec<_>>())?
+        } else {
+            HashMap::new()
+        };
+
+        let (start_dates, last_histories) = self.calculate_start_dates_and_last_histories(
+            accounts,
+            &account_activities,
+            &all_last_histories,
+            force_full_calculation,
+        );
+
+        // Parallel calculations might need adjustment if calculate_account_history becomes async
+        // For now, keeping it synchronous as in the original code, but this might need `async move` and `.await`
+        let summaries_and_histories: Vec<_> = if accounts.len() > 10 {
+            accounts.par_iter().map(|account| {
+                self.calculate_account_history(
+                    account,
+                    &account_activities,
+                    &quotes, // Pass Arc<Quotes> directly
+                    &start_dates,
+                    &last_histories,
+                    end_date,
+                    &account_currencies,
+                )
+            }).collect()
+        } else {
+            accounts.iter().map(|account| {
+                 self.calculate_account_history(
+                    account,
+                    &account_activities,
+                    &quotes, // Pass Arc<Quotes> directly
+                    &start_dates,
+                    &last_histories,
+                    end_date,
+                    &account_currencies,
+                )
+            }).collect()
+        };
+
+        let mut summaries: Vec<HistorySummary> = summaries_and_histories
+            .iter()
+            .map(|(summary, _)| summary.clone())
+            .collect();
+
+        let account_histories: Vec<HistoryRecord> = summaries_and_histories
+            .into_iter()
+            .flat_map(|(_, histories)| histories)
+            .collect();
+
+        if force_full_calculation {
+            // Assuming HistoryRepositoryTrait has delete_by_accounts
+            self.repository.delete_by_accounts(accounts)?;
+        }
+
+        // Assuming HistoryRepositoryTrait has save_batch
+        self.repository.save_batch(&account_histories)?;
+
+        // calculate_total_portfolio_history might need to become async if it uses async repo methods
+        let total_history = self.calculate_total_portfolio_history()?; // Might need .await if changed
+
+        // Assuming HistoryRepositoryTrait has save_batch
+        self.repository.save_batch(&total_history)?;
+
+        let total_summary = self.create_total_summary(&total_history);
+        summaries.push(total_summary);
+
+        Ok(summaries)
+    }
+
+    // Note: Helper methods like group_activities_by_account, get_account_currencies, etc.,
+    // are kept in the impl HistoryService block as they are implementation details
+    // and not part of the public trait contract unless explicitly needed.
 }

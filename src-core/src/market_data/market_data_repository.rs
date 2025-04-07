@@ -4,12 +4,14 @@ use diesel::sqlite::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::market_data_errors::{MarketDataError, Result};
-use super::market_data_model::Quote;
+use crate::errors::Result;
 use crate::db::get_connection;
 use crate::market_data::market_data_model::QuoteDb;
 use crate::schema::quotes::dsl::*;
 use crate::schema::quotes;
+use super::market_data_model::Quote;
+use super::market_data_errors::MarketDataError;
+use super::market_data_traits::MarketDataRepositoryTrait;
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -19,8 +21,10 @@ impl MarketDataRepository {
     pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
         Self { pool }
     }
+}
 
-    pub fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
+impl MarketDataRepositoryTrait for MarketDataRepository {
+    fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
 
         Ok(quotes
@@ -32,7 +36,7 @@ impl MarketDataRepository {
             .collect())
     }
 
-    pub fn get_historical_quotes_for_symbol(&self, input_symbol: &str) -> Result<Vec<Quote>> {
+    fn get_historical_quotes_for_symbol(&self, input_symbol: &str) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
 
         Ok(quotes
@@ -45,7 +49,7 @@ impl MarketDataRepository {
             .collect())
     }
 
-    pub fn save_quotes(&self, input_quotes: &[Quote]) -> Result<()> {
+    fn save_quotes(&self, input_quotes: &[Quote]) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
         let transaction_result = conn.transaction(|conn| {
             // Process in smaller batches to prevent memory issues
@@ -64,12 +68,12 @@ impl MarketDataRepository {
         transaction_result
     }
 
-    pub fn save_quote(&self, quote: &Quote) -> Result<Quote> {
+    fn save_quote(&self, quote: &Quote) -> Result<Quote> {
         self.save_quotes(&[quote.clone()])?;
         Ok(quote.clone())
     }
 
-    pub fn delete_quote(&self, quote_id: &str) -> Result<()> {
+    fn delete_quote(&self, quote_id: &str) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
 
         diesel::delete(quotes::table.filter(quotes::id.eq(quote_id)))
@@ -79,16 +83,16 @@ impl MarketDataRepository {
         Ok(())
     }
     
-    pub fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()> {
+    fn delete_quotes_for_symbols(&self, symbols_to_delete: &[String]) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
 
-        diesel::delete(quotes::table.filter(quotes::symbol.eq_any(symbols)))
+        diesel::delete(quotes::table.filter(symbol.eq_any(symbols_to_delete)))
             .execute(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
         Ok(())
     }
 
-    pub fn get_historical_quotes_by_source(
+    fn get_quotes_by_source(
         &self,
         input_symbol: &str,
         source: &str,
@@ -106,25 +110,26 @@ impl MarketDataRepository {
             .collect())
     }
 
-    pub fn get_latest_quote_for_symbol(&self, input_symbol: &str) -> Result<Quote> {
+    fn get_latest_quote_for_symbol(&self, input_symbol: &str) -> Result<Quote> {
         let mut conn = get_connection(&self.pool)?;
 
-        quotes
+        let query_result = quotes
             .filter(symbol.eq(input_symbol))
             .order(date.desc())
             .first::<QuoteDb>(&mut conn)
-            .optional()
-            .map_err(MarketDataError::DatabaseError)?
-            .map(Quote::from)
-            .ok_or_else(|| {
-                MarketDataError::NotFound(format!(
-                    "No quote found in database for symbol: {}",
-                    input_symbol
-                ))
-            })
+            .optional(); // Result<Option<QuoteDb>, diesel::result::Error>
+
+        match query_result {
+            Ok(Some(quote_db)) => Ok(Quote::from(quote_db)), // Convert QuoteDb to Quote
+            Ok(None) => Err(MarketDataError::NotFound(format!(
+                "No quote found in database for symbol: {}",
+                input_symbol
+            )).into()), // Convert MarketDataError to Error
+            Err(diesel_err) => Err(MarketDataError::DatabaseError(diesel_err).into()), // Convert diesel::result::Error -> MarketDataError -> Error
+        }
     }
 
-    pub fn get_latest_quotes_for_symbols(
+    fn get_latest_quotes_for_symbols(
         &self,
         input_symbols: &[String],
     ) -> Result<HashMap<String, Quote>> {
@@ -157,19 +162,4 @@ impl MarketDataRepository {
 
         Ok(result)
     }
-
-    pub fn get_quotes_by_source(&self, input_symbol: &str, source: &str) -> Result<Vec<Quote>> {
-        let mut conn = get_connection(&self.pool)?;
-
-        Ok(quotes
-            .filter(symbol.eq(input_symbol))
-            .filter(data_source.eq(source))
-            .order(date.asc())
-            .load::<QuoteDb>(&mut conn)
-            .map_err(MarketDataError::DatabaseError)?
-            .into_iter()
-            .map(Quote::from)
-            .collect())
-    }
-
 }

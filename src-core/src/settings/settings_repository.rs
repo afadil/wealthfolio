@@ -1,16 +1,38 @@
+use crate::db::{get_connection, DbPool};
+use crate::errors::{Error, Result};
 use crate::models::{AppSetting, Settings, SettingsUpdate};
 use crate::schema::app_settings::dsl::*;
+use crate::schema::{accounts, assets};
 use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
+use std::sync::Arc;
 
-pub struct SettingsRepository;
+// Define the trait for SettingsRepository
+pub trait SettingsRepositoryTrait: Send + Sync {
+    fn get_settings(&self) -> Result<Settings>;
+    fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()>;
+    fn get_setting(&self, setting_key_param: &str) -> Result<String>;
+    fn update_setting(&self, setting_key_param: &str, setting_value_param: &str) -> Result<()>;
+    fn get_distinct_currencies_excluding_base(&self, base_currency: &str) -> Result<Vec<String>>;
+}
+
+pub struct SettingsRepository {
+    pool: Arc<DbPool>,
+}
 
 impl SettingsRepository {
+    pub fn new(pool: Arc<DbPool>) -> Self {
+        SettingsRepository { pool }
+    }
+}
 
-    pub fn get_settings(conn: &mut SqliteConnection) -> Result<Settings, diesel::result::Error> {
+// Implement the trait for SettingsRepository
+impl SettingsRepositoryTrait for SettingsRepository {
+    fn get_settings(&self) -> Result<Settings> {
+        let mut conn = get_connection(&self.pool)?;
         let all_settings: Vec<(String, String)> = app_settings
             .select((setting_key, setting_value))
-            .load::<(String, String)>(conn)?;
+            .load::<(String, String)>(&mut conn)
+            .map_err(Error::from)?;
 
         let mut settings = Settings {
             theme: String::new(),
@@ -40,10 +62,8 @@ impl SettingsRepository {
         Ok(settings)
     }
 
-    pub fn update_settings(
-        conn: &mut SqliteConnection,
-        new_settings: &SettingsUpdate,
-    ) -> Result<(), diesel::result::Error> {
+    fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()> {
+        let mut conn = get_connection(&self.pool)?;
         let settings_to_insert = vec![
             AppSetting {
                 setting_key: "theme".to_string(),
@@ -61,20 +81,19 @@ impl SettingsRepository {
 
         diesel::replace_into(app_settings)
             .values(&settings_to_insert)
-            .execute(conn)?;
-            
+            .execute(&mut conn)
+            .map_err(Error::from);
+
         Ok(())
     }
 
-    pub fn get_setting(
-        conn: &mut SqliteConnection,
-        setting_key_param: &str,
-    ) -> Result<String, diesel::result::Error> {
+    fn get_setting(&self, setting_key_param: &str) -> Result<String> {
+        let mut conn = get_connection(&self.pool)?;
         let result = app_settings
             .filter(setting_key.eq(setting_key_param))
             .select(setting_value)
-            .first(conn);
-        
+            .first(&mut conn);
+
         match result {
             Ok(value) => Ok(value),
             Err(diesel::result::Error::NotFound) => {
@@ -82,25 +101,57 @@ impl SettingsRepository {
                 let default_value = match setting_key_param {
                     "theme" => "light",
                     "font" => "font-mono",
-                    _ => return Err(diesel::result::Error::NotFound),
+                    _ => return Err(Error::from(diesel::result::Error::NotFound)),
                 };
                 Ok(default_value.to_string())
             }
-            Err(e) => Err(e),
+            Err(e) => Err(Error::from(e)),
         }
     }
 
-    pub fn update_setting(
-        conn: &mut SqliteConnection,
+    fn update_setting(
+        &self,
         setting_key_param: &str,
         setting_value_param: &str,
-    ) -> Result<(), diesel::result::Error> {
+    ) -> Result<()> {
+        let mut conn = get_connection(&self.pool)?;
         diesel::replace_into(app_settings)
             .values(AppSetting {
                 setting_key: setting_key_param.to_string(),
                 setting_value: setting_value_param.to_string(),
             })
-            .execute(conn)?;
+            .execute(&mut conn)
+            .map_err(Error::from);
         Ok(())
+    }
+
+    fn get_distinct_currencies_excluding_base(
+        &self,
+        base_currency: &str,
+    ) -> Result<Vec<String>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let currency_assets: Vec<String> = assets::table
+            .filter(assets::asset_type.eq("FOREX"))
+            .filter(assets::currency.ne(base_currency))
+            .select(assets::currency)
+            .distinct()
+            .load::<String>(&mut conn)
+            .map_err(Error::from)?;
+
+        let account_currencies: Vec<String> = accounts::table
+            .filter(accounts::currency.ne(base_currency))
+            .select(accounts::currency)
+            .distinct()
+            .load::<String>(&mut conn)
+            .map_err(Error::from)?;
+
+        let mut all_currencies: Vec<String> = Vec::new();
+        all_currencies.extend(currency_assets);
+        all_currencies.extend(account_currencies);
+        all_currencies.sort();
+        all_currencies.dedup();
+
+        Ok(all_currencies)
     }
 }

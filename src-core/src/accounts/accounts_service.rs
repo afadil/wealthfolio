@@ -1,112 +1,102 @@
-use diesel::prelude::*;
-use diesel::r2d2::{self, Pool};
-use diesel::sqlite::SqliteConnection;
-use diesel::Connection;
 use log::debug;
 use std::sync::Arc;
 
-use super::accounts_model::{Account, AccountDB, AccountUpdate, NewAccount};
-use super::accounts_repository::AccountRepository;
-use crate::accounts::{AccountError, Result};
-use crate::fx::fx_service::FxService;
-use crate::schema;
+use super::accounts_model::{Account, AccountUpdate, NewAccount};
+use super::accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
+use crate::errors::Result;
+use crate::db::DbTransactionExecutor;
+use crate::fx::fx_traits::FxServiceTrait;
 
-/// Service for managing accounts
-pub struct AccountService {
-    pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
+/// Service for managing accounts (Generic over Executor)
+pub struct AccountService<E: DbTransactionExecutor + Send + Sync + Clone> {
+    repository: Arc<dyn AccountRepositoryTrait>,
+    fx_service: Arc<dyn FxServiceTrait>,
     base_currency: String,
-    fx_service: FxService,
+    transaction_executor: E,
 }
 
-impl AccountService {
+impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountService<E> {
     /// Creates a new AccountService instance
-    pub fn new(pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>, base_currency: String) -> Self {
-        let fx_service = FxService::new(pool.clone());
-        Self { pool, base_currency, fx_service }
+    pub fn new(
+        repository: Arc<dyn AccountRepositoryTrait>,
+        fx_service: Arc<dyn FxServiceTrait>,
+        transaction_executor: E,
+        base_currency: String,
+    ) -> Self {
+        Self {
+            repository,
+            fx_service,
+            transaction_executor,
+            base_currency,
+        }
     }
+}
 
+#[async_trait::async_trait]
+impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountServiceTrait for AccountService<E> {
     /// Creates a new account with currency exchange support
-    pub async fn create_account(&self, new_account: NewAccount) -> Result<Account> {
+    async fn create_account(&self, new_account: NewAccount) -> Result<Account> {
         let base_currency = self.base_currency.clone();
         debug!(
             "Creating account..., base_currency: {}, new_account.currency: {}",
             base_currency, new_account.currency
         );
 
-        let mut conn = self.pool.get()
-            .map_err(|e| AccountError::DatabaseError(e.to_string()))?;
+        let fx_service = self.fx_service.clone();
+        let repository = self.repository.clone();
+        let new_account_clone = new_account.clone();
+        let executor = self.transaction_executor.clone();
 
-        conn.transaction(|tx_conn| {
-            if new_account.currency != base_currency {
-                // Register the currency pair if it's different from base currency
-                self.fx_service.register_currency_pair(
-                    new_account.currency.as_str(),
-                    base_currency.as_str(),
-                )
-                .map_err(|e| AccountError::DatabaseError(e.to_string()))?;
-            }
+        executor
+            .execute(move |tx_conn| {
+                if new_account_clone.currency != base_currency {
+                    (*fx_service).register_currency_pair(
+                        new_account_clone.currency.as_str(),
+                        base_currency.as_str(),
+                    )?;
+                }
 
-            let new_account = new_account.clone();
-            new_account.validate()?;
-
-            let mut account_db: AccountDB = new_account.into();
-            account_db.id = uuid::Uuid::new_v4().to_string();
-            
-            diesel::insert_into(schema::accounts::table)
-                .values(&account_db)
-                .execute(tx_conn)
-                .map_err(|e| AccountError::DatabaseError(e.to_string()))?;
-
-            Ok(account_db.into())
-        })
-        .map_err(|e| match e {
-            AccountError::DatabaseError(msg) => AccountError::DatabaseError(format!("Transaction failed: {}", msg)),
-            other => other,
-        })
+                (*repository).create_in_transaction(new_account_clone, tx_conn)
+            })
     }
 
     /// Updates an existing account
-    pub fn update_account(&self, account_update: AccountUpdate) -> Result<Account> {
-        let repo = AccountRepository::new(self.pool.clone());
-        repo.update(account_update)
+    fn update_account(&self, account_update: AccountUpdate) -> Result<Account> {
+        (*self.repository).update(account_update)
     }
 
     /// Retrieves an account by its ID
-    pub fn get_account(&self, account_id: &str) -> Result<Account> {
-        let repo = AccountRepository::new(self.pool.clone());
-        repo.get_by_id(account_id)
+    fn get_account(&self, account_id: &str) -> Result<Account> {
+        (*self.repository).get_by_id(account_id)
     }
 
     /// Lists all accounts with optional filtering by active status and account IDs
-    pub fn list_accounts(
+    fn list_accounts(
         &self,
         is_active_filter: Option<bool>,
         account_ids: Option<&[String]>,
     ) -> Result<Vec<Account>> {
-        let repo = AccountRepository::new(self.pool.clone());
-        repo.list(is_active_filter, account_ids)
+        (*self.repository).list(is_active_filter, account_ids)
     }
 
     /// Lists all accounts
-    pub fn get_all_accounts(&self) -> Result<Vec<Account>> {
-        let repo = AccountRepository::new(self.pool.clone());
-        repo.list(None, None)
+    fn get_all_accounts(&self) -> Result<Vec<Account>> {
+        (*self.repository).list(None, None)
     }
 
     /// Lists only active accounts
-    pub fn get_active_accounts(&self) -> Result<Vec<Account>> {
+    fn get_active_accounts(&self) -> Result<Vec<Account>> {
         self.list_accounts(Some(true), None)
     }
 
     /// Retrieves multiple accounts by their IDs
-    pub fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>> {
+    fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>> {
         self.list_accounts(None, Some(account_ids))
     }
 
     /// Deletes an account by its ID
-    pub fn delete_account(&self, account_id: &str) -> Result<()> {
-        let repo = AccountRepository::new(self.pool.clone());
-        repo.delete(account_id)?;
+    fn delete_account(&self, account_id: &str) -> Result<()> {
+        (*self.repository).delete(account_id)?;
         Ok(())
     }
-} 
+}

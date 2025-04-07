@@ -9,7 +9,7 @@ use crate::market_data::MarketDataService;
 use crate::market_data::Quote;
 use crate::models::{ Holding, Performance};
 use crate::portfolio::transaction::get_transaction_handler;
-use crate::{Activity, ActivityType};
+use crate::activities::{Activity, ActivityType};
 use rust_decimal::Decimal;
 use diesel::SqliteConnection;
 use diesel::r2d2::{Pool, ConnectionManager};

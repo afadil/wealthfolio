@@ -1,12 +1,13 @@
 use diesel::result::Error as DieselError;
 use std::num::ParseFloatError;
 use thiserror::Error;
+use chrono::ParseError as ChronoParseError;
 
 use crate::market_data::MarketDataError;
 use crate::activities::ActivityError;
-use crate::accounts::AccountError;
 use crate::fx::FxError;
-use crate::assets::assets_errors::AssetError;
+// use crate::assets::assets_errors::AssetError;
+// use crate::holdings::holdings_errors::CalculatorError;
 
 // Create a type alias for Result using our Error type
 pub type Result<T> = std::result::Result<T, Error>;
@@ -35,8 +36,11 @@ pub enum Error {
     #[error("Activity error: {0}")]
     Activity(#[from] ActivityError),
 
-    #[error("Account error: {0}")]
-    Account(#[from] AccountError),
+    #[error("Repository error: {0}")]
+    Repository(String),
+
+    // #[error("Holdings calculation failed: {0}")]
+    // HoldingsCalculation(#[from] CalculatorError),
 }
 
 #[derive(Error, Debug)]
@@ -59,6 +63,8 @@ pub enum DatabaseError {
     #[error("Database restore failed: {0}")]
     RestoreFailed(String),
 }
+
+
 
 #[derive(Error, Debug)]
 pub enum CurrencyError {
@@ -85,6 +91,9 @@ pub enum ValidationError {
 
     #[error("Failed to parse decimal number: {0}")]
     DecimalParse(#[from] rust_decimal::Error),
+
+    #[error("Failed to parse date/time: {0}")]
+    DateTimeParse(#[from] ChronoParseError),
 }
 
 #[derive(Error, Debug)]
@@ -156,9 +165,16 @@ impl From<FxError> for Error {
 }
 
 // Add From implementation for AssetError
-impl From<AssetError> for Error {
-    fn from(err: AssetError) -> Self {
-        Error::Asset(err.to_string())
+// impl From<AssetError> for Error {
+//     fn from(err: AssetError) -> Self {
+//         Error::Asset(err.to_string())
+//     }
+// }
+
+// Add From implementation for chrono::ParseError
+impl From<ChronoParseError> for Error {
+    fn from(err: ChronoParseError) -> Self {
+        Error::Validation(ValidationError::DateTimeParse(err))
     }
 }
 

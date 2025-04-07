@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::Quote;
+use crate::errors::Result;
+use crate::Error;
+use crate::errors::ValidationError;
 
-use super::assets_errors::Result;
-use super::assets_errors::AssetError;
 use super::assets_constants::*;
 
 /// Domain model representing an asset in the system
@@ -32,6 +33,21 @@ pub struct Asset {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Sector {
+    pub name: String,
+    pub weight: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Country {
+    pub name: String,
+    pub weight: f64,
 }
 
 /// Input model for creating a new asset
@@ -61,14 +77,14 @@ impl NewAsset {
     /// Validates the new asset data
     pub fn validate(&self) -> Result<()> {
         if self.symbol.trim().is_empty() {
-            return Err(AssetError::InvalidData(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Asset symbol cannot be empty".to_string(),
-            ));
+            )));
         }
         if self.currency.trim().is_empty() {
-            return Err(AssetError::InvalidData(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Currency cannot be empty".to_string(),
-            ));
+            )));
         }
         Ok(())
     }
@@ -152,9 +168,9 @@ impl UpdateAssetProfile {
     /// Validates the asset profile update data
     pub fn validate(&self) -> Result<()> {
         if self.symbol.trim().is_empty() {
-            return Err(AssetError::InvalidData(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Asset symbol cannot be empty".to_string(),
-            ));
+            )));
         }
         Ok(())
     }

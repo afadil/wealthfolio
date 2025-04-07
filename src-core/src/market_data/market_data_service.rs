@@ -1,62 +1,45 @@
+use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::sqlite::SqliteConnection;
 use log::{debug, error, info};
+use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use rust_decimal::Decimal;
 
+use super::market_data_constants::*;
+use super::market_data_errors::MarketDataError;
+use super::market_data_model::{Quote, QuoteRequest, QuoteSummary};
+use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
+use super::providers::models::AssetProfile;
+use crate::errors::Result;
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::ProviderRegistry;
 
-use super::market_data_constants::*;
-use super::market_data_errors::{MarketDataError, Result};
-use super::market_data_model::{Quote, QuoteRequest, QuoteSummary};
-use super::market_data_repository::MarketDataRepository;
-use super::providers::models::AssetProfile;
-
 pub struct MarketDataService {
     provider_registry: Arc<ProviderRegistry>,
-    repository: MarketDataRepository,
+    repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
 }
 
-impl MarketDataService {
-    pub async fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Result<Self> {
-        let provider_registry = Arc::new(ProviderRegistry::new().await?);
-
-        Ok(Self {
-            provider_registry,
-            repository: MarketDataRepository::new(pool),
-        })
-    }
-
-    pub async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
+#[async_trait]
+impl MarketDataServiceTrait for MarketDataService {
+    async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
         // Use the default provider (Yahoo) for symbol search
         self.provider_registry
             .default_provider()
             .search_ticker(query)
             .await
-            .map_err(|e| {
-                MarketDataError::ProviderError(format!(
-                    "Failed to search ticker for '{}': {}",
-                    query, e
-                ))
-            })
+            .map_err(|e| e.into())
     }
 
-    pub fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
+    fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
         self.repository.get_latest_quote_for_symbol(symbol)
     }
 
-    pub fn get_latest_quotes_for_symbols(
-        &self,
-        symbols: &[String],
-    ) -> Result<HashMap<String, Quote>> {
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
         self.repository.get_latest_quotes_for_symbols(symbols)
     }
 
-    pub fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
+    fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
         let quotes = self.repository.get_all_historical_quotes()?;
         let mut quotes_map: HashMap<String, Vec<(NaiveDate, Quote)>> = HashMap::new();
 
@@ -76,19 +59,14 @@ impl MarketDataService {
         Ok(quotes_map)
     }
 
-    pub async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile> {
+    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile> {
         if symbol.starts_with("$CASH") {
             // Use manual provider for $CASH-
             self.provider_registry
                 .get_profiler(DataSource::Manual)
                 .get_asset_profile(symbol)
                 .await
-                .map_err(|e| {
-                    MarketDataError::ProviderError(format!(
-                        "Failed to get symbol profile for {}: {}",
-                        symbol, e
-                    ))
-                })
+                .map_err(|e| e.into())
         } else {
             // Try Yahoo first, then fall back to manual if needed
             match self
@@ -103,33 +81,28 @@ impl MarketDataService {
                     .get_profiler(DataSource::Manual)
                     .get_asset_profile(symbol)
                     .await
-                    .map_err(|e| {
-                        MarketDataError::ProviderError(format!(
-                            "Failed to get symbol profile for {}: {}",
-                            symbol, e
-                        ))
-                    }),
+                    .map_err(|e| e.into()),
             }
         }
     }
 
-    pub async fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>> {
+    fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>> {
         self.repository.get_historical_quotes_for_symbol(symbol)
     }
 
-    pub fn add_quote(&self, quote: &Quote) -> Result<Quote> {
+    fn add_quote(&self, quote: &Quote) -> Result<Quote> {
         self.repository.save_quote(quote)
     }
 
-    pub fn update_quote(&self, quote: Quote) -> Result<Quote> {
+    fn update_quote(&self, quote: Quote) -> Result<Quote> {
         self.repository.save_quote(&quote)
     }
 
-    pub fn delete_quote(&self, quote_id: &str) -> Result<()> {
+    fn delete_quote(&self, quote_id: &str) -> Result<()> {
         self.repository.delete_quote(quote_id)
     }
-    
-    pub async fn get_historical_quotes_from_provider(
+
+    async fn get_historical_quotes_from_provider(
         &self,
         symbol: &str,
         start_date: NaiveDate,
@@ -149,18 +122,17 @@ impl MarketDataService {
         // Use the default provider (Yahoo) for history
         self.provider_registry
             .default_provider()
-            .get_historical_quotes(symbol, start_time, end_time,"USD".to_string())
+            .get_historical_quotes(symbol, start_time, end_time, "USD".to_string())
             .await
-            .map_err(|e| {
-                MarketDataError::ProviderError(format!(
-                    "Failed to fetch history for {}: {}",
-                    symbol, e
-                ))
-            })
+            .map_err(|e| e.into())
     }
 
-    pub async fn sync_quotes(&self, quote_requests: &[QuoteRequest], refetch_all: bool) -> Result<()> {
-        info!("Syncing quotes for {} symbols..., with refetch all: {}", quote_requests.len(), refetch_all);
+    async fn sync_quotes(&self, quote_requests: &[QuoteRequest], refetch_all: bool) -> Result<()> {
+        info!(
+            "Syncing quotes for {} symbols..., with refetch all: {}",
+            quote_requests.len(),
+            refetch_all
+        );
         let end_date = SystemTime::now();
 
         // Group requests by data source
@@ -181,7 +153,7 @@ impl MarketDataService {
                         "Failed to sync manual quotes for symbol {}: {}",
                         request.symbol, e
                     );
-                    failed_requests.push((request.symbol, e));
+                    failed_requests.push((request.symbol.clone(), e));
                 }
             }
         }
@@ -197,21 +169,27 @@ impl MarketDataService {
             // Get the start date for fetching based on refetch_all parameter
             let start_date = if refetch_all {
                 let default_history_days = DEFAULT_HISTORY_DAYS;
-                Utc.from_utc_datetime(&(Utc::now().naive_utc() - Duration::days(default_history_days))).into()
+                Utc.from_utc_datetime(
+                    &(Utc::now().naive_utc() - Duration::days(default_history_days)),
+                )
+                .into()
             } else {
                 // Extract just the symbols for querying latest quotes
                 let symbols: Vec<String> = public_symbols_with_currencies
                     .iter()
                     .map(|(sym, _)| sym.clone())
                     .collect();
-                
+
                 // Get the latest quotes for all symbols
                 match self.repository.get_latest_quotes_for_symbols(&symbols) {
                     Ok(quotes_map) => {
                         if quotes_map.is_empty() {
                             // No quotes found for any symbol, use default history
                             let default_history_days = DEFAULT_HISTORY_DAYS;
-                            Utc.from_utc_datetime(&(Utc::now().naive_utc() - Duration::days(default_history_days))).into()
+                            Utc.from_utc_datetime(
+                                &(Utc::now().naive_utc() - Duration::days(default_history_days)),
+                            )
+                            .into()
                         } else {
                             // Find the minimum date among all latest quotes
                             let min_date = quotes_map
@@ -219,15 +197,19 @@ impl MarketDataService {
                                 .map(|quote| quote.date)
                                 .min()
                                 .unwrap_or_else(|| Utc::now().naive_utc());
-                            
+
                             // Subtract one day to ensure overlap
-                            Utc.from_utc_datetime(&(min_date - Duration::days(1))).into()
+                            Utc.from_utc_datetime(&(min_date - Duration::days(1)))
+                                .into()
                         }
-                    },
+                    }
                     Err(_) => {
                         // Error getting latest quotes, use default history
                         let default_history_days = DEFAULT_HISTORY_DAYS;
-                        Utc.from_utc_datetime(&(Utc::now().naive_utc() - Duration::days(default_history_days))).into()
+                        Utc.from_utc_datetime(
+                            &(Utc::now().naive_utc() - Duration::days(default_history_days)),
+                        )
+                        .into()
                     }
                 }
             };
@@ -242,7 +224,7 @@ impl MarketDataService {
                 Ok(quotes) => all_quotes.extend(quotes),
                 Err(e) => {
                     error!("Failed to sync public quotes batch: {}", e);
-                    return Err(MarketDataError::ProviderError(e.to_string()));
+                    return Err(MarketDataError::ProviderError(e.to_string()).into());
                 }
             }
         }
@@ -266,10 +248,22 @@ impl MarketDataService {
             return Err(MarketDataError::ProviderError(format!(
                 "Sync completed with errors for the following symbols: {:?}",
                 failed_requests
-            )));
+            ))
+            .into());
         }
 
         Ok(())
+    }
+}
+
+impl MarketDataService {
+    pub async fn new(repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>) -> Result<Self> {
+        let provider_registry = Arc::new(ProviderRegistry::new().await?);
+
+        Ok(Self {
+            provider_registry,
+            repository,
+        })
     }
 
     async fn sync_manual_quotes(&self, request: &QuoteRequest) -> Result<Vec<Quote>> {
@@ -294,10 +288,8 @@ impl MarketDataService {
         let mut quotes = Vec::with_capacity(days_between);
 
         // Create an iterator over quote dates and prices
-        let mut quote_changes: Vec<(NaiveDate, Decimal)> = vec![(
-            first_quote_date,
-            manual_quotes[0].close.clone(),
-        )];
+        let mut quote_changes: Vec<(NaiveDate, Decimal)> =
+            vec![(first_quote_date, manual_quotes[0].close.clone())];
         quote_changes.push((today, manual_quotes.last().unwrap().close.clone()));
 
         // Pop the first manual quote since we've already used it for the initial price

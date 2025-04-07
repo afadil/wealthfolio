@@ -5,9 +5,10 @@ use std::sync::Arc;
 
 use crate::db::get_connection;
 use crate::schema::assets;
+use crate::errors::Result;
 
-use super::assets_errors::Result;
 use super::assets_model::{Asset, AssetDB, NewAsset, UpdateAssetProfile};
+use super::assets_traits::AssetRepositoryTrait;
 
 /// Repository for managing asset data in the database
 pub struct AssetRepository {
@@ -22,7 +23,7 @@ impl AssetRepository {
 
     /// Creates a new asset in the database
     pub fn create(&self, new_asset: NewAsset) -> Result<Asset> {
-        new_asset.validate()?; 
+        new_asset.validate()?;
         let asset_db: AssetDB = new_asset.into();
        
         let mut conn = get_connection(&self.pool)?;
@@ -105,5 +106,41 @@ impl AssetRepository {
 
         Ok(results.into_iter().map(Asset::from).collect())
     }
-    
+}
+
+impl AssetRepositoryTrait for AssetRepository {
+    /// Creates a new asset in the database
+    fn create(&self, new_asset: NewAsset) -> Result<Asset> {
+        AssetRepository::create(self, new_asset)
+    }
+
+    /// Updates an existing asset in the database
+    fn update_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset> {
+        AssetRepository::update_profile(self, asset_id, payload)
+    }
+
+    /// Updates the data source of an asset
+    fn update_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
+        AssetRepository::update_data_source(self, asset_id, data_source)
+    }
+
+    /// Retrieves an asset by its ID
+    fn get_by_id(&self, asset_id: &str) -> Result<Asset> {
+        AssetRepository::get_by_id(self, asset_id)
+    }
+
+    /// Lists all assets in the database
+    fn list(&self) -> Result<Vec<Asset>> {
+        AssetRepository::list(self)
+    }
+
+    /// Lists currency assets for a given base currency
+    fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
+        AssetRepository::list_cash_assets(self, base_currency)
+    }
+
+    /// Lists assets by their symbols
+    fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+        AssetRepository::list_by_symbols(self, symbols)
+    }
 } 

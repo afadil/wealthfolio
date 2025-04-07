@@ -1,38 +1,31 @@
 use rust_decimal::Decimal;
 use chrono::{Utc, NaiveDate};
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::SqliteConnection;
 use std::sync::{Arc, RwLock};
-use super::fx_errors::FxError;
-use super::fx_model::{ExchangeRate, NewExchangeRate};
+use crate::errors::Result;
 use crate::market_data::market_data_model::DataSource;
-use super::fx_repository::FxRepository;
+use super::fx_model::{ExchangeRate, NewExchangeRate};
 use super::currency_converter::CurrencyConverter;
+use super::fx_traits::{FxRepositoryTrait, FxServiceTrait};
+use super::fx_errors::FxError;
 
 #[derive(Clone)]
 pub struct FxService {
-    repository: FxRepository,
-    converter: Arc<RwLock<Option<CurrencyConverter>>>, // Currency converter for conversion operations
+    repository: Arc<dyn FxRepositoryTrait>,
+    converter: Arc<RwLock<Option<CurrencyConverter>>>,
 }
 
 impl FxService {
-    const DEFAULT_DATA_SOURCE: DataSource = DataSource::Manual;
+    pub const DEFAULT_DATA_SOURCE: DataSource = DataSource::Manual;
 
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
+    pub fn new(repository: Arc<dyn FxRepositoryTrait>) -> Self {
         Self {
-            repository: FxRepository::new(pool.clone()),
+            repository,
             converter: Arc::new(RwLock::new(None)),
         }
     }
 
-    pub fn initialize(&self) -> Result<(), FxError> {
-        // Initialize currency converter with all exchange rates
-        self.initialize_converter()?;
-        Ok(())
-    }
-
     /// Initialize the currency converter with all exchange rates
-    fn initialize_converter(&self) -> Result<(), FxError> {
+    fn initialize_converter(&self) -> Result<()> {
         let exchange_rates = self.get_exchange_rates()?;
         
         // Only initialize the converter if we have exchange rates
@@ -53,12 +46,12 @@ impl FxService {
                 log::error!("Failed to initialize currency converter: {}", e);
                 let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
                 *converter_lock = None;
-                Err(e)
+                Err(e.into())
             }
         }
     }
 
-    fn get_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate, FxError> {
+    fn get_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate> {
         // Fetch from repository
         match self.repository.get_exchange_rate(from, to)? {
             Some(rate) => {
@@ -82,14 +75,21 @@ impl FxService {
                     },
                     None => Err(FxError::RateNotFound(format!(
                         "Exchange rate not found for {}/{}", from, to
-                    ))),
+                    )).into()),
                 }
             }
         }
     }
+}
 
-    pub fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate, FxError> {
+impl FxServiceTrait for FxService {
+    fn initialize(&self) -> Result<()> {
+        // Initialize currency converter with all exchange rates
+        self.initialize_converter()?;
+        Ok(())
+    }
 
+    fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
         // First register the currency pair
         self.register_currency_pair_manual(&new_rate.from_currency, &new_rate.to_currency)?;
 
@@ -102,25 +102,15 @@ impl FxService {
             timestamp: Utc::now().naive_utc(),
         };
 
-        match self.repository.save_exchange_rate(rate) {
-            Ok(saved_rate) => {
-                // Reinitialize the converter with updated rates
-                self.initialize_converter()?;
-                
-                Ok(saved_rate)
-            },
-            Err(e) => Err(FxError::SaveError(format!(
-                "Failed to save exchange rate: {}", e
-            ))),
-        }
+        Ok(self.repository.save_exchange_rate(rate)?)
     }
 
-    pub fn get_historical_rates(
+    fn get_historical_rates(
         &self,
         from: &str,
         to: &str,
         days: i64,
-    ) -> Result<Vec<ExchangeRate>, FxError> {
+    ) -> Result<Vec<ExchangeRate>> {
         let symbol = ExchangeRate::make_fx_symbol(from, to);
         let end = Utc::now();
         let start = end - chrono::Duration::days(days);
@@ -132,16 +122,16 @@ impl FxService {
             },
             Err(e) => Err(FxError::FetchError(format!(
                 "Failed to fetch historical rates: {}", e
-            ))),
+            )).into()),
         }
     }
 
-    pub fn update_exchange_rate(
+    fn update_exchange_rate(
         &self,
         from: &str,
         to: &str,
         rate: Decimal,
-    ) -> Result<ExchangeRate, FxError> {
+    ) -> Result<ExchangeRate> {
         let new_rate = NewExchangeRate {
             from_currency: from.to_string(),
             to_currency: to.to_string(),
@@ -151,11 +141,11 @@ impl FxService {
         self.add_exchange_rate(new_rate)
     }
 
-    pub fn get_latest_exchange_rate(
+    fn get_latest_exchange_rate(
         &self,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<Decimal, FxError> {
+    ) -> Result<Decimal> {
         if from_currency == to_currency {
             return Ok(Decimal::ONE);
         }
@@ -185,25 +175,24 @@ impl FxService {
         }
     }
 
-    pub fn get_exchange_rate_for_date(
+    fn get_exchange_rate_for_date(
         &self,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<Decimal, FxError> {
+    ) -> Result<Decimal> {
         // Check for valid currency codes
         if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
             // log::error!("Invalid from_currency code: {}", from_currency);
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}", from_currency
-            )));
+            )).into());
         }
         
         if to_currency.len() != 3 || !to_currency.chars().all(|c| c.is_alphabetic()) {
-            // log::error!("Invalid to_currency code: {}", to_currency);
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}", to_currency
-            )));
+            )).into());
         }
         
         if from_currency == to_currency {
@@ -230,12 +219,12 @@ impl FxService {
         self.get_latest_exchange_rate(from_currency, to_currency)
     }
 
-    pub fn convert_currency(
+    fn convert_currency(
         &self,
         amount: Decimal,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<Decimal, FxError> {
+    ) -> Result<Decimal> {
         if from_currency.eq(to_currency) {
             return Ok(amount);
         }
@@ -263,13 +252,13 @@ impl FxService {
         Ok(amount * rate)
     }
 
-    pub fn convert_currency_for_date(
+    fn convert_currency_for_date(
         &self,
         amount: Decimal,
         from_currency: &str,
         to_currency: &str,
         date: NaiveDate,
-    ) -> Result<Decimal, FxError> {
+    ) -> Result<Decimal> {
         if from_currency.eq(to_currency) {
             return Ok(amount);
         }
@@ -296,14 +285,14 @@ impl FxService {
         Ok(amount * rate)
     }
 
-    pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>, FxError> {
+    fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         self.repository.get_exchange_rates()
     }
 
-    pub fn delete_exchange_rate(
+    fn delete_exchange_rate(
         &self,
         rate_id: &str,
-    ) -> Result<(), FxError> {
+    ) -> Result<()> {
         self.repository.delete_exchange_rate(rate_id)?;
 
         // Reinitialize the converter with updated rates
@@ -313,7 +302,7 @@ impl FxService {
     }
 
     /// Register a new currency pair and create necessary FX assets
-    pub fn register_currency_pair(&self, from: &str, to: &str) -> Result<(), FxError> {
+    fn register_currency_pair(&self, from: &str, to: &str) -> Result<()> {
         // Return early if trying to register the same currency
         if from == to {
             return Ok(());
@@ -340,8 +329,7 @@ impl FxService {
         Ok(())
     }
 
-     /// Register a new currency pair and create necessary FX assets
-    pub fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<(), FxError> {
+    fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<()> {
         // Return early if trying to register the same currency
         if from == to {
             return Ok(());

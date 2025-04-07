@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fmt;
-use crate::db::DatabaseError;
+use crate::errors::DatabaseError;
 
 #[derive(Debug)]
 pub enum FxError {

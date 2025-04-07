@@ -13,10 +13,10 @@ pub struct ContributionLimit {
     pub contribution_year: i32,
     pub limit_amount: f64,
     pub account_ids: Option<String>,
-    pub start_date: Option<String>,
-    pub end_date: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
 }
 
 #[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]

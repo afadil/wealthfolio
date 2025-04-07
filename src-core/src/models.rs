@@ -8,179 +8,21 @@ use std::str::FromStr;
 use diesel::sql_types::Text;
 
 use crate::accounts::Account;
+use crate::activities::activities_model::IncomeData;
+// Import holding models from the new location
+// use crate::holdings::holdings_model::{Holding, Lot};
+// Import decimal serializers from the new utils module
+use crate::utils::decimal_serde::*;
 
-pub const ROUNDING_SCALE: u32 = 18;
+// Define constants needed within models
+pub const ROUNDING_SCALE: u32 = 6; // Or higher precision if needed
+pub const QUANTITY_THRESHOLD: &str = "0.000001"; // Or higher precision
+pub const DISPLAY_ROUNDING_SCALE: u32 = 2;
 pub const PORTFOLIO_PERCENT_SCALE: u32 = 4;
-
-// Custom serializer/deserializer for Decimal (rounds on serialization)
-mod decimal_serde {
-    use rust_decimal::Decimal;
-    use serde::de::Error;
-    use serde::{Deserialize, Deserializer, Serializer};
-    use std::str::FromStr;
-
-    pub fn serialize<S>(value: &Decimal, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let rounded = value.round_dp(super::ROUNDING_SCALE);
-        serializer.serialize_str(&rounded.to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: String = String::deserialize(deserializer)?;
-        Decimal::from_str(&s).map_err(|_| D::Error::custom("Invalid Decimal"))
-    }
-}
-
-// Custom serializer/deserializer for Option<Decimal>
-mod decimal_serde_option {
-    use rust_decimal::Decimal;
-    use serde::de::Error;
-    use serde::{Deserialize, Deserializer, Serializer};
-    use std::str::FromStr;
-
-    pub fn serialize<S>(value: &Option<Decimal>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match value {
-            Some(d) => {
-                let rounded = d.round_dp(super::ROUNDING_SCALE);
-                serializer.serialize_str(&rounded.to_string())
-            }
-            None => serializer.serialize_none(),
-        }
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Decimal>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: Option<String> = Option::deserialize(deserializer)?;
-        match s {
-            Some(s) => {
-                let d = Decimal::from_str(&s)
-                    .map_err(|_| D::Error::custom("Invalid Decimal"))?;
-                Ok(Some(d))
-            }
-            None => Ok(None),
-        }
-    }
-}
 
 //********************************** */
 // Custom models
 //********************************** */
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Performance {
-    #[serde(with = "decimal_serde")]
-    pub total_gain_percent: Decimal,
-    #[serde(with = "decimal_serde")]
-    pub total_gain_amount: Decimal,
-    #[serde(with = "decimal_serde")]
-    pub total_gain_amount_converted: Decimal,
-    #[serde(with = "decimal_serde_option")]
-    pub day_gain_percent: Option<Decimal>,
-    #[serde(with = "decimal_serde_option")]
-    pub day_gain_amount: Option<Decimal>,
-    #[serde(with = "decimal_serde_option")]
-    pub day_gain_amount_converted: Option<Decimal>,
-}
-
-impl Default for Performance {
-    fn default() -> Self {
-        Performance {
-            total_gain_percent: Decimal::ZERO,
-            total_gain_amount: Decimal::ZERO,
-            total_gain_amount_converted: Decimal::ZERO,
-            day_gain_percent: Some(Decimal::ZERO),
-            day_gain_amount: Some(Decimal::ZERO),
-            day_gain_amount_converted: Some(Decimal::ZERO),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Sector {
-    pub name: String,
-    pub weight: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Country {
-    pub name: String,
-    pub weight: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Holding {
-    pub id: String,
-    pub symbol: String,
-    pub symbol_name: Option<String>,
-    pub holding_type: String,
-    #[serde(with = "decimal_serde")]
-    pub quantity: Decimal,
-    pub currency: String,
-    pub base_currency: String,
-    #[serde(with = "decimal_serde_option")]
-    pub market_price: Option<Decimal>,
-    #[serde(with = "decimal_serde_option")]
-    pub average_cost: Option<Decimal>,
-    #[serde(with = "decimal_serde")]
-    pub market_value: Decimal,
-    #[serde(with = "decimal_serde")]
-    pub book_value: Decimal,
-    #[serde(with = "decimal_serde")]
-    pub market_value_converted: Decimal,
-    #[serde(with = "decimal_serde")]
-    pub book_value_converted: Decimal,
-    pub performance: Performance,
-    pub account: Option<Account>,
-    pub asset_class: Option<String>,
-    pub asset_sub_class: Option<String>,
-    pub asset_data_source: Option<String>,
-    pub sectors: Option<Vec<Sector>>,
-    pub countries: Option<Vec<Country>>,
-    #[serde(with = "decimal_serde_option")]
-    pub portfolio_percent: Option<Decimal>,
-}
-
-impl Default for Holding {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            symbol: String::new(),
-            symbol_name: None,
-            holding_type: String::new(),
-            quantity: Decimal::ZERO,
-            currency: String::new(),
-            base_currency: String::new(),
-            market_price: None,
-            average_cost: None,
-            market_value: Decimal::ZERO,
-            book_value: Decimal::ZERO,
-            market_value_converted: Decimal::ZERO,
-            book_value_converted: Decimal::ZERO,
-            performance: Performance::default(),
-            account: None,
-            asset_class: None,
-            asset_sub_class: None,
-            asset_data_source: None,
-            sectors: None,
-            countries: None,
-            portfolio_percent: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -189,23 +31,13 @@ pub struct FinancialHistory {
     pub history: Vec<HistoryRecord>,
 }
 
-#[derive(Debug, Serialize, QueryableByName)]
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[diesel(table_name = crate::schema::activities)]
-pub struct IncomeData {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub date: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub income_type: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub symbol_name: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub currency: String,
-    #[diesel(sql_type = diesel::sql_types::Text)]
-     #[serde(with = "decimal_serde")]
-    pub amount: Decimal,
+pub struct Holding {
+    pub period: String,
+    pub by_month: HashMap<String, Decimal>,
+   
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -255,6 +87,39 @@ impl IncomeSummary {
         let months = num_months.unwrap_or_else(|| self.by_month.len() as u32);
         if months > 0 {
             self.monthly_average = &self.total_income / Decimal::new(months as i64, 0);
+        }
+    }
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Performance {
+    #[serde(with = "decimal_serde")]
+    pub total_gain_percent: Decimal,
+    #[serde(with = "decimal_serde")]
+    pub total_gain_amount: Decimal,
+    #[serde(with = "decimal_serde")]
+    pub total_gain_amount_converted: Decimal,
+    #[serde(with = "decimal_serde_option")]
+    pub day_gain_percent: Option<Decimal>,
+    #[serde(with = "decimal_serde_option")]
+    pub day_gain_amount: Option<Decimal>,
+    #[serde(with = "decimal_serde_option")]
+    pub day_gain_amount_converted: Option<Decimal>,
+}
+
+
+
+impl Default for Performance {
+    fn default() -> Self {
+        Performance {
+            total_gain_percent: Decimal::ZERO,
+            total_gain_amount: Decimal::ZERO,
+            total_gain_amount_converted: Decimal::ZERO,
+            day_gain_percent: Some(Decimal::ZERO),
+            day_gain_amount: Some(Decimal::ZERO),
+            day_gain_amount_converted: Some(Decimal::ZERO),
         }
     }
 }

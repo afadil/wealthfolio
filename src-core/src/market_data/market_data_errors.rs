@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::db;
+use crate::errors::DatabaseError;
 use yahoo_finance_api::YahooError;
 
 #[derive(Error, Debug)]
@@ -9,7 +9,7 @@ pub enum MarketDataError {
     DatabaseError(#[from] diesel::result::Error),
 
     #[error("Database error: {0}")]
-    DatabaseConnectionError(#[from] db::DatabaseError),
+    DatabaseConnectionError(#[from] DatabaseError),
 
     #[error("Provider error: {0}")]
     ProviderError(String),
@@ -45,5 +45,3 @@ impl From<YahooError> for MarketDataError {
         }
     }
 }
-
-pub type Result<T> = std::result::Result<T, MarketDataError>; 
