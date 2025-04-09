@@ -15,7 +15,6 @@ use super::market_data_traits::MarketDataRepositoryTrait;
 use diesel::sql_query;
 use diesel::sqlite::Sqlite;
 use diesel::sql_types::Text;
-use diesel::sql_types::Untyped;
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,

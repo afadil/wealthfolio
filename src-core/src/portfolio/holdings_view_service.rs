@@ -125,15 +125,6 @@ impl HoldingsViewService {
                         "Missing latest quote for security {}. Performance metrics might be incomplete.",
                         pos.asset_id
                     );
-                    // If no quote, we might still want to represent the cost basis?
-                    // Let's calculate cost basis in base currency if available.
-                    if pos.total_cost_basis > dec!(0) {
-                         let total_cost_basis_base = (pos.total_cost_basis * fx_rate).round_dp(2);
-                         // Maybe set market value to cost basis if no quote? Or leave None?
-                         // Leaving as None for now to indicate missing market data.
-                         // We can still report the cost basis component in base currency if needed elsewhere,
-                         // but PerformanceMetrics focuses on market-based values.
-                    }
                 }
             }
             Holding::Cash(cash) => {
@@ -246,7 +237,7 @@ impl HoldingsViewService {
         let summary_calc_start = Instant::now();
         let asset_summaries_map: HashMap<String, AssetSummary> = assets_map
             .into_iter() // Consume the original map
-            .filter_map(|(asset_id, asset)| { // Use filter_map to handle potential parsing errors gracefully
+            .filter_map(|(_asset_id, asset)| { // Use filter_map to handle potential parsing errors gracefully
                 let sectors: Option<Vec<Sector>> = asset.sectors.as_ref().and_then(|s| {
                     match serde_json::from_str(s) {
                         Ok(parsed) => Some(parsed),

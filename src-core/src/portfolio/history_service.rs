@@ -243,13 +243,6 @@ impl HistoryService {
         (start_dates, last_histories)
     }
 
-    fn get_all_last_portfolio_histories(
-        &self,
-        accounts: &[Account],
-    ) -> Result<HashMap<String, Option<HistoryRecord>>> {
-        let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
-        self.repository.get_all_last_histories(&account_ids)
-    }
 
     fn calculate_account_history(
         &self,

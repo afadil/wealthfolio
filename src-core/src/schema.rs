@@ -178,17 +178,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    portfolio_snapshots (id) {
-        id -> Text,
-        account_id -> Text,
-        snapshot_date -> Text,
-        calculated_at -> Timestamp,
-        portfolio_state_json -> Text,
-        triggering_activity_id -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
     quotes (id) {
         id -> Text,
         symbol -> Text,
@@ -225,6 +214,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     goals_allocation,
     platforms,
     portfolio_history,
-    portfolio_snapshots,
     quotes,
 );

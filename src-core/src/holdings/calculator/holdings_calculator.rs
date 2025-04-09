@@ -16,7 +16,7 @@ use crate::holdings::holdings_errors::{Result, CalculatorError};
 use std::collections::HashMap;
 use chrono::Utc;
 use std::str::FromStr; // For parsing ActivityType string
-use log::{debug, error, warn}; // For logging progress and issues
+use log::{debug, error}; // For logging progress and issues
 
 /// Calculates the state of holdings (securities and cash) based on a series of activities.
 ///

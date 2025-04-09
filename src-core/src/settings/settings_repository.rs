@@ -82,7 +82,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
         diesel::replace_into(app_settings)
             .values(&settings_to_insert)
             .execute(&mut conn)
-            .map_err(Error::from);
+            .map_err(Error::from)?;
 
         Ok(())
     }
@@ -121,7 +121,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 setting_value: setting_value_param.to_string(),
             })
             .execute(&mut conn)
-            .map_err(Error::from);
+            .map_err(Error::from)?;
         Ok(())
     }
 
