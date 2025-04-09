@@ -121,4 +121,8 @@ impl AssetServiceTrait for AssetService {
         let assets = self.asset_repository.list_by_symbols(symbols)?;
         self.sync_asset_quotes(&assets, refetch_all).await
     }
+
+    fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+        self.asset_repository.list_by_symbols(symbols)
+    }
 } 

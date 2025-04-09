@@ -175,50 +175,88 @@ export interface ImportValidationResult {
 
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
 
+// Holding types based on Rust HoldingView model
+
+// Types matching Rust structs from src-core/src/assets/assets_model.rs
+export interface Sector {
+  name: string;
+  weight: number;
+}
+
+export interface Country {
+  name: string;
+  weight: number;
+}
+
+export interface AssetSummary {
+  id: string;
+  name?: string | null;
+  assetType?: string | null;
+  symbol: string;
+  assetClass?: string | null;
+  assetSubClass?: string | null;
+  currency: string;
+  countries?: Country[] | null;
+  sectors?: Sector[] | null;
+}
+
+export interface Lot {
+  id: string;
+  positionId: string;
+  acquisitionDate: string; // ISO date string
+  quantity: number;
+  costBasis: number;
+  acquisitionPrice: number;
+  acquisitionFees: number;
+}
+
+export interface Position {
+  id: string;
+  accountId: string;
+  assetId: string;
+  quantity: number;
+  averageCost: number;
+  totalCostBasis: number;
+  currency: string;
+  inceptionDate: string; // ISO date string
+  lots: Lot[];
+}
+
+export interface CashHolding {
+  id: string;
+  accountId: string;
+  currency: string;
+  amount: number;
+  lastUpdated: string; // ISO date string
+}
+
+
+// Renamed from Performance and updated fields
+export interface PerformanceMetrics {
+  marketPrice: number;
+  marketValue: number;
+  totalGainLossAmount: number;
+  totalGainLossPercent: number;
+  dayGainLossAmount: number;
+  dayGainLossPercent: number;
+  baseCurrency: string;
+  fxRateToBase: number;
+}
+
 export interface Holding {
   id: string;
+  holdingType: 'security' | 'cash';
+  accountId: string;
+  assetId: string;
   symbol: string;
-  symbolName: string;
-  holdingType: HoldingType;
+  asset?: AssetSummary | null;
   quantity: number;
+  averageCostPrice: number;
+  totalCostBasis: number;
   currency: string;
-  baseCurrency: string;
-  marketPrice?: number;
-  averageCost?: number;
-  marketValue: number;
-  bookValue: number;
-  marketValueConverted: number;
-  bookValueConverted: number;
-  portfolioPercent: number;
-  performance: {
-    totalGainPercent: number;
-    totalGainAmount: number;
-    totalGainAmountConverted: number;
-    dayGainPercent?: number;
-    dayGainAmount?: number;
-    dayGainAmountConverted?: number;
-  };
-  account?: {
-    id: string;
-    name: string;
-    type: string;
-    group: string;
-    currency: string;
-  };
-  assetClass?: string;
-  assetSubClass?: string;
-  sectors?: [
-    {
-      name: string;
-      weight: number;
-    },
-  ];
-  countries?: [
-    {
-      name: string;
-      weight: number;
-    },
-  ];
+  inceptionDate: string;
+  performance: PerformanceMetrics;
+  allocationPercent: number;
 }
 
 export interface Asset {

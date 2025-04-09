@@ -4,25 +4,11 @@ import { z } from 'zod';
 export const PORTFOLIO_ACCOUNT_ID = 'TOTAL';
 
 export const HoldingType = {
-  CASH: 'CASH',
-  STOCK: 'STOCK',
-  MUTUAL_FUND: 'MUTUAL_FUND',
-  ETF: 'ETF',
-  BOND: 'BOND',
-  OTHER: 'OTHER',
-  CRYPTOCURRENCY: 'CRYPTOCURRENCY',
+  CASH: 'cash',
+  SECURITY: 'security',
 } as const;
 
 export type HoldingType = (typeof HoldingType)[keyof typeof HoldingType];
-
-export const holdingTypeSchema = z.enum([
-  HoldingType.CASH,
-  HoldingType.STOCK,
-  HoldingType.MUTUAL_FUND,
-  HoldingType.ETF,
-  HoldingType.BOND,
-  HoldingType.OTHER,
-]);
 
 export const AccountType = {
   SECURITIES: 'SECURITIES',

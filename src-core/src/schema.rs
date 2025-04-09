@@ -1,6 +1,43 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    cash_holdings (id) {
+        id -> Text,
+        account_id -> Text,
+        currency -> Text,
+        amount -> Text,
+        last_updated -> Text,
+    }
+}
+
+diesel::table! {
+    lots (id) {
+        id -> Text,
+        position_id -> Text,
+        acquisition_date -> Text,
+        quantity -> Text,
+        cost_basis -> Text,
+        acquisition_price -> Text,
+        acquisition_fees -> Text,
+        last_updated -> Text,
+    }
+}
+
+diesel::table! {
+    positions (id) {
+        id -> Text,
+        account_id -> Text,
+        asset_id -> Text,
+        currency -> Text,
+        quantity -> Text,
+        average_cost -> Text,
+        total_cost_basis -> Text,
+        inception_date -> Text,
+        last_updated -> Text,
+    }
+}
+
+diesel::table! {
     accounts (id) {
         id -> Text,
         name -> Text,
@@ -83,10 +120,10 @@ diesel::table! {
         contribution_year -> Integer,
         limit_amount -> Double,
         account_ids -> Nullable<Text>,
-        start_date -> Nullable<Timestamp>,
-        end_date -> Nullable<Timestamp>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        start_date -> Nullable<Timestamp>,
+        end_date -> Nullable<Timestamp>,
     }
 }
 
@@ -141,6 +178,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    portfolio_snapshots (id) {
+        id -> Text,
+        account_id -> Text,
+        snapshot_date -> Text,
+        calculated_at -> Timestamp,
+        portfolio_state_json -> Text,
+        triggering_activity_id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     quotes (id) {
         id -> Text,
         symbol -> Text,
@@ -157,12 +205,16 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(lots -> positions (position_id));
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    cash_holdings,
+    lots,
+    positions,
     accounts,
     activities,
     activity_import_profiles,
@@ -173,5 +225,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     goals_allocation,
     platforms,
     portfolio_history,
+    portfolio_snapshots,
     quotes,
 );

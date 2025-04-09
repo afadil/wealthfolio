@@ -6,12 +6,16 @@ use std::sync::Arc;
 
 use crate::errors::Result;
 use crate::db::get_connection;
-use crate::market_data::market_data_model::QuoteDb;
+use crate::market_data::market_data_model::{QuoteDb, LatestQuotePair};
 use crate::schema::quotes::dsl::*;
 use crate::schema::quotes;
 use super::market_data_model::Quote;
 use super::market_data_errors::MarketDataError;
 use super::market_data_traits::MarketDataRepositoryTrait;
+use diesel::sql_query;
+use diesel::sqlite::Sqlite;
+use diesel::sql_types::Text;
+use diesel::sql_types::Untyped;
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -161,5 +165,84 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .collect();
 
         Ok(result)
+    }
+
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        input_symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>> {
+        if input_symbols.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+
+        // 1. Construct the raw SQL query with ROW_NUMBER()
+        let placeholders = input_symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let sql = format!(
+            "WITH RankedQuotes AS ( \
+                SELECT \
+                    q.*, \
+                    ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.date DESC) as rn \
+                FROM quotes q \
+                WHERE q.symbol IN ({}) \
+            ) \
+            SELECT * \
+            FROM RankedQuotes \
+            WHERE rn <= 2 \
+            ORDER BY symbol, rn", // Ensure consistent order for pairing
+            placeholders
+        );
+
+        // 2. Bind parameters and execute the query using type erasure
+        // Use into_boxed() instead of explicit BoxableSqlQuery type
+        let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+        for symbol_val in input_symbols {
+            query_builder = query_builder.bind::<Text, _>(symbol_val);
+        }
+
+        let ranked_quotes_db: Vec<QuoteDb> = query_builder
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?;
+
+        // 3. Group results by symbol manually and create LatestQuotePair
+        let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
+        let mut current_symbol_quotes: Vec<Quote> = Vec::new();
+
+        for quote_db in ranked_quotes_db {
+            let quote = Quote::from(quote_db);
+
+            if current_symbol_quotes.is_empty() || quote.symbol == current_symbol_quotes[0].symbol {
+                current_symbol_quotes.push(quote);
+            } else {
+                // Process the completed group
+                if !current_symbol_quotes.is_empty() {
+                    let latest_quote = current_symbol_quotes.remove(0);
+                    let previous_quote = if !current_symbol_quotes.is_empty() {
+                        Some(current_symbol_quotes.remove(0))
+                    } else {
+                        None
+                    };
+                    result_map.insert(latest_quote.symbol.clone(), LatestQuotePair { latest: latest_quote, previous: previous_quote });
+                }
+                // Start the new group
+                current_symbol_quotes.clear();
+                current_symbol_quotes.push(quote);
+            }
+        }
+
+        // Process the last group
+        if !current_symbol_quotes.is_empty() {
+            let latest_quote = current_symbol_quotes.remove(0);
+            let previous_quote = if !current_symbol_quotes.is_empty() {
+                Some(current_symbol_quotes.remove(0))
+            } else {
+                None
+            };
+             result_map.insert(latest_quote.symbol.clone(), LatestQuotePair { latest: latest_quote, previous: previous_quote });
+        }
+
+        Ok(result_map)
     }
 }

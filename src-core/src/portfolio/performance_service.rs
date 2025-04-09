@@ -89,34 +89,6 @@ impl PerformanceService {
         }
     }
 
-    /// Calculates cumulative returns for a given item (account or symbol)
-    async fn calculate_performance(
-        &self,
-        item_type: &str,
-        item_id: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
-    ) -> ServiceResult<PerformanceResponse> {
-        match item_type {
-            "account" => {
-                self.calculate_account_performance(
-                    item_id,
-                    start_date,
-                    end_date,
-                    ReturnMethod::TimeWeighted,
-                )
-                .await
-            }
-            "symbol" => {
-                self.calculate_symbol_performance(item_id, start_date, end_date)
-                    .await
-            }
-            _ => Err(errors::Error::Validation(ValidationError::InvalidInput(
-                "Invalid item type".to_string(),
-            ))),
-        }
-    }
-
     /// Internal function for calculating account performance (Refactored Logic)
     async fn calculate_account_performance(
         &self,

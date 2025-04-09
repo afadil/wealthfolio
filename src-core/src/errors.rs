@@ -7,7 +7,7 @@ use crate::market_data::MarketDataError;
 use crate::activities::ActivityError;
 use crate::fx::FxError;
 // use crate::assets::assets_errors::AssetError;
-// use crate::holdings::holdings_errors::CalculatorError;
+use crate::holdings::holdings_errors::CalculatorError;
 
 // Create a type alias for Result using our Error type
 pub type Result<T> = std::result::Result<T, Error>;
@@ -39,8 +39,8 @@ pub enum Error {
     #[error("Repository error: {0}")]
     Repository(String),
 
-    // #[error("Holdings calculation failed: {0}")]
-    // HoldingsCalculation(#[from] CalculatorError),
+    #[error("Holdings calculation failed: {0}")]
+    HoldingsCalculation(#[from] CalculatorError),
 }
 
 #[derive(Error, Debug)]

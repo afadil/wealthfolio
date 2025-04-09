@@ -33,16 +33,22 @@ pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
 
 pub fn run_migrations(pool: &DbPool) -> Result<()> {
     info!("Running database migrations");
-    let mut connection = pool.get().map_err(|e| {
-        error!("Failed to get connection for migrations: {}", e);
-        Error::Database(DatabaseError::ConnectionFailed(ConnectionError::BadConnection(e.to_string())))
-    })?;
+    let mut connection = get_connection(pool)?;
     
-    connection.run_pending_migrations(MIGRATIONS).map_err(|e| {
+    let result = connection.run_pending_migrations(MIGRATIONS).map_err(|e| {
         error!("Database migration failed: {}", e);
         Error::Database(DatabaseError::MigrationFailed(e.to_string()))
     })?;
-    info!("Database migrations completed successfully");
+
+    if result.is_empty() {
+        info!("No pending migrations to apply.");
+    } else {
+        info!("Applied the following migrations:");
+        for migration_version in &result {
+            info!("  - {}", migration_version);
+        }
+    }
+
     Ok(())
 }
 
@@ -132,7 +138,7 @@ impl DbTransactionExecutor for DbPool {
         let mut conn = self.get()?;
         
         conn.transaction(|tx_conn| {
-            f(tx_conn).map_err(|e| diesel::result::Error::RollbackTransaction)
+            f(tx_conn).map_err(|_| diesel::result::Error::RollbackTransaction)
         })
         .map_err(|e| Error::Database(DatabaseError::QueryFailed(e)))
     }

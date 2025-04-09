@@ -149,3 +149,9 @@ impl From<&str> for DataSource {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct LatestQuotePair {
+    pub latest: Quote,
+    pub previous: Option<Quote>,
+}

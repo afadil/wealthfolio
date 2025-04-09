@@ -107,6 +107,7 @@ pub fn main() {
             commands::goal::load_goals_allocations,
             commands::portfolio::calculate_historical_data,
             commands::portfolio::compute_holdings,
+            commands::portfolio::get_holdings,
             commands::portfolio::get_income_summary,
             commands::portfolio::get_portfolio_history,
             commands::portfolio::get_accounts_summary,

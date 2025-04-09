@@ -8,7 +8,7 @@ use std::time::SystemTime;
 
 use super::market_data_constants::*;
 use super::market_data_errors::MarketDataError;
-use super::market_data_model::{Quote, QuoteRequest, QuoteSummary};
+use super::market_data_model::{Quote, QuoteRequest, QuoteSummary, LatestQuotePair};
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
 use crate::errors::Result;
@@ -37,6 +37,13 @@ impl MarketDataServiceTrait for MarketDataService {
 
     fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
         self.repository.get_latest_quotes_for_symbols(symbols)
+    }
+
+    fn get_latest_quotes_pair_for_symbols(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>> {
+        self.repository.get_latest_quotes_pair_for_symbols(symbols)
     }
 
     fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {

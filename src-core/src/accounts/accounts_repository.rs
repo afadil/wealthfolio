@@ -3,7 +3,7 @@ use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 use crate::schema::accounts;
 use crate::schema::accounts::dsl::*;
 use crate::db::get_connection;

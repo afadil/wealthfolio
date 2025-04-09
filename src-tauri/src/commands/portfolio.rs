@@ -2,13 +2,12 @@ use std::sync::Arc;
 
 // Project imports
 use crate::context::ServiceContext;
-use crate::models::{AccountSummary, HistorySummary, Holding, IncomeSummary, HistoryRecord};
+use crate::models::{AccountSummary, HistoryRecord, HistorySummary, Holding, IncomeSummary};
 
 // External imports
 use log::debug;
 use tauri::State;
-use wealthfolio_core::PerformanceResponse;
-
+use wealthfolio_core::{HoldingView, PerformanceResponse};
 
 #[tauri::command]
 pub async fn calculate_historical_data(
@@ -25,12 +24,27 @@ pub async fn calculate_historical_data(
 }
 
 #[tauri::command]
-pub async fn compute_holdings(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Holding>, String> {
-    debug!("Computing holdings...");
+pub async fn compute_holdings(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<Holding>, String> {
+    debug!("Get holdings...");
     state
         .portfolio_service()
         .compute_holdings()
         .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_holdings(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+) -> Result<Vec<HoldingView>, String> {
+    debug!("Get holdings...");
+    let base_currency = state.get_base_currency();
+    state
+        .holding_view_service()
+        .get_holdings(&account_id, &base_currency)
         .map_err(|e| e.to_string())
 }
 
@@ -71,10 +85,12 @@ pub async fn recalculate_portfolio(
 }
 
 #[tauri::command]
-pub async fn get_income_summary(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<IncomeSummary>, String> {
+pub async fn get_income_summary(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<IncomeSummary>, String> {
     debug!("Fetching income summary...");
     state
-        .portfolio_service()
+        .income_service()
         .get_income_summary()
         .map_err(|e| e.to_string())
 }

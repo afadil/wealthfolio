@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LayoutDashboard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
+import { Icons } from '@/components/icons';
 
 type ReturnType = 'daily' | 'total';
 
@@ -130,11 +132,11 @@ const CustomizedContent = (props: any) => {
 };
 
 interface PortfolioCompositionProps {
-  assets: Holding[];
+  holdings: Holding[];
   isLoading?: boolean;
 }
 
-export function PortfolioComposition({ assets, isLoading }: PortfolioCompositionProps) {
+export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositionProps) {
   const [returnType, setReturnType] = useState<ReturnType>('daily');
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
@@ -150,26 +152,26 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
     let maxGain = -Infinity;
     let minGain = Infinity;
 
-    assets.forEach((asset) => {
-      if (asset.symbol) {
-        const symbol = asset.symbol;
+    holdings.forEach((holding) => {
+      if (holding.symbol) {
+        const symbol = holding.symbol;
         const gain =
           returnType === 'daily'
-            ? Number(asset.performance.dayGainPercent)
-            : Number(asset.performance.totalGainPercent);
+            ? Number(holding.performance.dayGainLossPercent)
+            : Number(holding.performance.totalGainLossPercent);
 
         maxGain = Math.max(maxGain, gain);
         minGain = Math.min(minGain, gain);
 
         if (data[symbol]) {
-          data[symbol].marketValueConverted += Number(asset.marketValueConverted);
-          data[symbol].bookBalueConverted += Number(asset.bookValueConverted);
+          data[symbol].marketValueConverted += Number(holding.performance.marketValue * holding.performance.fxRateToBase);
+          data[symbol].bookBalueConverted += Number(holding.totalCostBasis * holding.performance.fxRateToBase);
           data[symbol].gain = gain;
         } else {
           data[symbol] = {
             name: symbol,
-            marketValueConverted: Number(asset.marketValueConverted),
-            bookBalueConverted: Number(asset.bookValueConverted),
+            marketValueConverted: Number(holding.performance.marketValue * holding.performance.fxRateToBase),
+            bookBalueConverted: Number(holding.totalCostBasis * holding.performance.fxRateToBase),
             gain,
           };
         }
@@ -187,7 +189,7 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
     dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
     return dataArray;
-  }, [assets, returnType]);
+  }, [holdings, returnType]);
 
   if (isLoading) {
     return (
@@ -204,6 +206,26 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
         </CardHeader>
         <CardContent>
           <Skeleton className="h-[500px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (holdings.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center space-x-2">
+            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="flex h-[500px] items-center justify-center">
+          <EmptyPlaceholder
+            icon={<Icons.BarChart className="h-10 w-10" />}
+            title="No holdings data"
+            description="There is no holdings data available for your portfolio."
+          />
         </CardContent>
       </Card>
     );

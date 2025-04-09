@@ -59,7 +59,6 @@ export const AccountSelectionStep = ({
         ? 'loading'
         : 'valid';
 
-  console.log('fileValidationStatus', fileValidationStatus, 'hasErrors', hasErrors);
 
   const handleFileChange = (file: File | null) => {
     setCsvFile(file);

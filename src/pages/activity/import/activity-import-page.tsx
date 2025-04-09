@@ -57,7 +57,6 @@ const ActivityImportPage = () => {
     navigate('/activities');
   };
 
-  console.log('parsingErrors', parsingErrors);
 
   // Handle file selection
   const handleFileChange = (file: File | null) => {

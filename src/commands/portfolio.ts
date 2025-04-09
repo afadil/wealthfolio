@@ -43,7 +43,7 @@ export const computeHoldings = async (): Promise<Holding[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('compute_holdings');
+        return invokeTauri('get_portfolio_holdings');
       default:
         throw new Error(`Unsupported`);
     }
@@ -52,6 +52,21 @@ export const computeHoldings = async (): Promise<Holding[]> => {
     throw error;
   }
 };
+
+export const getHoldings = async (accountId: string): Promise<Holding[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_holdings', { accountId });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error fetching holdings.');
+    throw error;
+  }
+};
+
 
 export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   try {

@@ -162,7 +162,6 @@ export function formatPercent(value: number | null | undefined) {
     return String(value);
   }
 }
-
 export function formatStockQuantity(quantity: string | number) {
   const numQuantity = parseFloat(String(quantity));
   if (Number.isInteger(numQuantity)) {
@@ -177,4 +176,32 @@ export function toPascalCase(input: string) {
     .split(' ')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join('');
+}
+
+export function formatQuantity(quantity: number | null | undefined): string {
+  if (quantity === null || quantity === undefined) {
+    return '-';
+  }
+
+  // Use Intl.NumberFormat for consistent number formatting
+  // Minimum fraction digits of 0 allows whole numbers to show without decimals
+  // Maximum of 4 decimal places when needed
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+    useGrouping: true
+  }).format(quantity);
+}
+
+/**
+ * Safely divides two numbers, returning 0 if the divisor is 0.
+ * @param numerator The number to be divided.
+ * @param denominator The number to divide by.
+ * @returns The result of the division, or 0 if the denominator is 0.
+ */
+export function safeDivide(numerator: number, denominator: number): number {
+  if (denominator === 0) {
+    return 0;
+  }
+  return numerator / denominator;
 }

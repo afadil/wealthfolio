@@ -138,8 +138,6 @@ export const DataPreviewStep = ({
     })),
   ];
 
-  console.log('csvErrors', csvErrors);
-
   const handleInitialClick = () => {
     setConfirmationState('confirm');
   };

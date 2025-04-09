@@ -3,10 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatAmount } from '@/lib/utils';
+import { safeDivide } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 import { GainPercent } from '@/components/gain-percent';
-import { PrivacyAmount } from '@/components/privacy-amount';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
@@ -14,8 +13,32 @@ import { useNavigate } from 'react-router-dom';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from '@/components/amount-display';
 import { QuantityDisplay } from '@/components/quantity-display';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Helper function to get display value and currency based on toggle state
+const getDisplayValueAndCurrency = (
+  holding: Holding,
+  valueInBase: number | null | undefined, 
+  showConvertedToBase: boolean,
+): { value: number; currency: string } => {
+  const fxRate = holding.performance.fxRateToBase ?? 1; 
+
+  if (showConvertedToBase) {
+    // Show value in Base Currency
+    return {
+      value: valueInBase ?? 0,
+      currency: holding.performance.baseCurrency,
+    };
+  } else {
+    // Show value in Asset's Original Currency
+    const valueInOriginal = safeDivide(valueInBase ?? 0, fxRate); 
+    return {
+      value: valueInOriginal,
+      currency: holding.currency,
+    };
+  }
+};
 
 export const HoldingsTable = ({
   holdings,
@@ -26,10 +49,6 @@ export const HoldingsTable = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
-
-  const nonCashHoldings = useMemo(() => {
-    return holdings.filter((holding) => holding.holdingType !== 'CASH');
-  }, [holdings]);
 
   if (isLoading) {
     return (
@@ -43,9 +62,9 @@ export const HoldingsTable = ({
   }
 
   const uniqueTypesSet = new Set();
-  const assetsTypes: { label: string; value: string }[] = nonCashHoldings.reduce(
+  const assetsTypes: { label: string; value: string }[] = holdings.reduce(
     (result: { label: string; value: string }[], asset) => {
-      const type = asset?.holdingType;
+      const type = asset?.asset?.assetSubClass;
       if (type && !uniqueTypesSet.has(type)) {
         uniqueTypesSet.add(type);
         result.push({ label: type.toUpperCase(), value: type });
@@ -66,7 +85,7 @@ export const HoldingsTable = ({
   return (
     <div className="pt-6">
       <DataTable
-        data={nonCashHoldings}
+        data={holdings}
         columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
         searchBy="symbol"
         filters={filters}
@@ -117,7 +136,7 @@ const getColumns = (
             {symbol}
           </Badge>
 
-          <span className="ml-2">{holding.symbolName}</span>
+          <span className="ml-2 line-clamp-1">{holding.asset?.name || holding.assetId}</span>
         </div>
       );
     },
@@ -127,16 +146,15 @@ const getColumns = (
     filterFn: (row) => {
       const holding = row.original;
       const searchTerm = row.getValue('symbol') as string;
-      return (
-        holding.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        holding.symbolName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const nameMatch = holding.asset?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const symbolMatch = holding.symbol.toLowerCase().includes(searchTerm.toLowerCase());
+      return !!(symbolMatch || nameMatch);
     },
     enableHiding: false,
   },
   {
     id: 'symbolName',
-    accessorKey: 'symbolName',
+    accessorFn: (row) => row.asset?.name || row.assetId,
     meta: {
       label: 'Symbol Name',
     },
@@ -153,7 +171,7 @@ const getColumns = (
       label: 'Shares',
     },
     cell: ({ row }) => (
-      <div className="flex min-h-[40px] flex-col items-end justify-center">
+      <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
         <QuantityDisplay value={row.original.quantity} isHidden={isHidden} />
         <div className="text-xs text-transparent">-</div>
       </div>
@@ -162,9 +180,9 @@ const getColumns = (
   },
   {
     id: 'marketPrice',
-    accessorKey: 'marketPrice',
+    accessorFn: (row) => row.performance.marketPrice ?? 0,
     enableHiding: true,
-    enableSorting: false,
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader
         className="justify-end text-right"
@@ -177,12 +195,14 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
+      const price = holding.performance.marketPrice ?? 0;
+      const currency = holding.currency;
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center">
-          <div>{formatAmount(holding.marketPrice || 0, holding.currency)}</div>
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={price} currency={currency} />
           <GainPercent
             className="text-xs text-muted-foreground"
-            value={holding.performance.dayGainPercent || 0}
+            value={holding.performance.dayGainLossPercent || 0}
           />
         </div>
       );
@@ -190,7 +210,7 @@ const getColumns = (
   },
   {
     id: 'bookValue',
-    accessorKey: 'bookValue',
+    accessorKey: 'totalCostBasis',
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
@@ -200,29 +220,25 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const value = showConvertedValues ? holding.bookValueConverted : holding.bookValue;
-      const currency = showConvertedValues ? holding.baseCurrency : holding.currency;
+      const value = holding.totalCostBasis ?? 0;
+      const currency = holding.currency;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center pr-4">
-          <PrivacyAmount value={value} currency={currency} />
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-xs text-transparent">-</div>
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = showConvertedValues
-        ? rowA.original.bookValueConverted
-        : rowA.original.bookValue;
-      const valueB = showConvertedValues
-        ? rowB.original.bookValueConverted
-        : rowB.original.bookValue;
+      const valueA = rowA.original.totalCostBasis ?? 0;
+      const valueB = rowB.original.totalCostBasis ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'marketValue',
-    accessorKey: 'marketValue',
+    accessorFn: (row) => row.performance.marketValue ?? 0,
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
@@ -232,70 +248,67 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const value = showConvertedValues ? holding.marketValueConverted : holding.marketValue;
-      const currency = showConvertedValues ? holding.baseCurrency : holding.currency;
+      const { value, currency } = getDisplayValueAndCurrency(
+        holding,
+        holding.performance.marketValue,
+        showConvertedValues,
+      );
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center">
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-xs text-muted-foreground">{currency}</div>
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = showConvertedValues
-        ? rowA.original.marketValueConverted
-        : rowA.original.marketValue;
-      const valueB = showConvertedValues
-        ? rowB.original.marketValueConverted
-        : rowB.original.marketValue;
+      const valueA = rowA.original.performance.marketValue ?? 0;
+      const valueB = rowB.original.performance.marketValue ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'performance',
-    accessorKey: 'performance',
+    accessorFn: (row) => row.performance.totalGainLossAmount ?? 0,
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Performance" />
+      <DataTableColumnHeader className="justify-end" column={column} title="Total Gain/Loss" />
     ),
     meta: {
-      label: 'Performance',
+      label: 'Total Gain/Loss',
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const currency = showConvertedValues ? holding.baseCurrency : holding.currency;
-      const gainAmount = showConvertedValues
-        ? holding.performance.totalGainAmountConverted
-        : holding.performance.totalGainAmount;
+      const { value, currency } = getDisplayValueAndCurrency(
+        holding,
+        holding.performance.totalGainLossAmount,
+        showConvertedValues,
+      );
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center pr-4">
-          <AmountDisplay value={gainAmount} currency={currency} colorFormat={true} />
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <GainPercent
             className="text-xs text-muted-foreground"
-            value={holding.performance.totalGainPercent}
+            value={holding.performance.totalGainLossPercent || 0}
           />
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = showConvertedValues
-        ? rowA.original.performance.totalGainAmountConverted
-        : rowA.original.performance.totalGainAmount;
-      const valueB = showConvertedValues
-        ? rowB.original.performance.totalGainAmountConverted
-        : rowB.original.performance.totalGainAmount;
+      const valueA = rowA.original.performance.totalGainLossAmount ?? 0;
+      const valueB = rowB.original.performance.totalGainLossAmount ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'holdingType',
-    accessorKey: 'holdingType',
+    accessorFn: (row) => row.asset?.assetSubClass,
     meta: {
       label: 'Asset Type',
     },
     header: ({ column }) => <DataTableColumnHeader column={column} title="Asset Type" />,
+    filterFn: 'arrIncludesSome',
   },
   {
     id: 'currency',
@@ -304,7 +317,10 @@ const getColumns = (
     meta: {
       label: 'Currency',
     },
-    cell: ({ row }) => <div>{row.original.currency}</div>,
+    cell: ({ row }) => <div className="text-muted-foreground">{row.original.currency}</div>,
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id));
+    },
   },
   {
     id: 'actions',
@@ -328,7 +344,7 @@ const getColumns = (
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>Show in {showConvertedValues ? 'Base' : 'Asset'} Currency</p>
+              <p>Show values in {showConvertedValues ? 'Asset Currency' : 'Base Currency'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

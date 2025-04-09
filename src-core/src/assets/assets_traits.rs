@@ -14,6 +14,7 @@ pub trait AssetServiceTrait: Send + Sync {
     fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset>;
     async fn sync_asset_quotes(&self, asset_list: &Vec<Asset>, refetch_all: bool) -> Result<()>;
     async fn sync_asset_quotes_by_symbols(&self, symbols: &Vec<String>, refetch_all: bool) -> Result<()>;
+    fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
 }
 
 /// Trait defining the contract for Asset repository operations.

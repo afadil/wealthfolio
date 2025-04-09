@@ -4,7 +4,7 @@ use diesel::r2d2::ConnectionManager;
 use diesel::SqliteConnection;
 use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
-    self, accounts, activities, assets, goals, limits, market_data, portfolio, settings,fx
+    self, accounts, activities, assets, fx, goals, holdings, limits, market_data, portfolio, settings
 };
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 
@@ -25,6 +25,9 @@ pub struct ServiceContext {
     pub limits_service: Arc<dyn limits::ContributionLimitServiceTrait>,
     pub fx_service:Arc<dyn fx::FxServiceTrait>,
     pub performance_service: Arc<dyn portfolio::PerformanceServiceTrait>,
+    pub holdings_service: Arc<dyn holdings::HoldingsServiceTrait>,
+    pub income_service: Arc<dyn portfolio::IncomeServiceTrait>,
+    pub holding_view_service: Arc<dyn portfolio::HoldingsViewServiceTrait>,
 }
 
 impl ServiceContext {
@@ -79,5 +82,17 @@ impl ServiceContext {
 
     pub fn performance_service(&self) -> Arc<dyn portfolio::PerformanceServiceTrait> {
         Arc::clone(&self.performance_service)
+    }
+
+    pub fn holdings_service(&self) -> Arc<dyn holdings::HoldingsServiceTrait> {
+        Arc::clone(&self.holdings_service)
+    }
+
+    pub fn income_service(&self) -> Arc<dyn portfolio::IncomeServiceTrait> {
+        Arc::clone(&self.income_service)
+    }
+
+    pub fn holding_view_service(&self) -> Arc<dyn portfolio::HoldingsViewServiceTrait> {
+        Arc::clone(&self.holding_view_service)
     }
 }
