@@ -89,7 +89,7 @@ const ActivityImportPage = () => {
 
     try {
       // Validate data and store results
-      const results = validateActivityImport(data, mapping, selectedAccount.id);
+      const results = validateActivityImport(data, mapping, selectedAccount.id, selectedAccount.currency);
 
       // Update state with validated activities
       setActivities(results.activities);

@@ -52,184 +52,172 @@ export function useCsvParser() {
         isParsing: true,
       }));
 
-      // First, parse the file as raw CSV (without headers) to get the raw lines
+      // Parse the file as raw CSV (without headers)
       Papa.parse(file, {
         header: false,
         skipEmptyLines: true,
-        complete: (rawResults) => {
-          const rawCsvLines = rawResults.data as string[][];
+        complete: (results: ParseResult<string[]>) => {
+          const rawCsvLines = results.data; // Keep as string[][]
 
-          // Store the raw lines immediately, regardless of header validity
+          // Store the raw lines immediately
           setState((prev) => ({
             ...prev,
             rawCsvLines,
           }));
 
-          // Now parse with headers for structured data
-          Papa.parse<Record<string, string>>(file, {
-            header: true, // Papaparse detects and uses the first row as headers
-            skipEmptyLines: true,
-            complete: (results: ParseResult<Record<string, string>>) => {
-              // Trim headers
-              const headers = (results.meta.fields || []).map((header) => header.trim());
+          // Check if we have at least a header row
+          if (rawCsvLines.length === 0) {
+            const errorMsg = 'The CSV file appears to be empty.';
+            logger.warn(errorMsg, { file: file.name });
+            const emptyFileError: CsvRowError = {
+              type: 'FieldMismatch',
+              code: 'MissingQuotes', // Using a relevant code, might need adjustment
+              message: errorMsg,
+              row: 0, // Indicate general file error
+            };
+            setState((prev) => ({
+              ...prev,
+              isParsing: false,
+              errors: [emptyFileError],
+            }));
+            return;
+          }
 
-              // Add lineNumber to each row and trim all values
-              const data = results.data.map((row, index) => {
-                const trimmedRow = Object.entries(row).reduce(
-                  (acc, [key, value]) => ({
-                    ...acc,
-                    [key.trim()]: typeof value === 'string' ? value.trim() : value,
-                  }),
-                  {},
-                );
+          // Extract and trim potential headers from the first row
+          const headers = rawCsvLines[0].map((header) => header.trim());
 
-                return {
-                  ...trimmedRow,
-                  lineNumber: (index + 2).toString(), // +2 because index 0 is row 2 (after header)
-                };
-              }) as CsvRowData[];
+          // Validate the detected headers
+          if (!validateHeaders(headers)) {
+            let errorMsg =
+              'Invalid CSV header row. Please ensure the first row contains valid, non-empty column names.';
+            if (headers.length < 3) {
+              errorMsg = `Invalid CSV header row. Expected at least 3 columns, but found ${headers.length}.`;
+            } else if (headers.some((header) => !header || header.trim() === '')) {
+              errorMsg =
+                'Invalid CSV header row. One or more column names are empty or contain only whitespace.';
+            }
+            logger.error(errorMsg, { file: file.name });
 
-              // Convert PapaParse errors to our custom CsvRowError type
-              const parseErrors: CsvRowError[] = results.errors.map((error) => ({
-                type: error.type,
-                code: error.code,
-                message: error.message,
-                row: typeof error.row === 'number' ? error.row + 1 : 1, // Add 1 to convert from 0-based index to 1-based row number, default to 1 if undefined
-                index: error.index,
-              }));
+            const headerError: CsvRowError = {
+              type: 'FieldMismatch',
+              code: 'TooFewFields', // Or another appropriate code
+              message: errorMsg,
+              row: 0, // Header error
+            };
 
-              // Log and store any row-level parsing errors encountered
-              if (parseErrors.length > 0) {
-                logger.warn(
-                  `CSV parsing encountered ${parseErrors.length} row errors: ${JSON.stringify(parseErrors)}`,
-                );
-                // Store these row errors in state
-                setState((prev) => ({ ...prev, errors: parseErrors }));
-              }
+            setState((prev) => ({
+              ...prev,
+              headers: headers, // Store invalid headers for context
+              data: [],
+              isParsing: false,
+              errors: [headerError],
+              // rawCsvLines is already set
+            }));
+            return; // Stop processing
+          }
 
-              // Validate the detected headers
-              if (!validateHeaders(headers)) {
-                let errorMsg =
-                  'Invalid CSV header row. Please ensure the first row contains valid, non-empty column names.';
-                // Provide a more specific error if the column count is the issue
-                if (headers.length < 3) {
-                  errorMsg = `Invalid CSV header row. Expected at least 3 columns, but found ${headers.length}.`;
-                } else if (headers.some((header) => !header || header.trim() === '')) {
-                  errorMsg =
-                    'Invalid CSV header row. One or more column names are empty or contain only whitespace.';
-                }
-                logger.error(errorMsg, { file: file.name });
+          // Process data rows (excluding the header row)
+          const data: CsvRowData[] = [];
+          const processingErrors: CsvRowError[] = []; // Collect potential errors during manual processing
 
-                // Create a custom error and add it to row errors
-                const headerError: CsvRowError = {
-                  type: 'FieldMismatch',
-                  code: 'TooFewFields',
-                  message: errorMsg,
-                  row: 0,
-                };
+          // Start from index 1 to skip header row
+          for (let i = 1; i < rawCsvLines.length; i++) {
+            const rawRow = rawCsvLines[i];
+            const lineNumber = i + 1; // CSV line number (1-based)
+            const rowData: CsvRowData = { lineNumber: lineNumber.toString() };
 
-                setState((prev) => ({
-                  ...prev,
-                  headers: headers, // Store potentially invalid headers for context
-                  data: [], // No valid data if headers are invalid
-                  isParsing: false,
-                  errors: [headerError], // Only include header error - clear all other errors
-                  // Keeping rawCsvLines from previous setState
-                }));
-                return; // Stop processing
-              }
-
-              // Check if data (excluding header) was actually parsed
-              if (data.length === 0 && parseErrors.length === 0) {
-                // Also check if there weren't row errors causing emptiness
-                const errorMsg = 'The CSV file appears to be empty or contains only a header row.';
-                logger.warn(errorMsg, { file: file.name });
-
-                // Create an empty data error
-                const emptyDataError: CsvRowError = {
-                  type: 'FieldMismatch',
-                  code: 'TooFewFields',
-                  message: errorMsg,
-                  row: 0,
-                };
-
-                setState((prev) => ({
-                  ...prev,
-                  headers: headers, // Headers might be valid, but no data
-                  data: [],
-                  isParsing: false,
-                  errors: [emptyDataError], // Add empty data error to row errors
-                  // Keeping rawCsvLines from previous setState
-                }));
-                return;
-              }
-
-              // Successful parse (or parse with row errors but valid headers/structure)
-              setState((prev) => ({
-                ...prev,
-                data: data,
-                headers: headers,
-                isParsing: false,
-                // errors are already set if they existed
-                // Keeping rawCsvLines from previous setState
-              }));
-            },
-            error: (error: Error) => {
-              // Handle file-level parsing errors (e.g., file not readable)
-              const errorMessage = `Error parsing CSV file: ${error.message}`;
-              logger.error(errorMessage, { file: file.name });
-
-              // Create a file-level error
-              const fileError: CsvRowError = {
+            // Check for row length mismatch (fewer fields than headers)
+            if (rawRow.length < headers.length) {
+              const message = `Row ${lineNumber}: Expected ${headers.length} fields but found ${rawRow.length}.`;
+              logger.warn(message, { file: file.name });
+              processingErrors.push({
                 type: 'FieldMismatch',
                 code: 'TooFewFields',
-                message: errorMessage,
-                row: 0,
-              };
+                message: message,
+                row: lineNumber,
+              });
+              // Optionally skip this row or fill missing values
+              // continue; // If skipping
+            }
 
-              setState((prev) => ({
-                ...initialState, // Reset most state on critical file error
-                selectedFile: prev.selectedFile, // Keep the selected file for context
-                isParsing: false,
-                errors: [fileError], // Add file error to row errors
-                rawCsvLines: prev.rawCsvLines, // Keep any raw data we might have
-              }));
-            },
-          });
+            // Build the row object using headers, trimming values
+            // This loop inherently ignores extra fields in rawRow (if rawRow.length > headers.length)
+            headers.forEach((header, index) => {
+              const value = rawRow[index]; // Access value by index
+              rowData[header] = typeof value === 'string' ? value.trim() : value ?? ''; // Handle undefined/null
+            });
+
+            data.push(rowData);
+          }
+
+          // Check if data (excluding header) was actually processed
+          if (data.length === 0 && processingErrors.length === 0) {
+            const errorMsg = 'The CSV file contains only a header row or is empty after processing.';
+            logger.warn(errorMsg, { file: file.name });
+
+            const emptyDataError: CsvRowError = {
+              type: 'FieldMismatch',
+              code: 'TooFewFields', // Reusing code
+              message: errorMsg,
+              row: 0, // General data error indication
+            };
+
+            setState((prev) => ({
+              ...prev,
+              headers: headers, // Headers are valid
+              data: [],
+              isParsing: false,
+              errors: [emptyDataError], // Only this error
+              // rawCsvLines already set
+            }));
+            return;
+          }
+
+          // Successful processing (potentially with row errors)
+          setState((prev) => ({
+            ...prev,
+            data: data,
+            headers: headers,
+            isParsing: false,
+            errors: processingErrors, // Use errors found during manual processing
+            // rawCsvLines already set
+          }));
         },
         error: (error: Error) => {
-          // Handle raw parsing errors
-          const errorMessage = `Error parsing raw CSV file: ${error.message}`;
+          // Handle file-level parsing errors (e.g., file not readable)
+          const errorMessage = `Error parsing CSV file: ${error.message}`;
           logger.error(errorMessage, { file: file.name });
 
           // Create a file-level error
           const fileError: CsvRowError = {
-            type: 'FieldMismatch',
-            code: 'TooFewFields',
+            type: 'FieldMismatch', // Generic type
+            code: 'UndetectableDelimiter', // Or another relevant code
             message: errorMessage,
-            row: 0,
+            row: 0, // Indicate general file error
           };
 
           setState((prev) => ({
-            ...initialState,
-            selectedFile: prev.selectedFile,
+            ...initialState, // Reset most state on critical file error
+            selectedFile: prev.selectedFile, // Keep the selected file for context
             isParsing: false,
             errors: [fileError],
+            rawCsvLines: prev.rawCsvLines, // Keep raw lines if any were read
           }));
         },
       });
     },
-    [resetParserStates], // resetParserStates dependency is correct
+    [resetParserStates], // Keep resetParserStates dependency
   );
 
-  
+
   // Prepare errors for display format
   // If there's a header error (row 0), only show that and suppress other errors
   const displayErrors = useMemo(() => {
-    const hasHeaderError = state.errors.some((error) => error.row === 0);
-    if (hasHeaderError) {
-      return state.errors.filter((error) => error.row === 0);
+    const headerOrFileError = state.errors.find((error) => error.row === 0);
+    if (headerOrFileError) {
+      return [headerOrFileError]; // Show only the first file/header level error
     }
+    // Otherwise show all row-specific processing errors
     return state.errors;
   }, [state.errors]);
 

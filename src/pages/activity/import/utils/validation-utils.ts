@@ -55,107 +55,163 @@ export function calculateCashActivityAmount(
   return safeQuantity;
 }
 
+// Define types for the calculation functions
+type SymbolCalculator = (activity: Partial<ActivityImport>, accountCurrency: string) => string | undefined;
+type AmountCalculator = (activity: Partial<ActivityImport>) => number | undefined;
+type FeeCalculator = (activity: Partial<ActivityImport>) => number | undefined;
+
+// Define the configuration structure
+interface ActivityLogicConfig {
+  calculateSymbol: SymbolCalculator;
+  calculateAmount: AmountCalculator;
+  calculateFee: FeeCalculator;
+}
+
+// Create the configuration map
+const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
+  [ActivityType.BUY]: {
+    calculateSymbol: (activity) => activity.symbol, // Keep original symbol
+    calculateAmount: (activity) => {
+      // Calculate amount = quantity * price if both positive
+      if (activity.quantity && activity.quantity > 0 && activity.unitPrice && activity.unitPrice > 0) {
+        return activity.quantity * activity.unitPrice;
+      }
+      return activity.amount; // Fallback to provided amount
+    },
+    calculateFee: (activity) => activity.fee ?? 0, // Use provided fee or 0
+  },
+  [ActivityType.SELL]: {
+    // Similar logic to BUY
+    calculateSymbol: (activity) => activity.symbol,
+    calculateAmount: (activity) => {
+       if (activity.quantity && activity.quantity > 0 && activity.unitPrice && activity.unitPrice > 0) {
+        return activity.quantity * activity.unitPrice;
+      }
+      return activity.amount;
+    },
+    calculateFee: (activity) => activity.fee ?? 0,
+  },
+  [ActivityType.DEPOSIT]: {
+    calculateSymbol: (activity, accountCurrency) => `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateAmount: (activity) => activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
+    calculateFee: (activity) => activity.fee ?? 0,
+  },
+  [ActivityType.WITHDRAWAL]: {
+     calculateSymbol: (activity, accountCurrency) => `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+     calculateAmount: (activity) => activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
+     calculateFee: (activity) => activity.fee ?? 0,
+  },
+   [ActivityType.INTEREST]: {
+     calculateSymbol: (activity, accountCurrency) => `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+     calculateAmount: (activity) => activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
+     calculateFee: (activity) => activity.fee ?? 0,
+   },
+   [ActivityType.DIVIDEND]: {
+     calculateSymbol: (activity) => activity.symbol, // Usually associated with a stock
+     calculateAmount: (activity) => activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
+     calculateFee: (activity) => activity.fee ?? 0,
+   },
+   [ActivityType.FEE]: {
+     calculateSymbol: (activity, accountCurrency) => `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+     calculateAmount: (activity) => activity.amount ?? 0, // Fees usually don't have a separate 'amount'
+     calculateFee: (activity) => activity.fee ?? activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
+   },
+  // ... Add configurations for other ActivityTypes (TAX, TRANSFER_IN, TRANSFER_OUT, etc.)
+};
+
+// Default logic if type-specific logic isn't found
+const defaultLogic: ActivityLogicConfig = {
+  calculateSymbol: (activity) => activity.symbol,
+  calculateAmount: (activity) => activity.amount,
+  calculateFee: (activity) => activity.fee ?? 0,
+};
+
 // Helper function to transform a CSV row into an Activity object
 function transformRowToActivity(
   row: CsvRowData,
   mapping: ImportMappingData,
   accountId: string,
+  accountCurrency: string,
 ): Partial<ActivityImport> {
-  const activity: Partial<ActivityImport> = { accountId, isDraft: true, isValid: false }; // Start with defaults
+  const activity: Partial<ActivityImport> = { accountId, isDraft: true, isValid: false };
 
-  // Helper to get a value from a row based on the mapped header
+  // Helper to get mapped value
   const getMappedValue = (field: ImportFormat): string | undefined => {
-    const headerName = mapping.fieldMappings[field];
-    if (!headerName) return undefined;
-
-    // Safe property access
-    const value = row[headerName];
-    return typeof value === 'string' ? value.trim() : undefined;
+      const headerName = mapping.fieldMappings[field];
+      if (!headerName) return undefined;
+      const value = row[headerName];
+      return typeof value === 'string' ? value.trim() : undefined;
   };
 
-  // --- Map Fields ---
+  // 1. Map Raw Values & Basic Parsing
   const rawDate = getMappedValue(ImportFormat.DATE);
   activity.date = rawDate ? tryParseDate(rawDate)?.toISOString().split('T')[0] : undefined;
   activity.symbol = getMappedValue(ImportFormat.SYMBOL);
   const csvActivityType = getMappedValue(ImportFormat.ACTIVITY_TYPE);
+  // Store raw parsed values temporarily before applying logic
+  const rawQuantity = getMappedValue(ImportFormat.QUANTITY) ? parseFloat(getMappedValue(ImportFormat.QUANTITY)!) : undefined;
+  const rawUnitPrice = getMappedValue(ImportFormat.UNIT_PRICE) ? parseFloat(getMappedValue(ImportFormat.UNIT_PRICE)!) : undefined;
+  const rawFee = getMappedValue(ImportFormat.FEE) ? parseFloat(getMappedValue(ImportFormat.FEE)!) : undefined;
+  const rawAmount = getMappedValue(ImportFormat.AMOUNT) ? parseFloat(getMappedValue(ImportFormat.AMOUNT)!) : undefined;
 
-  // Parse numeric fields
-  const quantityStr = getMappedValue(ImportFormat.QUANTITY);
-  activity.quantity = quantityStr ? parseFloat(quantityStr) : undefined;
+  // Assign potentially NaN values first, they will be cleaned up later
+  activity.quantity = rawQuantity;
+  activity.unitPrice = rawUnitPrice;
+  activity.currency = getMappedValue(ImportFormat.CURRENCY) || accountCurrency;
+  activity.fee = rawFee;
+  activity.amount = rawAmount;
+  activity.lineNumber = parseInt(row.lineNumber);
 
-  const unitPriceStr = getMappedValue(ImportFormat.UNIT_PRICE);
-  activity.unitPrice = unitPriceStr ? parseFloat(unitPriceStr) : undefined;
-
-  activity.currency = getMappedValue(ImportFormat.CURRENCY);
-
-  const feeStr = getMappedValue(ImportFormat.FEE);
-  activity.fee = feeStr ? parseFloat(feeStr) : 0;
-
-  const amountStr = getMappedValue(ImportFormat.AMOUNT);
-  activity.amount = amountStr ? parseFloat(amountStr) : undefined;
-
-  // --- Apply Symbol Mapping ---
+  // Apply Symbol Mapping BEFORE determining activity type logic
   if (activity.symbol && mapping.symbolMappings[activity.symbol]) {
     activity.symbol = mapping.symbolMappings[activity.symbol];
   }
 
-  // --- Apply Activity Type Mapping ---
+  // 2. Determine Activity Type
   if (csvActivityType) {
-    const trimmedCsvType = csvActivityType.trim().toUpperCase();
-
-    // Try to find a matching activity type
-    for (const [appType, csvTypes] of Object.entries(mapping.activityMappings)) {
-      if (csvTypes?.some((ct) => trimmedCsvType.startsWith(ct.trim().toUpperCase()))) {
-        activity.activityType = appType as ActivityType;
-        break;
+      const trimmedCsvType = csvActivityType.trim().toUpperCase();
+      for (const [appType, csvTypes] of Object.entries(mapping.activityMappings)) {
+          if (csvTypes?.some((ct) => trimmedCsvType.startsWith(ct.trim().toUpperCase()))) {
+              activity.activityType = appType as ActivityType;
+              break;
+          }
       }
-    }
   }
 
-  // Set symbol for cash activities and income activities
-  if (
-    activity.activityType &&
-    (isCashActivity(activity.activityType) || isIncomeActivity(activity.activityType))
-  ) {
-    activity.symbol = activity.currency ? `$CASH-${activity.currency.toUpperCase()}` : undefined;
+  // 3. Apply Logic from Configuration
+  const logic = activity.activityType ? (activityLogicMap[activity.activityType] ?? defaultLogic) : defaultLogic;
 
-    // For cash activities, make sure amount is calculated if not present or zero
-    if (!activity.amount || activity.amount === 0) {
-      activity.amount = calculateCashActivityAmount(activity.quantity, activity.unitPrice);
-    }
-  } else if (
-    activity.activityType &&
-    isTradeActivity(activity.activityType) &&
-    activity.quantity !== undefined &&
-    activity.quantity > 0 &&
-    activity.unitPrice !== undefined &&
-    activity.unitPrice > 0
-  ) {
-    // For trade activities, calculate amount as quantity * price if both are positive
-    activity.amount = activity.quantity * activity.unitPrice;
-  }
+  // Calculate final symbol, amount, and fee using the config
+  // Pass a *copy* of the activity so far to avoid premature mutation within calc functions
+  const currentActivityState = { ...activity };
+  activity.symbol = logic.calculateSymbol(currentActivityState, accountCurrency);
+  activity.amount = logic.calculateAmount(currentActivityState);
+  activity.fee = logic.calculateFee(currentActivityState);
 
-  // For FEE activity, set the fee field if not set or zero
-  if (activity.activityType === ActivityType.FEE) {
-    if (!activity.fee || activity.fee === 0) {
-      // First try to use amount field if available and > 0
-      if (activity.amount && activity.amount > 0) {
-        activity.fee = activity.amount;
-      } else {
-        // Otherwise calculate fee using the same calculation logic
-        activity.fee = calculateCashActivityAmount(activity.quantity, activity.unitPrice);
-      }
-    }
-  }
-
-  // Handle NaN values
+  // 4. Final Cleanup & Defaulting
+  // Handle NaN values resulting from calculations or initial parsing
   if (activity.quantity !== undefined && isNaN(activity.quantity)) activity.quantity = undefined;
   if (activity.unitPrice !== undefined && isNaN(activity.unitPrice)) activity.unitPrice = undefined;
-  if (activity.fee !== undefined && isNaN(activity.fee)) activity.fee = undefined;
+  if (activity.fee !== undefined && isNaN(activity.fee)) activity.fee = 0; // Ensure fee is 0 if NaN
   if (activity.amount !== undefined && isNaN(activity.amount)) activity.amount = undefined;
 
-  // Set lineNumber for tracking from the built-in line number property
-  activity.lineNumber = parseInt(row.lineNumber);
+  // If amount is validly set (not undefined and not NaN), default quantity/unitPrice to 0 if they are undefined/NaN
+  if (activity.amount !== undefined && !isNaN(activity.amount)) {
+    if (activity.quantity === undefined || isNaN(activity.quantity)) {
+      activity.quantity = 0;
+    }
+    if (activity.unitPrice === undefined || isNaN(activity.unitPrice)) {
+      activity.unitPrice = 0;
+    }
+  } else {
+    // If amount is still undefined/NaN, ensure quantity/unitPrice remain undefined if they started as NaN
+    if (activity.quantity !== undefined && isNaN(activity.quantity)) activity.quantity = undefined;
+    if (activity.unitPrice !== undefined && isNaN(activity.unitPrice)) activity.unitPrice = undefined;
+  }
+
+   // Ensure fee is always a number (default to 0 if undefined)
+   activity.fee = activity.fee ?? 0;
+
   return activity;
 }
 
@@ -171,6 +227,7 @@ export function validateActivityImport(
   data: CsvRowData[],
   mapping: ImportMappingData,
   accountId: string,
+  accountCurrency: string,
 ): ValidationResult {
   if (!data || data.length === 0) {
     throw new Error('CSV data is required and must have at least one row');
@@ -188,7 +245,12 @@ export function validateActivityImport(
     data.forEach((row) => {
       try {
         // Transform row to activity object
-        const transformedActivity = transformRowToActivity(row, mapping, accountId);
+        const transformedActivity = transformRowToActivity(
+          row,
+          mapping,
+          accountId,
+          accountCurrency,
+        );
 
         // Validate against schema (type safety, required fields, business rules)
         const schemaValidation = importActivitySchema.safeParse(transformedActivity);
