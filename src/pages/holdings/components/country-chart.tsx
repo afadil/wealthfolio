@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { Holding } from '@/lib/types';
 import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { Icons } from '@/components/icons';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 interface CountryChartProps {
@@ -37,11 +36,13 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
   if (isLoading) {
     return (
       <Card className="overflow-hidden backdrop-blur-sm">
-        <CardContent className="p-6">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-[180px]" />
             <Skeleton className="h-5 w-[80px]" />
           </div>
+        </CardHeader>
+        <CardContent className="p-6">
           <div className="flex h-[200px] items-center justify-center">
             <Skeleton className="h-[150px] w-[150px] rounded-full" />
           </div>
@@ -56,34 +57,32 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
 
   return (
     <Card className="overflow-hidden backdrop-blur-sm">
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Country Distribution
-            </h3>
-            <span className="text-sm text-muted-foreground">
-              {data.length ? `Top ${data.length} countries` : 'No data'}
-            </span>
-          </div>
-
-          {data.length > 0 ? (
-            <CustomPieChart
-              data={data}
-              activeIndex={activeIndex}
-              onPieEnter={onPieEnter}
-              startAngle={180}
-              endAngle={0}
-              displayTooltip={false}
-            />
-          ) : (
-            <EmptyPlaceholder
-              icon={<Icons.Globe className="h-8 w-8 text-muted-foreground" />}
-              title="No country data"
-              description="There is no country data available for your holdings."
-            />
-          )}
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Country Allocation
+          </CardTitle>
+          <span className="text-sm text-muted-foreground">
+            {data.length ? `Top ${data.length} countries` : 'No data'}
+          </span>
         </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {data.length > 0 ? (
+          <CustomPieChart
+            data={data}
+            activeIndex={activeIndex}
+            onPieEnter={onPieEnter}
+            startAngle={180}
+            endAngle={0}
+            displayTooltip={false}
+          />
+        ) : (
+          <EmptyPlaceholder
+            description="There is no country data available for your holdings."
+            className="max-h-[160px]"
+          />
+        )}
       </CardContent>
     </Card>
   );

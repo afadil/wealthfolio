@@ -141,7 +141,7 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   };
 
   return (
-    <ChartContainer config={{}} className="h-[200px] w-full p-0">
+    <ChartContainer config={{}} className="h-[160px] w-full p-0">
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         {displayTooltip && (
           <ChartTooltip
@@ -151,12 +151,12 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
         )}
         <Pie
           data={data}
-          cx="50%"
-          cy="70%"
-          innerRadius="60%"
+          cy="80%"
+          innerRadius="110%"
+          outerRadius="140%"
           paddingAngle={4}
           cornerRadius={6}
-          animationDuration={300}
+          animationDuration={100}
           dataKey="value"
           nameKey="name"
           activeIndex={activeIndex !== -1 ? activeIndex : undefined}

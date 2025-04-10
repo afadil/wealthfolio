@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AmountDisplay } from '@/components/amount-display';
@@ -82,7 +83,7 @@ export function HoldingCurrencyChart({
           {/* Title */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Currency Distribution
+              Currency Allocation
             </h3>
             <span className="text-sm text-muted-foreground">
               {data.length ? `${data.length} currencies` : 'No data'}
@@ -199,11 +200,14 @@ function ProgressBar({ data }: { data: CurrencyData[] }) {
 
   return (
     <div className="flex h-6 w-full items-center justify-between gap-[1px]">
-      {segments.map((segment) => (
-        <div
+      {segments.map((segment, index) => (
+        <motion.div
           key={segment.key}
-          className={`h-full w-1 rounded-full ${segment.isEmpty ? 'bg-muted' : ''}`}
+          className={`h-full w-1 rounded-full origin-left ${segment.isEmpty ? 'bg-muted' : ''}`}
           style={segment.color ? { backgroundColor: segment.color } : undefined}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.3, delay: index * 0.005 }}
         />
       ))}
     </div>

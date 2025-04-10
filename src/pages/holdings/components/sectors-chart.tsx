@@ -68,9 +68,16 @@ export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
   const sectors = useMemo(() => getSectorsData(holdings), [holdings]);
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
-        <CardTitle className="text-md font-medium">By Sector</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Sector Allocation
+          </CardTitle>
+          <span className="text-sm text-muted-foreground">
+            {isLoading ? '' : sectors.length ? `${sectors.length} sectors` : 'No data'}
+          </span>
+        </div>
       </CardHeader>
       <CardContent className="w-full">
         {isLoading ? (

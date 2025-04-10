@@ -197,7 +197,9 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
             <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              Holding Composition
+            </CardTitle>
           </div>
           <div className="flex space-x-1 rounded-full bg-secondary p-1">
             <Skeleton className="h-8 w-24 rounded-full" />
@@ -235,8 +237,9 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center space-x-2">
-          <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Holding Composition
+          </CardTitle>
         </div>
         <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />
       </CardHeader>
