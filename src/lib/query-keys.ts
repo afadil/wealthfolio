@@ -11,6 +11,7 @@ export const QueryKeys = {
   HISTORY: 'history',
   HOLDINGS: 'holdings',
   INCOME_SUMMARY: 'incomeSummary',
+  PORTFOLIO_SUMMARY: 'portfolioSummary',
 
   // Goals related keys
   GOALS: 'goals',

@@ -158,6 +158,30 @@ impl HistoryRepository {
 
         Ok(result.into_iter().map(HistoryRecord::from).collect())
     }
+
+    /// Retrieves the history record for a specific account on or just before the given date.
+    pub fn get_point_in_time(&self, account_id_filter: &str, target_date: NaiveDate) -> Result<HistoryRecord> {
+        use crate::schema::portfolio_history::dsl::*;
+
+        let mut conn = self.get_connection()?;
+        let target_date_str = target_date.format("%Y-%m-%d").to_string();
+
+        let result = portfolio_history
+            .filter(account_id.eq(account_id_filter))
+            .filter(date.le(&target_date_str))
+            .order(date.desc())
+            .first::<HistoryRecordDB>(&mut conn)
+            .optional()?; // Use optional() to handle cases where no record is found
+
+        match result {
+            Some(db_record) => Ok(HistoryRecord::from(db_record)),
+            None => Err(Error::Repository(format!(
+                "No history record found for account {} on or before {}",
+                account_id_filter,
+                target_date_str.clone()
+            ))),
+        }
+    }
 }
 
 impl HistoryRepositoryTrait for HistoryRepository {
@@ -190,5 +214,10 @@ impl HistoryRepositoryTrait for HistoryRepository {
 
     fn get_all_active_account_histories(&self) -> Result<Vec<HistoryRecord>> {
         self.get_all_active_account_histories()
+    }
+
+    fn get_point_in_time(&self, account_id: &str, date: NaiveDate) -> Result<HistoryRecord> {
+        // Explicitly call the inherent method to avoid recursion/ambiguity
+        HistoryRepository::get_point_in_time(self, account_id, date)
     }
 }

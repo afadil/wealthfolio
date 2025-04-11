@@ -7,7 +7,7 @@ use crate::models::{AccountSummary, HistoryRecord, HistorySummary, Holding, Inco
 // External imports
 use log::debug;
 use tauri::State;
-use wealthfolio_core::{HoldingView, PerformanceResponse};
+use wealthfolio_core::{HoldingView, PerformanceResponse, AccountGroupView, TotalReturn};
 
 #[tauri::command]
 pub async fn calculate_historical_data(
@@ -116,26 +116,34 @@ pub async fn calculate_performance(
         .map_err(|e| format!("Failed to calculate cumulative returns: {}", e.to_string()))
 }
 
-// // The commented out get_portfolio_holdings needs similar refactoring if uncommented
-// #[tauri::command]
-// pub async fn get_portfolio_holdings(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<HoldingView>, String> {
-//     debug!("Calculating portfolio holdings view...");
-//     let holdings_service = state.holdings_service(); // Assuming holdings_service exists on context
-//     let view_service = state.portfolio_view_service(); // Assuming portfolio_view_service exists on context
+#[tauri::command]
+pub fn get_portfolio_summary(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<AccountGroupView>, String> {
+    debug!("Fetching portfolio summary...");
+    let base_currency = state.get_base_currency();
+    state
+        .holding_view_service()
+        .get_portfolio_summary(&base_currency)
+        .map_err(|e| e.to_string())
+}
 
-//     // 1. Calculate historical state
-//     let historical_portfolio = holdings_service
-//         .calculate_historical_portfolio()
-//         .await
-//         .map_err(|e| format!("Failed to calculate historical portfolio: {}", e))?;
+#[tauri::command]
+pub async fn calculate_total_return(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+    start_date: String,
+    end_date: String,
+) -> Result<TotalReturn, String> {
+    debug!("Calculating total return for account {}...", account_id);
+    let start = chrono::NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid start date: {}", e))?;
+    let end = chrono::NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid end date: {}", e))?;
 
-//     // 2. Calculate current view with valuation
-//     let holding_views = view_service
-//         .calculate_portfolio_view(&historical_portfolio)
-//         .await
-//         .map_err(|e| format!("Failed to calculate portfolio view: {}", e))?;
-
-//     debug!("Portfolio holdings view calculation complete.");
-//     // 3. Return the HoldingView data to the frontend
-//     Ok(holding_views)
-// }
+    state
+        .performance_service()
+        .calculate_total_return(&account_id, start, end)
+        .await
+        .map_err(|e| format!("Failed to calculate total return: {}", e.to_string()))
+}

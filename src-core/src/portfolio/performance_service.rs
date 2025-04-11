@@ -21,6 +21,14 @@ pub struct CumulativeReturn {
     pub value: Decimal,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TotalReturn {
+    #[serde(with = "rust_decimal::serde::str")]
+    pub rate: Decimal,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub amount: Decimal,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,6 +74,13 @@ pub trait PerformanceServiceTrait: Send + Sync {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> ServiceResult<PerformanceResponse>;
+
+    async fn calculate_total_return(
+        &self,
+        account_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> ServiceResult<TotalReturn>;
 }
 
 pub struct PerformanceService {
@@ -411,6 +426,103 @@ impl PerformanceService {
 
         max_drawdown.round_dp(DECIMAL_PRECISION)
     }
+
+    /// Calculates the Time-Weighted Total Return (rate and amount) for an account.
+    async fn calculate_account_total_return(
+        &self,
+        account_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> ServiceResult<TotalReturn> {
+        if start_date > end_date {
+            return Err(errors::Error::Validation(ValidationError::InvalidInput(
+                "Start date must be before end date".to_string(),
+            )));
+        }
+
+        // Fetch history points exactly at or just before start_date and at or just before end_date
+        // Assumes get_point_in_time returns the value ON the date, or the last value BEFORE it if no exact match.
+        // TODO: Verify behavior of get_point_in_time or adjust HistoryRepositoryTrait if needed.
+        let start_point = self.history_repository.get_point_in_time(account_id, start_date)?;
+        let end_point = self.history_repository.get_point_in_time(account_id, end_date)?;
+
+        let initial_value = start_point.total_value;
+        let final_value = end_point.total_value;
+
+        // Fetch history within the date range to calculate cash flows and link sub-periods for TWRR
+        // Query range should ideally be (start_date, end_date] to get points needed for linking.
+        // However, using [start_date, end_date] and filtering later might be necessary depending on repository method specifics.
+        let history_in_range = self.history_repository.get_by_account(Some(account_id), Some(start_date), Some(end_date))?;
+
+        // Construct the list of points needed for TWRR calculation: [start_point, points_in_between, end_point]
+        let mut effective_history = vec![start_point.clone()];
+        effective_history.extend(history_in_range.into_iter().filter(|p| {
+            let p_date = NaiveDate::parse_from_str(&p.date, "%Y-%m-%d").unwrap_or(start_date);
+            // Include points strictly between start_point.date and end_point.date
+            p_date > start_point.date.parse::<NaiveDate>().unwrap_or(start_date) && p_date < end_point.date.parse::<NaiveDate>().unwrap_or(end_date)
+        }));
+        effective_history.push(end_point.clone());
+
+        // Sort and remove duplicates based on date to ensure correct order and handling
+        effective_history.sort_by_key(|p| NaiveDate::parse_from_str(&p.date, "%Y-%m-%d").unwrap_or(start_date));
+        effective_history.dedup_by_key(|p| p.date.clone()); // Use date string for dedup
+
+        // Handle cases with insufficient points for period linking
+        if effective_history.len() < 2 {
+            // If only start and end points (or fewer), calculate return based solely on these points and total cash flow.
+            let net_cash_flow = (end_point.net_deposit - start_point.net_deposit).round_dp(DECIMAL_PRECISION);
+            let total_return_amount = (final_value - initial_value - net_cash_flow).round_dp(DECIMAL_PRECISION);
+
+            // Calculate rate for the single period
+            let denominator = (start_point.total_value + net_cash_flow).round_dp(DECIMAL_PRECISION);
+            let total_return_rate = if denominator.is_zero() {
+                Decimal::ZERO
+            } else {
+                ((end_point.total_value / denominator) - Decimal::ONE).round_dp(DECIMAL_PRECISION)
+            };
+
+            return Ok(TotalReturn {
+                rate: total_return_rate,
+                amount: total_return_amount,
+            });
+        }
+
+        // Calculate TWRR by linking sub-periods
+        let one = Decimal::ONE;
+        let mut cumulative_factor = one;
+
+        for window in effective_history.windows(2) {
+            let prev_point = &window[0];
+            let curr_point = &window[1];
+
+            let prev_total_value = prev_point.total_value;
+            let prev_net_deposit = prev_point.net_deposit;
+            let current_total_value = curr_point.total_value;
+            let current_net_deposit = curr_point.net_deposit;
+
+            // Cash flow during this specific sub-period
+            let cash_flow = (current_net_deposit - prev_net_deposit).round_dp(DECIMAL_PRECISION);
+
+            let denominator = (prev_total_value + cash_flow).round_dp(DECIMAL_PRECISION);
+            let period_return = if denominator.is_zero() {
+                Decimal::ZERO
+            } else {
+                ((current_total_value / denominator) - one).round_dp(DECIMAL_PRECISION)
+            };
+            cumulative_factor *= one + period_return;
+        }
+
+        let total_return_rate = (cumulative_factor - one).round_dp(DECIMAL_PRECISION);
+
+        // Calculate total return amount: Final Value - Initial Value - Total Net Cash Flow over the entire period
+        let net_cash_flow_for_amount = (end_point.net_deposit - start_point.net_deposit).round_dp(DECIMAL_PRECISION);
+        let total_return_amount = (final_value - initial_value - net_cash_flow_for_amount).round_dp(DECIMAL_PRECISION);
+
+        Ok(TotalReturn {
+            rate: total_return_rate,
+            amount: total_return_amount,
+        })
+    }
 }
 
 #[async_trait::async_trait]
@@ -441,5 +553,14 @@ impl PerformanceServiceTrait for PerformanceService {
                 "Invalid item type".to_string(),
             ))),
         }
+    }
+
+    async fn calculate_total_return(
+        &self,
+        account_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> ServiceResult<TotalReturn> {
+        self.calculate_account_total_return(account_id, start_date, end_date).await
     }
 }

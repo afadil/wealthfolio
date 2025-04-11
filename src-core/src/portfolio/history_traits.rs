@@ -14,6 +14,8 @@ pub trait HistoryRepositoryTrait: Send + Sync {
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<HistoryRecord>>;
     
+    fn get_point_in_time(&self, account_id: &str, date: NaiveDate) -> Result<HistoryRecord>;
+    
     // Added methods from HistoryRepository
     fn get_all(&self) -> Result<Vec<HistoryRecord>>;
     fn get_latest_by_account(&self, input_account_id: &str) -> Result<HistoryRecord>;

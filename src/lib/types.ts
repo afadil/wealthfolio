@@ -4,7 +4,6 @@ import {
   ActivityType,
   DataSource,
   AccountType,
-  HoldingType,
 } from './constants';
 
 export {
@@ -391,6 +390,34 @@ export interface PortfolioHistory {
   calculatedAt: string;
 }
 
+export interface AccountPerformanceMetrics {
+  totalGainLossAmount: number | null;
+  totalGainLossPercent: number | null;
+  dayGainLossAmount: number | null;
+  dayGainLossPercent: number | null;
+}
+
+export interface AccountSummaryView {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  accountGroup: string | null;
+  accountCurrency: string;
+  totalValueAccountCurrency: number;
+  totalValueBaseCurrency: number;
+  baseCurrency: string;
+  performance: AccountPerformanceMetrics;
+}
+
+export interface AccountGroup {
+  groupName: string;
+  accounts: AccountSummaryView[];
+  totalValueBaseCurrency: number;
+  baseCurrency: string;
+  performance: AccountPerformanceMetrics;
+  accountCount: number;
+}
+
 export interface AccountSummary {
   account: Account;
   performance: PortfolioHistory;
@@ -449,6 +476,12 @@ export interface PerformanceData {
   annualizedReturn: number;
   volatility: number;
   maxDrawdown: number;
+}
+
+// Added based on Rust struct in performance_service.rs
+export interface TotalReturn {
+  rate: string;
+  amount: string;
 }
 
 export interface UpdateAssetProfile {

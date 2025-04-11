@@ -140,6 +140,8 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.TRANSFER_OUT,
   ActivityType.CONVERSION_IN,
   ActivityType.CONVERSION_OUT,
+  ActivityType.TAX,
+  ActivityType.FEE,
 ] as const;
 
 export const INCOME_ACTIVITY_TYPES = [

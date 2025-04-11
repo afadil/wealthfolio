@@ -58,6 +58,11 @@ pub struct PerformanceMetrics { // Renamed from Performance
     pub base_currency: String,      // Portfolio's base currency (display currency)
     #[serde(with = "decimal_serde_option")] // FX rate might not apply if holding is in base currency
     pub fx_rate_to_base: Option<Decimal>, // Rate: 1 unit of holding currency = X units of base currency
+    // --- Added fields needed for summary percentage calculation ---
+    #[serde(with = "decimal_serde_option")]
+    pub total_cost_basis_base: Option<Decimal>, // Total cost basis (in base currency) - For Security holdings
+    #[serde(with = "decimal_serde_option")]
+    pub previous_market_value_base: Option<Decimal>, // Market value as of previous close (in base currency) - For Security holdings
 }
 
 // Default implementation for PerformanceMetrics
@@ -73,6 +78,52 @@ impl Default for PerformanceMetrics {
             day_gain_loss_percent: None,
             base_currency: String::new(),
             fx_rate_to_base: None, // Defaulting to None might be safer than assuming 1
+            total_cost_basis_base: None, // Added default
+            previous_market_value_base: None, // Added default
         }
     }
+}
+
+// --- Portfolio Summary Models ---
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountPerformanceMetrics {
+    #[serde(with = "decimal_serde_option")]
+    pub total_gain_loss_amount: Option<Decimal>, // In Base Currency
+    #[serde(with = "decimal_serde_option")]
+    pub total_gain_loss_percent: Option<Decimal>, 
+    #[serde(with = "decimal_serde_option")]
+    pub day_gain_loss_amount: Option<Decimal>, // In Base Currency
+    #[serde(with = "decimal_serde_option")]
+    pub day_gain_loss_percent: Option<Decimal>,
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountSummaryView {
+    pub account_id: String,
+    pub account_name: String,
+    pub account_type: String, // Added type
+    pub account_group: Option<String>, // Added group for easier access if needed downstream
+    pub account_currency: String,
+    #[serde(with = "decimal_serde")]
+    pub total_value_account_currency: Decimal, // Total value in the account's own currency
+    #[serde(with = "decimal_serde")]
+    pub total_value_base_currency: Decimal, // Total value converted to the portfolio base currency
+    pub base_currency: String, // The base currency used for conversion
+    pub performance: AccountPerformanceMetrics, // Aggregated performance for the account (in base currency)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountGroupView {
+    pub group_name: String, // Name of the group (or "Uncategorized")
+    pub accounts: Vec<AccountSummaryView>, // List of accounts belonging to this group
+    #[serde(with = "decimal_serde")]
+    pub total_value_base_currency: Decimal, // Sum of total_value_base_currency for all accounts in the group
+    pub base_currency: String, // The base currency used for conversion
+    pub performance: AccountPerformanceMetrics, // Aggregated performance for the group (in base currency)
+     pub account_count: usize, // Number of accounts in the group
 } 

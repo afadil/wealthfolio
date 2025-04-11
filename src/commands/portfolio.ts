@@ -6,6 +6,8 @@ import {
   PortfolioHistory,
   AccountSummary,
   PerformanceData,
+  AccountGroup,
+  TotalReturn,
 } from '@/lib/types';
 
 export const calculateHistoricalData = async (params: {
@@ -67,7 +69,6 @@ export const getHoldings = async (accountId: string): Promise<Holding[]> => {
   }
 };
 
-
 export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   try {
     switch (getRunEnv()) {
@@ -110,6 +111,20 @@ export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
   }
 };
 
+export const getPortfolioSummary = async (): Promise<AccountGroup[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_portfolio_summary');
+      default:
+        throw new Error(`Unsupported environment for getPortfolioSummary`);
+    }
+  } catch (error) {
+    logger.error('Error fetching portfolio summary.');
+    throw error;
+  }
+};
+
 export const calculatePerformance = async (
   itemType: 'account' | 'symbol',
   itemId: string,
@@ -132,6 +147,36 @@ export const calculatePerformance = async (
     return response as PerformanceData;
   } catch (error) {
     logger.error('Error calculating cumulative returns.');
+    throw error;
+  }
+};
+
+export const calculateTotalReturn = async (
+  accountId: string,
+  startDate: string,
+  endDate: string,
+): Promise<TotalReturn> => {
+  try {
+    const response = await invokeTauri('calculate_total_return', {
+      accountId,
+      startDate,
+      endDate,
+    });
+
+    // Basic validation
+    if (typeof response === 'string') { // Handle string error first
+        throw new Error(response);
+    }
+    if (typeof response !== 'object' || response === null || 
+        !('rate' in response) || typeof response.rate !== 'string' || 
+        !('amount' in response) || typeof response.amount !== 'string') {
+       throw new Error('Invalid total return data received');
+    }
+
+    // Now TypeScript knows response has the required properties
+    return response as TotalReturn; // Type assertion is still good practice here
+  } catch (error) {
+    logger.error('Error calculating total return.');
     throw error;
   }
 };
