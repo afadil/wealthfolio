@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use diesel::r2d2;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use diesel::result::ConnectionError;
 use diesel::sqlite::SqliteConnection;
 use diesel::Connection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -22,7 +21,7 @@ pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
     info!("Creating database connection pool");
     let manager = ConnectionManager::<SqliteConnection>::new(db_path);
     let pool = r2d2::Pool::builder()
-        .max_size(8)  // Increased from 5 to 8 for better concurrency
+        .max_size(8) 
         .min_idle(Some(1))  // Keep at least one connection ready
         .connection_timeout(std::time::Duration::from_secs(30))
         .connection_customizer(Box::new(ConnectionCustomizer {}))
