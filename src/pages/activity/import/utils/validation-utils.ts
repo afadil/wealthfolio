@@ -7,7 +7,6 @@ import {
   ImportValidationResult,
 } from '@/lib/types';
 import { importActivitySchema } from '@/lib/schemas';
-import { isCashActivity, isIncomeActivity, isTradeActivity } from '@/lib/activity-utils';
 import { tryParseDate } from '@/lib/utils';
 import { logger } from '@/adapters';
 
