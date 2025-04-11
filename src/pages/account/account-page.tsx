@@ -14,8 +14,8 @@ import { useParams } from 'react-router-dom';
 import AccountDetail from './account-detail';
 import AccountHoldings from './account-holdings';
 import { useQuery } from '@tanstack/react-query';
-import { Holding, PortfolioHistory, AccountSummary } from '@/lib/types';
-import { computeHoldings, getHistory, getAccountsSummary } from '@/commands/portfolio';
+import { PortfolioHistory, AccountSummary } from '@/lib/types';
+import { getHistory, getAccountsSummary } from '@/commands/portfolio';
 import { QueryKeys } from '@/lib/query-keys';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Icons } from '@/components/icons';
@@ -46,14 +46,6 @@ const AccountPage = () => {
     enabled: !!id,
   });
 
-  const { data: holdings, isLoading: isLoadingHoldings } = useQuery<Holding[], Error>({
-    queryKey: [QueryKeys.HOLDINGS],
-    queryFn: computeHoldings,
-  });
-
-  const accountHoldings = holdings
-    ?.filter((holding) => holding.account?.id === id)
-    .sort((a, b) => a.symbol.localeCompare(b.symbol));
 
   const account = accountSummary?.account;
   const performance = accountSummary?.performance;
@@ -91,7 +83,7 @@ const AccountPage = () => {
                           currency={account?.currency || 'USD'}
                           displayCurrency={false}
                         />
-                        <div className="my-1 border-r border-gray-300 pr-2" />
+                        <div className="my-1 border-r border-muted-foreground pr-2" />
                         <GainPercent
                           className="text-sm font-light"
                           value={performance?.totalGainPercentage || 0}
@@ -176,10 +168,7 @@ const AccountPage = () => {
         )}
       </div>
 
-      <AccountHoldings
-        holdings={(accountHoldings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}
-        isLoading={isLoadingHoldings}
-      />
+      <AccountHoldings accountId={id} />
     </ApplicationShell>
   );
 };

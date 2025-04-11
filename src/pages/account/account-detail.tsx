@@ -6,6 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatPercent } from '@/lib/utils';
 import { PortfolioHistory } from '@/lib/types';
 import { PrivacyAmount } from '@/components/privacy-amount';
+import { GainAmount } from '@/components/gain-amount';
+import { GainPercent } from '@/components/gain-percent';
 
 interface AccountDetailProps {
   data?: PortfolioHistory;
@@ -40,22 +42,30 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
     {
       label: "Today's return",
       value: (
-        <>
-          <PrivacyAmount value={dayGainValue} currency={currency} /> (
-          {formatPercent(dayGainPercentage)})
-        </>
+        <span className="flex items-center space-x-2">
+          <GainPercent
+            value={dayGainPercentage}
+            animated={true}
+            variant="badge"
+            className="py-0.5 text-xs font-light"
+          />
+          <GainAmount value={dayGainValue} currency={currency} displayCurrency={false} />
+        </span>
       ),
-      color: dayGainValue < 0 ? 'text-destructive' : 'text-success',
     },
     {
       label: 'Total return',
       value: (
-        <>
-          <PrivacyAmount value={totalGainValue} currency={currency} /> (
-          {formatPercent(totalGainPercentage)})
-        </>
+        <span className="flex items-center space-x-2">
+          <GainPercent
+            value={totalGainPercentage}
+            animated={true}
+            variant="badge"
+            className="py-0.5 text-xs font-light"
+          />
+          <GainAmount value={totalGainValue} currency={currency} displayCurrency={false} />
+        </span>
       ),
-      color: totalGainPercentage < 0 ? 'text-destructive' : 'text-success',
     },
   ];
 
@@ -71,10 +81,10 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
       <CardContent>
         <Separator className="my-4" />
         <div className="space-y-4 text-sm">
-          {rows.map(({ label, value, color }, idx) => (
+          {rows.map(({ label, value }, idx) => (
             <div key={idx} className="flex justify-between">
               <span className="text-muted-foreground">{label}</span>
-              <span className={`font-medium ${color || ''}`}>{value}</span>
+              <span className={`font-medium`}>{value}</span>
             </div>
           ))}
         </div>
