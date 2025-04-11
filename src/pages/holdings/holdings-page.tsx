@@ -112,7 +112,7 @@ export const HoldingsPage = () => {
             </div>
 
             {/* Sectors Chart - Now self-contained */}
-            <div className="col-span-1">
+            <div className="col-span-1 h-full">
               <SectorsChart holdings={holdings || []} isLoading={isLoading} />
             </div>
           </div>

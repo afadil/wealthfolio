@@ -79,6 +79,20 @@ export function HistoryChart({
     return data.filter((d) => new Date(d.date) >= startDate);
   }, [data, interval]);
 
+  // Calculate min and max values for better domain control
+  const minValue = useMemo(() => {
+    if (!filteredData.length) return 0;
+    const min = Math.min(...filteredData.map((d) => d.totalValue));
+    // Return 0 if min is negative, otherwise add 5% padding to the bottom
+    return min < 0 ? 0 : min * 0.9;
+  }, [filteredData]);
+
+  const maxValue = useMemo(() => {
+    if (!filteredData.length) return 0;
+    const max = filteredData.reduce((max, d) => Math.max(max, d.totalValue), -Infinity);
+    return max;
+  }, [filteredData]);
+  
   const chartConfig = {
     totalValue: {
       label: 'Total Value',
@@ -103,13 +117,10 @@ export function HistoryChart({
             <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.1} />
           </linearGradient>
         </defs>
-        {/* @ts-ignore */}
         <Tooltip
           content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} />}
         />
-        {interval !== 'ALL' && interval !== '1Y' && (
-          <YAxis hide type="number" domain={['auto', 'auto']} />
-        )}
+        <YAxis hide type="number" domain={[minValue, maxValue]} />
         <Area
           isAnimationActive={true}
           animationDuration={300}

@@ -1,8 +1,8 @@
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Holding } from '@/lib/types';
-import { cn, formatPercent } from '@/lib/utils';
+import { cn, formatPercent, formatAmount } from '@/lib/utils';
 import { useMemo, useState } from 'react';
-import { ResponsiveContainer, Treemap } from 'recharts';
+import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,6 +136,24 @@ interface PortfolioCompositionProps {
   isLoading?: boolean;
 }
 
+const CompositionTooltip = ({ active, payload, settings }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const value = payload[0].value;
+    return (
+      <Card>
+        <CardHeader className="p-4">
+          <CardTitle className="text-sm text-muted-foreground">{data.name}</CardTitle>
+          <p className="text-sm font-semibold">
+            {formatAmount(value, settings?.baseCurrency || 'USD')}
+          </p>
+        </CardHeader>
+      </Card>
+    );
+  }
+  return null;
+};
+
 export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositionProps) {
   const [returnType, setReturnType] = useState<ReturnType>('daily');
   const { settings } = useSettingsContext();
@@ -164,14 +182,14 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         minGain = Math.min(minGain, gain);
 
         if (data[symbol]) {
-          data[symbol].marketValueConverted += Number(holding.performance.marketValue * holding.performance.fxRateToBase);
-          data[symbol].bookBalueConverted += Number(holding.totalCostBasis * holding.performance.fxRateToBase);
+          data[symbol].marketValueConverted += Number(holding.performance.marketValue);
+          data[symbol].bookBalueConverted += Number(holding.totalCostBasis);
           data[symbol].gain = gain;
         } else {
           data[symbol] = {
             name: symbol,
-            marketValueConverted: Number(holding.performance.marketValue * holding.performance.fxRateToBase),
-            bookBalueConverted: Number(holding.totalCostBasis * holding.performance.fxRateToBase),
+            marketValueConverted: Number(holding.performance.marketValue),
+            bookBalueConverted: Number(holding.totalCostBasis),
             gain,
           };
         }
@@ -252,7 +270,9 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             dataKey="marketValueConverted"
             animationDuration={100}
             content={<CustomizedContent theme={settings?.theme || 'light'} />}
-          />
+          >
+            <Tooltip content={<CompositionTooltip settings={settings}/>} />
+          </Treemap>
         </ResponsiveContainer>
       </CardContent>
     </Card>

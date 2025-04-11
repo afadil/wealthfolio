@@ -1,6 +1,6 @@
 import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
-import { Bar, BarChart, Cell, XAxis, YAxis, Tooltip } from 'recharts';
+import { Bar, BarChart, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,13 +22,15 @@ function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
   const sectors = holdings?.reduce(
     (acc, holding) => {
-      const assetSectors = holding.asset?.sectors ? holding.asset.sectors : [{ name: 'Others', weight: 1 }];
+      const assetSectors = holding.asset?.sectors
+        ? holding.asset.sectors
+        : [{ name: 'Others', weight: 1 }];
       assetSectors.forEach((sector) => {
         const current = acc[sector.name] || 0;
         //@ts-ignore
         acc[sector.name] =
           Number(current) +
-          Number(holding.performance.marketValue * holding.performance.fxRateToBase) *
+          Number(holding.performance.marketValue) *
             (Number(sector.weight) > 1 ? Number(sector.weight) / 100 : Number(sector.weight));
       });
       return acc;
@@ -79,7 +81,7 @@ export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
           </span>
         </div>
       </CardHeader>
-      <CardContent className="w-full">
+      <CardContent className="h-full w-full">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-8 w-full" />
@@ -98,20 +100,21 @@ export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
             />
           </div>
         ) : (
-          <ChartContainer config={{}} className="h-[330px] w-full">
+          <ChartContainer config={{}} className="h-full w-full pt-2 pl-0 pb-0">
             <BarChart
-              width={600}
-              height={300}
               data={sectors}
               layout="vertical"
-              margin={{ top: 0, right: 0, left: 50, bottom: 0 }}
+              margin={{ top: 10, right: 0, left: 50, bottom: 70 }}
             >
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name" className="text-xs" stroke="currentColor" />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
                 {sectors.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="py-12" />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Bar>
             </BarChart>

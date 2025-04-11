@@ -8,6 +8,7 @@ interface GainAmountProps extends React.HTMLAttributes<HTMLDivElement> {
   displayCurrency?: boolean;
   currency: string;
   displayDecimal?: boolean;
+  showSign?: boolean;
 }
 
 export function GainAmount({
@@ -16,16 +17,17 @@ export function GainAmount({
   displayCurrency = true,
   className,
   displayDecimal = true,
+  showSign = true,
   ...props
 }: GainAmountProps) {
   const { isBalanceHidden } = useBalancePrivacy();
 
   return (
-    <div className={cn('flex flex-col items-end text-right', className)} {...props}>
+    <div className={cn('flex flex-col items-end text-right text-sm', className)} {...props}>
       <div
         className={cn(
           'flex items-center',
-          value === 0 ? 'text-foreground' : value > 0 ? 'text-success' : 'text-destructive',
+          value > 0 ? 'text-success' : value < 0 ? 'text-destructive' : 'text-foreground',
         )}
       >
         {isBalanceHidden ? (
@@ -40,6 +42,7 @@ export function GainAmount({
               currencyDisplay: 'narrowSymbol',
               minimumFractionDigits: displayDecimal ? 2 : 0,
               maximumFractionDigits: displayDecimal ? 2 : 0,
+              signDisplay: showSign ? 'exceptZero' : 'never',
             }}
             locales={navigator.language || 'en-US'}
           />
