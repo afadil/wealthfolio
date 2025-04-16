@@ -4,7 +4,6 @@ import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-
 import { Icons } from '@/components/icons';
 import {
   DialogDescription,
@@ -40,6 +39,7 @@ const accountTypes = [
 
 import { newAccountSchema } from '@/lib/schemas';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { BrokerInput } from '@/components/ui/broker-input';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -55,6 +55,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     resolver: zodResolver(newAccountSchema),
     defaultValues,
   });
+  const brokerAPIEnabled = form.watch("isIntegratedBroker");
 
   function onSubmit(data: NewAccount) {
     const { id, ...rest } = data;
@@ -68,16 +69,17 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle> {defaultValues?.id ? 'Update Account' : 'Add Account'}</DialogTitle>
+          <DialogTitle>{defaultValues?.id ? 'Update Account' : 'Add Account'}</DialogTitle>
           <DialogDescription>
             {defaultValues?.id
               ? 'Update account information'
-              : ' Add an investment account to track.'}
+              : 'Add an investment account to track.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-10 p-4">
           <input type="hidden" name="id" />
+          
           <FormField
             control={form.control}
             name="name"
@@ -91,6 +93,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="group"
@@ -98,7 +101,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               <FormItem>
                 <FormLabel>Account Group</FormLabel>
                 <FormControl>
-                  <Input placeholder="Retirement, 401K, RRSP, TFSA,..." {...field} />
+                  <Input placeholder="Retirement, 401K, RRSP, TFSA, ..." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -129,6 +132,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               </FormItem>
             )}
           />
+
           {!defaultValues?.id ? (
             <FormField
               control={form.control}
@@ -137,10 +141,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 <FormItem className="flex flex-col">
                   <FormLabel>Currency</FormLabel>
                   <FormControl>
-                    <CurrencyInput
-                      value={field.value}
-                      onChange={(value) => field.onChange(value)}
-                    />
+                    <CurrencyInput value={field.value} onChange={(value) => field.onChange(value)} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -156,11 +157,12 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="space-y-0 pl-2"> Default Account</FormLabel>
+                <FormLabel className="space-y-0 pl-2">Default Account</FormLabel>
                 <FormMessage />
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="isActive"
@@ -169,12 +171,62 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="space-y-0 pl-2"> Is Active</FormLabel>
+                <FormLabel className="space-y-0 pl-2">Is Active</FormLabel>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          <FormField
+            control={form.control}
+            name="isIntegratedBroker"
+            render={({ field }) => (
+              <FormItem className="flex items-center">
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+                <FormLabel className="space-y-0 pl-2">Integrate API</FormLabel>
+              </FormItem>
+            )}
+          />
+
+          {/* Conditionally render additional fields if brokerAPI is enabled */}
+          {brokerAPIEnabled && (
+            <>
+
+              {!defaultValues?.id ? (
+                <FormField
+                  control={form.control}
+                  name="broker"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Broker</FormLabel>
+                      <FormControl>
+                        <BrokerInput value={field.value} onChange={(value) => field.onChange(value)} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
+              
+              <FormField
+                control={form.control}
+                name="brokerApiKey"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>API Key</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your API key" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
         </div>
+
         <DialogFooter>
           <DialogTrigger asChild>
             <Button variant="outline">Cancel</Button>
