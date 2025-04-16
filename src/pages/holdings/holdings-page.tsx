@@ -148,7 +148,7 @@ export const HoldingsPage = () => {
                   <SectorsChart assets={nonCashHoldings} isLoading={isLoading} />
                 ) : (
                   <EmptyPlaceholder
-                    icon={<Icons.PieChart className="h-10 w-10" />}
+                    icon={<Icons.PieChart className="h-10 w-15" />}
                     title="No sector data"
                     description="There is no sector data available for your holdings."
                   />

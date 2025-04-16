@@ -1,6 +1,7 @@
 import { Holding } from '@/lib/types';
 import { useMemo } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { useSettingsContext } from '@/lib/settings-provider';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,13 +42,14 @@ function getSectorsData(assets: Holding[]) {
 }
 
 const CustomTooltip = ({ active, payload }: any) => {
+  const { settings } = useSettingsContext();
   if (active && payload && payload.length) {
     return (
       <Card>
         <CardHeader className="p-4">
           <CardTitle className="text-sm text-muted-foreground">{payload[0].payload.name}</CardTitle>
           <p className="text-sm font-semibold">
-            <PrivacyAmount value={payload[0].value} currency="USD" />
+            <PrivacyAmount value={payload[0].value} currency= {settings?.baseCurrency || 'USD'} />
           </p>
         </CardHeader>
       </Card>
@@ -78,7 +80,7 @@ export function SectorsChart({ assets, isLoading }: SectorsChartProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={330}>
+    <ResponsiveContainer width="100%" height={480}>
       <BarChart
         width={600}
         height={300}

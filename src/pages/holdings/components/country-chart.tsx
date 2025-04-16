@@ -46,10 +46,12 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
 
   return (
     <CustomPieChart
-      data={data}
-      activeIndex={activeIndex}
-      onPieEnter={onPieEnter}
-      onPieLeave={onPieLeave}
-    />
+    data={data}
+    activeIndex={activeIndex}
+    onPieEnter={onPieEnter}
+    onPieLeave={onPieLeave}
+    innerRadius={50}
+    outerRadius={100}
+  />
   );
 };
