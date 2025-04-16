@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, Sector } from 'recharts';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { ChartContainer } from '@/components/ui/chart';
+import { useSettingsContext } from '@/lib/settings-provider';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -16,6 +17,7 @@ const COLORS = [
 
 const renderActiveShape = (props: any) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { settings } = useSettingsContext();
   const RADIAN = Math.PI / 180;
   const {
     cx,
@@ -95,7 +97,8 @@ const renderActiveShape = (props: any) => {
             whiteSpace: 'nowrap',
           }}
         >
-          <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
+          {/* <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} /> */}
+          <AmountDisplay value={value} currency={settings?.baseCurrency || 'USD'} isHidden={isBalanceHidden} />
         </div>
       </foreignObject>
     </g>
