@@ -71,7 +71,11 @@ const renderActiveShape = (props: any) => {
       >
         {(percent * 100).toFixed(0)}%
       </text>
-      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
+      <path
+        d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
+        stroke={fill}
+        fill="none"
+      />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
       <text
         x={ex + labelOffset}
@@ -121,6 +125,10 @@ interface CustomPieChartProps {
   activeIndex: number;
   onPieEnter: (event: React.MouseEvent, index: number) => void;
   onPieLeave?: (event: React.MouseEvent, index: number) => void;
+  width?: number;
+  height?: number;
+  innerRadius?: number;
+  outerRadius?: number;
 }
 
 export const CustomPieChart: React.FC<CustomPieChartProps> = ({
@@ -128,6 +136,10 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   activeIndex,
   onPieEnter,
   onPieLeave,
+  width = 400, 
+  height = 400,
+  innerRadius = 40, 
+  outerRadius = 65,
 }) => {
   const chartConfig = data.reduce(
     (acc, item, index) => {
@@ -137,18 +149,22 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
       };
       return acc;
     },
-    {} as Record<string, { label: string; color: string }>,
+    {} as Record<string, { label: string; color: string }>
   );
 
   return (
     <ChartContainer config={chartConfig}>
-      <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+      <PieChart
+        width={width}
+        height={height}
+        margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
         <Pie
           data={data}
           cx="50%"
           cy="50%"
-          innerRadius={40}
-          outerRadius={65}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
           paddingAngle={2}
           animationDuration={100}
           dataKey="value"
