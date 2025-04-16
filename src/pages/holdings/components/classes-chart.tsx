@@ -42,5 +42,5 @@ export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
     setActiveIndex(index);
   };
 
-  return <CustomPieChart data={data} activeIndex={activeIndex} onPieEnter={onPieEnter} />;
+  return <CustomPieChart data={data} activeIndex={activeIndex} innerRadius={50} outerRadius={100} onPieEnter={onPieEnter} />;
 }
