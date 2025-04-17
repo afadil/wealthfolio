@@ -30,6 +30,7 @@ fn test_historical_private_asset_portfolio_value(){
 		is_default: false,
 		is_active: true,
 		platform_id: None,
+		is_api_integrations: false,
 	};
 	
 	let account = tokio_test::block_on(account_service.
@@ -118,6 +119,7 @@ fn test_manual_quotes(){
 		is_default: false,
 		is_active: true,
 		platform_id: None,
+		is_api_integrations: false,
 	};
 	
 	let account = tokio_test::block_on(account_service.

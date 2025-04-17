@@ -28,6 +28,7 @@ use commands::settings::{
     delete_contribution_limit, delete_exchange_rate, get_contribution_limits, get_exchange_rates,
     get_settings, update_contribution_limit, update_exchange_rate, update_settings,
 };
+use commands::broker::sync_all_accounts;
 
 use log::error;
 use updater::check_for_update;
@@ -64,22 +65,26 @@ use tauri::{AppHandle, Emitter};
 struct AppState {
     pool: Arc<DbPool>,
     base_currency: Arc<RwLock<String>>,
+    pub encryption_key: String,
 }
 
 pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
+    let encryption_key = env::var("ENCRYPTION_KEY")
+        .expect("ENCRYPTION_KEY must be set in the .env file");
+
     let app = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
-                .level(log::LevelFilter::Info)
+                .level(log::LevelFilter::Debug) // set back to Info once dev is done!
                 .build(),
         )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
-        .setup(|app| {
+        .setup(move |app| {
             let app_data_dir = app
                 .path()
                 .app_data_dir()
@@ -107,6 +112,7 @@ pub fn main() {
             let state = AppState {
                 pool,
                 base_currency: Arc::new(RwLock::new(settings.base_currency)),
+                encryption_key: encryption_key.clone(),
             };
             app.manage(state.clone());
 
@@ -173,6 +179,7 @@ pub fn main() {
             refresh_quotes_for_symbols,
             update_quote,
             delete_quote,
+            sync_all_accounts,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

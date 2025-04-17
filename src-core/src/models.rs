@@ -6,6 +6,7 @@ use diesel::Selectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
+use crate::brokers::encryption::EncryptedApiKey;
 
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Debug)]
 #[diesel(table_name= crate::schema::platforms)]
@@ -43,6 +44,9 @@ pub struct Account {
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
     pub platform_id: Option<String>,
+    pub is_api_integrations: bool,
+    pub broker: Option<String>,
+    pub broker_api: Option<EncryptedApiKey>,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone)]
@@ -57,6 +61,9 @@ pub struct NewAccount {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub is_api_integrations: bool,
+    pub broker: Option<String>,
+    pub broker_api: Option<EncryptedApiKey>,
 }
 #[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
 #[diesel(table_name = crate::schema::accounts)]
@@ -69,6 +76,9 @@ pub struct AccountUpdate {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub is_api_integrations: bool,
+    pub broker: Option<String>,
+    pub broker_api: Option<EncryptedApiKey>,
 }
 
 #[derive(
