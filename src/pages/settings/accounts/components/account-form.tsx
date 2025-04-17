@@ -77,7 +77,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-10 p-4">
+        <div className="max-h-[64.75vh] overflow-y-auto grid gap-10 p-4">
           <input type="hidden" name="id" />
           
           <FormField
