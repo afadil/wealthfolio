@@ -55,7 +55,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     resolver: zodResolver(newAccountSchema),
     defaultValues,
   });
-  const brokerAPIEnabled = form.watch("isIntegratedBroker");
+  const brokerAPIEnabled = form.watch("isApiIntegrations");
 
   function onSubmit(data: NewAccount) {
     const { id, ...rest } = data;
@@ -179,7 +179,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
 
           <FormField
             control={form.control}
-            name="isIntegratedBroker"
+            name="isApiIntegrations"
             render={({ field }) => (
               <FormItem className="flex items-center">
                 <FormControl>
@@ -189,8 +189,6 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               </FormItem>
             )}
           />
-
-          {/* Conditionally render additional fields if brokerAPI is enabled */}
           {brokerAPIEnabled && (
             <>
 
@@ -212,7 +210,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               
               <FormField
                 control={form.control}
-                name="brokerApiKey"
+                name="brokerApi"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>API Key</FormLabel>

@@ -22,9 +22,9 @@ export const newAccountSchema = z.object({
   isActive: z.boolean().optional(),
   accountType: z.enum(['SECURITIES', 'CASH', 'CRYPTOCURRENCY']),
   currency: z.string({ required_error: 'Please select a currency.' }),
-  isIntegratedBroker: z.boolean().optional(),
+  isApiIntegrations: z.boolean().optional(),
   broker: z.string().optional(),
-  brokerApiKey: z.string().optional(),
+  brokerApi: z.string().optional(),
 });
 
 export const newGoalSchema = z.object({
