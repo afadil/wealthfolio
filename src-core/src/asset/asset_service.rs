@@ -260,4 +260,56 @@ impl AssetService {
     ) -> QueryResult<HashMap<String, Quote>> {
         self.market_data_service.get_latest_quotes(conn, symbols)
     }
+
+    pub async fn get_or_create_asset_by_symbol(
+        &self,
+        conn: &mut SqliteConnection,
+        symbol_str: &str,
+    ) -> Result<Asset, diesel::result::Error> {
+        use crate::schema::assets::dsl::*;
+    
+        debug!("Looking for asset with symbol: {}", symbol_str);
+    
+        match assets
+            .filter(symbol.eq(symbol_str))
+            .first::<Asset>(conn)
+        {
+            Ok(asset) => {
+                debug!("Found existing asset in DB: {} (id: {})", asset.symbol, asset.id);
+                Ok(asset)
+            }
+            Err(diesel::NotFound) => {
+                debug!("Asset not found in DB. Fetching from market data service: {}", symbol_str);
+    
+                match self.market_data_service.get_asset_info(symbol_str).await {
+                    Ok(asset_info) => {
+                        debug!("Market data found. Inserting asset: {}", symbol_str);
+    
+                        let inserted = self.insert_new_asset(conn, asset_info).await?;
+    
+                        debug!("Asset inserted with ID: {}", inserted.id);
+    
+                        if let Err(e) = self.sync_asset_quotes(conn, &vec![inserted.clone()]).await {
+                            debug!(
+                                "Failed to sync quotes for new asset {}: {}",
+                                inserted.symbol, e
+                            );
+                        } else {
+                            debug!("Synced quotes for asset {}", inserted.symbol);
+                        }
+    
+                        Ok(inserted)
+                    }
+                    Err(err) => {
+                        debug!("No market data found for symbol '{}': {:?}", symbol_str, err);
+                        Err(diesel::result::Error::NotFound)
+                    }
+                }
+            }
+            Err(e) => {
+                debug!("Error while querying asset '{}': {}", symbol_str, e);
+                Err(e)
+            }
+        }
+    }      
 }
