@@ -13,6 +13,19 @@ import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
 import { useAccountMutations } from './components/useAccountMutations';
 
+import { syncBrokers } from '@/commands/broker';
+
+import { logger } from '@/adapters';
+const handleSyncBrokers = async () => {
+  try {
+    logger.info('Typescript start')
+    await syncBrokers();
+    logger.info('Brokers synced successfully.');
+  } catch (error) {
+    console.error('Failed to sync brokers:', error);
+  }
+}
+
 const SettingsAccountsPage = () => {
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -58,6 +71,9 @@ const SettingsAccountsPage = () => {
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">
+          <Button onClick={handleSyncBrokers}>
+            Sync Broker
+          </Button>
           {accounts?.length ? (
             <div className="divide-y divide-border rounded-md border">
               {accounts.map((account: Account) => (
