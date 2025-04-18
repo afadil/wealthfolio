@@ -14,6 +14,7 @@ pub struct Trading212Provider {
     client: Client,
     endpoint_orders: String,
     endpoint_dividends: String,
+    endpoint_deposits: String,
 }
 
 impl Trading212Provider {
@@ -27,6 +28,7 @@ impl Trading212Provider {
             client: Client::new(),
             endpoint_orders: "https://live.trading212.com/api/v0/equity/history/orders".to_string(),
             endpoint_dividends: "https://live.trading212.com/api/v0/history/dividends".to_string(),
+            endpoint_deposits: "https://live.trading212.com/api/v0/history/transactions".to_string(),
         })
     }
 
@@ -118,6 +120,16 @@ struct Trading212Dividend {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct Trading212Deposit {
+    amount: f64,
+    date_time: String,
+    reference: Option<String>,
+    #[serde(rename = "type")]
+    deposit_type: String, // "WITHDRAW", "DEPOSIT", etc.
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Trading212OrderResponse {
     items: Vec<Trading212Order>,
     next_page_path: Option<String>,
@@ -127,6 +139,13 @@ struct Trading212OrderResponse {
 #[serde(rename_all = "camelCase")]
 struct Trading212DividendResponse {
     items: Vec<Trading212Dividend>,
+    next_page_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Trading212DepositResponse {
+    items: Vec<Trading212Deposit>,
     next_page_path: Option<String>,
 }
 
@@ -160,7 +179,7 @@ impl BrokerProvider for Trading212Provider {
                         if retries >= 5 {
                             return Err(BrokerError::ApiRequestFailed("Too many 429s on orders; giving up".to_string()));
                         }
-                        let wait = 2u64.pow(retries) * 1000;
+                        let wait = 2u64.pow(retries) * 2000;
                         debug!("Got 429 on orders. Sleeping for {}ms before retrying...", wait);
                         sleep(Duration::from_millis(wait)).await;
                         retries += 1;
@@ -240,12 +259,11 @@ impl BrokerProvider for Trading212Provider {
                     continue;
                 };
             
-                let activity_type = match o.fill_result.as_deref() {
-                    Some("SELL") => "SELL",
-                    Some("BUY") => "BUY",
-                    _ => {
-                        // Fallback guess based on other logic (e.g. quantity/price)
-                        if o.filled_quantity.unwrap_or(0.0) < 0.0 {
+                let activity_type = match o.filled_value {
+                    Some(v) if v < 0.0 => "SELL",
+                    Some(_) => "BUY",
+                    None => {
+                        if o.ordered_value.unwrap_or(0.0) < 0.0 {
                             "SELL"
                         } else {
                             "BUY"
@@ -296,7 +314,7 @@ impl BrokerProvider for Trading212Provider {
                         if retries >= 5 {
                             return Err(BrokerError::ApiRequestFailed("Too many 429s on dividends; giving up".to_string()));
                         }
-                        let wait = 2u64.pow(retries) * 1000;
+                        let wait = 2u64.pow(retries) * 2000;
                         debug!("Got 429 on dividends. Sleeping for {}ms before retrying...", wait);
                         sleep(Duration::from_millis(wait)).await;
                         retries += 1;
@@ -344,6 +362,108 @@ impl BrokerProvider for Trading212Provider {
                 }
             }
 
+            next_url = parsed.next_page_path;
+            sleep(Duration::from_millis(300)).await;
+        }
+
+        // === DEPOSITS ===
+        let mut next_url = Some(self.endpoint_deposits.clone());
+        while let Some(url) = next_url {
+            let full_url = if url.starts_with("http") {
+                url
+            } else {
+                format!("https://live.trading212.com/api/v0/history/transactions?{}", url)
+            };
+
+            let mut retries = 0;
+            let resp = loop {
+                debug!("Fetching deposits from URL: {}", full_url);
+                let resp = self
+                    .client
+                    .get(&full_url)
+                    .header("Authorization", self.api_key.clone())
+                    .send()
+                    .await;
+                
+                match resp {
+                    Ok(r) if r.status() == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                        if retries >=5 {
+                            return Err(BrokerError::ApiRequestFailed("Too many 429s on deposits; giving up".to_string()));
+                        }
+                        let wait = 2u64.pow(retries) * 2000;
+                        debug!("Got 429 on deposit. Sleeping for {}ms before retrying...", wait);
+                        sleep(Duration::from_millis(wait)).await;
+                        retries += 1;
+                        continue;
+                    }
+                    Ok(r) => break r,
+                    Err(e) => return Err(BrokerError::from(e)),
+                }
+            };
+
+            let status = resp.status();
+            let body = resp.text().await.map_err(BrokerError::from)?;
+            if !status.is_success() {
+                return Err(BrokerError::ApiRequestFailed(format!(
+                    "Failed to fetch deposit history: HTTP {}", status
+                )));
+            }
+
+            let parsed: Trading212DepositResponse = serde_json::from_str(&body).map_err(BrokerError::from)?;
+            debug!("Parsed {} deposits", parsed.items.len());
+            debug!("next_page_path (deposits): {:?}", parsed.next_page_path);
+
+            for o in parsed.items {
+                let ts = match DateTime::parse_from_rfc3339(&o.date_time) {
+                    Ok(dt) => dt.naive_utc(),
+                    Err(_) => {
+                        debug!("Skipping deposit with invalid date: {:?}", o.date_time);
+                        continue;
+                    }
+                };
+
+                if ts <= since {
+                    debug!("Skipping older deposits");
+                    continue;
+                }
+
+                let activity_type = match o.deposit_type.as_str() {
+                    "DEPOSIT" => {
+                        let time = ts.time();
+                        if time >= chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()
+                            && time < chrono::NaiveTime::from_hms_opt(0, 30, 0).unwrap()
+                        {
+                            "INTEREST"
+                        } else {
+                            "DEPOSIT"
+                        }
+                    }
+                    "WITHDRAW" => "WITHDRAWAL",
+                    "TRANSFER" => {
+                        if o.amount > 0.0 {
+                            "TRANSFER_IN"
+                        } else {
+                            "TRANSFER_OUT"
+                        }
+                    }
+                    "FEE" => "FEE",
+                    other => {
+                        debug!("Unknown deposit type: {}", other);
+                        continue;
+                    }
+                };
+
+                all_activities.push(ExternalActivity {
+                    symbol: "$CASH-EUR".to_string(), // tbd what should this be
+                    activity_type: activity_type.to_string(),
+                    quantity: o.amount.abs(),
+                    price: 1.0,
+                    timestamp: ts,
+                    currency: Some("EUR".to_string()),
+                    fee: Some(0.0),
+                    comment: Some("Imported from Trading212 deposit history".to_string()),
+                });
+            }
             next_url = parsed.next_page_path;
             sleep(Duration::from_millis(300)).await;
         }
