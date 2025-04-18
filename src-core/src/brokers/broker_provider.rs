@@ -85,7 +85,6 @@ pub struct ExternalActivity {
 }
 
 impl ExternalActivity {
-    /// Creates a NewActivity from this ExternalActivity using a known account ID and resolved asset ID.
     pub fn to_new_activity(&self, acc_id: &str, ass_id: &str) -> NewActivity {
         debug!("Creating new activity");
         NewActivity {
@@ -104,8 +103,7 @@ impl ExternalActivity {
     }
 }
 
-/// Returns the most recent `activity_date` for a given account_id.
-/// If none exists, defaults to 2020-01-01 00:00:00.
+// Get the last synced transaction from the account -> this way we don't have to pull all the account history everytime
 pub fn get_last_synced_timestamp(
     conn: &mut SqliteConnection,
     account_id_val: &str,

@@ -17,6 +17,7 @@ pub struct Trading212Provider {
     endpoint_deposits: String,
 }
 
+// T212 specific Logic
 impl Trading212Provider {
     pub async fn new(config: BrokerApiConfig) -> Result<Self, BrokerError> {
         if config.api_key.is_empty() {
@@ -96,14 +97,15 @@ pub struct Trading212Order {
     pub status: Option<String>,
 }
 
-
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Trading212Tax {
+pub struct Trading212Tax {
     name: String,
     quantity: f64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Trading212Dividend {
@@ -118,6 +120,7 @@ struct Trading212Dividend {
     dividend_type: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Trading212Deposit {
@@ -352,7 +355,7 @@ impl BrokerProvider for Trading212Provider {
                     all_activities.push(ExternalActivity {
                         symbol,
                         activity_type: "DIVIDEND".to_string(),
-                        quantity: d.amount_in_euro.unwrap_or(0.0),
+                        quantity: d.quantity,
                         price: d.gross_amount_per_share.unwrap_or(0.0),
                         timestamp: ts,
                         currency: Some("EUR".to_string()),

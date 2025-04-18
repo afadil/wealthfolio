@@ -13,7 +13,8 @@ impl BrokerDataService {
     pub async fn sync_all_accounts(conn: &mut SqliteConnection) -> Result<(), String> {
         use crate::schema::accounts::dsl::*;
 
-        let account_list: Vec<Account> = accounts
+        // gets accounts with broker configured
+        let account_list: Vec<Account> = accounts 
             .filter(is_api_integrations.eq(true))
             .filter(is_active.eq(true))
             .load::<Account>(conn)
@@ -23,25 +24,19 @@ impl BrokerDataService {
 
         let asset_service = AssetService::new().await;
         for account in account_list {
-            match BrokerProviderFactory::from_account(&account).await {
+            match BrokerProviderFactory::from_exchange(&account).await {
                 Ok(provider) => {
                     match get_last_synced_timestamp(conn, &account.id) {
                         Ok(last_synced) => {
-                            debug!("Got last sync timestamp @ {:?}", last_synced);
-
                             match provider.fetch_activities(last_synced).await {
                                 Ok(external_activities) => {
-                                    for ext_activity in external_activities {
+                                    for activity in external_activities {
                                         match asset_service
-                                            .get_or_create_asset_by_symbol(conn, &ext_activity.symbol)
+                                            .get_or_create_asset_by_symbol(conn, &activity.symbol)
                                             .await
                                         {
                                             Ok(asset) => {
-                                                let new_activity =
-                                                    ext_activity.to_new_activity(
-                                                        &account.id,
-                                                        &asset.id,
-                                                    );
+                                                let new_activity = activity.to_new_activity(&account.id, &asset.id);
 
                                                 if let Err(e) = diesel::insert_into(activities)
                                                     .values(&new_activity)
@@ -57,7 +52,7 @@ impl BrokerDataService {
                                             Err(e) => {
                                                 error!(
                                                     "Failed to resolve asset for symbol {} (account: {}): {:?}",
-                                                    ext_activity.symbol, account.name, e
+                                                    activity.symbol, account.name, e
                                                 );
                                             }
                                         }
@@ -84,7 +79,6 @@ impl BrokerDataService {
                 }
             }
         }
-
         Ok(())
     }
 }

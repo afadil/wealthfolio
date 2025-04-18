@@ -9,8 +9,9 @@ use log::debug; // for debugging
 
 pub struct BrokerProviderFactory;
 
+// this logic routes the sync request to the correct logic
 impl BrokerProviderFactory {
-    pub async fn from_account(account: &Account) -> Result<Arc<dyn BrokerProvider>, BrokerError> {
+    pub async fn from_exchange(account: &Account) -> Result<Arc<dyn BrokerProvider>, BrokerError> {
         let decrypted_api_key = account
             .broker_api
             .as_ref()
