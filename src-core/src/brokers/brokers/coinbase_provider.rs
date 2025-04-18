@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use crate::brokers::broker_provider::{
     BrokerApiConfig, BrokerError, BrokerProvider, ExternalActivity,
 };
+use log::debug;
 
 pub struct CoinbaseProvider {
     api_key: String,
@@ -79,43 +80,42 @@ impl BrokerProvider for CoinbaseProvider {
         let accounts_url = format!("{}/v2/accounts", self.endpoint);
         let accounts_response = self.client
             .get(&accounts_url)
-            .bearer_auth(&self.bearer_token)
+            .bearer_auth(&self.api_key)
             .send()
             .await
-            .map_err(|e| BrokerError::RequestFailed(format!("Failed to fetch accounts: {}", e)))?;
+            .map_err(|e| BrokerError::ApiRequestFailed(format!("Failed to fetch accounts: {}", e)))?;
 
         let status = accounts_response.status();
-        let body = accounts_response.text().await.map_err(|e| BrokerError::RequestFailed(e.to_string()))?;
+        let body = accounts_response.text().await.map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
         if !status.is_success() {
-            return Err(BrokerError::RequestFailed(format!("Coinbase returned {}: {}", status, body)));
+            return Err(BrokerError::ApiRequestFailed(format!("Coinbase returned {}: {}", status, body)));
         }
 
-        let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| BrokerError::ParseFailed(e.to_string()))?;
+        let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| BrokerError::Unknown(e.to_string()))?;
 
         let accounts = json["data"]
             .as_array()
-            .ok_or_else(|| BrokerError::ParseFailed("Missing 'data' field for accounts".to_string()))?;
+            .ok_or_else(|| BrokerError::Unknown("Missing 'data' field for accounts".to_string()))?;
         
+        let mut activities = vec![];
         for acc in accounts {
-            let url = format!("{}/accounts/{}/transactions", self.endpoint, account_id);
+            let url = format!("{}/accounts/{}/transactions", self.endpoint, acc);
 
             let response = self.client
                 .get(&url)
                 .bearer_auth(&self.api_key)
                 .send()
                 .await
-                .map_err(|e| BrokerError::RequestFailed(e.to_string()))?;
+                .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
 
             if !response.status().is_success() {
-                return Err(BrokerError::RequestFailed(format!("Coinbase returned {}", response.status())));
+                return Err(BrokerError::ApiRequestFailed(format!("Coinbase returned {}", response.status())));
             }
 
             let txs: TransactionListResponse = response
                 .json()
                 .await
-                .map_err(|e| BrokerError::ParseFailed(e.to_string()))?;
-
-            let mut activities = vec![];
+                .map_err(|e| BrokerError::Unknown(e.to_string()))?;
 
             for tx in txs.data {
                 let created_at = DateTime::parse_from_rfc3339(&tx.created_at)
