@@ -12,8 +12,6 @@ pub trait AssetServiceTrait: Send + Sync {
     fn create_cash_asset(&self, currency: &str) -> Result<Asset>;
     async fn get_or_create_asset(&self, asset_id: &str) -> Result<Asset>;
     fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset>;
-    async fn sync_asset_quotes(&self, asset_list: &Vec<Asset>, refetch_all: bool) -> Result<()>;
-    async fn sync_asset_quotes_by_symbols(&self, symbols: &Vec<String>, refetch_all: bool) -> Result<()>;
     fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
 }
 

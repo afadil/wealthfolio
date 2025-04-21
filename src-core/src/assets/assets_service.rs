@@ -2,14 +2,12 @@ use log::{debug, error};
 use std::sync::Arc;
 
 use crate::market_data::market_data_traits::MarketDataServiceTrait;
-use crate::market_data::{DataSource, QuoteRequest};
 
 use crate::errors::{Error, Result, DatabaseError};
 use diesel::result::Error as DieselError;
 use super::assets_model::{Asset, AssetData, NewAsset, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 
-use super::assets_constants::CASH_ASSET_TYPE;
 
 /// Service for managing assets
 pub struct AssetService {
@@ -99,27 +97,6 @@ impl AssetServiceTrait for AssetService {
     /// Updates the data source for an asset
     fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
         self.asset_repository.update_data_source(asset_id, data_source)
-    }
-
-
-    /// Synchronizes quotes for a list of assets
-    async fn sync_asset_quotes(&self, asset_list: &Vec<Asset>, refetch_all: bool) -> Result<()> {
-        let quote_requests: Vec<_> = asset_list.iter()
-            .filter(|asset| asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE))
-            .map(|asset| QuoteRequest {
-                symbol: asset.symbol.clone(),
-                data_source: DataSource::from(asset.data_source.as_str()),
-                currency: asset.currency.clone(),
-            })
-            .collect();
-
-        self.market_data_service.sync_quotes(&quote_requests, refetch_all).await?;
-        Ok(())
-    }
-
-    async fn sync_asset_quotes_by_symbols(&self, symbols: &Vec<String>, refetch_all: bool) -> Result<()> {
-        let assets = self.asset_repository.list_by_symbols(symbols)?;
-        self.sync_asset_quotes(&assets, refetch_all).await
     }
 
     fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
