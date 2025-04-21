@@ -162,7 +162,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
       [symbol: string]: {
         name: string;
         marketValueConverted: number;
-        bookBalueConverted: number;
+        bookValueConverted: number;
         gain: number;
       };
     } = {};
@@ -171,39 +171,42 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
     let minGain = Infinity;
 
     holdings.forEach((holding) => {
-      if (holding.symbol) {
-        const symbol = holding.symbol;
+      const symbol = holding.instrument?.symbol;
+      if (symbol) {
         const gain =
           returnType === 'daily'
-            ? Number(holding.performance.dayGainLossPercent)
-            : Number(holding.performance.totalGainLossPercent);
+            ? Number(holding.dayChangePct) || 0
+            : Number(holding.totalGainPct) || 0;
+
+        const marketValue = Number(holding.marketValue?.base) || 0;
+        const costBasis = Number(holding.costBasis?.base) || 0;
+
+        if (isNaN(gain) || isNaN(marketValue) || isNaN(costBasis)) return;
 
         maxGain = Math.max(maxGain, gain);
         minGain = Math.min(minGain, gain);
 
         if (data[symbol]) {
-          data[symbol].marketValueConverted += Number(holding.performance.marketValue);
-          data[symbol].bookBalueConverted += Number(holding.totalCostBasis);
+          data[symbol].marketValueConverted += marketValue;
+          data[symbol].bookValueConverted += costBasis;
           data[symbol].gain = gain;
         } else {
           data[symbol] = {
             name: symbol,
-            marketValueConverted: Number(holding.performance.marketValue),
-            bookBalueConverted: Number(holding.totalCostBasis),
+            marketValueConverted: marketValue,
+            bookValueConverted: costBasis,
             gain,
           };
         }
       }
     });
 
-    // Convert the object values to an array
     const dataArray = Object.values(data).map((item) => ({
       ...item,
       maxGain,
       minGain,
     }));
 
-    // Sort the array by marketValue in descending order
     dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
     return dataArray;
@@ -271,7 +274,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             animationDuration={100}
             content={<CustomizedContent theme={settings?.theme || 'light'} />}
           >
-            <Tooltip content={<CompositionTooltip settings={settings}/>} />
+            <Tooltip content={<CompositionTooltip settings={settings} />} />
           </Treemap>
         </ResponsiveContainer>
       </CardContent>

@@ -43,11 +43,11 @@ export const CashHoldingsWidget = ({ cashHoldings, isLoading, className }: CashH
       <div className="flex flex-wrap items-center gap-3">
         {cashHoldings.map((holding) => (
           <div key={holding.id} className="flex items-center gap-1.5">
-            <span>{holding.currency}</span>
+            <span>{holding.localCurrency}</span>
             <span className="font-medium text-foreground">
               <AmountDisplay
-                value={holding.quantity ?? 0}
-                currency={holding.currency}
+                value={holding.marketValue?.local ?? 0}
+                currency={holding.localCurrency}
                 isHidden={isBalanceHidden}
               />
             </span>

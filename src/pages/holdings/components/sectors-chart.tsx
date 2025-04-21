@@ -1,4 +1,4 @@
-import { Holding } from '@/lib/types';
+import { Holding, Sector, HoldingType } from '@/lib/types';
 import { useMemo } from 'react';
 import { Bar, BarChart, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -22,16 +22,21 @@ function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
   const sectors = holdings?.reduce(
     (acc, holding) => {
-      const assetSectors = holding.asset?.sectors
-        ? holding.asset.sectors
-        : [{ name: 'Others', weight: 1 }];
-      assetSectors.forEach((sector) => {
+      const assetSectors = holding.instrument?.sectors;
+      const marketValue = Number(holding.marketValue?.base) || 0;
+
+      const sectorsToProcess = assetSectors && assetSectors.length > 0
+          ? assetSectors
+          : [{ name: 'Others', weight: 1 }];
+
+      if (isNaN(marketValue)) return acc;
+
+      sectorsToProcess.forEach((sector: Sector) => {
         const current = acc[sector.name] || 0;
-        //@ts-ignore
+        const weight = Number(sector.weight) || 0;
         acc[sector.name] =
-          Number(current) +
-          Number(holding.performance.marketValue) *
-            (Number(sector.weight) > 1 ? Number(sector.weight) / 100 : Number(sector.weight));
+          current +
+          marketValue * (weight > 1 ? weight / 100 : weight);
       });
       return acc;
     },

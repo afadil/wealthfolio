@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Holding } from '@/lib/types';
+import { Holding, Country } from '@/lib/types';
 import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,12 +17,15 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
     if (!holdings) return [];
     const countryMap = new Map<string, number>();
     holdings.forEach((holding) => {
-      if (holding.asset?.countries && holding.asset?.countries.length > 0) {
-        holding.asset?.countries.forEach((country) => {
+      const countries = holding.instrument?.countries;
+      const marketValue = Number(holding.marketValue?.base) || 0;
+
+      if (countries && countries.length > 0 && !isNaN(marketValue)) {
+        countries.forEach((country: Country) => {
           const currentValue = countryMap.get(country.name) || 0;
+          const weight = Number(country.weight) || 0;
           const weightedValue =
-            holding.performance.marketValue *
-            (country.weight > 1 ? country.weight / 100 : country.weight);
+            marketValue * (weight > 1 ? weight / 100 : weight);
           countryMap.set(country.name, currentValue + weightedValue);
         });
       }

@@ -22,37 +22,57 @@ interface CurrencyData {
   percent: number;
 }
 
-function getCurrencyData(holdings: Holding[] = [], baseCurrency: string): CurrencyData[] {
-  if (!Array.isArray(holdings) || !holdings.length || !baseCurrency) return [];
+interface CurrencyChartData {
+  data: CurrencyData[];
+  totalBase: number;
+}
 
-  // Aggregate holdings by currency
-  const currencies = holdings.reduce<Record<string, number>>((acc, holding) => {
-    if (!holding) return acc;
+function getCurrencyData(holdings: Holding[] = [], baseCurrency: string): CurrencyChartData {
+  if (!Array.isArray(holdings) || !holdings.length || !baseCurrency) return { data: [], totalBase: 0 };
 
-    const currency = holding.currency || baseCurrency;
-    const marketValue = Number(holding.performance.marketValue) || 0;
+  // Aggregate holdings by currency using local value, calculate total base value
+  const aggregation = holdings.reduce<{ currencies: Record<string, number>; totalBase: number }>(
+    (acc, holding) => {
+      if (!holding) return acc;
 
-    // Ensure we're not adding NaN values
-    if (isNaN(marketValue)) return acc;
+      const currency = holding.localCurrency || baseCurrency;
+      const localValue = Number(holding.marketValue?.local) || 0;
+      const baseValue = Number(holding.marketValue?.base) || 0;
 
-    const current = acc[currency] || 0;
-    acc[currency] = current + marketValue;
-    return acc;
-  }, {});
+      // Ensure we're not adding NaN values
+      if (isNaN(localValue) || isNaN(baseValue)) return acc;
 
-  // Calculate total value across all currencies
-  const total = Object.values(currencies).reduce((sum, value) => sum + value, 0);
+      const current = acc.currencies[currency] || 0;
+      acc.currencies[currency] = current + localValue;
+      acc.totalBase += baseValue;
 
-  // Handle case where total is 0 to avoid division by zero
-  if (total === 0) return [];
+      return acc;
+    },
+    { currencies: {}, totalBase: 0 },
+  );
 
-  return Object.entries(currencies)
-    .map(([name, value]) => ({
-      name,
-      value,
-      percent: (value / total) * 100,
-    }))
+  const { currencies, totalBase } = aggregation;
+
+  // Handle case where total base value is 0 to avoid division by zero
+  if (totalBase === 0) return { data: [], totalBase: 0 };
+
+  const currencyData = Object.entries(currencies)
+    .map(([name, value]) => {
+      // Calculate percentage based on base value relative to total base value
+      // Find the corresponding base value contribution for this currency
+      const baseValueContribution = holdings
+        .filter((h) => (h.localCurrency || baseCurrency) === name)
+        .reduce((sum, h) => sum + (Number(h.marketValue?.base) || 0), 0);
+
+      return {
+        name,
+        value: Number(value) || 0, // Ensure value is a number
+        percent: (baseValueContribution / totalBase) * 100 || 0, // Calculate percent based on base values
+      };
+    })
     .sort((a, b) => b.value - a.value);
+
+  return { data: currencyData, totalBase };
 }
 
 interface HoldingCurrencyChartProps {
@@ -66,11 +86,8 @@ export function HoldingCurrencyChart({
   baseCurrency = 'USD',
   isLoading = false,
 }: HoldingCurrencyChartProps) {
-  const data = useMemo(() => getCurrencyData(holdings, baseCurrency), [holdings, baseCurrency]);
+  const { data, totalBase } = useMemo(() => getCurrencyData(holdings, baseCurrency), [holdings, baseCurrency]);
   const { isBalanceHidden } = useBalancePrivacy();
-
-  // Calculate the total for the spending amount
-  const totalAmount = useMemo(() => data.reduce((sum, item) => sum + (item.value || 0), 0), [data]);
 
   if (isLoading) {
     return <LoadingState />;
@@ -94,7 +111,7 @@ export function HoldingCurrencyChart({
           <div className="flex flex-col items-baseline space-y-3">
             <div className="text-xl font-light">
               <AmountDisplay
-                value={totalAmount}
+                value={totalBase}
                 currency={baseCurrency}
                 isHidden={isBalanceHidden}
               />

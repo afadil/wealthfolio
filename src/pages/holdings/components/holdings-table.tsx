@@ -19,23 +19,23 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // Helper function to get display value and currency based on toggle state
 const getDisplayValueAndCurrency = (
   holding: Holding,
-  valueInBase: number | null | undefined, 
+  valueInBase: number | null | undefined,
   showConvertedToBase: boolean,
 ): { value: number; currency: string } => {
-  const fxRate = holding.performance.fxRateToBase ?? 1; 
+  const fxRate = holding.fxRate ?? 1; // Use fxRate from Holding
 
   if (showConvertedToBase) {
     // Show value in Base Currency
     return {
       value: valueInBase ?? 0,
-      currency: holding.performance.baseCurrency,
+      currency: holding.baseCurrency, // Use baseCurrency from Holding
     };
   } else {
     // Show value in Asset's Original Currency
-    const valueInOriginal = safeDivide(valueInBase ?? 0, fxRate); 
+    const valueInOriginal = safeDivide(valueInBase ?? 0, fxRate);
     return {
       value: valueInOriginal,
-      currency: holding.currency,
+      currency: holding.localCurrency, // Use localCurrency from Holding
     };
   }
 };
@@ -64,7 +64,7 @@ export const HoldingsTable = ({
   const uniqueTypesSet = new Set();
   const assetsTypes: { label: string; value: string }[] = holdings.reduce(
     (result: { label: string; value: string }[], asset) => {
-      const type = asset?.asset?.assetSubClass;
+      const type = asset.instrument?.assetSubclass; // Use instrument.assetSubclass
       if (type && !uniqueTypesSet.has(type)) {
         uniqueTypesSet.add(type);
         result.push({ label: type.toUpperCase(), value: type });
@@ -112,7 +112,7 @@ const getColumns = (
 ): ColumnDef<Holding>[] => [
   {
     id: 'symbol',
-    accessorKey: 'symbol',
+    accessorKey: 'instrument.symbol',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
     meta: {
       label: 'Position',
@@ -120,12 +120,12 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
-      let symbol = holding.symbol.split('.')[0];
-      if (symbol.startsWith('$CASH')) {
-        symbol = symbol.split('-')[0];
-      }
+      const symbol = holding.instrument?.symbol?.split('.')[0] ?? holding.id;
+      const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+
       const handleNavigate = () => {
-        navigate(`/holdings/${holding.symbol}`, { state: { holding } });
+        const navSymbol = holding.instrument?.symbol ?? holding.id;
+        navigate(`/holdings/${navSymbol}`, { state: { holding } });
       };
       return (
         <div className="flex items-center">
@@ -133,28 +133,31 @@ const getColumns = (
             className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
             onClick={handleNavigate}
           >
-            {symbol}
+            {displaySymbol}
           </Badge>
 
-          <span className="ml-2 line-clamp-1">{holding.asset?.name || holding.assetId}</span>
+          <span className="ml-2 line-clamp-1">{holding.instrument?.name || holding.id}</span>
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      return rowA.original.symbol.localeCompare(rowB.original.symbol);
+      const symbolA = rowA.original.instrument?.symbol ?? rowA.original.id;
+      const symbolB = rowB.original.instrument?.symbol ?? rowB.original.id;
+      return symbolA.localeCompare(symbolB);
     },
-    filterFn: (row) => {
+    filterFn: (row, columnId, filterValue) => {
       const holding = row.original;
-      const searchTerm = row.getValue('symbol') as string;
-      const nameMatch = holding.asset?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const symbolMatch = holding.symbol.toLowerCase().includes(searchTerm.toLowerCase());
-      return !!(symbolMatch || nameMatch);
+      const searchTerm = filterValue as string;
+      const nameMatch = holding.instrument?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const symbolMatch = holding.instrument?.symbol?.toLowerCase().includes(searchTerm.toLowerCase());
+      const idMatch = holding.id.toLowerCase().includes(searchTerm.toLowerCase());
+      return !!(symbolMatch || nameMatch || idMatch);
     },
     enableHiding: false,
   },
   {
     id: 'symbolName',
-    accessorFn: (row) => row.asset?.name || row.assetId,
+    accessorFn: (row) => row.instrument?.name || row.id,
     meta: {
       label: 'Symbol Name',
     },
@@ -180,7 +183,7 @@ const getColumns = (
   },
   {
     id: 'marketPrice',
-    accessorFn: (row) => row.performance.marketPrice ?? 0,
+    accessorFn: (row) => row.price ?? 0,
     enableHiding: true,
     enableSorting: true,
     header: ({ column }) => (
@@ -195,14 +198,14 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const price = holding.performance.marketPrice ?? 0;
-      const currency = holding.currency;
+      const price = holding.price ?? 0;
+      const currency = holding.localCurrency;
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={price} currency={currency} />
           <GainPercent
-            className="text-xs text-muted-foreground"
-            value={holding.performance.dayGainLossPercent || 0}
+            className="text-xs"
+            value={holding.dayChangePct || 0}
           />
         </div>
       );
@@ -210,7 +213,7 @@ const getColumns = (
   },
   {
     id: 'bookValue',
-    accessorKey: 'totalCostBasis',
+    accessorFn: (row) => row.costBasis?.local ?? 0,
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
@@ -220,8 +223,8 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const value = holding.totalCostBasis ?? 0;
-      const currency = holding.currency;
+      const value = holding.costBasis?.local ?? 0;
+      const currency = holding.localCurrency;
 
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
@@ -231,14 +234,14 @@ const getColumns = (
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.totalCostBasis ?? 0;
-      const valueB = rowB.original.totalCostBasis ?? 0;
+      const valueA = rowA.original.costBasis?.local ?? 0;
+      const valueB = rowB.original.costBasis?.local ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'marketValue',
-    accessorFn: (row) => row.performance.marketValue ?? 0,
+    accessorFn: (row) => row.marketValue.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
@@ -250,7 +253,7 @@ const getColumns = (
       const holding = row.original;
       const { value, currency } = getDisplayValueAndCurrency(
         holding,
-        holding.performance.marketValue,
+        holding.marketValue.base,
         showConvertedValues,
       );
 
@@ -262,14 +265,14 @@ const getColumns = (
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.performance.marketValue ?? 0;
-      const valueB = rowB.original.performance.marketValue ?? 0;
+      const valueA = rowA.original.marketValue.base ?? 0;
+      const valueB = rowB.original.marketValue.base ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'performance',
-    accessorFn: (row) => row.performance.totalGainLossAmount ?? 0,
+    accessorFn: (row) => row.totalGain?.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Gain/Loss" />
@@ -281,7 +284,7 @@ const getColumns = (
       const holding = row.original;
       const { value, currency } = getDisplayValueAndCurrency(
         holding,
-        holding.performance.totalGainLossAmount,
+        holding.totalGain?.base,
         showConvertedValues,
       );
 
@@ -289,21 +292,21 @@ const getColumns = (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <GainPercent
-            className="text-xs text-muted-foreground"
-            value={holding.performance.totalGainLossPercent || 0}
+            className="text-xs"
+            value={holding.totalGainPct || 0}
           />
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.performance.totalGainLossAmount ?? 0;
-      const valueB = rowB.original.performance.totalGainLossAmount ?? 0;
+      const valueA = rowA.original.totalGain?.base ?? 0;
+      const valueB = rowB.original.totalGain?.base ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'holdingType',
-    accessorFn: (row) => row.asset?.assetSubClass,
+    accessorFn: (row) => row.instrument?.assetSubclass,
     meta: {
       label: 'Asset Type',
     },
@@ -312,12 +315,12 @@ const getColumns = (
   },
   {
     id: 'currency',
-    accessorKey: 'currency',
+    accessorKey: 'localCurrency',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
     meta: {
       label: 'Currency',
     },
-    cell: ({ row }) => <div className="text-muted-foreground">{row.original.currency}</div>,
+    cell: ({ row }) => <div className="text-muted-foreground">{row.original.localCurrency}</div>,
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id));
     },
@@ -353,7 +356,8 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const handleNavigate = () => {
-        navigate(`/holdings/${row.original.symbol}`, { state: { holding: row.original } });
+        const navSymbol = row.original.instrument?.symbol ?? row.original.id;
+        navigate(`/holdings/${navSymbol}`, { state: { holding: row.original } });
       };
 
       return (

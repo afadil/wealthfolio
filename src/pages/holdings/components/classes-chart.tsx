@@ -1,5 +1,5 @@
 import { CustomPieChart } from '@/components/custom-pie-chart';
-import { Holding } from '@/lib/types';
+import { Holding, HoldingType } from '@/lib/types';
 import { useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +10,14 @@ function getClassData(holdings: Holding[]) {
 
   const classes = holdings.reduce(
     (acc, holding) => {
-      const assetSubClass = holding.asset?.assetSubClass || 'Other';
+      const isCash = holding.holdingType === HoldingType.CASH;
+      const assetSubClass = isCash
+        ? 'Cash'
+        : holding.instrument?.assetSubclass || 'Other';
+
       const current = acc[assetSubClass] || 0;
-      acc[assetSubClass] = Number(current) + Number(holding.performance.marketValue);
+      const value = Number(holding.marketValue?.base) || 0;
+      acc[assetSubClass] = current + value;
       return acc;
     },
     {} as Record<string, number>,

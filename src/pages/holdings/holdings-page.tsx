@@ -48,6 +48,7 @@ export const HoldingsPage = () => {
     setSelectedAccount(account);
   };
 
+  console.log('holdings', holdings);
   const { cashHoldings, nonCashHoldings } = useMemo(() => {
     const cash =
       holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) || [];
@@ -102,7 +103,7 @@ export const HoldingsPage = () => {
 
             <ClassesChart holdings={holdings} isLoading={isLoading} />
 
-            <CountryChart holdings={holdings} isLoading={isLoading} />
+            <CountryChart holdings={nonCashHoldings} isLoading={isLoading} />
           </div>
 
           {/* Second row: Composition and Sector */}
@@ -113,7 +114,7 @@ export const HoldingsPage = () => {
 
             {/* Sectors Chart - Now self-contained */}
             <div className="col-span-1 h-full">
-              <SectorsChart holdings={holdings || []} isLoading={isLoading} />
+              <SectorsChart holdings={nonCashHoldings} isLoading={isLoading} />
             </div>
           </div>
         </TabsContent>
