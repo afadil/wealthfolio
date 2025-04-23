@@ -25,6 +25,7 @@ export const newAccountSchema = z.object({
   isApiIntegrations: z.boolean().optional(),
   broker: z.string().optional(),
   brokerApi: z.string().optional(),
+  brokerExtra: z.string().optional(),
 });
 
 export const newGoalSchema = z.object({

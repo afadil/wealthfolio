@@ -56,6 +56,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     defaultValues,
   });
   const brokerAPIEnabled = form.watch("isApiIntegrations");
+  const brokerName = form.watch("broker");
 
   function onSubmit(data: NewAccount) {
     const { id, ...rest } = data;
@@ -208,6 +209,21 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 />
               ) : null}
               
+              {brokerName === "COINBASE" && (
+                <FormField
+                  control={form.control}
+                  name="brokerExtra"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Key Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder='Enter key name' {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <FormField
                 control={form.control}
                 name="brokerApi"

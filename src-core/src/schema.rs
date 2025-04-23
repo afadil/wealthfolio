@@ -15,6 +15,7 @@ diesel::table! {
         is_api_integrations -> Bool,
         broker -> Nullable<Text>,
         broker_api -> Nullable<Binary>,
+        broker_extra -> Nullable<Binary>,
     }
 }
 

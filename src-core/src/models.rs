@@ -47,6 +47,7 @@ pub struct Account {
     pub is_api_integrations: bool,
     pub broker: Option<String>,
     pub broker_api: Option<EncryptedApiKey>,
+    pub broker_extra: Option<EncryptedApiKey>,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone)]
@@ -64,6 +65,7 @@ pub struct NewAccount {
     pub is_api_integrations: bool,
     pub broker: Option<String>,
     pub broker_api: Option<EncryptedApiKey>,
+    pub broker_extra: Option<EncryptedApiKey>,
 }
 #[derive(Insertable, AsChangeset, Serialize, Deserialize, Debug, Clone)]
 #[diesel(table_name = crate::schema::accounts)]
@@ -79,6 +81,7 @@ pub struct AccountUpdate {
     pub is_api_integrations: bool,
     pub broker: Option<String>,
     pub broker_api: Option<EncryptedApiKey>,
+    pub broker_extra: Option<EncryptedApiKey>,
 }
 
 #[derive(

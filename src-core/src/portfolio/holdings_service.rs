@@ -584,7 +584,8 @@ impl Portfolio {
                             platform_id: None,
                             is_api_integrations: false,
                             broker: None,
-                            broker_api: None
+                            broker_api: None,
+                            broker_extra: None,
                         }),
                         asset_class: holding.asset_class.clone(),
                         asset_sub_class: holding.asset_sub_class.clone(),
@@ -672,6 +673,7 @@ impl Portfolio {
                             is_api_integrations: false,
                             broker: None,
                             broker_api: None,
+                            broker_extra: None,
                         }),
                         asset_class: Some("CASH".to_string()),
                         asset_sub_class: Some("CASH".to_string()),
@@ -764,7 +766,8 @@ impl Portfolio {
                             platform_id: None,
                             is_api_integrations: false,
                             broker: None,
-                            broker_api: None
+                            broker_api: None,
+                            broker_extra: None,
                         }),
                         asset_class: Some("Cash".to_string()),
                         asset_sub_class: None,
