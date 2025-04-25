@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use chrono::Date;
 use chrono::NaiveDateTime;
 use chrono::DateTime;
 use hmac::{Hmac, Mac};
@@ -10,8 +9,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::brokers::broker_provider::{BrokerApiConfig, BrokerError, BrokerProvider, ExternalActivity};
 type HmacSha256 = Hmac<Sha256>;
-
-use log::debug;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
