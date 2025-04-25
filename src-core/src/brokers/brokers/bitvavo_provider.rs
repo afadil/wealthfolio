@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Date;
 use chrono::NaiveDateTime;
 use chrono::DateTime;
 use hmac::{Hmac, Mac};
@@ -9,6 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::brokers::broker_provider::{BrokerApiConfig, BrokerError, BrokerProvider, ExternalActivity};
 type HmacSha256 = Hmac<Sha256>;
+
+use log::debug;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -130,6 +133,10 @@ impl BrokerProvider for BitvavoProvider {
                 let executed = DateTime::parse_from_rfc3339(&item.executed_at)
                     .map_err(|e| BrokerError::ApiRequestFailed(format!("Failed to parse executed_at: {}", e)))?
                     .naive_utc();
+
+                if executed.and_utc().timestamp_millis() <= from_ts + 10000 {
+                    continue; // prevent double entries
+                }
 
                 let symbol: String;
                 let qty: f64;
