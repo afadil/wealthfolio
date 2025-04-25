@@ -37,5 +37,8 @@ tokio = { version = "1", features = ["full"] }
 sha2 = "0.10"
 hmac = "0.12"      
 
+jsonwebtoken = { version = "9", features = ["pem"] }
+hex = "0.4"
+
 [dev-dependencies]
 tokio-test = "*"
