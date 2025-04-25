@@ -53,7 +53,7 @@ impl From<serde_json::Error> for BrokerError {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BrokerApiConfig {
     pub api_key: String,
-    pub secret: Option<String>,
+    pub optional: Option<String>,
     pub account_id: Option<String>,
 }
 
@@ -61,7 +61,7 @@ impl Default for BrokerApiConfig {
     fn default() -> Self {
         Self {
             api_key: String::new(),
-            secret: None,
+            optional: None,
             account_id: None,
         }
     }

@@ -209,7 +209,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 />
               ) : null}
               
-              {brokerName === "COINBASE" && (
+              {brokerName === "COINBASE" || brokerName === "BITVAVO" && (
                 <FormField
                   control={form.control}
                   name="brokerExtra"
