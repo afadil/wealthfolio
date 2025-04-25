@@ -209,7 +209,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 />
               ) : null}
               
-              {brokerName === "COINBASE" || brokerName === "BITVAVO" && (
+              {["COINBASE", "BITVAVO"].includes(brokerName!) && (
                 <FormField
                   control={form.control}
                   name="brokerExtra"
