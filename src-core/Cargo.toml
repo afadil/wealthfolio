@@ -34,6 +34,8 @@ aes-gcm = "0.10"
 rand = "0.8"
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
+sha2 = "0.10"
+hmac = "0.12"      
 
 [dev-dependencies]
 tokio-test = "*"
