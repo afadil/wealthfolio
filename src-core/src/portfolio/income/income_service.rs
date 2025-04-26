@@ -1,32 +1,32 @@
 use crate::{
-    activities::{activities_errors::ActivityError, activities_model::IncomeData, activities_traits::ActivityRepositoryTrait}, models::IncomeSummary
+    activities::{activities_errors::ActivityError, activities_model::IncomeData, activities_traits::ActivityRepositoryTrait}, Error, Result
 };
 use chrono::{Datelike, NaiveDate, Utc};
 
 use log::{debug, error};
 use num_traits::Zero;
 use rust_decimal::Decimal;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use crate::fx::fx_traits::FxServiceTrait;
-
+use super::IncomeSummary;
 // Define the trait for the income service
 pub trait IncomeServiceTrait: Send + Sync {
     fn get_income_summary(
         &self,
-    ) -> Result<Vec<IncomeSummary>, ActivityError>;
+    ) -> Result<Vec<IncomeSummary>>;
 }
 
 pub struct IncomeService {
     fx_service: Arc<dyn FxServiceTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
-    base_currency: String,
+    base_currency: Arc<RwLock<String>>,
 }
 
 impl IncomeService {
     pub fn new(
         fx_service: Arc<dyn FxServiceTrait>,
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
-        base_currency: String,
+        base_currency: Arc<RwLock<String>>,
     ) -> Self {
         IncomeService {
             fx_service,
@@ -48,14 +48,14 @@ impl IncomeService {
 impl IncomeServiceTrait for IncomeService {
     fn get_income_summary(
         &self,
-    ) -> Result<Vec<IncomeSummary>, ActivityError> {
+    ) -> Result<Vec<IncomeSummary>> {
         debug!("Getting income summary...");
 
         let activities = match self.activity_repository.get_income_activities_data() {
             Ok(activity) => activity,
             Err(e) => {
                 error!("Error getting aggregated income data: {:?}", e);
-                return Err(e);
+                return Err(Error::Activity(ActivityError::InvalidData(e.to_string())));
             }
         };
 
@@ -63,7 +63,7 @@ impl IncomeServiceTrait for IncomeService {
             return Ok(Vec::new());
         }
 
-        let base_currency = self.base_currency.clone();
+        let base_currency = self.base_currency.read().unwrap().clone();
         let current_date = Utc::now().naive_utc().date();
         let current_year = current_date.year();
         let last_year = current_year - 1;

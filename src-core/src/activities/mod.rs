@@ -6,7 +6,7 @@ pub(crate) mod activities_service;
 pub(crate) mod activities_traits;
 
 pub use activities_constants::*;
-pub use activities_errors::{ActivityError, Result};
+pub use activities_errors::ActivityError;
 pub use activities_model::{Activity, ActivityType, ActivityDB, ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate, ImportMapping, ImportMappingData, NewActivity, Sort};
 pub use activities_repository::ActivityRepository;
 pub use activities_service::ActivityService;

@@ -1,6 +1,7 @@
 use crate::market_data::market_data_model::{DataSource, Quote};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +12,7 @@ pub struct ExchangeRate {
     #[serde(serialize_with = "serialize_decimal_6")]
     pub rate: Decimal,
     pub source: DataSource,
-    pub timestamp: chrono::NaiveDateTime,
+    pub timestamp: DateTime<Utc>,
 }
 
 impl ExchangeRate {
@@ -24,7 +25,7 @@ impl ExchangeRate {
             to_currency,
             rate: quote.close,
             source: quote.data_source.clone(),
-            timestamp: quote.date,
+            timestamp: quote.timestamp,
         }
     }
 
@@ -34,7 +35,7 @@ impl ExchangeRate {
         Quote {
             id: format!("{}_{}", formatted_date, symbol),
             symbol,
-            date: self.timestamp,
+            timestamp: self.timestamp,
             open: self.rate.clone(),
             high: self.rate.clone(),
             low: self.rate.clone(),
@@ -81,13 +82,13 @@ pub struct NewExchangeRate {
 
 impl NewExchangeRate {
     pub fn to_quote(&self) -> Quote {
-        let now = chrono::Utc::now().naive_utc();
+        let now = Utc::now();
         let formatted_date = now.format("%Y%m%d").to_string();
         let symbol = ExchangeRate::make_fx_symbol(&self.from_currency, &self.to_currency);
         Quote {
             id: format!("{}_{}", formatted_date, symbol),
             symbol,
-            date: now,
+            timestamp: now,
             open: self.rate.clone(),
             high: self.rate.clone(),
             low: self.rate.clone(),

@@ -108,3 +108,9 @@ number-flow-react::part(right)::after,
 number-flow-react::part(symbol) {
   padding: calc(var(--number-flow-mask-height, 0.25em) / 2) 0;
 }
+
+
+number-flow-react.muted-fraction::part(decimal),
+number-flow-react.muted-fraction::part(fraction) {
+  color: hsl(var(--muted-foreground));
+}

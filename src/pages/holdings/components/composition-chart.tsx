@@ -158,58 +158,48 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
   const [returnType, setReturnType] = useState<ReturnType>('daily');
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
-    const data: {
-      [symbol: string]: {
-        name: string;
-        marketValueConverted: number;
-        bookValueConverted: number;
-        gain: number;
-      };
-    } = {};
-
     let maxGain = -Infinity;
     let minGain = Infinity;
 
-    holdings.forEach((holding) => {
-      const symbol = holding.instrument?.symbol;
-      if (symbol) {
+    // Map holdings directly, assuming backend provides aggregated data
+    const processedData = holdings
+      .map((holding) => {
+        const symbol = holding.instrument?.symbol;
+        if (!symbol) return null; // Skip if no symbol
+
         const gain =
           returnType === 'daily'
             ? Number(holding.dayChangePct) || 0
             : Number(holding.totalGainPct) || 0;
 
         const marketValue = Number(holding.marketValue?.base) || 0;
-        const costBasis = Number(holding.costBasis?.base) || 0;
 
-        if (isNaN(gain) || isNaN(marketValue) || isNaN(costBasis)) return;
+        // Basic validation
+        if (isNaN(gain) || isNaN(marketValue) || marketValue <= 0) return null;
 
+        // Update min/max gain across all valid holdings
         maxGain = Math.max(maxGain, gain);
         minGain = Math.min(minGain, gain);
 
-        if (data[symbol]) {
-          data[symbol].marketValueConverted += marketValue;
-          data[symbol].bookValueConverted += costBasis;
-          data[symbol].gain = gain;
-        } else {
-          data[symbol] = {
-            name: symbol,
-            marketValueConverted: marketValue,
-            bookValueConverted: costBasis,
-            gain,
-          };
-        }
-      }
-    });
+        return {
+          name: symbol, // Use symbol for the treemap node name/link
+          marketValueConverted: marketValue,
+          gain,
+          // We'll add min/max gain later after iterating through all
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null) // Explicit non-null filter
+      // Add minGain and maxGain to each item after calculating them
+      .map((item) => ({
+        ...item,
+        maxGain,
+        minGain,
+      }));
 
-    const dataArray = Object.values(data).map((item) => ({
-      ...item,
-      maxGain,
-      minGain,
-    }));
+    // Sort by market value after processing all holdings
+    processedData.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
-    dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
-
-    return dataArray;
+    return processedData;
   }, [holdings, returnType]);
 
   if (isLoading) {

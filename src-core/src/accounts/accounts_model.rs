@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{errors::ValidationError, Error, Result};
 
 /// Domain model representing an account in the system
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     pub id: String,

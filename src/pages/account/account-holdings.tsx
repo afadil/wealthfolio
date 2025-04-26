@@ -51,15 +51,15 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
               <div key={holding.id} className="grid grid-cols-5 gap-4 border-b p-4">
                 <div className="col-span-2 flex-grow text-left">
                   <p className="mb-1 font-bold">
-                    <Link to={`/holdings/${holding.symbol}`}>{holding.symbol}</Link>
+                    <Link to={`/holdings/${holding.instrument?.symbol}`}>{holding.instrument?.symbol ?? '-'}</Link>
                   </p>
-                  <p className="text-sm">{holding.asset?.name}</p>
+                  <p className="text-sm">{holding.instrument?.name}</p>
                 </div>
 
                 <div className="text-right">
                   <AmountDisplay
-                    value={holding.performance.marketValue}
-                    currency={holding.currency}
+                    value={holding.marketValue.local}
+                    currency={holding.localCurrency}
                     isHidden={isBalanceHidden}
                   />
                   <p className="text-sm text-muted-foreground">
@@ -68,18 +68,18 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
                 </div>
 
                 <div className="text-right">
-                  <p>{formatAmount(holding.performance.marketPrice || 0, holding.currency, false)}</p>
-                  <p className="text-sm text-muted-foreground">{holding.currency}</p>
+                  <p>{formatAmount(holding.price ?? 0, holding.localCurrency, false)}</p>
+                  <p className="text-sm text-muted-foreground">{holding.localCurrency}</p>
                 </div>
 
                 <div className="text-right flex items-center justify-end gap-4">
                   <GainAmount
-                    value={holding.performance.totalGainLossAmount}
-                    currency={holding.currency}
+                    value={holding.totalGain?.local ?? 0}
+                    currency={holding.localCurrency}
                     displayCurrency={false}
                   />
                   <GainPercent
-                    value={holding.performance.totalGainLossPercent}
+                    value={holding.totalGainPct ?? 0}
                     animated={true}
                     variant="badge"
                   />

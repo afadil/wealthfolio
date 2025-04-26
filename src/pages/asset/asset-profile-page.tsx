@@ -15,7 +15,7 @@ import { useAssetProfileMutations } from './useAssetProfileMutations';
 import { useQuoteMutations } from './useQuoteMutations';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
-import { computeHoldings } from '@/commands/portfolio';
+import { getHoldings } from '@/commands/portfolio';
 import { QueryKeys } from '@/lib/query-keys';
 import AssetDetailCard from './asset-detail-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -75,16 +75,16 @@ export const AssetProfilePage = () => {
 
   const { data: allHoldings, isLoading: isHoldingsLoading } = useQuery<Holding[], Error>({
     queryKey: [QueryKeys.HOLDINGS],
-    queryFn: computeHoldings,
+    queryFn: () => getHoldings(PORTFOLIO_ACCOUNT_ID),
   });
 
   const holding = useMemo(() => {
     if (location.state?.holding) return location.state.holding;
-    return allHoldings?.find((h) => h.account?.id === PORTFOLIO_ACCOUNT_ID && h.symbol === symbol);
+    return allHoldings?.find((h) => h.accountId === PORTFOLIO_ACCOUNT_ID && h.instrument?.symbol === symbol);
   }, [location.state?.holding, allHoldings, symbol]);
 
   const quote = useMemo(() => {
-    return assetData?.quoteHistory?.[0] ?? null;
+    return assetData?.quoteHistory?.at(-1) ?? null;
   }, [assetData?.quoteHistory]);
 
   const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();

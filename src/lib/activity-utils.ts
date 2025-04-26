@@ -102,7 +102,7 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
   }
   
   if (activityType === ActivityType.FEE || activityType === ActivityType.TAX) {
-    return getFee(activity);
+    return Number(getFee(activity));
   }
   
   // Handle cash activities
@@ -114,29 +114,29 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     if (activityType === ActivityType.WITHDRAWAL || 
         activityType === ActivityType.CONVERSION_OUT || 
         activityType === ActivityType.TRANSFER_OUT) {
-      return amount + fee; // Fee is already negative in the UI display
+      return Number(amount) + Number(fee);
     }
     
     // For incoming cash activities, subtract fee from amount
-    return amount - fee;
+    return Number(amount) - Number(fee);
   }
   
   // Handle trading activities
   const quantity = getQuantity(activity);
   const unitPrice = getUnitPrice(activity);
   const fee = getFee(activity);
-  const activityAmount = quantity * unitPrice;
+  const activityAmount = Number(quantity) * Number(unitPrice);
   
   if (activityType === ActivityType.BUY) {
-    return activityAmount + fee; // Total cost including fees
+    return Number(activityAmount) + Number(fee); // Total cost including fees
   }
   
   if (activityType === ActivityType.SELL) {
-    return activityAmount - fee; // Net proceeds after fees
+    return Number(activityAmount) - Number(fee); // Net proceeds after fees
   }
   
   // Default case - just return the activity amount
-  return activityAmount;
+  return Number(activityAmount);
 };
 
 /**

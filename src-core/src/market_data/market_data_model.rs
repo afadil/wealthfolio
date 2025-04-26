@@ -5,7 +5,7 @@ use diesel::{
     expression::AsExpression,
 };
 use rust_decimal::Decimal;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL};
@@ -15,7 +15,7 @@ use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_M
 pub struct Quote {
     pub id: String,
     pub symbol: String,
-    pub date: NaiveDateTime,
+    pub timestamp: DateTime<Utc>,
     pub open: Decimal,
     pub high: Decimal,
     pub low: Decimal,
@@ -24,7 +24,7 @@ pub struct Quote {
     pub volume: Decimal,
     pub currency: String,
     pub data_source: DataSource,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Queryable, Identifiable, Selectable, Insertable, AsChangeset, Debug, Clone, Serialize, Deserialize, PartialEq, QueryableByName)]
@@ -36,8 +36,8 @@ pub struct QuoteDb {
     pub id: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub symbol: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub date: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub timestamp: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub open: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -54,17 +54,23 @@ pub struct QuoteDb {
     pub currency: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub data_source: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub created_at: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub created_at: String,
 }
 
 // Conversion implementations
 impl From<QuoteDb> for Quote {
     fn from(db: QuoteDb) -> Self {
+        let parse_datetime = |s: &str| -> DateTime<Utc> {
+            DateTime::parse_from_rfc3339(s)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now())
+        };
+
         Quote {
             id: db.id,
             symbol: db.symbol,
-            date: db.date,
+            timestamp: parse_datetime(&db.timestamp),
             open: Decimal::from_str(&db.open).unwrap_or_default(),
             high: Decimal::from_str(&db.high).unwrap_or_default(),
             low: Decimal::from_str(&db.low).unwrap_or_default(),
@@ -72,7 +78,7 @@ impl From<QuoteDb> for Quote {
             adjclose: Decimal::from_str(&db.adjclose).unwrap_or_default(),
             volume: Decimal::from_str(&db.volume).unwrap_or_default(),
             data_source: DataSource::from(db.data_source.as_ref()),
-            created_at: db.created_at,
+            created_at: parse_datetime(&db.created_at),
             currency: db.currency,
         }
     }
@@ -81,18 +87,18 @@ impl From<QuoteDb> for Quote {
 impl From<&Quote> for QuoteDb {
     fn from(quote: &Quote) -> Self {
         QuoteDb {
-            id: quote.id.clone(),  // String needs cloning
-            symbol: quote.symbol.clone(),  // String needs cloning
-            date: quote.date,          // NaiveDateTime is Copy
-            open: quote.open.to_string(),   // Decimal -> String
-            high: quote.high.to_string(),  // Decimal -> String
-            low: quote.low.to_string(),   // Decimal -> String
-            close: quote.close.to_string(),  // Decimal -> String
+            id: quote.id.clone(),
+            symbol: quote.symbol.clone(),
+            timestamp: quote.timestamp.to_rfc3339(),
+            open: quote.open.to_string(),
+            high: quote.high.to_string(),
+            low: quote.low.to_string(),
+            close: quote.close.to_string(),
             adjclose: quote.adjclose.to_string(),
-            volume: quote.volume.to_string(), //Decimal -> String
-            currency: quote.currency.clone(),  //String needs cloning
+            volume: quote.volume.to_string(),
+            currency: quote.currency.clone(),
             data_source: quote.data_source.as_str().to_string(),
-            created_at: quote.created_at, // NaiveDateTime is copy
+            created_at: quote.created_at.to_rfc3339(),
         }
     }
 }

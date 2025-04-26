@@ -4,6 +4,7 @@ import type { ValueType, NameType } from 'recharts/types/component/DefaultToolti
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { formatPercent } from '@/lib/utils';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -67,7 +68,7 @@ const renderActiveShape = (props: any) => {
         dominantBaseline="central"
         className="text-xs"
       >
-        {(percent * 100).toFixed(0)}%
+        {formatPercent(percent)}
       </text>
 
       {/* Center label with value */}

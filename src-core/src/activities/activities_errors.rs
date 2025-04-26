@@ -41,6 +41,3 @@ impl From<ActivityError> for diesel::result::Error {
         )
     }
 }
-
-/// Result type for activity operations
-pub type Result<T> = std::result::Result<T, ActivityError>; 

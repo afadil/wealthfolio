@@ -1,6 +1,6 @@
-import { Holding, Sector, HoldingType } from '@/lib/types';
+import { Holding, Sector } from '@/lib/types';
 import { useMemo } from 'react';
-import { Bar, BarChart, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, Cell, XAxis, YAxis, Tooltip } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { Skeleton } from '@/components/ui/skeleton';

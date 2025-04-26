@@ -9,12 +9,12 @@ import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { useCalculatePerformance } from './hooks/use-performance-data';
+import { useCalculatePerformanceHistory } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PerformanceData } from '@/lib/types';
+import { PerformanceMetrics, ReturnData } from '@/lib/types';
 import { GainPercent } from '@/components/gain-percent';
 import NumberFlow from '@number-flow/react';
 import { AccountSelector } from '../../components/account-selector';
@@ -32,28 +32,39 @@ const PORTFOLIO_TOTAL: ComparisonItem = {
   name: 'All Portfolio',
 };
 
+// Define the type expected by the chart
+interface ChartDataItem {
+  id: string;
+  name: string;
+  returns: ReturnData[];
+}
+
+// Define the actual structure returned by the hook (assuming it includes name/type)
+interface PerformanceDataFromHook extends PerformanceMetrics {
+  name: string;
+  type: 'account' | 'symbol';
+}
+
 function PerformanceContent({
-  performanceData,
+  chartData,
   isLoading,
   hasErrors,
   errorMessages,
 }: {
-  performanceData: (PerformanceData | null)[] | undefined;
+  chartData: ChartDataItem[] | undefined;
   isLoading: boolean;
   hasErrors: boolean;
   errorMessages: string[];
 }) {
   return (
     <div className="relative flex h-full w-full flex-col">
-      {performanceData && performanceData.length > 0 && (
+      {chartData && chartData.length > 0 && (
         <div className="min-h-0 w-full flex-1">
-          <PerformanceChart
-            data={performanceData.filter((item): item is PerformanceData => item !== null)}
-          />
+          <PerformanceChart data={chartData} />
         </div>
       )}
 
-      {!performanceData?.length && !isLoading && !hasErrors && (
+      {!chartData?.length && !isLoading && !hasErrors && (
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<BarChart className="h-10 w-10" />}
@@ -185,30 +196,44 @@ export default function PerformancePage() {
     hasErrors,
     errorMessages,
     displayDateRange
-  } = useCalculatePerformance({
+  } = useCalculatePerformanceHistory({
     selectedItems,
     dateRange
   });
 
+  // Calculate derived chart data
+  const chartData = useMemo(() => {
+    if (!performanceData || !selectedItems) return [];
+
+    return performanceData
+      // Update type predicate to use the more accurate type
+      .filter((item): item is PerformanceDataFromHook => 
+        item !== null && typeof item.id === 'string' && Array.isArray(item.returns)
+      )
+      .map((perfItem): ChartDataItem => ({
+        id: perfItem.id,
+        name: perfItem.name, // Can now safely access name from perfItem
+        returns: perfItem.returns,
+      }));
+  }, [performanceData, selectedItems]);
+
   // Calculate selected item data
   const selectedItemData = useMemo(() => {
-    if (!performanceData?.length) return null;
-
-    // If no item is selected, use the first one
-    const targetId = selectedItemId || performanceData[0]?.id;
+    if (!performanceData?.length || !selectedItems) return null;
+    const targetId = selectedItemId || performanceData.find(item => item !== null)?.id; // Find first non-null item ID if none selected
+    if (!targetId) return null;
     const found = performanceData.find((item) => item?.id === targetId);
-
     if (!found) return null;
-
+    const name = selectedItems.find(item => item.id === found.id)?.name || 'Unknown';
     return {
       id: found.id,
-      name: found.name,
-      totalReturn: Number(found.totalReturn) * 100,
-      annualizedReturn: Number(found.annualizedReturn) * 100,
-      volatility: Number(found.volatility) * 100,
-      maxDrawdown: Number(found.maxDrawdown) * 100,
+      name: name,
+      totalReturn: Number(found.cumulativeTwr),
+      annualizedReturn: Number(found.annualizedTwr),
+      volatility: Number(found.volatility),
+      maxDrawdown: Number(found.maxDrawdown),
     };
-  }, [selectedItemId, performanceData]);
+  }, [selectedItemId, performanceData, selectedItems]);
 
   const handleAccountSelect = (account: { id: string; name: string }) => {
     setSelectedItems((prev) => {
@@ -313,7 +338,7 @@ export default function PerformancePage() {
                               : 'text-destructive'
                           }`}
                         >
-                          <GainPercent value={selectedItemData?.totalReturn || 0} animated={true} />
+                          <GainPercent value={selectedItemData?.totalReturn || 0} animated={true} className='text-lg'/>
                         </span>
                       </div>
                     </div>
@@ -335,6 +360,7 @@ export default function PerformancePage() {
                           <GainPercent
                             value={selectedItemData?.annualizedReturn || 0}
                             animated={true}
+                            className='text-lg'
                           />
                         </span>
                       </div>
@@ -347,7 +373,7 @@ export default function PerformancePage() {
                       <div className="flex items-baseline">
                         <span className="text-lg text-foreground">
                           <NumberFlow
-                            value={(selectedItemData?.volatility || 0) / 100}
+                            value={(selectedItemData?.volatility || 0)}
                             animated={true}
                             format={{
                               style: 'percent',
@@ -367,7 +393,7 @@ export default function PerformancePage() {
                       <div className="flex items-baseline">
                         <span className="text-lg text-destructive">
                           <NumberFlow
-                            value={(selectedItemData?.maxDrawdown || 0) / 100}
+                            value={(selectedItemData?.maxDrawdown || 0) * -1}
                             animated={true}
                             format={{
                               style: 'percent',
@@ -384,7 +410,7 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent className="min-h-0 flex-1 p-6">
             <PerformanceContent
-              performanceData={performanceData}
+              chartData={chartData}
               isLoading={isLoadingPerformance}
               hasErrors={hasErrors}
               errorMessages={errorMessages}

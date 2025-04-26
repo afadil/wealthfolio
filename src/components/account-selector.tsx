@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Check, ChevronsUpDown, CreditCard, Briefcase, DollarSign, Bitcoin, Plus, Wallet } from 'lucide-react';
 import {
@@ -13,11 +12,11 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Account } from '@/lib/types';
-import { QueryKeys } from '@/lib/query-keys';
-import { getAccounts } from '@/commands/account';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { PORTFOLIO_ACCOUNT_ID, AccountType } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAccounts } from '@/hooks/use-accounts';
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -44,19 +43,7 @@ interface UIAccount extends Omit<Account, 'accountType'> {
   accountType: UIAccountType;
 }
 
-export function useAccounts(filterActive: boolean = true) {
-  const { data: fetchedAccounts = [], isLoading } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
 
-  // Apply active filter if requested
-  const filteredAccounts = filterActive 
-    ? fetchedAccounts.filter(account => account.isActive) 
-    : fetchedAccounts;
-  
-  return { accounts: filteredAccounts, isLoading };
-}
 
 // Create a portfolio account for UI purposes
 function createPortfolioAccount(): UIAccount {
@@ -359,7 +346,7 @@ export function AccountSelector({
                       return (
                         <CommandItem
                           key={account.id}
-                          value={`${account.name} ${account.accountType}`}
+                          value={account.id}
                           onSelect={() => {
                             setSelectedAccount(account);
                             setOpen(false);
@@ -368,7 +355,7 @@ export function AccountSelector({
                         >
                           <div className="flex flex-1 items-center">
                             <IconComponent className="mr-2 h-4 w-4" />
-                            <span>{account.name}</span>
+                            <span>{account.name} ({account.currency})</span>
                           </div>
                           <Check
                             className={cn(

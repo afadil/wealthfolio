@@ -8,7 +8,7 @@ import { Quote, TimePeriod } from '@/lib/types';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
-import { useRefreshQuotesMutation } from '@/hooks/useRefreshQuotes';
+import { useSyncMarketDataMutation } from '@/hooks/use-sync-market-data';
 import { Button } from '@/components/ui/button';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
@@ -42,10 +42,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   symbol,
   className,
 }) => {
-  const refreshQuotesMutation = useRefreshQuotesMutation({
-    successTitle: 'Quotes refreshed successfully',
-    errorTitle: 'Failed to refresh quotes',
-  });
+  const syncMarketDataMutation = useSyncMarketDataMutation();
 
   const [interval, setInterval] = useState<TimePeriod>('3M');
   const { isBalanceHidden } = useBalancePrivacy();
@@ -80,7 +77,6 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
           totalValue: quote.close,
           currency: currency,
         }))
-        .reverse();
     }
 
     return quoteHistory
@@ -90,7 +86,6 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
         totalValue: quote.close,
         currency: currency,
       }))
-      .reverse();
   }, [interval, quoteHistory, currency]);
 
   // Gain calculation
@@ -152,18 +147,18 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                   </h4>
                 </div>
                 <Button
-                  onClick={() => refreshQuotesMutation.mutate([symbol])}
+                  onClick={() => syncMarketDataMutation.mutate([symbol])}
                   variant="outline"
                   size="sm"
                   className="rounded-full"
-                  disabled={refreshQuotesMutation.isPending}
+                  disabled={syncMarketDataMutation.isPending}
                 >
-                  {refreshQuotesMutation.isPending ? (
+                  {syncMarketDataMutation.isPending ? (
                     <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Icons.Refresh className="mr-2 h-4 w-4" />
                   )}
-                  {refreshQuotesMutation.isPending ? 'Refreshing quotes...' : 'Refresh Quotes'}
+                  {syncMarketDataMutation.isPending ? 'Refreshing quotes...' : 'Refresh Quotes'}
                 </Button>
               </div>
             </HoverCardContent>
@@ -173,6 +168,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
       <CardContent className="relative p-0">
         <HistoryChart data={filteredData} />
         <IntervalSelector
+          selectedInterval={interval}
           onIntervalSelect={handleIntervalSelect}
           className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
         />

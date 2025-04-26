@@ -105,3 +105,5 @@ UPDATE assets
 SET countries = REPLACE(countries, '"code":', '"name":')
 WHERE countries IS NOT NULL;
 
+-- Delete quotes for cash symbols (not needed)
+DELETE from quotes where symbol like '$CASH-%';

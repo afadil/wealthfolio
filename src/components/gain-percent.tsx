@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import NumberFlow from '@number-flow/react';
 
@@ -32,13 +31,13 @@ export function GainPercent({
       {...props}
     >
       <NumberFlow
-        value={value / 100}
+        value={value}
         animated={animated}
         format={{
           style: 'percent',
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-          signDisplay: 'always',
+          signDisplay: 'exceptZero',
         }}
       />
     </div>

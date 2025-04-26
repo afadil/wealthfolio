@@ -3,7 +3,7 @@ use crate::schema::{quotes, assets};
 use crate::assets::assets_model::AssetDB;
 use crate::assets::assets_constants::FOREX_ASSET_TYPE;
 use rust_decimal::Decimal;
-use chrono::NaiveDate;
+use chrono::{DateTime, Utc, NaiveDateTime, TimeZone, NaiveDate};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sql_query;
@@ -11,7 +11,7 @@ use diesel::sqlite::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::db::get_connection;
-use crate::errors::{Result, Error, DatabaseError};
+use crate::errors::{Result, Error, DatabaseError, ValidationError};
 use super::fx_model::ExchangeRate;
 use log::error;
 use std::str::FromStr;
@@ -30,20 +30,18 @@ impl FxRepository {
     pub fn get_all_currency_quotes(&self) -> Result<HashMap<String, Vec<Quote>>> {
         let mut conn = get_connection(&self.pool)?;
         
-        // Use a more efficient query that directly gets currency quotes
         let query = "
             SELECT q.*
             FROM quotes q
-            INNER JOIN assets a ON q.symbol = a.symbol
+            INNER JOIN assets a ON q.symbol = a.id
             WHERE a.asset_type = 'FOREX'
-            ORDER BY q.symbol, q.date";
+            ORDER BY q.symbol, q.timestamp";
 
-        let quotes: Vec<QuoteDb> = diesel::sql_query(query)
+        let quotes_db: Vec<QuoteDb> = diesel::sql_query(query)
             .load(&mut conn)?;
 
-        // Group quotes by symbol efficiently
         let mut grouped_quotes: HashMap<String, Vec<Quote>> = HashMap::with_capacity(100);
-        for quote_db in quotes {
+        for quote_db in quotes_db {
             let quote = Quote::from(quote_db);
             grouped_quotes
                 .entry(quote.symbol.clone())
@@ -61,20 +59,20 @@ impl FxRepository {
             WITH LatestQuotes AS (
                 SELECT q.* 
                 FROM quotes q
-                INNER JOIN assets a ON q.symbol = a.symbol 
+                INNER JOIN assets a ON q.symbol = a.id
                 WHERE a.asset_type = 'FOREX'
-                AND (q.symbol, q.date) IN (
-                    SELECT symbol, MAX(date)
+                AND (q.symbol, q.timestamp) IN (
+                    SELECT symbol, MAX(timestamp)
                     FROM quotes
                     GROUP BY symbol
                 )
             )
             SELECT * FROM LatestQuotes";
 
-        let quotes: Vec<QuoteDb> = diesel::sql_query(query)
+        let quotes_db: Vec<QuoteDb> = diesel::sql_query(query)
             .load(&mut conn)?;
 
-        Ok(quotes.into_iter().map(|q| (q.symbol, Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)))).collect())
+        Ok(quotes_db.into_iter().map(|q| (q.symbol, Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)))).collect())
     }
 
     pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
@@ -82,12 +80,12 @@ impl FxRepository {
         
         let latest_quotes = sql_query(
             "SELECT q.* FROM quotes q
-             INNER JOIN assets a ON q.symbol = a.symbol AND a.asset_type = 'FOREX'
+             INNER JOIN assets a ON q.symbol = a.id AND a.asset_type = 'FOREX'
              INNER JOIN (
-                 SELECT symbol, MAX(date) as max_date
+                 SELECT symbol, MAX(timestamp) as max_timestamp
                  FROM quotes
                  GROUP BY symbol
-             ) latest ON q.symbol = latest.symbol AND q.date = latest.max_date
+             ) latest ON q.symbol = latest.symbol AND q.timestamp = latest.max_timestamp
              ORDER BY q.symbol"
         )
         .load::<QuoteDb>(&mut conn)?;
@@ -98,6 +96,26 @@ impl FxRepository {
             .collect())
     }
 
+    /// Fetches all historical exchange rates (quotes) for FOREX assets.
+    pub fn get_all_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let all_quotes_db = quotes::table
+            .inner_join(assets::table.on(quotes::symbol.eq(assets::id)))
+            .filter(assets::asset_type.eq(FOREX_ASSET_TYPE))
+            .select(quotes::all_columns)
+            .order_by((quotes::symbol.asc(), quotes::timestamp.asc()))
+            .load::<QuoteDb>(&mut conn)?;
+
+        Ok(all_quotes_db
+            .into_iter()
+            .map(|q_db| {
+                let quote = Quote::from(q_db);
+                ExchangeRate::from_quote(&quote)
+            })
+            .collect())
+    }
+
     pub fn get_exchange_rate(
         &self,
         from: &str,
@@ -105,14 +123,14 @@ impl FxRepository {
     ) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
         
-        let symbol = format!("{}{}=X", from, to);
-        let quote = quotes::table
+        let symbol = ExchangeRate::make_fx_symbol(from, to);
+        let quote_db = quotes::table
             .filter(quotes::symbol.eq(symbol))
-            .order_by(quotes::date.desc())
+            .order_by(quotes::timestamp.desc())
             .first::<QuoteDb>(&mut conn)
             .optional()?;
 
-        Ok(quote.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
+        Ok(quote_db.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
     }
 
     pub fn get_exchange_rate_by_id(
@@ -121,50 +139,60 @@ impl FxRepository {
     ) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
         
-        let quote = quotes::table
+        let quote_db = quotes::table
             .filter(quotes::symbol.eq(id))
-            .order_by(quotes::date.desc())
+            .order_by(quotes::timestamp.desc())
             .first::<QuoteDb>(&mut conn)
             .optional()?;
 
-        Ok(quote.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
+        Ok(quote_db.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
     }
 
     pub fn get_historical_quotes(
         &self,
         symbol: &str,
-        start_date: chrono::NaiveDateTime,
-        end_date: chrono::NaiveDateTime,
+        start_date: NaiveDateTime,
+        end_date: NaiveDateTime,
     ) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
         
-        let quotes = quotes::table
+        let start_dt_str = Utc.from_utc_datetime(&start_date).to_rfc3339();
+        let end_dt_str = Utc.from_utc_datetime(&end_date).to_rfc3339();
+
+        let quotes_db = quotes::table
             .filter(quotes::symbol.eq(symbol))
-            .filter(quotes::date.ge(start_date))
-            .filter(quotes::date.le(end_date))
-            .order_by(quotes::date.asc())
+            .filter(quotes::timestamp.ge(start_dt_str))
+            .filter(quotes::timestamp.le(end_dt_str))
+            .order_by(quotes::timestamp.asc())
             .load::<QuoteDb>(&mut conn)?;
 
-        Ok(quotes.into_iter().map(Quote::from).collect())
+        Ok(quotes_db.into_iter().map(Quote::from).collect())
     }
 
     pub fn add_quote(
         &self,
         symbol: String,
-        date: String,
+        date_str: String,
         rate: Decimal,
         source: String,
     ) -> Result<Quote> {
         let mut conn = get_connection(&self.pool)?;
         
+        let naive_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+            .map_err(|e| Error::Validation(ValidationError::InvalidInput(format!("Invalid date format: {}", e))))?;
+        let naive_datetime = naive_date.and_hms_opt(16, 0, 0)
+            .ok_or_else(|| Error::Validation(ValidationError::InvalidInput(format!("Failed to create NaiveDateTime for {}", date_str))))?;
+        let timestamp_utc: DateTime<Utc> = Utc.from_utc_datetime(&naive_datetime);
+        let timestamp_str = timestamp_utc.to_rfc3339();
+        let created_at_str = Utc::now().to_rfc3339();
+
         let currency = symbol.split_at(3).0.to_string();
-        let quote = QuoteDb {
-            id: format!("{}_{}", date.replace("-", ""), symbol.clone()),
-            symbol,
-            date: NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-                .unwrap()
-                .and_hms_opt(0, 0, 0)
-                .unwrap(),
+        let quote_id = format!("{}_{}", date_str.replace("-", ""), symbol);
+
+        let quote_db = QuoteDb {
+            id: quote_id,
+            symbol: symbol.clone(),
+            timestamp: timestamp_str.clone(),
             open: rate.to_string(),
             high: rate.to_string(),
             low: rate.to_string(),
@@ -172,24 +200,24 @@ impl FxRepository {
             adjclose: rate.to_string(),
             volume: "0".to_string(),
             currency,
-            data_source: source,
-            created_at: chrono::Utc::now().naive_utc(),
+            data_source: source.clone(),
+            created_at: created_at_str,
         };
 
         diesel::insert_into(quotes::table)
-            .values(&quote)
-            .on_conflict((quotes::symbol, quotes::date, quotes::data_source))
+            .values(&quote_db)
+            .on_conflict((quotes::symbol, quotes::timestamp, quotes::data_source))
             .do_update()
             .set((
-                quotes::close.eq(quote.close.clone()),
-                quotes::data_source.eq(&quote.data_source),
+                quotes::close.eq(quote_db.close.clone()),
+                quotes::data_source.eq(&quote_db.data_source),
             ))
             .execute(&mut conn)?;
 
         Ok(quotes::table
-            .filter(quotes::symbol.eq(&quote.symbol))
-            .filter(quotes::date.eq(&quote.date))
-            .filter(quotes::data_source.eq(&quote.data_source))
+            .filter(quotes::symbol.eq(&symbol))
+            .filter(quotes::timestamp.eq(&timestamp_str))
+            .filter(quotes::data_source.eq(&source))
             .first::<QuoteDb>(&mut conn)
             .map(Quote::from)?)
     }
@@ -218,7 +246,6 @@ impl FxRepository {
             ))
             .execute(&mut conn)?;
 
-        // Fetch the upserted record and return it or map the error
         quotes::table
             .filter(quotes::id.eq(&quote_db.id))
             .first::<QuoteDb>(&mut conn)
@@ -244,7 +271,7 @@ impl FxRepository {
 
         diesel::update(quotes::table)
             .filter(quotes::symbol.eq(&quote_db.symbol))
-            .filter(quotes::date.eq(&quote_db.date))
+            .filter(quotes::timestamp.eq(&quote_db.timestamp))
             .set((
                 quotes::close.eq(quote_db.close.clone()),
                 quotes::data_source.eq(&quote_db.data_source),
@@ -274,7 +301,7 @@ impl FxRepository {
             "Currency pair for converting from {} to {}",
             from, to
         );
-        let now = chrono::Utc::now().naive_utc();
+        let now_naive = chrono::Utc::now().naive_utc();
 
         let asset_db = AssetDB {
             id: symbol.clone(),
@@ -286,8 +313,8 @@ impl FxRepository {
             notes: Some(notes),
             currency: from.to_string(),
             data_source: source.to_string(),
-            created_at: now,
-            updated_at: now,
+            created_at: now_naive,
+            updated_at: now_naive,
             ..Default::default()
         };
 
@@ -303,7 +330,7 @@ impl FxRepository {
                 assets::notes.eq(&asset_db.notes),
                 assets::currency.eq(&asset_db.currency),
                 assets::data_source.eq(&asset_db.data_source),
-                assets::updated_at.eq(now),
+                assets::updated_at.eq(now_naive),
             ))
             .execute(&mut conn)
             .map_err(|e| Error::Database(DatabaseError::QueryFailed(e)))?;
@@ -343,8 +370,8 @@ impl FxRepositoryTrait for FxRepository {
     fn get_historical_quotes(
         &self,
         symbol: &str,
-        start_date: chrono::NaiveDateTime,
-        end_date: chrono::NaiveDateTime,
+        start_date: NaiveDateTime,
+        end_date: NaiveDateTime,
     ) -> Result<Vec<Quote>> {
         self.get_historical_quotes(symbol, start_date, end_date)
     }
@@ -383,5 +410,10 @@ impl FxRepositoryTrait for FxRepository {
     /// Creates or updates an FX asset in the database
     fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
         self.create_fx_asset(from, to, source)
+    }
+
+    /// Fetches all historical exchange rates (quotes) for FOREX assets.
+    fn get_all_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+        self.get_all_historical_exchange_rates()
     }
 }

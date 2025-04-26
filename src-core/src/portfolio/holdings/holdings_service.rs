@@ -1,8 +1,7 @@
 use crate::assets::AssetServiceTrait;
 use crate::assets_model::{Asset, Country as AssetCountry, Sector as AssetSector};
-use crate::model::holdings_model;
 use crate::portfolio::holdings::holdings_model::{Holding, Instrument, HoldingType, MonetaryValue, Country, Sector};
-use crate::portfolio::snapshot::SnapshotServiceTrait;
+use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
 
 use crate::errors::{Error as CoreError, Result};
 use async_trait::async_trait;
@@ -74,7 +73,7 @@ impl HoldingsServiceTrait for HoldingsService {
             }
         };
 
-        let snapshot_positions: Vec<holdings_model::Position> = latest_snapshot
+        let snapshot_positions: Vec<snapshot::Position> = latest_snapshot
             .positions
             .values()
             .filter(|p| p.quantity != Decimal::ZERO)
@@ -270,11 +269,10 @@ impl HoldingsServiceTrait for HoldingsService {
         if total_portfolio_value_base > dec!(0) {
             for holding_view in &mut holdings {
                 holding_view.weight =
-                    ((holding_view.market_value.base / total_portfolio_value_base) * dec!(100))
-                        .round_dp(2);
+                    (holding_view.market_value.base / total_portfolio_value_base).round_dp(4);
             }
         } else {
-            info!("Total portfolio base value is zero or negative for account {}. Allocations set to 0%.", account_id);
+            info!("Total portfolio base value is zero or negative for account {}. Allocations set to 0.", account_id);
             for holding_view in &mut holdings {
                 holding_view.weight = Decimal::ZERO;
             }

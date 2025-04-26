@@ -33,7 +33,7 @@ const Balance: React.FC<BalanceProps> = ({
   };
 
   return (
-    <h1 className="font-heading text-3xl font-bold tracking-tight">
+    <h1 className="font-heading text-3xl tracking-tight">
       {isBalanceHidden ? (
         <span>
           {displayCurrency ? `${getCurrencySymbol(currency)}` : ''}
@@ -41,6 +41,7 @@ const Balance: React.FC<BalanceProps> = ({
         </span>
       ) : (
         <NumberFlow
+          className="muted-fraction"
           value={targetValue}
           isolate={false}
           format={{

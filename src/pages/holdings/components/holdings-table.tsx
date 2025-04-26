@@ -145,7 +145,7 @@ const getColumns = (
       const symbolB = rowB.original.instrument?.symbol ?? rowB.original.id;
       return symbolA.localeCompare(symbolB);
     },
-    filterFn: (row, columnId, filterValue) => {
+    filterFn: (row, _columnId, filterValue) => {
       const holding = row.original;
       const searchTerm = filterValue as string;
       const nameMatch = holding.instrument?.name?.toLowerCase().includes(searchTerm.toLowerCase());

@@ -1,25 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import { createActivity, updateActivity, deleteActivity } from '@/commands/activity';
-import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
-import { QueryKeys } from '@/lib/query-keys';
 import { logger } from '@/adapters';
 import { NewActivityFormValues } from '../components/forms/schemas';
+import { QueryKeys } from '@/lib/query-keys';
 
-export function useActivityMutations(onSuccess?: () => void) {
+export function useActivityMutations(onSuccess?: (activity: { accountId?: string | null }) => void) {
   const queryClient = useQueryClient();
-  const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Activity updated successfully.',
-  });
-
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
-      calculateHistoryMutation.mutate({
-        accountIds: activity.accountId ? [activity.accountId] : undefined,
-        forceFullCalculation: true,
-      });
-      if (onSuccess) onSuccess();
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+      if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {
       logger.error(`Error ${action} activity: ${error}`);

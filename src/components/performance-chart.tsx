@@ -1,4 +1,4 @@
-import { CumulativeReturn } from '@/lib/types';
+import { ReturnData } from '@/lib/types';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
 import { formatPercent } from '@/lib/utils';
@@ -16,7 +16,7 @@ interface PerformanceChartProps {
   data: {
     id: string;
     name: string;
-    returns: CumulativeReturn[];
+    returns: ReturnData[];
   }[];
 }
 
@@ -26,7 +26,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     data.forEach((series) => {
       const matchingPoint = series.returns?.find((p) => p.date === item.date);
       if (matchingPoint) {
-        dataPoint[series.id] = matchingPoint.value * 100;
+        dataPoint[series.id] = matchingPoint.value;
       }
     });
     return dataPoint;
@@ -94,7 +94,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     value,
     name,
   ) => {
-    const formattedValue = typeof value === 'number' ? formatPercent(value) : value.toString();
+    const formattedValue = formatPercent(Number(value));
     return [formattedValue + ' - ', name.toString()];
   };
 
@@ -122,6 +122,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
+              domain={[-0.12, "auto"]}
             />
             <ChartTooltip
               cursor={false}

@@ -2,10 +2,11 @@ use chrono::Utc;
 use log::{debug, error, info};
 use std::sync::Arc;
 
+use crate::activities::activities_errors::ActivityError;
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::activities::{ActivityError, Result};
+use crate::{Error, Result};
 use crate::assets::{Asset, AssetServiceTrait};
 use crate::fx::FxServiceTrait;
 use uuid::Uuid;
@@ -90,13 +91,12 @@ impl ActivityServiceTrait for ActivityService {
         let asset = self
             .asset_service
             .get_or_create_asset(&activity.asset_id)
-            .await
-            .map_err(|e| ActivityError::AssetError(e.to_string()))?;
+            .await?;
 
         let account: Account = self
             .account_service
             .get_account(&activity.account_id)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+            ?;
 
         if activity.currency.is_empty() {
             activity.currency = if !asset.currency.is_empty() {
@@ -109,7 +109,7 @@ impl ActivityServiceTrait for ActivityService {
         if activity.currency != account.currency {
             self.fx_service
                 .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
-                .map_err(|e| ActivityError::CurrencyExchangeError(e.to_string()))?;
+                ?;
         }
 
         self.activity_repository.create_activity(activity)
@@ -120,24 +120,12 @@ impl ActivityServiceTrait for ActivityService {
         let asset = self
             .asset_service
             .get_or_create_asset(&activity.asset_id)
-            .await
-            .map_err(|e| ActivityError::AssetError(e.to_string()))?;
-
-        if let Err(e) = self
-            .asset_service
-            .sync_asset_quotes(&vec![asset.clone()], true)
-            .await
-        {
-            error!(
-                "Failed to sync quotes for asset: {}. Error: {:?}",
-                asset.symbol, e
-            );
-        }
+            .await?;
 
         let account: Account = self
             .account_service
             .get_account(&activity.account_id)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+            ?;
 
         if activity.currency.is_empty() {
             activity.currency = if !asset.currency.is_empty() {
@@ -150,7 +138,7 @@ impl ActivityServiceTrait for ActivityService {
         if activity.currency != account.currency {
             self.fx_service
                 .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
-                .map_err(|e| ActivityError::CurrencyExchangeError(e.to_string()))?;
+                ?;
         }
 
         self.activity_repository.update_activity(activity)
@@ -170,7 +158,7 @@ impl ActivityServiceTrait for ActivityService {
         let account: Account = self
             .account_service
             .get_account(&account_id)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+            ?;
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
         let mut assets_to_sync: Vec<Asset> = Vec::new();
@@ -284,7 +272,7 @@ impl ActivityServiceTrait for ActivityService {
     fn get_first_activity_date(
         &self,
         account_ids: Option<&[String]>,
-    ) -> Result<Option<chrono::NaiveDate>> {
+    ) -> Result<Option<chrono::DateTime<Utc>>> {
         self.activity_repository
             .get_first_activity_date(account_ids)
     }
@@ -298,7 +286,7 @@ impl ActivityServiceTrait for ActivityService {
         let mut result = match mapping {
             Some(m) => m
                 .to_mapping_data()
-                .map_err(|e| ActivityError::DatabaseError(e.to_string()))?,
+                .map_err(|e| ActivityError::InvalidData(format!("Failed to parse mapping data: {}", e)))?,
             None => ImportMappingData::default(),
         };
         result.account_id = account_id;
@@ -313,12 +301,9 @@ impl ActivityServiceTrait for ActivityService {
         let now = Utc::now().naive_utc();
         let new_mapping = ImportMapping {
             account_id: mapping_data.account_id.clone(),
-            field_mappings: serde_json::to_string(&mapping_data.field_mappings)
-                .map_err(|e| ActivityError::DatabaseError(e.to_string()))?,
-            activity_mappings: serde_json::to_string(&mapping_data.activity_mappings)
-                .map_err(|e| ActivityError::DatabaseError(e.to_string()))?,
-            symbol_mappings: serde_json::to_string(&mapping_data.symbol_mappings)
-                .map_err(|e| ActivityError::DatabaseError(e.to_string()))?,
+            field_mappings: serde_json::to_string(&mapping_data.field_mappings)?,
+            activity_mappings: serde_json::to_string(&mapping_data.activity_mappings)?,
+            symbol_mappings: serde_json::to_string(&mapping_data.symbol_mappings)?,
             created_at: now,
             updated_at: now,
         };

@@ -28,51 +28,56 @@ export function tryParseDate(dateStr: string): Date | null {
   
   // Array of date format patterns to try
   const formatPatterns = [
-    // North American Banking Formats
-    'MMM dd yyyy',     // "MAY 01 2024" - Common in North American banks
-    'MMMM dd yyyy',    // "MAY 01 2024" (full month)
-    'MM/dd/yyyy',      // "05/01/2024" - US Standard
-    'M/d/yyyy',        // "5/1/2024" - US Relaxed
-    
-    // European Banking Formats
-    'dd/MM/yyyy',      // "01/05/2024" - UK/EU Standard
-    'd/M/yyyy',        // "1/5/2024" - UK/EU Relaxed
-    'dd.MM.yyyy',      // "01.05.2024" - German/Swiss/Russian
-    'd.M.yyyy',        // "1.5.2024" - German/Swiss Relaxed
-    'dd-MM-yyyy',      // "01-05-2024" - Dutch/Danish
-    
+    // Standard ISO 8601 UTC
+    "yyyy-MM-dd'T'HH:mm:ss'Z'", // Added Standard ISO format
+    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", // Added Standard ISO format with milliseconds
+    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", // Added Standard ISO timestamp with microsecond precision and timezone offset
+
     // ISO and Technical Formats
-    'yyyy-MM-dd',      // "2024-05-01" - ISO 8601
-    'yyyyMMdd',        // "20240501" - Compact ISO
-    'yyyy/MM/dd',      // "2024/05/01" - Modified ISO
-    'yyyy.MM.dd',      // "2024.05.01" - Modified ISO
-    
+    'yyyy-MM-dd', // "2024-05-01" - ISO 8601
+    'yyyyMMdd', // "20240501" - Compact ISO
+    'yyyy/MM/dd', // "2024/05/01" - Modified ISO
+    'yyyy.MM.dd', // "2024.05.01" - Modified ISO
+
+    // North American Banking Formats
+    'MMM dd yyyy', // "MAY 01 2024" - Common in North American banks
+    'MMMM dd yyyy', // "MAY 01 2024" (full month)
+    'MM/dd/yyyy', // "05/01/2024" - US Standard
+    'M/d/yyyy', // "5/1/2024" - US Relaxed
+
+    // European Banking Formats
+    'dd/MM/yyyy', // "01/05/2024" - UK/EU Standard
+    'd/M/yyyy', // "1/5/2024" - UK/EU Relaxed
+    'dd.MM.yyyy', // "01.05.2024" - German/Swiss/Russian
+    'd.M.yyyy', // "1.5.2024" - German/Swiss Relaxed
+    'dd-MM-yyyy', // "01-05-2024" - Dutch/Danish
+
     // Asian Banking Formats
-    'yyyy年MM月dd日',   // "2024年05月01日" - Japanese
-    'yyyy년MM월dd일',   // "2024년05월01일" - Korean
-    'yyyy年M月d日',     // "2024年5月1日" - Chinese Traditional
-    
+    'yyyy年MM月dd日', // "2024年05月01日" - Japanese
+    'yyyy년MM월dd일', // "2024년05월01일" - Korean
+    'yyyy年M月d日', // "2024年5月1日" - Chinese Traditional
+
     // Common Text Formats
-    'MMMM d, yyyy',    // "May 1, 2024" - US Formal
-    'MMM d, yyyy',     // "May 1, 2024" - US Common
-    'd MMM yyyy',      // "1 May 2024" - UK Common
-    'dd MMM yyyy',     // "01 May 2024" - UK Formal
-    'd MMMM yyyy',     // "1 May 2024" - UK Extended
-    'dd MMMM yyyy',    // "01 May 2024" - UK Extended Formal
-    
+    'MMMM d, yyyy', // "May 1, 2024" - US Formal
+    'MMM d, yyyy', // "May 1, 2024" - US Common
+    'd MMM yyyy', // "1 May 2024" - UK Common
+    'dd MMM yyyy', // "01 May 2024" - UK Formal
+    'd MMMM yyyy', // "1 May 2024" - UK Extended
+    'dd MMMM yyyy', // "01 May 2024" - UK Extended Formal
+
     // Additional Banking Formats
-    'dd-MMM-yyyy',     // "01-MAY-2024" - Legacy Banking
-    'ddMMMyyyy',       // "01MAY2024" - Swift/Wire
-    'dd MMM yy',       // "01 MAY 24" - Short Year
-    'MMM dd, yy',      // "MAY 01, 24" - US Short
-    
+    'dd-MMM-yyyy', // "01-MAY-2024" - Legacy Banking
+    'ddMMMyyyy', // "01MAY2024" - Swift/Wire
+    'dd MMM yy', // "01 MAY 24" - Short Year
+    'MMM dd, yy', // "MAY 01, 24" - US Short
+
     // Fiscal Year Formats
-    'MMM dd FY yyyy',  // "MAY 01 FY 2024"
-    'dd MMM FY yyyy',  // "01 MAY FY 2024"
-    
+    'MMM dd FY yyyy', // "MAY 01 FY 2024"
+    'dd MMM FY yyyy', // "01 MAY FY 2024"
+
     // Quarter Formats
-    'Qn yyyy',         // "Q2 2024"
-    'yyyy-Qn',         // "2024-Q2"
+    'Qn yyyy', // "Q2 2024"
+    'yyyy-Qn', // "2024-Q2"
   ];
 
   // Try each format pattern
@@ -116,19 +121,21 @@ export function formatDate(input: string | number): string {
 
 export const formatDateTime = (date: string | Date, timezone?: string) => {
   if (!date) return { date: '-', time: '-' };
+  // Determine the effective timezone: use provided timezone or default to user's local timezone
+  const effectiveTimezone = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const dateOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    timeZone: timezone || 'UTC',
+    timeZone: effectiveTimezone,
   };
 
   const timeOptions: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
     minute: 'numeric',
     second: 'numeric',
-    timeZone: timezone || 'UTC',
+    timeZone: effectiveTimezone,
   };
 
   const dateFormatter = new Intl.DateTimeFormat('en-US', dateOptions);
@@ -153,13 +160,16 @@ export function formatAmount(amount: number, currency: string, displayCurrency =
 export function formatPercent(value: number | null | undefined) {
   if (value == null) return '-';
   try {
-    if (isNaN(value)) {
-      throw new Error('Invalid number');
-    }
-    return `${Number(value).toFixed(2)}%`;
+    // Use Intl.NumberFormat for correct percentage formatting (handles x100 and % sign)
+    return new Intl.NumberFormat('en-US', {
+      style: 'percent',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
   } catch (error) {
     logger.error(`Error formatting percent ${value}: ${error}`);
-    return String(value);
+    // Fallback to simple string conversion if formatting fails
+    return `${value}%`; // Keep original fallback but it might still be incorrect
   }
 }
 export function formatStockQuantity(quantity: string | number) {

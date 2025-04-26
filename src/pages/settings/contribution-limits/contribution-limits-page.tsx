@@ -12,14 +12,14 @@ import { QueryKeys } from '@/lib/query-keys';
 import { useContributionLimitMutations } from './useContributionLimitMutations';
 import { ContributionLimitItem } from './components/contribution-limit-item';
 import { ContributionLimitEditModal } from './components/contribution-limit-edit-modal';
-import { useAccounts } from '@/pages/account/useAccounts';
+import { useAccounts } from '@/hooks/use-accounts';
 
 const SettingsContributionLimitPage = () => {
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedLimit, setSelectedLimit] = useState<ContributionLimit | null>(null);
   const [showPreviousYears, setShowPreviousYears] = useState(false);
 
-  const { data: accounts } = useAccounts();
+  const { accounts } = useAccounts();
 
   const { data: limits, isLoading } = useQuery<ContributionLimit[], Error>({
     queryKey: [QueryKeys.CONTRIBUTION_LIMITS],

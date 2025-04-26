@@ -19,17 +19,17 @@ CREATE TABLE activities_old (
     asset_id TEXT NOT NULL,
     activity_type TEXT NOT NULL,
     activity_date TIMESTAMP NOT NULL,
-    quantity DOUBLE NOT NULL,  -- Changed back to DOUBLE
-    unit_price DOUBLE NOT NULL, -- Changed back to DOUBLE
+    quantity DOUBLE NOT NULL,
+    unit_price DOUBLE NOT NULL,
     currency TEXT NOT NULL,
-    fee DOUBLE NOT NULL, -- Changed back to DOUBLE
+    fee DOUBLE NOT NULL,
     is_draft BOOLEAN NOT NULL,
     comment TEXT,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
 
--- Copy data from new table to old table, converting TEXT values back to DOUBLE
+-- Copy data from new table to old table, converting TEXT values back to DOUBLE and TEXT timestamps back to TIMESTAMP format
 -- For cash activities, we need to restore the original values from amount
 INSERT INTO activities_old (
     id, account_id, asset_id, activity_type, activity_date,
@@ -37,7 +37,8 @@ INSERT INTO activities_old (
     is_draft, comment, created_at, updated_at
 )
 SELECT 
-    id, account_id, asset_id, activity_type, activity_date,
+    id, account_id, asset_id, activity_type, 
+    datetime(activity_date),
     CASE 
         WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX', 'SPLIT') 
              OR (activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT') AND asset_id LIKE '$CASH-%') THEN 1.0
@@ -53,7 +54,9 @@ SELECT
         ELSE CAST(unit_price AS DOUBLE)
     END as unit_price,
     currency, CAST(fee AS DOUBLE),
-    is_draft, comment, created_at, updated_at
+    is_draft, comment, 
+    datetime(created_at),
+    datetime(updated_at)
 FROM activities;
 
 -- Drop new table
@@ -117,7 +120,7 @@ CREATE TABLE quotes_old (
     CONSTRAINT "quotes_asset_id_fkey" FOREIGN KEY ("symbol") REFERENCES "assets" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- Copy data from new table to old table, converting TEXT values back to DOUBLE
+-- Copy data from new table to old table, converting TEXT values back to DOUBLE and TEXT timestamps back to TIMESTAMP format
 INSERT INTO quotes_old (
     id, symbol, date, open, high, low, close, 
     adjclose, volume, data_source, created_at

@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import { createAccount, updateAccount, deleteAccount } from '@/commands/account';
-import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { QueryKeys } from '@/lib/query-keys';
 import { logger } from '@/adapters';
 interface UseAccountMutationsProps {
@@ -10,10 +9,6 @@ interface UseAccountMutationsProps {
 
 export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutationsProps) {
   const queryClient = useQueryClient();
-
-  const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Account updated successfully.',
-  });
 
   const handleSuccess = (message?: string) => {
     onSuccess();
@@ -44,12 +39,9 @@ export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutation
 
   const updateAccountMutation = useMutation({
     mutationFn: updateAccount,
-    onSuccess: (updatedAccount) => {
+    onSuccess: () => {
       handleSuccess();
-      calculateHistoryMutation.mutate({
-        accountIds: [updatedAccount.id],
-        forceFullCalculation: true,
-      });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     },
     onError: (e) => {
       logger.error(`Error updating account: ${e}`);
@@ -61,10 +53,7 @@ export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutation
     mutationFn: deleteAccount,
     onSuccess: () => {
       handleSuccess();
-      calculateHistoryMutation.mutate({
-        accountIds: undefined,
-        forceFullCalculation: true,
-      });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     },
     onError: (e) => {
       logger.error(`Error deleting account: ${e}`);

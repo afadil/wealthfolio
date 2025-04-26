@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
-use super::market_data_model::{Quote, QuoteRequest, QuoteSummary, LatestQuotePair};
+use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair};
 use super::providers::models::AssetProfile;
 
 #[async_trait]
@@ -26,11 +26,24 @@ pub trait MarketDataServiceTrait: Send + Sync {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<Quote>>;
-    async fn sync_quotes(&self, quote_requests: &[QuoteRequest], refetch_all: bool) -> Result<()>;
+    async fn sync_market_data(&self, symbols: Option<Vec<String>>, refetch_all: bool) -> Result<()>;
     fn get_latest_quotes_pair_for_symbols(
         &self,
         symbols: &[String],
     ) -> Result<HashMap<String, LatestQuotePair>>;
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>>;
+    /// Fetches historical quotes for the needed symbols and date range, grouped by date.
+    async fn get_daily_quotes(
+        &self,
+        asset_ids: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>>;
 }
 
 pub trait MarketDataRepositoryTrait {
@@ -50,4 +63,10 @@ pub trait MarketDataRepositoryTrait {
         &self,
         symbols: &[String],
     ) -> Result<HashMap<String, LatestQuotePair>>;
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Quote>>;
 } 

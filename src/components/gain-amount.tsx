@@ -35,7 +35,7 @@ export function GainAmount({
         ) : (
           <NumberFlow
             value={value}
-            isolate={false}
+            isolate={true}
             format={{
               currency: currency,
               style: displayCurrency ? 'currency' : 'decimal',

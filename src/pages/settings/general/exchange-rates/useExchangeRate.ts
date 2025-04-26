@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
 import { logger } from '@/adapters';
 import { ExchangeRate } from '@/lib/types';
@@ -9,15 +9,9 @@ import {
   deleteExchangeRate as deleteExchangeRateApi,
 } from '@/commands/exchange-rates';
 import { QueryKeys } from '@/lib/query-keys';
-import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
 import { worldCurrencies } from '@/lib/currencies';
 
 export function useExchangeRates() {
-  const queryClient = useQueryClient();
-  const calculateHistoryMutation = useCalculateHistoryMutation({
-    successTitle: 'Exchange rates updated successfully.',
-  });
-
   const getCurrencyName = (code: string) => {
     const currency = worldCurrencies.find((c) => c.value === code);
     return currency ? currency.label.split(' (')[0] : code;
@@ -51,14 +45,6 @@ export function useExchangeRates() {
 
   const updateExchangeRateMutation = useMutation({
     mutationFn: updateExchangeRateApi,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-
-      calculateHistoryMutation.mutate({
-        accountIds: undefined,
-        forceFullCalculation: true,
-      });
-    },
     onError: (error) => {
       logger.error(`Error updating exchange rate: ${error}`);
       toast({
@@ -71,13 +57,6 @@ export function useExchangeRates() {
 
   const addExchangeRateMutation = useMutation({
     mutationFn: addExchangeRateApi,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-      calculateHistoryMutation.mutate({
-        accountIds: undefined,
-        forceFullCalculation: true,
-      });
-    },
     onError: (error) => {
       logger.error(`Error adding exchange rate: ${error}`);
       toast({
@@ -90,13 +69,6 @@ export function useExchangeRates() {
 
   const deleteExchangeRateMutation = useMutation({
     mutationFn: deleteExchangeRateApi,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.EXCHANGE_RATES] });
-      calculateHistoryMutation.mutate({
-        accountIds: undefined,
-        forceFullCalculation: true,
-      });
-    },
     onError: (error) => {
       logger.error(`Error deleting exchange rate: ${error}`);
       toast({

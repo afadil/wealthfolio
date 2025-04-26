@@ -29,9 +29,9 @@ export {
   listenFileDropHoverTauri,
   listenFileDropTauri,
   listenFileDropCancelledTauri,
-  listenQuotesSyncStartTauri,
-  listenQuotesSyncCompleteTauri,
-  listenQuotesSyncErrorTauri,
+  listenPortfolioUpdateStartTauri,
+  listenPortfolioUpdateCompleteTauri,
+  listenPortfolioUpdateErrorTauri,
   openFileSaveDialogTauri,
   logger,
 } from './tauri';

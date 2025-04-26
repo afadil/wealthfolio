@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
+use crate::events::{
+    emit_portfolio_recalculate_request,
+    PortfolioRequestPayload,
+};
 use log::debug;
-use tauri::State;
+use tauri::{State, AppHandle};
 use wealthfolio_core::activities::{
     Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
     NewActivity, Sort,
@@ -25,7 +29,7 @@ pub async fn search_activities(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
-    state
+    Ok(state
         .activity_service()
         .search_activities(
             page,
@@ -35,16 +39,28 @@ pub async fn search_activities(
             asset_id_keyword,
             sort,
         )
-        .map_err(|e| e.to_string())
+        ?)
 }
 
 #[tauri::command]
 pub async fn create_activity(
     activity: NewActivity,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Creating activity...");
     let result = state.activity_service().create_activity(activity).await?;
+    let handle = handle.clone();
+    let account_id_clone = result.account_id.clone();
+    let symbols = vec![result.asset_id.clone()];
+
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(Some(vec![account_id_clone]))
+        .sync_market_data(false)
+        .symbols(Some(symbols))
+        .build();
+    emit_portfolio_recalculate_request(&handle, payload);
+
     Ok(result)
 }
 
@@ -52,9 +68,21 @@ pub async fn create_activity(
 pub async fn update_activity(
     activity: ActivityUpdate,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Updating activity...");
     let result = state.activity_service().update_activity(activity).await?;
+    let handle = handle.clone();
+    let account_id_clone = result.account_id.clone();
+    let symbols = vec![result.asset_id.clone()];
+
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(Some(vec![account_id_clone]))
+        .sync_market_data(true)
+        .symbols(Some(symbols))
+        .build();
+    emit_portfolio_recalculate_request(&handle, payload);
+
     Ok(result)
 }
 
@@ -65,8 +93,7 @@ pub async fn check_activities_import(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<ActivityImport>, String> {
     debug!("Checking activities import for account: {}", account_id);
-    let result = state
-        .activity_service()
+    let result = state.activity_service()
         .check_activities_import(account_id, activities)
         .await?;
     Ok(result)
@@ -76,24 +103,56 @@ pub async fn check_activities_import(
 pub async fn create_activities(
     activities: Vec<NewActivity>,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<usize, String> {
     debug!("Creating activities...");
-    state
-        .activity_service()
-        .create_activities(activities)
-        .map_err(|e| e.to_string())
+    let account_ids_clone = activities
+        .iter()
+        .map(|a| a.account_id.clone())
+        .collect::<std::collections::HashSet<String>>()
+        .into_iter()
+        .collect::<Vec<String>>();
+
+    let symbols_clone = activities
+        .iter()
+        .map(|a| a.asset_id.clone())
+        .collect::<std::collections::HashSet<String>>()
+        .into_iter()
+        .collect::<Vec<String>>();
+
+    let result = state.activity_service().create_activities(activities)?;
+    let handle = handle.clone();
+
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(Some(account_ids_clone))
+        .sync_market_data(false)
+        .symbols(Some(symbols_clone))
+        .build();
+    emit_portfolio_recalculate_request(&handle, payload);
+
+    Ok(result)
 }
 
 #[tauri::command]
 pub async fn delete_activity(
     activity_id: String,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Deleting activity...");
-    state
-        .activity_service()
-        .delete_activity(activity_id)
-        .map_err(|e| e.to_string())
+    let result = state.activity_service().delete_activity(activity_id)?;
+    let handle = handle.clone();
+    let account_id_clone = result.account_id.clone();
+    let symbols = vec![result.asset_id.clone()];
+
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(Some(vec![account_id_clone]))
+        .sync_market_data(false)
+        .symbols(Some(symbols))
+        .build();
+    emit_portfolio_recalculate_request(&handle, payload);
+
+    Ok(result)
 }
 
 #[tauri::command]
@@ -102,10 +161,8 @@ pub async fn get_account_import_mapping(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Getting import mapping for account: {}", account_id);
-    state
-        .activity_service()
-        .get_import_mapping(account_id)
-        .map_err(|e| e.to_string())
+    Ok(state.activity_service()
+        .get_import_mapping(account_id)?)
 }
 
 #[tauri::command]
@@ -114,10 +171,8 @@ pub async fn save_account_import_mapping(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Saving import mapping for account: {}", mapping.account_id);
-    state
-        .activity_service()
-        .save_import_mapping(mapping)
-        .map_err(|e| e.to_string())
+    Ok(state.activity_service()
+        .save_import_mapping(mapping)?)
 }
 
 #[tauri::command]
@@ -125,11 +180,28 @@ pub async fn import_activities(
     account_id: String,
     activities: Vec<ActivityImport>,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<Vec<ActivityImport>, String> {
     debug!("Importing activities for account: {}", account_id);
-    state
-        .activity_service()
-        .import_activities(account_id, activities)
-        .await
-        .map_err(|e| e.to_string())
+
+    let symbols_clone = activities
+        .iter()
+        .map(|a| a.symbol.clone())
+        .collect::<std::collections::HashSet<String>>()
+        .into_iter()
+        .collect::<Vec<String>>();
+
+    let result = state.activity_service()
+        .import_activities(account_id.clone(), activities)
+        .await?;
+    let handle = handle.clone();
+
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(Some(vec![account_id]))
+        .sync_market_data(false)
+        .symbols(Some(symbols_clone))
+        .build();
+    emit_portfolio_recalculate_request(&handle, payload);
+
+    Ok(result)
 }

@@ -1,8 +1,9 @@
-import { useQueries } from '@tanstack/react-query';
-import { calculatePerformance } from '@/commands/portfolio';
+import { keepPreviousData, useQueries } from '@tanstack/react-query';
+import { calculatePerformanceHistory } from '@/commands/portfolio';
 import { useRef } from 'react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import { QueryKeys } from '@/lib/query-keys';
 
 type ComparisonItem = {
   id: string;
@@ -25,7 +26,7 @@ type ComparisonItem = {
  *          the effective start date used for calculations,
  *          and a formatted display date range string.
  */
-export function useCalculatePerformance({
+export function useCalculatePerformanceHistory({
   selectedItems,
   dateRange,
 }: {
@@ -46,35 +47,44 @@ export function useCalculatePerformance({
     effectiveStartDate: null
   });
 
-  // Get the formatted date range for API calls
-  const formattedStartDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
-  const formattedEndDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+  // Get the formatted date range for API calls, keep as undefined if not present
+  const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
+  const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
 
   // Check if we need to update our tracking refs
   const currentSelectionKey = selectedItems.map(item => item.id).join(',');
   const hasSelectionChanged = currentSelectionKey !== processedRef.current.selectedItemIds.join(',');
-  const hasDateChanged = formattedStartDate !== processedRef.current.dateFrom;
+  const hasDateChanged = startDate !== processedRef.current.dateFrom;
   
   // If selection or date changed, reset the processed state
   if (hasSelectionChanged || hasDateChanged) {
     processedRef.current = {
       selectedItemIds: selectedItems.map(item => item.id),
-      dateFrom: formattedStartDate,
+      dateFrom: startDate || null, // Store startDate or null in ref
       effectiveStartDate: null
     };
     effectiveStartDateRef.current = null;
   }
 
-  // Use the effective start date if available, otherwise use the formatted start date
-  const startDateToUse = effectiveStartDateRef.current || formattedStartDate;
+  // Use the effective start date if available, otherwise use the original start date (potentially undefined)
+  const startDateToUse = effectiveStartDateRef.current || startDate;
 
   const performanceQueries = useQueries({
     queries: selectedItems.map((item) => ({
-      queryKey: ['calculate_cumulative_returns', item.type, item.id, startDateToUse, formattedEndDate],
-      queryFn: () => calculatePerformance(item.type, item.id, startDateToUse, formattedEndDate),
-      enabled: !!item.id && !!startDateToUse && !!formattedEndDate,
+      // Use potentially undefined dates in queryKey and queryFn
+      queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate],
+      // Pass null for undefined dates to satisfy string type requirement
+      queryFn: () => calculatePerformanceHistory(
+        item.type,
+        item.id,
+        startDateToUse!, // Assert as string (enabled check guarantees)
+        endDate!         // Assert as string (enabled check guarantees)
+      ),
+      // Enable query only if essential item identifiers AND dates are present.
+      enabled: !!item.id && !!item.type && !!startDateToUse && !!endDate,
       staleTime: 30 * 1000,
-      retry: false, 
+      retry: false,
+      placeholderData: keepPreviousData,
     })),
   });
 
@@ -102,9 +112,9 @@ export function useCalculatePerformance({
     .filter(Boolean);
 
   // Process performance data to determine effective start date (only once per data set)
-  if (chartData?.length && 
-      formattedStartDate && 
-      !effectiveStartDateRef.current && 
+  if (chartData?.length &&
+      startDate && // Only adjust effective date if an initial start date was provided
+      !effectiveStartDateRef.current &&
       !processedRef.current.effectiveStartDate) {
     
     // Find the first account in the selected items
@@ -119,7 +129,7 @@ export function useCalculatePerformance({
         const firstDataDateStr = firstAccountData.returns[0].date;
         
         // Compare date strings directly (YYYY-MM-DD format strings can be compared lexicographically)
-        const effectiveStartDate = firstDataDateStr > formattedStartDate ? firstDataDateStr : formattedStartDate;
+        const effectiveStartDate = firstDataDateStr > startDate ? firstDataDateStr : startDate;
         
         effectiveStartDateRef.current = effectiveStartDate;
         processedRef.current.effectiveStartDate = effectiveStartDate;
@@ -129,9 +139,9 @@ export function useCalculatePerformance({
 
   // Format the effective date for display
   const displayStartDate = effectiveStartDateRef.current
-    ? format(new Date(effectiveStartDateRef.current), 'MMM d, yyyy')
-    : dateRange?.from 
-      ? format(dateRange.from, 'MMM d, yyyy') 
+    ? format(new Date(effectiveStartDateRef.current + 'T00:00:00'), 'MMM d, yyyy') // Add time part for correct Date parsing
+    : dateRange?.from
+      ? format(dateRange.from, 'MMM d, yyyy')
       : '';
 
   const displayEndDate = dateRange?.to 
@@ -149,9 +159,9 @@ export function useCalculatePerformance({
     errorMessages,
     queries: performanceQueries,
     effectiveStartDate: effectiveStartDateRef.current,
-    formattedStartDate,
-    formattedEndDate,
+    formattedStartDate: startDate, // Return the potentially undefined start date
+    formattedEndDate: endDate,     // Return the potentially undefined end date
     displayDateRange,
-    isCustomRange: effectiveStartDateRef.current !== null && effectiveStartDateRef.current !== formattedStartDate
+    isCustomRange: effectiveStartDateRef.current !== null && effectiveStartDateRef.current !== startDate
   };
 }

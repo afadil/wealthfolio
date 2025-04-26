@@ -93,7 +93,8 @@ export const ActivityTable = ({
             activityType === 'DIVIDEND' ||
             activityType === 'INTEREST' ||
             activityType === 'CONVERSION_IN' ||
-            activityType === 'TRANSFER_IN'
+            activityType === 'TRANSFER_IN' ||
+            activityType === 'ADD_HOLDING'
               ? 'success'
               : activityType === 'SPLIT'
                 ? 'secondary'
@@ -282,7 +283,7 @@ export const ActivityTable = ({
   );
 
   const accountOptions =
-    accounts?.map((account) => ({
+    accounts?.filter(account => account.isActive).map((account) => ({
       label: account.name + '-(' + account.currency + ')',
       value: account.id,
       currency: account.currency,

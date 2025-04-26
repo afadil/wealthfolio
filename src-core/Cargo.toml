@@ -23,7 +23,6 @@ reqwest = { version = "0.12", features = ["json", "cookies" ] }
 thiserror = "1.0"
 lazy_static = "1.5"
 diesel_migrations = { version = "2.2", features = ["sqlite" ] }
-rayon = "1.10"
 r2d2 = "0.8"
 dashmap = "6.1"
 async-trait = "0.1"

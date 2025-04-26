@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer, Serializer};
 use std::str::FromStr;
 
 // Import constants from models
-use crate::models::{ROUNDING_SCALE, DISPLAY_ROUNDING_SCALE};
+use crate::constants::{DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION};
 
 // Custom serializer/deserializer for Decimal (rounds on serialization)
 pub mod decimal_serde {
@@ -14,7 +14,7 @@ pub mod decimal_serde {
     where
         S: Serializer,
     {
-        let rounded = value.round_dp(ROUNDING_SCALE); // Use imported constant
+        let rounded = value.round_dp(DECIMAL_PRECISION); // Use imported constant
         serializer.serialize_str(&rounded.to_string())
     }
 
@@ -37,7 +37,7 @@ pub mod decimal_serde_option {
     {
         match value {
             Some(d) => {
-                let rounded = d.round_dp(ROUNDING_SCALE); // Use imported constant
+                let rounded = d.round_dp(DECIMAL_PRECISION); // Use imported constant
                 serializer.serialize_str(&rounded.to_string())
             }
             None => serializer.serialize_none(),
@@ -60,7 +60,7 @@ pub mod decimal_serde_option {
     }
 }
 
-// Custom serializer for Decimal, rounding to DISPLAY_ROUNDING_SCALE
+// Custom serializer for Decimal, rounding to DISPLAY_DECIMAL_PRECISION
 pub mod decimal_serde_round_display {
     use super::*; // Import parent scope items
 
@@ -68,7 +68,7 @@ pub mod decimal_serde_round_display {
     where
         S: Serializer,
     {
-        let rounded = value.round_dp(DISPLAY_ROUNDING_SCALE); // Use imported constant
+        let rounded = value.round_dp(DISPLAY_DECIMAL_PRECISION); // Use imported constant
         serializer.serialize_str(&rounded.to_string())
     }
     

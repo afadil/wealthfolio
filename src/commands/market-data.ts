@@ -109,17 +109,17 @@ export const updateQuote = async (symbol: string, quote: Quote): Promise<void> =
   }
 };
 
-export const refreshQuotesForSymbols = async (symbols: string[]): Promise<void> => {
+export const syncMarketData = async (symbols: string[], refetchAll: boolean): Promise<void> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        await invokeTauri('refresh_quotes_for_symbols', { symbols });
+        await invokeTauri('sync_market_data', { symbols, refetchAll });
         return;
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error refreshing quotes for symbols.');
+    logger.error(`Error refreshing quotes for symbols: ${error}`);
     throw error;
   }
 };

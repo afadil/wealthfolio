@@ -1,5 +1,5 @@
 use log::debug;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use super::accounts_model::{Account, AccountUpdate, NewAccount};
 use super::accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
@@ -11,7 +11,7 @@ use crate::fx::fx_traits::FxServiceTrait;
 pub struct AccountService<E: DbTransactionExecutor + Send + Sync + Clone> {
     repository: Arc<dyn AccountRepositoryTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
-    base_currency: String,
+    base_currency: Arc<RwLock<String>>,
     transaction_executor: E,
 }
 
@@ -21,7 +21,7 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountService<E> {
         repository: Arc<dyn AccountRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
         transaction_executor: E,
-        base_currency: String,
+        base_currency: Arc<RwLock<String>>,
     ) -> Self {
         Self {
             repository,
@@ -36,7 +36,7 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountService<E> {
 impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountServiceTrait for AccountService<E> {
     /// Creates a new account with currency exchange support
     async fn create_account(&self, new_account: NewAccount) -> Result<Account> {
-        let base_currency = self.base_currency.clone();
+        let base_currency = self.base_currency.read().unwrap().clone();
         debug!(
             "Creating account..., base_currency: {}, new_account.currency: {}",
             base_currency, new_account.currency

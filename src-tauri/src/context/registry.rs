@@ -4,7 +4,7 @@ use diesel::r2d2::ConnectionManager;
 use diesel::SqliteConnection;
 use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
-    self, accounts, activities, assets, fx, goals, holdings, limits, market_data, portfolio, settings
+    self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings
 };
 type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 
@@ -17,17 +17,18 @@ pub struct ServiceContext {
     // Services
     pub settings_service: Arc<dyn settings::SettingsServiceTrait>,
     pub activity_service: Arc<dyn activities::ActivityServiceTrait>,
-    pub portfolio_service: Arc<dyn portfolio::PortfolioServiceTrait>,
     pub account_service: Arc<dyn accounts::AccountServiceTrait>,
     pub goal_service: Arc<dyn goals::GoalServiceTrait>,
     pub asset_service: Arc<dyn assets::AssetServiceTrait>,
     pub market_data_service: Arc<dyn market_data::MarketDataServiceTrait>,
     pub limits_service: Arc<dyn limits::ContributionLimitServiceTrait>,
     pub fx_service:Arc<dyn fx::FxServiceTrait>,
-    pub performance_service: Arc<dyn portfolio::PerformanceServiceTrait>,
-    pub holdings_service: Arc<dyn holdings::HoldingsServiceTrait>,
-    pub income_service: Arc<dyn portfolio::IncomeServiceTrait>,
-    pub holding_view_service: Arc<dyn portfolio::HoldingsViewServiceTrait>,
+    pub performance_service: Arc<dyn portfolio::performance::PerformanceServiceTrait>,
+    pub income_service: Arc<dyn portfolio::income::IncomeServiceTrait>,
+    pub snapshot_service: Arc<dyn portfolio::snapshot::SnapshotServiceTrait>,
+    pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
+    pub holdings_valuation_service: Arc<dyn portfolio::holdings::HoldingsValuationServiceTrait>,
+    pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
 }
 
 impl ServiceContext {
@@ -60,10 +61,6 @@ impl ServiceContext {
         Arc::clone(&self.asset_service)
     }
 
-    pub fn portfolio_service(&self) -> Arc<dyn portfolio::PortfolioServiceTrait> {
-        Arc::clone(&self.portfolio_service)
-    }
-
     pub fn goal_service(&self) -> Arc<dyn goals::GoalServiceTrait> {
         Arc::clone(&self.goal_service)
     }
@@ -80,19 +77,27 @@ impl ServiceContext {
         Arc::clone(&self.fx_service)
     }
 
-    pub fn performance_service(&self) -> Arc<dyn portfolio::PerformanceServiceTrait> {
+    pub fn performance_service(&self) -> Arc<dyn portfolio::performance::PerformanceServiceTrait> {
         Arc::clone(&self.performance_service)
     }
 
-    pub fn holdings_service(&self) -> Arc<dyn holdings::HoldingsServiceTrait> {
-        Arc::clone(&self.holdings_service)
-    }
-
-    pub fn income_service(&self) -> Arc<dyn portfolio::IncomeServiceTrait> {
+    pub fn income_service(&self) -> Arc<dyn portfolio::income::IncomeServiceTrait> {
         Arc::clone(&self.income_service)
     }
 
-    pub fn holding_view_service(&self) -> Arc<dyn portfolio::HoldingsViewServiceTrait> {
-        Arc::clone(&self.holding_view_service)
+    pub fn snapshot_service(&self) -> Arc<dyn portfolio::snapshot::SnapshotServiceTrait> {
+        Arc::clone(&self.snapshot_service)
+    }
+
+    pub fn holdings_service(&self) -> Arc<dyn portfolio::holdings::HoldingsServiceTrait> {
+        Arc::clone(&self.holdings_service)
+    }
+
+    pub fn holdings_valuation_service(&self) -> Arc<dyn portfolio::holdings::HoldingsValuationServiceTrait> {
+        Arc::clone(&self.holdings_valuation_service)
+    }
+
+    pub fn valuation_service(&self) -> Arc<dyn portfolio::valuation::ValuationServiceTrait> {
+        Arc::clone(&self.valuation_service)
     }
 }

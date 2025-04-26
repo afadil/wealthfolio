@@ -1,20 +1,20 @@
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::errors::Result;
-use crate::db::get_connection;
-use crate::market_data::market_data_model::{QuoteDb, LatestQuotePair};
-use crate::schema::quotes::dsl::*;
-use crate::schema::quotes;
-use super::market_data_model::Quote;
 use super::market_data_errors::MarketDataError;
+use super::market_data_model::Quote;
 use super::market_data_traits::MarketDataRepositoryTrait;
+use crate::db::get_connection;
+use crate::errors::Result;
+use crate::market_data::market_data_model::{LatestQuotePair, QuoteDb};
+use crate::schema::quotes::dsl::{data_source, id, quotes, symbol, timestamp};
 use diesel::sql_query;
-use diesel::sqlite::Sqlite;
 use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -31,7 +31,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         let mut conn = get_connection(&self.pool)?;
 
         Ok(quotes
-            .order(date.desc())
+            .order(timestamp.desc())
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
@@ -44,7 +44,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
         Ok(quotes
             .filter(symbol.eq(input_symbol))
-            .order(date.desc())
+            .order(timestamp.desc())
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
@@ -55,12 +55,10 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     fn save_quotes(&self, input_quotes: &[Quote]) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
         let transaction_result = conn.transaction(|conn| {
-            // Process in smaller batches to prevent memory issues
             for chunk in input_quotes.chunks(1000) {
-                // Convert Vec<Quote> to Vec<QuoteDb> (avoiding clone if possible)
                 let quote_dbs: Vec<QuoteDb> = chunk.iter().map(QuoteDb::from).collect();
 
-                diesel::replace_into(quotes::table) // Use replace_into for full replacement
+                diesel::replace_into(quotes)
                     .values(&quote_dbs)
                     .execute(conn)
                     .map_err(MarketDataError::DatabaseError)?;
@@ -79,33 +77,29 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     fn delete_quote(&self, quote_id: &str) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
 
-        diesel::delete(quotes::table.filter(quotes::id.eq(quote_id)))
+        diesel::delete(quotes.filter(id.eq(quote_id)))
             .execute(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
         Ok(())
     }
-    
+
     fn delete_quotes_for_symbols(&self, symbols_to_delete: &[String]) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
 
-        diesel::delete(quotes::table.filter(symbol.eq_any(symbols_to_delete)))
+        diesel::delete(quotes.filter(symbol.eq_any(symbols_to_delete)))
             .execute(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
         Ok(())
     }
 
-    fn get_quotes_by_source(
-        &self,
-        input_symbol: &str,
-        source: &str,
-    ) -> Result<Vec<Quote>> {
+    fn get_quotes_by_source(&self, input_symbol: &str, source: &str) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
 
         Ok(quotes
             .filter(symbol.eq(input_symbol))
             .filter(data_source.eq(source))
-            .order(date.asc())
+            .order(timestamp.asc())
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
@@ -118,17 +112,18 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
         let query_result = quotes
             .filter(symbol.eq(input_symbol))
-            .order(date.desc())
+            .order(timestamp.desc())
             .first::<QuoteDb>(&mut conn)
-            .optional(); // Result<Option<QuoteDb>, diesel::result::Error>
+            .optional();
 
         match query_result {
-            Ok(Some(quote_db)) => Ok(Quote::from(quote_db)), // Convert QuoteDb to Quote
+            Ok(Some(quote_db)) => Ok(Quote::from(quote_db)),
             Ok(None) => Err(MarketDataError::NotFound(format!(
                 "No quote found in database for symbol: {}",
                 input_symbol
-            )).into()), // Convert MarketDataError to Error
-            Err(diesel_err) => Err(MarketDataError::DatabaseError(diesel_err).into()), // Convert diesel::result::Error -> MarketDataError -> Error
+            ))
+            .into()),
+            Err(diesel_err) => Err(MarketDataError::DatabaseError(diesel_err).into()),
         }
     }
 
@@ -138,26 +133,23 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     ) -> Result<HashMap<String, Quote>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // 1. Filter by the provided symbols.
         let filtered_quotes = quotes
             .filter(symbol.eq_any(input_symbols))
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
-        // 2. Group by symbol and find the maximum date for each.
         let mut latest_quotes_map: HashMap<String, QuoteDb> = HashMap::new();
         for q in filtered_quotes {
             latest_quotes_map
                 .entry(q.symbol.clone())
                 .and_modify(|existing_quote| {
-                    if q.date > existing_quote.date {
+                    if q.timestamp > existing_quote.timestamp {
                         *existing_quote = q.clone();
                     }
                 })
                 .or_insert(q);
         }
 
-        // 3. Convert QuoteDb to Quote
         let result: HashMap<String, Quote> = latest_quotes_map
             .into_iter()
             .map(|(s, q_db)| (s, q_db.into()))
@@ -176,25 +168,26 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
         let mut conn = get_connection(&self.pool)?;
 
-        // 1. Construct the raw SQL query with ROW_NUMBER()
-        let placeholders = input_symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let placeholders = input_symbols
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
         let sql = format!(
             "WITH RankedQuotes AS ( \
                 SELECT \
                     q.*, \
-                    ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.date DESC) as rn \
+                    ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.timestamp DESC) as rn \
                 FROM quotes q \
                 WHERE q.symbol IN ({}) \
             ) \
             SELECT * \
             FROM RankedQuotes \
             WHERE rn <= 2 \
-            ORDER BY symbol, rn", // Ensure consistent order for pairing
+            ORDER BY symbol, rn",
             placeholders
         );
 
-        // 2. Bind parameters and execute the query using type erasure
-        // Use into_boxed() instead of explicit BoxableSqlQuery type
         let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
 
         for symbol_val in input_symbols {
@@ -205,7 +198,6 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
-        // 3. Group results by symbol manually and create LatestQuotePair
         let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
         let mut current_symbol_quotes: Vec<Quote> = Vec::new();
 
@@ -215,7 +207,6 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             if current_symbol_quotes.is_empty() || quote.symbol == current_symbol_quotes[0].symbol {
                 current_symbol_quotes.push(quote);
             } else {
-                // Process the completed group
                 if !current_symbol_quotes.is_empty() {
                     let latest_quote = current_symbol_quotes.remove(0);
                     let previous_quote = if !current_symbol_quotes.is_empty() {
@@ -223,15 +214,19 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
                     } else {
                         None
                     };
-                    result_map.insert(latest_quote.symbol.clone(), LatestQuotePair { latest: latest_quote, previous: previous_quote });
+                    result_map.insert(
+                        latest_quote.symbol.clone(),
+                        LatestQuotePair {
+                            latest: latest_quote,
+                            previous: previous_quote,
+                        },
+                    );
                 }
-                // Start the new group
                 current_symbol_quotes.clear();
                 current_symbol_quotes.push(quote);
             }
         }
 
-        // Process the last group
         if !current_symbol_quotes.is_empty() {
             let latest_quote = current_symbol_quotes.remove(0);
             let previous_quote = if !current_symbol_quotes.is_empty() {
@@ -239,9 +234,52 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             } else {
                 None
             };
-             result_map.insert(latest_quote.symbol.clone(), LatestQuotePair { latest: latest_quote, previous: previous_quote });
+            result_map.insert(
+                latest_quote.symbol.clone(),
+                LatestQuotePair {
+                    latest: latest_quote,
+                    previous: previous_quote,
+                },
+            );
         }
 
         Ok(result_map)
+    }
+
+    fn get_historical_quotes_for_symbols_in_range(
+        &self,
+        input_symbols: &HashSet<String>,
+        start_date_naive: NaiveDate,
+        end_date_naive: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        if input_symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut conn = get_connection(&self.pool)?;
+
+        let symbols_vec: Vec<String> = input_symbols.iter().cloned().collect();
+
+        let start_datetime_naive = start_date_naive
+            .and_hms_opt(0, 0, 0)
+            .unwrap_or_else(|| NaiveDateTime::MIN);
+        let end_datetime_naive = end_date_naive
+            .and_hms_opt(23, 59, 59)
+            .unwrap_or_else(|| NaiveDateTime::MAX);
+
+        let start_datetime_utc: DateTime<Utc> = Utc.from_utc_datetime(&start_datetime_naive);
+        let end_datetime_utc: DateTime<Utc> = Utc.from_utc_datetime(&end_datetime_naive);
+        let start_str = start_datetime_utc.to_rfc3339();
+        let end_str = end_datetime_utc.to_rfc3339();
+
+        Ok(quotes
+            .filter(symbol.eq_any(symbols_vec))
+            .filter(timestamp.ge(start_str))
+            .filter(timestamp.le(end_str))
+            .order(timestamp.desc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
     }
 }

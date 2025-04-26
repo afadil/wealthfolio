@@ -24,22 +24,25 @@ impl FxService {
         }
     }
 
-    /// Initialize the currency converter with all exchange rates
+    /// Initialize the currency converter with all exchange rates, filling missing days
     fn initialize_converter(&self) -> Result<()> {
-        let exchange_rates = self.get_exchange_rates()?;
-        
+        // Fetch ALL historical rates instead of just the latest
+        let all_historical_rates = self.repository.get_all_historical_exchange_rates()?;
+
         // Only initialize the converter if we have exchange rates
-        if exchange_rates.is_empty() {
+        if all_historical_rates.is_empty() {
             log::warn!("No exchange rates available, converter not initialized");
             let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
             *converter_lock = None;
             return Ok(());
         }
-        
-        match CurrencyConverter::new(exchange_rates) {
+
+        // Directly use the fetched rates without filling gaps
+        match CurrencyConverter::new(all_historical_rates) {
             Ok(converter) => {
                 let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
                 *converter_lock = Some(converter);
+                log::info!("Currency converter initialized successfully.");
                 Ok(())
             },
             Err(e) => {
@@ -99,7 +102,7 @@ impl FxServiceTrait for FxService {
             to_currency: new_rate.to_currency,
             rate: new_rate.rate,
             source: new_rate.source,
-            timestamp: Utc::now().naive_utc(),
+            timestamp: Utc::now(),
         };
 
         Ok(self.repository.save_exchange_rate(rate)?)
@@ -315,15 +318,6 @@ impl FxServiceTrait for FxService {
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
             self.repository.create_fx_asset(from, to, DataSource::Yahoo.as_str())?;
-
-            let exchange_rate = NewExchangeRate {
-                from_currency: from.to_string(),
-                to_currency: to.to_string(),
-                rate: Decimal::ONE,
-                source: DataSource::Yahoo,
-            };
-
-            self.add_exchange_rate(exchange_rate)?;
         }
         
         Ok(())

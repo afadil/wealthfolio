@@ -235,9 +235,9 @@ impl HoldingsValuationService {
 
                 if cost_basis_base != dec!(0) {
                     holding.unrealized_gain_pct =
-                        Some((unrealized_gain_base / cost_basis_base) * dec!(100));
+                        Some((unrealized_gain_base / cost_basis_base).round_dp(4));
                 } else if unrealized_gain_base != dec!(0) {
-                    holding.unrealized_gain_pct = Some(dec!(100.0));
+                    holding.unrealized_gain_pct = Some(dec!(1.0));
                 } else {
                     holding.unrealized_gain_pct = Some(Decimal::ZERO);
                 }
@@ -277,7 +277,7 @@ impl HoldingsValuationService {
 
                     if prev_value_base != dec!(0) {
                         holding.day_change_pct =
-                            Some((day_change_base / prev_value_base) * dec!(100));
+                            Some((day_change_base / prev_value_base).round_dp(4));
                     } else if day_change_base != dec!(0) {
                         holding.day_change_pct = None;
                     } else {

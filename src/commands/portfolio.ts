@@ -2,32 +2,27 @@ import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 import {
   Holding,
   IncomeSummary,
-  HistorySummary,
-  PortfolioHistory,
-  AccountSummary,
-  PerformanceData,
-  AccountGroup,
-  TotalReturn,
+  AccountValuation,
+  PerformanceMetrics,
+  SimplePerformanceMetrics,
 } from '@/lib/types';
 
-export const calculateHistoricalData = async (params: {
-  accountIds?: string[];
-  forceFullCalculation: boolean;
-}): Promise<HistorySummary[]> => {
+
+export const updatePortfolio = async (): Promise<void> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('calculate_historical_data', params);
+        return invokeTauri('update_portfolio');
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error calculating historical data.');
+    logger.error('Error updating portfolio.');
     throw error;
   }
 };
 
-export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
+export const recalculatePortfolio = async (): Promise<void> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -37,20 +32,6 @@ export const recalculatePortfolio = async (): Promise<HistorySummary[]> => {
     }
   } catch (error) {
     logger.error('Error recalculating portfolio.');
-    throw error;
-  }
-};
-
-export const computeHoldings = async (): Promise<Holding[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('get_portfolio_holdings');
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    logger.error('Error computing holdings.');
     throw error;
   }
 };
@@ -83,100 +64,118 @@ export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
   }
 };
 
-export const getHistory = async (accountId?: string): Promise<PortfolioHistory[]> => {
+export const getHistoricalValuations = async (
+  accountId?: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<AccountValuation[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_portfolio_history', accountId ? { accountId } : undefined);
+        const params: { accountId?: string; startDate?: string; endDate?: string } = {};
+        if (accountId) params.accountId = accountId;
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+
+        return invokeTauri('get_historical_valuations', Object.keys(params).length > 0 ? params : undefined);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error fetching portfolio history.');
+    logger.error('Error fetching historical valuations.');
     throw error;
   }
 };
 
-export const getAccountsSummary = async (): Promise<AccountSummary[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('get_accounts_summary');
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    logger.error('Error fetching active accounts summary.');
-    throw error;
-  }
-};
-
-export const getPortfolioSummary = async (): Promise<AccountGroup[]> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('get_portfolio_summary');
-      default:
-        throw new Error(`Unsupported environment for getPortfolioSummary`);
-    }
-  } catch (error) {
-    logger.error('Error fetching portfolio summary.');
-    throw error;
-  }
-};
-
-export const calculatePerformance = async (
+export const calculatePerformanceHistory = async (
   itemType: 'account' | 'symbol',
   itemId: string,
   startDate: string,
   endDate: string,
-): Promise<PerformanceData> => {
+): Promise<PerformanceMetrics> => {
   try {
-    const response = await invokeTauri('calculate_performance', {
+    const response = await invokeTauri('calculate_performance_history', {
       itemType,
       itemId,
       startDate,
       endDate,
     });
     
-    // Check if the response is an error message (string) instead of the expected object
     if (typeof response === 'string' || !response || Object.keys(response).length === 0) {
-      throw new Error(typeof response === 'string' ? response : 'Failed to calculate cumulative returns');
+      throw new Error(typeof response === 'string' ? response : 'Failed to calculate performance history');
     }
     
-    return response as PerformanceData;
+    return response as PerformanceMetrics;
   } catch (error) {
-    logger.error('Error calculating cumulative returns.');
+    logger.error('Error calculating performance history.');
     throw error;
   }
 };
 
-export const calculateTotalReturn = async (
-  accountId: string,
-  startDate: string,
-  endDate: string,
-): Promise<TotalReturn> => {
+interface CalculatePerformanceSummaryArgs {
+  itemType: 'account' | 'symbol';
+  itemId: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export const calculatePerformanceSummary = async ({
+  itemType,
+  itemId,
+  startDate,
+  endDate,
+}: CalculatePerformanceSummaryArgs): Promise<PerformanceMetrics> => {
   try {
-    const response = await invokeTauri('calculate_total_return', {
-      accountId,
-      startDate,
-      endDate,
-    });
-
-    // Basic validation
-    if (typeof response === 'string') { // Handle string error first
-        throw new Error(response);
+    const args: CalculatePerformanceSummaryArgs = {
+      itemType,
+      itemId,
+    };
+    if (startDate) {
+      args.startDate = startDate;
     }
-    if (typeof response !== 'object' || response === null || 
-        !('rate' in response) || typeof response.rate !== 'string' || 
-        !('amount' in response) || typeof response.amount !== 'string') {
-       throw new Error('Invalid total return data received');
+    if (endDate) {
+      args.endDate = endDate;
     }
 
-    // Now TypeScript knows response has the required properties
-    return response as TotalReturn; // Type assertion is still good practice here
+    const response = await invokeTauri<PerformanceMetrics>(
+      'calculate_performance_summary',
+      args as unknown as Record<string, unknown>
+    );
+
+    if (!response || typeof response !== 'object' || !response.id) {
+      logger.error(
+        `Invalid data received from calculate_performance_summary. Response: ${JSON.stringify(response)}`
+      );
+      throw new Error('Received invalid performance summary data from backend.');
+    }
+
+    return response;
   } catch (error) {
-    logger.error('Error calculating total return.');
+    const errorString = error instanceof Error ? error.message : JSON.stringify(error);
+    logger.error(
+      `Failed to fetch performance summary for ${itemType} ${itemId}. Error: ${errorString}`
+    );
+    throw error instanceof Error ? error : new Error('An unknown error occurred while fetching performance summary');
+  }
+};
+
+export const calculateAccountsSimplePerformance = async (
+  accountIds: string[],
+): Promise<SimplePerformanceMetrics[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('calculate_accounts_simple_performance', { accountIds });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error calculating simple performance for accounts.');
     throw error;
   }
 };
+
+
+
+
+

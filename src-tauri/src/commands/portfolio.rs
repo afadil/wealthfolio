@@ -1,86 +1,85 @@
 use std::sync::Arc;
 
-// Project imports
-use crate::context::ServiceContext;
-use crate::models::{AccountSummary, HistoryRecord, HistorySummary, Holding, IncomeSummary};
+use crate::{
+    context::ServiceContext,
+    events::{emit_portfolio_recalculate_request, emit_portfolio_update_request, PortfolioRequestPayload},
+};
 
-// External imports
 use log::debug;
-use tauri::State;
-use wealthfolio_core::{HoldingView, PerformanceResponse, AccountGroupView, TotalReturn};
+use tauri::{AppHandle, State};
+use wealthfolio_core::{
+    valuation::DailyAccountValuation,
+    holdings::Holding,
+    income::IncomeSummary,
+    performance::{PerformanceMetrics, SimplePerformanceMetrics}
+};
 
 #[tauri::command]
-pub async fn calculate_historical_data(
-    state: State<'_, Arc<ServiceContext>>,
-    account_ids: Option<Vec<String>>,
-    force_full_calculation: bool,
-) -> Result<Vec<HistorySummary>, String> {
-    debug!("Calculating historical data...");
-    state
-        .portfolio_service()
-        .calculate_historical_data(account_ids, force_full_calculation)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
+    debug!("Emitting PORTFOLIO_UPDATE_REQUEST event...");
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(None) // None signifies all accounts
+        .symbols(None) // None signifies all relevant symbols
+        .sync_market_data(true)
+        .refetch_all(true)
+        .build();
+    emit_portfolio_recalculate_request(&handle, payload);
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn compute_holdings(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<Holding>, String> {
-    debug!("Get holdings...");
-    state
-        .portfolio_service()
-        .compute_holdings()
-        .await
-        .map_err(|e| e.to_string())
+pub async fn update_portfolio(handle: AppHandle) -> Result<(), String> {
+    debug!("Emitting PORTFOLIO_UPDATE_REQUEST event...");
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(None) // None signifies all accounts
+        .symbols(None) // None signifies all relevant symbols
+        .sync_market_data(true)
+        .build();
+    emit_portfolio_update_request(&handle, payload);
+    Ok(())
 }
+
 
 #[tauri::command]
 pub async fn get_holdings(
     state: State<'_, Arc<ServiceContext>>,
     account_id: String,
-) -> Result<Vec<HoldingView>, String> {
+) -> Result<Vec<Holding>, String> {
     debug!("Get holdings...");
     let base_currency = state.get_base_currency();
     state
-        .holding_view_service()
+        .holdings_service()
         .get_holdings(&account_id, &base_currency)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn get_portfolio_history(
-    state: State<'_, Arc<ServiceContext>>,
-    account_id: Option<String>,
-) -> Result<Vec<HistoryRecord>, String> {
-    debug!("Fetching portfolio history...");
-    let account_id_ref = account_id.as_deref();
-    state
-        .portfolio_service()
-        .get_portfolio_history(account_id_ref)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn get_accounts_summary(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<AccountSummary>, String> {
-    debug!("Fetching active accounts performance...");
-    state
-        .portfolio_service()
-        .get_accounts_summary()
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn recalculate_portfolio(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<HistorySummary>, String> {
-    debug!("Recalculating portfolio...");
-    state
-        .portfolio_service()
-        .update_portfolio()
         .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_historical_valuations(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<Vec<DailyAccountValuation>, String> {
+    debug!("Get historical valuations for account: {}", account_id);
+    //     // Parse optional dates into Option<NaiveDate>
+    let from_date_opt: Option<chrono::NaiveDate> = start_date
+        .map(|date_str| {
+            chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                .map_err(|e| format!("Invalid start date: {}", e))
+        })
+        .transpose()?;
+
+    let to_date_opt: Option<chrono::NaiveDate> = end_date
+        .map(|date_str| {
+            chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                .map_err(|e| format!("Invalid end date: {}", e))
+        })
+        .transpose()?;
+
+    state
+        .valuation_service()
+        .get_historical_valuations(&account_id, from_date_opt, to_date_opt)
         .map_err(|e| e.to_string())
 }
 
@@ -96,54 +95,107 @@ pub async fn get_income_summary(
 }
 
 #[tauri::command]
-pub async fn calculate_performance(
+pub async fn calculate_accounts_simple_performance(
     state: State<'_, Arc<ServiceContext>>,
-    item_type: String,
-    item_id: String,
-    start_date: String,
-    end_date: String,
-) -> Result<PerformanceResponse, String> {
-    debug!("Calculating cumulative returns...");
-    let start = chrono::NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid start date: {}", e))?;
-    let end = chrono::NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid end date: {}", e))?;
+    account_ids: Vec<String>,
+) -> Result<Vec<SimplePerformanceMetrics>, String> {
+    debug!("Calculate simple performance for accounts: {:?}", account_ids);
+
+    let ids_to_process = if account_ids.is_empty() {
+        debug!("Input account_ids is empty, fetching active accounts.");
+        state
+            .account_service()
+            .get_active_accounts()
+            .map_err(|e| format!("Failed to fetch active accounts: {}", e))?
+            .into_iter()
+            .map(|acc| acc.id)
+            .collect()
+    } else {
+        account_ids
+    };
+
+    if ids_to_process.is_empty() {
+        return Ok(Vec::new());
+    }
 
     state
         .performance_service()
-        .calculate_performance(&item_type, &item_id, start, end)
-        .await
-        .map_err(|e| format!("Failed to calculate cumulative returns: {}", e.to_string()))
-}
-
-#[tauri::command]
-pub fn get_portfolio_summary(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<AccountGroupView>, String> {
-    debug!("Fetching portfolio summary...");
-    let base_currency = state.get_base_currency();
-    state
-        .holding_view_service()
-        .get_portfolio_summary(&base_currency)
+        .calculate_accounts_simple_performance(&ids_to_process) // Pass the potentially modified list
         .map_err(|e| e.to_string())
 }
 
+/// Calculates performance history for a given item (account or symbol) over a given date range.
+/// return performance metrics for the item and also the cumulative performance metrics for all days.
 #[tauri::command]
-pub async fn calculate_total_return(
+pub async fn calculate_performance_history(
     state: State<'_, Arc<ServiceContext>>,
-    account_id: String,
-    start_date: String,
-    end_date: String,
-) -> Result<TotalReturn, String> {
-    debug!("Calculating total return for account {}...", account_id);
-    let start = chrono::NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid start date: {}", e))?;
-    let end = chrono::NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid end date: {}", e))?;
+    item_type: String,
+    item_id: String,
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<PerformanceMetrics, String> {
+    debug!(
+        "Calculating performance for type: {}, id: {}, start: {:?}, end: {:?}",
+        item_type, item_id, start_date, end_date
+    );
+
+    // Parse optional dates into Option<NaiveDate>
+    let start_date_opt: Option<chrono::NaiveDate> = start_date
+        .map(|date_str| {
+            chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                .map_err(|e| format!("Invalid start date format '{}': {}", date_str, e))
+        })
+        .transpose()?;
+
+    let end_date_opt: Option<chrono::NaiveDate> = end_date
+        .map(|date_str| {
+            chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                .map_err(|e| format!("Invalid end date format '{}': {}", date_str, e))
+        })
+        .transpose()?;
 
     state
         .performance_service()
-        .calculate_total_return(&account_id, start, end)
+        .calculate_performance_history(&item_type, &item_id, start_date_opt, end_date_opt)
         .await
-        .map_err(|e| format!("Failed to calculate total return: {}", e.to_string()))
+        .map_err(|e| format!("Failed to calculate performance: {}", e.to_string()))
 }
+
+/// Calculates performance summary for a given item (account or symbol) over a given date range.
+/// return performance metrics for the item.
+#[tauri::command]
+pub async fn calculate_performance_summary(
+    state: State<'_, Arc<ServiceContext>>,
+    item_type: String,
+    item_id: String,
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<PerformanceMetrics, String> {
+    debug!(
+        "Calculating performance summary for type: {}, id: {}, start: {:?}, end: {:?}",
+        item_type, item_id, start_date, end_date
+    );
+
+    // Parse optional dates into Option<NaiveDate>
+    let start_date_opt: Option<chrono::NaiveDate> = start_date
+        .map(|date_str| {
+            chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                .map_err(|e| format!("Invalid start date format '{}': {}", date_str, e))
+        })
+        .transpose()?;
+
+    let end_date_opt: Option<chrono::NaiveDate> = end_date
+        .map(|date_str| {
+            chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                .map_err(|e| format!("Invalid end date format '{}': {}", date_str, e))
+        })
+        .transpose()?;
+
+    state
+        .performance_service()
+        .calculate_performance_summary(&item_type, &item_id, start_date_opt, end_date_opt)
+        .await
+        .map_err(|e| format!("Failed to calculate performance: {}", e.to_string()))
+}
+
+

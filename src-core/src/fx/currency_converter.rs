@@ -1,10 +1,10 @@
 use crate::fx::fx_errors::FxError;
 use crate::fx::fx_model::ExchangeRate;
 use rust_decimal::Decimal;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, DateTime, Utc};
 use std::collections::{HashMap, HashSet};
 
-/// A calculator for currency conversions, supporting historical rates.
+/// A calculator for currency conversions, supporting historical rates based on the latest rate per day.
 pub struct CurrencyConverter {
     // Date -> (From, To) -> Rate
     historical_rates: HashMap<NaiveDate, HashMap<(String, String), Decimal>>,
@@ -23,59 +23,99 @@ impl CurrencyConverter {
         Ok(converter)
     }
 
-    /// Adds historical FX rates, handling inverses and transitive rates.
+    /// Adds historical FX rates, processing inverses and transitive rates.
+    /// For each day, only the latest available rate for a given pair is considered.
     fn add_historical_rates(&mut self, rates: Vec<ExchangeRate>) -> Result<(), FxError> {
-        // Group rates by date first.
-        let mut rates_by_date: HashMap<NaiveDate, Vec<ExchangeRate>> = HashMap::new();
-        for rate in rates {
-            let date = rate.timestamp.date();
-            rates_by_date.entry(date).or_default().push(rate);
-        }
+        // Group rates by date and select the latest timestamp for each pair within that date.
+        let mut latest_rates_by_date: HashMap<NaiveDate, HashMap<(String, String), ExchangeRate>> = HashMap::new();
 
-        for (date, rates_for_date) in rates_by_date {
-            // Check for duplicates.
-            let mut seen_pairs: HashSet<(String, String)> = HashSet::new();
-            for rate in &rates_for_date {
-                if !seen_pairs.insert((rate.from_currency.clone(), rate.to_currency.clone())) {
-                    return Err(FxError::ConversionError(format!(
-                        "Multiple rates found for the same currency pair ({} to {}) on {}",
-                        rate.from_currency, rate.to_currency, date
-                    )));
-                }
+        for rate in rates { // No longer mutable, no normalization
+            // Preserve original case
+            // let from_currency = rate.from_currency.clone();
+            // let to_currency = rate.to_currency.clone();
+
+            // Ignore self-referential rates
+            if rate.from_currency == rate.to_currency {
+                continue;
             }
 
+            let date = rate.timestamp.date_naive(); // Group by NaiveDate
+            // Use original case for the pair key
+            let pair = (rate.from_currency.clone(), rate.to_currency.clone());
+
+            let date_map = latest_rates_by_date.entry(date).or_default();
+
+            // Check if we have a rate for this pair on this date, keep the latest timestamp
+            match date_map.entry(pair) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    // Duplicate pair found for this date, keep the one with the later timestamp
+                    if rate.timestamp > entry.get().timestamp {
+                        *entry.get_mut() = rate; // Update with the later rate
+                    }
+                    // Else, discard the current 'rate' as it's earlier or same timestamp
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    // No rate for this pair on this date yet, insert this one
+                    entry.insert(rate);
+                }
+            }
+        }
+
+        // Clear existing processed rates before adding new ones based on daily latest
+        self.historical_rates.clear();
+        self.sorted_dates.clear();
+
+        // Now process the latest rates selected for each date
+        for (date, chosen_rates_for_date) in latest_rates_by_date {
+             // The chosen_rates_for_date map now contains only the latest rate per pair for this date.
             let mut rate_map: HashMap<(String, String), Decimal> = HashMap::new();
             let mut currencies: HashSet<String> = HashSet::new();
 
-            // Add direct and inverse rates.
-            for rate in rates_for_date {
+            // Add direct and inverse rates from the chosen rates.
+            for (_pair, rate) in chosen_rates_for_date {
+                // Use original case preserved in 'rate'
                 currencies.insert(rate.from_currency.clone());
                 currencies.insert(rate.to_currency.clone());
 
                 let forward_rate = rate.rate;
+                 // Check for zero rate before division
+                if forward_rate.is_zero() {
+                     // Decide how to handle zero rate (e.g., log error, skip inverse)
+                     log::error!("Zero exchange rate encountered for {}/{} on {}. Cannot calculate inverse.",
+                                rate.from_currency, rate.to_currency, date);
+                     // Insert forward rate but skip inverse
+                     rate_map.insert(
+                        (rate.from_currency.clone(), rate.to_currency.clone()),
+                        forward_rate,
+                    );
+                    continue; // Skip inverse calculation for this rate
+                }
                 let inverse_rate = Decimal::ONE / forward_rate;
-                
+
                 rate_map.insert(
-                    (rate.from_currency.clone(), rate.to_currency.clone()),
+                    (rate.from_currency.clone(), rate.to_currency.clone()), // Use original case
                     forward_rate,
                 );
                 rate_map.insert(
-                    (rate.to_currency.clone(), rate.from_currency.clone()),
+                    (rate.to_currency.clone(), rate.from_currency.clone()), // Use original case
                     inverse_rate,
                 );
             }
 
-            // Build transitive rates.
+            // Build transitive rates (logic remains the same)
             let currencies_vec: Vec<_> = currencies.into_iter().collect();
             for i in 0..currencies_vec.len() {
                 for j in 0..currencies_vec.len() {
                     if i == j {
+                        // Add identity rate
+                        rate_map.insert((currencies_vec[i].clone(), currencies_vec[j].clone()), Decimal::ONE);
                         continue;
                     }
                     let from = &currencies_vec[i];
                     let to = &currencies_vec[j];
 
                     if !rate_map.contains_key(&(from.clone(), to.clone())) {
+                        // Try to find a transitive path
                         for k in 0..currencies_vec.len() {
                             if k == i || k == j {
                                 continue;
@@ -88,19 +128,35 @@ impl CurrencyConverter {
                             ) {
                                 let transitive_rate = rate1 * rate2;
                                 rate_map.insert((from.clone(), to.clone()), transitive_rate);
-                                // No break; find all possible transitive paths.
+                                // Add inverse transitive rate as well
+                                if !transitive_rate.is_zero() {
+                                     rate_map.insert((to.clone(), from.clone()), Decimal::ONE / transitive_rate);
+                                } else {
+                                     log::warn!("Zero transitive rate calculated for {}->{} via {} on {}. Cannot store inverse.", from, to, via, date);
+                                }
+                                // Found *a* path, break inner loop to avoid redundant calculations for this pair?
+                                // Or let it run to potentially find a more direct path later? Current logic allows override.
+                                // break; // Optional: break if one path is enough
                             }
                         }
                     }
                 }
             }
+             // Add identity rates again just in case they were missed
+            for currency in &currencies_vec {
+                rate_map.entry((currency.clone(), currency.clone())).or_insert(Decimal::ONE);
+            }
+
+
             self.historical_rates.insert(date, rate_map);
-            // Add date in sorted insert
+            // Add date in sorted insert (logic remains the same)
             if !self.sorted_dates.contains(&date) {
                 self.sorted_dates.push(date);
                 self.sorted_dates.sort();
+                log::debug!("Added rates for date {} to converter.", date);
             }
         }
+        log::info!("CurrencyConverter initialized with data for {} dates.", self.sorted_dates.len());
         Ok(())
     }
 
@@ -164,7 +220,8 @@ impl CurrencyConverter {
                     // Requested date is between two dates.
                     let prev_date = self.sorted_dates[index - 1];
                     let next_date = self.sorted_dates[index];
-                    if (date - prev_date) < (next_date - date) {
+                    // Compare differences in days
+                    if (date - prev_date).num_days() < (next_date - date).num_days() {
                         prev_date
                     } else {
                         next_date
@@ -214,70 +271,81 @@ impl CurrencyConverter {
 mod tests {
     use super::*;
     use crate::market_data::market_data_model::DataSource;
-    use chrono::NaiveDate;
+    use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
 
     fn test_exchange_rates() -> Vec<ExchangeRate> {
-        let date1 = NaiveDate::from_ymd_opt(2023, 10, 26)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap();
-        let date2 = NaiveDate::from_ymd_opt(2023, 10, 27)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap();
-        let date3 = NaiveDate::from_ymd_opt(2023, 10, 28)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap();
+        // Helper to create DateTime<Utc> from NaiveDate
+        let dt = |y, m, d, h, min, s| {
+            Utc.from_utc_datetime(&NaiveDate::from_ymd_opt(y, m, d).unwrap().and_hms_opt(h, min, s).unwrap())
+        };
 
         vec![
+            // Date 1: USD/EUR has two rates, EUR/GBP has one
             ExchangeRate {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: Decimal::from(85),
+                rate: Decimal::new(84, 2), // Earlier rate
                 source: DataSource::Manual,
-                timestamp: date1,
-            },
-            ExchangeRate {
-                id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
-                from_currency: "EUR".to_string(),
-                to_currency: "GBP".to_string(),
-                rate: Decimal::from(90),
-                source: DataSource::Manual,
-                timestamp: date1,
+                timestamp: dt(2023, 10, 26, 10, 0, 0),
             },
             ExchangeRate {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: Decimal::from(86),
+                rate: Decimal::new(85, 2), // LATEST rate for this pair on this day
                 source: DataSource::Manual,
-                timestamp: date2,
+                timestamp: dt(2023, 10, 26, 15, 0, 0),
             },
             ExchangeRate {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: Decimal::from(91),
+                rate: Decimal::new(90, 2),
                 source: DataSource::Manual,
-                timestamp: date2,
+                timestamp: dt(2023, 10, 26, 12, 0, 0), // Only rate for this pair/day
             },
+            // Date 2: Only one rate per pair
             ExchangeRate {
                 id: ExchangeRate::make_fx_symbol("USD", "EUR"),
                 from_currency: "USD".to_string(),
                 to_currency: "EUR".to_string(),
-                rate: Decimal::from(87),
+                rate: Decimal::new(86, 2),
                 source: DataSource::Manual,
-                timestamp: date3,
+                timestamp: dt(2023, 10, 27, 11, 0, 0),
             },
             ExchangeRate {
                 id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
                 from_currency: "EUR".to_string(),
                 to_currency: "GBP".to_string(),
-                rate: Decimal::from(92),
+                rate: Decimal::new(91, 2),
                 source: DataSource::Manual,
-                timestamp: date3,
+                timestamp: dt(2023, 10, 27, 13, 0, 0),
+            },
+            // Date 3: EUR/GBP latest rate is different
+            ExchangeRate {
+                id: ExchangeRate::make_fx_symbol("USD", "EUR"),
+                from_currency: "USD".to_string(),
+                to_currency: "EUR".to_string(),
+                rate: Decimal::new(87, 2),
+                source: DataSource::Manual,
+                timestamp: dt(2023, 10, 28, 9, 0, 0),
+            },
+            ExchangeRate {
+                id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
+                from_currency: "EUR".to_string(),
+                to_currency: "GBP".to_string(),
+                rate: Decimal::new(915, 3), // 0.915, earlier
+                source: DataSource::Manual,
+                timestamp: dt(2023, 10, 28, 10, 0, 0),
+            },
+            ExchangeRate {
+                id: ExchangeRate::make_fx_symbol("EUR", "GBP"),
+                from_currency: "EUR".to_string(),
+                to_currency: "GBP".to_string(),
+                rate: Decimal::new(92, 2), // LATEST rate
+                source: DataSource::Manual,
+                timestamp: dt(2023, 10, 28, 16, 0, 0),
             },
         ]
     }
@@ -292,7 +360,7 @@ mod tests {
         let converted_amount = converter
             .convert_amount(amount, "USD", "EUR", date)
             .unwrap();
-        assert_eq!(converted_amount, Decimal::from(85));
+        assert_eq!(converted_amount, Decimal::new(85, 0));
     }
 
     #[test]
@@ -355,20 +423,21 @@ mod tests {
         let converted_amount = converter
             .convert_amount_nearest(amount.clone(), "USD", "EUR", date_exact)
             .unwrap();
-        assert_eq!(converted_amount, Decimal::from(86)); // Rate on 2023-10-27
+        assert_eq!(converted_amount, Decimal::new(86, 0)); // Rate on 2023-10-27
 
         // Test with a date before the first date
         let date_before = NaiveDate::from_ymd_opt(2023, 10, 25).unwrap();
         let converted_amount = converter
             .convert_amount_nearest(amount.clone(), "USD", "EUR", date_before)
             .unwrap();
-        assert_eq!(converted_amount, Decimal::from(85)); // Should use 2023-10-26
+        assert_eq!(converted_amount, Decimal::new(85, 0)); // Should use 2023-10-26
 
         // Test with a date after the last date
         let date_after = NaiveDate::from_ymd_opt(2023, 10, 29).unwrap();
         let converted_amount = converter
             .convert_amount_nearest(amount.clone(), "USD", "EUR", date_after)
             .unwrap();
-        assert_eq!(converted_amount, Decimal::from(87)); // Should use 2023-10-28
+        assert_eq!(converted_amount, Decimal::new(87, 0)); // Should use 2023-10-28
     }
 }
+

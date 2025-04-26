@@ -1,43 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    cash_holdings (id) {
-        id -> Text,
-        account_id -> Text,
-        currency -> Text,
-        amount -> Text,
-        last_updated -> Text,
-    }
-}
-
-diesel::table! {
-    lots (id) {
-        id -> Text,
-        position_id -> Text,
-        acquisition_date -> Text,
-        quantity -> Text,
-        cost_basis -> Text,
-        acquisition_price -> Text,
-        acquisition_fees -> Text,
-        last_updated -> Text,
-    }
-}
-
-diesel::table! {
-    positions (id) {
-        id -> Text,
-        account_id -> Text,
-        asset_id -> Text,
-        currency -> Text,
-        quantity -> Text,
-        average_cost -> Text,
-        total_cost_basis -> Text,
-        inception_date -> Text,
-        last_updated -> Text,
-    }
-}
-
-diesel::table! {
     accounts (id) {
         id -> Text,
         name -> Text,
@@ -58,7 +21,7 @@ diesel::table! {
         account_id -> Text,
         asset_id -> Text,
         activity_type -> Text,
-        activity_date -> Timestamp,
+        activity_date -> Text,
         quantity -> Text,
         unit_price -> Text,
         currency -> Text,
@@ -66,8 +29,8 @@ diesel::table! {
         amount -> Nullable<Text>,
         is_draft -> Bool,
         comment -> Nullable<Text>,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
@@ -128,6 +91,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    daily_account_valuation (id) {
+        id -> Text,
+        account_id -> Text,
+        valuation_date -> Date,
+        account_currency -> Text,
+        base_currency -> Text,
+        fx_rate_to_base -> Text,
+        cash_balance -> Text,
+        investment_market_value -> Text,
+        total_value -> Text,
+        cost_basis -> Text,
+        net_contribution -> Text,
+        calculated_at -> Text,
+    }
+}
+
+diesel::table! {
     goals (id) {
         id -> Text,
         title -> Text,
@@ -147,6 +127,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    holdings_snapshots (id) {
+        id -> Text,
+        account_id -> Text,
+        snapshot_date -> Date,
+        currency -> Text,
+        positions -> Text,
+        cash_balances -> Text,
+        cost_basis -> Text,
+        net_contribution -> Text,
+        calculated_at -> Text,
+    }
+}
+
+diesel::table! {
     platforms (id) {
         id -> Text,
         name -> Nullable<Text>,
@@ -155,33 +149,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    portfolio_history (id) {
-        id -> Text,
-        account_id -> Text,
-        date -> Text,
-        total_value -> Text,
-        market_value -> Text,
-        book_cost -> Text,
-        available_cash -> Text,
-        net_deposit -> Text,
-        currency -> Text,
-        base_currency -> Text,
-        total_gain_value -> Text,
-        total_gain_percentage -> Text,
-        day_gain_percentage -> Text,
-        day_gain_value -> Text,
-        allocation_percentage -> Text,
-        exchange_rate -> Text,
-        holdings -> Nullable<Text>,
-        calculated_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     quotes (id) {
         id -> Text,
         symbol -> Text,
-        date -> Timestamp,
+        timestamp -> Text,
         open -> Text,
         high -> Text,
         low -> Text,
@@ -190,29 +161,26 @@ diesel::table! {
         volume -> Text,
         currency -> Text,
         data_source -> Text,
-        created_at -> Timestamp,
+        created_at -> Text,
     }
 }
 
-diesel::joinable!(lots -> positions (position_id));
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(quotes -> assets (symbol));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    cash_holdings,
-    lots,
-    positions,
     accounts,
     activities,
     activity_import_profiles,
     app_settings,
     assets,
     contribution_limits,
+    daily_account_valuation,
     goals,
     goals_allocation,
+    holdings_snapshots,
     platforms,
-    portfolio_history,
     quotes,
 );

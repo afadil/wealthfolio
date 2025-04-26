@@ -5,7 +5,7 @@ import { type NavigationProps, SidebarNav } from './sidebar-nav';
 import { useQuery } from '@tanstack/react-query';
 import { Account } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
-import { useSettings } from '@/lib/useSettings';
+import { useSettings } from '@/hooks/use-settings';
 import { QueryKeys } from '@/lib/query-keys';
 import { ErrorBoundary } from '@/components/error-boundary';
 

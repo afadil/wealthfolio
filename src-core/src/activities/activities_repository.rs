@@ -1,23 +1,24 @@
-use diesel::prelude::*;
-use diesel::r2d2::{Pool, ConnectionManager};
-use diesel::sqlite::SqliteConnection;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::expression_methods::ExpressionMethods;
+use diesel::prelude::*;
+use diesel::result::Error as DieselError;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sqlite::SqliteConnection;
 use log::info;
-use uuid::Uuid;
-use chrono::{NaiveDate, NaiveDateTime};
-use std::sync::Arc;
 use rust_decimal::Decimal;
 use std::str::FromStr;
+use std::sync::Arc;
+use uuid::Uuid;
 
-use crate::activities::activities_constants::*;
-use crate::activities::activities_errors::{ActivityError, Result};
-use crate::activities::activities_model::*;
-use crate::schema::{accounts, activities, activity_import_profiles, assets};
-use crate::db::get_connection;
 use super::activities_traits::ActivityRepositoryTrait;
+use crate::activities::activities_constants::*;
+use crate::activities::activities_errors::ActivityError;
+use crate::activities::activities_model::*;
+use crate::db::get_connection;
+use crate::schema::{accounts, activities, activity_import_profiles, assets};
+use crate::{Error, Result};
 use diesel::dsl::min;
 use num_traits::Zero;
-
 
 /// Repository for managing activity data in the database
 pub struct ActivityRepository {
@@ -35,47 +36,44 @@ impl ActivityRepository {
 // Implement the trait for the repository
 impl ActivityRepositoryTrait for ActivityRepository {
     fn get_trading_activities(&self) -> Result<Vec<Activity>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
-        activities::table
+        let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)
-            .map(|activities| activities.into_iter().map(Activity::from).collect())
-            .map_err(ActivityError::from)
+            .load::<ActivityDB>(&mut conn)?;
+
+        Ok(activities_db.into_iter().map(Activity::from).collect())
     }
 
     fn get_income_activities(&self) -> Result<Vec<Activity>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
-        activities::table
+        let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq_any(INCOME_ACTIVITY_TYPES))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)
-            .map(|activities| activities.into_iter().map(Activity::from).collect())
-            .map_err(ActivityError::from)
+            .load::<ActivityDB>(&mut conn)?;
+
+        Ok(activities_db.into_iter().map(Activity::from).collect())
     }
 
     fn get_activities(&self) -> Result<Vec<Activity>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
-        activities::table
+        let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)
-            .map(|activities| activities.into_iter().map(Activity::from).collect())
-            .map_err(ActivityError::from)
+            .load::<ActivityDB>(&mut conn)?;
+
+        Ok(activities_db.into_iter().map(Activity::from).collect())
     }
 
     fn search_activities(
@@ -87,8 +85,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
         sort: Option<Sort>,                        // Optional sort
     ) -> Result<ActivitySearchResponse> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
         let offset = page * page_size;
 
@@ -151,7 +148,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
         };
 
         // Count query
-        let total_row_count = create_base_query(&conn).count().get_result::<i64>(&mut conn)?;
+        let total_row_count = create_base_query(&conn)
+            .count()
+            .get_result::<i64>(&mut conn)?;
 
         // Data fetching query
         let results = create_base_query(&conn)
@@ -174,7 +173,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 accounts::currency,
                 assets::symbol,
                 assets::name,
-                assets::data_source
+                assets::data_source,
             ))
             .limit(page_size)
             .offset(offset)
@@ -187,8 +186,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
     }
 
     fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn =
+            get_connection(&self.pool).map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
 
         new_activity.validate()?;
 
@@ -197,16 +196,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         info!("Creating activity in DB: {:?}", activity_db);
 
-        diesel::insert_into(activities::table)
+        let inserted_activity = diesel::insert_into(activities::table)
             .values(&activity_db)
-            .get_result::<ActivityDB>(&mut conn)
-            .map(Activity::from)
-            .map_err(ActivityError::from)
+            .get_result::<ActivityDB>(&mut conn)?;
+
+        Ok(Activity::from(inserted_activity))
     }
 
     fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn =
+            get_connection(&self.pool).map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
 
         activity_update.validate()?;
 
@@ -216,19 +215,19 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .first::<ActivityDB>(&mut conn)?;
 
         activity_db.created_at = existing.created_at;
-        activity_db.updated_at = chrono::Utc::now().naive_utc();
+        activity_db.updated_at = chrono::Utc::now().to_rfc3339();
 
-        diesel::update(activities::table.find(&activity_db.id))
+        let updated_activity = diesel::update(activities::table.find(&activity_db.id))
             .set(&activity_db)
-            .get_result::<ActivityDB>(&mut conn)
-            .map(Activity::from)
-            .map_err(ActivityError::from)
+            .get_result::<ActivityDB>(&mut conn)?;
+
+        Ok(Activity::from(updated_activity))
     }
 
     /// Deletes an activity by ID
     fn delete_activity(&self, activity_id: String) -> Result<Activity> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn =
+            get_connection(&self.pool).map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
 
         let activity = activities::table
             .find(&activity_id)
@@ -240,46 +239,39 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(activity.into())
     }
 
-     /// Retrieves activities by account ID
+    /// Retrieves activities by account ID
     fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
-        activities::table
+        let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq(account_id))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)
-            .map(|activities| activities.into_iter().map(Activity::from).collect())
-            .map_err(ActivityError::from)
+            .load::<ActivityDB>(&mut conn)?;
+
+        Ok(activities_db.into_iter().map(Activity::from).collect())
     }
 
     /// Retrieves activities by account IDs
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
-        activities::table
+        let activities_db = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
             .filter(activities::account_id.eq_any(account_ids))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)
-            .map(|activities| activities.into_iter().map(Activity::from).collect())
-            .map_err(ActivityError::from)
+            .load::<ActivityDB>(&mut conn)?;
+
+        Ok(activities_db.into_iter().map(Activity::from).collect())
     }
 
     /// Calculates the average cost for an asset in an account
-    fn calculate_average_cost(
-        &self,
-        account_id: &str,
-        asset_id: &str,
-    ) -> Result<Decimal> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+    fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal> {
+        let mut conn = get_connection(&self.pool)?;
 
         #[derive(QueryableByName, Debug)]
         struct AverageCost {
@@ -317,47 +309,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(Decimal::from_str(&result.average_cost).unwrap_or_default())
     }
 
-    /// Gets the first activity date for given account IDs
-    fn get_first_activity_date(
-        &self,
-        account_ids: Option<&[String]>,
-    ) -> Result<Option<NaiveDate>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
-
-        let mut query = activities::table
-            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
-            .filter(accounts::is_active.eq(true))
-            .into_boxed();
-
-        if let Some(ids) = account_ids {
-            query = query.filter(activities::account_id.eq_any(ids));
-        }
-
-        query
-            .select(diesel::dsl::min(diesel::dsl::date(
-                activities::activity_date,
-            )))
-            .first::<Option<NaiveDate>>(&mut conn)
-            .map_err(ActivityError::from)
-    }
-
     /// Gets the import mapping for a given account ID
     fn get_import_mapping(&self, some_account_id: &str) -> Result<Option<ImportMapping>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
         activity_import_profiles::table
             .filter(activity_import_profiles::account_id.eq(some_account_id))
             .first::<ImportMapping>(&mut conn)
             .optional()
-            .map_err(ActivityError::from)
+            .map_err(Error::from)
     }
 
     /// Saves or updates an import mapping
     fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
         diesel::insert_into(activity_import_profiles::table)
             .values(mapping)
@@ -369,42 +334,39 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activity_import_profiles::symbol_mappings.eq(&mapping.symbol_mappings),
                 activity_import_profiles::updated_at.eq(&mapping.updated_at),
             ))
-            .execute(&mut conn)
-            .map_err(ActivityError::from)?;
+            .execute(&mut conn)?;
+
         Ok(())
     }
 
     /// Creates multiple activities in a single transaction
     fn create_activities(&self, mut activities: Vec<NewActivity>) -> Result<usize> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
-        conn.transaction(|conn| {
+        let inserted_count = conn.transaction::<usize, Error, _>(|conn| {
             // Generate UUIDs for activities that don't have IDs
             for activity in activities.iter_mut() {
                 if activity.id.is_none() {
                     activity.id = Some(Uuid::new_v4().to_string());
                 }
                 // Validate each activity
-                activity.validate()?;
+                activity.validate().map_err(Error::Activity)?;
             }
 
             // Convert NewActivity to ActivityDB for insertion
-            let activities_db: Vec<ActivityDB> = activities.into_iter()
-                .map(|activity| {
-                    let mut activity_db: ActivityDB = activity.into();
-                    activity_db.created_at = chrono::Utc::now().naive_utc();
-                    activity_db.updated_at = activity_db.created_at;
-                    activity_db
-                })
-                .collect();
+            let activities_db: Vec<ActivityDB> =
+                activities.into_iter().map(ActivityDB::from).collect();
+            let count = activities_db.len(); 
 
             // Perform batch insert
             diesel::insert_into(activities::table)
                 .values(activities_db)
-                .execute(conn)
-                .map_err(ActivityError::from)
-        })
+                .execute(conn)?;
+
+            Ok(count) // Return the stored count
+        })?; 
+
+        Ok(inserted_count) // Return the count from the successful transaction
     }
 
     /// Retrieves deposit activities for specified accounts within a year as raw data
@@ -414,8 +376,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
     ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
         // Use a proper join with explicit ON condition
         let results = activities::table
@@ -423,7 +384,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(accounts::id.eq_any(account_ids))
             .filter(accounts::is_active.eq(true))
             .filter(activities::activity_type.eq("DEPOSIT"))
-            .filter(activities::activity_date.between(start_date, end_date))
+            .filter(activities::activity_date.between(
+                Utc.from_utc_datetime(&start_date).to_rfc3339(),
+                Utc.from_utc_datetime(&end_date).to_rfc3339(),
+            ))
             .select((
                 activities::account_id,
                 activities::quantity,
@@ -452,10 +416,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(converted_results)
     }
 
-
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+        let mut conn = get_connection(&self.pool)?;
 
         let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
@@ -510,16 +472,49 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(results)
     }
 
-    fn get_first_activity_date_overall(&self) -> Result<NaiveDateTime> {
-        let mut conn = get_connection(&self.pool)
-            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+    fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>> {
+        let mut conn = get_connection(&self.pool)?;
 
-        activities::table
+        let min_date_str = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::is_active.eq(true))
             .select(min(activities::activity_date))
-            .first::<Option<NaiveDateTime>>(&mut conn)
-            .map_err(ActivityError::from)
-            .and_then(|opt| opt.ok_or(ActivityError::NotFound("No activities found.".to_string())))
+            .first::<Option<String>>(&mut conn)
+            .map_err(Error::from)?
+            .ok_or(ActivityError::NotFound("No activities found.".to_string()))?;
+
+        // Parse the string result
+        DateTime::parse_from_rfc3339(&min_date_str)
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|e| ActivityError::InvalidData(format!("Failed to parse date: {}", e)).into())
     }
-} 
+
+    /// Gets the first activity date for given account IDs
+    fn get_first_activity_date(
+        &self,
+        account_ids: Option<&[String]>,
+    ) -> Result<Option<DateTime<Utc>>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let mut query = activities::table
+            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
+            .filter(accounts::is_active.eq(true))
+            .select(min(activities::activity_date))
+            .into_boxed();
+
+        if let Some(ids) = account_ids {
+            query = query.filter(activities::account_id.eq_any(ids));
+        }
+
+        let min_date_str_opt = query
+            .first::<Option<String>>(&mut conn)
+            .map_err(Error::from)?;
+
+        match min_date_str_opt {
+            Some(date_str) => DateTime::parse_from_rfc3339(&date_str)
+                .map(|dt| Some(dt.with_timezone(&Utc)))
+                .map_err(|e| ActivityError::InvalidData(format!("Failed to parse date: {}", e)).into()),
+            None => Ok(None), // If no activity found, return None
+        }
+    }
+}

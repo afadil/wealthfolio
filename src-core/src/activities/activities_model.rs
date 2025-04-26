@@ -1,10 +1,12 @@
-use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate};
+use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate, TimeZone};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rust_decimal::Decimal;
 use crate::utils::decimal_serde::*;
 use crate::accounts::Account;
+use crate::Result;
+use crate::activities::activities_errors::ActivityError;
 
 /// Domain model representing an activity in the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +52,7 @@ pub struct ActivityDB {
     pub account_id: String,
     pub asset_id: String,
     pub activity_type: String,
-    pub activity_date: NaiveDateTime,
+    pub activity_date: String,
     pub quantity: String,
     pub unit_price: String,
     pub currency: String,
@@ -58,8 +60,8 @@ pub struct ActivityDB {
     pub amount: Option<String>,
     pub is_draft: bool,
     pub comment: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 /// Input model for creating a new activity
@@ -82,7 +84,7 @@ pub struct NewActivity {
 
 impl NewActivity {
     /// Validates the new activity data
-    pub fn validate(&self) -> crate::activities::Result<()> {
+    pub fn validate(&self) -> std::result::Result<(), ActivityError> {
         if self.account_id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Account ID cannot be empty".to_string(),
@@ -131,26 +133,26 @@ pub struct ActivityUpdate {
 
 impl ActivityUpdate {
     /// Validates the activity update data
-    pub fn validate(&self) -> crate::activities::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity ID is required for updates".to_string(),
-            ));
+            ).into());
         }
         if self.account_id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Account ID cannot be empty".to_string(),
-            ));
+            ).into());
         }
         if self.asset_id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Asset ID cannot be empty".to_string(),
-            ));
+            ).into());
         }
         if self.activity_type.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity type cannot be empty".to_string(),
-            ));
+            ).into());
         }
         Ok(())
     }
@@ -169,8 +171,8 @@ pub struct ActivityDetails {
     pub asset_id: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub activity_type: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub date: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub date: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub quantity: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -185,10 +187,10 @@ pub struct ActivityDetails {
     pub is_draft: bool,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub comment: Option<String>,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub created_at: NaiveDateTime,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub updated_at: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub created_at: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub updated_at: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub account_name: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -228,6 +230,21 @@ impl ActivityDetails {
             log::error!("Failed to parse amount '{}': {}", s, e);
             Decimal::ZERO
         }))
+    }
+
+    // Helper to parse the date string
+    pub fn get_date(&self) -> std::result::Result<DateTime<Utc>, chrono::ParseError> {
+        DateTime::parse_from_rfc3339(&self.date).map(|dt| dt.with_timezone(&Utc))
+    }
+
+    // Helper to parse the created_at string
+    pub fn get_created_at(&self) -> std::result::Result<DateTime<Utc>, chrono::ParseError> {
+        DateTime::parse_from_rfc3339(&self.created_at).map(|dt| dt.with_timezone(&Utc))
+    }
+
+    // Helper to parse the updated_at string
+    pub fn get_updated_at(&self) -> std::result::Result<DateTime<Utc>, chrono::ParseError> {
+        DateTime::parse_from_rfc3339(&self.updated_at).map(|dt| dt.with_timezone(&Utc))
     }
 }
 
@@ -350,7 +367,7 @@ impl Default for ImportMappingData {
 }
 
 impl ImportMapping {
-    pub fn to_mapping_data(&self) -> Result<ImportMappingData, serde_json::Error> {
+    pub fn to_mapping_data(&self) -> std::result::Result<ImportMappingData, serde_json::Error> {
         Ok(ImportMappingData {
             account_id: self.account_id.clone(),
             field_mappings: serde_json::from_str(&self.field_mappings)?,
@@ -359,7 +376,7 @@ impl ImportMapping {
         })
     }
 
-    pub fn from_mapping_data(data: &ImportMappingData) -> Result<Self, serde_json::Error> {
+    pub fn from_mapping_data(data: &ImportMappingData) -> std::result::Result<Self, serde_json::Error> {
         Ok(Self {
             account_id: data.account_id.clone(),
             field_mappings: serde_json::to_string(&data.field_mappings)?,
@@ -417,7 +434,7 @@ impl ActivityType {
 impl FromStr for ActivityType {
     type Err = String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         use crate::activities::activities_constants::*;
         match s {
             s if s == ACTIVITY_TYPE_BUY => Ok(ActivityType::Buy),
@@ -466,8 +483,8 @@ mod timestamp_format {
         
         // Then try as date-only format
         if let Ok(date) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
-            // Use noon UTC for date-only values
-            return Ok(Utc.from_utc_datetime(&date.and_hms_opt(12, 0, 0).unwrap_or_default()));
+            // Use midnight UTC for date-only values
+            return Ok(Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default()));
         }
         
         Err(serde::de::Error::custom(format!(
@@ -485,7 +502,12 @@ impl From<ActivityDB> for Activity {
             account_id: db.account_id,
             asset_id: db.asset_id,
             activity_type: db.activity_type,
-            activity_date: DateTime::from_naive_utc_and_offset(db.activity_date, Utc),
+            activity_date: DateTime::parse_from_rfc3339(&db.activity_date)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|e| {
+                    log::error!("Failed to parse activity_date '{}': {}", db.activity_date, e);
+                    Utc::now() // Fallback to now
+                }),
             quantity: Decimal::from_str(&db.quantity).unwrap_or_else(|e| {
                 log::error!("Failed to parse quantity '{}': {}", db.quantity, e);
                 Decimal::ZERO
@@ -505,28 +527,38 @@ impl From<ActivityDB> for Activity {
             })),
             is_draft: db.is_draft,
             comment: db.comment,
-            created_at: DateTime::from_naive_utc_and_offset(db.created_at, Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(db.updated_at, Utc),
+            created_at: DateTime::parse_from_rfc3339(&db.created_at)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|e| {
+                    log::error!("Failed to parse created_at '{}': {}", db.created_at, e);
+                    Utc::now() // Fallback to now
+                }),
+            updated_at: DateTime::parse_from_rfc3339(&db.updated_at)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|e| {
+                    log::error!("Failed to parse updated_at '{}': {}", db.updated_at, e);
+                    Utc::now() // Fallback to now
+                }),
         }
     }
 }
 
 impl From<NewActivity> for ActivityDB {
     fn from(domain: NewActivity) -> Self {
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         
         // Parse the date and normalize to UTC
-        let activity_date = DateTime::parse_from_rfc3339(&domain.activity_date)
-            .map(|dt| dt.naive_utc())
+        let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
+            .map(|dt| dt.with_timezone(&Utc))
             .or_else(|_| {
-                // If date-only format, use noon UTC
+                // If date-only format, use midnight UTC
                 NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d")
-                    .map(|date| date.and_hms_opt(12, 0, 0).unwrap_or_default())
+                    .map(|date| Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default()))
             })
             .unwrap_or_else(|e| {
                 log::error!("Failed to parse activity date '{}': {}", domain.activity_date, e);
-                // If parsing fails, use noon UTC today
-                now.date().and_hms_opt(12, 0, 0).unwrap_or(now)
+                // If parsing fails, use midnight UTC today
+                Utc.from_utc_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap_or_else(|| now.naive_utc()))
             });
 
         // Handle cash activities and splits
@@ -564,7 +596,7 @@ impl From<NewActivity> for ActivityDB {
             account_id: domain.account_id,
             asset_id: domain.asset_id,
             activity_type: domain.activity_type,
-            activity_date,
+            activity_date: activity_datetime.to_rfc3339(),
             quantity,
             unit_price,
             currency: domain.currency,
@@ -572,26 +604,26 @@ impl From<NewActivity> for ActivityDB {
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
-            created_at: now,
-            updated_at: now,
+            created_at: now.to_rfc3339(),
+            updated_at: now.to_rfc3339(),
         }
     }
 }
 
 impl From<ActivityUpdate> for ActivityDB {
     fn from(domain: ActivityUpdate) -> Self {
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
         
         // Use the same date parsing logic as NewActivity for consistency
-        let activity_date = DateTime::parse_from_rfc3339(&domain.activity_date)
-            .map(|dt| dt.naive_utc())
+        let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
+            .map(|dt| dt.with_timezone(&Utc))
             .or_else(|_| {
                 NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d")
-                    .map(|date| date.and_hms_opt(12, 0, 0).unwrap_or_default())
+                    .map(|date| Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default()))
             })
             .unwrap_or_else(|e| {
                 log::error!("Failed to parse activity date '{}': {}", domain.activity_date, e);
-                now.date().and_hms_opt(12, 0, 0).unwrap_or(now)
+                Utc.from_utc_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap_or_else(|| now.naive_utc()))
             });
 
         // Handle cash activities and splits
@@ -629,7 +661,7 @@ impl From<ActivityUpdate> for ActivityDB {
             account_id: domain.account_id,
             asset_id: domain.asset_id,
             activity_type: domain.activity_type,
-            activity_date,
+            activity_date: activity_datetime.to_rfc3339(),
             quantity,
             unit_price,
             currency: domain.currency,
@@ -637,8 +669,8 @@ impl From<ActivityUpdate> for ActivityDB {
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
-            created_at: now,
-            updated_at: now,
+            created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
+            updated_at: now.to_rfc3339(),
         }
     }
 }

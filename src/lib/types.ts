@@ -4,6 +4,7 @@ import {
   ActivityType,
   DataSource,
   AccountType,
+  HoldingType,
 } from './constants';
 
 export {
@@ -187,16 +188,20 @@ export interface Country {
   weight: number;
 }
 
-export interface AssetSummary {
+export interface Instrument {
   id: string;
-  name?: string | null;
-  assetType?: string | null;
   symbol: string;
-  assetClass?: string | null;
-  assetSubClass?: string | null;
+  name?: string | null;
   currency: string;
+  assetClass?: string | null;
+  assetSubclass?: string | null;
   countries?: Country[] | null;
   sectors?: Sector[] | null;
+}
+
+export interface MonetaryValue {
+  local: number;
+  base: number;
 }
 
 export interface Lot {
@@ -229,33 +234,30 @@ export interface CashHolding {
   lastUpdated: string; // ISO date string
 }
 
-
-// Renamed from Performance and updated fields
-export interface PerformanceMetrics {
-  marketPrice: number;
-  marketValue: number;
-  totalGainLossAmount: number;
-  totalGainLossPercent: number;
-  dayGainLossAmount: number;
-  dayGainLossPercent: number;
-  baseCurrency: string;
-  fxRateToBase: number;
-}
-
 export interface Holding {
   id: string;
-  holdingType: 'security' | 'cash';
+  holdingType: HoldingType;
   accountId: string;
-  assetId: string;
-  symbol: string;
-  asset?: AssetSummary | null;
+  instrument?: Instrument | null;
   quantity: number;
-  averageCostPrice: number;
-  totalCostBasis: number;
-  currency: string;
-  inceptionDate: string;
-  performance: PerformanceMetrics;
-  allocationPercent: number;
+  openDate?: string | Date | null;
+  localCurrency: string;
+  baseCurrency: string;
+  fxRate?: number | null;
+  marketValue: MonetaryValue;
+  costBasis?: MonetaryValue | null;
+  price?: number | null;
+  unrealizedGain?: MonetaryValue | null;
+  unrealizedGainPct?: number | null;
+  realizedGain?: MonetaryValue | null;
+  realizedGainPct?: number | null;
+  totalGain?: MonetaryValue | null;
+  totalGainPct?: number | null;
+  dayChange?: MonetaryValue | null;
+  dayChangePct?: number | null;
+  prevCloseValue?: MonetaryValue | null;
+  weight: number;
+  asOfDate: string;
 }
 
 export interface Asset {
@@ -363,39 +365,38 @@ export interface IncomeSummary {
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
 
-export interface HistorySummary {
-  id?: string;
-  startDate: string;
-  endDate: string;
-  entriesCount: number;
-}
 
 export interface PortfolioHistory {
   id: string;
   accountId: string;
   date: string;
-  totalValue: number;
-  marketValue: number;
-  bookCost: number;
-  availableCash: number;
-  netDeposit: number;
-  currency: string;
+  accountCurrency: string;
   baseCurrency: string;
-  totalGainValue: number;
-  totalGainPercentage: number;
-  dayGainPercentage: number;
-  dayGainValue: number;
-  allocationPercentage: number | null;
-  exchangeRate: number | null;
+  fxRateToBase: number;
+  cashValue: number;
+  investmentMarketValue: number;
+  totalValue: number;
+  bookCost: number;
+  netDeposit: number;
   calculatedAt: string;
 }
 
-export interface AccountPerformanceMetrics {
-  totalGainLossAmount: number | null;
-  totalGainLossPercent: number | null;
-  dayGainLossAmount: number | null;
-  dayGainLossPercent: number | null;
+export interface AccountValuation {
+  id: string;
+  accountId: string;
+  valuationDate: string;
+  accountCurrency: string;
+  baseCurrency: string;
+  fxRateToBase: number;
+  cashBalance: number;
+  investmentMarketValue: number;
+  totalValue: number;
+  costBasis: number;
+  netContribution: number;
+  calculatedAt: string;
 }
+
+
 
 export interface AccountSummaryView {
   accountId: string;
@@ -406,7 +407,20 @@ export interface AccountSummaryView {
   totalValueAccountCurrency: number;
   totalValueBaseCurrency: number;
   baseCurrency: string;
-  performance: AccountPerformanceMetrics;
+  performance: SimplePerformanceMetrics;
+}
+
+export interface SimplePerformanceMetrics {
+  accountId: string;
+  totalValue?: number | null;
+  accountCurrency?: string | null;
+  baseCurrency?: string | null;
+  fxRateToBase?: number | null;
+  totalGainLossAmount?: number | null;
+  cumulativeReturnPercent?: number | null;
+  dayGainLossAmount?: number | null;
+  dayReturnPercentModDietz?: number | null;
+  portfolioWeight?: number | null;
 }
 
 export interface AccountGroup {
@@ -414,13 +428,8 @@ export interface AccountGroup {
   accounts: AccountSummaryView[];
   totalValueBaseCurrency: number;
   baseCurrency: string;
-  performance: AccountPerformanceMetrics;
+  performance: SimplePerformanceMetrics;
   accountCount: number;
-}
-
-export interface AccountSummary {
-  account: Account;
-  performance: PortfolioHistory;
 }
 
 export interface ExchangeRate {
@@ -463,25 +472,28 @@ export interface DepositsCalculation {
 
 export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
 
-export interface CumulativeReturn {
-  date: string;
+// Renamed from CumulativeReturn to match Rust struct ReturnData
+export interface ReturnData {
+  date: string; // Changed from CumulativeReturn
   value: number;
 }
 
-export interface PerformanceData {
+// Renamed from PerformanceData to match Rust struct
+export interface PerformanceMetrics {
   id: string;
-  name: string;
-  returns: CumulativeReturn[];
-  totalReturn: number;
-  annualizedReturn: number;
+  returns: ReturnData[]; // Changed from CumulativeReturn[]
+  periodStartDate?: string | null; // Changed from periodStartDate?
+  periodEndDate?: string | null; // Changed from periodEndDate?
+  currency: string;
+  cumulativeTwr: number; // Added field, corresponds to TWR
+  gainLossAmount?: number | null; // Made explicitly nullable
+  annualizedTwr: number; // Added field, corresponds to TWR
+  simpleReturn: number; // Added field
+  annualizedSimpleReturn: number; // Added field
+  cumulativeMwr: number; // Added field, corresponds to MWR
+  annualizedMwr: number; // Added field, corresponds to MWR
   volatility: number;
   maxDrawdown: number;
-}
-
-// Added based on Rust struct in performance_service.rs
-export interface TotalReturn {
-  rate: string;
-  amount: string;
 }
 
 export interface UpdateAssetProfile {

@@ -5,9 +5,9 @@ use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::{AssetProfiler, MarketDataProvider, Quote as ModelQuote, QuoteSummary};
 use rust_decimal::Decimal;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, TimeZone};
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, warn};
 use num_traits::FromPrimitive;
 use reqwest::{header, Client};
 use serde_json::json;
@@ -162,13 +162,13 @@ impl YahooProvider {
             .regular_market_price
             .as_ref()
             .ok_or(yahoo::YahooError::EmptyDataSet)?;
-        let date = chrono::Utc::now().naive_utc();
+        let now_utc: DateTime<Utc> = Utc::now();
 
         Ok(ModelQuote {
-            id: format!("{}_{}", date.format("%Y%m%d"), symbol),
-            created_at: date,
+            id: format!("{}_{}", now_utc.format("%Y%m%d"), symbol),
+            created_at: now_utc,
             data_source: DataSource::Yahoo,
-            date,
+            timestamp: now_utc,
             symbol: symbol.to_string(),
             open: Decimal::from_f64_retain(
                 price
@@ -224,16 +224,15 @@ impl YahooProvider {
         yahoo_quote: yahoo::Quote,
         fallback_currency: String,
     ) -> ModelQuote {
-        let date = DateTime::<Utc>::from_timestamp(yahoo_quote.timestamp as i64, 0)
-            .unwrap_or_default()
-            .naive_utc();
+        let quote_timestamp: DateTime<Utc> = Utc.timestamp_opt(yahoo_quote.timestamp as i64, 0).single().unwrap_or_default();
+        let now_utc: DateTime<Utc> = Utc::now();
 
         ModelQuote {
-            id: format!("{}_{}", date.format("%Y%m%d"), symbol),
-            created_at: chrono::Utc::now().naive_utc(),
+            id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+            created_at: now_utc,
             data_source: DataSource::Yahoo,
-            date,
-            symbol: symbol,
+            timestamp: quote_timestamp,
+            symbol,
             open: Decimal::from_f64_retain(yahoo_quote.open).unwrap_or_default(),
             high: Decimal::from_f64_retain(yahoo_quote.high).unwrap_or_default(),
             low: Decimal::from_f64_retain(yahoo_quote.low).unwrap_or_default(),
@@ -572,10 +571,15 @@ impl YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        debug!(
-            "Fetching stock history for {} symbols",
-            symbols_with_currencies.len()
-        );
+        // If start time is after or equal to end time, no data needs fetching.
+        if start >= end {
+            warn!(
+                "Start time ({:?}) is after or equal to end time ({:?}). Skipping fetch.",
+                DateTime::<Utc>::from(start),
+                DateTime::<Utc>::from(end)
+            );
+            return Ok(Vec::new());
+        }
 
         if symbols_with_currencies.is_empty() {
             return Ok(Vec::new());

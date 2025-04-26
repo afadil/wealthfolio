@@ -5,7 +5,7 @@ import {
   Account,
   ActivityDetails,
   Goal,
-  PortfolioHistory,
+  AccountValuation,
 } from '@/lib/types';
 import { logger } from '@/adapters';
 import { toast } from '@/components/ui/use-toast';
@@ -16,7 +16,7 @@ import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
 import { getActivities } from '@/commands/activity';
 import { getGoals } from '@/commands/goal';
-import { getHistory } from '@/commands/portfolio';
+import { getHistoricalValuations } from '@/commands/portfolio';
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -39,9 +39,9 @@ export function useExportData() {
     queryFn: getGoals,
     enabled: false,
   });
-  const { refetch: fetchPortfolioHistory } = useQuery<PortfolioHistory[], Error>({
-    queryKey: [QueryKeys.HISTORY],
-    queryFn: () => getHistory(),
+  const { refetch: fetchPortfolioHistory } = useQuery<AccountValuation[], Error>({
+    queryKey: [QueryKeys.HISTORY_VALUATION],
+    queryFn: () => getHistoricalValuations(),
     enabled: false,
   });
 

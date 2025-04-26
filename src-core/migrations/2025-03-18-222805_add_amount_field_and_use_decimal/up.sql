@@ -37,29 +37,32 @@ CREATE TABLE activities_new (
     account_id TEXT NOT NULL,
     asset_id TEXT NOT NULL,
     activity_type TEXT NOT NULL,
-    activity_date TIMESTAMP NOT NULL,
-    quantity TEXT NOT NULL,  -- Changed from DOUBLE to TEXT
-    unit_price TEXT NOT NULL, -- Changed from DOUBLE to TEXT
+    activity_date TEXT NOT NULL,
+    quantity TEXT NOT NULL,
+    unit_price TEXT NOT NULL,
     currency TEXT NOT NULL,
-    fee TEXT NOT NULL, -- Changed from DOUBLE to TEXT
-    amount TEXT, -- New field for cash activities amount
+    fee TEXT NOT NULL,
+    amount TEXT,
     is_draft BOOLEAN NOT NULL,
     comment TEXT,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
--- Copy data from old table to new table, converting numeric values to TEXT
+-- Copy data from old table to new table, converting numeric values to TEXT and timestamps to RFC3339 UTC
 INSERT INTO activities_new (
     id, account_id, asset_id, activity_type, activity_date,
     quantity, unit_price, currency, fee, amount,
     is_draft, comment, created_at, updated_at
 )
 SELECT 
-    id, account_id, asset_id, activity_type, activity_date,
+    id, account_id, asset_id, activity_type, 
+    strftime('%Y-%m-%dT%H:%M:%fZ', activity_date),
     CAST(quantity AS TEXT), CAST(unit_price AS TEXT), currency, CAST(fee AS TEXT),
     CAST(amount AS TEXT), 
-    is_draft, comment, created_at, updated_at
+    is_draft, comment, 
+    strftime('%Y-%m-%dT%H:%M:%fZ', created_at),
+    strftime('%Y-%m-%dT%H:%M:%fZ', updated_at)
 FROM activities;
 
 -- Drop old table
@@ -74,40 +77,12 @@ CREATE INDEX idx_activities_asset_id ON activities(asset_id);
 CREATE INDEX idx_activities_activity_type ON activities(activity_type);
 CREATE INDEX idx_activities_activity_date ON activities(activity_date);
 
--- For portfolio_history table, completely drop it and recreate from scratch
-DROP TABLE IF EXISTS portfolio_history;
-
--- Create fresh portfolio_history table with explicit TEXT types
-CREATE TABLE portfolio_history (
-    id TEXT NOT NULL PRIMARY KEY,
-    account_id TEXT NOT NULL,
-    date TEXT NOT NULL,
-    total_value TEXT NOT NULL,
-    market_value TEXT NOT NULL,
-    book_cost TEXT NOT NULL,
-    available_cash TEXT NOT NULL,
-    net_deposit TEXT NOT NULL,
-    currency TEXT NOT NULL,
-    base_currency TEXT NOT NULL,
-    total_gain_value TEXT NOT NULL,
-    total_gain_percentage TEXT NOT NULL,
-    day_gain_percentage TEXT NOT NULL,
-    day_gain_value TEXT NOT NULL,
-    allocation_percentage TEXT NOT NULL,
-    exchange_rate TEXT NOT NULL,
-    holdings TEXT,
-    calculated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create indexes
-CREATE INDEX idx_portfolio_history_account_id ON portfolio_history(account_id);
-CREATE INDEX idx_portfolio_history_date ON portfolio_history(date);
 
 -- Create temporary quotes table with only the columns that exist in the old table
 CREATE TABLE quotes_temp AS 
 SELECT id, symbol, date, open, high, low, close, adjclose, volume, data_source, created_at 
-FROM quotes 
-WHERE data_source = 'MANUAL';
+FROM quotes;
+-- WHERE data_source = 'MANUAL';
 
 -- Drop and recreate quotes table with new structure
 DROP TABLE IF EXISTS quotes;
@@ -115,7 +90,7 @@ DROP TABLE IF EXISTS quotes;
 CREATE TABLE quotes (
     id TEXT NOT NULL PRIMARY KEY,
     symbol TEXT NOT NULL,
-    date TIMESTAMP NOT NULL,
+    timestamp TEXT NOT NULL,
     open TEXT NOT NULL,
     high TEXT NOT NULL,
     low TEXT NOT NULL,
@@ -124,18 +99,19 @@ CREATE TABLE quotes (
     volume TEXT NOT NULL,
     currency TEXT NOT NULL,
     data_source TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL,
+    created_at TEXT NOT NULL,
     CONSTRAINT "quotes_asset_id_fkey" FOREIGN KEY ("symbol") REFERENCES "assets" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- Reinsert the MANUAL quotes with numeric values converted to TEXT
+-- Reinsert the MANUAL quotes with numeric values converted to TEXT and timestamp converted to RFC3339 UTC
 -- Join with assets table to get the correct currency
 INSERT INTO quotes (
-    id, symbol, date, open, high, low, close, 
+    id, symbol, timestamp, open, high, low, close,
     adjclose, volume, currency, data_source, created_at
 )
-SELECT 
-    q.id, q.symbol, q.date,
+SELECT
+    q.id, q.symbol,
+    strftime('%Y-%m-%dT%H:%M:%fZ', q.date),
     CAST(q.open AS TEXT),
     CAST(q.high AS TEXT),
     CAST(q.low AS TEXT),
@@ -143,16 +119,18 @@ SELECT
     CAST(q.adjclose AS TEXT),
     CAST(q.volume AS TEXT),
     a.currency,
-    q.data_source, q.created_at
+    q.data_source,
+    strftime('%Y-%m-%dT%H:%M:%fZ', q.created_at)
 FROM quotes_temp q
-JOIN assets a ON q.symbol = a.id;
+JOIN assets a ON q.symbol = a.id
+WHERE q.data_source = 'MANUAL';
 
 -- Drop temporary table
 DROP TABLE quotes_temp;
 
 -- Create indexes for quotes table
-CREATE INDEX idx_quotes_symbol_date ON quotes(symbol, date);
-CREATE INDEX idx_quotes_date ON quotes(date);
+CREATE INDEX idx_quotes_symbol_date ON quotes(symbol, timestamp);
+CREATE INDEX idx_quotes_date ON quotes(timestamp);
 CREATE INDEX idx_quotes_symbol ON quotes(symbol);
 
 -- Add foreign key constraints

@@ -1,9 +1,9 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { getCurrentWindow, Theme } from '@tauri-apps/api/window';
 
-import { Settings, SettingsContextType } from './types';
-import { useSettings } from './useSettings';
-import { useSettingsMutation } from './useSettingsMutation';
+import { Settings, SettingsContextType } from '@/lib/types';
+import { useSettings } from '@/hooks/use-settings';
+import { useSettingsMutation } from '@/hooks/use-settings-mutation';
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
@@ -12,7 +12,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
 
-  const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument, settings);
+  const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument);
 
   const updateSettings = (newSettings: Settings) => {
     updateMutation.mutate(newSettings);

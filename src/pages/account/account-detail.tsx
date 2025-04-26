@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPercent } from '@/lib/utils';
-import { PortfolioHistory } from '@/lib/types';
+import { SimplePerformanceMetrics } from '@/lib/types';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 
 interface AccountDetailProps {
-  data?: PortfolioHistory;
+  data?: SimplePerformanceMetrics;
   className?: string;
 }
 
@@ -22,34 +22,31 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
       </Card>
     );
   const {
-    marketValue,
-    bookCost,
-    netDeposit,
-    availableCash,
-    totalGainValue,
-    dayGainPercentage,
-    dayGainValue,
-    totalGainPercentage,
-    allocationPercentage,
-    currency,
+    totalValue,
+    baseCurrency,
+    totalGainLossAmount,
+    cumulativeReturnPercent,
+    dayGainLossAmount,
+    dayReturnPercentModDietz,
+    portfolioWeight,
   } = data;
 
+  const currency = baseCurrency || 'USD';
+
   const rows = [
-    { label: 'Investments', value: <PrivacyAmount value={marketValue} currency={currency} /> },
-    { label: 'Book Cost', value: <PrivacyAmount value={bookCost} currency={currency} /> },
-    { label: 'Net Deposit', value: <PrivacyAmount value={netDeposit} currency={currency} /> },
-    { label: '% of my portfolio', value: formatPercent(allocationPercentage || 0) },
+    { label: 'Total Value', value: <PrivacyAmount value={totalValue || 0} currency={currency} /> },
+    { label: '% of my portfolio', value: formatPercent(portfolioWeight || 0) },
     {
       label: "Today's return",
       value: (
         <span className="flex items-center space-x-2">
           <GainPercent
-            value={dayGainPercentage}
+            value={dayReturnPercentModDietz || 0}
             animated={true}
             variant="badge"
             className="py-0.5 text-xs font-light"
           />
-          <GainAmount value={dayGainValue} currency={currency} displayCurrency={false} />
+          <GainAmount value={dayGainLossAmount || 0} currency={currency} displayCurrency={false} />
         </span>
       ),
     },
@@ -58,12 +55,12 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
       value: (
         <span className="flex items-center space-x-2">
           <GainPercent
-            value={totalGainPercentage}
+            value={cumulativeReturnPercent || 0}
             animated={true}
             variant="badge"
             className="py-0.5 text-xs font-light"
           />
-          <GainAmount value={totalGainValue} currency={currency} displayCurrency={false} />
+          <GainAmount value={totalGainLossAmount || 0} currency={currency} displayCurrency={false} />
         </span>
       ),
     },
@@ -71,14 +68,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ data, className }) => {
 
   return (
     <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between pb-0">
-        <CardTitle className="text-lg font-bold">Cash Balance</CardTitle>
-        <div className="text-lg font-extrabold">
-          <PrivacyAmount value={availableCash} currency={currency} />
-        </div>
-      </CardHeader>
-
-      <CardContent>
+      <CardContent className="pt-4">
         <Separator className="my-4" />
         <div className="space-y-4 text-sm">
           {rows.map(({ label, value }, idx) => (

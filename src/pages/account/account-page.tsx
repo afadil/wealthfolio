@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useMemo } from 'react';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 
@@ -13,52 +12,72 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useParams } from 'react-router-dom';
 import AccountDetail from './account-detail';
 import AccountHoldings from './account-holdings';
-import { useQuery } from '@tanstack/react-query';
-import { PortfolioHistory, AccountSummary } from '@/lib/types';
-import { getHistory, getAccountsSummary } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Icons } from '@/components/icons';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
+import { AccountValuation, TimePeriod, SimplePerformanceMetrics } from '@/lib/types';
+import { useAccountsSimplePerformance } from '@/hooks/use-accounts-simple-performance';
+import { useAccounts } from '@/hooks/use-accounts';
 import { AccountContributionLimit } from './account-contribution-limit';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { PrivacyToggle } from '@/components/privacy-toggle';
+import { useValuationHistory } from '@/hooks/use-valuation-history';
+import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
+import { useDerivedValuationMetrics } from '@/hooks/use-derived-valuation-metrics';
+
+interface HistoryChartData {
+  date: string;
+  totalValue: number;
+  netContribution: number;
+  currency: string;
+}
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
-  const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
 
-  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
-    queryFn: getAccountsSummary,
-  });
+  const { accounts, isLoading: isAccountsLoading } = useAccounts();
+  const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
 
-  const accountSummary = accounts?.find((account) => account.account.id === id);
+  const { 
+    data: performanceData, 
+    isLoading: isPerformanceLoading, 
+    isFetching: isPerformanceFetching 
+  } = useAccountsSimplePerformance(account ? [account] : []);
 
-  const { data: accountHistory, isLoading: isLoadingAccountHistory } = useQuery<
-    PortfolioHistory[],
-    Error
-  >({
-    queryKey: QueryKeys.accountHistory(id),
-    queryFn: () => getHistory(id),
-    enabled: !!id,
-  });
+  const performance: SimplePerformanceMetrics | undefined = useMemo(() => {
+    if (performanceData && performanceData.length > 0) {
+        return performanceData.find(p => p.accountId === id);
+    }
+    return undefined;
+  }, [performanceData, id]);
 
+  const {
+    valuationHistory,
+    isLoading: isValuationHistoryLoading,
+    interval,
+    setInterval,
+  } = useValuationHistory('3M', id);
 
-  const account = accountSummary?.account;
-  const performance = accountSummary?.performance;
+  const chartData: HistoryChartData[] = useMemo(() => {
+    if (!valuationHistory) return [];
+    return valuationHistory.map((valuation: AccountValuation) => ({
+      date: valuation.valuationDate,
+      totalValue: valuation.totalValue,
+      netContribution: valuation.netContribution,
+      currency: valuation.accountCurrency,
+    }));
+  }, [valuationHistory]);
 
-  const updatePortfolioMutation = useRecalculatePortfolioMutation({
-    successTitle: 'Portfolio recalculated successfully',
-    errorTitle: 'Failed to recalculate portfolio',
-  });
+  const {
+    gainLossAmount,
+    simpleReturn,
+    currentValuation,
+  } = useDerivedValuationMetrics(valuationHistory);
+
+  const isLoading = isAccountsLoading || isValuationHistoryLoading;
+  const isDetailsLoading = isPerformanceLoading || isPerformanceFetching;
 
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader
-        heading={account?.name || '-'}
+        heading={account?.name || 'Account'}
         headingPrefix={account?.group || account?.currency}
         displayBack={true}
       />
@@ -66,72 +85,43 @@ const AccountPage = () => {
         <Card className="col-span-1 md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-md">
-              <HoverCard>
-                <HoverCardTrigger asChild className="cursor-pointer">
+              {isLoading || !account ? (
+                <Skeleton className="h-20 w-48" />
+              ) : (
+                <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
                   <div className="flex items-start gap-2">
                     <div>
                       <p className="pt-3 text-xl font-bold">
                         <PrivacyAmount
-                          value={performance?.totalValue || 0}
-                          currency={performance?.currency || 'USD'}
+                          value={currentValuation?.totalValue || 0}
+                          currency={account?.currency || 'USD'}
                         />
                       </p>
                       <div className="flex space-x-3 text-sm">
                         <GainAmount
                           className="text-sm font-light"
-                          value={performance?.totalGainValue || 0}
+                          value={gainLossAmount}
                           currency={account?.currency || 'USD'}
                           displayCurrency={false}
                         />
                         <div className="my-1 border-r border-muted-foreground pr-2" />
                         <GainPercent
                           className="text-sm font-light"
-                          value={performance?.totalGainPercentage || 0}
+                          value={simpleReturn}
                           animated={true}
                         />
                       </div>
                     </div>
                     <PrivacyToggle className="mt-3" />
                   </div>
-                </HoverCardTrigger>
-                <HoverCardContent align="start" className="w-80 shadow-none">
-                  <div className="flex flex-col space-y-4">
-                    <div className="space-y-2">
-                      <h4 className="flex text-sm font-light">
-                        <Icons.Calendar className="mr-2 h-4 w-4" />
-                        As of:{' '}
-                        <Badge className="ml-1 font-medium" variant="secondary">
-                          {performance?.calculatedAt
-                            ? `${format(new Date(performance.calculatedAt), 'PPpp')}`
-                            : '-'}
-                        </Badge>
-                      </h4>
-                    </div>
-                    <Button
-                      onClick={() => updatePortfolioMutation.mutate()}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full"
-                      disabled={updatePortfolioMutation.isPending}
-                    >
-                      {updatePortfolioMutation.isPending ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Icons.Refresh className="mr-2 h-4 w-4" />
-                      )}
-                      {updatePortfolioMutation.isPending
-                        ? 'Updating portfolio...'
-                        : 'Update Portfolio'}
-                    </Button>
-                  </div>
-                </HoverCardContent>
-              </HoverCard>
+                </PortfolioUpdateTrigger>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="w-full p-0">
               <div className="flex w-full flex-col">
-                {isLoadingAccountHistory ? (
+                {isValuationHistoryLoading ? (
                   <div className="space-y-2 p-4">
                     <Skeleton className="h-8 w-full" />
                     <Skeleton className="h-8 w-full" />
@@ -144,10 +134,11 @@ const AccountPage = () => {
                   </div>
                 ) : (
                   <div className="h-[400px] w-full">
-                    <HistoryChart data={accountHistory || []} interval={interval} />
+                    <HistoryChart data={chartData} />
                     <IntervalSelector
                       className="relative bottom-10 left-0 right-0 z-10"
-                      onIntervalSelect={(newInterval) => {
+                      selectedInterval={interval}
+                      onIntervalSelect={(newInterval: TimePeriod) => {
                         setInterval(newInterval);
                       }}
                     />
@@ -158,7 +149,7 @@ const AccountPage = () => {
           </CardContent>
         </Card>
 
-        {isAccountsLoading && !performance ? (
+        {isDetailsLoading || !performance ? (
           <Skeleton className="h-full" />
         ) : (
           <div className="flex flex-col space-y-4">

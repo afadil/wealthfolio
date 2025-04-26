@@ -1,7 +1,8 @@
 use super::activities_model::*;
-use super::Result;
-use chrono::NaiveDate;
+use crate::Result;
 use chrono::NaiveDateTime;
+use chrono::DateTime;
+use chrono::Utc;
 use rust_decimal::Decimal; // Assuming Result is defined in activities_model or activities_errors
 
 /// Trait defining the contract for Activity repository operations.
@@ -30,13 +31,13 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity>;
     fn delete_activity(&self, activity_id: String) -> Result<Activity>;
     fn create_activities(&self, activities: Vec<NewActivity>) -> Result<usize>;
-    fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<NaiveDate>>;
+    fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<DateTime<Utc>>>;
     fn get_import_mapping(&self, account_id: &str) -> Result<Option<ImportMapping>>;
     fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
     // Add other repository methods if necessary, e.g., calculate_average_cost, get_deposit_activities
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>>;
-    fn get_first_activity_date_overall(&self) -> Result<NaiveDateTime>;
+    fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -70,7 +71,7 @@ pub trait ActivityServiceTrait: Send + Sync {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>>;
-    fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<NaiveDate>>;
+    fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<DateTime<Utc>>>;
     fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData>;
     fn save_import_mapping(&self, mapping_data: ImportMappingData) -> Result<ImportMappingData>;
 
