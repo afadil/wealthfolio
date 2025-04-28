@@ -156,11 +156,12 @@ struct Trading212DepositResponse {
 impl BrokerProvider for Trading212Provider {
     async fn fetch_activities(&self, since: NaiveDateTime) -> Result<Vec<ExternalActivity>, BrokerError> {
         let mut all_activities: Vec<ExternalActivity> = Vec::new();
+        let mut past_date: bool = false;
         debug!("Fetching T212 Data since {:?}", since);
 
         // === ORDERS ===
         let mut next_url = Some(self.endpoint_orders.clone());
-        while let Some(url) = next_url {
+        while let Some(url) = next_url.filter(|_| !past_date)  {
             let full_url = if url.starts_with("http") {
                 url
             } else {
@@ -222,6 +223,7 @@ impl BrokerProvider for Trading212Provider {
             
                 if ts <= since {
                     debug!("Skipping older order: {:?}", o.ticker);
+                    past_date = true;
                     continue;
                 }
             
@@ -294,8 +296,9 @@ impl BrokerProvider for Trading212Provider {
         }
 
         // === DIVIDENDS ===
+        past_date = false;
         let mut next_url = Some(self.endpoint_dividends.clone());
-        while let Some(url) = next_url {
+        while let Some(url) = next_url.filter(|_| !past_date) {
             let full_url = if url.starts_with("http") {
                 url
             } else {
@@ -348,6 +351,7 @@ impl BrokerProvider for Trading212Provider {
                 if let Ok(ts) = DateTime::parse_from_rfc3339(&d.paid_on).map(|dt| dt.naive_utc()) {
                     if ts <= since {
                         debug!("Skipping older dividend: {:?}", d.ticker);
+                        past_date = true;
                         continue;
                     }
 
@@ -370,8 +374,9 @@ impl BrokerProvider for Trading212Provider {
         }
 
         // === DEPOSITS ===
+        past_date = false;
         let mut next_url = Some(self.endpoint_deposits.clone());
-        while let Some(url) = next_url {
+        while let Some(url) = next_url.filter(|_| !past_date) {
             let full_url = if url.starts_with("http") {
                 url
             } else {
@@ -427,6 +432,7 @@ impl BrokerProvider for Trading212Provider {
 
                 if ts <= since {
                     debug!("Skipping older deposits");
+                    past_date = true;
                     continue;
                 }
 
