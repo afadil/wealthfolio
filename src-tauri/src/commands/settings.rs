@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_recalculate_request, PortfolioRequestPayload};
-use crate::models::{Settings, SettingsUpdate};
 use log::debug;
 use tauri::{State, AppHandle};
+use wealthfolio_core::settings::{Settings, SettingsUpdate};
 use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 
 #[tauri::command]
@@ -75,7 +75,7 @@ pub async fn update_exchange_rate(
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         // Emit event to trigger portfolio update
-        // emit_holdings_history_calculation_request(&handle, None, false);
+        emit_portfolio_recalculate_request(&handle, PortfolioRequestPayload::builder().build());
     });
     Ok(result)
 }
@@ -106,7 +106,7 @@ pub async fn add_exchange_rate(
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         // Emit event to trigger portfolio update
-        // emit_holdings_history_calculation_request(&handle, None, false);
+        emit_portfolio_recalculate_request(&handle, PortfolioRequestPayload::builder().build());
     });
     Ok(result)
 }
@@ -126,7 +126,7 @@ pub async fn delete_exchange_rate(
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         // Emit event to trigger portfolio update
-        // emit_holdings_history_calculation_request(&handle, None, false);
+        emit_portfolio_recalculate_request(&handle, PortfolioRequestPayload::builder().build());
     });
     Ok(())
 }

@@ -2,7 +2,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::activities::activities_model::IncomeData;
-use crate::utils::decimal_serde::*;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,12 +12,9 @@ pub struct IncomeSummary {
     pub by_type: HashMap<String, Decimal>,
     pub by_symbol: HashMap<String, Decimal>,     
     pub by_currency: HashMap<String, Decimal>,
-    #[serde(with = "decimal_serde")]
     pub total_income: Decimal,
     pub currency: String,
-    #[serde(with = "decimal_serde")]
     pub monthly_average: Decimal,
-    #[serde(with = "decimal_serde_option")]
     pub yoy_growth: Option<Decimal>,
 }
 

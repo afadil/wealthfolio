@@ -1,7 +1,6 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use diesel::expression_methods::ExpressionMethods;
 use diesel::prelude::*;
-use diesel::result::Error as DieselError;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::info;

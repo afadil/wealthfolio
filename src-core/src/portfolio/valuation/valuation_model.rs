@@ -1,5 +1,5 @@
-use crate::{constants::DECIMAL_PRECISION, utils::decimal_serde::decimal_serde};
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use crate::constants::DECIMAL_PRECISION;
+use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -13,17 +13,11 @@ pub struct DailyAccountValuation {
     pub valuation_date: NaiveDate,
     pub account_currency: String,
     pub base_currency: String,
-    #[serde(with = "decimal_serde")]
     pub fx_rate_to_base: Decimal,
-    #[serde(with = "decimal_serde")]
     pub cash_balance: Decimal,
-    #[serde(with = "decimal_serde")]
     pub investment_market_value: Decimal,
-    #[serde(with = "decimal_serde")]
     pub total_value: Decimal,
-    #[serde(with = "decimal_serde")]
     pub cost_basis: Decimal,
-    #[serde(with = "decimal_serde")]
     pub net_contribution: Decimal,
     pub calculated_at: DateTime<Utc>,
 }

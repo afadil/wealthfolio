@@ -1,6 +1,5 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use crate::utils::decimal_serde::{decimal_serde, decimal_serde_option};
 use chrono::{DateTime, NaiveDate, Utc};
 
 
@@ -46,9 +45,7 @@ pub struct Instrument {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MonetaryValue {
-    #[serde(with = "decimal_serde")]
     pub local: Decimal,
-    #[serde(with = "decimal_serde")]
     pub base: Decimal,
 }
 
@@ -74,20 +71,17 @@ pub struct Holding {
     pub instrument: Option<Instrument>,
     
     // Position data
-    #[serde(with = "decimal_serde")]
     pub quantity: Decimal,
     pub open_date: Option<DateTime<Utc>>,
     
     // Currency info
     pub local_currency: String,
     pub base_currency: String,
-    #[serde(with = "decimal_serde_option")]
     pub fx_rate: Option<Decimal>,
     
     // Current valuation
     pub market_value: MonetaryValue,
     pub cost_basis: Option<MonetaryValue>,
-    #[serde(with = "decimal_serde_option")]
     pub price: Option<Decimal>,
     
     // Total performance (since inception or purchase)
@@ -104,7 +98,6 @@ pub struct Holding {
     pub prev_close_value: Option<MonetaryValue>,
     
     // Portfolio allocation
-    #[serde(with = "decimal_serde")]
     pub weight: Decimal,
     
     // Reference date for performance calculations

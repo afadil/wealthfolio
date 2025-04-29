@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use chrono::{Duration, NaiveDate, TimeZone, Utc};
-use log::{debug, error, info};
+use chrono::{Duration, NaiveDate, TimeZone, Utc, Local};
+use log::{debug, error};
 use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -146,7 +146,7 @@ impl MarketDataServiceTrait for MarketDataService {
         symbols: Option<Vec<String>>,
         refetch_all: bool,
     ) -> Result<()> {
-        info!(
+        debug!(
             "Syncing market data. Symbols: {:?}, Refetch all: {}",
             symbols, refetch_all
         );
@@ -184,9 +184,11 @@ impl MarketDataServiceTrait for MarketDataService {
             return Ok(());
         }
 
-        // Set end date to the beginning of the next day (UTC) to ensure full coverage of the current day.
-        let end_naive_date = Utc::now().naive_utc().date() + Duration::days(1);
-        let end_date: SystemTime = Utc.from_utc_datetime(&end_naive_date.and_hms_opt(0, 0, 0).unwrap()).into();
+        // Set end date to the end of the current day (local time) to ensure full coverage.
+        let current_local_naive_date = Local::now().date_naive();
+        // Convert the local date with end-of-day time to UTC for SystemTime
+        let end_date_naive_local = current_local_naive_date.and_hms_opt(23, 59, 59).unwrap();
+        let end_date: SystemTime = Utc.from_utc_datetime(&end_date_naive_local.and_local_timezone(Local).unwrap().naive_utc()).into();
         let initial_request_count = quote_requests.len(); // Store length before moving
 
         // Group requests by data source
@@ -220,17 +222,12 @@ impl MarketDataServiceTrait for MarketDataService {
 
         // Fetch all public quotes in parallel if there are any
         if !symbols_with_currencies.is_empty() {
-            info!(
+            debug!(
                 "Processing {} public quote requests.",
                 symbols_with_currencies.len()
             );
             let start_date_time =
                 self.calculate_sync_start_time(refetch_all, &symbols_with_currencies)?;
-
-            info!("Sync time range: {} to {}", 
-                chrono::DateTime::<chrono::Utc>::from(start_date_time).format("%Y-%m-%d %H:%M:%S"),
-                chrono::DateTime::<chrono::Utc>::from(end_date).format("%Y-%m-%d %H:%M:%S")
-            );
 
             // Use Yahoo provider for bulk history
             match self
@@ -270,7 +267,7 @@ impl MarketDataServiceTrait for MarketDataService {
 
         // Fill gaps for each symbol up to the sync end date and collect
         let mut filled_quotes_to_save = Vec::new();
-        let sync_end_naive_date = end_naive_date - Duration::days(1); // Use the *actual* end date for filling, not the next day start
+        let sync_end_naive_date = current_local_naive_date; // Use the current local date for filling
 
         for (_symbol, mut symbol_quotes) in quotes_by_symbol {
             if !symbol_quotes.is_empty() {
@@ -315,7 +312,6 @@ impl MarketDataServiceTrait for MarketDataService {
             return Err(MarketDataError::ProviderError(error_message).into());
         }
 
-        info!("Market data sync completed successfully.");
         Ok(())
     }
 
@@ -420,13 +416,12 @@ impl MarketDataService {
         );
 
         let mut quotes_to_save = manual_quotes.clone(); // Start with existing quotes
-        let mut current_price = manual_quotes.last().unwrap().close.clone();
+        let current_price = manual_quotes.last().unwrap().close.clone();
         let mut current_date = last_quote_date + Duration::days(1);
 
         // Generate quotes from the day after the last manual quote up to today
         while current_date <= today {
             quotes_to_save.push(Quote {
-                // Generate a somewhat unique ID, although collision is possible if run multiple times a day
                 id: format!(
                     "{}_{}_{}",
                     request.symbol,

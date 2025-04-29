@@ -146,11 +146,6 @@ impl PerformanceService {
         let actual_end_date = end_point.valuation_date;
         let currency = start_point.account_currency.clone();
 
-        info!(
-            "Calculating FULL account performance (TWR, Simple, MWR) for '{}' over actual range: {} to {}",
-            account_id, actual_start_date, actual_end_date
-        );
-
         let capacity = full_history.len();
         let mut returns = Vec::with_capacity(capacity);
         let mut daily_twr_returns = Vec::with_capacity(capacity - 1);

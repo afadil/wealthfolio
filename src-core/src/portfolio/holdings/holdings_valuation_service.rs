@@ -81,6 +81,7 @@ impl HoldingsValuationService {
             HashMap::new()
         };
 
+        info!("latest_quote_pairs from fetch_batch_quote_data: {:?}", latest_quote_pairs);
         Ok(latest_quote_pairs)
     }
 }
@@ -185,6 +186,7 @@ impl HoldingsValuationService {
         if let Some(quote_pair) = latest_quote_pairs.get(symbol) {
             let latest_quote = &quote_pair.latest;
             let prev_quote_opt = quote_pair.previous.as_ref();
+
             let quote_currency = &latest_quote.currency;
 
             let fx_rate_quote_to_base = if pos_currency == quote_currency {

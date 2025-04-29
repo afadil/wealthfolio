@@ -1,12 +1,12 @@
 use chrono::Utc;
-use log::{debug, error, info};
+use log::{debug, info};
 use std::sync::Arc;
 
 use crate::activities::activities_errors::ActivityError;
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::{Error, Result};
+use crate::Result;
 use crate::assets::{Asset, AssetServiceTrait};
 use crate::fx::FxServiceTrait;
 use uuid::Uuid;

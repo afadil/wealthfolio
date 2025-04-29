@@ -1,16 +1,8 @@
-// context/registry.rs
-use diesel::r2d2;
-use diesel::r2d2::ConnectionManager;
-use diesel::SqliteConnection;
 use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
     self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings
 };
-type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
-
 pub struct ServiceContext {
-    // Database connection
-    pub pool: Arc<DbPool>,
     pub base_currency: Arc<RwLock<String>>,
     pub instance_id: Arc<String>,
 
@@ -27,15 +19,10 @@ pub struct ServiceContext {
     pub income_service: Arc<dyn portfolio::income::IncomeServiceTrait>,
     pub snapshot_service: Arc<dyn portfolio::snapshot::SnapshotServiceTrait>,
     pub holdings_service: Arc<dyn portfolio::holdings::HoldingsServiceTrait>,
-    pub holdings_valuation_service: Arc<dyn portfolio::holdings::HoldingsValuationServiceTrait>,
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
 }
 
 impl ServiceContext {
-    // Accessor methods
-    pub fn pool(&self) -> &Arc<DbPool> {
-        &self.pool
-    }
 
     pub fn get_base_currency(&self) -> String {
         self.base_currency.read().unwrap().clone()
@@ -91,10 +78,6 @@ impl ServiceContext {
 
     pub fn holdings_service(&self) -> Arc<dyn portfolio::holdings::HoldingsServiceTrait> {
         Arc::clone(&self.holdings_service)
-    }
-
-    pub fn holdings_valuation_service(&self) -> Arc<dyn portfolio::holdings::HoldingsValuationServiceTrait> {
-        Arc::clone(&self.holdings_valuation_service)
     }
 
     pub fn valuation_service(&self) -> Arc<dyn portfolio::valuation::ValuationServiceTrait> {

@@ -10,7 +10,6 @@ mod listeners;
 
 use log::error;
 use updater::check_for_update;
-use wealthfolio_core::models;
 
 use dotenvy::dotenv;
 use std::env;

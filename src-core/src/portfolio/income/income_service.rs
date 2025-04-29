@@ -2,6 +2,7 @@ use crate::{
     activities::{activities_errors::ActivityError, activities_model::IncomeData, activities_traits::ActivityRepositoryTrait}, Error, Result
 };
 use chrono::{Datelike, NaiveDate, Utc};
+use crate::constants::DISPLAY_DECIMAL_PRECISION;
 
 use log::{debug, error};
 use num_traits::Zero;
@@ -37,7 +38,7 @@ impl IncomeService {
 
     fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
         if previous > Decimal::zero() {
-            ((current - previous) / previous) * Decimal::ONE_HUNDRED
+            (current - previous) / previous
         } else {
             Decimal::zero()
         }
@@ -151,10 +152,10 @@ impl IncomeServiceTrait for IncomeService {
 
         // Calculate Year-over-Year Growth using the static helper method
         let ytd_yoy_growth =
-            IncomeService::calculate_yoy_growth(ytd_summary.total_income.clone(), last_year_summary.total_income.clone());
+            IncomeService::calculate_yoy_growth(ytd_summary.total_income, last_year_summary.total_income);
         let last_year_yoy_growth = IncomeService::calculate_yoy_growth(
-            last_year_summary.total_income.clone(),
-            two_years_ago_summary.total_income.clone(),
+            last_year_summary.total_income,
+            two_years_ago_summary.total_income,
         );
 
         ytd_summary.yoy_growth = Some(ytd_yoy_growth);
@@ -163,12 +164,40 @@ impl IncomeServiceTrait for IncomeService {
         // Two years ago YoY growth can't be calculated without activity from three years ago
         two_years_ago_summary.yoy_growth = None;
 
-        debug!("Income summary calculation completed successfully");
-        Ok(vec![
+        // Round the calculated values before returning
+        let summaries = vec![
             total_summary,
             ytd_summary,
             last_year_summary,
             two_years_ago_summary,
-        ])
+        ];
+
+        let rounded_summaries = summaries
+            .into_iter()
+            .map(|mut summary| {
+                summary.total_income = summary.total_income.round_dp(DISPLAY_DECIMAL_PRECISION);
+                summary.monthly_average = summary.monthly_average.round_dp(DISPLAY_DECIMAL_PRECISION);
+                if let Some(growth) = summary.yoy_growth {
+                    summary.yoy_growth = Some(growth.round_dp(DISPLAY_DECIMAL_PRECISION));
+                }
+
+                for val in summary.by_month.values_mut() {
+                    *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                for val in summary.by_type.values_mut() {
+                    *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                for val in summary.by_symbol.values_mut() {
+                    *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                for val in summary.by_currency.values_mut() {
+                    *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                summary
+            })
+            .collect();
+
+        debug!("Income summary calculation and rounding completed successfully");
+        Ok(rounded_summaries)
     }
 }

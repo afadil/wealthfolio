@@ -122,7 +122,6 @@ pub async fn initialize_context(
     ));
 
     Ok(ServiceContext {
-        pool: pool.clone(),
         base_currency,
         instance_id,
         settings_service,
@@ -137,7 +136,6 @@ pub async fn initialize_context(
         income_service,
         snapshot_service,
         holdings_service,
-        holdings_valuation_service,
         valuation_service,
     })
 }

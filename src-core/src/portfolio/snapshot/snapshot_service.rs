@@ -1,12 +1,9 @@
-// src-core/src/portfolio/snapshot_service.rs
-
 use super::holdings_calculator::HoldingsCalculator;
 use super::snapshot_repository::SnapshotRepository;
 use crate::accounts::{Account, AccountRepositoryTrait};
 use crate::activities::{Activity, ActivityRepositoryTrait};
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
-use crate::fx::fx_service;
 use crate::fx::fx_traits::FxServiceTrait;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::utils::time_utils::get_days_between;
@@ -123,12 +120,10 @@ impl SnapshotService {
         account_ids_param: Option<&[String]>,
         force_full_calculation: bool,
     ) -> Result<usize> {
-        info!(
+        debug!(
             "Starting snapshot calculation (Holdings Only) for {:?} accounts. Force full: {}",
             account_ids_param, force_full_calculation
         );
-
-        let overall_start_time = Instant::now();
 
         // Step 1-3: Fetch required data
         // `accounts_to_process` includes individual accounts AND the virtual TOTAL account if needed.
@@ -188,7 +183,7 @@ impl SnapshotService {
         }
 
         // Step 7: Calculate daily snapshots (in memory), identify keyframes
-        let (final_holdings_states, keyframes_to_save) = self.calculate_daily_holdings_snapshots(
+        let (_final_holdings_states, keyframes_to_save) = self.calculate_daily_holdings_snapshots(
             &accounts_needing_calculation,
             &activities_by_account_date,
             &start_keyframes,
@@ -199,11 +194,6 @@ impl SnapshotService {
 
         // Step 8: Persist only the identified keyframe snapshots (individual and/or TOTAL)
         self.persist_keyframes(&keyframes_to_save)?;
-
-        info!(
-            "Snapshot calculation (Holdings Only) completed in {:?}",
-            overall_start_time.elapsed()
-        );
 
         // Return count of saved keyframes as an indicator of work done
         Ok(keyframes_to_save.len())
@@ -218,7 +208,7 @@ impl SnapshotService {
         account_ids_param: Option<&[String]>,
     ) -> Result<(AccountsMap, ActivitiesVec, NaiveDate, NaiveDate)> {
         let mut accounts_to_process: AccountsMap = HashMap::new();
-        let mut account_ids_to_fetch_activities = Vec::new();
+        let account_ids_to_fetch_activities: Vec<String>;
         let calculate_total =
             account_ids_param.map_or(true, |ids| ids.iter().any(|id| *id == PORTFOLIO_TOTAL_ACCOUNT_ID));
 
@@ -416,10 +406,6 @@ impl SnapshotService {
         let latest_keyframes = if force_full_calculation {
             HashMap::new() // Don't fetch if forcing full recalc
         } else {
-            info!(
-                "Incremental calculation: Fetching latest *saved keyframe* snapshots for accounts: {:?}",
-                account_ids_to_check
-            );
             self.snapshot_repository
                 .get_all_latest_snapshots(&account_ids_to_check)?
         };
@@ -537,12 +523,6 @@ impl SnapshotService {
         HashMap<String, AccountStateSnapshot>, // Final states
         Vec<AccountStateSnapshot>,             // Keyframes to save
     )> {
-        info!(
-            "Starting daily iteration (Holdings Only) from {} to {} for accounts: {:?}",
-            calculation_min_date,
-            calculation_end_date,
-            accounts_needing_calculation.keys()
-        );
 
         let mut current_holdings_snapshots = start_keyframes.clone();
         let mut keyframes_to_save: Vec<AccountStateSnapshot> = Vec::new();
@@ -572,14 +552,11 @@ impl SnapshotService {
                 HashMap::with_capacity(accounts_to_process_today.len());
             let mut keyframes_today = Vec::new();
 
-            for (account_id, account) in accounts_to_process_today {
+            for (account_id, _account) in accounts_to_process_today {
                 let previous_holdings_snapshot = current_holdings_snapshots
                     .get(account_id)
                      .ok_or_else(|| {
-                         // This indicates a logic error if an account is in accounts_to_process_today
-                         // but its starting keyframe wasn't loaded correctly.
                          error!("CRITICAL: Missing previous holdings snapshot for account {} in memory map for date {}", account_id, current_date);
-                         // Use existing Calculation variant
                          Error::Calculation(CalculatorError::Calculation(format!(
                              "Missing previous holdings snapshot for account {} for date {}",
                              account_id, current_date
@@ -593,47 +570,71 @@ impl SnapshotService {
                     .cloned()
                     .unwrap_or_default();
 
-                // Calculate next holdings state using the calculator
-                match self.holdings_calculator.calculate_next_holdings(
-                    previous_holdings_snapshot,
-                    &activities_today,
-                    current_date,
-                ) {
-                    Ok(current_holdings_snapshot) => {
-                        let is_first_day =
-                            effective_start_dates.get(account_id) == Some(&current_date);
-                        let has_activities = !activities_today.is_empty();
-                        let is_keyframe = is_first_day || has_activities;
+                let is_first_day = effective_start_dates.get(account_id) == Some(&current_date);
+                let has_activities = !activities_today.is_empty();
 
-                        if is_keyframe {
-                            debug!(
-                                "Keyframe identified for account {} on {} (Holdings Only) (First day: {}, Has activities: {})",
-                                account_id, current_date, is_first_day, has_activities
+                let current_holdings_snapshot: AccountStateSnapshot; // Final state for today
+
+                if !has_activities {
+                    // No activities today, just carry forward the previous state
+                    let mut carried_forward_state = previous_holdings_snapshot.clone();
+                    carried_forward_state.snapshot_date = current_date;
+                    carried_forward_state.id = format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
+                    // Note: calculated_at remains the same as the previous snapshot
+                    current_holdings_snapshot = carried_forward_state;
+                    debug!(
+                        "No activities for account {} on {}. Carrying forward state.",
+                        account_id, current_date
+                    );
+                } else {
+                    // Activities occurred, call the calculator
+                    match self.holdings_calculator.calculate_next_holdings(
+                        previous_holdings_snapshot,
+                        &activities_today, // Pass the already fetched activities
+                        current_date,
+                    ) {
+                        Ok(calculated_snapshot) => {
+                            // Calculator provides the new state, including updated calculated_at
+                            current_holdings_snapshot = calculated_snapshot;
+                             debug!(
+                                "Holdings calculated successfully for account {} on {}",
+                                account_id, current_date
                             );
-                            // Ensure the account ID in the snapshot matches (especially for TOTAL)
-                            let mut keyframe_snapshot = current_holdings_snapshot.clone();
-                            keyframe_snapshot.account_id = account_id.clone();
-                            keyframe_snapshot.id =
-                                format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
-                            keyframes_today.push(keyframe_snapshot);
                         }
-                        // Store the calculated snapshot for the next iteration
-                        next_day_holdings_snapshots
-                            .insert(account_id.to_string(), current_holdings_snapshot);
-                    }
-                    Err(e) => {
-                        error!(
-                            "Holdings calculation failed for account {} on {}: {}. Carrying forward previous state.",
-                            account_id, current_date, e
-                        );
-                        // Carry forward the previous day's state on error
-                        let mut errored_state = previous_holdings_snapshot.clone();
-                        errored_state.snapshot_date = current_date; // Update date even if carried forward
-                        errored_state.id =
-                            format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
-                        next_day_holdings_snapshots.insert(account_id.to_string(), errored_state);
+                        Err(e) => {
+                            error!(
+                                "Holdings calculation failed for account {} on {}: {}. Carrying forward previous state.",
+                                account_id, current_date, e
+                            );
+                            // Carry forward the previous day's state on error
+                            let mut errored_state = previous_holdings_snapshot.clone();
+                            errored_state.snapshot_date = current_date; // Update date even if carried forward
+                            errored_state.id = format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
+                            // calculated_at remains the same as the previous snapshot
+                            current_holdings_snapshot = errored_state;
+                        }
                     }
                 }
+
+                // Decide if it's a keyframe based on the determined snapshot
+                // A keyframe is needed on the first day of calculation or if activities happened.
+                let is_keyframe = is_first_day || has_activities;
+
+                if is_keyframe {
+                    debug!(
+                        "Keyframe identified for account {} on {} (Holdings Only) (First day: {}, Has activities: {})",
+                        account_id, current_date, is_first_day, has_activities
+                    );
+                    // Create the keyframe based on the final state for today
+                    let mut keyframe_snapshot = current_holdings_snapshot.clone();
+                    // Ensure account_id and id are correctly set for the keyframe
+                    keyframe_snapshot.account_id = account_id.clone();
+                    keyframe_snapshot.id = format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
+                    keyframes_today.push(keyframe_snapshot);
+                }
+
+                // Store the calculated/carried-forward snapshot for the next iteration's "previous" state
+                next_day_holdings_snapshots.insert(account_id.to_string(), current_holdings_snapshot); // Use the final determined snapshot
             }
 
             // Update the main state map for the next day
@@ -654,12 +655,6 @@ impl SnapshotService {
             info!("No new keyframe snapshots to save.");
             return Ok(());
         }
-
-        info!(
-            "Saving {} identified keyframe snapshots (incl. TOTAL if calculated)...",
-            keyframes_to_save.len()
-        );
-        let save_start = Instant::now();
 
         // Group by account ID for potentially more efficient batching if repo supports it
         let mut keyframes_by_account: HashMap<String, Vec<&AccountStateSnapshot>> = HashMap::new();
@@ -698,7 +693,6 @@ impl SnapshotService {
             }
         }
 
-        info!("Keyframe snapshots saved in {:?}", save_start.elapsed());
         Ok(())
     }
 

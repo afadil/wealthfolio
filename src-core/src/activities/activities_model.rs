@@ -3,7 +3,6 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rust_decimal::Decimal;
-use crate::utils::decimal_serde::*;
 use crate::accounts::Account;
 use crate::Result;
 use crate::activities::activities_errors::ActivityError;
@@ -691,6 +690,5 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub currency: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
-     #[serde(with = "decimal_serde")]
     pub amount: Decimal,
 }

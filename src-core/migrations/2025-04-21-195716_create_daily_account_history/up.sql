@@ -13,7 +13,7 @@ CREATE TABLE holdings_snapshots (
     positions TEXT NOT NULL DEFAULT '{}',     -- JSON HashMap<String, Position>
     cash_balances TEXT NOT NULL DEFAULT '{}', -- JSON HashMap<String, Decimal>
 
-    -- Store Decimals as TEXT (using decimal_serde format)
+    -- Store Decimals as TEXT
     cost_basis TEXT NOT NULL DEFAULT '0.0',
     net_contribution TEXT NOT NULL DEFAULT '0.0',
 

@@ -1,6 +1,6 @@
 use crate::db::{get_connection, DbPool};
 use crate::errors::{Error, Result};
-use crate::models::{AppSetting, Settings, SettingsUpdate};
+use crate::settings::{AppSetting, Settings, SettingsUpdate};
 use crate::schema::app_settings::dsl::*;
 use crate::schema::{accounts, assets};
 use diesel::prelude::*;

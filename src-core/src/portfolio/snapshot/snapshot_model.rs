@@ -30,10 +30,8 @@ pub struct AccountStateSnapshot {
     pub cash_balances: HashMap<String, Decimal>, // currency -> amount
 
     // --- Calculated Aggregates (Account Currency) ---
-    #[serde(with = "rust_decimal::serde::str")]
     #[serde(default)]
     pub cost_basis: Decimal, // Sum of cost basis of all positions
-    #[serde(with = "rust_decimal::serde::str")]
     #[serde(default)]
     pub net_contribution: Decimal, // Cumulative net deposits in account currency
 

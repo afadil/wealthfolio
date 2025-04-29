@@ -1,7 +1,7 @@
 use crate::fx::fx_errors::FxError;
 use crate::fx::fx_model::ExchangeRate;
 use rust_decimal::Decimal;
-use chrono::{NaiveDate, DateTime, Utc};
+use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
 
 /// A calculator for currency conversions, supporting historical rates based on the latest rate per day.

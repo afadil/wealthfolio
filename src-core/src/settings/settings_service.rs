@@ -1,7 +1,7 @@
 use super::settings_repository::SettingsRepositoryTrait;
 use crate::fx::fx_traits::FxServiceTrait;
 use crate::errors::{Error, Result, DatabaseError};
-use crate::models::{Settings, SettingsUpdate};
+use crate::settings::{Settings, SettingsUpdate};
 use log::{debug, error};
 use std::sync::Arc;
 

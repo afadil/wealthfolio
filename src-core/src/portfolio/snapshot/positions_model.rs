@@ -9,7 +9,6 @@ use crate::activities::Activity;
 use crate::activities::ActivityType;
 
 use crate::constants::QUANTITY_THRESHOLD;
-use crate::utils::decimal_serde::*;
 
 use crate::errors::{CalculatorError, Result};
 
@@ -26,13 +25,10 @@ pub struct Position {
     pub id: String,
     pub account_id: String,
     pub asset_id: String,
-    #[serde(with = "decimal_serde")]
     pub quantity: Decimal,
     /// Average cost per unit in the asset's currency.
-    #[serde(with = "decimal_serde")]
     pub average_cost: Decimal,
     /// Total cost basis of all lots in the asset's currency.
-    #[serde(with = "decimal_serde")]
     pub total_cost_basis: Decimal,
     /// The currency of the asset and the cost basis values (e.g., "USD", "EUR"). Set by the first acquisition activity.
     pub currency: String,
@@ -67,16 +63,12 @@ pub struct Lot {
     pub id: String,
     pub position_id: String,
     pub acquisition_date: DateTime<Utc>,
-    #[serde(with = "decimal_serde")]
     pub quantity: Decimal,
     /// Represents the total amount paid for the entire lot in the Position's currency, including any fees or commissions if applicable (e.g., for Buy).
-    #[serde(with = "decimal_serde")]
     pub cost_basis: Decimal,
     /// Represents the price per share/unit in the Position's currency at the time of purchase.
-    #[serde(with = "decimal_serde")]
     pub acquisition_price: Decimal,
     /// Represents fees paid in the Position's currency associated with the acquisition.
-    #[serde(with = "decimal_serde")]
     pub acquisition_fees: Decimal,
 }
 
@@ -86,7 +78,6 @@ pub struct CashHolding {
     pub id: String, // e.g., "CASH-USD-ACCT123"
     pub account_id: String,
     pub currency: String, // "USD", "EUR" - acts as asset_id for cash
-    #[serde(with = "decimal_serde")]
     pub amount: Decimal,
     pub last_updated: DateTime<Utc>,
 }

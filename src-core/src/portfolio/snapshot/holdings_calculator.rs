@@ -158,9 +158,9 @@ impl HoldingsCalculator {
         match activity_type {
             ActivityType::Buy => self.handle_buy(activity, state, account_currency, fee_acct),
             ActivityType::Sell => self.handle_sell(activity, state, account_currency, fee_acct),
-            ActivityType::Deposit => self.handle_deposit(activity, state, account_currency, amount_acct, fee_acct),
-            ActivityType::Withdrawal => self.handle_withdrawal(activity, state, account_currency, amount_acct, fee_acct),
-            ActivityType::Dividend | ActivityType::Interest => self.handle_income(activity, state, account_currency, amount_acct, fee_acct, &activity_type),
+            ActivityType::Deposit => self.handle_deposit( state, account_currency, amount_acct, fee_acct),
+            ActivityType::Withdrawal => self.handle_withdrawal( state, account_currency, amount_acct, fee_acct),
+            ActivityType::Dividend | ActivityType::Interest => self.handle_income(state, account_currency, amount_acct, fee_acct),
             ActivityType::Fee | ActivityType::Tax => self.handle_charge(activity, state, account_currency, &activity_type),
             ActivityType::AddHolding => self.handle_add_holding(activity, state, account_currency, fee_acct),
             ActivityType::RemoveHolding => self.handle_remove_holding(activity, state, account_currency, fee_acct),
@@ -268,7 +268,6 @@ impl HoldingsCalculator {
 
     fn handle_deposit( 
         &self,
-        activity: &Activity, // Activity not strictly needed, amount/fee passed in
         state: &mut AccountStateSnapshot, 
         account_currency: &str, 
         amount_acct: Decimal, // Already converted using activity date
@@ -283,7 +282,6 @@ impl HoldingsCalculator {
 
     fn handle_withdrawal( 
         &self,
-        activity: &Activity, 
         state: &mut AccountStateSnapshot, 
         account_currency: &str, 
         amount_acct: Decimal, // Already converted using activity date
@@ -298,12 +296,10 @@ impl HoldingsCalculator {
 
     fn handle_income( 
         &self,
-        activity: &Activity, 
         state: &mut AccountStateSnapshot, 
         account_currency: &str, 
         amount_acct: Decimal, // Already converted using activity date
         fee_acct: Decimal, // Already converted using activity date
-        activity_type: &ActivityType // Keep for potential future logging/logic
     ) -> Result<()> { 
          let net_amount_acct = amount_acct - fee_acct;
          *state.cash_balances.entry(account_currency.to_string()).or_insert(Decimal::ZERO) += net_amount_acct;
