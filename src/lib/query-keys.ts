@@ -36,4 +36,11 @@ export const QueryKeys = {
   HISTORY_VALUATION: 'historyValuation',
   // Helper function to create account-specific keys
   valuationHistory: (id: string) => [QueryKeys.HISTORY_VALUATION, id],
+
+  // Account simple performance
+  ACCOUNTS_SIMPLE_PERFORMANCE: 'accountsSimplePerformance',
+  accountsSimplePerformance: (accountIds: string[]) => [
+    QueryKeys.ACCOUNTS_SIMPLE_PERFORMANCE,
+    [...accountIds].sort().join(',') || 'none',
+  ],
 } as const;

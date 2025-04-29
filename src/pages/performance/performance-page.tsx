@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { X, BarChart } from 'lucide-react';
 import { DateRangeSelector } from '@/components/date-range-selector';
-import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
@@ -14,19 +13,15 @@ import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector'
 import { AlertFeedback } from '@/components/alert-feedback';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PerformanceMetrics, ReturnData } from '@/lib/types';
+import { TrackedItem, PerformanceMetrics, ReturnData, DateRange } from '@/lib/types';
 import { GainPercent } from '@/components/gain-percent';
 import NumberFlow from '@number-flow/react';
 import { AccountSelector } from '../../components/account-selector';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 
-type ComparisonItem = {
-  id: string;
-  type: 'account' | 'symbol';
-  name: string;
-};
 
-const PORTFOLIO_TOTAL: ComparisonItem = {
+
+const PORTFOLIO_TOTAL: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
   type: 'account',
   name: 'All Portfolio',
@@ -125,7 +120,7 @@ const SelectedItemBadge = ({
   onSelect, 
   onDelete 
 }: { 
-  item: ComparisonItem; 
+  item: TrackedItem; 
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
@@ -170,7 +165,7 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
-  const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
+  const [selectedItems, setSelectedItems] = useState<TrackedItem[]>([PORTFOLIO_TOTAL]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subMonths(new Date(), 12),
@@ -178,7 +173,7 @@ export default function PerformancePage() {
   });
 
   // Helper function to sort comparison items (accounts first, then symbols)
-  const sortComparisonItems = (items: ComparisonItem[]): ComparisonItem[] => {
+  const sortComparisonItems = (items: TrackedItem[]): TrackedItem[] => {
     return [...items].sort((a, b) => {
       // Sort by type first (accounts before symbols)
       if (a.type !== b.type) {
@@ -243,7 +238,7 @@ export default function PerformancePage() {
       }
 
       // Create a proper ComparisonItem
-      const newItem: ComparisonItem = {
+      const newItem: TrackedItem = {
         id: account.id,
         type: 'account',
         name: account.name,
@@ -258,7 +253,7 @@ export default function PerformancePage() {
       const exists = prev.some((item) => item.id === symbol.id);
       if (exists) return sortComparisonItems(prev);
 
-      const newSymbol: ComparisonItem = {
+      const newSymbol: TrackedItem = {
         id: symbol.id,
         type: 'symbol',
         name: symbol.name,
@@ -268,11 +263,11 @@ export default function PerformancePage() {
     });
   };
 
-  const handleBadgeSelect = (item: ComparisonItem) => {
+  const handleBadgeSelect = (item: TrackedItem) => {
     setSelectedItemId(selectedItemId === item.id ? null : item.id);
   };
 
-  const handleBadgeDelete = (e: React.MouseEvent, item: ComparisonItem) => {
+  const handleBadgeDelete = (e: React.MouseEvent, item: TrackedItem) => {
     e.stopPropagation();
     if (item.type === 'account') {
       handleAccountSelect({ id: item.id, name: item.name });

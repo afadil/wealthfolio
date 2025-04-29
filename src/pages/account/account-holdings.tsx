@@ -48,7 +48,7 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
           <Separator />
           <CardContent className="p-0">
             {holdings?.filter(holding => holding.holdingType !== HoldingType.CASH).map((holding) => (
-              <div key={holding.id} className="grid grid-cols-5 gap-4 border-b p-4">
+              <div key={holding.id} className="grid grid-cols-5 gap-4 border-b p-4 text-sm">
                 <div className="col-span-2 flex-grow text-left">
                   <p className="mb-1 font-bold">
                     <Link to={`/holdings/${holding.instrument?.symbol}`}>{holding.instrument?.symbol ?? '-'}</Link>

@@ -286,7 +286,7 @@ export interface Quote {
   id: string;
   createdAt: string;
   dataSource: string;
-  date: string;
+  timestamp: string;
   symbol: string;
   open: number;
   high: number;
@@ -297,7 +297,7 @@ export interface Quote {
 }
 
 export interface QuoteUpdate {
-  date: string;
+  timestamp: string;
   symbol: string;
   open: number;
   high: number;
@@ -363,23 +363,14 @@ export interface IncomeSummary {
   yoyGrowth: number | null; // Changed from optional to nullable
 }
 
+// Define custom DateRange type matching react-day-picker's
+export type DateRange = {
+  from: Date | undefined;
+  to: Date | undefined;
+};
+
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
 
-
-export interface PortfolioHistory {
-  id: string;
-  accountId: string;
-  date: string;
-  accountCurrency: string;
-  baseCurrency: string;
-  fxRateToBase: number;
-  cashValue: number;
-  investmentMarketValue: number;
-  totalValue: number;
-  bookCost: number;
-  netDeposit: number;
-  calculatedAt: string;
-}
 
 export interface AccountValuation {
   id: string;
@@ -395,8 +386,6 @@ export interface AccountValuation {
   netContribution: number;
   calculatedAt: string;
 }
-
-
 
 export interface AccountSummaryView {
   accountId: string;
@@ -504,4 +493,11 @@ export interface UpdateAssetProfile {
   assetClass: string;
   assetSubClass: string;
 }
+
+// Rename ComparisonItem to TrackedItem
+export type TrackedItem = {
+  id: string;
+  type: 'account' | 'symbol';
+  name: string;
+};
 

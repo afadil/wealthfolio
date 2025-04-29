@@ -5,15 +5,22 @@ import IntervalSelector from '@/components/interval-selector';
 import Balance from './balance';
 import { Skeleton } from '@/components/ui/skeleton';
 import SavingGoals from './goals';
-import { useMemo } from 'react';
-
+import { useMemo, useState } from 'react';
 import { PrivacyToggle } from '@/components/privacy-toggle';
 import { AccountsSummary } from './accounts-summary';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { useValuationHistory } from '@/hooks/use-valuation-history';
 import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
-import { useDerivedValuationMetrics } from '@/hooks/use-derived-valuation-metrics';
+import { useCalculatePerformanceHistory } from '@/pages/performance/hooks/use-performance-data';
+import { TrackedItem, DateRange } from '@/lib/types';
+import { subMonths } from 'date-fns';
+
+const PORTFOLIO_TOTAL_ITEM: TrackedItem = {
+  id: PORTFOLIO_ACCOUNT_ID,
+  type: 'account',
+  name: 'Portfolio Total',
+};
 
 function DashboardSkeleton() {
   return (
@@ -30,22 +37,39 @@ function DashboardSkeleton() {
   );
 }
 
+// Helper function to get the initial date range for 3M
+const getInitialDateRange = (): DateRange => ({
+  from: subMonths(new Date(), 3),
+  to: new Date(),
+});
+
 export default function DashboardPage() {
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+
   const {
     valuationHistory,
     isLoading: isValuationHistoryLoading,
-    interval,
-    setInterval,
-  } = useValuationHistory('3M');
+  } = useValuationHistory(dateRange);
 
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency || 'USD';
 
-  const { 
-    gainLossAmount, 
-    simpleReturn, 
-    currentValuation 
-  } = useDerivedValuationMetrics(valuationHistory);
+  const { data: performanceDataArray, isLoading: isPerformanceLoading } =
+    useCalculatePerformanceHistory({
+      selectedItems: [PORTFOLIO_TOTAL_ITEM],
+      dateRange: dateRange,
+    });
+
+  const performanceMetrics = performanceDataArray?.[0] || null;
+
+  const gainLossAmount = performanceMetrics?.gainLossAmount ?? 0;
+  const cumulativeMwr = performanceMetrics?.cumulativeMwr ?? 0;
+
+  const currentValuation = useMemo(() => {
+    return valuationHistory && valuationHistory.length > 0
+      ? valuationHistory[valuationHistory.length - 1]
+      : null;
+  }, [valuationHistory]);
 
   const chartData = useMemo(() => {
     return valuationHistory?.map(item => ({
@@ -56,7 +80,9 @@ export default function DashboardPage() {
     })) || [];
   }, [valuationHistory, baseCurrency]);
 
-  if (isValuationHistoryLoading && !valuationHistory) {
+  const isLoading = isValuationHistoryLoading || (isPerformanceLoading && !performanceMetrics);
+
+  if (isLoading && !valuationHistory && !performanceMetrics) {
     return <DashboardSkeleton />;
   }
 
@@ -82,7 +108,7 @@ export default function DashboardPage() {
                 <div className="my-1 border-r border-secondary pr-2" />
                 <GainPercent
                   className="text-md font-light"
-                  value={simpleReturn}
+                  value={cumulativeMwr}
                   animated={true}
                 ></GainPercent>
               </div>
@@ -98,10 +124,8 @@ export default function DashboardPage() {
             <HistoryChart data={chartData} />
             <IntervalSelector
               className="relative bottom-0 left-0 right-0 z-10"
-              selectedInterval={interval}
-              onIntervalSelect={(newInterval) => {
-                setInterval(newInterval as '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL');
-              }}
+              selectedRange={dateRange}
+              onRangeSelect={setDateRange}
               isLoading={isValuationHistoryLoading}
             />
           </>

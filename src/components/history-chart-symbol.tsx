@@ -12,7 +12,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     const data = payload[0].payload;
     return (
       <div className="center-items">
-        <p className="font-thin">{formatDate(data.date)}</p>
+        <p className="font-thin">{formatDate(data.timestamp)}</p>
         <p className="label">{formatAmount(payload[0].value, data.currency, false)}</p>
       </div>
     );
@@ -22,7 +22,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 };
 
 interface HistoryChartData {
-  date: string;
+  timestamp: string;
   totalValue: number;
   currency: string;
 }

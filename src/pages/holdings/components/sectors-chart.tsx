@@ -114,7 +114,7 @@ export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name" className="text-xs" stroke="currentColor" />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
+              <Bar dataKey="value" radius={4} barSize={20}>
                 {sectors.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}

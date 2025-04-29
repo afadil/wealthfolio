@@ -33,19 +33,21 @@ export function GainAmount({
         {isBalanceHidden ? (
           <span>••••</span>
         ) : (
-          <NumberFlow
-            value={value}
-            isolate={true}
-            format={{
-              currency: currency,
-              style: displayCurrency ? 'currency' : 'decimal',
-              currencyDisplay: 'narrowSymbol',
-              minimumFractionDigits: displayDecimal ? 2 : 0,
-              maximumFractionDigits: displayDecimal ? 2 : 0,
-              signDisplay: showSign ? 'exceptZero' : 'never',
-            }}
-            locales={navigator.language || 'en-US'}
-          />
+          <>
+            {value > 0 ? '+' : value < 0 ? '-' : null}
+            <NumberFlow
+              value={Math.abs(value)}
+              isolate={true}
+              format={{
+                currency: currency,
+                style: displayCurrency ? 'currency' : 'decimal',
+                currencyDisplay: 'narrowSymbol',
+                minimumFractionDigits: displayDecimal ? 2 : 0,
+                maximumFractionDigits: displayDecimal ? 2 : 0,
+              }}
+              locales={navigator.language || 'en-US'}
+            />
+          </>
         )}
       </div>
     </div>

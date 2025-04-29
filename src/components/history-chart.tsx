@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/utils';
 import { ChartConfig, ChartContainer } from './ui/chart';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from './amount-display';
+import { Skeleton } from './ui/skeleton';
 
 type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
   isBalanceHidden: boolean;
@@ -55,8 +56,10 @@ interface HistoryChartData {
 
 export function HistoryChart({
   data,
+  isLoading,
 }: {
   data: HistoryChartData[];
+  isLoading?: boolean;
 }) {
   const { isBalanceHidden } = useBalancePrivacy();
 
@@ -80,6 +83,13 @@ export function HistoryChart({
       label: 'Total Value',
     },
   } satisfies ChartConfig;
+
+  // Conditional rendering for loading state
+  if (isLoading && data.length === 0) {
+    return (
+      <Skeleton className="h-full w-full" />
+    );
+  }
 
   return (
     <ChartContainer config={chartConfig} className="h-full w-full">

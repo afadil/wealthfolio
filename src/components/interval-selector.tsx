@@ -1,50 +1,72 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { TimePeriod } from '@/lib/types';
+import { TimePeriod, DateRange } from '@/lib/types';
 import { Icons } from '@/components/icons';
+import { subWeeks, subMonths, subYears, isSameDay } from 'date-fns';
+
+const intervals: { label: TimePeriod; calculateRange: () => DateRange | undefined }[] = [
+  { label: '1W', calculateRange: () => ({ from: subWeeks(new Date(), 1), to: new Date() }) },
+  { label: '1M', calculateRange: () => ({ from: subMonths(new Date(), 1), to: new Date() }) },
+  { label: '3M', calculateRange: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
+  { label: '1Y', calculateRange: () => ({ from: subYears(new Date(), 1), to: new Date() }) },
+  { label: 'ALL', calculateRange: () => ({ from: new Date('1970-01-01'), to: new Date() }) },
+];
 
 interface IntervalSelectorProps {
-  selectedInterval: TimePeriod;
-  onIntervalSelect: (interval: TimePeriod) => void;
+  selectedRange: DateRange | undefined;
+  onRangeSelect: (range: DateRange | undefined) => void;
   className?: string;
   isLoading?: boolean;
 }
 
+const compareDates = (date1: Date | undefined, date2: Date | undefined) => {
+  if (!date1 || !date2) return false;
+  return isSameDay(date1, date2);
+};
+
 const IntervalSelector: React.FC<IntervalSelectorProps> = ({
-  selectedInterval,
-  onIntervalSelect,
+  selectedRange,
+  onRangeSelect,
   className,
   isLoading,
 }) => {
   const handleClick = (interval: TimePeriod) => {
-    onIntervalSelect(interval);
+    const selectedIntervalData = intervals.find(i => i.label === interval);
+    if (selectedIntervalData) {
+      onRangeSelect(selectedIntervalData.calculateRange());
+    }
   };
 
-  const renderButton = (interval: TimePeriod) => {
-    const isSelected = selectedInterval === interval;
+  const renderButton = (intervalData: { label: TimePeriod; calculateRange: () => DateRange | undefined }) => {
+    const { label, calculateRange } = intervalData;
+    const rangeForButton = calculateRange();
+
+    const isSelected =
+      (selectedRange === undefined && rangeForButton === undefined) ||
+      (selectedRange !== undefined &&
+        rangeForButton !== undefined &&
+        compareDates(selectedRange.from, rangeForButton.from) &&
+        compareDates(selectedRange.to, rangeForButton.to));
+
     const showSpinner = isLoading && isSelected;
 
     return (
       <Button
-        key={interval}
+        key={label}
         className="-m-1 rounded-full px-4 py-2"
         variant={isSelected ? 'default' : 'ghost'}
-        onClick={() => handleClick(interval)}
+        onClick={() => handleClick(label)}
         disabled={isLoading}
       >
-        {showSpinner ? (
-          <Icons.Spinner className="h-4 w-4 animate-spin" />
-        ) : (
-          interval
-        )}
+        {showSpinner ? <Icons.Spinner className="h-4 w-4 animate-spin" /> : label}
       </Button>
     );
   };
 
   return (
     <div className={cn('flex justify-center space-x-2', className)}>
-      {['1W', '1M', '3M', '1Y', 'ALL'].map((interval) => renderButton(interval as TimePeriod))}
+      {intervals.map((intervalData) => renderButton(intervalData))}
     </div>
   );
 };

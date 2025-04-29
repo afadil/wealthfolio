@@ -11,6 +11,7 @@ import { useSettingsContext } from '@/lib/settings-provider';
 import { useAccounts } from '@/hooks/use-accounts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAccountsSimplePerformance } from '@/hooks/use-accounts-simple-performance';
+import { Separator } from '@/components/ui/separator';
 
 // Define a unified type for displaying both individual accounts and groups
 type AccountSummaryDisplayData = {
@@ -142,7 +143,7 @@ const AccountSummaryComponent = React.memo(
                 )}
                 {performance.totalGainLossAmount !== null &&
                   performance.totalGainLossPercent !== null && (
-                    <div className="mx-1 h-3 border-r border-gray-300" />
+                    <Separator orientation="vertical" className="h-3" />
                   )}
                 {performance.totalGainLossPercent !== null && (
                   <GainPercent

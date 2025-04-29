@@ -8,12 +8,14 @@ interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
   animated?: boolean;
   variant?: GainPercentVariant;
+  showSign?: boolean;
 }
 
 export function GainPercent({
   value,
   animated = false,
   variant = 'text',
+  showSign = true,
   className,
   ...props
 }: GainPercentProps) {
@@ -30,16 +32,16 @@ export function GainPercent({
       )}
       {...props}
     >
+      {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
       <NumberFlow
-        value={value}
+        value={Math.abs(value * 100)}
         animated={animated}
         format={{
-          style: 'percent',
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-          signDisplay: 'exceptZero',
         }}
       />
+      %
     </div>
   );
 }

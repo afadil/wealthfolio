@@ -47,10 +47,6 @@ export function SavingGoals() {
     return calculateGoalProgress(accountsPerformance, goals, allocations);
   }, [accountsPerformance, goals, allocations]);
 
-  console.log('accountsPerformance', accountsPerformance);
-  console.log('goals', goals);
-  console.log('allocations', allocations);
-  console.log('goalsProgress', goalsProgress);
   const isLoading = isLoadingPerformance || isLoadingGoals || isLoadingAllocations;
   const isError = isErrorPerformance || isErrorGoals || isErrorAllocations;
 

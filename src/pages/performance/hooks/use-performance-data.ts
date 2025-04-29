@@ -4,12 +4,7 @@ import { useRef } from 'react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { QueryKeys } from '@/lib/query-keys';
-
-type ComparisonItem = {
-  id: string;
-  type: 'account' | 'symbol';
-  name: string;
-};
+import { TrackedItem } from '@/lib/types';
 
 /**
  * Hook to calculate cumulative returns for a list of comparison items.
@@ -30,7 +25,7 @@ export function useCalculatePerformanceHistory({
   selectedItems,
   dateRange,
 }: {
-  selectedItems: ComparisonItem[];
+  selectedItems: TrackedItem[];
   dateRange: DateRange | undefined;
 }) {
   // Use a ref to track the effective start date without causing re-renders

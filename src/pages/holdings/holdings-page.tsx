@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
@@ -18,6 +18,7 @@ import { CashHoldingsWidget } from './components/cash-holdings-widget';
 import { AccountSelector } from '@/components/account-selector';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 import { HoldingCurrencyChart } from './components/currency-chart';
+import { AccountAllocationChart } from './components/account-allocation-chart';
 
 export const HoldingsPage = () => {
   const location = useLocation();
@@ -48,7 +49,6 @@ export const HoldingsPage = () => {
     setSelectedAccount(account);
   };
 
-  console.log('holdings', holdings);
   const { cashHoldings, nonCashHoldings } = useMemo(() => {
     const cash =
       holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) || [];
@@ -94,12 +94,14 @@ export const HoldingsPage = () => {
 
         <TabsContent value="overview" className="space-y-4">
           {/* Top row: Summary widgets */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <HoldingCurrencyChart
               holdings={holdings || []}
               baseCurrency={settings?.baseCurrency || 'USD'}
               isLoading={isLoading}
             />
+
+            <AccountAllocationChart isLoading={isLoading} />
 
             <ClassesChart holdings={holdings} isLoading={isLoading} />
 
@@ -107,8 +109,8 @@ export const HoldingsPage = () => {
           </div>
 
           {/* Second row: Composition and Sector */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="col-span-1 md:col-span-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="col-span-1 md:col-span-3">
               <PortfolioComposition holdings={nonCashHoldings} isLoading={isLoading} />
             </div>
 

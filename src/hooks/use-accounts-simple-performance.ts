@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { calculateAccountsSimplePerformance } from '@/commands/portfolio';
 import { Account, SimplePerformanceMetrics } from '@/lib/types';
+import { QueryKeys } from '@/lib/query-keys';
 
 export const useAccountsSimplePerformance = (accounts: Account[] | undefined) => {
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
@@ -11,12 +12,10 @@ export const useAccountsSimplePerformance = (accounts: Account[] | undefined) =>
     Error
   >(
     {
-      queryKey: ['accountsSimplePerformance', accountIds.join(',') || 'none'],
+      queryKey: QueryKeys.accountsSimplePerformance(accountIds),
       queryFn: () => {
         return calculateAccountsSimplePerformance(accountIds);
       },
-      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-      refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
     }
   );
 
