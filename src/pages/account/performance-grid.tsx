@@ -27,10 +27,16 @@ const MetricDisplay: React.FC<MetricDisplayProps> = ({
   isPercentage = true,
   className,
 }) => {
-  const displayValue = isPercentage ? (
-    <GainPercent value={value} animated={true} className="text-base font-medium" />
-  ) : (
-    <GainPercent value={value} animated={true} showSign={false} className="text-base font-medium text-foreground" />
+  const displayValue = (
+    <GainPercent 
+      value={value} 
+      animated={true} 
+      showSign={isPercentage}
+      className={cn(
+        "text-base font-medium",
+        !isPercentage && "text-foreground"
+      )}
+    />
   );
 
   return (
@@ -86,7 +92,9 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
   isLoading,
   className,
 }) => {
-  if (isLoading ?? !performance) {
+
+  console.log('performance', performance);
+  if (isLoading || !performance) {
     return (
       <div className={cn('w-full', className)}>
         <Card className="border-none p-0">
@@ -119,9 +127,9 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
   // Destructure performance metrics, providing default 0 for potentially missing values
   const {
     cumulativeTwr = 0,
-    annualizedTwr,
+    annualizedTwr = 0,
     cumulativeMwr = 0,
-    annualizedMwr,
+    annualizedMwr = 0,
     volatility = 0,
     maxDrawdown = 0,
   } = performance;

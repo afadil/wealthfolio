@@ -66,14 +66,12 @@ export function useCalculatePerformanceHistory({
 
   const performanceQueries = useQueries({
     queries: selectedItems.map((item) => ({
-      // Use potentially undefined dates in queryKey and queryFn
       queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate],
-      // Pass null for undefined dates to satisfy string type requirement
       queryFn: () => calculatePerformanceHistory(
         item.type,
         item.id,
-        startDateToUse!, // Assert as string (enabled check guarantees)
-        endDate!         // Assert as string (enabled check guarantees)
+        startDateToUse!,
+        endDate!        
       ),
       // Enable query only if essential item identifiers AND dates are present.
       enabled: !!item.id && !!item.type && !!startDateToUse && !!endDate,
@@ -154,8 +152,8 @@ export function useCalculatePerformanceHistory({
     errorMessages,
     queries: performanceQueries,
     effectiveStartDate: effectiveStartDateRef.current,
-    formattedStartDate: startDate, // Return the potentially undefined start date
-    formattedEndDate: endDate,     // Return the potentially undefined end date
+    formattedStartDate: startDate,
+    formattedEndDate: endDate,
     displayDateRange,
     isCustomRange: effectiveStartDateRef.current !== null && effectiveStartDateRef.current !== startDate
   };

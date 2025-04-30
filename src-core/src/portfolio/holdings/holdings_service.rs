@@ -243,10 +243,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 .calculate_holdings_live_valuation(&mut holdings)
                 .await
             {
-                Ok(_) => info!(
-                    "Live valuation calculation successful for account {}.",
-                    account_id
-                ),
+                Ok(_) => (),
                 Err(e) => {
                     error!(
                          "Live valuation calculation failed for account {}: {}. Returning partially valued holdings.",
@@ -278,11 +275,6 @@ impl HoldingsServiceTrait for HoldingsService {
             }
         }
 
-        info!(
-            "Successfully built and valued {} holding views for account {}",
-            holdings.len(),
-            account_id
-        );
         Ok(holdings)
     }
 }

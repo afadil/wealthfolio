@@ -13,7 +13,7 @@ import { useValuationHistory } from '@/hooks/use-valuation-history';
 import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 import { useCalculatePerformanceHistory } from '@/pages/performance/hooks/use-performance-data';
-import { TrackedItem, DateRange } from '@/lib/types';
+import { TrackedItem, DateRange, TimePeriod } from '@/lib/types';
 import { subMonths } from 'date-fns';
 
 const PORTFOLIO_TOTAL_ITEM: TrackedItem = {
@@ -42,6 +42,8 @@ const getInitialDateRange = (): DateRange => ({
   from: subMonths(new Date(), 3),
   to: new Date(),
 });
+
+const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
@@ -86,6 +88,15 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
+  // Callback for IntervalSelector
+  const handleIntervalSelect = (
+    _code: TimePeriod, 
+    _description: string,
+    range: DateRange | undefined
+  ) => {
+    setDateRange(range); 
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
@@ -124,9 +135,9 @@ export default function DashboardPage() {
             <HistoryChart data={chartData} />
             <IntervalSelector
               className="relative bottom-0 left-0 right-0 z-10"
-              selectedRange={dateRange}
-              onRangeSelect={setDateRange}
+              onIntervalSelect={handleIntervalSelect}
               isLoading={isValuationHistoryLoading}
+              initialSelection={INITIAL_INTERVAL_CODE}
             />
           </>
         ) : null}

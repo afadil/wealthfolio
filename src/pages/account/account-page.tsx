@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useParams } from 'react-router-dom';
 import AccountMetrics from './account-metrics';
 import AccountHoldings from './account-holdings';
-import { AccountValuation, DateRange, TrackedItem } from '@/lib/types';
+import { AccountValuation, DateRange, TrackedItem, TimePeriod } from '@/lib/types';
 import { useAccounts } from '@/hooks/use-accounts';
 import { AccountContributionLimit } from './account-contribution-limit';
 import { PrivacyAmount } from '@/components/privacy-amount';
@@ -33,6 +33,9 @@ const getInitialDateRange = (): DateRange => ({
   from: subMonths(new Date(), 3),
   to: new Date(),
 });
+
+// Define the initial interval code (consistent with other pages)
+const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
@@ -75,6 +78,15 @@ const AccountPage = () => {
 
   const isLoading = isAccountsLoading || isValuationHistoryLoading;
   const isDetailsLoading = isLoading || isPerformanceHistoryLoading;
+
+  // Callback for IntervalSelector
+  const handleIntervalSelect = (
+    _code: TimePeriod,
+    _description: string,
+    range: DateRange | undefined
+  ) => {
+    setDateRange(range); // Update state used for data fetching
+  };
 
   return (
     <ApplicationShell className="p-6">
@@ -123,9 +135,9 @@ const AccountPage = () => {
                   <HistoryChart data={chartData} isLoading={false} />
                   <IntervalSelector
                     className="relative bottom-10 left-0 right-0 z-10"
-                    selectedRange={dateRange}
-                    onRangeSelect={setDateRange}
+                    onIntervalSelect={handleIntervalSelect}
                     isLoading={isValuationHistoryLoading}
+                    initialSelection={INITIAL_INTERVAL_CODE}
                   />
                 </div>
               </div>

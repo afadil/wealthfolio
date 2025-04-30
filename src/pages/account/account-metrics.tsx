@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountValuation, PerformanceMetrics } from '@/lib/types';
@@ -87,7 +87,9 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
 
         <PerformanceGrid performance={performance} isLoading={isLoading} />
       </CardContent>
-    
+      <CardFooter className="flex justify-end pb-0">
+        <p className="p-0 m-0 text-xs text-muted-foreground">from {formattedStartDate} to {formattedEndDate}</p>
+      </CardFooter>
     </Card>
   );
 };

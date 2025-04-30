@@ -10,7 +10,7 @@ import { useBalancePrivacy } from '@/context/privacy-context';
 interface AssetDetail {
   numShares: number;
   marketValue: number;
-  bookValue: number;
+  costBasis: number;
   averagePrice: number;
   portfolioPercent: number;
   todaysReturn: number | null;
@@ -40,7 +40,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
   const {
     numShares,
     marketValue,
-    bookValue,
+    costBasis,
     averagePrice,
     portfolioPercent,
     todaysReturn,
@@ -54,7 +54,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
   const holdingRows = [
     {
       label: 'Book value',
-      value: <AmountDisplay value={bookValue} currency={currency} isHidden={isBalanceHidden} />,
+      value: <AmountDisplay value={costBasis} currency={currency} isHidden={isBalanceHidden} />,
     },
     {
       label: 'Average cost',

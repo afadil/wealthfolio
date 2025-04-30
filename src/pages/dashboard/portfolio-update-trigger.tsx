@@ -3,7 +3,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
-import { useUpdatePortfolioMutation, useRecalculatePortfolioMutation } from '@/hooks/use-calculate-portfolio'; // Import the hook
+import { useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio'; // Import the hook
 import { formatDateTime } from '@/lib/utils';
 
 // Rename interface
@@ -15,15 +15,12 @@ interface PortfolioUpdateTriggerProps {
 // Rename function
 export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: PortfolioUpdateTriggerProps) {
 
-  console.log('lastCalculatedAt', lastCalculatedAt);
   // Instantiate the mutation hook inside the component
   const updatePortfolioMutation = useUpdatePortfolioMutation();
-  const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
 
   // Define handleRecalculate internally
   const handleRecalculate = async () => {
-    recalculatePortfolioMutation.mutate();
-    // updatePortfolioMutation.mutate();
+    updatePortfolioMutation.mutate();
   };
 
   return (

@@ -81,7 +81,6 @@ impl HoldingsValuationService {
             HashMap::new()
         };
 
-        info!("latest_quote_pairs from fetch_batch_quote_data: {:?}", latest_quote_pairs);
         Ok(latest_quote_pairs)
     }
 }

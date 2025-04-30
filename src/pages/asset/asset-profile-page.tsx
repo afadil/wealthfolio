@@ -33,7 +33,7 @@ interface AssetProfileFormData {
 interface AssetDetailData {
   numShares: number;
   marketValue: number;
-  bookValue: number;
+  costBasis: number;
   averagePrice: number;
   portfolioPercent: number;
   todaysReturn: number | null;
@@ -90,6 +90,8 @@ export const AssetProfilePage = () => {
   const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
 
+  console.log('holding', holding);
+
   useEffect(() => {
     if (assetData?.asset) {
       setFormData({
@@ -105,17 +107,26 @@ export const AssetProfilePage = () => {
 
   const profile = useMemo(() => {
     if (!assetData?.asset) return null;
+    const totalGainAmount = holding?.totalGain?.local ?? 0;
+    const totalGainPercent = holding?.totalGainPct ?? 0;
+    const calculatedAt = holding?.asOfDate;
+
     return {
       ...assetData.asset,
       marketPrice: quote?.close ?? 0,
-      totalGainAmount: holding?.performance?.totalGainAmount ?? 0,
-      totalGainPercent: holding?.performance?.totalGainPercent ?? 0,
-      calculatedAt: holding?.calculatedAt,
+      totalGainAmount,
+      totalGainPercent,
+      calculatedAt,
     };
   }, [assetData?.asset, quote, holding]);
 
   const symbolHolding = useMemo((): AssetDetailData | null => {
     if (!holding) return null;
+
+    const averageCostPrice =
+      holding.costBasis?.local && holding.quantity !== 0
+        ? holding.costBasis.local / holding.quantity
+        : 0;
 
     const quoteData = quote
       ? {
@@ -134,15 +145,15 @@ export const AssetProfilePage = () => {
 
     return {
       numShares: Number(holding.quantity),
-      marketValue: Number(holding.marketValue),
-      bookValue: Number(holding.bookValue),
-      averagePrice: Number(holding.averageCost ?? 0),
-      portfolioPercent: Number(holding.portfolioPercent ?? 0),
+      marketValue: Number(holding.marketValue.local ?? 0),
+      costBasis: Number(holding.costBasis?.local ?? 0),
+      averagePrice: Number(averageCostPrice),
+      portfolioPercent: Number(holding.weight ?? 0),
       todaysReturn: quoteData?.todaysReturn ?? null,
       todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
-      totalReturn: Number(holding.performance?.totalGainAmount ?? 0),
-      totalReturnPercent: Number(holding.performance?.totalGainPercent ?? 0),
-      currency: assetData?.asset.currency || 'USD',
+      totalReturn: Number(holding.totalGain?.local ?? 0),
+      totalReturnPercent: Number(holding.totalGainPct ?? 0),
+      currency: holding.localCurrency || assetData?.asset.currency || 'USD',
       quote: quoteData?.quote ?? null,
     };
   }, [holding, quote, assetData?.asset?.currency]);
@@ -174,6 +185,8 @@ export const AssetProfilePage = () => {
   };
 
   if (isHoldingsLoading || isAssetDataLoading || !profile) return null;
+
+  console.log('assetData', assetData);
 
   return (
     <ApplicationShell className="p-6">
