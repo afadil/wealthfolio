@@ -186,7 +186,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
-                <FormLabel className="space-y-0 pl-2">Integrate API</FormLabel>
+                <FormLabel className="space-y-0 pl-2">Use API</FormLabel>
               </FormItem>
             )}
           />
@@ -229,7 +229,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                 name="brokerApi"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>API Key</FormLabel>
+                    <FormLabel>Private Key</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter your API key" {...field} />
                     </FormControl>

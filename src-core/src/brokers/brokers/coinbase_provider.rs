@@ -235,69 +235,76 @@ impl BrokerProvider for CoinbaseProvider {
                     if dt.timestamp_millis() <= since_ms + 1000 {
                         continue;
                     }
-                    let coin_num = tx.get("amount")
-                        .and_then(|amt| amt.get("amount"))
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| s.parse::<f64>().ok())
-                        .unwrap_or(0.0);
+                    if tx.get("status").unwrap() != "completed" { continue; }
                     let coin_ticker = tx.get("amount")
                         .and_then(|amt| amt.get("currency"))
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
 
-                    let in_cash = tx.get("native_amount")
-                        .and_then(|na| na.get("amount"))
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| s.parse::<f64>().ok())
-                        .unwrap_or(0.0)
-                        .abs();
                     let fiat_currency = tx.get("native_amount")
                         .and_then(|na| na.get("currency"))
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
-
-                    let price = in_cash / coin_num.abs();
-                    let fee = tx.get("network")
-                        .and_then(|net| net.get("transaction_fee"))
-                        .and_then(|fee| fee.get("amount"))
+                    let coin_num: f64 = tx.get("amount")
+                        .and_then(|amt| amt.get("amount"))
                         .and_then(|v| v.as_str())
-                        .and_then(|s| s.parse::<f64>().ok());
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .filter(|n| n.is_finite())
+                        .unwrap_or(0.0);
+
+                    let in_cash: f64 = tx.get("native_amount")
+                        .and_then(|na| na.get("amount"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .filter(|n| n.is_finite())
+                        .map(|n| n.abs())
+                        .unwrap_or(0.0);
+
+                    let fee_str = tx.get("network")
+                        .and_then(|n| n.get("transaction_fee")).and_then(|f| f.get("amount"))
+                        .or_else(|| tx.get("trade").and_then(|t| t.get("fee")).and_then(|f| f.get("amount")))
+                        .or_else(|| tx.get("buy").and_then(|b| b.get("fee")).and_then(|f| f.get("amount")))
+                        .or_else(|| tx.get("advanced_trade_fill").and_then(|a| a.get("commission")))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("0.0");
+                    let fees: f64 = fee_str.parse().unwrap_or(0.0);
 
                     let comment = tx.get("details")
                         .and_then(|d| d.get("title"))
                         .and_then(|v| v.as_str())
-                        .map(String::from);
+                        .map(String::from)
+                        .or_else(|| {
+                            tx.get("buy")
+                            .and_then(|b| b.get("payment_method_name"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| format!("via {}", s))
+                        });
 
-                    let symbol = format!("{}-{}", coin_ticker, fiat_currency);
                     let ty = tx
                         .get("type")
                         .and_then(Value::as_str)
                         .unwrap_or("UNKNOWN")
                         .to_uppercase();
 
-                    let activity_type = match ty.as_str() {
-                        "TRADE" | "ADVANCED_TRADE_FILL" if coin_num > 0.0 => "BUY",
-                        "TRADE" | "ADVANCED_TRADE_FILL" => "SELL",
-                        "EARN_PAYOUT" => "BUY",
-                        "FIAT_DEPOSIT" => "DEPOSIT",
-                        "FIAT_WITHDRAWAL" => "WITHDRAWAL",
-                        "INTEREST" => "INTEREST",
-                        "CARDSPEND" | "SEND" => "SELL",
-                        "STAKING_REWARD" | "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" => "DIVIDEND",
-                        "WRAP_ASSET" | "RETAIL_ETH2_DEPRECATION" => continue,
-                        other               => other,
-                    }
-                    .to_string();
+                    let activity_type = map_transaction_basic(&ty, coin_num);
+                    if activity_type == "CONTINUE" { continue; }
+
+                    let cost_price: f64 = if coin_num.abs() > std::f64::EPSILON {
+                        in_cash / coin_num
+                    } else {
+                        0.0
+                    };
+
                     out.push(ExternalActivity {
-                        symbol,
+                        symbol: make_symbol(&coin_ticker, &fiat_currency),
                         activity_type,
                         quantity: coin_num.abs(),
-                        price,
+                        price: cost_price.abs(),
                         timestamp: dt.naive_utc(),
                         currency: Some(fiat_currency),
-                        fee,
+                        fee: Some(fees),
                         comment,
                     });
                 }
@@ -305,4 +312,67 @@ impl BrokerProvider for CoinbaseProvider {
         }
         Ok(out)
     }
+}
+
+pub fn make_symbol(coin: &str, fiat: &str) -> String {
+    if coin == fiat {
+        return format!("$CASH-{}", fiat);
+    }
+    let base = match coin {
+        "ETH2" => "ETH",
+        other => other,
+    };
+    format!("{}-{}", base, fiat)
+}
+
+pub fn map_transaction_basic(activity: &str, coin_num: f64) -> String {
+    let mapped = match activity {
+        "TRADE" | "ADVANCED_TRADE_FILL" | "BUY" if coin_num > 0.0 => "BUY",
+        "TRADE" | "ADVANCED_TRADE_FILL" | "BUY" | "SELL" => "SELL",
+        "EARN_PAYOUT" | "STAKING_REWARD" => "DIVIDEND",
+        "FIAT_DEPOSIT" | "DEPOSIT" | "INTERNAL_DEPOSIT" | "EXCHANGE_DEPOSIT" | "ONCHAIN_DEPOSIT" | "SWEEP_DEPOSIT" | "INTX_DEPOSIT" | "RECEIVE" => "DEPOSIT",
+        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" | "WRAP_ASSET" | "UNWRAP_ASSET" if coin_num > 0.0 => "DEPOSIT",
+        "FIAT_WITHDRAWAL" | "WITHDRAWAL" | "INTERNAL_WITHDRAWAL" | "EXCHANGE_WITHDRAWAL" | "ONCHAIN_WITHDRAWAL" | "SWEEP_WITHDRAWAL" | "INTX_WITHDRAWAL" | "CARDSPEND" | "SEND" | "RETAIL_ETH2_DEPRECATION" => "WITHDRAWAL",
+        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" | "WRAP_ASSET" | "UNWRAP_ASSET" if coin_num < 0.0 => "WITHDRAWAL",
+        _ => "CONTINUE",
+    };
+    mapped.to_string()
+}
+
+
+// this is in my opinion how we should map them actually, yet this result in a book_cost=NaN error
+pub fn map_transaction(activity: &str, coin_num: f64) -> String {
+    match activity {
+        "TRADE" | "ADVANCED_TRADE_FILL" if coin_num > 0.0 => "BUY",
+        "TRADE" | "ADVANCED_TRADE_FILL" => "SELL",
+        "EARN_PAYOUT" => "DIVIDEND",
+        "FIAT_DEPOSIT" | "DEPOSIT" => "DEPOSIT",
+        "FIAT_WITHDRAWAL" | "WITHDRAWAL" => "WITHDRAW",
+        "INTERNAL_DEPOSIT" => "TRANSFER_IN",
+        "INTERNAL_WITHDRAWAL" => "TRANSFER_OUT",
+        "EXCHANGE_DEPOSIT" => "TRANSFER_IN",
+        "EXCHANGE_WITHDRAWAL" => "TRANSFER_OUT",
+        "ONCHAIN_DEPOSIT" => "TRANSFER_IN",
+        "ONCHAIN_WITHDRAWAL" => "TRANSFER_OUT",
+        "SWEEP_DEPOSIT" => "TRANSFER_IN",
+        "SWEEP_WITHDRAWAL" => "TRANSFER_OUT",
+        "INTX_DEPOSIT" => "TRANSFER_IN",
+        "INTX_WITHDRAWAL" => "TRANSFER_OUT",
+        "INTEREST" => "INTEREST",
+        "CARDSPEND" | "SEND" => "TRANSFER_OUT",
+        "RECEIVE" => "TRANSFER_IN",
+        "STAKING_REWARD" => "DIVIDEND",
+        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" if coin_num > 0.0 => "TRANSFER_IN",
+        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" => "TRANSFER_OUT",
+        "WRAP_ASSET" if coin_num > 0.0 => "CONVERSION_IN",
+        "WRAP_ASSET" => "CONVERSION_OUT",
+        "UNWRAP_ASSET" if coin_num > 0.0 => "CONVERSION_IN",
+        "UNWRAP_ASSET" => "CONVERSION_OUT",
+        "RETAIL_ETH2_DEPRECATION" => "CONVERSION_OUT",
+        "FEE" => "FEE",
+        "TAX" => "TAX",
+        "TRANSACTION_TYPE_UNKNOWN" => "CONTINUE",
+        _ => "CONTINUE",
+    }                        
+    .to_string()
 }
