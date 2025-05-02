@@ -2,12 +2,11 @@ use std::sync::Arc;
 use crate::models::Account;
 use crate::brokers::broker_provider::{BrokerApiConfig, BrokerProvider, BrokerError};
 use crate::brokers::brokers::{
-    // coinbase_provider::CoinbaseProvider,
-    coinbase_v2_provider::CoinbaseProvider,
+    coinbase_provider::CoinbaseProvider,
     trading212_provider::Trading212Provider,
     bitvavo_provider::BitvavoProvider,
 };
-use log::debug; // for debugging 
+use log::debug; 
 
 pub struct BrokerProviderFactory;
 

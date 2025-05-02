@@ -11,30 +11,24 @@ use log::debug;
 
 #[derive(Debug, Error)]
 pub enum BrokerError {
+    #[error("Key error: {0}")]
+    Key(String),
     #[error("Missing broker API data")]
     MissingApiData,
-
     #[error("Invalid broker API format")]
     InvalidApiData,
-
     #[error("Missing broker name")]
     MissingBrokerName,
-
     #[error("Unsupported broker: {0}")]
     UnsupportedBroker(String),
-
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
-
     #[error("API request failed: {0}")]
     ApiRequestFailed(String),
-
     #[error("Invalid response: {0}")]
     InvalidApiResponse(String),
-
     #[error("Rate limited: {0}")]
     RateLimited(String),
-
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

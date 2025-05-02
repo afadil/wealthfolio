@@ -1,167 +1,308 @@
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime};
-use reqwest::Client;
-use serde::Deserialize;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use chrono::{DateTime, NaiveDateTime, Utc};
+use openssl::ec::EcKey;
+use openssl::pkey::PKey;
+use rand::rngs::OsRng;
+use rand::RngCore;
+use reqwest::{Client, Method, Url};
+use ring::rand::SystemRandom;
+use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING};
+use serde::Serialize;
+use serde_json::Value;
 use std::collections::HashMap;
-use crate::brokers::broker_provider::{
-    BrokerApiConfig, BrokerError, BrokerProvider, ExternalActivity,
-};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use crate::brokers::broker_provider::{BrokerApiConfig, BrokerError, BrokerProvider, ExternalActivity};
+
 use log::debug;
 
-pub struct CoinbaseProvider {
+const V2_PREFIX: &str = "/v2";
+const V3_PREFIX: &str = "/api/v3/brokerage";
+const DEFAULT_LIMIT: usize = 25;
+const USER_AGENT: &str = "Wealthfolio";
+
+#[derive(Clone)]
+struct Jwt {
     api_key: String,
+    signing_key: Arc<EcdsaKeyPair>,
+    rng: SystemRandom,
+}
+
+#[derive(Serialize)]
+struct JwtHeader<'a> {
+    alg: &'a str,
+    kid: String,
+    nonce: String,
+}
+
+#[derive(Serialize)]
+struct JwtPayload<'a> {
+    sub: String,
+    iss: &'a str,
+    nbf: u64,
+    exp: u64,
+    uri: Option<String>,
+}
+
+impl Jwt {
+    pub fn new(api_key: String, pem_bytes: &[u8]) -> Result<Self, BrokerError> {
+        let secret_der = Self::format_key(pem_bytes)?;
+        let rng = SystemRandom::new();
+        let signing_key = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &secret_der)
+            .map_err(|e| BrokerError::Key(e.to_string()))?;
+        Ok(Jwt { api_key, signing_key: Arc::new(signing_key), rng })
+    }
+
+    fn format_key(key: &[u8]) -> Result<Vec<u8>, BrokerError> {
+        let ec = EcKey::private_key_from_pem(key)
+            .map_err(|e| BrokerError::Key(e.to_string()))?;
+        let pkey = PKey::from_ec_key(ec).map_err(|e| BrokerError::Key(e.to_string()))?;
+        let der = pkey.private_key_to_pkcs8().map_err(|e| BrokerError::Key(e.to_string()))?;
+        Ok(der)
+    }
+
+    fn build_header(&self) -> Result<String, BrokerError> {
+        let mut nonce_bytes = [0u8; 48];
+        OsRng.fill_bytes(&mut nonce_bytes);
+        let header = JwtHeader { alg: "ES256", kid: self.api_key.clone(), nonce: URL_SAFE_NO_PAD.encode(&nonce_bytes) };
+        let raw = serde_json::to_vec(&header).map_err(|e| BrokerError::Unknown(e.to_string()))?;
+        let b64 = URL_SAFE_NO_PAD.encode(&raw);
+        Ok(b64)
+    }
+
+    fn build_payload(&self, uri: &str) -> Result<String, BrokerError> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| BrokerError::Unknown(e.to_string()))?
+            .as_secs();
+        let payload = JwtPayload { sub: self.api_key.clone(), iss: "cdp", nbf: now, exp: now + 120, uri: Some(uri.to_owned()) };
+        let raw = serde_json::to_vec(&payload).map_err(|e| BrokerError::Unknown(e.to_string()))?;
+        let b64 = URL_SAFE_NO_PAD.encode(&raw);
+        Ok(b64)
+    }
+
+    fn sign(&self, message: &[u8]) -> Result<String, BrokerError> {
+        let sig = self.signing_key.sign(&self.rng, message).map_err(|e| BrokerError::Key(e.to_string()))?;
+        let b64 = URL_SAFE_NO_PAD.encode(sig.as_ref());
+        Ok(b64)
+    }
+
+    pub fn encode(&self, method: &str, host: &str, path: &str) -> Result<String, BrokerError> {
+        let uri = format!("{} {}{}", method, host, path);
+        let header_b64 = self.build_header()?;
+        let payload_b64 = self.build_payload(&uri)?;
+        let mut token = format!("{}.{}", header_b64, payload_b64);
+        let signature = self.sign(token.as_bytes())?;
+        token.push('.');
+        token.push_str(&signature);
+        Ok(token)
+    }
+}
+
+pub struct CoinbaseClient {
+    host: String,
+    jwt: Jwt,
     client: Client,
-    endpoint: String,
+}
+
+impl CoinbaseClient {
+    pub fn new(api_key: String, api_secret_pem: &[u8], host: String) -> Result<Self, BrokerError> {
+        let jwt = Jwt::new(api_key.clone(), api_secret_pem)?;
+        Ok(Self {
+            host,
+            jwt,
+            client: Client::new(),
+        })
+    }
+
+    async fn request(&self, method: Method, path: &str, params: Option<&HashMap<&str, String>>)
+        -> Result<Value, BrokerError>
+    {
+        let token = self.jwt.encode(method.as_str(), &self.host, path)?;
+        let url = Url::parse(&format!("https://{}{}", self.host, path))
+            .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
+        debug!("Fetching data from: {:?}", url.path());
+        let mut req = self.client
+            .request(method, url)
+            .header("Content-Type", "application/json")
+            .header("User-Agent", USER_AGENT)
+            .bearer_auth(token);
+        if let Some(q) = params {
+            req = req.query(q);
+        }
+        let resp = req.send().await.map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
+        let status = resp.status();
+        let text = resp.text().await.map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
+
+        if status == 401 {
+            return Err(BrokerError::AuthenticationFailed("Unauthorized".into()));
+        } else if !status.is_success() {
+            return Err(BrokerError::ApiRequestFailed(format!("{}: {}", status, text)));
+        }
+        serde_json::from_str(&text).map_err(|e| BrokerError::Unknown(e.to_string()))
+    }
+
+    async fn paginate(&self, method: Method, path: &str, mut params: HashMap<&str,String>) -> Result<Vec<Value>, BrokerError> {
+        if !params.contains_key("limit") {
+        params.insert("limit", DEFAULT_LIMIT.to_string());
+        }
+        let is_v3 = path.starts_with(V3_PREFIX);
+
+        let mut pages = Vec::new();
+        loop {
+            let page = self.request(method.clone(), path, Some(&params)).await?;
+            pages.push(page.clone());
+
+            let has_next = page.get("has_next")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+            if !has_next { break; }
+
+            let token = page.get("cursor")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| BrokerError::ApiRequestFailed(
+                            "Missing cursor on next page".into()))?;
+            let key = if is_v3 { "cursor" } else { "starting_after" };
+            params.insert(key, token.to_owned());
+        }
+        Ok(pages)
+    }
+
+    pub async fn get_all_accounts(&self) -> Result<Vec<Value>, BrokerError> {
+        let pages = self.paginate(Method::GET, &format!("{}{}", V3_PREFIX, "/accounts"), HashMap::new()).await?;
+        let mut all = Vec::new();
+        for p in pages {
+            if let Some(arr) = p.get("accounts").and_then(|v| v.as_array()) {
+                all.extend(arr.clone());
+            }
+        }
+        Ok(all)
+    }
+
+    pub async fn get_all_transactions(&self, account_id: &str) -> Result<Vec<Value>, BrokerError> {
+        let path = format!("{}{}", V2_PREFIX, format!("/accounts/{}/transactions", account_id));
+        let pages = self.paginate(Method::GET, &path, HashMap::new()).await?;
+        let mut all = Vec::new();
+        for p in pages {
+            if let Some(arr) = p.get("data").and_then(|v| v.as_array()) {
+                all.extend(arr.clone());
+            }
+        }
+        Ok(all)
+    }
+}
+
+pub struct CoinbaseProvider {
+    inner: CoinbaseClient,
 }
 
 impl CoinbaseProvider {
     pub async fn new(config: BrokerApiConfig) -> Result<Self, BrokerError> {
-        if config.api_key.is_empty() {
-            return Err(BrokerError::AuthenticationFailed("API key is empty".to_string()));
-        }
-
-        Ok(Self {
-            api_key: config.api_key,
-            client: Client::new(),
-            endpoint: "https://api.coinbase.com/v2".to_string(),
-        })
+        let secret = config.api_key;
+        let key = config.optional
+            .ok_or(BrokerError::MissingApiData)?;
+        let client = CoinbaseClient::new(key.clone(), &secret.replace("\\n", "\n").into_bytes(), "api.coinbase.com".into())
+            .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
+        Ok(Self { inner: client })
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CoinbaseMoney {
-    pub amount: String,
-    pub currency: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CoinbaseTransaction {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub tx_type: String,
-    pub status: String,
-    pub amount: CoinbaseMoney,
-    pub native_amount: CoinbaseMoney,
-    pub description: Option<String>,
-    pub created_at: String,
-    pub updated_at: Option<String>,
-    pub details: Option<HashMap<String, String>>,
-    pub to: Option<HashMap<String, String>>,
-    pub network: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct BrokerageAccount {
-    uuid: String,
-    name: String,
-    currency: String,
-    r#type: Option<String>,
-    active: bool,
-    ready: bool,
-    platform: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TransactionListResponse {
-    pub data: Vec<CoinbaseTransaction>,
-}
-
-#[derive(Debug, Deserialize)]
-struct BrokerageAccountsResponse {
-    accounts: Vec<BrokerageAccount>,
-    has_next: bool,
-    cursor: Option<String>,
-    size: Option<u32>,
 }
 
 #[async_trait]
 impl BrokerProvider for CoinbaseProvider {
     async fn fetch_activities(&self, since: NaiveDateTime) -> Result<Vec<ExternalActivity>, BrokerError> {
-        let accounts_url = format!("{}/v2/accounts", self.endpoint);
-        let accounts_response = self.client
-            .get(&accounts_url)
-            .bearer_auth(&self.api_key)
-            .send()
+        let accounts = self.inner.get_all_accounts()
             .await
-            .map_err(|e| BrokerError::ApiRequestFailed(format!("Failed to fetch accounts: {}", e)))?;
+            .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
 
-        let status = accounts_response.status();
-        let body = accounts_response.text().await.map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
-        if !status.is_success() {
-            return Err(BrokerError::ApiRequestFailed(format!("Coinbase returned {}: {}", status, body)));
-        }
+        let mut out = Vec::new();
+        let since_ms = since.and_utc().timestamp_millis();
 
-        let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| BrokerError::Unknown(e.to_string()))?;
+        for acct in accounts {
+            if let Some(aid) = acct.get("uuid").and_then(|v| v.as_str()) {
+                let txs = self.inner.get_all_transactions(aid)
+                    .await
+                    .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
 
-        let accounts = json["data"]
-            .as_array()
-            .ok_or_else(|| BrokerError::Unknown("Missing 'data' field for accounts".to_string()))?;
-        
-        let mut activities = vec![];
-        for acc in accounts {
-            let url = format!("{}/accounts/{}/transactions", self.endpoint, acc);
+                for tx in txs {
+                    let ts_str = tx.get("created_at")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| BrokerError::ApiRequestFailed("missing created_at".into()))?;
+                    let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(ts_str)
+                        .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?
+                        .with_timezone(&Utc);
+                    if dt.timestamp_millis() <= since_ms + 1000 {
+                        continue;
+                    }
+                    let coin_num = tx.get("amount")
+                        .and_then(|amt| amt.get("amount"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .unwrap_or(0.0);
+                    let coin_ticker = tx.get("amount")
+                        .and_then(|amt| amt.get("currency"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
 
-            let response = self.client
-                .get(&url)
-                .bearer_auth(&self.api_key)
-                .send()
-                .await
-                .map_err(|e| BrokerError::ApiRequestFailed(e.to_string()))?;
+                    let in_cash = tx.get("native_amount")
+                        .and_then(|na| na.get("amount"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .unwrap_or(0.0)
+                        .abs();
+                    let fiat_currency = tx.get("native_amount")
+                        .and_then(|na| na.get("currency"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
 
-            if !response.status().is_success() {
-                return Err(BrokerError::ApiRequestFailed(format!("Coinbase returned {}", response.status())));
-            }
+                    let price = in_cash / coin_num.abs();
+                    let fee = tx.get("network")
+                        .and_then(|net| net.get("transaction_fee"))
+                        .and_then(|fee| fee.get("amount"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok());
 
-            let txs: TransactionListResponse = response
-                .json()
-                .await
-                .map_err(|e| BrokerError::Unknown(e.to_string()))?;
+                    let comment = tx.get("details")
+                        .and_then(|d| d.get("title"))
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
 
-            for tx in txs.data {
-                let created_at = DateTime::parse_from_rfc3339(&tx.created_at)
-                    .map(|dt| dt.naive_utc())
-                    .unwrap_or_else(|_| NaiveDateTime::from_timestamp(0, 0));
+                    let symbol = format!("{}-{}", coin_ticker, fiat_currency);
+                    let ty = tx
+                        .get("type")
+                        .and_then(Value::as_str)
+                        .unwrap_or("UNKNOWN")
+                        .to_uppercase();
 
-                if created_at < since {
-                    continue;
+                    let activity_type = match ty.as_str() {
+                        "TRADE" | "ADVANCED_TRADE_FILL" if coin_num > 0.0 => "BUY",
+                        "TRADE" | "ADVANCED_TRADE_FILL" => "SELL",
+                        "EARN_PAYOUT" => "BUY",
+                        "FIAT_DEPOSIT" => "DEPOSIT",
+                        "FIAT_WITHDRAWAL" => "WITHDRAWAL",
+                        "INTEREST" => "INTEREST",
+                        "CARDSPEND" | "SEND" => "SELL",
+                        "STAKING_REWARD" | "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" => "DIVIDEND",
+                        "WRAP_ASSET" | "RETAIL_ETH2_DEPRECATION" => continue,
+                        other               => other,
+                    }
+                    .to_string();
+                    out.push(ExternalActivity {
+                        symbol,
+                        activity_type,
+                        quantity: coin_num.abs(),
+                        price,
+                        timestamp: dt.naive_utc(),
+                        currency: Some(fiat_currency),
+                        fee,
+                        comment,
+                    });
                 }
-
-                let quantity: f64 = tx.amount.amount.parse().unwrap_or(0.0);
-                let native_total: f64 = tx.native_amount.amount.parse().unwrap_or(0.0);
-
-                let price = if quantity.abs() > 0.0 {
-                    native_total.abs() / quantity.abs()
-                } else {
-                    0.0
-                };
-
-                let activity_type = match tx.tx_type.as_str() {
-                    "buy" => "BUY",
-                    "sell" => "SELL",
-                    "send" => "SEND",
-                    "receive" => "RECEIVE",
-                    "transfer" => "TRANSFER",
-                    _ => "OTHER", // How to handle this case?
-                }.to_string();
-
-                let comment = tx.details
-                    .as_ref()
-                    .and_then(|d| d.get("title").cloned())
-                    .or_else(|| tx.description.clone())
-                    .unwrap_or_else(|| "Coinbase API transaction".to_string());
-
-                activities.push(ExternalActivity {
-                    symbol: format!("{}-USD", tx.amount.currency),
-                    activity_type,
-                    quantity: quantity.abs(),
-                    price,
-                    timestamp: created_at,
-                    currency: Some(format!("$CASH-{}", tx.native_amount.currency.clone())),
-                    fee: None,
-                    comment: Some(comment),
-                });
             }
         }
-        Ok(activities)
+        Ok(out)
     }
 }
