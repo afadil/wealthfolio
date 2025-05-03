@@ -113,6 +113,7 @@ pub fn main() {
             commands::goal::update_goal_allocations,
             commands::goal::load_goals_allocations,
             commands::portfolio::get_holdings,
+            commands::portfolio::get_holding,
             commands::portfolio::get_income_summary,
             commands::portfolio::get_historical_valuations,
             commands::portfolio::calculate_accounts_simple_performance,
@@ -133,6 +134,7 @@ pub fn main() {
             commands::market_data::sync_market_data,
             commands::market_data::update_quote,
             commands::market_data::delete_quote,
+            commands::market_data::get_quote_history,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

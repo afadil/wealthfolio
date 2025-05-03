@@ -55,6 +55,25 @@ pub async fn get_holdings(
 }
 
 #[tauri::command]
+pub async fn get_holding(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+    asset_id: String,
+) -> Result<Option<Holding>, String> {
+    debug!(
+        "Get specific holding for asset {} in account {}",
+        asset_id,
+        account_id
+    );
+    let base_currency = state.get_base_currency();
+    state
+        .holdings_service()
+        .get_holding(&account_id, &asset_id, &base_currency)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_historical_valuations(
     state: State<'_, Arc<ServiceContext>>,
     account_id: String,

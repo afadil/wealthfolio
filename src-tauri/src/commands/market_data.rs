@@ -83,3 +83,15 @@ pub async fn delete_quote(
     });
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_quote_history(
+    symbol: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<Quote>, String> {
+    debug!("Fetching quote history for symbol: {}", symbol);
+    state
+        .market_data_service()
+        .get_historical_quotes_for_symbol(&symbol)
+        .map_err(|e| e.to_string())
+}

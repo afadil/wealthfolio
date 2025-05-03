@@ -1,7 +1,10 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, NaiveDate, Utc};
+use std::collections::VecDeque;
 
+// Import Lot from its definition
+use crate::portfolio::snapshot::Lot;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +35,8 @@ pub struct Instrument {
     pub symbol: String,
     pub name: Option<String>,
     pub currency: String,
+    pub notes: Option<String>,
+    pub data_source: Option<String>,
     
     // Classification
     pub asset_class: Option<String>,
@@ -73,6 +78,7 @@ pub struct Holding {
     // Position data
     pub quantity: Decimal,
     pub open_date: Option<DateTime<Utc>>,
+    pub lots: Option<VecDeque<Lot>>,
     
     // Currency info
     pub local_currency: String,

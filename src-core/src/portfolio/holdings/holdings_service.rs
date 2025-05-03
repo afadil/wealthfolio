@@ -1,9 +1,8 @@
 use crate::assets::AssetServiceTrait;
 use crate::assets_model::{Asset, Country as AssetCountry, Sector as AssetSector};
 use crate::portfolio::holdings::holdings_model::{Holding, Instrument, HoldingType, MonetaryValue, Country, Sector};
-use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
-
-use crate::errors::{Error as CoreError, Result};
+use crate::portfolio::snapshot::{self, SnapshotServiceTrait, Position};
+use crate::errors::{Error as CoreError, Result, CalculatorError};
 use async_trait::async_trait;
 use chrono::Utc;
 use log::{error, info, warn};
@@ -18,6 +17,14 @@ use super::HoldingsValuationServiceTrait;
 #[async_trait]
 pub trait HoldingsServiceTrait: Send + Sync {
     async fn get_holdings(&self, account_id: &str, base_currency: &str) -> Result<Vec<Holding>>;
+
+    /// Retrieves a specific holding for an account, calculates its valuation, and includes lot details.
+    async fn get_holding(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        base_currency: &str,
+    ) -> Result<Option<Holding>>;
 }
 
 #[derive(Clone)]
@@ -111,10 +118,12 @@ impl HoldingsServiceTrait for HoldingsService {
                         });
 
                         let instrument = Instrument {
-                            id: asset.id,
+                            id: asset.id.clone(),
                             symbol: asset.symbol.clone(),
                             name: asset.name,
                             currency: asset.currency,
+                            notes: asset.notes,
+                            data_source: Some(asset.data_source),
                             asset_class: asset.asset_class,
                             asset_subclass: asset.asset_sub_class,
                             countries: countries_vec.map(|c| {
@@ -134,7 +143,7 @@ impl HoldingsServiceTrait for HoldingsService {
                                     .collect()
                             }),
                         };
-                        Some((asset.symbol, instrument))
+                        Some((asset.id, instrument))
                     })
                     .collect(),
                 Err(e) => {
@@ -171,6 +180,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 instrument: instrument_view,
                 quantity: snapshot_pos.quantity,
                 open_date: Some(snapshot_pos.inception_date),
+                lots: None,
                 local_currency: snapshot_pos.currency.clone(),
                 base_currency: base_currency.to_string(),
                 fx_rate: None,
@@ -207,6 +217,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 instrument: None,
                 quantity: amount,
                 open_date: None,
+                lots: None,
                 local_currency: currency.clone(),
                 base_currency: base_currency.to_string(),
                 fx_rate: None,
@@ -276,5 +287,161 @@ impl HoldingsServiceTrait for HoldingsService {
         }
 
         Ok(holdings)
+    }
+
+    async fn get_holding(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        base_currency: &str,
+    ) -> Result<Option<Holding>> {
+        info!(
+            "Getting specific holding for asset {} in account {} (base currency: {})",
+            asset_id, account_id, base_currency
+        );
+        let today = Utc::now().date_naive();
+
+        let latest_snapshot = match self.snapshot_service.get_latest_holdings_snapshot(account_id) {
+            Ok(snap) => snap,
+            Err(CoreError::Repository(ref msg)) if msg.contains("No snapshot found") => {
+                warn!(
+                    "No snapshot found for account {}. Cannot get holding for asset {}.",
+                    account_id, asset_id
+                );
+                return Ok(None);
+            }
+            Err(e) => {
+                error!(
+                    "Failed to get latest snapshot for account {} while getting holding {}: {}",
+                    account_id, asset_id, e
+                );
+                return Err(e);
+            }
+        };
+
+        let maybe_position: Option<Position> = latest_snapshot.positions.get(asset_id).cloned();
+
+        if maybe_position.is_none() {
+            log::debug!(
+                "Asset {} not found in holdings snapshot for account {}.",
+                asset_id, account_id
+            );
+            return Ok(None);
+        }
+        let position = maybe_position.unwrap();
+
+        if position.quantity == Decimal::ZERO {
+            log::debug!(
+                "Asset {} found but quantity is zero in snapshot for account {}.",
+                asset_id, account_id
+            );
+             return Ok(None);
+        }
+
+        let asset_details = self.asset_service.get_asset_by_id(asset_id).map_err(|e| {
+            error!(
+                "Failed to get asset details for asset_id {} while getting holding: {}. Holding data will be incomplete.",
+                asset_id, e
+            );
+            CoreError::Calculation(CalculatorError::Calculation(format!(
+                "Failed to fetch asset details for holding {}: {}",
+                asset_id, e
+            )))
+        })?;
+
+        let countries_vec = asset_details.countries.as_ref().and_then(|c| {
+            serde_json::from_str::<Option<Vec<AssetCountry>>>(c)
+                .map_err(|e| warn!("Failed to parse countries for {}: {}", asset_details.symbol, e))
+                .ok()
+                .flatten()
+        });
+        let sectors_vec = asset_details.sectors.as_ref().and_then(|s| {
+            serde_json::from_str::<Option<Vec<AssetSector>>>(s)
+                .map_err(|e| warn!("Failed to parse sectors for {}: {}", asset_details.symbol, e))
+                .ok()
+                .flatten()
+        });
+
+        let instrument = Instrument {
+            id: asset_details.id.clone(),
+            symbol: asset_details.symbol.clone(),
+            name: asset_details.name,
+            currency: asset_details.currency,
+            notes: asset_details.notes,
+            data_source: Some(asset_details.data_source),
+            asset_class: asset_details.asset_class,
+            asset_subclass: asset_details.asset_sub_class,
+            countries: countries_vec.map(|c| {
+                c.iter()
+                    .map(|country| Country {
+                        name: country.name.clone(),
+                        weight: country.weight,
+                    })
+                    .collect()
+            }),
+            sectors: sectors_vec.map(|s| {
+                s.iter()
+                    .map(|sector| Sector {
+                        name: sector.name.clone(),
+                        weight: sector.weight,
+                    })
+                    .collect()
+            }),
+        };
+
+        let holding_view = Holding {
+            id: format!("SEC-{}-{}", account_id, asset_id),
+            account_id: account_id.to_string(),
+            holding_type: HoldingType::Security,
+            instrument: Some(instrument),
+            quantity: position.quantity,
+            open_date: Some(position.inception_date),
+            lots: Some(position.lots),
+            local_currency: position.currency.clone(),
+            base_currency: base_currency.to_string(),
+            fx_rate: None,
+            market_value: MonetaryValue::zero(),
+            cost_basis: Some(MonetaryValue {
+                local: position.total_cost_basis,
+                base: Decimal::ZERO,
+            }),
+            price: None,
+            unrealized_gain: None,
+            unrealized_gain_pct: None,
+            realized_gain: None,
+            realized_gain_pct: None,
+            total_gain: None,
+            total_gain_pct: None,
+            day_change: None,
+            day_change_pct: None,
+            prev_close_value: None,
+            weight: Decimal::ZERO,
+            as_of_date: today,
+        };
+
+        let mut single_holding_vec = vec![holding_view];
+        match self
+            .valuation_service
+            .calculate_holdings_live_valuation(&mut single_holding_vec)
+            .await
+        {
+            Ok(_) => {
+                if let Some(valued_holding) = single_holding_vec.into_iter().next() {
+                     Ok(Some(valued_holding))
+                 } else {
+                     error!("Valuation service returned Ok but the holding vector was empty for asset {} in account {}.", asset_id, account_id);
+                     Err(CoreError::Calculation(CalculatorError::Calculation(
+                         "Valuation failed unexpectedly".to_string()
+                     )))
+                 }
+            }
+            Err(e) => {
+                error!(
+                    "Live valuation failed for single holding {} in account {}: {}. Returning holding without valuation.",
+                    asset_id, account_id, e
+                );
+                 Err(e)
+            }
+        }
     }
 }

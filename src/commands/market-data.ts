@@ -91,7 +91,7 @@ export const updateQuote = async (symbol: string, quote: Quote): Promise<void> =
 
       // Create QuoteUpdate object
       const quoteUpdate: QuoteUpdate = {
-        date: formatDate(quote.date),
+        timestamp: formatDate(quote.timestamp),
         symbol,
         open: quote.open,
         high: quote.high,
@@ -132,6 +132,20 @@ export const deleteQuote = async (id: string): Promise<void> => {
     }
   } catch (error) {
     logger.error('Error deleting quote');
+    throw error;
+  }
+};
+
+export const getQuoteHistory = async (symbol: string): Promise<Quote[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_quote_history', { symbol });
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error(`Error fetching quote history for symbol ${symbol}.`);
     throw error;
   }
 };

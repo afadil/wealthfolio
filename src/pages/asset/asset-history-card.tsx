@@ -23,7 +23,7 @@ interface AssetHistoryProps {
   className?: string;
 }
 
-const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
+const AssetHistoryCard: React.FC<AssetHistoryProps> = ({ 
   marketPrice,
   totalGainAmount,
   totalGainPercent,
@@ -31,21 +31,20 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   quoteHistory,
   symbol,
   className,
-}) => {
+ }) => {
   const syncMarketDataMutation = useSyncMarketDataMutation();
+  const { isBalanceHidden } = useBalancePrivacy();
 
-  // State to store the *results* received from IntervalSelector's callback
   const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>('3M');
-  const [selectedIntervalDesc, setSelectedIntervalDesc] = useState<string>('past 3 months'); // Initial state description
+  const [selectedIntervalDesc, setSelectedIntervalDesc] = useState<string>('past 3 months');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    // Initial state range (corresponding to '3M')
     from: subMonths(new Date(), 3),
     to: new Date(),
   });
-  const { isBalanceHidden } = useBalancePrivacy();
 
-  // Filter data based on the dateRange received from the callback
   const filteredData = useMemo(() => {
+    if (!quoteHistory) return [];
+    
     if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === 'ALL') {
       return quoteHistory
         .map((quote) => ({
@@ -67,8 +66,9 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
       }))
   }, [dateRange, quoteHistory, currency, selectedIntervalCode]);
 
-  // Gain calculation based on the selected interval code and filtered data
   const { ganAmount, percentage, calculatedAt } = useMemo(() => {
+    const lastFilteredDate = filteredData.at(-1)?.timestamp;
+
     if (selectedIntervalCode === 'ALL') {
       const lastQuoteDate = quoteHistory.length > 0 ? quoteHistory[quoteHistory.length - 1].timestamp : undefined;
       return { ganAmount: totalGainAmount, percentage: totalGainPercent, calculatedAt: lastQuoteDate };
@@ -76,13 +76,12 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
 
     const startValue = filteredData[0]?.totalValue;
     const endValue = filteredData.at(-1)?.totalValue;
-    const lastFilteredDate = filteredData.at(-1)?.timestamp;
     const isValidStartValue = typeof startValue === 'number' && startValue !== 0;
 
     return {
       ganAmount:
         typeof startValue === 'number' && typeof endValue === 'number'
-          ? endValue - startValue 
+          ? endValue - startValue
           : 0,
       percentage:
         isValidStartValue && typeof endValue === 'number'
@@ -90,15 +89,13 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
           : 0,
       calculatedAt: lastFilteredDate,
     };
-  }, [filteredData, selectedIntervalCode, totalGainAmount, totalGainPercent, quoteHistory]);
+  }, [filteredData, selectedIntervalCode, quoteHistory, totalGainAmount, totalGainPercent]);
 
-  // Callback function passed to IntervalSelector
   const handleIntervalSelect = (
     code: TimePeriod,
     description: string,
     range: DateRange | undefined
   ) => {
-    // Update AssetHistoryCard's state with the values from the selector
     setSelectedIntervalCode(code);
     setSelectedIntervalDesc(description);
     setDateRange(range);
@@ -157,11 +154,10 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
       <CardContent className="relative p-0">
         <HistoryChart data={filteredData} />
         <IntervalSelector
-          // No selectedInterval prop passed down
-          onIntervalSelect={handleIntervalSelect} // Provide the callback
+          onIntervalSelect={handleIntervalSelect}
           className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
-          isLoading={syncMarketDataMutation.isPending} // Pass loading state
-          initialSelection="3M" // Set the initial selection for the component
+          isLoading={syncMarketDataMutation.isPending}
+          initialSelection="3M"
         />
       </CardContent>
     </Card>

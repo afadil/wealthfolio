@@ -175,6 +175,26 @@ export const calculateAccountsSimplePerformance = async (
   }
 };
 
+export const getHolding = async (
+  accountId: string,
+  assetId: string
+): Promise<Holding | null> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        // The Rust command returns Option<Holding>, which tauri-plugin-api maps to Holding | null
+        return invokeTauri<Holding | null>('get_holding', { accountId, assetId });
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error(`Error fetching holding for asset ${assetId} in account ${accountId}.`);
+    // Re-throw or return null depending on desired error handling
+    throw error;
+    // return null;
+  }
+};
+
 
 
 
