@@ -288,7 +288,7 @@ impl BrokerProvider for CoinbaseProvider {
                         .unwrap_or("UNKNOWN")
                         .to_uppercase();
 
-                    let activity_type = map_transaction_basic(&ty, coin_num);
+                    let activity_type = map_transaction(&ty, coin_num);
                     if activity_type == "CONTINUE" { continue; }
 
                     let cost_price: f64 = if coin_num.abs() > std::f64::EPSILON {
@@ -325,54 +325,61 @@ pub fn make_symbol(coin: &str, fiat: &str) -> String {
     format!("{}-{}", base, fiat)
 }
 
-pub fn map_transaction_basic(activity: &str, coin_num: f64) -> String {
+pub fn map_transaction(activity: &str, coin_num: f64) -> String {
     let mapped = match activity {
-        "TRADE" | "ADVANCED_TRADE_FILL" | "BUY" if coin_num > 0.0 => "BUY",
-        "TRADE" | "ADVANCED_TRADE_FILL" | "BUY" | "SELL" => "SELL",
-        "EARN_PAYOUT" | "STAKING_REWARD" => "DIVIDEND",
-        "FIAT_DEPOSIT" | "DEPOSIT" | "INTERNAL_DEPOSIT" | "EXCHANGE_DEPOSIT" | "ONCHAIN_DEPOSIT" | "SWEEP_DEPOSIT" | "INTX_DEPOSIT" | "RECEIVE" => "DEPOSIT",
-        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" | "WRAP_ASSET" | "UNWRAP_ASSET" if coin_num > 0.0 => "DEPOSIT",
-        "FIAT_WITHDRAWAL" | "WITHDRAWAL" | "INTERNAL_WITHDRAWAL" | "EXCHANGE_WITHDRAWAL" | "ONCHAIN_WITHDRAWAL" | "SWEEP_WITHDRAWAL" | "INTX_WITHDRAWAL" | "CARDSPEND" | "SEND" | "RETAIL_ETH2_DEPRECATION" => "WITHDRAWAL",
-        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" | "WRAP_ASSET" | "UNWRAP_ASSET" if coin_num < 0.0 => "WITHDRAWAL",
-        _ => "CONTINUE",
+        "TRADE"
+        | "ADVANCED_TRADE_FILL"
+        | "BUY"
+        | "SEND" if coin_num > 0.0 => "BUY",
+        "TRADE"
+        | "ADVANCED_TRADE_FILL"
+        | "BUY"
+        | "SELL"
+        | "SEND" => "SELL",
+        "EARN_PAYOUT"
+        | "STAKING_REWARD"
+        | "INCENTIVES_REWARDS_PAYOUT"
+        | "SUBSCRIPTION_REBATE" => "DIVIDEND",
+        "FIAT_DEPOSIT"
+        | "DEPOSIT"
+        | "INTERNAL_DEPOSIT"
+        | "EXCHANGE_DEPOSIT"
+        | "ONCHAIN_DEPOSIT"
+        | "SWEEP_DEPOSIT"
+        | "INTX_DEPOSIT"
+        | "RECEIVE"
+        | "UNSUPPORTED_ASSET_RECOVERY"
+            => "DEPOSIT",
+        "CLAWBACK"
+        | "INCENTIVES_SHARED_CLAWBACK" => "DEPOSIT",
+        "RETAIL_SIMPLE_DUST" if coin_num > 0.0 => "DEPOSIT",
+        "REQUEST" if coin_num > 0.0 => "DEPOSIT",
+        "STAKING_TRANSFER"
+        | "UNSTAKING_TRANSFER"
+        | "WRAP_ASSET"
+        | "UNWRAP_ASSET" if coin_num > 0.0 => "DEPOSIT",
+        "DERIVATIVES_SETTLEMENT"
+        | "TRANSFER" if coin_num > 0.0 => "DEPOSIT",
+        "EXCHANGE_WITHDRAWAL"
+        | "INTERNAL_WITHDRAWAL"
+        | "FIAT_WITHDRAWAL"
+        | "WITHDRAWAL"
+        | "ONCHAIN_WITHDRAWAL"
+        | "SWEEP_WITHDRAWAL"
+        | "INTX_WITHDRAWAL"
+        | "VAULT_WITHDRAWAL"
+        | "SUBSCRIPTION"  
+            => "WITHDRAWAL",
+        "RETAIL_SIMPLE_DUST" => "WITHDRAWAL",
+        "REQUEST" if coin_num < 0.0 => "WITHDRAWAL",
+        "STAKING_TRANSFER"
+        | "UNSTAKING_TRANSFER"
+        | "WRAP_ASSET"
+        | "UNWRAP_ASSET" if coin_num < 0.0 => "SELL",
+        "DERIVATIVES_SETTLEMENT"
+        | "TRANSFER" if coin_num < 0.0 => "WITHDRAWAL",
+        "RETAIL_ETH2_DEPRECATION" => "CONTINUE",
+        other => other, // thios case should never happen but is included in case Coinbase decides to add more activity types (such that no activities are missed)
     };
     mapped.to_string()
-}
-
-
-// this is in my opinion how we should map them actually, yet this result in a book_cost=NaN error
-pub fn map_transaction(activity: &str, coin_num: f64) -> String {
-    match activity {
-        "TRADE" | "ADVANCED_TRADE_FILL" if coin_num > 0.0 => "BUY",
-        "TRADE" | "ADVANCED_TRADE_FILL" => "SELL",
-        "EARN_PAYOUT" => "DIVIDEND",
-        "FIAT_DEPOSIT" | "DEPOSIT" => "DEPOSIT",
-        "FIAT_WITHDRAWAL" | "WITHDRAWAL" => "WITHDRAW",
-        "INTERNAL_DEPOSIT" => "TRANSFER_IN",
-        "INTERNAL_WITHDRAWAL" => "TRANSFER_OUT",
-        "EXCHANGE_DEPOSIT" => "TRANSFER_IN",
-        "EXCHANGE_WITHDRAWAL" => "TRANSFER_OUT",
-        "ONCHAIN_DEPOSIT" => "TRANSFER_IN",
-        "ONCHAIN_WITHDRAWAL" => "TRANSFER_OUT",
-        "SWEEP_DEPOSIT" => "TRANSFER_IN",
-        "SWEEP_WITHDRAWAL" => "TRANSFER_OUT",
-        "INTX_DEPOSIT" => "TRANSFER_IN",
-        "INTX_WITHDRAWAL" => "TRANSFER_OUT",
-        "INTEREST" => "INTEREST",
-        "CARDSPEND" | "SEND" => "TRANSFER_OUT",
-        "RECEIVE" => "TRANSFER_IN",
-        "STAKING_REWARD" => "DIVIDEND",
-        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" if coin_num > 0.0 => "TRANSFER_IN",
-        "STAKING_TRANSFER" | "UNSTAKING_TRANSFER" => "TRANSFER_OUT",
-        "WRAP_ASSET" if coin_num > 0.0 => "CONVERSION_IN",
-        "WRAP_ASSET" => "CONVERSION_OUT",
-        "UNWRAP_ASSET" if coin_num > 0.0 => "CONVERSION_IN",
-        "UNWRAP_ASSET" => "CONVERSION_OUT",
-        "RETAIL_ETH2_DEPRECATION" => "CONVERSION_OUT",
-        "FEE" => "FEE",
-        "TAX" => "TAX",
-        "TRANSACTION_TYPE_UNKNOWN" => "CONTINUE",
-        _ => "CONTINUE",
-    }                        
-    .to_string()
 }
