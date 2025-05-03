@@ -193,6 +193,8 @@ export interface Instrument {
   symbol: string;
   name?: string | null;
   currency: string;
+  notes?: string | null;
+  dataSource?: string | null;
   assetClass?: string | null;
   assetSubclass?: string | null;
   countries?: Country[] | null;
@@ -241,6 +243,7 @@ export interface Holding {
   instrument?: Instrument | null;
   quantity: number;
   openDate?: string | Date | null;
+  lots?: Lot[] | null;
   localCurrency: string;
   baseCurrency: string;
   fxRate?: number | null;
@@ -294,6 +297,7 @@ export interface Quote {
   volume: number;
   close: number;
   adjclose: number;
+  currency: string;
 }
 
 export interface QuoteUpdate {

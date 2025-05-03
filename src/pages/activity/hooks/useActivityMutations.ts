@@ -3,13 +3,12 @@ import { toast } from '@/components/ui/use-toast';
 import { createActivity, updateActivity, deleteActivity } from '@/commands/activity';
 import { logger } from '@/adapters';
 import { NewActivityFormValues } from '../components/forms/schemas';
-import { QueryKeys } from '@/lib/query-keys';
 
 export function useActivityMutations(onSuccess?: (activity: { accountId?: string | null }) => void) {
   const queryClient = useQueryClient();
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+      queryClient.invalidateQueries();
       if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {

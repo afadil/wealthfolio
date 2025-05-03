@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PORTFOLIO_ACCOUNT_ID, AccountType } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAccounts } from '@/hooks/use-accounts';
+import { useSettings } from '@/hooks/use-settings';
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -46,13 +47,13 @@ interface UIAccount extends Omit<Account, 'accountType'> {
 
 
 // Create a portfolio account for UI purposes
-function createPortfolioAccount(): UIAccount {
+function createPortfolioAccount(baseCurrency: string): UIAccount {
   return {
     id: PORTFOLIO_ACCOUNT_ID,
     name: 'All Portfolio',
     accountType: PORTFOLIO_ACCOUNT_ID as UIAccountType,
     balance: 0,
-    currency: 'USD',
+    currency: baseCurrency,
     isDefault: false,
     isActive: true,
     createdAt: new Date(),
@@ -109,13 +110,17 @@ export function AccountSelector({
   includePortfolio = false
 }: AccountSelectorProps) {
   const [open, setOpen] = useState(false);
-  const { accounts, isLoading } = useAccounts(filterActive);
+  const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
+  const { data: settings, isLoading: isLoadingSettings } = useSettings();
+
+  const isLoading = isLoadingAccounts || isLoadingSettings;
   
   // Add portfolio account if requested
   const displayAccounts = [...accounts];
   
   if (includePortfolio) {
-    const portfolioAccount = createPortfolioAccount();
+    const baseCurrency = settings?.baseCurrency || 'USD'; // Default to USD if settings not loaded
+    const portfolioAccount = createPortfolioAccount(baseCurrency);
     // Check if portfolio account already exists to avoid duplication
     const portfolioExists = accounts.some(account => account.id === PORTFOLIO_ACCOUNT_ID);
     

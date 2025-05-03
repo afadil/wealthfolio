@@ -18,7 +18,7 @@ const Balance: React.FC<BalanceProps> = ({
 
 
   return (
-    <h1 className="font-heading text-3xl tracking-tight">
+    <h1 className="font-heading font-bold text-3xl tracking-tight">
       {isBalanceHidden ? (
         <span>
           {displayCurrency ? `${currency}` : ''}

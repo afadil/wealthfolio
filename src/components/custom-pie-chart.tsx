@@ -14,6 +14,8 @@ const COLORS = [
   'hsl(var(--chart-5))',
   'hsl(var(--chart-6))',
   'hsl(var(--chart-7))',
+  'hsl(var(--chart-8))',
+  'hsl(var(--chart-9))',
 ];
 
 const renderActiveShape = (props: any) => {
