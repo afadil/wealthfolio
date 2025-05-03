@@ -102,9 +102,6 @@ export function HoldingCurrencyChart({
             <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
               Currency Allocation
             </h3>
-            <span className="text-sm text-muted-foreground">
-              {data.length ? `${data.length} currencies` : 'No data'}
-            </span>
           </div>
 
           {/* Total amount */}

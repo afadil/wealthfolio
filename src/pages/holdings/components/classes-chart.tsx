@@ -67,9 +67,6 @@ export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
           <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
             Asset Allocation
           </CardTitle>
-          <span className="text-sm text-muted-foreground">
-            {data.length ? `${data.length} classes` : 'No data'}
-          </span>
         </div>
       </CardHeader>
       <CardContent className="pt-0">

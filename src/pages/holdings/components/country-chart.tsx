@@ -65,9 +65,6 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
           <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
             Country Allocation
           </CardTitle>
-          <span className="text-sm text-muted-foreground">
-            {data.length ? `Top ${data.length} countries` : 'No data'}
-          </span>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
