@@ -17,6 +17,7 @@
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.5",
     "@hookform/resolvers": "^3.9.1",
+    "@internationalized/date": "^3.8.0",
     "@number-flow/react": "^0.5.9",
     "@radix-ui/react-accordion": "^1.2.1",
     "@radix-ui/react-alert-dialog": "^1.1.2",
@@ -56,7 +57,8 @@
     "lucide-react": "^0.467.0",
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
-    "react-day-picker": "^9.6.5",
+    "react-aria-components": "^1.8.0",
+    "react-day-picker": "^8.7.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.55.0",

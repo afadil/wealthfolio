@@ -115,14 +115,14 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar
-            initialFocus
+            autoFocus
             mode="range"
             defaultMonth={value?.from}
             selected={value as DayPickerDateRange | undefined}
             onSelect={(selectedRange: DayPickerDateRange | undefined) => {
               onChange(selectedRange as CustomDateRange | undefined);
             }}
-            numberOfMonths={2}
+            numberOfMonths={3}
           />
         </PopoverContent>
       </Popover>
