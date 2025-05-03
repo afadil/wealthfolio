@@ -92,7 +92,7 @@ export function DataTable<TData, TValue>({
       <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} />
       <div className={`rounded-md border ${scrollable ? 'h-[700px] overflow-y-auto' : ''}`}>
         <Table>
-          <TableHeader className="bg-muted">
+          <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
