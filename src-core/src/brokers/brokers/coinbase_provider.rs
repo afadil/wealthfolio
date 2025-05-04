@@ -297,6 +297,23 @@ impl BrokerProvider for CoinbaseProvider {
                         0.0
                     };
 
+                    // custom handles for coinbase transactions (due to the mismatch between wealthfolio and coinbase we need to generate additional transactions)
+                    if activity_type == "BUY" {
+                        if let Some(pm_name) = tx
+                            .get("buy")
+                            .and_then(|b| b.get("payment_method_name"))
+                            .and_then(|v| v.as_str())
+                        {
+                            if pm_name == "EUR-portemonnee" || pm_name == "USD-wallet" {
+                                out.push(add_account_cash(&fiat_currency, &in_cash, dt.naive_utc()));
+                            }
+                        }
+                    }       
+                    if activity_type == "SELL" && coin_ticker == fiat_currency { continue; }
+                    if ty == "SEND" {
+                        out.push(handle_crypto_movements(&coin_num, &make_symbol(&coin_ticker, &fiat_currency), &fiat_currency, &cost_price, &fees, dt.naive_utc()));
+                    }     
+                    
                     out.push(ExternalActivity {
                         symbol: make_symbol(&coin_ticker, &fiat_currency),
                         activity_type,
@@ -325,17 +342,42 @@ pub fn make_symbol(coin: &str, fiat: &str) -> String {
     format!("{}-{}", base, fiat)
 }
 
+pub fn add_account_cash(fiat_currency: &str, cash: &f64, ts: NaiveDateTime) -> ExternalActivity {
+    let cash_ticker = make_symbol(fiat_currency, fiat_currency);
+    ExternalActivity {
+        symbol: cash_ticker,
+        activity_type: "DEPOSIT".to_string(),
+        quantity: cash.clone(),
+        price: 1.0,
+        timestamp: ts,
+        currency: Some(fiat_currency.to_string()),
+        fee: Some(0.0),
+        comment: Some("Auto Adjust from Coinbase API".to_string())
+    }
+}
+
+pub fn handle_crypto_movements(coin_num: &f64, ticker: &str, fiat_currency: &str, price: &f64, fee: &f64, ts: NaiveDateTime) -> ExternalActivity {
+    let activity: &str = if coin_num > &0.0 { "BUY" } else { "SELL" };
+    ExternalActivity { 
+        symbol: ticker.to_string(),
+        activity_type: activity.to_string(),
+        quantity: coin_num.clone().abs(),
+        price: price.clone(),
+        timestamp: ts,
+        currency: Some(fiat_currency.to_string()),
+        fee: Some(fee.clone()),
+        comment: Some("Auto Adjust from Coinbase API".to_string())
+    }
+}
+
 pub fn map_transaction(activity: &str, coin_num: f64) -> String {
     let mapped = match activity {
         "TRADE"
-        | "ADVANCED_TRADE_FILL"
-        | "BUY"
-        | "SEND" if coin_num > 0.0 => "BUY",
+        | "ADVANCED_TRADE_FILL" if coin_num > 0.0 => "BUY",
+        "BUY" => "BUY",
         "TRADE"
         | "ADVANCED_TRADE_FILL"
-        | "BUY"
-        | "SELL"
-        | "SEND" => "SELL",
+        | "SELL" => "SELL",
         "EARN_PAYOUT"
         | "STAKING_REWARD"
         | "INCENTIVES_REWARDS_PAYOUT"
@@ -352,7 +394,7 @@ pub fn map_transaction(activity: &str, coin_num: f64) -> String {
             => "DEPOSIT",
         "CLAWBACK"
         | "INCENTIVES_SHARED_CLAWBACK" => "DEPOSIT",
-        "RETAIL_SIMPLE_DUST" if coin_num > 0.0 => "DEPOSIT",
+        "RETAIL_SIMPLE_DUST" | "SEND" if coin_num > 0.0 => "DEPOSIT",
         "REQUEST" if coin_num > 0.0 => "DEPOSIT",
         "STAKING_TRANSFER"
         | "UNSTAKING_TRANSFER"
@@ -371,7 +413,7 @@ pub fn map_transaction(activity: &str, coin_num: f64) -> String {
         | "SUBSCRIPTION"  
             => "WITHDRAWAL",
         "RETAIL_SIMPLE_DUST" => "WITHDRAWAL",
-        "REQUEST" if coin_num < 0.0 => "WITHDRAWAL",
+        "REQUEST" | "SEND" if coin_num < 0.0 => "WITHDRAWAL",
         "STAKING_TRANSFER"
         | "UNSTAKING_TRANSFER"
         | "WRAP_ASSET"
