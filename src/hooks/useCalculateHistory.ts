@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
-import { calculateHistoricalData, recalculatePortfolio } from '@/commands/portfolio';
+import { recalculatePortfolio } from '@/commands/portfolio';
+import { updatePortfolio } from '@/commands/broker';
 import { logger } from '@/adapters';
 
 interface UseCalculateHistoryMutationOptions {
@@ -15,7 +16,7 @@ export function useCalculateHistoryMutation({
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: calculateHistoricalData,
+    mutationFn: updatePortfolio, //calculateHistoricalData,
     onSuccess: () => {
       queryClient.invalidateQueries();
       toast({

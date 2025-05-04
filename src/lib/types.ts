@@ -36,6 +36,9 @@ export type Account = {
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional
+  brokerAPI: boolean; // Activate/Deactivate API integration
+  broker?: string; // Optional (Only if integrated with API)
+  brokerApiKey?: string; // Optional (Only if integrated with API)
 };
 
 export type Activity = {

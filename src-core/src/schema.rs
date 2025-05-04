@@ -12,6 +12,10 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         platform_id -> Nullable<Text>,
+        is_api_integrations -> Bool,
+        broker -> Nullable<Text>,
+        broker_api -> Nullable<Binary>,
+        broker_extra -> Nullable<Binary>,
     }
 }
 
