@@ -136,18 +136,34 @@ impl BrokerProvider for BitvavoProvider {
                 }
 
                 let symbol: String;
-                let qty: f64;
+                let mut qty: f64;
                 let activity_type = match item.tx_type.as_str() {
                     "buy" => "BUY".to_string(),
                     "sell" => "SELL".to_string(),
-                    "staking" => "INTEREST".to_string(),
+                    "staking" => "DIVIDEND".to_string(),
                     "deposit" => "DEPOSIT".to_string(),
                     "withdrawal" => "SELL".to_string(),
                     other => other.to_uppercase(),
                 };
-                if activity_type == "INTEREST" {
-                    continue; // for now crypto staking is not suported, there's no good way to handle this in Wealtfolio a.t.m.
-                    //TODO:  Maybe in the future I can add some custom code to handle this case automatically
+                if activity_type == "DIVIDEND" {
+                    let recieved = item.received_currency.clone().unwrap_or_default();
+                    qty = item
+                        .received_amount
+                        .clone()
+                        .unwrap_or_default()
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+                    all_activities.push(
+                        ExternalActivity { 
+                            symbol: format!("{}-EUR", recieved),
+                            activity_type: "BUY".to_string(), 
+                            quantity: qty, 
+                            price: 0.0, 
+                            timestamp: executed, 
+                            currency: item.price_currency.clone(), 
+                            fee: Some(0.0), 
+                            comment: Some("Bitvavo API - handle staking".to_string()) }
+                    );
                 }
                 if activity_type == "DEPOSIT" || activity_type == "WITHDRAWAL" {
                     symbol = "$CASH-EUR".to_string();
