@@ -40,6 +40,7 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>(INITIAL_INTERVAL_CODE);
 
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
@@ -81,12 +82,22 @@ const AccountPage = () => {
 
   // Callback for IntervalSelector
   const handleIntervalSelect = (
-    _code: TimePeriod,
+    code: TimePeriod,
     _description: string,
     range: DateRange | undefined
   ) => {
-    setDateRange(range); // Update state used for data fetching
+    setSelectedIntervalCode(code);
+    setDateRange(range);
   };
+
+  const percentageToDisplay = useMemo(() => {
+    if (!accountPerformance) return 0;
+
+    if (selectedIntervalCode === 'ALL') {
+      return accountPerformance.simpleReturn ?? 0;
+    }
+    return accountPerformance.cumulativeMwr ?? 0;
+  }, [accountPerformance, selectedIntervalCode]);
 
   return (
     <ApplicationShell className="p-6">
@@ -118,7 +129,7 @@ const AccountPage = () => {
                       <div className="my-1 border-r border-muted-foreground pr-2" />
                       <GainPercent
                         className="text-sm font-light"
-                        value={accountPerformance?.cumulativeMwr ?? 0}
+                        value={percentageToDisplay}
                         animated={true}
                       />
                     </div>

@@ -179,7 +179,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
                     q.*, \
                     ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.timestamp DESC) as rn \
                 FROM quotes q \
-                WHERE q.symbol IN ({}) \
+                WHERE q.symbol IN ({}) and q.id not like '%filled%' \
             ) \
             SELECT * \
             FROM RankedQuotes \

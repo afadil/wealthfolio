@@ -216,22 +216,49 @@ impl PerformanceService {
         let volatility = Self::calculate_volatility(&daily_twr_returns);
         let max_drawdown = Self::calculate_max_drawdown(&daily_twr_returns);
 
-        let start_value = start_point.total_value;
-        let end_value = end_point.total_value;
         let start_net_contribution = start_point.net_contribution;
         let end_net_contribution = end_point.net_contribution;
         let net_cash_flow = end_net_contribution - start_net_contribution;
-        let gain_loss_amount = end_value - start_value - net_cash_flow;
 
-        let simple_total_return = if start_value.is_zero() {
-            if end_value == start_value && net_cash_flow.is_zero() {
+        let mut start_value_for_gain_calc = start_point.total_value;
+
+        // Edge case: If period starts on acquisition, net_cash_flow is 0 for this period,
+        // and start_net_contribution represents cost, use it as baseline for gain/loss amount.
+        if net_cash_flow.is_zero() && 
+           !start_point.net_contribution.is_zero() &&
+           // Ensure this logic applies if start_point is indeed the first record in the provided history
+           // (which is true by definition of start_point = full_history.first().unwrap())
+           // and we are calculating for a period where start_net_contribution is the relevant principal.
+           // This condition primarily targets the scenario where an item is added and its performance
+           // from cost is measured from that day.
+           start_point.total_value != start_point.net_contribution // Only adjust if there's a difference to begin with
+        {
+            start_value_for_gain_calc = start_point.net_contribution;
+            debug!(
+                "Account Performance Info: Using net_contribution ({}) as baseline for gain/loss instead of start_value ({}) for account_id: {}, date: {}",
+                start_point.net_contribution, start_point.total_value, account_id, actual_start_date
+            );
+        }
+        
+        let gain_loss_amount = end_point.total_value - start_value_for_gain_calc - net_cash_flow;
+
+        let simple_total_return = if start_value_for_gain_calc.is_zero() {
+            // If the effective start value for gain calculation is zero, simple return is tricky.
+            // If gain_loss_amount is also zero, return 0. Otherwise, it could be infinite or undefined.
+            // For simplicity, returning 0 if gain_loss_amount is also 0, else could be an error or specific value.
+            if gain_loss_amount.is_zero() {
                 Decimal::ZERO
             } else {
-                Decimal::ZERO
+                // Consider what to return if start_value_for_gain_calc is zero but gain_loss_amount is not.
+                // This case implies infinite return or an anomaly. For now, returning zero to avoid division by zero error.
+                // A more robust solution might be None or an error.
+                warn!("Simple total return calculation: start_value_for_gain_calc is zero but gain_loss_amount is non-zero for account_id: {}. Returning 0.", account_id);
+                Decimal::ZERO 
             }
         } else {
-            (end_value - start_value - net_cash_flow) / start_value
+            gain_loss_amount / start_value_for_gain_calc
         };
+
         let annualized_simple_return = Self::calculate_annualized_return(
             actual_start_date,
             actual_end_date,

@@ -47,6 +47,7 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>(INITIAL_INTERVAL_CODE);
 
   const {
     valuationHistory,
@@ -65,7 +66,6 @@ export default function DashboardPage() {
   const performanceMetrics = performanceDataArray?.[0] || null;
 
   const gainLossAmount = performanceMetrics?.gainLossAmount ?? 0;
-  const cumulativeMwr = performanceMetrics?.cumulativeMwr ?? 0;
 
   const currentValuation = useMemo(() => {
     return valuationHistory && valuationHistory.length > 0
@@ -84,16 +84,27 @@ export default function DashboardPage() {
 
   const isLoading = isValuationHistoryLoading || (isPerformanceLoading && !performanceMetrics);
 
+  const percentageToDisplay = useMemo(() => {
+    if (!performanceMetrics) return 0;
+
+    if (selectedIntervalCode === 'ALL') {
+      return performanceMetrics.simpleReturn ?? 0;
+    }
+    // For other periods, use MWR (Money-Weighted Return).
+    return performanceMetrics.cumulativeMwr ?? 0;
+  }, [performanceMetrics, selectedIntervalCode]);
+
   if (isLoading && !valuationHistory && !performanceMetrics) {
     return <DashboardSkeleton />;
   }
 
   // Callback for IntervalSelector
   const handleIntervalSelect = (
-    _code: TimePeriod, 
+    code: TimePeriod, 
     _description: string,
     range: DateRange | undefined
   ) => {
+    setSelectedIntervalCode(code);
     setDateRange(range); 
   };
 
@@ -119,7 +130,7 @@ export default function DashboardPage() {
                 <div className="my-1 border-r border-secondary pr-2" />
                 <GainPercent
                   className="text-md font-light"
-                  value={cumulativeMwr}
+                  value={percentageToDisplay}
                   animated={true}
                 ></GainPercent>
               </div>
