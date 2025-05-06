@@ -320,13 +320,14 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  onboardingCompleted: boolean;
 }
 
 export interface SettingsContextType {
   settings: Settings | null;
   isLoading: boolean;
   isError: boolean;
-  updateSettings: (settings: Settings) => void;
+  updateBaseCurrency: (currency: Settings['baseCurrency']) => Promise<void>;
   accountsGrouped: boolean;
   setAccountsGrouped: (value: boolean) => void;
 }

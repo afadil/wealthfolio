@@ -30,9 +30,12 @@ impl SettingsServiceTrait for SettingsService {
     fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()> {
         let current_base_currency = self.get_base_currency()?;
 
-        if current_base_currency.as_deref() != Some(new_settings.base_currency.as_str()) {
-            self.update_base_currency(&new_settings.base_currency)?;
+        if let Some(ref new_base_currency_val) = new_settings.base_currency {
+            if current_base_currency.as_deref() != Some(new_base_currency_val.as_str()) {
+                 self.update_base_currency(new_base_currency_val.as_str())?;
+            }
         }
+        
         self.settings_repository.update_settings(new_settings)?;
         Ok(())
     }

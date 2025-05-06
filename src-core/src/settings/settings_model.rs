@@ -9,6 +9,7 @@ pub struct Settings {
     pub font: String,
     pub base_currency: String,
     pub instance_id: String,
+    pub onboarding_completed: bool,
 }
 
 impl Default for Settings {
@@ -16,8 +17,9 @@ impl Default for Settings {
         Self {
             theme: "light".to_string(),
             font: "default".to_string(),
-            base_currency: "USD".to_string(),
+            base_currency: "".to_string(),
             instance_id: "".to_string(),
+            onboarding_completed: false,
         }
     }
 }
@@ -25,9 +27,10 @@ impl Default for Settings {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsUpdate {
-    pub theme: String,
-    pub font: String,
-    pub base_currency: String,
+    pub theme: Option<String>,
+    pub font: Option<String>,
+    pub base_currency: Option<String>,
+    pub onboarding_completed: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

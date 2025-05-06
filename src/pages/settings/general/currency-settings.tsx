@@ -27,25 +27,94 @@ const baseCurrencyFormSchema = z.object({
 
 type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
 
-export function BaseCurrencySettings() {
-  const { settings, updateSettings } = useSettingsContext();
+// Extracted form component
+export function BaseCurrencyForm() {
+  const { settings, updateBaseCurrency } = useSettingsContext();
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || 'USD',
   };
   const form = useForm<BaseCurrencyFormValues>({
     resolver: zodResolver(baseCurrencyFormSchema),
     defaultValues,
+    // Reset form when settings change from external source
+    values: { baseCurrency: settings?.baseCurrency || 'USD' },
   });
 
-  function onSubmit(data: BaseCurrencyFormValues) {
-    const updatedSettings = {
-      theme: settings?.theme || 'light',
-      font: settings?.font || 'font-mono',
-      ...data,
-    };
-    updateSettings(updatedSettings);
+  async function onSubmit(data: BaseCurrencyFormValues) {
+    try {
+      await updateBaseCurrency(data.baseCurrency);
+    } catch (error) {
+      console.error('Failed to update currency settings:', error);
+    }
   }
 
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="baseCurrency"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <Popover modal={true}>
+                <PopoverTrigger asChild>
+                  <FormControl className="w-[300px]">
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn('justify-between', !field.value && 'text-muted-foreground')}
+                    >
+                      {field.value
+                        ? worldCurrencies.find((currency) => currency.value === field.value)
+                            ?.label
+                        : 'Select account currency'}
+                      <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search currency..." />
+                    <CommandList>
+                      <CommandEmpty>No currency found.</CommandEmpty>
+                      <CommandGroup>
+                        <ScrollArea className="max-h-96 overflow-y-auto">
+                          {worldCurrencies.map((currency) => (
+                            <CommandItem
+                              value={currency.label}
+                              key={currency.value}
+                              onSelect={() => {
+                                form.setValue(field.name, currency.value);
+                              }}
+                            >
+                              <Icons.Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              {currency.label}
+                            </CommandItem>
+                          ))}
+                        </ScrollArea>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit">Save Currency</Button> {/* Changed button text slightly */}
+      </form>
+    </Form>
+  );
+}
+
+// Original component now uses the extracted form inside a Card
+export function BaseCurrencySettings() {
   return (
     <Card>
       <CardHeader>
@@ -55,67 +124,7 @@ export function BaseCurrencySettings() {
         </div>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="baseCurrency"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <Popover modal={true}>
-                    <PopoverTrigger asChild>
-                      <FormControl className="w-[300px]">
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn('justify-between', !field.value && 'text-muted-foreground')}
-                        >
-                          {field.value
-                            ? worldCurrencies.find((currency) => currency.value === field.value)
-                                ?.label
-                            : 'Select account currency'}
-                          <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search currency..." />
-                        <CommandList>
-                          <CommandEmpty>No currency found.</CommandEmpty>
-                          <CommandGroup>
-                            <ScrollArea className="max-h-96 overflow-y-auto">
-                              {worldCurrencies.map((currency) => (
-                                <CommandItem
-                                  value={currency.label}
-                                  key={currency.value}
-                                  onSelect={() => {
-                                    form.setValue(field.name, currency.value);
-                                  }}
-                                >
-                                  <Icons.Check
-                                    className={cn(
-                                      'mr-2 h-4 w-4',
-                                      currency.value === field.value ? 'opacity-100' : 'opacity-0',
-                                    )}
-                                  />
-                                  {currency.label}
-                                </CommandItem>
-                              ))}
-                            </ScrollArea>
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button type="submit">Save</Button>
-          </form>
-        </Form>
+        <BaseCurrencyForm />
       </CardContent>
     </Card>
   );

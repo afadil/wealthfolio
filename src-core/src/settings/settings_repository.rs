@@ -34,12 +34,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
             .load::<(String, String)>(&mut conn)
             .map_err(Error::from)?;
 
-        let mut settings = Settings {
-            theme: String::new(),
-            font: String::new(),
-            base_currency: String::new(),
-            instance_id: String::new(),
-        };
+        let mut settings = Settings::default(); // Use default implementation
 
         for (key, value) in all_settings {
             match key.as_str() {
@@ -47,44 +42,63 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "font" => settings.font = value,
                 "base_currency" => settings.base_currency = value,
                 "instance_id" => settings.instance_id = value,
+                "onboarding_completed" => {
+                    // Parse the string value into a boolean
+                    settings.onboarding_completed = value.parse().unwrap_or(false);
+                }
                 _ => {} // Ignore unknown settings
             }
         }
 
-        // Set default values if any setting is missing
-        if settings.theme.is_empty() {
-            settings.theme = "light".to_string();
-        }
-        if settings.font.is_empty() {
-            settings.font = "font-mono".to_string();
-        }
+        // Defaults are now handled by Settings::default(), but we ensure onboarding_completed
+        // defaults to false if not explicitly found or if parsing fails above.
+        // The call to `Settings::default()` already sets it to false initially.
 
         Ok(settings)
     }
 
     fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
-        let settings_to_insert = vec![
-            AppSetting {
-                setting_key: "theme".to_string(),
-                setting_value: new_settings.theme.clone(),
-            },
-            AppSetting {
-                setting_key: "font".to_string(),
-                setting_value: new_settings.font.clone(),
-            },
-            AppSetting {
-                setting_key: "base_currency".to_string(),
-                setting_value: new_settings.base_currency.clone(),
-            },
-        ];
+        
+        conn.transaction::<_, Error, _>(|conn| {
+            if let Some(ref theme) = new_settings.theme {
+                diesel::replace_into(app_settings)
+                    .values(&AppSetting {
+                        setting_key: "theme".to_string(),
+                        setting_value: theme.clone(),
+                    })
+                    .execute(conn)?;
+            }
 
-        diesel::replace_into(app_settings)
-            .values(&settings_to_insert)
-            .execute(&mut conn)
-            .map_err(Error::from)?;
+            if let Some(ref font) = new_settings.font {
+                diesel::replace_into(app_settings)
+                    .values(&AppSetting {
+                        setting_key: "font".to_string(),
+                        setting_value: font.clone(),
+                    })
+                    .execute(conn)?;
+            }
 
-        Ok(())
+            if let Some(ref base_currency) = new_settings.base_currency {
+                 diesel::replace_into(app_settings)
+                    .values(&AppSetting {
+                        setting_key: "base_currency".to_string(),
+                        setting_value: base_currency.clone(),
+                    })
+                    .execute(conn)?;
+            }
+            
+            if let Some(onboarding_completed) = new_settings.onboarding_completed {
+                diesel::replace_into(app_settings)
+                    .values(&AppSetting {
+                        setting_key: "onboarding_completed".to_string(),
+                        setting_value: onboarding_completed.to_string(),
+                    })
+                    .execute(conn)?;
+            }
+
+            Ok(())
+        })
     }
 
     fn get_setting(&self, setting_key_param: &str) -> Result<String> {
@@ -101,6 +115,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 let default_value = match setting_key_param {
                     "theme" => "light",
                     "font" => "font-mono",
+                    "onboarding_completed" => "false", // Add default for onboarding_completed
                     _ => return Err(Error::from(diesel::result::Error::NotFound)),
                 };
                 Ok(default_value.to_string())

@@ -15,7 +15,7 @@ export const getSettings = async (): Promise<Settings> => {
   }
 };
 
-export const saveSettings = async (settingsUpdate: Settings): Promise<Settings> => {
+export const updateSettings = async (settingsUpdate: Settings): Promise<Settings> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

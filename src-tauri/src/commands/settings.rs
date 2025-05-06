@@ -26,9 +26,17 @@ pub async fn update_settings(
     let service = state.settings_service();
 
     let current_base_currency = state.get_base_currency();
+    let mut base_currency_changed = false;
+    let mut new_base_currency_val: Option<String> = None;
 
-    // Determine if the base currency specified in the update is different from the current one
-    let base_currency_changed = current_base_currency != settings_update.base_currency;
+    // Check if base_currency is present in the update and if it's different
+    if let Some(ref updated_currency) = settings_update.base_currency {
+        // Compare the current String with the String inside the Option
+        if &current_base_currency != updated_currency { 
+            base_currency_changed = true;
+            new_base_currency_val = Some(updated_currency.clone());
+        }
+    }
 
     // Update settings in the database (this applies all changes in settings_update)
     service
@@ -37,21 +45,27 @@ pub async fn update_settings(
 
     // If the base currency was changed, update the state and emit the event
     if base_currency_changed {
-        // We clone the String from the update to pass to the state update function.
-        let new_base_currency = settings_update.base_currency.clone();
-        debug!("Base currency changed, updating state to: {}", new_base_currency);
-        state.update_base_currency(new_base_currency);
+        // new_base_currency_val is guaranteed to be Some(String) here because 
+        // base_currency_changed is true only if the check above passed.
+        if let Some(new_currency) = new_base_currency_val { // Still good practice to use if let
+             debug!(
+                "Base currency changed from {} to {}, updating state.", // Use {} as new_currency is String
+                current_base_currency,
+                &new_currency // Log the String itself
+             );
+            state.update_base_currency(new_currency); // Pass the unwrapped String
 
-        let handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            // Emit event to trigger portfolio update using the builder
-            let payload = PortfolioRequestPayload::builder()
-                .account_ids(None) // Base currency change affects all accounts
-                .sync_market_data(true)
-                .symbols(None) // Sync all relevant symbols
-                .build();
-            emit_portfolio_recalculate_request(&handle, payload);
-        });
+            let handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                // Emit event to trigger portfolio update using the builder
+                let payload = PortfolioRequestPayload::builder()
+                    .account_ids(None) // Base currency change affects all accounts
+                    .sync_market_data(true)
+                    .symbols(None) // Sync all relevant symbols
+                    .build();
+                emit_portfolio_recalculate_request(&handle, payload);
+            });
+        }
     }
 
     // Return the latest settings from the database
