@@ -167,9 +167,7 @@ impl HoldingsCalculator {
             ActivityType::TransferIn => self.handle_transfer_in(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::TransferOut => self.handle_transfer_out(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::Split => Ok(()), 
-            ActivityType::ConversionIn => self.handle_conversion_in(activity, state, account_currency, amount_acct, fee_acct),
-            ActivityType::ConversionOut => self.handle_conversion_out(activity, state, account_currency, amount_acct, fee_acct),
-        }
+         }
     }
 
     // --- Activity Type Handlers (Updated Signatures & Conversions) ---
@@ -610,43 +608,6 @@ impl HoldingsCalculator {
         Ok(())
     }
 
-    fn handle_conversion_in( 
-        &self,
-        activity: &Activity, 
-        state: &mut AccountStateSnapshot, 
-        account_currency: &str, 
-        amount_acct: Decimal, // Already converted using activity date
-        fee_acct: Decimal // Already converted using activity date
-    ) -> Result<()> {
-         if activity.asset_id.starts_with("$CASH") {
-            let net_amount_acct = amount_acct - fee_acct;
-            *state.cash_balances.entry(account_currency.to_string()).or_insert(Decimal::ZERO) += net_amount_acct;
-            // Assumes ConversionIn affects net deposit like a regular deposit
-            state.net_contribution += amount_acct;
-        } else {
-            warn!("Non-cash ConversionIn activity {} ignored by handle_conversion_in.", activity.id);
-        }
-        Ok(())
-    }
-
-    fn handle_conversion_out( 
-        &self,
-        activity: &Activity, 
-        state: &mut AccountStateSnapshot, 
-        account_currency: &str, 
-        amount_acct: Decimal, // Already converted using activity date
-        fee_acct: Decimal // Already converted using activity date
-    ) -> Result<()> {
-        if activity.asset_id.starts_with("$CASH") {
-            let net_amount_acct = amount_acct + fee_acct;
-            *state.cash_balances.entry(account_currency.to_string()).or_insert(Decimal::ZERO) -= net_amount_acct;
-            // Assumes ConversionOut affects net deposit like a regular withdrawal
-            state.net_contribution -= amount_acct;
-        } else {
-             warn!("Non-cash ConversionOut activity {} ignored by handle_conversion_out.", activity.id);
-        }
-        Ok(())
-    }
 
     /// Gets amount from activity, handling missing values. Returns ZERO if missing.
     fn get_activity_amount(&self, activity: &Activity) -> Decimal {

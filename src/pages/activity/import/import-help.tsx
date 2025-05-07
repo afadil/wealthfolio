@@ -92,8 +92,6 @@ export function ImportHelpPopover() {
                     <li>WITHDRAWAL</li>
                     <li>TRANSFER_IN (Doesn't affect cashflow)</li>
                     <li>TRANSFER_OUT (Doesn't affect cashflow)</li>
-                    <li>CONVERSION_IN (same as deposit)</li>
-                    <li>CONVERSION_OUT (same as withdrawal)</li>
                     <li>FEE</li>
                     <li>TAX</li>
                   </ul>

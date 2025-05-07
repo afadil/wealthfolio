@@ -13,8 +13,8 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
   const isManualAsset = watch('assetDataSource') === 'MANUAL';
 
   const otherTypes: ActivityTypeUI[] = [
-    { value: 'SPLIT', label: 'Split', icon: 'Split' },
-    { value: 'FEE', label: 'Fee', icon: 'Receipt' },
+    { value: 'SPLIT', label: 'Split', icon: 'Split', description: 'Record a stock split. This changes the number of shares you own but typically not the total value of your holding (e.g., a 2-for-1 split doubles your shares).' },
+    { value: 'FEE', label: 'Fee', icon: 'Receipt', description: 'Record a standalone fee or charge not directly tied to a specific trade, such as an account maintenance fee. This will decrease your cash balance.' },
   ];
 
   const shouldShowSymbolLookup = activityType !== 'FEE';

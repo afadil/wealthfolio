@@ -1,5 +1,3 @@
-// src-core/src/portfolio/snapshot/snapshot_repository.rs
-
 use crate::errors::{Error, Result};
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::AccountStateSnapshotDB;
@@ -10,6 +8,9 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::Arc;
+use diesel::sql_query;
+use diesel::sql_types::Text; 
+use diesel::sqlite::Sqlite; 
 
 use crate::db::get_connection;
 use log::debug;
@@ -159,44 +160,109 @@ impl SnapshotRepository {
         account_ids_vec: &[String],
         target_date: NaiveDate,
     ) -> Result<HashMap<String, AccountStateSnapshot>> {
-        use crate::schema::holdings_snapshots::dsl::*;
-        let mut conn = get_connection(&self.pool)?;
-        let mut results = HashMap::new();
-        let target_date_str = target_date.format("%Y-%m-%d").to_string();
 
-        for acc_id in account_ids_vec {
-            let latest_snapshot_db = holdings_snapshots
-                .filter(account_id.eq(acc_id))
-                .filter(snapshot_date.le(&target_date_str))
-                .order(snapshot_date.desc())
-                .first::<AccountStateSnapshotDB>(&mut conn)
-                .optional()?;
-
-            if let Some(db_snap) = latest_snapshot_db {
-                results.insert(acc_id.to_string(), AccountStateSnapshot::from(db_snap));
-            }
+        if account_ids_vec.is_empty() {
+            return Ok(HashMap::new());
         }
-        Ok(results)
+
+        let mut conn = get_connection(&self.pool)?;
+        let target_date_str = target_date.format("%Y-%m-%d").to_string(); // SQLite expects date strings
+
+        let placeholders: String = account_ids_vec
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(", ");
+
+        // Fields: id, account_id, snapshot_date, currency, positions, cash_balances, cost_basis, net_contribution, calculated_at
+        let sql = format!(
+            "WITH RankedSnapshots AS ( \
+                SELECT \
+                    id, account_id, snapshot_date, currency, positions, \
+                    cash_balances, cost_basis, net_contribution, calculated_at, \
+                    ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY snapshot_date DESC) as rn \
+                FROM {} \
+                WHERE account_id IN ({}) AND snapshot_date <= ? \
+            ) \
+            SELECT \
+                id, account_id, snapshot_date, currency, positions, \
+                cash_balances, cost_basis, net_contribution, calculated_at \
+            FROM RankedSnapshots \
+            WHERE rn = 1",
+            "holdings_snapshots", // Use direct table name string
+            placeholders
+        );
+        
+        let mut query_builder = sql_query(sql).into_boxed::<Sqlite>();
+
+        for acc_id_str in account_ids_vec {
+            query_builder = query_builder.bind::<Text, _>(acc_id_str);
+        }
+        // Bind the target_date_str as the last parameter
+        query_builder = query_builder.bind::<Text, _>(target_date_str); // SQLite uses TEXT for dates
+
+        let latest_snapshots_db: Vec<AccountStateSnapshotDB> = query_builder
+            .load::<AccountStateSnapshotDB>(&mut conn)?;
+
+        let results_map: HashMap<String, AccountStateSnapshot> = latest_snapshots_db
+            .into_iter()
+            .map(|db_item| (db_item.account_id.clone(), AccountStateSnapshot::from(db_item)))
+            .collect();
+
+        Ok(results_map)
     }
 
     pub fn get_all_latest_snapshots(
         &self,
         account_ids_vec: &[String],
     ) -> Result<HashMap<String, AccountStateSnapshot>> {
-        use crate::schema::holdings_snapshots::dsl::*;
-        let mut conn = get_connection(&self.pool)?;
-        let mut results = HashMap::new();
-        for acc_id in account_ids_vec {
-            let latest_snapshot_db = holdings_snapshots
-                .filter(account_id.eq(acc_id))
-                .order(snapshot_date.desc())
-                .first::<AccountStateSnapshotDB>(&mut conn)
-                .optional()?;
-            if let Some(db_snap) = latest_snapshot_db {
-                results.insert(acc_id.to_string(), AccountStateSnapshot::from(db_snap));
-            }
+
+        if account_ids_vec.is_empty() {
+            return Ok(HashMap::new());
         }
-        Ok(results)
+
+        let mut conn = get_connection(&self.pool)?;
+
+        let placeholders: String = account_ids_vec
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(", ");
+
+        // Fields: id, account_id, snapshot_date, currency, positions, cash_balances, cost_basis, net_contribution, calculated_at
+        let sql = format!(
+            "WITH RankedSnapshots AS ( \
+                SELECT \
+                    id, account_id, snapshot_date, currency, positions, \
+                    cash_balances, cost_basis, net_contribution, calculated_at, \
+                    ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY snapshot_date DESC) as rn \
+                FROM {} \
+                WHERE account_id IN ({}) \
+            ) \
+            SELECT \
+                id, account_id, snapshot_date, currency, positions, \
+                cash_balances, cost_basis, net_contribution, calculated_at \
+            FROM RankedSnapshots \
+            WHERE rn = 1",
+            "holdings_snapshots",
+            placeholders
+        );
+
+        let mut query_builder = sql_query(sql).into_boxed::<Sqlite>();
+
+        for acc_id_str in account_ids_vec {
+            query_builder = query_builder.bind::<Text, _>(acc_id_str);
+        }
+
+        let latest_snapshots_db: Vec<AccountStateSnapshotDB> = query_builder
+            .load::<AccountStateSnapshotDB>(&mut conn)?;
+
+        let results_map: HashMap<String, AccountStateSnapshot> = latest_snapshots_db
+            .into_iter()
+            .map(|db_item| (db_item.account_id.clone(), AccountStateSnapshot::from(db_item)))
+            .collect();
+
+        Ok(results_map)
     }
 
     pub fn delete_snapshots_by_account_ids(&self, account_ids_to_delete: &[String]) -> Result<()> {

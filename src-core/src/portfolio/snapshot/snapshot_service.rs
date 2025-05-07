@@ -191,7 +191,7 @@ impl SnapshotService {
         )?;
 
         // Step 8: Persist only the identified keyframe snapshots (individual and/or TOTAL)
-        self.persist_keyframes(&keyframes_to_save)?;
+        self.persist_keyframes(&keyframes_to_save, force_full_calculation)?;
 
         // Return count of saved keyframes as an indicator of work done
         Ok(keyframes_to_save.len())
@@ -647,8 +647,8 @@ impl SnapshotService {
         Ok((current_holdings_snapshots, keyframes_to_save))
     }
 
-    // --- Step 8: Persist keyframes --- (Unchanged, handles any keyframes passed)
-    fn persist_keyframes(&self, keyframes_to_save: &[AccountStateSnapshot]) -> Result<()> {
+    // --- Step 8: Persist keyframes ---
+    fn persist_keyframes(&self, keyframes_to_save: &[AccountStateSnapshot], force_full_calculation_happened: bool) -> Result<()> {
         if keyframes_to_save.is_empty() {
             info!("No new keyframe snapshots to save.");
             return Ok(());
@@ -674,13 +674,25 @@ impl SnapshotService {
             let mut sorted_keyframes = keyframes.to_vec();
             sorted_keyframes.sort_by_key(|kf| kf.snapshot_date);
 
-            // Delete existing snapshots in the date range for this account before saving new ones
-            if let (Some(min_date), Some(max_date)) = (
-                sorted_keyframes.first().map(|k| k.snapshot_date),
-                sorted_keyframes.last().map(|k| k.snapshot_date),
-            ) {
-                self.snapshot_repository
-                    .delete_snapshots_for_account_in_range(&account_id, min_date, max_date)?;
+            // Delete existing snapshots in the date range for this account before saving new ones,
+            // only if a full delete didn't just happen.
+            if !force_full_calculation_happened {
+                if let (Some(min_date), Some(max_date)) = (
+                    sorted_keyframes.first().map(|k| k.snapshot_date),
+                    sorted_keyframes.last().map(|k| k.snapshot_date),
+                ) {
+                    debug!(
+                        "Persist keyframes (incremental): Deleting snapshots for account {} from {} to {}",
+                        account_id, min_date, max_date
+                    );
+                    self.snapshot_repository
+                        .delete_snapshots_for_account_in_range(&account_id, min_date, max_date)?;
+                }
+            } else {
+                debug!(
+                    "Persist keyframes (full recalc): Skipping range delete for account {} as full delete already occurred.",
+                    account_id
+                );
             }
 
             for batch in sorted_keyframes.chunks(BATCH_SIZE) {

@@ -345,14 +345,6 @@ impl Default for ImportMappingData {
         activity_mappings.insert("ADD_HOLDING".to_string(), vec!["ADD_HOLDING".to_string()]);
         activity_mappings.insert("REMOVE_HOLDING".to_string(), vec!["REMOVE_HOLDING".to_string()]);
         activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
-        activity_mappings.insert(
-            "CONVERSION_IN".to_string(),
-            vec!["CONVERSION_IN".to_string()],
-        );
-        activity_mappings.insert(
-            "CONVERSION_OUT".to_string(),
-            vec!["CONVERSION_OUT".to_string()],
-        );
         activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
         activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
 
@@ -398,8 +390,6 @@ pub enum ActivityType {
     Withdrawal,
     TransferIn,
     TransferOut,
-    ConversionIn,
-    ConversionOut,
     Fee,
     Tax,
     Split,
@@ -419,8 +409,6 @@ impl ActivityType {
             ActivityType::Withdrawal => ACTIVITY_TYPE_WITHDRAWAL,
             ActivityType::TransferIn => ACTIVITY_TYPE_TRANSFER_IN,
             ActivityType::TransferOut => ACTIVITY_TYPE_TRANSFER_OUT,
-            ActivityType::ConversionIn => ACTIVITY_TYPE_CONVERSION_IN,
-            ActivityType::ConversionOut => ACTIVITY_TYPE_CONVERSION_OUT,
             ActivityType::Fee => ACTIVITY_TYPE_FEE,
             ActivityType::Tax => ACTIVITY_TYPE_TAX,
             ActivityType::Split => ACTIVITY_TYPE_SPLIT,
@@ -444,8 +432,6 @@ impl FromStr for ActivityType {
             s if s == ACTIVITY_TYPE_WITHDRAWAL => Ok(ActivityType::Withdrawal),
             s if s == ACTIVITY_TYPE_TRANSFER_IN => Ok(ActivityType::TransferIn),
             s if s == ACTIVITY_TYPE_TRANSFER_OUT => Ok(ActivityType::TransferOut),
-            s if s == ACTIVITY_TYPE_CONVERSION_IN => Ok(ActivityType::ConversionIn),
-            s if s == ACTIVITY_TYPE_CONVERSION_OUT => Ok(ActivityType::ConversionOut),
             s if s == ACTIVITY_TYPE_FEE => Ok(ActivityType::Fee),
             s if s == ACTIVITY_TYPE_TAX => Ok(ActivityType::Tax),
             s if s == ACTIVITY_TYPE_SPLIT => Ok(ActivityType::Split),
@@ -568,8 +554,6 @@ impl From<NewActivity> for ActivityDB {
                               activity_type == "INTEREST" ||
                               activity_type == "DIVIDEND" ||
                               activity_type == "SPLIT" ||
-                              activity_type == "CONVERSION_IN" ||
-                              activity_type == "CONVERSION_OUT" ||
                               activity_type == "TRANSFER_IN" ||
                               activity_type == "TRANSFER_OUT";
 
@@ -633,8 +617,6 @@ impl From<ActivityUpdate> for ActivityDB {
                               activity_type == "INTEREST" ||
                               activity_type == "DIVIDEND" ||
                               activity_type == "SPLIT" ||
-                              activity_type == "CONVERSION_IN" ||
-                              activity_type == "CONVERSION_OUT" ||
                               activity_type == "TRANSFER_IN" ||
                               activity_type == "TRANSFER_OUT";
 

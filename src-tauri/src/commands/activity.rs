@@ -56,7 +56,7 @@ pub async fn create_activity(
 
     let payload = PortfolioRequestPayload::builder()
         .account_ids(Some(vec![account_id_clone]))
-        .sync_market_data(false)
+        .sync_market_data(true)
         .symbols(Some(symbols))
         .build();
     emit_portfolio_recalculate_request(&handle, payload);
@@ -198,7 +198,7 @@ pub async fn import_activities(
 
     let payload = PortfolioRequestPayload::builder()
         .account_ids(Some(vec![account_id]))
-        .sync_market_data(false)
+        .sync_market_data(true)
         .symbols(Some(symbols_clone))
         .build();
     emit_portfolio_recalculate_request(&handle, payload);

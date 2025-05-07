@@ -14,8 +14,6 @@ describe('Activity Utilities', () => {
       expect(isCashActivity(ActivityType.WITHDRAWAL)).toBe(true);
       expect(isCashActivity(ActivityType.FEE)).toBe(true);
       expect(isCashActivity(ActivityType.INTEREST)).toBe(true);
-      expect(isCashActivity(ActivityType.CONVERSION_IN)).toBe(true);
-      expect(isCashActivity(ActivityType.CONVERSION_OUT)).toBe(true);
       
       expect(isCashActivity(ActivityType.BUY)).toBe(false);
       expect(isCashActivity(ActivityType.SELL)).toBe(false);

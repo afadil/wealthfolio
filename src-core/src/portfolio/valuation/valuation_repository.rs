@@ -3,6 +3,10 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 use chrono::NaiveDate;
+use std::collections::HashMap;
+use diesel::sql_query;
+use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
 
 use crate::db::get_connection;
 use crate::errors::Result;
@@ -23,7 +27,7 @@ pub trait ValuationRepositoryTrait: Send + Sync {
     fn delete_valuations_for_account(&self, account_id: &str) -> Result<()>;
     fn get_latest_valuations(
         &self,
-        account_ids: &[String],
+        input_account_ids: &[String],
     ) -> Result<Vec<DailyAccountValuation>>;
     fn get_valuations_on_date(
         &self,
@@ -131,22 +135,62 @@ impl ValuationRepositoryTrait for ValuationRepository {
         &self,
         input_account_ids: &[String],
     ) -> Result<Vec<DailyAccountValuation>> {
-        let mut conn = get_connection(&self.pool)?;
-        let mut results = Vec::new();
-
-        for input_account_id_str in input_account_ids {
-            let latest_entry = daily_account_valuation::table
-                .filter(account_id.eq(input_account_id_str))
-                .order(valuation_date.desc())
-                .first::<DailyAccountValuationDb>(&mut conn)
-                .optional()?;
-
-            if let Some(db_entry) = latest_entry {
-                results.push(DailyAccountValuation::from(db_entry));
-            }
+        if input_account_ids.is_empty() {
+            return Ok(Vec::new());
         }
 
-        Ok(results)
+        let mut conn = get_connection(&self.pool)?;
+
+        let placeholders: String = input_account_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(", ");
+
+        // Ensure all fields from DailyAccountValuationDb are selected, in the correct order.
+        let sql = format!(
+            "WITH RankedValuations AS ( \
+                SELECT \
+                    id, account_id, valuation_date, account_currency, base_currency, \
+                    fx_rate_to_base, cash_balance, investment_market_value, total_value, \
+                    cost_basis, net_contribution, calculated_at, \
+                    ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY valuation_date DESC) as rn \
+                FROM {} \
+                WHERE account_id IN ({}) \
+            ) \
+            SELECT \
+                id, account_id, valuation_date, account_currency, base_currency, \
+                fx_rate_to_base, cash_balance, investment_market_value, total_value, \
+                cost_basis, net_contribution, calculated_at \
+            FROM RankedValuations \
+            WHERE rn = 1",
+            "daily_account_valuation", // Use direct table name string
+            placeholders
+        );
+
+        let mut query_builder = sql_query(sql).into_boxed::<Sqlite>();
+
+        for acc_id_str in input_account_ids {
+            query_builder = query_builder.bind::<Text, _>(acc_id_str);
+        }
+
+        let latest_valuations_db: Vec<DailyAccountValuationDb> = query_builder
+            .load::<DailyAccountValuationDb>(&mut conn)?;
+
+        // To maintain input order, we first put results into a map
+        let mut results_map: HashMap<String, DailyAccountValuation> = latest_valuations_db
+            .into_iter()
+            .map(|db_item| (db_item.account_id.clone(), DailyAccountValuation::from(db_item)))
+            .collect();
+
+        // Then build the ordered Vec
+        let mut ordered_results = Vec::new();
+        for acc_id_str in input_account_ids {
+            if let Some(valuation) = results_map.remove(acc_id_str) { // Use remove to avoid cloning if DailyAccountValuation is large
+                ordered_results.push(valuation);
+            }
+        }
+        Ok(ordered_results)
     }
 
     fn get_valuations_on_date(

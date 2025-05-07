@@ -201,7 +201,7 @@ impl Position {
         let cost_basis = if *activity_type == ActivityType::Buy {
             quantity * acquisition_price + acquisition_fees
         } else {
-            // For AddHolding, TransferIn (Asset), ConversionIn (Asset), fee affects cash only, not basis
+            // For AddHolding, TransferIn (Asset), fee affects cash only, not basis
             quantity * acquisition_price
         };
 

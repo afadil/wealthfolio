@@ -13,8 +13,8 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
   const shouldShowSymbolLookup = activityType === 'DIVIDEND';
 
   const incomeTypes: ActivityTypeUI[] = [
-    { value: 'DIVIDEND', label: 'Dividend', icon: 'Income' },
-    { value: 'INTEREST', label: 'Interest', icon: 'Percent' },
+    { value: 'DIVIDEND', label: 'Dividend', icon: 'Income', description: 'Income received from owning shares in a company or units in a fund. This typically represents a distribution of profits.' },
+    { value: 'INTEREST', label: 'Interest', icon: 'Percent', description: 'Income earned from cash deposits, bonds, or lending money. This is a payment for the use of your money.' },
   ];
 
   return (

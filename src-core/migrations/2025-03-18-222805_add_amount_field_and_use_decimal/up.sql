@@ -27,6 +27,10 @@ UPDATE activities
 SET activity_type = 'REMOVE_HOLDING'
 WHERE activity_type = 'TRANSFER_OUT' AND asset_id NOT LIKE '$CASH-%';
 
+-- Rename CONVERSION_IN/OUT to TRANSFER_IN/OUT
+UPDATE activities SET activity_type = 'TRANSFER_IN' WHERE activity_type = 'CONVERSION_IN';
+UPDATE activities SET activity_type = 'TRANSFER_OUT' WHERE activity_type = 'CONVERSION_OUT';
+
 -- Rename comment column to notes in assets table
 ALTER TABLE assets RENAME COLUMN comment TO notes;
 

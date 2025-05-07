@@ -25,6 +25,7 @@ CREATE TABLE holdings_snapshots (
 -- Add indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_holdings_snapshots_account_date ON holdings_snapshots (account_id, snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_holdings_snapshots_date ON holdings_snapshots (snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_holdings_snapshots_account_id ON holdings_snapshots (account_id);
 
 
 -- table to store daily account history valuation metrics

@@ -12,8 +12,8 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
   const isManualAsset = watch('assetDataSource') === 'MANUAL';
 
   const tradeTypes: ActivityTypeUI[] = [
-    { value: 'BUY', label: 'Buy', icon: 'ArrowDown' },
-    { value: 'SELL', label: 'Sell', icon: 'ArrowUp' },
+    { value: 'BUY', label: 'Buy', icon: 'ArrowDown', description: 'Purchase an asset. This increases your holding quantity and decreases your cash balance.' },
+    { value: 'SELL', label: 'Sell', icon: 'ArrowUp', description: 'Sell an asset. This decreases your holding quantity and increases your cash balance.' },
   ];
 
   return (

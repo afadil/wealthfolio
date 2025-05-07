@@ -1,6 +1,7 @@
 -- This file should undo anything in `up.sql`
 DROP TABLE IF EXISTS daily_account_valuation;
-DROP TABLE IF EXISTS holdings_snapshots;
+DROP TABLE IF EXISTS holdings_snapshots; -- This will also drop associated indexes implicitly, but good practice to be explicit for new ones.
+
 
 -- Recreate the original portfolio_history table
 CREATE TABLE portfolio_history (

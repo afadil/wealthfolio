@@ -115,8 +115,6 @@ export const ActivityType = {
   REMOVE_HOLDING: 'REMOVE_HOLDING',
   TRANSFER_IN: 'TRANSFER_IN',
   TRANSFER_OUT: 'TRANSFER_OUT',
-  CONVERSION_IN: 'CONVERSION_IN',
-  CONVERSION_OUT: 'CONVERSION_OUT',
   FEE: 'FEE',
   TAX: 'TAX',
   SPLIT: 'SPLIT',
@@ -138,8 +136,6 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.INTEREST,
   ActivityType.TRANSFER_IN,
   ActivityType.TRANSFER_OUT,
-  ActivityType.CONVERSION_IN,
-  ActivityType.CONVERSION_OUT,
   ActivityType.TAX,
   ActivityType.FEE,
 ] as const;
@@ -161,9 +157,23 @@ export const activityTypeSchema = z.enum([
   ActivityType.TRANSFER_OUT,
   ActivityType.ADD_HOLDING,
   ActivityType.REMOVE_HOLDING,
-  ActivityType.CONVERSION_IN,
-  ActivityType.CONVERSION_OUT,
   ActivityType.FEE,
   ActivityType.TAX,
   ActivityType.SPLIT,
-]); 
+]);
+
+export const ActivityTypeNames: Record<ActivityType, string> = {
+  [ActivityType.BUY]: 'Buy',
+  [ActivityType.SELL]: 'Sell',
+  [ActivityType.DIVIDEND]: 'Dividend',
+  [ActivityType.INTEREST]: 'Interest',
+  [ActivityType.DEPOSIT]: 'Deposit',
+  [ActivityType.WITHDRAWAL]: 'Withdrawal',
+  [ActivityType.ADD_HOLDING]: 'Add Asset',
+  [ActivityType.REMOVE_HOLDING]: 'Remove Asset',
+  [ActivityType.TRANSFER_IN]: 'Transfer In',
+  [ActivityType.TRANSFER_OUT]: 'Transfer Out',
+  [ActivityType.FEE]: 'Fee',
+  [ActivityType.TAX]: 'Tax',
+  [ActivityType.SPLIT]: 'Split',
+}; 

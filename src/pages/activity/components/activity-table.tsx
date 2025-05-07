@@ -30,23 +30,14 @@ import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
 import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';
+import { ActivityType, ActivityTypeNames } from '@/lib/constants';
 
 const fetchSize = 25;
 
-const activityTypeOptions = [
-  { label: 'Buy', value: 'BUY' },
-  { label: 'Sell', value: 'SELL' },
-  { label: 'Deposit', value: 'DEPOSIT' },
-  { label: 'Withdrawal', value: 'WITHDRAWAL' },
-  { label: 'Dividend', value: 'DIVIDEND' },
-  { label: 'Transfer In', value: 'TRANSFER_IN' },
-  { label: 'Transfer Out', value: 'TRANSFER_OUT' },
-  { label: 'Conversion In', value: 'CONVERSION_IN' },
-  { label: 'Conversion Out', value: 'CONVERSION_OUT' },
-  { label: 'Fee', value: 'FEE' },
-  { label: 'Tax', value: 'TAX' },
-  { label: 'Interest', value: 'INTEREST' },
-];
+const activityTypeOptions = Object.entries(ActivityTypeNames).map(([value, label]) => ({
+  label,
+  value: value as ActivityType,
+}));
 
 
 export const ActivityTable = ({
@@ -92,7 +83,6 @@ export const ActivityTable = ({
             activityType === 'DEPOSIT' ||
             activityType === 'DIVIDEND' ||
             activityType === 'INTEREST' ||
-            activityType === 'CONVERSION_IN' ||
             activityType === 'TRANSFER_IN' ||
             activityType === 'ADD_HOLDING'
               ? 'success'
@@ -102,7 +92,7 @@ export const ActivityTable = ({
           return (
             <div className="flex items-center text-sm">
               <Badge className="text-xs font-normal" variant={badgeVariant}>
-                {activityType}
+                {ActivityTypeNames[activityType as ActivityType]}
               </Badge>
             </div>
           );

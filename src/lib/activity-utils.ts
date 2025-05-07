@@ -112,7 +112,6 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     
     // For outgoing cash activities, subtract fee from amount
     if (activityType === ActivityType.WITHDRAWAL || 
-        activityType === ActivityType.CONVERSION_OUT || 
         activityType === ActivityType.TRANSFER_OUT) {
       return Number(amount) + Number(fee);
     }
@@ -148,7 +147,6 @@ export const isNegativeValueActivity = (activityType: string): boolean => {
   return activityType === ActivityType.BUY || 
          activityType === ActivityType.WITHDRAWAL || 
          activityType === ActivityType.TRANSFER_OUT || 
-         activityType === ActivityType.CONVERSION_OUT || 
          activityType === ActivityType.FEE || 
          activityType === ActivityType.TAX;
 };

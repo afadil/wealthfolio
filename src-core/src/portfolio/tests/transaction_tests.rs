@@ -4,7 +4,7 @@ use crate::{
     models::{Activity, Asset},
     portfolio::{
         holdings_service::Portfolio,
-        transaction::{BuyTransaction, ConversionInTransaction, ConversionOutTransaction, DepositTransaction, SellTransaction, SplitTransaction, Transaction, TransferInTransaction, TransferOutTransaction, WithdrawalTransaction},
+        transaction::{BuyTransaction, DepositTransaction, SellTransaction, SplitTransaction, Transaction, TransferInTransaction, TransferOutTransaction, WithdrawalTransaction},
     },
 };
 

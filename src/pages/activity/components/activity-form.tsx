@@ -151,7 +151,18 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             )}
           </div>
           <SheetDescription>
-            {activity?.id ? 'Update transaction details' : 'Record a new account transaction.'}
+            {activity?.id
+              ? 'Update the details of your transaction'
+              : 'Record a new transaction in your account.'}
+            {'→ '}
+            <a
+              href="https://wealthfolio.app/docs/guide/#managing-activities"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              Learn more
+            </a>
           </SheetDescription>
         </SheetHeader>
         <Tabs defaultValue={defaultTab} className="w-full">
