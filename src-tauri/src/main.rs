@@ -23,7 +23,8 @@ use tauri::Manager;
 use context::ServiceContext;
 use events::{
     PortfolioRequestPayload,
-    emit_portfolio_update_request,
+    emit_portfolio_trigger_update,
+    emit_portfolio_trigger_recalculate,
 };
 
 pub fn main() {
@@ -96,7 +97,6 @@ pub fn main() {
             commands::activity::update_activity,
             commands::activity::delete_activity,
             commands::activity::check_activities_import,
-            commands::activity::create_activities,
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
@@ -177,8 +177,7 @@ fn spawn_background_tasks(
     // Defaults: no specific accounts (all), sync market data (all symbols), incremental calculation
     let initial_payload = PortfolioRequestPayload::builder()
         .account_ids(None)
-        .sync_market_data(true)
-        .symbols(None)
+        .refetch_all_market_data(false)
         .build();
-    emit_portfolio_update_request(&handle, initial_payload);
+    emit_portfolio_trigger_update(&handle, initial_payload);
 }

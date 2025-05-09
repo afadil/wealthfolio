@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{emit_portfolio_recalculate_request, emit_portfolio_update_request, PortfolioRequestPayload},
+    events::{emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload},
 };
 
 use log::debug;
@@ -16,26 +16,25 @@ use wealthfolio_core::{
 
 #[tauri::command]
 pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
-    debug!("Emitting PORTFOLIO_UPDATE_REQUEST event...");
+    debug!("Emitting PORTFOLIO_TRIGGER_RECALCULATE event...");
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
         .symbols(None) // None signifies all relevant symbols
-        .sync_market_data(true)
-        .refetch_all(true)
+        .refetch_all_market_data(true)
         .build();
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn update_portfolio(handle: AppHandle) -> Result<(), String> {
-    debug!("Emitting PORTFOLIO_UPDATE_REQUEST event...");
+    debug!("Emitting PORTFOLIO_TRIGGER_UPDATE event...");
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
         .symbols(None) // None signifies all relevant symbols
-        .sync_market_data(true)
+        .refetch_all_market_data(false)
         .build();
-    emit_portfolio_update_request(&handle, payload);
+    emit_portfolio_trigger_update(&handle, payload);
     Ok(())
 }
 

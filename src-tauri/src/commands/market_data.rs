@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
-use crate::{context::ServiceContext, events::{emit_portfolio_update_request, PortfolioRequestPayload}};
+use crate::{
+    context::ServiceContext,
+    events::{emit_portfolio_trigger_update, PortfolioRequestPayload},
+};
 
 use log::{debug, info};
-use tauri::{State, AppHandle};
+use tauri::{AppHandle, State};
 use wealthfolio_core::market_data::{Quote, QuoteSummary};
 
 #[tauri::command]
@@ -24,14 +27,16 @@ pub async fn sync_market_data(
     refetch_all: bool,
     handle: AppHandle,
 ) -> Result<(), String> {
-    info!("Emitting MARKET_DATA_NEEDS_SYNC event: Symbols={:?}, RefetchAll={}", symbols, refetch_all);
+    info!(
+        "Emitting MARKET_DATA_NEEDS_SYNC event: Symbols={:?}, RefetchAll={}",
+        symbols, refetch_all
+    );
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None)
-        .sync_market_data(true)
+        .refetch_all_market_data(refetch_all)
         .symbols(symbols)
-        .refetch_all(refetch_all)
         .build();
-    emit_portfolio_update_request(&handle, payload);
+    emit_portfolio_trigger_update(&handle, payload);
     Ok(())
 }
 
@@ -52,10 +57,10 @@ pub async fn update_quote(
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .sync_market_data(true)
+            .refetch_all_market_data(true)
             .symbols(Some(vec![quote.symbol]))
             .build();
-        emit_portfolio_update_request(&handle, payload);
+        emit_portfolio_trigger_update(&handle, payload);
     });
     Ok(())
 }
@@ -76,10 +81,10 @@ pub async fn delete_quote(
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .sync_market_data(false)
+            .refetch_all_market_data(false)
             .symbols(None)
             .build();
-        emit_portfolio_update_request(&handle, payload);
+        emit_portfolio_trigger_update(&handle, payload);
     });
     Ok(())
 }

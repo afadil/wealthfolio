@@ -71,6 +71,14 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
 
     /// Retrieves the date of the earliest snapshot for a given account.
     fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
+
+    /// Replaces all snapshots for multiple accounts within a single transaction.
+    /// If `is_full_recalc_delete_done` is true, assumes a global delete occurred and skips ranged deletes.
+    fn replace_all_snapshots(
+        &self,
+        all_keyframes: &[AccountStateSnapshot],
+        is_full_recalc_delete_done: bool,
+    ) -> Result<()>;
 }
 
 pub struct SnapshotRepository {
@@ -404,6 +412,87 @@ impl SnapshotRepository {
             None => Ok(None), // No snapshots found for this account
         }
     }
+
+    pub fn replace_all_snapshots(
+        &self,
+        all_keyframes: &[AccountStateSnapshot],
+        is_full_recalc_delete_done: bool,
+    ) -> Result<()> {
+        use crate::schema::holdings_snapshots;
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        if all_keyframes.is_empty() {
+            debug!("replace_all_snapshots called with no keyframes. Nothing to do.");
+            return Ok(());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+
+        conn.transaction(|conn_tx| {
+            if !is_full_recalc_delete_done {
+                // Group keyframes by account ID to determine per-account deletion ranges for incremental updates
+                let mut keyframes_by_account_for_delete: HashMap<String, Vec<&AccountStateSnapshot>> = HashMap::new();
+                for kf in all_keyframes {
+                    keyframes_by_account_for_delete
+                        .entry(kf.account_id.clone())
+                        .or_default()
+                        .push(kf);
+                }
+
+                for (acc_id_str, acc_keyframes) in keyframes_by_account_for_delete {
+                    if acc_keyframes.is_empty() { continue; }
+
+                    // Sort snapshots by date to correctly determine range for this account
+                    let mut sorted_acc_keyframes = acc_keyframes.to_vec(); // Clone refs for sorting
+                    sorted_acc_keyframes.sort_by_key(|s| s.snapshot_date);
+
+                    if let (Some(min_date), Some(max_date)) = (
+                        sorted_acc_keyframes.first().map(|s| s.snapshot_date),
+                        sorted_acc_keyframes.last().map(|s| s.snapshot_date),
+                    ) {
+                        debug!(
+                            "Replace all snapshots (incremental part for account {}): Deleting existing snapshots from {} to {} in transaction",
+                            acc_id_str, min_date, max_date
+                        );
+                        let start_date_str = min_date.format("%Y-%m-%d").to_string();
+                        let end_date_str = max_date.format("%Y-%m-%d").to_string();
+                        diesel::delete(
+                            holdings_snapshots::table
+                                .filter(account_id.eq(acc_id_str))
+                                .filter(snapshot_date.ge(start_date_str))
+                                .filter(snapshot_date.le(end_date_str)),
+                        )
+                        .execute(conn_tx)?;
+                    }
+                }
+            } else {
+                debug!(
+                    "Replace all snapshots (full recalc): Skipping all per-account range deletes as full delete already occurred."
+                );
+            }
+
+            // Save all new keyframes in a single batch operation
+            let db_models_to_save: Vec<AccountStateSnapshotDB> = all_keyframes
+                .iter()
+                .cloned()
+                .map(AccountStateSnapshotDB::from)
+                .collect();
+            
+            if !db_models_to_save.is_empty() {
+                debug!(
+                    "Replace all snapshots: Saving {} snapshots to DB in a single batch (transactional)",
+                    db_models_to_save.len()
+                );
+                diesel::replace_into(holdings_snapshots::table)
+                    .values(&db_models_to_save)
+                    .execute(conn_tx)?;
+            } else {
+                debug!("Replace all snapshots: No actual DB models to save after processing.");
+            }
+
+            Ok::<(), Error>(())
+        })
+    }
 }
 
 // Implement the trait methods for SnapshotRepository
@@ -489,5 +578,13 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
 
     fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>> {
         SnapshotRepository::get_earliest_snapshot_date(self, account_id)
+    }
+
+    fn replace_all_snapshots(
+        &self,
+        all_keyframes: &[AccountStateSnapshot],
+        is_full_recalc_delete_done: bool,
+    ) -> Result<()> {
+        SnapshotRepository::replace_all_snapshots(self, all_keyframes, is_full_recalc_delete_done)
     }
 }

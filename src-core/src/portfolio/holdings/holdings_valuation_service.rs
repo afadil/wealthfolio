@@ -103,7 +103,6 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
         let latest_quote_pairs: HashMap<String, LatestQuotePair> =
             self.fetch_batch_quote_data(holdings).await?;
 
-        info!("Latest quote pairs: {:?}", latest_quote_pairs);
         let today = Utc::now().date_naive();
 
         for holding in holdings.iter_mut() {

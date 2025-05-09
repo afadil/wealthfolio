@@ -60,24 +60,6 @@ export const checkActivitiesImport = async ({
   }
 };
 
-export const createActivities = async ({
-  activities,
-}: {
-  activities: NewActivity[];
-}): Promise<number> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('create_activities', { activities });
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    logger.error('Error importing activities.');
-    throw error;
-  }
-};
-
 export const getAccountImportMapping = async (accountId: string): Promise<ImportMappingData> => {
   try {
     switch (getRunEnv()) {

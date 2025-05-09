@@ -1,8 +1,9 @@
 use std::sync::Arc;
+use std::collections::HashSet;
 
 use crate::context::ServiceContext;
 use crate::events::{
-    emit_portfolio_recalculate_request,
+    emit_portfolio_trigger_recalculate,
     PortfolioRequestPayload,
 };
 use log::debug;
@@ -11,6 +12,57 @@ use wealthfolio_core::activities::{
     Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
     NewActivity, Sort,
 };
+
+// Helper function to generate symbols for portfolio recalculation (single activity)
+fn get_symbols_to_sync(
+    state: &State<'_, Arc<ServiceContext>>,
+    activity_account_id: &str,
+    activity_currency: &str,
+    activity_asset_id: &str,
+) -> Result<Vec<String>, String> {
+    let account = state
+        .account_service()
+        .get_account(activity_account_id)
+        .map_err(|e| format!("Failed to get account {}: {}", activity_account_id, e))?;
+    let account_currency = account.currency;
+
+    let mut symbols = vec![activity_asset_id.to_string()];
+
+    if !activity_currency.is_empty() && activity_currency != &account_currency {
+        let fx_symbol = format!("{}{}=X", account_currency, activity_currency);
+        symbols.push(fx_symbol);
+    }
+    Ok(symbols)
+}
+
+// Helper function to generate symbols for imported activities (batch)
+fn get_all_symbols_to_sync(
+    state: &State<'_, Arc<ServiceContext>>,
+    account_id: &str,
+    activities: &[ActivityImport], // Use slice
+) -> Result<Vec<String>, String> {
+    let account = state
+        .account_service()
+        .get_account(account_id)
+        .map_err(|e| format!("Failed to get account {}: {}", account_id, e))?;
+    let account_currency = account.currency;
+
+    let mut all_symbols: HashSet<String> = HashSet::new();
+
+    for activity_import in activities {
+        // Add asset symbol
+        if !activity_import.symbol.is_empty() {
+            all_symbols.insert(activity_import.symbol.clone());
+        }
+
+        // Add FX symbol if currencies differ
+        if !activity_import.currency.is_empty() && activity_import.currency != account_currency {
+            let fx_symbol = format!("{}{}=X", account_currency, activity_import.currency);
+            all_symbols.insert(fx_symbol);
+        }
+    }
+    Ok(all_symbols.into_iter().collect())
+}
 
 #[tauri::command]
 pub async fn get_activities(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Activity>, String> {
@@ -49,17 +101,23 @@ pub async fn create_activity(
     handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Creating activity...");
+    // Note: Account currency for FX check is now handled by get_symbols_to_sync using the result
     let result = state.activity_service().create_activity(activity).await?;
     let handle = handle.clone();
-    let account_id_clone = result.account_id.clone();
-    let symbols = vec![result.asset_id.clone()];
+
+    let symbols_for_payload = get_symbols_to_sync(
+        &state,
+        &result.account_id,
+        &result.currency,
+        &result.asset_id,
+    )?;
 
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id_clone]))
-        .sync_market_data(true)
-        .symbols(Some(symbols))
+        .account_ids(Some(vec![result.account_id.clone()]))
+        .refetch_all_market_data(true)
+        .symbols(Some(symbols_for_payload))
         .build();
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
 
     Ok(result)
 }
@@ -73,62 +131,20 @@ pub async fn update_activity(
     debug!("Updating activity...");
     let result = state.activity_service().update_activity(activity).await?;
     let handle = handle.clone();
-    let account_id_clone = result.account_id.clone();
-    let symbols = vec![result.asset_id.clone()];
+
+    let symbols_for_payload = get_symbols_to_sync(
+        &state,
+        &result.account_id,
+        &result.currency,
+        &result.asset_id,
+    )?;
 
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id_clone]))
-        .sync_market_data(true)
-        .symbols(Some(symbols))
+        .account_ids(Some(vec![result.account_id.clone()]))
+        .refetch_all_market_data(true)
+        .symbols(Some(symbols_for_payload))
         .build();
-    emit_portfolio_recalculate_request(&handle, payload);
-
-    Ok(result)
-}
-
-#[tauri::command]
-pub async fn check_activities_import(
-    account_id: String,
-    activities: Vec<ActivityImport>,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<ActivityImport>, String> {
-    debug!("Checking activities import for account: {}", account_id);
-    let result = state.activity_service()
-        .check_activities_import(account_id, activities)
-        .await?;
-    Ok(result)
-}
-
-#[tauri::command]
-pub async fn create_activities(
-    activities: Vec<NewActivity>,
-    state: State<'_, Arc<ServiceContext>>,
-    handle: AppHandle,
-) -> Result<usize, String> {
-    debug!("Creating activities...");
-    let account_ids_clone = activities
-        .iter()
-        .map(|a| a.account_id.clone())
-        .collect::<std::collections::HashSet<String>>()
-        .into_iter()
-        .collect::<Vec<String>>();
-
-    let symbols_clone = activities
-        .iter()
-        .map(|a| a.asset_id.clone())
-        .collect::<std::collections::HashSet<String>>()
-        .into_iter()
-        .collect::<Vec<String>>();
-
-    let result = state.activity_service().create_activities(activities)?;
-    let handle = handle.clone();
-
-    let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(account_ids_clone))
-        .sync_market_data(false)
-        .symbols(Some(symbols_clone))
-        .build();
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
 
     Ok(result)
 }
@@ -147,10 +163,10 @@ pub async fn delete_activity(
 
     let payload = PortfolioRequestPayload::builder()
         .account_ids(Some(vec![account_id_clone]))
-        .sync_market_data(false)
+        .refetch_all_market_data(true)
         .symbols(Some(symbols))
         .build();
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
 
     Ok(result)
 }
@@ -176,6 +192,19 @@ pub async fn save_account_import_mapping(
 }
 
 #[tauri::command]
+pub async fn check_activities_import(
+    account_id: String,
+    activities: Vec<ActivityImport>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<ActivityImport>, String> {
+    debug!("Checking activities import for account: {}", account_id);
+    let result = state.activity_service()
+        .check_activities_import(account_id, activities)
+        .await?;
+    Ok(result)
+}
+
+#[tauri::command]
 pub async fn import_activities(
     account_id: String,
     activities: Vec<ActivityImport>,
@@ -184,24 +213,24 @@ pub async fn import_activities(
 ) -> Result<Vec<ActivityImport>, String> {
     debug!("Importing activities for account: {}", account_id);
 
-    let symbols_clone = activities
-        .iter()
-        .map(|a| a.symbol.clone())
-        .collect::<std::collections::HashSet<String>>()
-        .into_iter()
-        .collect::<Vec<String>>();
+    // Generate symbols (including FX) using the new helper function
+    let symbols_for_payload = get_all_symbols_to_sync(
+        &state,
+        &account_id,
+        &activities,
+    )?;
 
     let result = state.activity_service()
-        .import_activities(account_id.clone(), activities)
+        .import_activities(account_id.clone(), activities) // activities is moved here
         .await?;
     let handle = handle.clone();
 
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id]))
-        .sync_market_data(true)
-        .symbols(Some(symbols_clone))
+        .account_ids(Some(vec![account_id])) // account_id is still available
+        .refetch_all_market_data(true)
+        .symbols(Some(symbols_for_payload))
         .build();
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
 
     Ok(result)
 }

@@ -7,7 +7,7 @@ use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::Result;
-use crate::assets::{Asset, AssetServiceTrait};
+use crate::assets::AssetServiceTrait;
 use crate::fx::FxServiceTrait;
 use uuid::Uuid;
 
@@ -161,7 +161,6 @@ impl ActivityServiceTrait for ActivityService {
             ?;
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
-        let mut assets_to_sync: Vec<Asset> = Vec::new();
 
         for mut activity in activities {
             activity.id = Some(Uuid::new_v4().to_string());
@@ -176,15 +175,6 @@ impl ActivityServiceTrait for ActivityService {
             let (is_valid, error) = match symbol_profile_result {
                 Ok(profile) => {
                     activity.symbol_name = profile.name;
-                    let asset_copy = Asset {
-                        symbol: activity.symbol.clone(),
-                        currency: profile.currency.clone(),
-                        asset_type: profile.asset_type.clone(),
-                        data_source: profile.data_source.clone(),
-                        ..Default::default()
-                    };
-                    assets_to_sync.push(asset_copy);
-
                     if activity.currency != account.currency {
                         match self.fx_service.register_currency_pair(
                             account.currency.as_str(),
@@ -215,11 +205,6 @@ impl ActivityServiceTrait for ActivityService {
         }
 
         Ok(activities_with_status)
-    }
-
-    /// Creates multiple activities in a single transaction
-    fn create_activities(&self, activities: Vec<NewActivity>) -> Result<usize> {
-        self.activity_repository.create_activities(activities)
     }
 
     /// Imports activities after validation
@@ -262,7 +247,7 @@ impl ActivityServiceTrait for ActivityService {
             })
             .collect();
 
-        let count = self.create_activities(new_activities)?;
+        let count = self.activity_repository.create_activities(new_activities)?;
         debug!("Successfully imported {} activities", count);
 
         Ok(validated_activities)

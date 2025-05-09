@@ -26,7 +26,8 @@ pub trait MarketDataServiceTrait: Send + Sync {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<Quote>>;
-    async fn sync_market_data(&self, symbols: Option<Vec<String>>, refetch_all: bool) -> Result<()>;
+    async fn sync_market_data(&self) -> Result<()>;
+    async fn resync_market_data(&self, symbols: Option<Vec<String>>) -> Result<()>;
     fn get_latest_quotes_pair_for_symbols(
         &self,
         symbols: &[String],

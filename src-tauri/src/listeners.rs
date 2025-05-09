@@ -1,26 +1,26 @@
 use futures::future::join_all;
-use log::{debug, error};
+use log::{debug, error, info};
 use std::sync::Arc;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
 
 use crate::context::ServiceContext;
 use crate::events::{
-    emit_portfolio_recalculate_request, emit_portfolio_update_request, PortfolioRequestPayload,
-    PORTFOLIO_RECALCULATE_REQUEST, PORTFOLIO_TOTAL_ACCOUNT_ID, PORTFOLIO_UPDATE_COMPLETE,
-    PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_REQUEST, PORTFOLIO_UPDATE_START,
+    emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
+    PORTFOLIO_TRIGGER_RECALCULATE, PORTFOLIO_TOTAL_ACCOUNT_ID, PORTFOLIO_UPDATE_COMPLETE,
+    PORTFOLIO_UPDATE_ERROR, PORTFOLIO_TRIGGER_UPDATE, PORTFOLIO_UPDATE_START,
 };
 
 /// Sets up the global event listeners for the application.
 pub fn setup_event_listeners(handle: AppHandle) {
     // Listener for consolidated portfolio update requests
     let update_handle = handle.clone();
-    handle.listen(PORTFOLIO_UPDATE_REQUEST, move |event| {
+    handle.listen(PORTFOLIO_TRIGGER_UPDATE, move |event| {
         handle_portfolio_request(update_handle.clone(), event.payload(), false);
     });
 
     // Listener for full portfolio recalculation requests
     let recalc_handle = handle.clone();
-    handle.listen(PORTFOLIO_RECALCULATE_REQUEST, move |event| {
+    handle.listen(PORTFOLIO_TRIGGER_RECALCULATE, move |event| {
         handle_portfolio_request(recalc_handle.clone(), event.payload(), true); // force_recalc = true
     });
 }
@@ -28,9 +28,9 @@ pub fn setup_event_listeners(handle: AppHandle) {
 /// Handles the common logic for both portfolio update and recalculation requests.
 fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: bool) {
     let event_name = if force_recalc {
-        PORTFOLIO_RECALCULATE_REQUEST
+        PORTFOLIO_TRIGGER_RECALCULATE
     } else {
-        PORTFOLIO_UPDATE_REQUEST
+        PORTFOLIO_TRIGGER_UPDATE
     };
 
     match serde_json::from_str::<PortfolioRequestPayload>(payload_str) {
@@ -43,65 +43,67 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 
             // Spawn a task to handle the update/recalculate steps
             spawn(async move {
-                let should_sync = payload.sync_market_data;
-                let symbols_to_sync = if should_sync {
-                    payload.symbols.clone() // None means sync all relevant symbols
-                } else {
-                    None
-                };
+                let symbols_to_sync = payload.symbols.clone(); // None means sync all relevant symbols
                 let accounts_to_recalc = payload.account_ids.clone();
-                let refetch_all = payload.refetch_all;
+                let refetch_all = payload.refetch_all_market_data;
+                let context_result = handle_clone.try_state::<Arc<ServiceContext>>();
 
-                if should_sync {
-                    let context_result = handle_clone.try_state::<Arc<ServiceContext>>();
+                if let Some(context) = context_result {
+                    let market_data_service = context.market_data_service();
 
-                    if let Some(context) = context_result {
-                        let market_data_service = context.market_data_service();
+                    // Emit sync start event
+                    if let Err(e) = handle_clone.emit(PORTFOLIO_UPDATE_START, ()) {
+                        error!("Failed to emit {} event: {}", PORTFOLIO_UPDATE_START, e);
+                    }
 
-                        // Emit sync start event
-                        if let Err(e) = handle_clone.emit("market:sync-start", ()) {
-                            error!("Failed to emit market:sync-start event: {}", e);
-                        }
-
-                        let sync_result = market_data_service
-                            .sync_market_data(symbols_to_sync, refetch_all)
-                            .await;
-
-                        match sync_result {
-                            Ok(_) => {
-                                if let Err(e) = handle_clone.emit("market:sync-complete", ()) {
-                                    error!("Failed to emit market:sync-complete event: {}", e);
-                                }
-                                // Initialize the FxService after successful sync
-                                let fx_service = context.fx_service();
-                                if let Err(e) = fx_service.initialize() {
-                                    error!("Failed to initialize FxService after market data sync: {}", e);
-                                    // Optionally emit an error event or decide how to proceed
-                                    // For now, we'll log the error and continue with calculation
-                                }
-
-                                // Trigger calculation after successful sync
-                                handle_portfolio_calculation(
-                                    handle_clone.clone(), // Clone again for this call
-                                    accounts_to_recalc,
-                                    force_recalc,
-                                );
-                            }
-                            Err(e) => {
-                                if let Err(e_emit) =
-                                    handle_clone.emit("market:sync-error", &e.to_string())
-                                {
-                                    error!("Failed to emit market:sync-error event: {}", e_emit);
-                                }
-                                error!("Market data sync failed: {}. Skipping portfolio calculation for this request.", e);
-                            }
-                        }
+                    let sync_result = if refetch_all {
+                        info!("Resyncing market data for symbols");
+                        market_data_service
+                            .resync_market_data(symbols_to_sync)
+                            .await
                     } else {
-                        error!("ServiceContext not found in state during market data sync for {} request.", event_name);
+                        info!("Syncing market data for all symbols");
+                        market_data_service.sync_market_data().await
+                    };
+
+                    // Mock result without calling market data service
+                    match sync_result {
+                        Ok(_) => {
+                            if let Err(e) = handle_clone.emit("market:sync-complete", ()) {
+                                error!("Failed to emit market:sync-complete event: {}", e);
+                            }
+                            // Initialize the FxService after successful sync
+                            let fx_service = context.fx_service();
+                            if let Err(e) = fx_service.initialize() {
+                                error!(
+                                    "Failed to initialize FxService after market data sync: {}",
+                                    e
+                                );
+                                // Optionally emit an error event or decide how to proceed
+                                // For now, we'll log the error and continue with calculation
+                            }
+
+                            // Trigger calculation after successful sync
+                            handle_portfolio_calculation(
+                                handle_clone.clone(), // Clone again for this call
+                                accounts_to_recalc,
+                                force_recalc,
+                            );
+                        }
+                        Err(e) => {
+                            if let Err(e_emit) =
+                                handle_clone.emit("market:sync-error", &e.to_string())
+                            {
+                                error!("Failed to emit market:sync-error event: {}", e_emit);
+                            }
+                            error!("Market data sync failed: {}. Skipping portfolio calculation for this request.", e);
+                        }
                     }
                 } else {
-                    // No sync needed, trigger calculation directly
-                    handle_portfolio_calculation(handle_clone, accounts_to_recalc, force_recalc);
+                    error!(
+                        "ServiceContext not found in state during market data sync for {} request.",
+                        event_name
+                    );
                 }
             });
         }
@@ -113,14 +115,13 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
             // Trigger a default action if payload parsing fails
             let fallback_payload = PortfolioRequestPayload::builder()
                 .account_ids(None)
-                .sync_market_data(true)
                 .symbols(None)
-                .refetch_all(false) // Default refetch_all to false
+                .refetch_all_market_data(false)
                 .build();
             if force_recalc {
-                emit_portfolio_recalculate_request(&handle, fallback_payload);
+                emit_portfolio_trigger_recalculate(&handle, fallback_payload);
             } else {
-                emit_portfolio_update_request(&handle, fallback_payload);
+                emit_portfolio_trigger_update(&handle, fallback_payload);
             }
         }
     }
@@ -195,7 +196,10 @@ fn handle_portfolio_calculation(
                             let account_id_clone = account_id.clone(); // Clone account_id for the async block
                             async move {
                                 let result = valuation_service
-                                    .calculate_valuation_history(&account_id_clone, force_full_recalculation)
+                                    .calculate_valuation_history(
+                                        &account_id_clone,
+                                        force_full_recalculation,
+                                    )
                                     .await;
                                 (account_id_clone, result) // Return account_id along with the result
                             }

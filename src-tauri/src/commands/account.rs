@@ -3,8 +3,7 @@ use std::sync::Arc;
 use crate::{
     context::ServiceContext,
     events::{
-        emit_portfolio_recalculate_request,
-        emit_portfolio_update_request,
+        emit_portfolio_trigger_recalculate,
         PortfolioRequestPayload,
     },
 };
@@ -90,11 +89,10 @@ pub async fn create_account(
                 // Build the payload using the builder pattern
                 let payload = PortfolioRequestPayload::builder()
                     .account_ids(Some(vec![account_id]))
-                    .sync_market_data(true)
                     .symbols(symbols_to_sync)
                     .build();
 
-                emit_portfolio_update_request(&handle, payload);
+                emit_portfolio_trigger_recalculate(&handle, payload);
             });
             Ok(acc)
         }
@@ -127,11 +125,10 @@ pub async fn update_account(
     // Build payload to recalculate for this account, syncing all relevant market data
     let payload = PortfolioRequestPayload::builder()
         .account_ids(Some(vec![account_id_clone])) // Target this account
-        .sync_market_data(true) // Always sync market data/quotes
         .build();
 
     // Emit the recalculation request
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
 
     Ok(updated_account)
 }
@@ -155,10 +152,9 @@ pub async fn delete_account(
     // Deleting an account likely requires a full recalculation or broader update
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
-        .sync_market_data(true)
         .build();
 
-    emit_portfolio_recalculate_request(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload);
 
     Ok(())
 }

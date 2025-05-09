@@ -67,7 +67,7 @@ pub struct SnapshotService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     snapshot_repository: Arc<SnapshotRepository>,
-    holdings_calculator: HoldingsCalculator,
+     holdings_calculator: HoldingsCalculator,
 }
 
 // Type aliases to simplify function signatures
@@ -80,10 +80,10 @@ type StartDatesMap = HashMap<String, NaiveDate>;
 impl SnapshotService {
     pub fn new(
         base_currency: Arc<RwLock<String>>,
-        fx_service: Arc<dyn FxServiceTrait>,
         account_repository: Arc<dyn AccountRepositoryTrait>,
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
         snapshot_repository: Arc<SnapshotRepository>,
+        fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
         let holdings_calculator = HoldingsCalculator::new(fx_service.clone());
         Self {
@@ -191,7 +191,10 @@ impl SnapshotService {
         )?;
 
         // Step 8: Persist only the identified keyframe snapshots (individual and/or TOTAL)
-        self.persist_keyframes(&keyframes_to_save, force_full_calculation)?;
+        self.snapshot_repository.replace_all_snapshots(
+            &keyframes_to_save, // Pass the whole slice
+            force_full_calculation
+        )?;
 
         // Return count of saved keyframes as an indicator of work done
         Ok(keyframes_to_save.len())
@@ -647,64 +650,6 @@ impl SnapshotService {
         Ok((current_holdings_snapshots, keyframes_to_save))
     }
 
-    // --- Step 8: Persist keyframes ---
-    fn persist_keyframes(&self, keyframes_to_save: &[AccountStateSnapshot], force_full_calculation_happened: bool) -> Result<()> {
-        if keyframes_to_save.is_empty() {
-            info!("No new keyframe snapshots to save.");
-            return Ok(());
-        }
-
-        // Group by account ID for potentially more efficient batching if repo supports it
-        let mut keyframes_by_account: HashMap<String, Vec<&AccountStateSnapshot>> = HashMap::new();
-        for kf in keyframes_to_save {
-            keyframes_by_account
-                .entry(kf.account_id.clone())
-                .or_default()
-                .push(kf);
-        }
-
-        const BATCH_SIZE: usize = 500;
-        for (account_id, keyframes) in keyframes_by_account {
-            debug!(
-                "Saving {} keyframes for account {}",
-                keyframes.len(),
-                account_id
-            );
-            // Sort keyframes by date before saving batches
-            let mut sorted_keyframes = keyframes.to_vec();
-            sorted_keyframes.sort_by_key(|kf| kf.snapshot_date);
-
-            // Delete existing snapshots in the date range for this account before saving new ones,
-            // only if a full delete didn't just happen.
-            if !force_full_calculation_happened {
-                if let (Some(min_date), Some(max_date)) = (
-                    sorted_keyframes.first().map(|k| k.snapshot_date),
-                    sorted_keyframes.last().map(|k| k.snapshot_date),
-                ) {
-                    debug!(
-                        "Persist keyframes (incremental): Deleting snapshots for account {} from {} to {}",
-                        account_id, min_date, max_date
-                    );
-                    self.snapshot_repository
-                        .delete_snapshots_for_account_in_range(&account_id, min_date, max_date)?;
-                }
-            } else {
-                debug!(
-                    "Persist keyframes (full recalc): Skipping range delete for account {} as full delete already occurred.",
-                    account_id
-                );
-            }
-
-            for batch in sorted_keyframes.chunks(BATCH_SIZE) {
-                // Clone snapshots in the batch before saving
-                let cloned_batch: Vec<AccountStateSnapshot> =
-                    batch.iter().map(|&kf| kf.clone()).collect();
-                self.snapshot_repository.save_snapshots(&cloned_batch)?;
-            }
-        }
-
-        Ok(())
-    }
 
     // --- Step 9: (Removed) Calculate and save total portfolio keyframes ---
     // This logic is now integrated into the main calculation loop by treating TOTAL as a virtual account.

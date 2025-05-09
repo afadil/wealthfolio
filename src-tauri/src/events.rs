@@ -3,8 +3,11 @@ use tauri::Emitter;
 
 pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
 
-/// Event emitted when the background portfolio recalculation process starts.
-pub const PORTFOLIO_UPDATE_REQUEST: &str = "portfolio:update-request";
+/// Event requesting a portfolio update, which may include market data sync and recalculation.
+pub const PORTFOLIO_TRIGGER_UPDATE: &str = "portfolio:trigger-update";
+
+/// Event requesting a full portfolio recalculation, including market data sync for specified accounts/symbols.
+pub const PORTFOLIO_TRIGGER_RECALCULATE: &str = "portfolio:trigger-recalculate";
 
 /// Event emitted when the background portfolio recalculation process starts.
 pub const PORTFOLIO_UPDATE_START: &str = "portfolio:update-start";
@@ -15,21 +18,17 @@ pub const PORTFOLIO_UPDATE_COMPLETE: &str = "portfolio:update-complete";
 /// Event emitted when the background portfolio recalculation process encounters an error.
 pub const PORTFOLIO_UPDATE_ERROR: &str = "portfolio:update-error";
 
-/// Event requesting a full portfolio recalculation.
-pub const PORTFOLIO_RECALCULATE_REQUEST: &str = "portfolio:recalculate-request";
+
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PortfolioRequestPayload {
     /// Optional list of account IDs. None implies all/total accounts.
     pub account_ids: Option<Vec<String>>,
-    /// Whether a market data sync should be performed before calculation.
-    #[serde(default)]
-    pub sync_market_data: bool,
     /// If syncing, specifies which symbols to sync. None implies sync all relevant symbols.
     pub symbols: Option<Vec<String>>,
     /// If syncing, specifies whether to refetch all symbols.
     #[serde(default)]
-    pub refetch_all: bool,
+    pub refetch_all_market_data: bool,
 }
 
 impl PortfolioRequestPayload {
@@ -43,9 +42,8 @@ impl PortfolioRequestPayload {
 #[derive(Default)]
 pub struct PortfolioRequestPayloadBuilder {
     account_ids: Option<Vec<String>>,
-    sync_market_data: Option<bool>,
     symbols: Option<Vec<String>>,
-    refetch_all: Option<bool>,
+    refetch_all_market_data: Option<bool>,
 }
 
 impl PortfolioRequestPayloadBuilder {
@@ -63,12 +61,6 @@ impl PortfolioRequestPayloadBuilder {
         self
     }
 
-    /// Sets whether market data synchronization is requested.
-    pub fn sync_market_data(mut self, sync: bool) -> Self {
-        self.sync_market_data = Some(sync);
-        self
-    }
-
     /// Sets the specific symbols to synchronize.
     pub fn symbols(mut self, symbols: Option<Vec<String>>) -> Self {
         self.symbols = symbols;
@@ -76,8 +68,8 @@ impl PortfolioRequestPayloadBuilder {
     }
 
     /// Sets whether to refetch all symbols.
-    pub fn refetch_all(mut self, refetch_all: bool) -> Self {
-        self.refetch_all = Some(refetch_all);
+    pub fn refetch_all_market_data(mut self, refetch_all: bool) -> Self {
+        self.refetch_all_market_data = Some(refetch_all);
         self
     }
 
@@ -85,41 +77,40 @@ impl PortfolioRequestPayloadBuilder {
     pub fn build(self) -> PortfolioRequestPayload {
         PortfolioRequestPayload {
             account_ids: self.account_ids,
-            sync_market_data: self.sync_market_data.unwrap_or(false), // Default to false if not set
             symbols: self.symbols,
-            refetch_all: self.refetch_all.unwrap_or(false),
+            refetch_all_market_data: self.refetch_all_market_data.unwrap_or(false),
         }
     }
 }
 
-/// Emits the PORTFOLIO_UPDATE_REQUEST event for incremental updates.
-pub fn emit_portfolio_update_request(
+/// Emits the PORTFOLIO_TRIGGER_UPDATE event for incremental updates.
+pub fn emit_portfolio_trigger_update(
     handle: &tauri::AppHandle,
     payload: PortfolioRequestPayload,
 ) {
     handle
-        .emit(PORTFOLIO_UPDATE_REQUEST, &payload)
+        .emit(PORTFOLIO_TRIGGER_UPDATE, &payload)
         .unwrap_or_else(|e| {
             log::error!(
                 "Failed to emit {} event for payload {:?}: {}",
-                PORTFOLIO_UPDATE_REQUEST,
+                PORTFOLIO_TRIGGER_UPDATE,
                 payload,
                 e
             )
         });
 }
 
-/// Emits the PORTFOLIO_RECALCULATE_REQUEST event for full recalculations.
-pub fn emit_portfolio_recalculate_request(
+/// Emits the PORTFOLIO_TRIGGER_RECALCULATE event for full recalculations.
+pub fn emit_portfolio_trigger_recalculate(
     handle: &tauri::AppHandle,
     payload: PortfolioRequestPayload,
 ) {
     handle
-        .emit(PORTFOLIO_RECALCULATE_REQUEST, &payload)
+        .emit(PORTFOLIO_TRIGGER_RECALCULATE, &payload)
         .unwrap_or_else(|e| {
             log::error!(
                 "Failed to emit {} event for payload {:?}: {}",
-                PORTFOLIO_RECALCULATE_REQUEST,
+                PORTFOLIO_TRIGGER_RECALCULATE,
                 payload,
                 e
             )

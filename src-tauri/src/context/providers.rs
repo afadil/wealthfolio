@@ -91,10 +91,10 @@ pub async fn initialize_context(
 
     let snapshot_service = Arc::new(SnapshotService::new(
         base_currency.clone(),
-        fx_service.clone(),
         account_repository.clone(),
         activity_repository.clone(),
         snapshot_repository.clone(),
+        fx_service.clone(),
     ));
 
     let holdings_valuation_service = Arc::new(HoldingsValuationService::new(

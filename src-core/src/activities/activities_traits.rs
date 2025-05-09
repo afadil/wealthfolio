@@ -65,7 +65,6 @@ pub trait ActivityServiceTrait: Send + Sync {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>>;
-    fn create_activities(&self, activities: Vec<NewActivity>) -> Result<usize>;
     async fn import_activities(
         &self,
         account_id: String,

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use crate::events::{emit_portfolio_recalculate_request, PortfolioRequestPayload};
+use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
 use tauri::{State, AppHandle};
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
@@ -60,10 +60,10 @@ pub async fn update_settings(
                 // Emit event to trigger portfolio update using the builder
                 let payload = PortfolioRequestPayload::builder()
                     .account_ids(None) // Base currency change affects all accounts
-                    .sync_market_data(true)
+                    .refetch_all_market_data(true)
                     .symbols(None) // Sync all relevant symbols
                     .build();
-                emit_portfolio_recalculate_request(&handle, payload);
+                emit_portfolio_trigger_recalculate(&handle, payload);
             });
         }
     }
@@ -89,7 +89,7 @@ pub async fn update_exchange_rate(
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         // Emit event to trigger portfolio update
-        emit_portfolio_recalculate_request(&handle, PortfolioRequestPayload::builder().build());
+        emit_portfolio_trigger_recalculate(&handle, PortfolioRequestPayload::builder().build());
     });
     Ok(result)
 }
@@ -120,7 +120,7 @@ pub async fn add_exchange_rate(
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         // Emit event to trigger portfolio update
-        emit_portfolio_recalculate_request(&handle, PortfolioRequestPayload::builder().build());
+        emit_portfolio_trigger_recalculate(&handle, PortfolioRequestPayload::builder().build());
     });
     Ok(result)
 }
@@ -140,7 +140,7 @@ pub async fn delete_exchange_rate(
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         // Emit event to trigger portfolio update
-        emit_portfolio_recalculate_request(&handle, PortfolioRequestPayload::builder().build());
+        emit_portfolio_trigger_recalculate(&handle, PortfolioRequestPayload::builder().build());
     });
     Ok(())
 }
