@@ -71,7 +71,15 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     isDraft: activity?.isDraft || false,
     comment: activity?.comment || null,
     assetId: activity?.assetId,
-    activityDate: activity?.date ? new Date(activity.date) : new Date(),
+    activityDate: activity?.date ? (() => {
+      const date = new Date(activity.date);
+      date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
+      return date;
+    })() : (() => {
+      const date = new Date();
+      date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
+      return date;
+    })(),
     currency: activity?.currency || '',
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
     showCurrencySelect: false,

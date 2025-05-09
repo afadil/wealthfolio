@@ -130,6 +130,8 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
               onChange={(date: Date | undefined) => field.onChange(date)}
               value={field.value}
               disabled={field.disabled}
+              enableTime={true}
+              timeGranularity="minute"
             />
             <FormMessage />
           </FormItem>
