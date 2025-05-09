@@ -28,16 +28,18 @@ interface SearchableSelectProps {
   disabled?: boolean;
   searchPlaceholder?: string;
   emptyMessage?: string;
+  className?: string;
 }
 
 export function SearchableSelect({
   options = [],
   value,
   onValueChange,
-  placeholder = "Sélectionner une option",
+  placeholder = "Select an option",
   disabled = false,
-  searchPlaceholder = "Rechercher...",
-  emptyMessage = "Aucun résultat trouvé.",
+  searchPlaceholder = "Search...",
+  emptyMessage = "No results found.",
+  className = "",
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -52,7 +54,7 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className={className}
           disabled={disabled}
         >
           {selectedOption ? selectedOption.label : placeholder}

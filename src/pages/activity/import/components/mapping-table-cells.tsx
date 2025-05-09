@@ -14,6 +14,7 @@ import TickerSearchInput from '@/components/ticker-search';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
+import { SearchableSelect } from '@/components/searchable-select';
 
 const SKIP_FIELD_VALUE = '__skip__';
 
@@ -103,15 +104,16 @@ function findAppTypeForCsvType(
   return null;
 }
 
-function renderActivityTypeCell({
-  csvType,
-  appType,
-  handleActivityTypeMapping,
-}: {
+interface ActivityTypeDisplayCellProps {
   csvType: string;
   appType: ActivityType | null;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
-}) {
+}
+function ActivityTypeDisplayCell({
+  csvType,
+  appType,
+  handleActivityTypeMapping,
+}: ActivityTypeDisplayCellProps) {
   const trimmedCsvType = csvType.trim().toUpperCase();
   const displayValue =
     trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
@@ -143,8 +145,8 @@ function renderActivityTypeCell({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-      <div className="truncate max-w-[180px]">
+    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+      <div className="max-w-[180px] truncate">
         {displayValue.length > ACTIVITY_TYPE_PREFIX_LENGTH ? (
           <span className="text-destructive" title={trimmedCsvType}>
             {displayValue}
@@ -155,38 +157,33 @@ function renderActivityTypeCell({
           </Badge>
         )}
       </div>
-      <Select
+      <SearchableSelect
+        options={Object.values(ActivityType).map((type) => ({
+          value: type,
+          label: type,
+        }))}
         onValueChange={(newType) =>
           handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
         }
+        placeholder="Map to..."
         value=""
-      >
-        <SelectTrigger className="h-8 w-full sm:w-auto min-w-[120px]">
-          <SelectValue placeholder="Map to..." />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.values(ActivityType).map((type) => (
-            <SelectItem key={type} value={type}>
-              {type}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      />
     </div>
   );
 }
 
-function renderSymbolCell({
-  csvSymbol,
-  mappedSymbol,
-  isInvalid,
-  handleSymbolMapping,
-}: {
+interface SymbolDisplayCellProps {
   csvSymbol: string;
   mappedSymbol: string | undefined;
   isInvalid: boolean;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
-}) {
+}
+function SymbolDisplayCell({
+  csvSymbol,
+  mappedSymbol,
+  isInvalid,
+  handleSymbolMapping,
+}: SymbolDisplayCellProps) {
   // Don't show anything if the symbol is empty/doesn't exist AND it's not invalid
   // We still want to show invalid empty symbols so they can be mapped
   if ((!csvSymbol || csvSymbol.trim() === '') && !isInvalid) {
@@ -197,7 +194,7 @@ function renderSymbolCell({
   if (mappedSymbol || !isInvalid) {
     return (
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-        <span 
+        <span
           className={cn(
             "truncate max-w-[120px]",
             mappedSymbol ? "text-muted-foreground" : (isInvalid ? "text-destructive" : "text-muted-foreground")
@@ -225,8 +222,8 @@ function renderSymbolCell({
   // Show search input only for invalid symbols without mapping
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-      <span 
-        className="text-destructive truncate max-w-[120px]" 
+      <span
+        className="text-destructive truncate max-w-[120px]"
         title={csvSymbol || "Empty symbol"}
       >
         {csvSymbol || "-"}
@@ -263,28 +260,37 @@ export function renderCell({
 
   // Nothing to display if value is empty and not a special field
   if (!value || value.trim() === '') {
-    return <span className="text-muted-foreground text-xs">-</span>;
+    // For symbol field, if it's invalid (e.g. empty but required), we might still want to render SymbolDisplayCell
+    if (field === ImportFormat.SYMBOL && invalidSymbols.includes(value || '')) {
+        // Fall through to SymbolDisplayCell rendering
+    } else {
+      return <span className="text-muted-foreground text-xs">-</span>;
+    }
   }
 
   // Special fields with custom renderers
   if (field === ImportFormat.ACTIVITY_TYPE) {
     const appType = findAppTypeForCsvType(value, mapping.activityMappings);
-    return renderActivityTypeCell({
-      csvType: value,
-      appType,
-      handleActivityTypeMapping,
-    });
+    return (
+      <ActivityTypeDisplayCell
+        csvType={value}
+        appType={appType}
+        handleActivityTypeMapping={handleActivityTypeMapping}
+      />
+    );
   }
 
   if (field === ImportFormat.SYMBOL) {
-    const isInvalid = invalidSymbols.includes(value);
+    const isInvalid = invalidSymbols.includes(value || ''); // handle empty string case for invalidSymbols check
     const mappedSymbol = mapping.symbolMappings[value];
-    return renderSymbolCell({
-      csvSymbol: value,
-      mappedSymbol,
-      isInvalid,
-      handleSymbolMapping,
-    });
+    return (
+      <SymbolDisplayCell
+        csvSymbol={value}
+        mappedSymbol={mappedSymbol}
+        isInvalid={isInvalid}
+        handleSymbolMapping={handleSymbolMapping}
+      />
+    );
   }
 
   // Default renderer for other fields
