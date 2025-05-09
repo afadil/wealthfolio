@@ -69,6 +69,7 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetDataSource?: DataSource;
+  subRows?: ActivityDetails[];
 }
 
 export type ActivitySearchResponse = {

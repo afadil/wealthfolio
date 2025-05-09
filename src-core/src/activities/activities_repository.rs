@@ -193,8 +193,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut activity_db: ActivityDB = new_activity.into();
         activity_db.id = Uuid::new_v4().to_string();
 
-        info!("Creating activity in DB: {:?}", activity_db);
-
         let inserted_activity = diesel::insert_into(activities::table)
             .values(&activity_db)
             .get_result::<ActivityDB>(&mut conn)?;

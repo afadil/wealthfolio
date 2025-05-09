@@ -37,6 +37,7 @@ interface AccountSelectorProps {
   buttonText?: string;
   filterActive?: boolean;
   includePortfolio?: boolean;
+  className?: string;
 }
 
 // Extended Account type for UI that can have the PORTFOLIO type
@@ -107,7 +108,8 @@ export function AccountSelector({
   variant = 'card',
   buttonText = 'Select Account',
   filterActive = true,
-  includePortfolio = false
+  includePortfolio = false,
+  className
 }: AccountSelectorProps) {
   const [open, setOpen] = useState(false);
   const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
@@ -277,7 +279,10 @@ export function AccountSelector({
             role="combobox"
             aria-expanded={open}
             size="sm"
-            className="flex items-center h-10 gap-1.5 rounded-full border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium hover:bg-muted/80"
+            className={cn(
+              "flex items-center h-10 gap-1.5 rounded-full border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium hover:bg-muted/80",
+              className
+            )}
           >
             <div className="flex items-center gap-2">
               {selectedAccount ? (

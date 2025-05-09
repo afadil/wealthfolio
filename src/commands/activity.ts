@@ -81,6 +81,20 @@ export const updateActivity = async (activity: ActivityUpdate): Promise<Activity
   }
 };
 
+export const saveActivities = async (activities: ActivityUpdate[]): Promise<Activity[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('save_activities', { activities: activities });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error saving activities.');
+    throw error;
+  }
+};
+
 export const deleteActivity = async (activityId: string): Promise<Activity> => {
   try {
     switch (getRunEnv()) {

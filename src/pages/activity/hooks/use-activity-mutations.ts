@@ -38,11 +38,12 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
   });
 
   const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
-    const { id, createdAt, updatedAt, date, ...restOfActivityData } = activityToDuplicate;
+    const { id, createdAt, updatedAt, date, comment, ...restOfActivityData } = activityToDuplicate;
     
     const newActivityData: NewActivityFormValues = {
       ...restOfActivityData,
       activityDate: date,
+      comment: "Duplicate",
     } as NewActivityFormValues;
 
     return await createActivity(newActivityData);

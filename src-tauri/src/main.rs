@@ -24,7 +24,6 @@ use context::ServiceContext;
 use events::{
     PortfolioRequestPayload,
     emit_portfolio_trigger_update,
-    emit_portfolio_trigger_recalculate,
 };
 
 pub fn main() {

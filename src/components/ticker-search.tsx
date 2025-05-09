@@ -16,6 +16,7 @@ interface SearchProps {
   value?: string;
   placeholder?: string;
   onSelectResult: (symbol: string) => void;
+  className?: string;
 }
 
 interface SearchResultsProps {
@@ -29,7 +30,7 @@ interface SearchResultsProps {
 
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
-    { selectedResult, defaultValue, value, placeholder = 'Select symbol...', onSelectResult },
+    { selectedResult, defaultValue, value, placeholder = 'Select symbol...', onSelectResult, className },
     ref,
   ) => {
     const [open, setOpen] = useState(false);
@@ -69,7 +70,12 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" className="w-full justify-between" ref={ref}>
+          <Button
+            variant="outline"
+            role="combobox"
+            className={cn("w-full justify-between", className)}
+            ref={ref}
+          >
             {displayName}
             <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>

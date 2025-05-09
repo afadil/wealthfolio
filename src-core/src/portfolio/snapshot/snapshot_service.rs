@@ -392,7 +392,7 @@ impl SnapshotService {
             // Use iterator chain
             let ids_to_delete: Vec<String> = accounts_to_process.keys().cloned().collect();
             if !ids_to_delete.is_empty() {
-                info!(
+                debug!(
                     "Force full calculation: Deleting existing snapshots for accounts: {:?}",
                     ids_to_delete
                 );

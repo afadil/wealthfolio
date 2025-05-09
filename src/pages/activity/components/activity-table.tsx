@@ -32,6 +32,8 @@ import { QueryKeys } from '@/lib/query-keys';
 import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';
 import { ActivityType, ActivityTypeNames } from '@/lib/constants';
 import { useActivityMutations } from '../hooks/use-activity-mutations';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Pencil } from "lucide-react";
 
 const fetchSize = 25;
 
@@ -45,10 +47,14 @@ export const ActivityTable = ({
   accounts,
   handleEdit,
   handleDelete,
+  isEditable,
+  onToggleEditable,
 }: {
   accounts: Account[];
   handleEdit: (activity?: ActivityDetails) => void;
   handleDelete: (activity: ActivityDetails) => void;
+  isEditable: boolean;
+  onToggleEditable: (value: boolean) => void;
 }) => {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
@@ -391,7 +397,30 @@ export const ActivityTable = ({
 
   return (
     <div className="space-y-4">
-      <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
+      <div className="flex justify-between items-center">
+        <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
+        <ToggleGroup
+          type="single"
+          size="sm"
+          value={isEditable ? "edit" : "view"}
+          onValueChange={(value: string) => {
+            if (value === "edit") {
+              onToggleEditable(true);
+            } else if (value === "view") {
+              onToggleEditable(false);
+            }
+          }}
+          aria-label="Table view mode"
+          className="rounded-md bg-muted p-0.5"
+        >
+          <ToggleGroupItem value="view" aria-label="View mode" className="rounded-md px-2.5 py-1.5 text-xs data-[state=on]:bg-background data-[state=on]:text-accent-foreground data-[state=off]:text-muted-foreground data-[state=off]:bg-transparent hover:bg-muted/50 hover:text-accent-foreground transition-colors">
+            <Icons.Rows3 className="h-4 w-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="edit" aria-label="Edit mode" className="rounded-md px-2.5 py-1.5 text-xs data-[state=on]:bg-background data-[state=on]:text-accent-foreground data-[state=off]:text-muted-foreground data-[state=off]:bg-transparent hover:bg-muted/50 hover:text-accent-foreground transition-colors">
+            <Icons.Grid3x3 className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
 
       <div
         className="h-[700px] overflow-y-auto rounded-md border"

@@ -60,6 +60,7 @@ import {
   Pencil,
   Info,
   Globe2,
+  Rows3,
   CircleGauge,
   Receipt,
   Percent,
@@ -69,6 +70,8 @@ import {
   ListChecks,
   Tag,
   Save,
+  Copy,
+  Grid3x3,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -76,6 +79,8 @@ export type Icon = LucideIcon;
 export const Icons = {
   AlertCircle: AlertCircle,
   AlertTriangle: AlertTriangle,
+  Grid3x3: Grid3x3,
+  Rows3: Rows3,
   Calendar: CalendarDays,
   Check: Check,
   CheckCircle: CheckCircle2,
@@ -83,6 +88,7 @@ export const Icons = {
   ListChecks: ListChecks,
   HandCoins: HandCoins,
   Home: Home,
+  Copy: Copy,
   HelpCircle: HelpCircle,
   ArrowRight: ArrowRight,
   ArrowLeft: ArrowLeft,
