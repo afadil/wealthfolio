@@ -3,22 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { DollarSign, PieChart as PieChartIcon } from 'lucide-react';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Bar,
-  ComposedChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Line,
   PieChart,
   Pie,
   Cell,
 } from 'recharts';
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
@@ -33,8 +25,6 @@ import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { formatAmount } from '@/lib/utils';
-import { format } from 'date-fns';
 import { AmountDisplay } from '@/components/amount-display';
 import { IncomeHistoryChart } from './income-history-chart';
 
