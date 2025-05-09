@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/table';
 import { ActivityDetails, Account, ActivitySearchResponse, ActivityUpdate } from '@/lib/types';
 import { tradeActivitySchema, cashActivitySchema, baseActivitySchema } from './forms/schemas';
-import { z, ZodType, ZodTypeDef } from 'zod';
+import { ZodType, ZodTypeDef } from 'zod';
 import { formatDateTime, formatAmount, cn } from '@/lib/utils';
 
 import DatePickerInput from '@/components/ui/date-picker-input';

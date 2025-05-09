@@ -33,7 +33,6 @@ import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivit
 import { ActivityType, ActivityTypeNames } from '@/lib/constants';
 import { useActivityMutations } from '../hooks/use-activity-mutations';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Pencil } from "lucide-react";
 
 const fetchSize = 25;
 

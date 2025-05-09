@@ -2,19 +2,6 @@ import { ActivityImport, ImportMappingData } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 import { logger } from '@/adapters';
 
-// Define the NewActivity type or import it if available elsewhere
-type NewActivity = {
-  id?: string;
-  accountId: string;
-  type: string;
-  date: string;
-  symbol?: string;
-  description?: string;
-  quantity?: number;
-  price?: number;
-  fees?: number;
-  amount?: number;
-};
 
 export const importActivities = async ({
   activities,

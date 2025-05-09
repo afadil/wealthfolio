@@ -27,7 +27,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { worldCurrencies } from '@/lib/currencies';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 // Simplified schema for onboarding - removed 'system' theme option for direct selection
 const onboardingSettingsSchema = z.object({

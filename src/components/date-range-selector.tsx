@@ -115,7 +115,6 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar
-            autoFocus
             mode="range"
             defaultMonth={value?.from}
             selected={value as DayPickerDateRange | undefined}

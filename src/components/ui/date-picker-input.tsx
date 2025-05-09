@@ -7,7 +7,6 @@ import {
   Dialog,
   Group,
   Popover,
-  PopoverProps as RacPopoverProps,
 } from 'react-aria-components';
 import {
   DateValue,
