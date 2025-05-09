@@ -36,7 +36,7 @@ const OnboardingPage = () => {
   };
 
   return (
-    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center pb-16 pt-24">
+    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center py-16 ">
       <img
         alt="Wealthfolio Illustration"
         className="align-self-end mx-auto mb-8"
@@ -49,7 +49,7 @@ const OnboardingPage = () => {
         }}
       />
       <div className="align-self-start w-full max-w-7xl">
-        <div className="w-full flex-1 space-y-6 px-4 md:px-0">{renderCurrentStep()}</div>
+        <div className="w-full flex-1 px-4 md:px-0">{renderCurrentStep()}</div>
       </div>
     
     </section>

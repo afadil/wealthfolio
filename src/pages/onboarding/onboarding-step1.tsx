@@ -30,7 +30,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
-            <ul className="ml-1 space-y-4 text-sm [&>li]:mt-1">
+            <ul className="ml-1 space-y-6 text-sm [&>li]:mt-1">
               <li className="flex items-start">
                 <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
                 <span>
@@ -73,7 +73,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
-            <ul className="ml-1 space-y-4 text-sm [&>li]:mt-1">
+            <ul className="ml-1 space-y-6 text-sm [&>li]:mt-1">
               <li className="flex items-start">
                 <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
                 <span>
