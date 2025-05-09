@@ -31,6 +31,7 @@ import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
 import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';
 import { ActivityType, ActivityTypeNames } from '@/lib/constants';
+import { useActivityMutations } from '../hooks/use-activity-mutations';
 
 const fetchSize = 25;
 
@@ -52,6 +53,12 @@ export const ActivityTable = ({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [sorting, setSorting] = React.useState<SortingState>([]);
+
+  const { duplicateActivityMutation } = useActivityMutations();
+
+  const handleDuplicate = async (activity: ActivityDetails) => {
+    return duplicateActivityMutation.mutateAsync(activity);
+  };
 
   const columns: ColumnDef<ActivityDetails>[] = useMemo(
     () => [
@@ -265,7 +272,7 @@ export const ActivityTable = ({
       {
         id: 'actions',
         cell: ({ row }) => {
-          return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} />;
+          return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />;
         },
       },
     ],

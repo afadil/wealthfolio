@@ -3,6 +3,7 @@ import { toast } from '@/components/ui/use-toast';
 import { createActivity, updateActivity, deleteActivity } from '@/commands/activity';
 import { logger } from '@/adapters';
 import { NewActivityFormValues } from '../components/forms/schemas';
+import { ActivityDetails } from '@/lib/types';
 
 export function useActivityMutations(onSuccess?: (activity: { accountId?: string | null }) => void) {
   const queryClient = useQueryClient();
@@ -36,6 +37,22 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
     ...createMutationOptions('deleting'),
   });
 
+  const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
+    const { id, createdAt, updatedAt, date, ...restOfActivityData } = activityToDuplicate;
+    
+    const newActivityData: NewActivityFormValues = {
+      ...restOfActivityData,
+      activityDate: date,
+    } as NewActivityFormValues;
+
+    return await createActivity(newActivityData);
+  };
+
+  const duplicateActivityMutation = useMutation({
+    mutationFn: duplicateActivity,
+    ...createMutationOptions('duplicating'),
+  });
+
   const submitActivity = async (data: NewActivityFormValues) => {
     const { id, ...rest } = data;
     if (id) {
@@ -48,6 +65,7 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
     addActivityMutation,
     updateActivityMutation,
     deleteActivityMutation,
+    duplicateActivityMutation,
     submitActivity,
   };
 }

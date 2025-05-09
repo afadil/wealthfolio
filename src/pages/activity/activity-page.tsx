@@ -10,7 +10,7 @@ import { Account, ActivityDetails } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { QueryKeys } from '@/lib/query-keys';
-import { useActivityMutations } from './hooks/useActivityMutations';
+import { useActivityMutations } from './hooks/use-activity-mutations';
 import { ActivityForm } from './components/activity-form';
 
 const ActivityPage = () => {

@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { DataSource } from '@/lib/constants';
 import type { ActivityDetails } from '@/lib/types';
-import { useActivityMutations } from '../hooks/useActivityMutations';
+import { useActivityMutations } from '../hooks/use-activity-mutations';
 import { TradeForm } from './forms/trade-form';
 import { CashForm } from './forms/cash-form';
 import { IncomeForm } from './forms/income-form';
