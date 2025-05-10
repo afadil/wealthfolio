@@ -10,7 +10,7 @@ use crate::utils::time_utils::get_days_between;
 
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, RwLock};

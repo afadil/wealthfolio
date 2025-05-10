@@ -107,11 +107,7 @@ export function HoldingCurrencyChart({
           {/* Total amount */}
           <div className="flex flex-col items-baseline space-y-3">
             <div className="text-xl font-light">
-              <AmountDisplay
-                value={totalBase}
-                currency={baseCurrency}
-                isHidden={isBalanceHidden}
-              />
+              <AmountDisplay value={totalBase} currency={baseCurrency} isHidden={isBalanceHidden} />
             </div>
             {/* Progress bar */}
             <ProgressBar data={data} />
@@ -131,18 +127,14 @@ export function HoldingCurrencyChart({
                   />
                   <span className="truncate text-sm font-medium">{currency.name}</span>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2">
-                  <span className="text-sm font-medium">
+                <div className="flex flex-shrink-0 items-center gap-2 text-sm font-medium">
                     <AmountDisplay
                       value={currency.value}
                       currency={baseCurrency}
                       isHidden={isBalanceHidden}
                     />
-                  </span>
                   <span className="text-xs text-muted-foreground">|</span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatPercent(currency.percent)}
-                  </span>
+                  <span className="text-muted-foreground">{formatPercent(currency.percent/100)}</span>
                 </div>
               </div>
             ))}

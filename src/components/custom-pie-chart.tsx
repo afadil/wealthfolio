@@ -20,8 +20,17 @@ const COLORS = [
 
 const renderActiveShape = (props: any) => {
   const { isBalanceHidden } = useBalancePrivacy();
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } =
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent, midAngle } =
     props;
+
+  const RADIAN = Math.PI / 180;
+  // Position for the label next to the arc
+  const labelRadiusOffset = 20; // Adjust as needed
+  const labelX = cx + (outerRadius + labelRadiusOffset) * Math.cos(-midAngle * RADIAN);
+  const labelY = cy + (outerRadius + labelRadiusOffset) * Math.sin(-midAngle * RADIAN);
+  const amountToDisplay = isBalanceHidden
+    ? '••••••'
+    : value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
     <g>
@@ -53,10 +62,10 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 16}
-        fill={fill}
+        fill={'hsl(var(--muted-foreground))'}
         textAnchor="middle"
         dominantBaseline="central"
-        className="text-xs"
+        className="text-xs font-medium"
       >
         {payload.name}
       </text>
@@ -65,24 +74,29 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 2}
-        fill={fill}
         textAnchor="middle"
+        fill={'hsl(var(--foreground))'}
         dominantBaseline="central"
-        className="text-xs"
+        className="text-xs font-medium"
       >
         {formatPercent(percent)}
       </text>
 
       {/* Center label with value */}
-      <text
-        x={cx}
-        y={cy + 30}
-        fill={fill}
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="text-xs"
-      >
+      <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" className="text-xs">
         <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
+      </text>
+
+      {/* Label next to the arc for active shape */}
+      <text
+        x={labelX}
+        y={labelY}
+        fill="hsl(var(--foreground))"
+        textAnchor={labelX > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        className="text-xs font-medium"
+      >
+        {amountToDisplay}
       </text>
     </g>
   );
@@ -150,6 +164,7 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
           <ChartTooltip
             cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
             content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
+            position={{ y: 0 }}
           />
         )}
         <Pie

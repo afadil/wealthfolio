@@ -1,12 +1,17 @@
 import { Holding, Sector } from '@/lib/types';
 import { useMemo } from 'react';
-import { Bar, BarChart, Cell, XAxis, YAxis, Tooltip } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChartContainer } from '@/components/ui/chart';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Icons } from '@/components/icons';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { formatPercent } from '@/lib/utils';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -52,22 +57,6 @@ function getSectorsData(holdings: Holding[]) {
   return sortedSectors;
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <Card>
-        <CardHeader className="p-4">
-          <CardTitle className="text-sm text-muted-foreground">{payload[0].payload.name}</CardTitle>
-          <p className="text-sm font-semibold">
-            <PrivacyAmount value={payload[0].value} currency="USD" />
-          </p>
-        </CardHeader>
-      </Card>
-    );
-  }
-  return null;
-};
-
 interface SectorsChartProps {
   holdings: Holding[];
   isLoading?: boolean;
@@ -75,6 +64,7 @@ interface SectorsChartProps {
 
 export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
   const sectors = useMemo(() => getSectorsData(holdings), [holdings]);
+  const total = sectors.reduce((sum, s) => sum + s.value, 0);
 
   return (
     <Card className="h-full">
@@ -83,47 +73,65 @@ export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
           <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
             Sector Allocation
           </CardTitle>
-          <span className="text-sm text-muted-foreground">
-            {isLoading ? '' : sectors.length ? `${sectors.length} sectors` : 'No data'}
-          </span>
         </div>
       </CardHeader>
-      <CardContent className="h-full w-full">
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-[90%]" />
-            <Skeleton className="h-8 w-[80%]" />
-            <Skeleton className="h-8 w-[70%]" />
-            <Skeleton className="h-8 w-[60%]" />
-            <Skeleton className="h-8 w-[50%]" />
-          </div>
-        ) : holdings.length === 0 ? (
-          <div className="flex h-[330px] items-center justify-center">
-            <EmptyPlaceholder
-              icon={<Icons.BarChart className="h-10 w-10" />}
-              title="No sectors data"
-              description="There is no sector data available for your holdings."
-            />
-          </div>
-        ) : (
-          <ChartContainer config={{}} className="h-full w-full pb-0 pl-0 pt-2">
-            <BarChart
-              data={sectors}
-              layout="vertical"
-              margin={{ top: 10, right: 0, left: 50, bottom: 70 }}
-            >
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="name" className="text-xs" stroke="currentColor" />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
-                {sectors.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ChartContainer>
-        )}
+      <CardContent className="h-full w-full relative">
+        <TooltipProvider>
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-[90%]" />
+              <Skeleton className="h-8 w-[80%]" />
+              <Skeleton className="h-8 w-[70%]" />
+              <Skeleton className="h-8 w-[60%]" />
+              <Skeleton className="h-8 w-[50%]" />
+            </div>
+          ) : holdings.length === 0 ? (
+            <div className="flex h-[330px] items-center justify-center">
+              <EmptyPlaceholder
+                icon={<Icons.BarChart className="h-10 w-10" />}
+                title="No sectors data"
+                description="There is no sector data available for your holdings."
+              />
+            </div>
+          ) : (
+            <div className="space-y-4 pt-2">
+              {sectors.map((sector) => {
+                const percent = total > 0 ? (sector.value / total) : 0;
+                return (
+                  <Tooltip key={sector.name} delayDuration={100}>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-4">
+                        {/* Label */}
+                        <span className="w-32 text-sm">{sector.name}</span>
+                        {/* Progress Bar */}
+                        <div className="mx-2 flex-1">
+                          <div className="relative h-3 rounded bg-muted">
+                            <div
+                              className="bg-chart-1 absolute left-0 top-0 h-3 rounded"
+                              style={{ width: `${percent * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        {/* Percentage */}
+                        <span className="w-10 text-right text-sm font-medium text-muted-foreground">
+                          {formatPercent(percent)}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="center">
+                      <span className="text-[0.70rem] uppercase text-muted-foreground">{sector.name}</span>
+                      {/* <div className="font-semibold">{sector.name}</div> */}
+                      <div>
+                        <PrivacyAmount value={sector.value} currency="USD" />
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          )}
+        </TooltipProvider>
       </CardContent>
     </Card>
   );

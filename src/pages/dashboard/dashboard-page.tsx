@@ -48,6 +48,7 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>(INITIAL_INTERVAL_CODE);
+  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>('Last 3 months');
 
   const {
     valuationHistory,
@@ -101,10 +102,11 @@ export default function DashboardPage() {
   // Callback for IntervalSelector
   const handleIntervalSelect = (
     code: TimePeriod, 
-    _description: string,
+    description: string,
     range: DateRange | undefined
   ) => {
     setSelectedIntervalCode(code);
+    setSelectedIntervalDescription(description);
     setDateRange(range); 
   };
 
@@ -133,6 +135,11 @@ export default function DashboardPage() {
                   value={percentageToDisplay}
                   animated={true}
                 ></GainPercent>
+                {selectedIntervalDescription && (
+                  <span className="text-md font-light text-muted-foreground ml-1">
+                    - {selectedIntervalDescription}
+                  </span>
+                )}
               </div>
             </div>
             <PrivacyToggle className="mt-2" />

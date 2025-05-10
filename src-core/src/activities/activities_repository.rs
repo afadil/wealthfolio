@@ -3,7 +3,6 @@ use diesel::expression_methods::ExpressionMethods;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
-use log::info;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 use std::sync::Arc;
