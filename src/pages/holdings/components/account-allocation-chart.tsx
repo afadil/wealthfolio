@@ -11,9 +11,10 @@ import { QueryKeys } from '@/lib/query-keys';
 
 interface AccountAllocationChartProps {
   isLoading?: boolean;
+  onAccountSectionClick?: (groupOrAccountName: string, accountIdsInGroup: string[]) => void;
 }
 
-export function AccountAllocationChart({ isLoading: isLoadingProp }: AccountAllocationChartProps) {
+export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSectionClick }: AccountAllocationChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
@@ -76,6 +77,23 @@ export function AccountAllocationChart({ isLoading: isLoadingProp }: AccountAllo
     setActiveIndex(index);
   };
 
+  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+    if (onAccountSectionClick && accounts) {
+      const groupOrAccountName = sectionData.name;
+      const accountIdsInGroup = accounts
+        .filter(acc => (acc.group || acc.name) === groupOrAccountName)
+        .map(acc => acc.id);
+      
+      if (accountIdsInGroup.length > 0) {
+        onAccountSectionClick(groupOrAccountName, accountIdsInGroup);
+      }
+    }
+    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    if (clickedIndex !== -1) {
+        setActiveIndex(clickedIndex);
+    }
+  };
+
   return (
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
@@ -91,6 +109,7 @@ export function AccountAllocationChart({ isLoading: isLoadingProp }: AccountAllo
             data={data}
             activeIndex={activeIndex}
             onPieEnter={onPieEnter}
+            onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}
           />

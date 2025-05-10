@@ -13,18 +13,6 @@ import {
 } from "@/components/ui/tooltip";
 import { formatPercent } from '@/lib/utils';
 
-const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-6))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-8))',
-  'hsl(var(--chart-9))',
-];
-
 function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
   const sectors = holdings?.reduce(
@@ -60,9 +48,10 @@ function getSectorsData(holdings: Holding[]) {
 interface SectorsChartProps {
   holdings: Holding[];
   isLoading?: boolean;
+  onSectorSectionClick?: (sectorName: string) => void;
 }
 
-export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
+export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: SectorsChartProps) {
   const sectors = useMemo(() => getSectorsData(holdings), [holdings]);
   const total = sectors.reduce((sum, s) => sum + s.value, 0);
 
@@ -101,27 +90,73 @@ export function SectorsChart({ holdings, isLoading }: SectorsChartProps) {
                 return (
                   <Tooltip key={sector.name} delayDuration={100}>
                     <TooltipTrigger asChild>
-                      <div className="flex items-center gap-4">
-                        {/* Label */}
-                        <span className="w-32 text-sm">{sector.name}</span>
-                        {/* Progress Bar */}
-                        <div className="mx-2 flex-1">
-                          <div className="relative h-3 rounded bg-muted">
+                      <div
+                        className="flex cursor-pointer items-center gap-0 rounded-md py-1 hover:bg-muted"
+                        onClick={() => onSectorSectionClick && onSectorSectionClick(sector.name)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            onSectorSectionClick && onSectorSectionClick(sector.name);
+                          }
+                        }}
+                      >
+                        {/* Container for Progress bar, Percentage, and Name */}
+                        <div className="relative h-5 flex-1 overflow-hidden rounded bg-secondary">
+                          {/* Actual Progress Fill */}
+                          <div
+                            className="bg-chart-2 absolute left-0 top-0 h-full rounded"
+                            style={{
+                              width: `${percent * 100}%`,
+                            }}
+                          />
+                          {/* Conditional Text Block */}
+                          {percent * 100 > 50 ? (
+                            <>
+                              {/* Percentage INSIDE the fill, right-aligned, white text */}
+                              <div
+                                className="absolute left-0 top-0 flex h-full items-center justify-end pr-1 text-xs font-medium text-background"
+                                style={{ width: `${percent * 100}%` }}
+                              >
+                                <span className="whitespace-nowrap">{formatPercent(percent)}</span>
+                              </div>
+                              {/* Name OUTSIDE the fill, right-aligned, standard text color */}
+                              <div
+                                className="absolute top-0 flex h-full items-center justify-end pl-1 pr-1 text-xs font-medium text-foreground"
+                                style={{
+                                  left: `${percent * 100}%`,
+                                  right: '0',
+                                }}
+                              >
+                                <span className="truncate" title={sector.name}>
+                                  {sector.name}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            // Percentage and Name both OUTSIDE the fill, standard text colors
                             <div
-                              className="bg-chart-1 absolute left-0 top-0 h-3 rounded"
-                              style={{ width: `${percent * 100}%` }}
-                            />
-                          </div>
+                              className="absolute top-0 flex h-full items-center justify-between text-xs font-medium text-foreground/70 dark:text-foreground/90"
+                              style={{
+                                left: `${percent * 100}%`,
+                                right: '0',
+                              }}
+                            >
+                              <span className="whitespace-nowrap pl-1">
+                                {formatPercent(percent)}
+                              </span>
+                              <span className="truncate pl-1 pr-1" title={sector.name}>
+                                {sector.name}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        {/* Percentage */}
-                        <span className="w-10 text-right text-sm font-medium text-muted-foreground">
-                          {formatPercent(percent)}
-                        </span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">
-                      <span className="text-[0.70rem] uppercase text-muted-foreground">{sector.name}</span>
-                      {/* <div className="font-semibold">{sector.name}</div> */}
+                      <span className="text-[0.70rem] uppercase text-muted-foreground">
+                        {sector.name}
+                      </span>
                       <div>
                         <PrivacyAmount value={sector.value} currency="USD" />
                       </div>

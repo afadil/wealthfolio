@@ -8,9 +8,10 @@ import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 interface CountryChartProps {
   holdings?: Holding[];
   isLoading?: boolean;
+  onCountrySectionClick?: (countryName: string) => void;
 }
 
-export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
+export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: CountryChartProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => {
@@ -58,6 +59,16 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
     setActiveIndex(index);
   };
 
+  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+    if (onCountrySectionClick) {
+      onCountrySectionClick(sectionData.name);
+    }
+    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    if (clickedIndex !== -1) {
+        setActiveIndex(clickedIndex);
+    }
+  };
+
   return (
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
@@ -73,6 +84,7 @@ export const CountryChart = ({ holdings, isLoading }: CountryChartProps) => {
             data={data}
             activeIndex={activeIndex}
             onPieEnter={onPieEnter}
+            onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}
             displayTooltip={false}

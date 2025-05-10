@@ -32,11 +32,23 @@ function getClassData(holdings: Holding[]) {
 interface ClassesChartProps {
   holdings?: Holding[];
   isLoading?: boolean;
+  onClassSectionClick?: (className: string) => void;
 }
 
-export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
+export function ClassesChart({ holdings, isLoading, onClassSectionClick }: ClassesChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+
   const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
+
+  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+    if (onClassSectionClick) {
+      onClassSectionClick(sectionData.name);
+    }
+    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    if (clickedIndex !== -1) {
+        setActiveIndex(clickedIndex);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -75,6 +87,7 @@ export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
             data={data}
             activeIndex={activeIndex}
             onPieEnter={onPieEnter}
+            onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}
           />

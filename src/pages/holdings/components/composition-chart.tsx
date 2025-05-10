@@ -79,7 +79,7 @@ const CustomizedContent = (props: any) => {
   const colorScale = getColorScale(gain, maxGain, minGain);
 
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }}>
       <rect
         x={x}
         y={y}

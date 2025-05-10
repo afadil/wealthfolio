@@ -10,7 +10,6 @@ import type { Holding } from '@/lib/types';
 // Using theme chart colors
 const INDICATOR_COLORS = [
   'hsl(var(--chart-1))',
-  'hsl(var(--chart-3))',
   'hsl(var(--chart-5))',
   'hsl(var(--chart-7))',
   'hsl(var(--chart-9))',
@@ -79,12 +78,14 @@ interface HoldingCurrencyChartProps {
   holdings: Holding[];
   baseCurrency: string;
   isLoading?: boolean;
+  onCurrencySectionClick?: (currencyName: string) => void;
 }
 
 export function HoldingCurrencyChart({
   holdings = [],
   baseCurrency = 'USD',
   isLoading = false,
+  onCurrencySectionClick,
 }: HoldingCurrencyChartProps) {
   const { data, totalBase } = useMemo(() => getCurrencyData(holdings, baseCurrency), [holdings, baseCurrency]);
   const { isBalanceHidden } = useBalancePrivacy();
@@ -118,7 +119,15 @@ export function HoldingCurrencyChart({
             {data.map((currency, index) => (
               <div
                 key={currency.name}
-                className="flex items-center justify-between gap-4 rounded-md py-1 transition-colors hover:bg-muted/50"
+                className="flex items-center justify-between gap-4 rounded-md py-1 transition-colors hover:bg-muted/50 cursor-pointer"
+                onClick={() => onCurrencySectionClick && onCurrencySectionClick(currency.name)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onCurrencySectionClick && onCurrencySectionClick(currency.name);
+                  }
+                }}
               >
                 <div className="flex min-w-0 items-center gap-2.5">
                   <div

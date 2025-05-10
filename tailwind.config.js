@@ -88,6 +88,8 @@ export default {
           foreground: 'hsl(var(--warning-foreground))',
         },
         'chart-1': 'hsl(var(--chart-1))',
+        'chart-2': 'hsl(var(--chart-2))',
+        'chart-3': 'hsl(var(--chart-3))',
         blue: {
           50: '#E1ECEB',
           100: '#C6DDE8',

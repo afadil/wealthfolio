@@ -33,7 +33,7 @@ const renderActiveShape = (props: any) => {
     : value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }}>
       {/* Main sector */}
       <Sector
         cx={cx}
@@ -106,7 +106,7 @@ const renderInactiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
 
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }}>
       <Sector
         cx={cx}
         cy={cy}
@@ -126,6 +126,7 @@ interface CustomPieChartProps {
   activeIndex: number;
   onPieEnter: (event: React.MouseEvent, index: number) => void;
   onPieLeave?: (event: React.MouseEvent, index: number) => void;
+  onSectionClick?: (data: { name: string; value: number }, index: number) => void;
   startAngle?: number;
   endAngle?: number;
   displayTooltip?: boolean;
@@ -136,6 +137,7 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   activeIndex,
   onPieEnter,
   onPieLeave,
+  onSectionClick,
   startAngle = 180,
   endAngle = 0,
   displayTooltip = false,
@@ -182,6 +184,11 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
           inactiveShape={renderInactiveShape}
           onMouseEnter={onPieEnter}
           onMouseLeave={onPieLeave}
+          onClick={(event, index) => {
+            if (onSectionClick && data[index]) {
+              onSectionClick(data[index], index);
+            }
+          }}
           startAngle={startAngle}
           endAngle={endAngle}
         >
