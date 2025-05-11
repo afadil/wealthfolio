@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import GoalsAllocations from './components/goal-allocations';
 import { useAccounts } from '@/hooks/use-accounts';
 import { QueryKeys } from '@/lib/query-keys';
-import { useGoalMutations } from './useGoalMutations';
+import { useGoalMutations } from './use-goal-mutations';
 
 const SettingsGoalsPage = () => {
   const { data: goals, isLoading } = useQuery<Goal[], Error>({

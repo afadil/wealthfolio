@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { useAccountMutations } from './useAccountMutations';
+import { useAccountMutations } from './use-account-mutations';
 
 const accountTypes = [
   { label: 'Securities', value: 'SECURITIES' },

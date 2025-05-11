@@ -8,7 +8,7 @@ import { StepIndicator } from './components/step-indicator';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AccountSelectionStep } from './steps/account-selection-step';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { useCsvParser } from './hooks/useCsvParser';
+import { useCsvParser } from './hooks/use-csv-parser';
 import { validateActivityImport } from './utils/validation-utils';
 import { MappingStep } from './steps/mapping-step';
 import { DataPreviewStep } from './steps/preview-step';

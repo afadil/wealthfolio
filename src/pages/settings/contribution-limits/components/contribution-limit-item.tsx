@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Account, ContributionLimit } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useContributionLimitProgress } from '../useContributionLimitMutations';
+import { useContributionLimitProgress } from '../use-contribution-limit-mutations';
 
 type ContributionLimitItemProps = {
   limit: ContributionLimit;

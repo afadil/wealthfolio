@@ -11,7 +11,7 @@ import ActivityPage from '@/pages/activity/activity-page';
 import ActivityImportPage from '@/pages/activity/import/activity-import-page';
 import HoldingsPage from '@/pages/holdings/holdings-page';
 import AssetProfilePage from './pages/asset/asset-profile-page';
-import useGlobalEventListener from './useGlobalEventListener';
+import useGlobalEventListener from './use-global-event-listener';
 import GeneralSettingsPage from './pages/settings/general/general-page';
 import OnboardingPage from './pages/onboarding/onboarding-page';
 import SettingsGoalsPage from './pages/settings/goals/goals-page';

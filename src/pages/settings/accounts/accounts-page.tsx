@@ -11,7 +11,7 @@ import { getAccounts } from '@/commands/account';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
-import { useAccountMutations } from './components/useAccountMutations';
+import { useAccountMutations } from './components/use-account-mutations';
 
 const SettingsAccountsPage = () => {
   const { data: accounts, isLoading } = useQuery<Account[], Error>({

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useExchangeRates } from './useExchangeRate';
+import { useExchangeRates } from './use-exchange-rate';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { ExchangeRate } from '@/lib/types';

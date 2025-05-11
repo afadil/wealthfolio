@@ -5,7 +5,7 @@ use crate::market_data::market_data_traits::MarketDataServiceTrait;
 use crate::portfolio::holdings::{Holding, HoldingType, MonetaryValue};
 use async_trait::async_trait;
 use chrono::Utc;
-use log::{debug, info, warn};
+use log::{debug, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
@@ -94,7 +94,7 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
         if holdings.is_empty() {
             return Ok(());
         }
-        info!(
+        debug!(
             "Starting calculate_holdings_live_valuation for {} holdings.",
             holdings.len()
         );
@@ -125,7 +125,7 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
             }
         }
 
-        info!("Finished calculate_holdings_live_valuation.");
+        debug!("Finished calculate_holdings_live_valuation.");
         Ok(())
     }
 }

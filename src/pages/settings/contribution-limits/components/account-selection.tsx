@@ -3,7 +3,7 @@ import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { Account, ContributionLimit, DepositsCalculation } from '@/lib/types';
-import { useContributionLimitMutations } from '../useContributionLimitMutations';
+import { useContributionLimitMutations } from '../use-contribution-limit-mutations';
 import { formatAmount } from '@/lib/utils';
 
 interface AccountSelectionProps {

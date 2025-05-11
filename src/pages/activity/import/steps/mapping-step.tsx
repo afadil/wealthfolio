@@ -3,7 +3,7 @@ import { CsvMappingEditor } from '../components/mapping-editor';
 import { ImportFormat, ActivityType, ImportMappingData, CsvRowData } from '@/lib/types';
 import { useMemo } from 'react';
 import { validateTickerSymbol } from '../utils/validation-utils';
-import { useImportMapping } from '../hooks/useImportMapping';
+import { useImportMapping } from '../hooks/use-import-mapping';
 import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
 import { ImportAlert } from '../components/import-alert';
 import { Icons } from '@/components/icons';

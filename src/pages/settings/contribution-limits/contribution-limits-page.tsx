@@ -9,7 +9,7 @@ import { getContributionLimit } from '@/commands/contribution-limits';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
-import { useContributionLimitMutations } from './useContributionLimitMutations';
+import { useContributionLimitMutations } from './use-contribution-limit-mutations';
 import { ContributionLimitItem } from './components/contribution-limit-item';
 import { ContributionLimitEditModal } from './components/contribution-limit-edit-modal';
 import { useAccounts } from '@/hooks/use-accounts';

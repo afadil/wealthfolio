@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CSVFileViewer } from '../components/csv-file-viewer';
 import { ImportPreviewTable } from '../import-preview-table';
 import { ImportAlert } from '../components/import-alert';
-import { useActivityImportMutations } from '../hooks/useActivityImportMutations';
+import { useActivityImportMutations } from '../hooks/use-activity-import-mutations';
 import { Icons } from '@/components/icons';
 import { ImportProgressIndicator } from '../components/progress-indicator';
 import { motion, AnimatePresence } from 'framer-motion';

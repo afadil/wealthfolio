@@ -137,7 +137,7 @@ export default function DashboardPage() {
                 ></GainPercent>
                 {selectedIntervalDescription && (
                   <span className="text-md font-light text-muted-foreground ml-1">
-                    - {selectedIntervalDescription}
+                     {selectedIntervalDescription}
                   </span>
                 )}
               </div>

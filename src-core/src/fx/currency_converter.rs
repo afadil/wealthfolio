@@ -156,7 +156,6 @@ impl CurrencyConverter {
                 log::debug!("Added rates for date {} to converter.", date);
             }
         }
-        log::info!("CurrencyConverter initialized with data for {} dates.", self.sorted_dates.len());
         Ok(())
     }
 

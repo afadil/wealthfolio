@@ -18,8 +18,13 @@ import { GainPercent } from '@/components/gain-percent';
 import NumberFlow from '@number-flow/react';
 import { AccountSelector } from '../../components/account-selector';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
-
-
+import {
+  MetricLabelWithInfo,
+  TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
+  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
+  VOLATILITY_INFO as volatilityInfo,
+  MAX_DRAWDOWN_INFO as maxDrawdownInfo
+} from '@/components/metric-display';
 
 const PORTFOLIO_TOTAL: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
@@ -112,7 +117,6 @@ function PerformanceContent({
     </div>
   );
 }
-
 
 const SelectedItemBadge = ({ 
   item, 
@@ -319,13 +323,9 @@ export default function PerformancePage() {
                 </div>
                 {performanceData && performanceData.length > 0 && (
                   <div className="grid grid-cols-2 gap-6 rounded-lg p-2 backdrop-blur-sm md:grid-cols-4">
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-light text-muted-foreground">
-                          Total Return
-                        </span>
-                      </div>
-                      <div className="flex items-baseline">
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                      <div className="flex justify-center items-baseline">
                         <span
                           className={`text-lg ${
                             selectedItemData && selectedItemData.totalReturn >= 0
@@ -338,13 +338,9 @@ export default function PerformancePage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-light text-muted-foreground">
-                          Annualized Return
-                        </span>
-                      </div>
-                      <div className="flex items-baseline">
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Annualized Return" infoText={annualizedReturnInfo} />
+                      <div className="flex justify-center items-baseline">
                         <span
                           className={`text-lg ${
                             selectedItemData && selectedItemData.annualizedReturn >= 0
@@ -361,11 +357,9 @@ export default function PerformancePage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-light text-muted-foreground">Volatility</span>
-                      </div>
-                      <div className="flex items-baseline">
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                      <div className="flex justify-center items-baseline">
                         <span className="text-lg text-foreground">
                           <NumberFlow
                             value={(selectedItemData?.volatility || 0)}
@@ -379,13 +373,9 @@ export default function PerformancePage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-light text-muted-foreground">
-                          Max Drawdown
-                        </span>
-                      </div>
-                      <div className="flex items-baseline">
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                      <div className="flex justify-center items-baseline">
                         <span className="text-lg text-destructive">
                           <NumberFlow
                             value={(selectedItemData?.maxDrawdown || 0) * -1}

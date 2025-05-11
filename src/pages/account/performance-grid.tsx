@@ -1,85 +1,15 @@
 import React from 'react';
 import { Card, CardContent} from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
-import { Info } from 'lucide-react';
 import { PerformanceMetrics } from '@/lib/types';
-import { GainPercent } from '@/components/gain-percent';
 import { cn } from '@/lib/utils';
-
-
-interface MetricDisplayProps {
-  label: string;
-  value: number;
-  infoText: string;
-  annualizedValue?: number | null;
-  isPercentage?: boolean;
-  className?: string;
-}
-
-const MetricDisplay: React.FC<MetricDisplayProps> = ({
-  label,
-  value,
-  infoText,
-  annualizedValue,
-  isPercentage = true,
-  className,
-}) => {
-  const displayValue = (
-    <GainPercent 
-      value={value} 
-      animated={true} 
-      showSign={isPercentage}
-      className={cn(
-        "text-base font-medium",
-        !isPercentage && "text-foreground"
-      )}
-    />
-  );
-
-  return (
-    <div
-      className={cn(
-        'flex min-h-[4rem] flex-col items-center justify-center space-y-1 p-4 md:p-4',
-        className,
-      )}
-    >
-      <div className="flex items-center text-xs text-muted-foreground">
-        <span>{label}</span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="ml-1 h-4 w-4 rounded-full">
-              <Info className="h-3 w-3" />
-              <span className="sr-only">More info about {label}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-60 text-xs" side="top" align="center">
-            {infoText}
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {annualizedValue !== undefined && annualizedValue !== null ? (
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">{displayValue}</div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">
-                Annualized: <GainPercent value={annualizedValue} />
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ) : (
-        <div>{displayValue}</div>
-      )}
-    </div>
-  );
-};
+import {
+  MetricDisplay,
+  TIME_WEIGHTED_RETURN_INFO,
+  MONEY_WEIGHTED_RETURN_INFO,
+  VOLATILITY_INFO,
+  MAX_DRAWDOWN_INFO
+} from '@/components/metric-display';
 
 export interface PerformanceGridProps {
   performance?: PerformanceMetrics | null;
@@ -134,18 +64,6 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
     maxDrawdown = 0,
   } = performance;
 
-
-
-  // Explanatory texts for info popovers
-  const twrInfo =
-    'Time-Weighted Return (TWR) measures the compound growth rate of a portfolio, ignoring the impact of cash flows (deposits/withdrawals). It isolates the performance of the underlying investments.';
-  const mwrInfo =
-    'Money-Weighted Return (MWR) measures the performance of a portfolio taking into account the size and timing of cash flows. It represents the internal rate of return (IRR) of the portfolio.';
-  const volatilityInfo =
-    'Volatility measures the dispersion of returns for a given investment. Higher volatility means the price of the investment can change dramatically over a short time period in either direction.';
-  const maxDrawdownInfo =
-    'Maximum Drawdown represents the largest percentage decline from a peak to a subsequent trough in portfolio value during the specified period. It indicates downside risk.';
-
   return (
     <div className={cn('w-full', className)}>
       <Card className="border-none p-0 shadow-none">
@@ -155,7 +73,7 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
               label="Time Weighted Return"
               value={cumulativeTwr}
               annualizedValue={annualizedTwr}
-              infoText={twrInfo}
+              infoText={TIME_WEIGHTED_RETURN_INFO}
               isPercentage={true}
               className="rounded-md border border-muted/30 bg-muted/30"
             />
@@ -163,21 +81,21 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
               label="Money Weighted Return"
               value={cumulativeMwr}
               annualizedValue={annualizedMwr}
-              infoText={mwrInfo}
+              infoText={MONEY_WEIGHTED_RETURN_INFO}
               isPercentage={true}
               className="rounded-md border border-muted/30 bg-muted/30"
             />
             <MetricDisplay
               label="Volatility"
               value={volatility}
-              infoText={volatilityInfo}
+              infoText={VOLATILITY_INFO}
               isPercentage={false}
               className="rounded-md border border-muted/30 bg-muted/30"
             />
             <MetricDisplay
               label="Max Drawdown"
               value={maxDrawdown * -1}
-              infoText={maxDrawdownInfo}
+              infoText={MAX_DRAWDOWN_INFO}
               isPercentage={true}
               className="rounded-md border border-muted/30 bg-muted/30"
             />

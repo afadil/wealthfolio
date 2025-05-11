@@ -5,7 +5,7 @@ use crate::portfolio::snapshot::{self, SnapshotServiceTrait, Position};
 use crate::errors::{Error as CoreError, Result, CalculatorError};
 use async_trait::async_trait;
 use chrono::Utc;
-use log::{error, info, warn};
+use log::{error, debug, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json;
@@ -51,7 +51,7 @@ impl HoldingsService {
 #[async_trait]
 impl HoldingsServiceTrait for HoldingsService {
     async fn get_holdings(&self, account_id: &str, base_currency: &str) -> Result<Vec<Holding>> {
-        info!(
+        debug!(
             "Getting holdings for account {} in base currency {}",
             account_id, base_currency
         );
@@ -263,7 +263,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 }
             }
         } else {
-            info!(
+            debug!(
                 "No holdings found for account {}. Skipping valuation.",
                 account_id
             );
@@ -280,7 +280,7 @@ impl HoldingsServiceTrait for HoldingsService {
                     (holding_view.market_value.base / total_portfolio_value_base).round_dp(4);
             }
         } else {
-            info!("Total portfolio base value is zero or negative for account {}. Allocations set to 0.", account_id);
+            debug!("Total portfolio base value is zero or negative for account {}. Allocations set to 0.", account_id);
             for holding_view in &mut holdings {
                 holding_view.weight = Decimal::ZERO;
             }
@@ -295,7 +295,7 @@ impl HoldingsServiceTrait for HoldingsService {
         asset_id: &str,
         base_currency: &str,
     ) -> Result<Option<Holding>> {
-        info!(
+        debug!(
             "Getting specific holding for asset {} in account {} (base currency: {})",
             asset_id, account_id, base_currency
         );

@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input';
 import DatePickerInput from '@/components/ui/date-picker-input';
 
 import { newContributionLimitSchema } from '@/lib/schemas';
-import { useContributionLimitMutations } from '../useContributionLimitMutations';
+import { useContributionLimitMutations } from '../use-contribution-limit-mutations';
 import { MoneyInput } from '@/components/ui/money-input';
 
 type NewContributionLimit = z.infer<typeof newContributionLimitSchema>;
