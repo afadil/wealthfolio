@@ -43,8 +43,8 @@ export function DataTableFacetedFilter<TData, TValue>({
           variant="outline"
           size="sm"
           className={cn(
-            'h-8',
-            selectedValues?.size > 0 ? 'bg-muted/40' : 'shadow-inner-xs bg-muted/20 border-dashed',
+            'hover:bg-muted/80" h-8 gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium',
+            selectedValues?.size > 0 ? 'bg-muted/40' : 'shadow-inner-xs bg-muted/90',
           )}
         >
           <Icons.PlusCircle className="mr-2 h-4 w-4" />

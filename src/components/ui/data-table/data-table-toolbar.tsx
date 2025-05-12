@@ -41,7 +41,7 @@ export function DataTableToolbar<TData>({
             placeholder="Search ..."
             value={table.getState().globalFilter ?? ''}
             onChange={(value) => table.setGlobalFilter(value)}
-            className="h-8 w-[150px] lg:w-[250px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"
+            className="h-8 w-[150px] lg:w-[250px] shadow-[inset_0_0.5px_0.5px_rgba(0,0,0,0.06)] bg-muted/40 border-border/50"
           />
         )}
         {filters?.map((filter) => (
@@ -70,7 +70,7 @@ export function DataTableToolbar<TData>({
       {showColumnToggle && hideableColumns.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="ml-auto">
+            <Button variant="outline" size="sm" className="ml-auto gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium hover:bg-muted/80">
               Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

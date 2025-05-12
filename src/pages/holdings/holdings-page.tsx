@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { AmountDisplay } from '@/components/amount-display';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
@@ -242,26 +243,27 @@ export const HoldingsPage = () => {
                   }
 
                   return (
-                    <li
+                    <Card
                       key={holding.id}
-                      className="flex justify-between rounded-md border p-3 text-sm"
+                      className="flex items-center justify-between text-sm"
                     >
-                      <div className="flex items-center">
-                        <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
-                          {symbol}
-                        </Badge>
-
-                        <span className="ml-2 line-clamp-1">
-                          {displayName}
-                        </span>
-                      </div>
-                      <span className="text-right font-semibold">
-                        <AmountDisplay
-                          value={Number(holding.marketValue?.base) || 0}
-                          currency={holding.baseCurrency}
-                        />
-                      </span>
-                    </li>
+                      <CardHeader className="flex w-full flex-row items-center justify-between space-x-2 p-4">
+                        <div className="flex items-center space-x-2">
+                          <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
+                            {symbol}
+                          </Badge>
+                          <CardTitle className="text-sm font-normal line-clamp-1">
+                            {displayName}
+                          </CardTitle>
+                        </div>
+                        <div className="text-right font-semibold">
+                          <AmountDisplay
+                            value={Number(holding.marketValue?.base) || 0}
+                            currency={holding.baseCurrency}
+                          />
+                        </div>
+                      </CardHeader>
+                    </Card>
                   );
                 })}
               </ul>
