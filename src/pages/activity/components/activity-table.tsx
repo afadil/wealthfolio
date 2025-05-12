@@ -49,15 +49,19 @@ const activityTypeOptions = [
 
 const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
 
+type ActivityTableProps = {
+  accounts: Account[];
+  handleEdit: (activity?: ActivityDetails) => void;
+  handleDuplicate: (activity: ActivityDetails) => void;
+  handleDelete: (activity: ActivityDetails) => void;
+}
+
 export const ActivityTable = ({
   accounts,
   handleEdit,
+  handleDuplicate,
   handleDelete,
-}: {
-  accounts: Account[];
-  handleEdit: (activity?: ActivityDetails) => void;
-  handleDelete: (activity: ActivityDetails) => void;
-}) => {
+}: ActivityTableProps) => {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -275,7 +279,7 @@ export const ActivityTable = ({
       {
         id: 'actions',
         cell: ({ row }) => {
-          return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} />;
+          return <ActivityOperations row={row} onEdit={handleEdit} onDuplicate={handleDuplicate} onDelete={handleDelete} />;
         },
         enableHiding: false,
       },

@@ -6,7 +6,7 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ActivityTable from './components/activity-table';
 import { useQuery } from '@tanstack/react-query';
-import { Account, ActivityDetails } from '@/lib/types';
+import { Account, ActivityDetails, NewActivity } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { QueryKeys } from '@/lib/query-keys';
@@ -23,11 +23,16 @@ const ActivityPage = () => {
     queryFn: getAccounts,
   });
 
-  const { deleteActivityMutation } = useActivityMutations();
+  const { addActivityMutation, deleteActivityMutation } = useActivityMutations();
 
   const handleEdit = useCallback((activity?: ActivityDetails) => {
     setSelectedActivity(activity);
     setShowForm(true);
+  }, []);
+
+  const handleDuplicate = useCallback(async (activity: ActivityDetails) => {
+    const duplicatedActivity = { ...activity, activityDate: new Date() }
+    await addActivityMutation.mutateAsync(duplicatedActivity as NewActivity);
   }, []);
 
   const handleDelete = useCallback((activity: ActivityDetails) => {
@@ -67,6 +72,7 @@ const ActivityPage = () => {
         <ActivityTable
           accounts={accounts || []}
           handleEdit={handleEdit}
+          handleDuplicate={handleDuplicate}
           handleDelete={handleDelete}
         />
       </div>
