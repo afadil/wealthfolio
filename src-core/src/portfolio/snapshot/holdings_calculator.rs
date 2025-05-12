@@ -72,6 +72,7 @@ impl HoldingsCalculator {
         let mut final_cost_basis_acct = Decimal::ZERO;
         for position in next_state.positions.values() {
              let position_currency = &position.currency;
+
              if position_currency.is_empty() {
                  warn!("Position {} has no currency set. Skipping its cost basis.", position.id);
                  continue;
@@ -82,17 +83,22 @@ impl HoldingsCalculator {
              }
 
              match self.fx_service.convert_currency_for_date(
-                 position.total_cost_basis, 
-                 position_currency, 
-                 &account_currency, 
-                 target_date // SNAPSHOT date
+                 position.total_cost_basis,
+                 position_currency,
+                 &account_currency,
+                 target_date
              ) {
-                 Ok(converted_cost) => final_cost_basis_acct += converted_cost,
+                 Ok(converted_cost) => {
+                    final_cost_basis_acct += converted_cost;
+                 },
                  Err(e) => {
                      error!(
-                         "Holdings Calc (Book Cost): Failed to convert {} {} to {} on {}: {}. Skipping position cost.",
+                         "Holdings Calc (Book Cost): Failed to convert {} {} to {} on {}: {}. Using original unconverted cost for snapshot.",
                          position.total_cost_basis, position_currency, account_currency, target_date, e
                      );
+                     if position_currency != &account_currency {
+                        final_cost_basis_acct += position.total_cost_basis;
+                     }
                  }
              }
          }
@@ -188,7 +194,7 @@ impl HoldingsCalculator {
             activity_currency, 
             activity.activity_date,
         )?;
-        let _cost_basis_asset_curr = position.add_lot(activity, &ActivityType::Buy)?;
+        let _cost_basis_asset_curr = position.add_lot(activity)?;
 
         // Calculate total cost in Account Currency for cash adjustment
         let unit_price_acct = match self.fx_service.convert_currency_for_date(
@@ -370,7 +376,7 @@ impl HoldingsCalculator {
             activity_currency, 
             activity.activity_date,
         )?;
-        let cost_basis_asset_curr = position.add_lot(activity, &ActivityType::AddHolding)?;
+        let cost_basis_asset_curr = position.add_lot(activity)?;
 
         // Adjust cash for fee (already in account currency)
         *state
@@ -496,7 +502,7 @@ impl HoldingsCalculator {
                 activity_currency,
                 activity.activity_date,
             )?;
-            let cost_basis_asset_curr = position.add_lot(activity, &ActivityType::TransferIn)?;
+            let cost_basis_asset_curr = position.add_lot(activity)?;
 
             // Adjust cash for fee (already in account currency)
             *state

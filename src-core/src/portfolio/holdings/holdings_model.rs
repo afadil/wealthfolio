@@ -47,7 +47,7 @@ pub struct Instrument {
     pub sectors: Option<Vec<Sector>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MonetaryValue {
     pub local: Decimal,

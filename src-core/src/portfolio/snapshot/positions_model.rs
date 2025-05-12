@@ -6,7 +6,6 @@ use std::collections::VecDeque;
 use std::default::Default;
 
 use crate::activities::Activity;
-use crate::activities::ActivityType;
 
 use crate::constants::QUANTITY_THRESHOLD;
 
@@ -105,8 +104,8 @@ impl Position {
             quantity: Decimal::ZERO,
             average_cost: Decimal::ZERO,
             total_cost_basis: Decimal::ZERO,
-            currency: asset_currency, // Set initial currency hint
-            inception_date: date,     // Initial inception date
+            currency: asset_currency, 
+            inception_date: date,    
             lots: VecDeque::new(),
             created_at: date,
             last_updated: date,
@@ -159,7 +158,6 @@ impl Position {
     pub fn add_lot(
         &mut self,
         activity: &Activity,
-        activity_type: &ActivityType,
     ) -> Result<Decimal> {
         if !activity.quantity.is_sign_positive() {
             warn!(
@@ -198,12 +196,7 @@ impl Position {
         let acquisition_fees = activity.fee; // Store the fee in activity currency
 
         // Cost basis ONLY includes fees for BUY activities
-        let cost_basis = if *activity_type == ActivityType::Buy {
-            quantity * acquisition_price + acquisition_fees
-        } else {
-            // For AddHolding, TransferIn (Asset), fee affects cash only, not basis
-            quantity * acquisition_price
-        };
+        let cost_basis = quantity * acquisition_price + acquisition_fees;
 
         let new_lot = Lot {
             id: activity.id.clone(), // Use activity ID as Lot ID

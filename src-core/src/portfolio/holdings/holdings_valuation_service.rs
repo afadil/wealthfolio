@@ -154,6 +154,22 @@ impl HoldingsValuationService {
         let pos_currency = &holding.local_currency;
         let context_msg = format!("HoldingValuation [Security {}]", symbol);
 
+        // --- Calculate FX Rate (Needed even for zero quantity) ---
+        let fx_rate_local_to_base = self.get_fx_rate_or_fallback(
+            pos_currency,
+            base_currency,
+            &format!("{}: FX Local->Base", context_msg),
+        );
+        holding.fx_rate = Some(fx_rate_local_to_base);
+
+        // --- Calculate Base Cost Basis (If applicable) ---
+        if let Some(cost_basis) = &mut holding.cost_basis {
+            cost_basis.base = cost_basis.local * fx_rate_local_to_base;
+        } else {
+            warn!("{}: Cost basis local value missing...", context_msg);
+        }
+
+        // --- Handle Zero Quantity ---
         if quantity == Decimal::ZERO {
             warn!("{}: Skipping valuation for zero quantity.", context_msg);
             holding.market_value = MonetaryValue::zero();
@@ -163,25 +179,11 @@ impl HoldingsValuationService {
             holding.day_change = None;
             holding.day_change_pct = None;
             holding.prev_close_value = None;
+            // FX rate and base cost basis are already set above
             return Ok(());
         }
 
-        let fx_rate_local_to_base = self.get_fx_rate_or_fallback(
-            pos_currency,
-            base_currency,
-            &format!("{}: FX Local->Base", context_msg),
-        );
-        holding.fx_rate = Some(fx_rate_local_to_base);
-
-        if let Some(cost_basis) = &mut holding.cost_basis {
-            cost_basis.base = cost_basis.local * fx_rate_local_to_base;
-        } else {
-            warn!(
-                "{}: Cost basis local value missing. Base cost basis cannot be calculated.",
-                context_msg
-            );
-        }
-
+        // --- Fetch and Process Quote Data (For Non-Zero Quantity) ---
         if let Some(quote_pair) = latest_quote_pairs.get(symbol) {
             let latest_quote = &quote_pair.latest;
             let prev_quote_opt = quote_pair.previous.as_ref();

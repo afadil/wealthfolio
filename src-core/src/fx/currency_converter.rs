@@ -270,7 +270,7 @@ impl CurrencyConverter {
 mod tests {
     use super::*;
     use crate::market_data::market_data_model::DataSource;
-    use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
+    use chrono::{NaiveDate, TimeZone, Utc};
 
     fn test_exchange_rates() -> Vec<ExchangeRate> {
         // Helper to create DateTime<Utc> from NaiveDate
