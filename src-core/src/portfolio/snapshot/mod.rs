@@ -11,3 +11,6 @@ pub use snapshot_service::*;
 pub use holdings_calculator::*;
 pub use positions_model::*;
 pub use snapshot_model::*;
+
+#[cfg(test)]
+mod holdings_calculator_tests;

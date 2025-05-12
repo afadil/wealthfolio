@@ -125,6 +125,7 @@ export default function DatePickerInput({
       onChange={handleRacChange}
       isDisabled={disabled}
       granularity={actualGranularity}
+      aria-label='Date'
       className={cn(`*:not-first:mt-2`, className)}
       {...props}
     >
