@@ -11,10 +11,14 @@ use super::market_data_traits::MarketDataRepositoryTrait;
 use crate::db::get_connection;
 use crate::errors::Result;
 use crate::market_data::market_data_model::{LatestQuotePair, QuoteDb};
-use crate::schema::quotes::dsl::{data_source, id, quotes, symbol, timestamp};
+use crate::schema::quotes::dsl::{quotes, symbol, timestamp};
 use diesel::sql_query;
 use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
+
+// Import for daily_account_valuation table
+use crate::schema::daily_account_valuation::dsl as dav_dsl;
+use super::market_data_constants::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -77,7 +81,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     fn delete_quote(&self, quote_id: &str) -> Result<()> {
         let mut conn = get_connection(&self.pool)?;
 
-        diesel::delete(quotes.filter(id.eq(quote_id)))
+        diesel::delete(quotes.filter(crate::schema::quotes::dsl::id.eq(quote_id)))
             .execute(&mut conn)
             .map_err(MarketDataError::DatabaseError)?;
 
@@ -98,7 +102,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
         Ok(quotes
             .filter(symbol.eq(input_symbol))
-            .filter(data_source.eq(source))
+            .filter(crate::schema::quotes::dsl::data_source.eq(source))
             .order(timestamp.asc())
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
@@ -281,5 +285,31 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .into_iter()
             .map(Quote::from)
             .collect())
+    }
+
+    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Fetch the latest calculated_at from daily_account_valuation table
+        let latest_calculated_at_str: Option<String> = dav_dsl::daily_account_valuation
+            .select(diesel::dsl::max(dav_dsl::calculated_at))
+            .first::<Option<String>>(&mut conn)
+            .optional()?
+            .flatten();
+
+        let latest_sync_naive_datetime: Option<NaiveDateTime> = latest_calculated_at_str.and_then(|s| {
+            DateTime::parse_from_rfc3339(&s)
+                .ok()
+                .map(|dt_utc| dt_utc.naive_utc())
+        });
+
+        let mut sync_dates_map: HashMap<String, Option<NaiveDateTime>> = HashMap::new();
+
+        // Use the single latest_sync_naive_datetime for all known providers
+        sync_dates_map.insert(DATA_SOURCE_YAHOO.to_string(), latest_sync_naive_datetime);
+        sync_dates_map.insert(DATA_SOURCE_MANUAL.to_string(), latest_sync_naive_datetime);
+        // Add other providers here if MarketDataService expects them
+
+        Ok(sync_dates_map)
     }
 }

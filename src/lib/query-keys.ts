@@ -45,4 +45,7 @@ export const QueryKeys = {
     QueryKeys.ACCOUNTS_SIMPLE_PERFORMANCE,
     [...accountIds].sort().join(',') || 'none',
   ],
+
+  // Market Data Providers
+  MARKET_DATA_PROVIDERS: 'marketDataProviders',
 } as const;

@@ -20,6 +20,7 @@ const useGlobalEventListener = () => {
 
   useEffect(() => {
     const handlePortfolioUpdateStart = () => {
+      console.log('Portfolio update started');
       // Store the toast object when creating the toast
       updateToastRef.current = toast({
         description: 'Updating Portfolio ...',
@@ -28,6 +29,9 @@ const useGlobalEventListener = () => {
     };
 
     const handlePortfolioUpdateComplete = () => {
+      console.log('Portfolio updated successfully');
+      queryClient.invalidateQueries();
+
       if (updateToastRef.current) {
         updateToastRef.current.update({
           description: 'Portfolio Updated Successfully!',
@@ -36,8 +40,6 @@ const useGlobalEventListener = () => {
         });
         updateToastRef.current = null;
       }
-
-      queryClient.invalidateQueries();
     };
 
     const handlePortfolioUpdateError = (error: string) => {

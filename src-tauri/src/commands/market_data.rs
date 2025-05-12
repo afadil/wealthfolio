@@ -5,9 +5,9 @@ use crate::{
     events::{emit_portfolio_trigger_update, PortfolioRequestPayload},
 };
 
-use log::{debug, info};
+use log::{debug, info, error};
 use tauri::{AppHandle, State};
-use wealthfolio_core::market_data::{Quote, QuoteSummary};
+use wealthfolio_core::market_data::{Quote, QuoteSummary, MarketDataProviderInfo};
 
 #[tauri::command]
 pub async fn search_symbol(
@@ -99,4 +99,19 @@ pub async fn get_quote_history(
         .market_data_service()
         .get_historical_quotes_for_symbol(&symbol)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_market_data_providers(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<MarketDataProviderInfo>, String> {
+    info!("Received request to get market data providers");
+    state
+        .market_data_service()
+        .get_market_data_providers_info()
+        .await
+        .map_err(|e| {
+            error!("Failed to get market data providers: {}", e);
+            e.to_string()
+        })
 }

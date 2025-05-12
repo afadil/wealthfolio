@@ -8,7 +8,7 @@ pub(crate) mod providers;
 
 // Re-export the public interface
 pub use market_data_constants::*;
-pub use market_data_model::{Quote, QuoteSummary, QuoteRequest, DataSource};
+pub use market_data_model::{Quote, QuoteSummary, QuoteRequest, DataSource, MarketDataProviderInfo};
 pub use market_data_repository::MarketDataRepository;
 pub use market_data_service::MarketDataService;
 pub use market_data_traits::MarketDataServiceTrait;

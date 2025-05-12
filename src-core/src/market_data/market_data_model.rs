@@ -161,3 +161,12 @@ pub struct LatestQuotePair {
     pub latest: Quote,
     pub previous: Option<Quote>,
 }
+
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketDataProviderInfo {
+    pub id: String,
+    pub name: String,
+    pub logo_filename: String,
+    pub last_synced_date: Option<chrono::DateTime<chrono::Utc>>,
+}

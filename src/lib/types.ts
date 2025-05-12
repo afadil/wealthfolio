@@ -148,6 +148,13 @@ export interface QuoteSummary {
   dataSource?: boolean;
 }
 
+export interface MarketDataProviderInfo {
+  id: string;
+  name: string;
+  logoFilename: string;
+  lastSyncedDate: string | null; // ISO date string
+}
+
 export interface MarketData {
   createdAt: Date;
   dataSource: string;

@@ -19,6 +19,7 @@ import IncomePage from '@/pages/income/income-page';
 import ExportSettingsPage from './pages/settings/exports/exports-page';
 import ContributionLimitPage from './pages/settings/contribution-limits/contribution-limits-page';
 import PerformancePage from '@/pages/performance/performance-page';
+import MarketDataSettingsPage from './pages/settings/market-data-settings';
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -44,6 +45,7 @@ export function AppRoutes() {
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
+            <Route path="market-data" element={<MarketDataSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />
         </Route>

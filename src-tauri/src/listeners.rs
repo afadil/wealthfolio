@@ -136,9 +136,6 @@ fn handle_portfolio_calculation(
     // Emit start event
 
     spawn(async move {
-        if let Err(e) = app_handle.emit(PORTFOLIO_UPDATE_START, ()) {
-            error!("Failed to emit {} event: {}", PORTFOLIO_UPDATE_START, e);
-        }
         // Retrieve the state (ServiceContext) from the app_handle
         let state_result = app_handle.try_state::<Arc<ServiceContext>>();
         match state_result {

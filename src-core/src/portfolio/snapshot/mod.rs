@@ -2,7 +2,7 @@
 
 mod snapshot_repository;
 mod snapshot_service;
-mod holdings_calculator;
+pub mod holdings_calculator;
 mod positions_model;
 mod snapshot_model;
 

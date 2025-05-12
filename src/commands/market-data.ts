@@ -5,6 +5,7 @@ import {
   Quote,
   QuoteUpdate,
   UpdateAssetProfile,
+  MarketDataProviderInfo,
 } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 
@@ -146,6 +147,21 @@ export const getQuoteHistory = async (symbol: string): Promise<Quote[]> => {
     }
   } catch (error) {
     logger.error(`Error fetching quote history for symbol ${symbol}.`);
+    throw error;
+  }
+};
+
+export const getMarketDataProviders = async (): Promise<MarketDataProviderInfo[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_market_data_providers');
+      default:
+        logger.error('Unsupported environment for getMarketDataProviders');
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error('Error fetching market data providers.');
     throw error;
   }
 };

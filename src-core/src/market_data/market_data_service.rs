@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use chrono::{Duration, Local, NaiveDate, TimeZone, Utc};
-use log::{debug, error};
+use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use log::{debug, error, info};
 use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -8,7 +8,7 @@ use std::time::SystemTime;
 
 use super::market_data_constants::*;
 use super::market_data_errors::MarketDataError;
-use super::market_data_model::{LatestQuotePair, Quote, QuoteRequest, QuoteSummary};
+use super::market_data_model::{LatestQuotePair, Quote, QuoteRequest, QuoteSummary, MarketDataProviderInfo};
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
 use crate::assets::assets_constants::CASH_ASSET_TYPE;
@@ -237,6 +237,38 @@ impl MarketDataServiceTrait for MarketDataService {
         }
 
         Ok(quotes_by_date)
+    }
+
+    async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> {
+        info!("Fetching market data providers info");
+        let latest_sync_dates_by_source = self.repository.get_latest_sync_dates_by_source()?;
+
+        let mut providers_info = Vec::new();
+
+        // Define known providers statically or load from config
+        // For now, hardcoding based on existing frontend and common data sources
+        let known_providers = vec![
+            (DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png"),
+        ];
+
+        for (id, name, logo_filename) in known_providers {
+            let last_synced_naive: Option<NaiveDateTime> = latest_sync_dates_by_source
+                .get(id)
+                .and_then(|opt_dt| *opt_dt);
+
+            let last_synced_utc: Option<DateTime<Utc>> = 
+                last_synced_naive.map(|naive_dt| Utc.from_utc_datetime(&naive_dt));
+
+            providers_info.push(MarketDataProviderInfo {
+                id: id.to_string(),
+                name: name.to_string(),
+                logo_filename: logo_filename.to_string(),
+                last_synced_date: last_synced_utc,
+            });
+        }
+        
+        debug!("Market data providers info: {:?}", providers_info);
+        Ok(providers_info)
     }
 }
 
