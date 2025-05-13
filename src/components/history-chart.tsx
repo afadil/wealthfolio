@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { formatDate } from '@/lib/utils';
@@ -11,34 +11,44 @@ type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
   isBalanceHidden: boolean;
 };
 
-const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, isBalanceHidden, isChartHovered }: CustomTooltipProps & { isChartHovered: boolean }) => {
   if (active && payload && payload.length > 0) {
-    const data = payload[0]?.payload;
-    if (data) {
+    const totalValueData = payload.find(p => p.dataKey === 'totalValue');
+    const netContributionData = payload.find(p => p.dataKey === 'netContribution');
+
+    if (totalValueData?.payload) {
       return (
-          <div className="grid grid-cols-1 gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5 rounded-md border bg-popover p-2 shadow-md">
             <p className="text-xs text-muted-foreground">
-              {formatDate(data.date)}
+              {formatDate(totalValueData.payload.date)}
             </p>
             
             <div className="flex items-center justify-between space-x-2">
-              <span className="text-xs text-muted-foreground">Total Value:</span>
+              <div className="flex items-center space-x-1.5">
+                <span className="block h-0.5 w-3" style={{ backgroundColor: 'hsl(var(--success))' }} />
+                <span className="text-xs text-muted-foreground">Total Value:</span>
+              </div>
               <AmountDisplay
-                value={data.totalValue}
-                currency={data.currency}
+                value={totalValueData.payload.totalValue}
+                currency={totalValueData.payload.currency}
                 isHidden={isBalanceHidden}
                 className="text-xs font-semibold"
               />
             </div>
-            <div className="flex items-center justify-between space-x-2">
-              <span className="text-xs text-muted-foreground">Net Deposit:</span>
-              <AmountDisplay
-                value={data.netContribution}
-                currency={data.currency}
-                isHidden={isBalanceHidden}
-                className="text-xs font-semibold"
-              />
-            </div>
+            {isChartHovered && netContributionData?.payload && (
+              <div className="flex items-center justify-between space-x-2">
+                 <div className="flex items-center space-x-1.5">
+                  <span className="block h-0 w-3 border-b-2 border-dashed" style={{ borderColor: 'hsl(var(--muted-foreground))' }} />
+                  <span className="text-xs text-muted-foreground">Net Deposit:</span>
+                </div>
+                <AmountDisplay
+                  value={netContributionData.payload.netContribution}
+                  currency={netContributionData.payload.currency}
+                  isHidden={isBalanceHidden}
+                  className="text-xs font-semibold"
+                />
+              </div>
+            )}
           </div>
       );
     }
@@ -62,6 +72,7 @@ export function HistoryChart({
   isLoading?: boolean;
 }) {
   const { isBalanceHidden } = useBalancePrivacy();
+  const [isChartHovered, setIsChartHovered] = useState(false);
 
   // Calculate min and max values for better domain control
   const minValue = useMemo(() => {
@@ -81,6 +92,9 @@ export function HistoryChart({
   const chartConfig = {
     totalValue: {
       label: 'Total Value',
+    },
+    netContribution: {
+      label: 'Net Contribution',
     },
   } satisfies ChartConfig;
 
@@ -102,6 +116,8 @@ export function HistoryChart({
           left: 0,
           bottom: 0,
         }}
+        onMouseEnter={() => setIsChartHovered(true)}
+        onMouseLeave={() => setIsChartHovered(false)}
       >
         <defs>
           <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
@@ -111,7 +127,7 @@ export function HistoryChart({
         </defs>
         <Tooltip
           position={{ y: -20 }}
-          content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} />}
+          content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} isChartHovered={isChartHovered} />}
         />
         <YAxis hide type="number" domain={[minValue, maxValue]} />
           {/* <YAxis hide type="number" domain={['auto', 'auto']} /> */}
@@ -125,6 +141,18 @@ export function HistoryChart({
           stroke="hsl(var(--success))"
           fillOpacity={1}
           fill="url(#colorUv)"
+        />
+        <Area
+          isAnimationActive={true}
+          animationDuration={300}
+          animationEasing="ease-out"
+          connectNulls={true}
+          type="monotone"
+          dataKey="netContribution"
+          stroke="hsl(var(--muted-foreground))"
+          fill="transparent"
+          strokeDasharray="5 5"
+          strokeOpacity={isChartHovered ? 0.8 : 0}
         />
       </AreaChart>
     </ChartContainer>
