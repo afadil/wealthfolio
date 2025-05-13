@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const performanceMetrics = performanceDataArray?.[0] || null;
 
   const gainLossAmount = performanceMetrics?.gainLossAmount ?? 0;
+  const simpleReturn = performanceMetrics?.simpleReturn ?? 0;
 
   const currentValuation = useMemo(() => {
     return valuationHistory && valuationHistory.length > 0
@@ -85,15 +86,6 @@ export default function DashboardPage() {
 
   const isLoading = isValuationHistoryLoading || (isPerformanceLoading && !performanceMetrics);
 
-  const percentageToDisplay = useMemo(() => {
-    if (!performanceMetrics) return 0;
-
-    if (selectedIntervalCode === 'ALL') {
-      return performanceMetrics.simpleReturn ?? 0;
-    }
-    // For other periods, use MWR (Money-Weighted Return).
-    return performanceMetrics.cumulativeMwr ?? 0;
-  }, [performanceMetrics, selectedIntervalCode]);
 
   if (isLoading && !valuationHistory && !performanceMetrics) {
     return <DashboardSkeleton />;
@@ -117,11 +109,14 @@ export default function DashboardPage() {
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
           <div className="flex items-start gap-2">
             <div>
-              <Balance
-                targetValue={currentValuation?.totalValue || 0}
-                currency={baseCurrency}
-                displayCurrency={true}
-              />
+              <div className="flex items-center gap-3">
+                <Balance
+                  targetValue={currentValuation?.totalValue || 0}
+                  currency={baseCurrency}
+                  displayCurrency={true}
+                />
+                <PrivacyToggle />
+              </div>
               <div className="text-md flex space-x-3">
                 <GainAmount
                   className="text-md font-light"
@@ -132,17 +127,16 @@ export default function DashboardPage() {
                 <div className="my-1 border-r border-secondary pr-2" />
                 <GainPercent
                   className="text-md font-light"
-                  value={percentageToDisplay}
+                  value={simpleReturn}
                   animated={true}
                 ></GainPercent>
                 {selectedIntervalDescription && (
-                  <span className="text-md font-light text-muted-foreground ml-1">
-                     {selectedIntervalDescription}
+                  <span className="text-md ml-1 font-light text-muted-foreground">
+                    {selectedIntervalDescription}
                   </span>
                 )}
               </div>
             </div>
-            <PrivacyToggle className="mt-2" />
           </div>
         </PortfolioUpdateTrigger>
       </div>
