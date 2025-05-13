@@ -21,7 +21,6 @@ export default function MarketDataSettingsPage() {
   } = useMarketDataProviders();
 
   const handleProviderUpdateData = (providerId: string) => {
-    console.log(`Update data for ${providerId}`);
     setActingProviderId(providerId);
     recalculatePortfolioMutation.mutate(undefined, {
       onSettled: () => setActingProviderId(null),
@@ -29,7 +28,6 @@ export default function MarketDataSettingsPage() {
   };
 
   const handleProviderRefetchAll = (providerId: string) => {
-    console.log(`Refetch all for ${providerId}`);
     setActingProviderId(providerId);
     recalculatePortfolioMutation.mutate(undefined, { 
       onSettled: () => setActingProviderId(null),

@@ -105,7 +105,7 @@ pub async fn get_quote_history(
 pub async fn get_market_data_providers(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<MarketDataProviderInfo>, String> {
-    info!("Received request to get market data providers");
+    debug!("Received request to get market data providers");
     state
         .market_data_service()
         .get_market_data_providers_info()

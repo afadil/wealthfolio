@@ -2,6 +2,7 @@ use futures::future::join_all;
 use log::{debug, error, info};
 use std::sync::Arc;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
+use serde::Serialize;
 
 use crate::context::ServiceContext;
 use crate::events::{
@@ -56,20 +57,22 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                         error!("Failed to emit {} event: {}", PORTFOLIO_UPDATE_START, e);
                     }
 
+                    if let Err(e) = handle_clone.emit("market:sync-start", &()) {
+                        error!("Failed to emit market:sync-start event: {}", e);
+                    }
                     let sync_result = if refetch_all {
-                        info!("Resyncing market data for symbols");
                         market_data_service
                             .resync_market_data(symbols_to_sync)
                             .await
                     } else {
-                        info!("Syncing market data for all symbols");
                         market_data_service.sync_market_data().await
                     };
 
-                    // Mock result without calling market data service
                     match sync_result {
-                        Ok(_) => {
-                            if let Err(e) = handle_clone.emit("market:sync-complete", ()) {
+                        Ok((_, failed_syncs)) => {
+                            info!("Market data sync complete: {:?}", failed_syncs);
+                            let result_payload = MarketSyncResult { failed_syncs };
+                            if let Err(e) = handle_clone.emit("market:sync-complete", &result_payload) {
                                 error!("Failed to emit market:sync-complete event: {}", e);
                             }
                             // Initialize the FxService after successful sync
@@ -249,4 +252,9 @@ fn handle_portfolio_calculation(
             }
         }
     });
+}
+
+#[derive(Serialize)]
+struct MarketSyncResult {
+    failed_syncs: Vec<(String, String)>,
 }
