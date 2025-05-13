@@ -35,7 +35,6 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   currency,
   isBalanceHidden,
 }) => {
-  console.log('IncomeHistoryChart received monthlyIncomeData:', monthlyIncomeData);
 
   const chartData = monthlyIncomeData.map(([month, income], index) => {
     const cumulative = monthlyIncomeData
@@ -55,8 +54,6 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
     };
   });
 
-  // Optional: Log the final chartData to see all cumulative values
-  // console.log('Calculated chartData:', chartData);
 
   const periodDescription =
     selectedPeriod === 'TOTAL'

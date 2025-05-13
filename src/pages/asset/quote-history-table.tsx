@@ -114,7 +114,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
 
   const handleAddNew = () => {
     if (onSaveQuote) {
-      onSaveQuote({ ...newQuote, id: crypto.randomUUID() } as Quote);
+      onSaveQuote({ ...newQuote } as Quote);
       setIsAddingQuote(false);
       setNewQuote(emptyQuote);
     }

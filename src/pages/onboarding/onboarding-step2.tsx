@@ -37,7 +37,6 @@ const onboardingSettingsSchema = z.object({
 
 // Helper for locale detection (simple example)
 function detectDefaultCurrency(): string {
-  console.log('Detecting default currency...');
   if (typeof navigator === 'undefined') return 'USD'; // Default SSR/Node
   const lang = navigator.language || navigator.languages[0];
   if (lang.startsWith('en-GB')) return 'GBP';
@@ -102,7 +101,6 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
   }, [form, settings, initialValuesSet]);
 
   async function onSubmit(data: OnboardingSettingsValues) {
-    console.log('onSubmit', data);
     try {
       await updateSettings({
         baseCurrency: data.baseCurrency,

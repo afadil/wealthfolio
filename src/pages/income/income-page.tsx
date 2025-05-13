@@ -162,7 +162,6 @@ export default function IncomePage() {
     amount: Number(amount) || 0,
   }));
 
-  console.log('currencyData', currencyData);
   const { isBalanceHidden } = useBalancePrivacy();
 
   return (
