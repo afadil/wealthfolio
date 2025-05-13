@@ -99,9 +99,10 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
 
     fn get_quotes_by_source(&self, input_symbol: &str, source: &str) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
+        use crate::schema::quotes::dsl::symbol as symbol_col;
 
         Ok(quotes
-            .filter(symbol.eq(input_symbol))
+            .filter(symbol_col.eq(input_symbol))
             .filter(crate::schema::quotes::dsl::data_source.eq(source))
             .order(timestamp.asc())
             .load::<QuoteDb>(&mut conn)
@@ -311,5 +312,66 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         // Add other providers here if MarketDataService expects them
 
         Ok(sync_dates_map)
+    }
+
+    fn upsert_manual_quotes_from_activities(&self, symbol_param: &str) -> Result<Vec<Quote>> {
+        use crate::schema::activities::dsl as activities_dsl;
+        use crate::schema::quotes::dsl;
+        use crate::activities::activities_constants::TRADING_ACTIVITY_TYPES;
+        use crate::activities::activities_model::ActivityDB;
+        use crate::market_data::market_data_model::{Quote, QuoteDb, DataSource};
+        use rust_decimal::Decimal;
+        use chrono::{Utc, TimeZone};
+        use std::str::FromStr;
+
+        let mut conn = get_connection(&self.pool)?;
+
+        // 1. Load all non-draft trading activities for this asset
+        let activity_rows = activities_dsl::activities
+            .filter(activities_dsl::asset_id.eq(symbol_param))
+            .filter(activities_dsl::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
+            .filter(activities_dsl::is_draft.eq(false))
+            .order(activities_dsl::activity_date.asc())
+            .load::<ActivityDB>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?;
+
+        let mut quotes_to_upsert = Vec::new();
+        for activity in activity_rows {
+            let price = Decimal::from_str(&activity.unit_price).unwrap_or(Decimal::ZERO);
+            if price > Decimal::ZERO {
+                // Parse date (try RFC3339, fallback to YYYY-MM-DD)
+                let naive_date = chrono::NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d")
+                    .or_else(|_| chrono::NaiveDateTime::parse_from_str(&activity.activity_date, "%Y-%m-%dT%H:%M:%S%.f%:z").map(|dt| dt.date()))
+                    .unwrap_or_else(|_| Utc::now().date_naive());
+                let quote_timestamp = Utc.from_utc_datetime(&naive_date.and_hms_opt(16, 0, 0).unwrap());
+                let now = Utc::now();
+                let quote = Quote {
+                    id: format!("{}_{}", naive_date.format("%Y%m%d"), symbol_param),
+                    symbol: symbol_param.to_string(),
+                    timestamp: quote_timestamp,
+                    open: price,
+                    high: price,
+                    low: price,
+                    close: price,
+                    adjclose: price,
+                    volume: Decimal::ZERO,
+                    data_source: DataSource::Manual,
+                    created_at: now,
+                    currency: activity.currency.clone(),
+                };
+                quotes_to_upsert.push(quote);
+            }
+        }
+
+        // Upsert all quotes
+        if !quotes_to_upsert.is_empty() {
+            let quote_dbs: Vec<QuoteDb> = quotes_to_upsert.iter().map(QuoteDb::from).collect();
+            diesel::replace_into(dsl::quotes)
+                .values(&quote_dbs)
+                .execute(&mut conn)
+                .map_err(MarketDataError::DatabaseError)?;
+        }
+
+        Ok(quotes_to_upsert)
     }
 }

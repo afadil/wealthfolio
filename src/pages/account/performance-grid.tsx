@@ -23,13 +23,12 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
   className,
 }) => {
 
-  console.log('performance', performance);
   if (isLoading || !performance) {
     return (
       <div className={cn('w-full', className)}>
         <Card className="border-none p-0">
           <CardContent className="p-0">
-            <div className="grid grid-cols-1 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2" >
               {[...Array(4)].map((_, index) => (
                 <div
                   key={index}
@@ -68,7 +67,7 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
     <div className={cn('w-full', className)}>
       <Card className="border-none p-0 shadow-none">
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 rounded bg-muted/30 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <MetricDisplay
               label="Time Weighted Return"
               value={cumulativeTwr}

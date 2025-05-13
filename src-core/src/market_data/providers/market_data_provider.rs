@@ -17,7 +17,6 @@ pub trait MarketDataProvider: Send + Sync {
         end: SystemTime,
         fallback_currency: String,
     ) -> Result<Vec<ModelQuote>, MarketDataError>;
-    // async fn get_exchange_rate(&self, from: &str, to: &str) -> Result<f64, MarketDataError>;
     
     /// Fetch historical quotes for multiple symbols in parallel
     async fn get_historical_quotes_bulk(
@@ -25,7 +24,7 @@ pub trait MarketDataProvider: Send + Sync {
         symbols_with_currencies: &[(String, String)],
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<ModelQuote>, MarketDataError>;
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError>;
 }
 
 #[async_trait]

@@ -49,6 +49,19 @@ export const listenPortfolioUpdateErrorTauri = async <T>(
   return listen<T>('portfolio:update-error', handler);
 };
 
+export async function listenMarketSyncCompleteTauri<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
+  return listen('market:sync-complete', handler);
+}
+
+export async function listenMarketSyncStartTauri<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
+  return listen('market:sync-start', handler);
+}
+
+
 export const openFileSaveDialogTauri = async (
   fileContent: string | Blob | Uint8Array,
   fileName: string,
@@ -89,3 +102,4 @@ export const logger = {
   trace,
   debug,
 };
+

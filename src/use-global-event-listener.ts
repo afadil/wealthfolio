@@ -1,82 +1,105 @@
 // useGlobalEventListener.ts
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/components/ui/use-toast';
+import { listenMarketSyncComplete } from '@/commands/portfolio-listener';
 
 import {
   listenPortfolioUpdateStart,
   listenPortfolioUpdateComplete,
   listenPortfolioUpdateError,
+  listenMarketSyncStart,
 } from '@/commands/portfolio-listener';
+import { logger } from './adapters/tauri';
+
+function handleMarketSyncStart() {
+  toast({
+    description: '⚪ Syncing market data...',
+    duration: 3000,
+    variant: 'subtle',
+  });
+}
+
+function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, string][] } }) {
+  const { failed_syncs } = event.payload || { failed_syncs: [] };
+  if (failed_syncs && failed_syncs.length > 0) {
+    const failedSymbols = failed_syncs.map(([symbol]) => symbol).join(', ');
+    toast({
+      title: '🔴 Market Data Update Incomplete',
+      description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
+      duration: 15000,
+      variant: 'destructive',
+    });
+  } 
+}
+
+const handlePortfolioUpdateStart = () => {
+  toast({
+    description: '⚪ Calculating portfolio performance...',
+    duration: 15000,
+    variant: 'subtle',
+  });
+};
+
+const handlePortfolioUpdateError = (error: string) => {
+  toast({
+    title: 'Portfolio Update Failed',
+    description: '🔴 There was an error updating your portfolio. Please try again or contact support if the issue persists.',
+    duration: 5000,
+    variant: 'destructive',
+  });
+  logger.error('Portfolio Update Error: ' + error);
+};
 
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
-  // Reference to store the toast object
-  const updateToastRef = useRef<{
-    id: string;
-    dismiss: () => void;
-    update: (props: any) => void;
-  } | null>(null);
+
+  const handlePortfolioUpdateComplete = () => {
+    queryClient.invalidateQueries();
+    toast({
+      description: '🟢 Portfolio Updated Successfully!',
+      variant: 'subtle',
+      duration: 2000,
+    });
+  };
 
   useEffect(() => {
-    const handlePortfolioUpdateStart = () => {
-      console.log('Portfolio update started');
-      // Store the toast object when creating the toast
-      updateToastRef.current = toast({
-        description: 'Updating Portfolio ...',
-        variant: 'subtle',
-      });
-    };
-
-    const handlePortfolioUpdateComplete = () => {
-      console.log('Portfolio updated successfully');
-      queryClient.invalidateQueries();
-
-      if (updateToastRef.current) {
-        updateToastRef.current.update({
-          description: 'Portfolio Updated Successfully!',
-          variant: 'subtle',
-          duration: 2000,
-        });
-        updateToastRef.current = null;
-      }
-    };
-
-    const handlePortfolioUpdateError = (error: string) => {
-      // Optionally dismiss the update toast when there's an error
-      if (updateToastRef.current) {
-        updateToastRef.current.dismiss();
-        updateToastRef.current = null;
-      }
-
-      toast({
-        title: 'Portfolio Update Error',
-        description: error,
-        duration: 5000,
-        variant: 'destructive',
-      });
-    };
+    let actualCleanup = () => {};
 
     const setupListeners = async () => {
-      const unlistenSyncStart = await listenPortfolioUpdateStart(handlePortfolioUpdateStart);
-      const unlistenSyncComplete = await listenPortfolioUpdateComplete(
+      const unlistenPortfolioSyncStart = await listenPortfolioUpdateStart(
+        handlePortfolioUpdateStart,
+      );
+      const unlistenPortfolioSyncComplete = await listenPortfolioUpdateComplete(
         handlePortfolioUpdateComplete,
       );
-      const unlistenSyncError = await listenPortfolioUpdateError((event) => {
+      const unlistenPortfolioSyncError = await listenPortfolioUpdateError((event) => {
         handlePortfolioUpdateError(event.payload as string);
       });
+      const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
+      const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
 
       return () => {
-        unlistenSyncStart();
-        unlistenSyncComplete();
-        unlistenSyncError();
+        unlistenPortfolioSyncStart();
+        unlistenPortfolioSyncComplete();
+        unlistenPortfolioSyncError();
+        unlistenMarketStart();
+        unlistenMarketComplete();
       };
     };
 
-    setupListeners().then((cleanup) => {
-      return cleanup;
-    });
-  }, [queryClient]);
+    setupListeners()
+      .then((cleanupFromAsync) => {
+        actualCleanup = cleanupFromAsync;
+      })
+      .catch((error) => {
+        console.error('Failed to setup global event listeners:', error);
+      });
+
+    return () => {
+      actualCleanup();
+    };
+  }, []);
 
   return null;
 };

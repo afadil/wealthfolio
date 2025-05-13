@@ -1,13 +1,11 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
-use log::{debug, error, info};
-use rust_decimal::Decimal;
+use log::{debug, error};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use super::market_data_constants::*;
-use super::market_data_errors::MarketDataError;
 use super::market_data_model::{LatestQuotePair, Quote, QuoteRequest, QuoteSummary, MarketDataProviderInfo};
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
@@ -141,7 +139,7 @@ impl MarketDataServiceTrait for MarketDataService {
             .map_err(|e| e.into())
     }
 
-    async fn sync_market_data(&self) -> Result<()> {
+    async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)> {
         debug!("Syncing market data.");
 
         // Fetch assets based on input symbols
@@ -161,13 +159,12 @@ impl MarketDataServiceTrait for MarketDataService {
         self.process_market_data_sync(quote_requests, false).await
     }
 
-    async fn resync_market_data(&self, symbols: Option<Vec<String>>) -> Result<()> {
+    async fn resync_market_data(&self, symbols: Option<Vec<String>>) -> Result<((), Vec<(String, String)>)> {
         debug!("Resyncing market data. Symbols: {:?}", symbols);
 
         // Fetch assets based on input symbols
         let assets = match symbols {
             Some(syms) if !syms.is_empty() => {
-                debug!("Fetching assets for symbols: {:?}", syms);
                 self.asset_repository.list_by_symbols(&syms)?
             }
             _ => {
@@ -240,7 +237,7 @@ impl MarketDataServiceTrait for MarketDataService {
     }
 
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> {
-        info!("Fetching market data providers info");
+        debug!("Fetching market data providers info");
         let latest_sync_dates_by_source = self.repository.get_latest_sync_dates_by_source()?;
 
         let mut providers_info = Vec::new();
@@ -290,10 +287,10 @@ impl MarketDataService {
         &self,
         quote_requests: Vec<QuoteRequest>,
         refetch_all: bool,
-    ) -> Result<()> {
+    ) -> Result<((), Vec<(String, String)>)> {
         if quote_requests.is_empty() {
             debug!("No non-cash assets found matching the criteria. Skipping sync.");
-            return Ok(());
+            return Ok(((), Vec::new()));
         }
 
         // Set end date to the end of the current day (local time) to ensure full coverage.
@@ -355,13 +352,14 @@ impl MarketDataService {
                 .get_historical_quotes_bulk(
                     &symbols_with_currencies,
                     start_date_time,
-                    end_date, // Use the adjusted end_date
+                    end_date,
                 )
                 .await
             {
-                Ok(quotes) => {
+                Ok((quotes, provider_failures)) => {
                     debug!("Successfully fetched {} public quotes.", quotes.len());
-                    all_quotes.extend(quotes)
+                    all_quotes.extend(quotes);
+                    failed_syncs.extend(provider_failures);
                 }
                 Err(e) => {
                     error!("Failed to sync public quotes batch: {}", e);
@@ -417,7 +415,7 @@ impl MarketDataService {
                 error!("Failed to save synced quotes to repository: {}", e);
                 // Consider how to handle partial saves or repository errors. Maybe add all symbols as failed.
                 // For now, just log the error.
-                return Err(e); // Propagate the repository error
+                failed_syncs.push(("repository_save".to_string(), e.to_string()));
             } else {
                 debug!(
                     "Successfully saved {} filled quotes.",
@@ -426,94 +424,13 @@ impl MarketDataService {
             }
         }
 
-        // If we had any failures, return an error
-        if !failed_syncs.is_empty() {
-            let error_message = format!(
-                "Sync completed with errors for the following symbols: {:?}",
-                failed_syncs
-            );
-            error!("{}", error_message);
-            return Err(MarketDataError::ProviderError(error_message).into());
-        }
-
-        Ok(())
+        // Always return Ok with the failed_syncs collected
+        Ok(((), failed_syncs))
     }
 
     async fn sync_manual_quotes(&self, request: &QuoteRequest) -> Result<Vec<Quote>> {
-        debug!("Syncing manual quotes for symbol {}", request.symbol);
-
-        // Load existing manual quotes for the symbol
-        let mut manual_quotes = self
-            .repository
-            .get_quotes_by_source(&request.symbol, DATA_SOURCE_MANUAL)?;
-
-        if manual_quotes.is_empty() {
-            debug!(
-                "No manual quotes found for symbol {}. Cannot sync.",
-                request.symbol
-            );
-            return Ok(Vec::new()); // Nothing to sync if no manual data exists
-        }
-
-        // Sort quotes by date
-        manual_quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-        let today = Utc::now().naive_utc().date();
-        let last_quote_date = manual_quotes.last().unwrap().timestamp.date_naive();
-
-        // If the last manual quote is already today or later, nothing new to generate
-        if last_quote_date >= today {
-            debug!(
-                "Last manual quote for {} is on or after today ({} >= {}). No sync needed.",
-                request.symbol, last_quote_date, today
-            );
-            return Ok(manual_quotes); // Return existing quotes as they are up-to-date
-        }
-
-        debug!(
-            "Last manual quote date for {}: {}. Generating filler quotes until {}",
-            request.symbol, last_quote_date, today
-        );
-
-        let mut quotes_to_save = manual_quotes.clone(); // Start with existing quotes
-        let current_price = manual_quotes.last().unwrap().close.clone();
-        let mut current_date = last_quote_date + Duration::days(1);
-
-        // Generate quotes from the day after the last manual quote up to today
-        while current_date <= today {
-            quotes_to_save.push(Quote {
-                id: format!(
-                    "{}_{}_{}",
-                    request.symbol,
-                    current_date.format("%Y%m%d"),
-                    Utc::now().timestamp_millis()
-                ),
-                symbol: request.symbol.clone(),
-                // Use a consistent time like 4 PM UTC, converted to DateTime<Utc>
-                timestamp: Utc.from_utc_datetime(&current_date.and_hms_opt(16, 0, 0).unwrap()),
-                open: current_price.clone(),
-                high: current_price.clone(),
-                low: current_price.clone(),
-                close: current_price.clone(),
-                adjclose: current_price.clone(),
-                volume: Decimal::ZERO,
-                data_source: DataSource::Manual,
-                created_at: Utc::now(), // Use Utc::now() directly for DateTime<Utc>
-                currency: request.currency.clone(),
-            });
-            current_date += Duration::days(1);
-        }
-
-        debug!(
-            "Generated {} new filler quotes for symbol {} from {} to {}",
-            quotes_to_save.len() - manual_quotes.len(),
-            request.symbol,
-            last_quote_date + Duration::days(1),
-            today
-        );
-        // Return all quotes (original + generated filler quotes)
-        // The save happens in the main sync_market_data function
-        Ok(quotes_to_save)
+        // All DB logic is now in the repository
+        self.repository.upsert_manual_quotes_from_activities(&request.symbol)
     }
 
     /// Fills missing days in a sequence of quotes, optionally up to a final date.
@@ -560,7 +477,7 @@ impl MarketDataService {
                     };
                     // Create a unique-ish ID for the filled quote
                     filled_quote.id = format!(
-                        "{}_{}_filled",
+                        "{}_{}",
                         date_to_fill.format("%Y%m%d"),
                         filled_quote.symbol
                     );
@@ -597,7 +514,7 @@ impl MarketDataService {
                     }
                 };
                 filled_quote.id = format!(
-                    "{}_{}_filled_end",
+                    "{}_{}",
                     date_to_fill.format("%Y%m%d"),
                     filled_quote.symbol,
                 );

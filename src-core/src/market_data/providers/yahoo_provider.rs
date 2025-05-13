@@ -570,7 +570,7 @@ impl YahooProvider {
         symbols_with_currencies: &[(String, String)],
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         // If start time is after or equal to end time, no data needs fetching.
         if start >= end {
             warn!(
@@ -578,18 +578,18 @@ impl YahooProvider {
                 DateTime::<Utc>::from(start),
                 DateTime::<Utc>::from(end)
             );
-            return Ok(Vec::new());
+            return Ok((Vec::new(), Vec::new()));
         }
 
         if symbols_with_currencies.is_empty() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), Vec::new()));
         }
 
         // Use a more efficient batching approach
         const BATCH_SIZE: usize = 10; // Adjust based on API limits
 
         let mut all_quotes = Vec::new();
-        let mut errors = Vec::new();
+        let mut errors: Vec<(String, String)> = Vec::new();
 
         for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
             let futures: Vec<_> = chunk
@@ -633,7 +633,7 @@ impl YahooProvider {
             );
         }
 
-        Ok(all_quotes)
+        Ok((all_quotes, errors))
     }
 }
 
@@ -681,7 +681,7 @@ impl MarketDataProvider for YahooProvider {
         symbols_with_currencies: &[(String, String)],
         start: SystemTime,
         end: SystemTime,
-    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         self.get_historical_quotes_bulk(symbols_with_currencies, start, end)
             .await
     }
