@@ -193,8 +193,7 @@ export const AssetProfilePage = () => {
     setIsEditing(false);
   };
 
-  // console.log('profile', profile); // Keep for debugging if needed
-
+  
   const isLoading = isHoldingLoading || isQuotesLoading;
   // Determine if this is a view primarily for quotes (no holding data found, possibly due to error or just no data)
   const isQuoteOnlyView = useMemo(() => {
@@ -217,9 +216,21 @@ export const AssetProfilePage = () => {
             data={quoteHistory ?? []}
             // Default to non-manual source, disable changing it as there's no profile context
             isManualDataSource={false}
-            onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
+            onSaveQuote={(quote: Quote) => {
+              let updatedQuote = { ...quote };
+              // Generate id if missing
+              if (!updatedQuote.id) {
+                const datePart = new Date(updatedQuote.timestamp).toISOString().slice(0, 10).replace(/-/g, '');
+                updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
+              }
+              // Set currency if missing
+              if (!updatedQuote.currency) {
+                updatedQuote.currency = profile?.currency || 'USD';
+              }
+              saveQuoteMutation.mutate(updatedQuote);
+            }}
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-            onChangeDataSource={undefined} // Disable source changes
+            onChangeDataSource={undefined}
           />
       </ApplicationShell>
     );
@@ -466,7 +477,19 @@ export const AssetProfilePage = () => {
             <QuoteHistoryTable
               data={quoteHistory ?? []}
               isManualDataSource={formData.dataSource === DataSource.MANUAL}
-              onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
+              onSaveQuote={(quote: Quote) => {
+                let updatedQuote = { ...quote };
+                // Generate id if missing
+                if (!updatedQuote.id) {
+                  const datePart = new Date(updatedQuote.timestamp).toISOString().slice(0, 10).replace(/-/g, '');
+                  updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
+                }
+                // Set currency if missing
+                if (!updatedQuote.currency) {
+                  updatedQuote.currency = profile?.currency || 'USD';
+                }
+                saveQuoteMutation.mutate(updatedQuote);
+              }}
               onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
               onChangeDataSource={(isManual) => {
                 // Only allow changing data source if there's a profile/holding to update

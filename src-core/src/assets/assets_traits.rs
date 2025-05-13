@@ -10,7 +10,7 @@ pub trait AssetServiceTrait: Send + Sync {
     fn update_asset_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset>;
     fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     fn create_cash_asset(&self, currency: &str) -> Result<Asset>;
-    async fn get_or_create_asset(&self, asset_id: &str) -> Result<Asset>;
+    async fn get_or_create_asset(&self, asset_id: &str, context_currency: Option<String>) -> Result<Asset>;
     fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset>;
     fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
 }

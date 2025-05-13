@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_type_currency ON assets(asset_type);
 
 -- Capitalize all asset types
 UPDATE assets SET asset_type = UPPER(asset_type), data_source = UPPER(data_source), symbol_mapping = symbol;
-UPDATE assets SET asset_type = 'CASH' WHERE asset_class = 'CASH';
+UPDATE assets SET asset_type = 'CASH' WHERE asset_class = 'CASH' OR id LIKE '$CASH-%';
 UPDATE assets SET asset_type = 'FOREX' WHERE asset_type = 'CURRENCY';
 UPDATE assets SET asset_class = 'FOREX', asset_sub_class = 'FOREX' WHERE asset_type = 'FOREX';
 -- Update the countries JSON field to rename "code" to "name"

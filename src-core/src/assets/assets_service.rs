@@ -1,4 +1,4 @@
-use log::{debug, error};
+use log::{debug, error, info};
 use std::sync::Arc;
 
 use crate::market_data::market_data_traits::MarketDataServiceTrait;
@@ -74,15 +74,35 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Retrieves or creates an asset by its ID
-    async fn get_or_create_asset(&self, asset_id: &str) -> Result<Asset> {
+    async fn get_or_create_asset(&self, asset_id: &str, context_currency: Option<String>) -> Result<Asset> {
         match self.asset_repository.get_by_id(asset_id) {
             Ok(existing_asset) => Ok(existing_asset),
             Err(Error::Database(DatabaseError::QueryFailed(DieselError::NotFound))) => {
-                debug!("Asset not found locally, attempting to fetch from market data: {}", asset_id);
-                let new_asset_profile = self.market_data_service.get_asset_profile(asset_id).await?;
-                
-                let new_asset: NewAsset = new_asset_profile.into();
-                
+                debug!(
+                    "Asset not found locally, attempting to fetch from market data: {}",
+                    asset_id
+                );
+                let asset_profile_from_provider = self
+                    .market_data_service
+                    .get_asset_profile(asset_id)
+                    .await?;
+
+                let mut new_asset: NewAsset = asset_profile_from_provider.into();
+
+                // If the asset profile didn't provide a currency (e.g., generic manual asset)
+                // and a context currency is available, use the context currency.
+                if new_asset.currency.is_empty() {
+                    if let Some(curr) = context_currency {
+                        if !curr.is_empty() {
+                            new_asset.currency = curr;
+                        }
+                    }
+                }
+
+                info!("New asset to be created: {:?}", new_asset);
+
+                // The NewAsset::validate() method (likely called within create)
+                // will ensure currency is not empty before insertion.
                 let inserted_asset = self.asset_repository.create(new_asset)?;
                 Ok(inserted_asset)
             }
@@ -92,7 +112,6 @@ impl AssetServiceTrait for AssetService {
             }
         }
     }
-
 
     /// Updates the data source for an asset
     fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {

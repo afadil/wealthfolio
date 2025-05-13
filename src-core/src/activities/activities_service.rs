@@ -88,23 +88,32 @@ impl ActivityServiceTrait for ActivityService {
     /// Creates a new activity
     async fn create_activity(&self, mut activity: NewActivity) -> Result<Activity> {
         info!("Creating activity: {:?}", activity);
-        let asset = self
-            .asset_service
-            .get_or_create_asset(&activity.asset_id)
-            .await?;
 
         let account: Account = self
             .account_service
             .get_account(&activity.account_id)
             ?;
 
+        // Determine the currency to be used as context for creating the asset, if it needs to be created.
+        // Priority: 1. Activity's own currency (if specified), 2. Account's currency.
+        let asset_context_currency = if !activity.currency.is_empty() {
+            activity.currency.clone()
+        } else {
+            account.currency.clone() // Fallback to account currency for context
+        };
+
+        let asset = self
+            .asset_service
+            .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
+            .await?;
+
+        // Now, ensure the activity's currency field is set.
+        // Priority: 1. Activity's original currency (if specified), 2. Asset's currency
         if activity.currency.is_empty() {
-            activity.currency = if !asset.currency.is_empty() {
-                asset.currency.clone()
-            } else {
-                account.currency.clone()
-            };
+            // asset.currency should now be guaranteed to be non-empty if get_or_create_asset succeeded
+            activity.currency = asset.currency.clone();
         }
+        
 
         if activity.currency != account.currency {
             self.fx_service
@@ -117,22 +126,26 @@ impl ActivityServiceTrait for ActivityService {
 
     /// Updates an existing activity
     async fn update_activity(&self, mut activity: ActivityUpdate) -> Result<Activity> {
-        let asset = self
-            .asset_service
-            .get_or_create_asset(&activity.asset_id)
-            .await?;
-
         let account: Account = self
             .account_service
             .get_account(&activity.account_id)
             ?;
+        
+        // Determine context currency for potential asset creation
+        let asset_context_currency = if !activity.currency.is_empty() {
+            activity.currency.clone()
+        } else {
+            account.currency.clone() // Fallback
+        };
 
+        let asset = self
+            .asset_service
+            .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
+            .await?;
+
+        // Ensure activity currency is set
         if activity.currency.is_empty() {
-            activity.currency = if !asset.currency.is_empty() {
-                asset.currency.clone()
-            } else {
-                account.currency.clone()
-            };
+            activity.currency = asset.currency.clone();
         }
 
         if activity.currency != account.currency {
@@ -167,37 +180,55 @@ impl ActivityServiceTrait for ActivityService {
             activity.account_name = Some(account.name.clone());
             activity.account_id = Some(account_id.clone());
 
+            // Determine context currency for potential asset creation during check
+            let asset_context_currency = if !activity.currency.is_empty() {
+                activity.currency.clone()
+            } else {
+                // Fallback to account currency for context if import data lacks currency
+                account.currency.clone() 
+            };
+
             let symbol_profile_result = self
                 .asset_service
-                .get_or_create_asset(&activity.symbol)
+                .get_or_create_asset(&activity.symbol, Some(asset_context_currency))
                 .await;
 
-            let (is_valid, error) = match symbol_profile_result {
-                Ok(profile) => {
-                    activity.symbol_name = profile.name;
-                    if activity.currency != account.currency {
+            let (mut is_valid, mut error_message) = (true, None);
+
+            match symbol_profile_result {
+                Ok(asset) => { // symbol_profile_result now returns Asset
+                    activity.symbol_name = asset.name; // Use asset name
+                    
+                    // Check if activity currency (from import) is valid and handle FX
+                    if activity.currency.is_empty() {
+                        // Activity must have a currency specified in the import
+                        is_valid = false;
+                        error_message = Some("Activity currency is missing in the import data.".to_string());
+                    } else if activity.currency != account.currency {
                         match self.fx_service.register_currency_pair(
                             account.currency.as_str(),
-                            activity.currency.as_str(),
+                            activity.currency.as_str(), // Use currency from import data
                         ) {
-                            Ok(_) => (true, None),
-                            Err(e) => (false, Some(format!("Failed to register currency: {}", e))),
+                            Ok(_) => { /* FX pair registered or already exists */ }
+                            Err(e) => {
+                                is_valid = false;
+                                error_message = Some(format!("Failed to register currency pair for FX: {}", e));
+                            }
                         }
-                    } else {
-                        (true, None)
                     }
                 }
-                Err(_) => {
-                    let error_msg =
-                        format!("Market data not found for symbol: {}", &activity.symbol);
-                    (false, Some(error_msg))
+                Err(e) => {
+                    // Failed to get or create asset
+                    let error_msg = format!("Failed to resolve asset for symbol '{}': {}", &activity.symbol, e);
+                    is_valid = false;
+                    error_message = Some(error_msg);
                 }
             };
 
             activity.is_valid = is_valid;
-            if let Some(error_msg) = error {
+            if let Some(error_msg) = error_message {
                 let mut errors = std::collections::HashMap::new();
-                errors.insert("symbol".to_string(), vec![error_msg]);
+                errors.insert(activity.symbol.clone(), vec![error_msg]); 
                 activity.errors = Some(errors);
             }
 
