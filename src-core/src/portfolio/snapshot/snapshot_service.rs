@@ -685,20 +685,28 @@ impl SnapshotService {
                 && a.activity_date.naive_utc().date() >= start_date
                 && a.activity_date.naive_utc().date() <= end_date
         }) {
-            // Use activity.quantity directly, it's Decimal, not Option<Decimal>
-            let split_ratio = activity.quantity;
-            if split_ratio.is_sign_positive() && !split_ratio.is_zero() {
-                split_factors
-                    .entry(activity.asset_id.clone())
-                    .or_default()
-                    .push((activity.activity_date.naive_utc().date(), split_ratio));
+            // Check if the activity amount exists and represents a valid positive split ratio
+            if let Some(split_ratio) = activity.amount {
+                if split_ratio.is_sign_positive() && !split_ratio.is_zero() {
+                    // Collect valid splits (date, ratio) for the asset
+                    split_factors
+                        .entry(activity.asset_id.clone())
+                        .or_default() // Get the Vec, create if needed
+                        .push((activity.activity_date.naive_utc().date(), split_ratio)); // Push (date, ratio) tuple
+                } else {
+                    // Log warning for invalid ratio (e.g., zero or negative)
+                    warn!(
+                        "Invalid split ratio {} for Split activity {} on {}. Ignoring split.",
+                        split_ratio, activity.id, activity.activity_date
+                    );
+                }
             } else {
+                // Log warning if amount is missing for a split activity
                 warn!(
-                    "Invalid split ratio {} for activity {}. Ignoring split.",
-                    split_ratio, activity.id
+                    "Missing amount for Split activity {} for asset {} on {}. Ignoring split.",
+                    activity.id, activity.asset_id, activity.activity_date
                 );
             }
-            // Removed handling for Option here as activity.quantity is not Option
         }
         for splits in split_factors.values_mut() {
             splits.sort_by_key(|k| k.0);
