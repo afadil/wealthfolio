@@ -14,7 +14,7 @@ import { logger } from './adapters/tauri';
 
 function handleMarketSyncStart() {
   toast({
-    description: '⚪ Syncing market data...',
+    description: 'Syncing market data...',
     duration: 3000,
     variant: 'subtle',
   });
@@ -35,7 +35,7 @@ function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, str
 
 const handlePortfolioUpdateStart = () => {
   toast({
-    description: '⚪ Calculating portfolio performance...',
+    description: 'Calculating portfolio performance...',
     duration: 15000,
     variant: 'subtle',
   });
@@ -57,7 +57,7 @@ const useGlobalEventListener = () => {
   const handlePortfolioUpdateComplete = () => {
     queryClient.invalidateQueries();
     toast({
-      description: '🟢 Portfolio Updated Successfully!',
+      description: 'Portfolio Updated Successfully!',
       variant: 'subtle',
       duration: 2000,
     });

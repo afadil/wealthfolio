@@ -9,7 +9,7 @@ use chrono::{Duration, NaiveDate};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use log::{debug, info, warn};
+use log::{debug, warn};
 use rust_decimal::Decimal;
 use rust_decimal::MathematicalOps;
 use rust_decimal_macros::dec;
@@ -84,7 +84,7 @@ impl PerformanceService {
         )?;
 
         if full_history.len() < 2 {
-            info!(
+            warn!(
                 "Account '{}': Not enough history data ({} points). Cannot calculate performance.",
                 account_id,
                 full_history.len()
@@ -220,26 +220,8 @@ impl PerformanceService {
         let end_net_contribution = end_point.net_contribution;
         let net_cash_flow = end_net_contribution - start_net_contribution;
 
-        let mut start_value_for_gain_calc = start_point.total_value;
-
-        // Edge case: If period starts on acquisition, net_cash_flow is 0 for this period,
-        // and start_net_contribution represents cost, use it as baseline for gain/loss amount.
-        if net_cash_flow.is_zero() && 
-           !start_point.net_contribution.is_zero() &&
-           // Ensure this logic applies if start_point is indeed the first record in the provided history
-           // (which is true by definition of start_point = full_history.first().unwrap())
-           // and we are calculating for a period where start_net_contribution is the relevant principal.
-           // This condition primarily targets the scenario where an item is added and its performance
-           // from cost is measured from that day.
-           start_point.total_value != start_point.net_contribution // Only adjust if there's a difference to begin with
-        {
-            start_value_for_gain_calc = start_point.net_contribution;
-            debug!(
-                "Account Performance Info: Using net_contribution ({}) as baseline for gain/loss instead of start_value ({}) for account_id: {}, date: {}",
-                start_point.net_contribution, start_point.total_value, account_id, actual_start_date
-            );
-        }
-        
+        let start_value_for_gain_calc = start_point.total_value;
+    
         let gain_loss_amount = end_point.total_value - start_value_for_gain_calc - net_cash_flow;
 
         let simple_total_return = if start_value_for_gain_calc.is_zero() {
@@ -309,6 +291,7 @@ impl PerformanceService {
         let start_net_contribution = start_point.net_contribution;
         let end_net_contribution = end_point.net_contribution;
         let net_cash_flow = end_net_contribution - start_net_contribution;
+
         let gain_loss_amount = end_value - start_value - net_cash_flow;
 
         let simple_total_return = if start_value.is_zero() {
@@ -374,7 +357,7 @@ impl PerformanceService {
             .await?;
 
         if quote_history.is_empty() {
-            info!(
+            warn!(
                 "Symbol '{}': No quote data found between {} and {}. Returning empty response.",
                 symbol, effective_start_date, effective_end_date
             );
@@ -384,11 +367,6 @@ impl PerformanceService {
         let actual_start_date = quote_history.first().unwrap().timestamp.date_naive();
         let actual_end_date = quote_history.last().unwrap().timestamp.date_naive();
         let currency = quote_history.first().unwrap().currency.clone();
-
-        info!(
-            "Calculating FULL symbol performance for '{}' over actual range: {} to {}",
-            symbol, actual_start_date, actual_end_date
-        );
 
         let quote_map: HashMap<NaiveDate, Decimal> = quote_history
             .into_iter()
@@ -412,7 +390,7 @@ impl PerformanceService {
         }
 
         if !found_start_price {
-            info!("Symbol '{}': Could not find starting price point within quote map. Returning empty response.", symbol);
+            warn!("Symbol '{}': Could not find starting price point within quote map. Returning empty response.", symbol);
             return Ok(PerformanceService::empty_response(symbol));
         }
 
@@ -457,10 +435,6 @@ impl PerformanceService {
         }
 
         if returns.is_empty() {
-            info!(
-                "Symbol '{}': No returns generated. Returning empty response.",
-                symbol
-            );
             return Ok(PerformanceService::empty_response(symbol));
         }
 
@@ -518,29 +492,37 @@ impl PerformanceService {
             return Decimal::ZERO;
         }
 
+        // If total_return is -100% or less, base would be 0 or negative.
+        // powd might handle base = 0, but negative base for non-integer exponent is problematic.
+        // Directly returning -1.0 (i.e., -100% loss) is a sensible cap.
         if total_return <= dec!(-1.0) {
             return dec!(-1.0);
         }
 
         let days = (end_date - start_date).num_days();
+
         if days <= 0 {
             return total_return;
         }
 
         let years = Decimal::from(days) / DAYS_PER_YEAR_DECIMAL;
-        if years < dec!(0.000001) {
+
+        if years < Decimal::ONE {
             return total_return;
         }
 
         let base = Decimal::ONE + total_return;
+
+        // This check is theoretically covered by `total_return <= dec!(-1.0)`,
+        // but as a safeguard if `total_return` was just slightly above -1.0,
+        // leading to `base` being zero or negative due to precision.
         if base <= Decimal::ZERO {
             return dec!(-1.0);
         }
 
         let exponent = Decimal::ONE / years;
-        let annualized_factor = base.powd(exponent);
 
-        annualized_factor - Decimal::ONE
+        base.powd(exponent) - Decimal::ONE
     }
 
     fn calculate_volatility(daily_returns: &[Decimal]) -> Decimal {
@@ -670,6 +652,7 @@ impl PerformanceService {
             portfolio_weight,
         }
     }
+
 }
 
 #[async_trait::async_trait]
