@@ -1,28 +1,23 @@
 import * as z from 'zod';
-import { importActivitySchema, importMappingSchema, newActivitySchema } from '@/lib/schemas';
+import { importActivitySchema, importMappingSchema } from '@/lib/schemas';
+import {
+  ActivityType,
+  DataSource,
+  AccountType,
+  HoldingType,
+} from './constants';
 
-export enum AccountType {
-  SECURITIES = 'SECURITIES',
-  SAVINGS = 'SAVINGS',
-  CHECKING = 'CHECKING',
-  // Add more types as needed
-}
+export {
+  ActivityType,
+  DataSource,
+  AccountType,
+  ImportFormat,
+  ExportDataType,
+  ExportedFileFormat,
+  HoldingType,
+} from './constants';
 
-export enum ActivityType {
-  BUY = 'BUY',
-  SELL = 'SELL',
-  DIVIDEND = 'DIVIDEND',
-  INTEREST = 'INTEREST',
-  DEPOSIT = 'DEPOSIT',
-  WITHDRAWAL = 'WITHDRAWAL',
-  TRANSFER_IN = 'TRANSFER_IN',
-  TRANSFER_OUT = 'TRANSFER_OUT',
-  CONVERSION_IN = 'CONVERSION_IN',
-  CONVERSION_OUT = 'CONVERSION_OUT',
-  FEE = 'FEE',
-  TAX = 'TAX',
-  SPLIT = 'SPLIT',
-}
+export type { ImportRequiredField } from './constants';
 
 export type Account = {
   id: string;
@@ -40,7 +35,7 @@ export type Account = {
 
 export type Activity = {
   id: string;
-  type: string;
+  type: ActivityType;
   date: Date | string;
   quantity: number;
   unitPrice: number;
@@ -56,10 +51,11 @@ export type Activity = {
 
 export interface ActivityDetails {
   id: string;
-  activityType: string;
+  activityType: ActivityType;
   date: Date;
   quantity: number;
   unitPrice: number;
+  amount: number;
   fee: number;
   currency: string;
   isDraft: boolean;
@@ -72,7 +68,8 @@ export interface ActivityDetails {
   accountCurrency: string;
   assetSymbol: string;
   assetName?: string;
-  assetDataSource?: 'Yahoo' | 'MANUAL';
+  assetDataSource?: DataSource;
+  subRows?: ActivityDetails[];
 }
 
 export type ActivitySearchResponse = {
@@ -82,9 +79,38 @@ export type ActivitySearchResponse = {
   };
 };
 
-export type NewActivity = z.infer<typeof newActivitySchema>;
+export type ActivityCreate = {
+  accountId: string;
+  activityType: string;
+  activityDate: string | Date;
+  assetId?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  currency?: string;
+  fee?: number;
+  isDraft: boolean;
+  comment?: string | null;
+}
+
+export type ActivityUpdate = ActivityCreate & { id: string };
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
+
+// Define a generic type for the parsed row data
+export type CsvRowData = Record<string, string> & { lineNumber: string };
+export interface CsvRowError {
+  /** Type of error that occurred */
+  type: string;
+  /** Standardized error code */
+  code: string;
+  /** Human-readable error message */
+  message: string;
+  /** Row index where the error occurred (optional) */
+  row?: number;
+  /** Column/field index where the error occurred (optional) */
+  index?: number;
+}
 
 export interface AssetProfile {
   id: string;
@@ -95,7 +121,7 @@ export interface AssetProfile {
   symbolMapping: string | null;
   assetClass: string | null;
   assetSubClass: string | null;
-  comment: string | null;
+  notes: string | null;
   countries: string | null;
   categories: string | null;
   classes: string | null;
@@ -122,6 +148,13 @@ export interface QuoteSummary {
   dataSource?: boolean;
 }
 
+export interface MarketDataProviderInfo {
+  id: string;
+  name: string;
+  logoFilename: string;
+  lastSyncedDate: string | null; // ISO date string
+}
+
 export interface MarketData {
   createdAt: Date;
   dataSource: string;
@@ -139,61 +172,103 @@ export interface Tag {
   activityId: string | null;
 }
 
+export interface ImportValidationResult {
+  activities: ActivityImport[];
+  validationSummary: {
+    totalRows: number;
+    validCount: number;
+    invalidCount: number;
+  };
+}
+
 export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
 
-export enum HoldingType {
-  CASH = 'CASH',
-  STOCK = 'STOCK',
-  MUTUAL_FUND = 'MUTUAL_FUND',
-  ETF = 'ETF',
-  BOND = 'BOND',
-  OTHER = 'OTHER',
+// Holding types based on Rust HoldingView model
+
+// Types matching Rust structs from src-core/src/assets/assets_model.rs
+export interface Sector {
+  name: string;
+  weight: number;
+}
+
+export interface Country {
+  name: string;
+  weight: number;
+}
+
+export interface Instrument {
+  id: string;
+  symbol: string;
+  name?: string | null;
+  currency: string;
+  notes?: string | null;
+  dataSource?: string | null;
+  assetClass?: string | null;
+  assetSubclass?: string | null;
+  countries?: Country[] | null;
+  sectors?: Sector[] | null;
+}
+
+export interface MonetaryValue {
+  local: number;
+  base: number;
+}
+
+export interface Lot {
+  id: string;
+  positionId: string;
+  acquisitionDate: string; // ISO date string
+  quantity: number;
+  costBasis: number;
+  acquisitionPrice: number;
+  acquisitionFees: number;
+}
+
+export interface Position {
+  id: string;
+  accountId: string;
+  assetId: string;
+  quantity: number;
+  averageCost: number;
+  totalCostBasis: number;
+  currency: string;
+  inceptionDate: string; // ISO date string
+  lots: Lot[];
+}
+
+export interface CashHolding {
+  id: string;
+  accountId: string;
+  currency: string;
+  amount: number;
+  lastUpdated: string; // ISO date string
 }
 
 export interface Holding {
   id: string;
-  symbol: string;
-  symbolName: string;
-  holdingType: string;
+  holdingType: HoldingType;
+  accountId: string;
+  instrument?: Instrument | null;
   quantity: number;
-  currency: string;
+  openDate?: string | Date | null;
+  lots?: Lot[] | null;
+  localCurrency: string;
   baseCurrency: string;
-  marketPrice?: number;
-  averageCost?: number;
-  marketValue: number;
-  bookValue: number;
-  marketValueConverted: number;
-  bookValueConverted: number;
-  portfolioPercent: number;
-  performance: {
-    totalGainPercent: number;
-    totalGainAmount: number;
-    totalGainAmountConverted: number;
-    dayGainPercent?: number;
-    dayGainAmount?: number;
-    dayGainAmountConverted?: number;
-  };
-  account?: {
-    id: string;
-    name: string;
-    type: string;
-    group: string;
-    currency: string;
-  };
-  assetClass?: string;
-  assetSubClass?: string;
-  sectors?: [
-    {
-      name: string;
-      weight: number;
-    },
-  ];
-  countries?: [
-    {
-      code: string;
-      weight: number;
-    },
-  ];
+  fxRate?: number | null;
+  marketValue: MonetaryValue;
+  costBasis?: MonetaryValue | null;
+  price?: number | null;
+  unrealizedGain?: MonetaryValue | null;
+  unrealizedGainPct?: number | null;
+  realizedGain?: MonetaryValue | null;
+  realizedGainPct?: number | null;
+  totalGain?: MonetaryValue | null;
+  totalGainPct?: number | null;
+  dayChange?: MonetaryValue | null;
+  dayChangePct?: number | null;
+  prevCloseValue?: MonetaryValue | null;
+  weight: number;
+  asOfDate: string;
 }
 
 export interface Asset {
@@ -205,7 +280,7 @@ export interface Asset {
   symbolMapping?: string | null;
   assetClass?: string | null;
   assetSubClass?: string | null;
-  comment?: string | null;
+  notes?: string | null;
   countries?: string | null;
   categories?: string | null;
   classes?: string | null;
@@ -222,7 +297,7 @@ export interface Quote {
   id: string;
   createdAt: string;
   dataSource: string;
-  date: string;
+  timestamp: string;
   symbol: string;
   open: number;
   high: number;
@@ -230,10 +305,11 @@ export interface Quote {
   volume: number;
   close: number;
   adjclose: number;
+  currency: string;
 }
 
 export interface QuoteUpdate {
-  date: string;
+  timestamp: string;
   symbol: string;
   open: number;
   high: number;
@@ -252,13 +328,14 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  onboardingCompleted: boolean;
 }
 
 export interface SettingsContextType {
   settings: Settings | null;
   isLoading: boolean;
   isError: boolean;
-  updateSettings: (settings: Settings) => void;
+  updateBaseCurrency: (currency: Settings['baseCurrency']) => Promise<void>;
   accountsGrouped: boolean;
   setAccountsGrouped: (value: boolean) => void;
 }
@@ -299,38 +376,62 @@ export interface IncomeSummary {
   yoyGrowth: number | null; // Changed from optional to nullable
 }
 
+// Define custom DateRange type matching react-day-picker's
+export type DateRange = {
+  from: Date | undefined;
+  to: Date | undefined;
+};
+
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
 
-export interface HistorySummary {
-  id?: string;
-  startDate: string;
-  endDate: string;
-  entriesCount: number;
-}
 
-export interface PortfolioHistory {
+export interface AccountValuation {
   id: string;
   accountId: string;
-  date: string;
-  totalValue: number;
-  marketValue: number;
-  bookCost: number;
-  availableCash: number;
-  netDeposit: number;
-  currency: string;
+  valuationDate: string;
+  accountCurrency: string;
   baseCurrency: string;
-  totalGainValue: number;
-  totalGainPercentage: number;
-  dayGainPercentage: number;
-  dayGainValue: number;
-  allocationPercentage: number | null;
-  exchangeRate: number | null;
+  fxRateToBase: number;
+  cashBalance: number;
+  investmentMarketValue: number;
+  totalValue: number;
+  costBasis: number;
+  netContribution: number;
   calculatedAt: string;
 }
 
-export interface AccountSummary {
-  account: Account;
-  performance: PortfolioHistory;
+export interface AccountSummaryView {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  accountGroup: string | null;
+  accountCurrency: string;
+  totalValueAccountCurrency: number;
+  totalValueBaseCurrency: number;
+  baseCurrency: string;
+  performance: SimplePerformanceMetrics;
+}
+
+export interface SimplePerformanceMetrics {
+  accountId: string;
+  totalValue?: number | null;
+  accountCurrency?: string | null;
+  baseCurrency?: string | null;
+  fxRateToBase?: number | null;
+  totalGainLossAmount?: number | null;
+  cumulativeReturnPercent?: number | null;
+  dayGainLossAmount?: number | null;
+  dayReturnPercentModDietz?: number | null;
+  portfolioWeight?: number | null;
+}
+
+export interface AccountGroup {
+  groupName: string;
+  accounts: AccountSummaryView[];
+  totalValueBaseCurrency: number;
+  baseCurrency: string;
+  performance: SimplePerformanceMetrics;
+  accountCount: number;
 }
 
 export interface ExchangeRate {
@@ -342,11 +443,8 @@ export interface ExchangeRate {
   rate: number;
   source: string;
   isLoading?: boolean;
+  timestamp: string;
 }
-
-export type ExportDataType = 'accounts' | 'activities' | 'goals' | 'portfolio-history';
-
-export type ExportedFileFormat = 'CSV' | 'JSON' | 'SQLite';
 
 export interface ContributionLimit {
   id: string;
@@ -354,6 +452,10 @@ export interface ContributionLimit {
   contributionYear: number;
   limitAmount: number;
   accountIds?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
@@ -370,51 +472,45 @@ export interface DepositsCalculation {
   byAccount: Record<string, AccountDeposit>;
 }
 
-export enum ImportFormat {
-  Date = 'date',
-  ActivityType = 'activityType',
-  Symbol = 'symbol',
-  Quantity = 'quantity',
-  UnitPrice = 'unitPrice',
-  Amount = 'amount',
-  Currency = 'currency',
-  Fee = 'fee',
-}
-
-// export interface ImportMappingData {
-//   accountId: string;
-//   fieldMappings: Record<string, string>;
-//   activityMappings: Record<string, string[]>;
-//   symbolMappings: Record<string, string>;
-// }
-
 export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
 
-export interface CumulativeReturn {
-  date: string;
+// Renamed from CumulativeReturn to match Rust struct ReturnData
+export interface ReturnData {
+  date: string; // Changed from CumulativeReturn
   value: number;
 }
 
-export interface CumulativeReturns {
+// Renamed from PerformanceData to match Rust struct
+export interface PerformanceMetrics {
   id: string;
-  name: string;
-  cumulativeReturns: CumulativeReturn[];
-  totalReturn: number;
-  annualizedReturn: number;
+  returns: ReturnData[]; // Changed from CumulativeReturn[]
+  periodStartDate?: string | null; // Changed from periodStartDate?
+  periodEndDate?: string | null; // Changed from periodEndDate?
+  currency: string;
+  cumulativeTwr: number; // Added field, corresponds to TWR
+  gainLossAmount?: number | null; // Made explicitly nullable
+  annualizedTwr: number; // Added field, corresponds to TWR
+  simpleReturn: number; // Added field
+  annualizedSimpleReturn: number; // Added field
+  cumulativeMwr: number; // Added field, corresponds to MWR
+  annualizedMwr: number; // Added field, corresponds to MWR
+  volatility: number;
+  maxDrawdown: number;
 }
 
 export interface UpdateAssetProfile {
   symbol: string;
   sectors: string;
   countries: string;
-  comment: string;
+  notes: string;
   assetClass: string;
   assetSubClass: string;
 }
 
-export const DataSource = {
-  MANUAL: 'MANUAL',
-  YAHOO: 'YAHOO',
-} as const;
+// Rename ComparisonItem to TrackedItem
+export type TrackedItem = {
+  id: string;
+  type: 'account' | 'symbol';
+  name: string;
+};
 
-export type DataSource = (typeof DataSource)[keyof typeof DataSource];

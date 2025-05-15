@@ -24,6 +24,10 @@ const sidebarNavItems = [
     href: 'appearance',
   },
   {
+    title: 'Market Data',
+    href: 'market-data',
+  },
+  {
     title: 'Data Export',
     href: 'exports',
   },

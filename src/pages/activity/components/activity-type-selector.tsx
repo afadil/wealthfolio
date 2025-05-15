@@ -3,11 +3,13 @@ import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { FormControl, FormField, FormItem } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface ActivityType {
   value: string;
   label: string;
   icon: keyof typeof Icons;
+  description?: string;
 }
 
 interface ActivityTypeSelectorProps {
@@ -42,13 +44,14 @@ export function ActivityTypeSelector({
             >
               {types.map((type) => {
                 const Icon = Icons[type.icon];
+                const InfoIcon = Icons['Info'];
                 return (
                   <div key={type.value}>
                     <RadioGroupItem value={type.value} id={type.value} className="peer sr-only" />
                     <label
                       htmlFor={type.value}
                       className={cn(
-                        'flex items-center gap-2 rounded-lg border p-3 text-sm transition-colors hover:bg-muted',
+                        'relative flex items-center gap-2 rounded-lg border p-3 text-sm transition-colors hover:bg-muted',
                         layout === 'vertical' && 'flex-col items-center justify-center py-3',
                         'min-h-[4rem] sm:min-h-[5rem]',
                         'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5',
@@ -63,6 +66,20 @@ export function ActivityTypeSelector({
                         )}
                       />
                       <span className="text-center">{type.label}</span>
+                      {type.description && (
+                        <div className="absolute top-1 right-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <InfoIcon className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs p-2 text-sm">
+                                <p>{type.description}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      )}
                     </label>
                   </div>
                 );

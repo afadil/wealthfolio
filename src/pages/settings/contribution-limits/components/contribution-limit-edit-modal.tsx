@@ -15,14 +15,15 @@ export function ContributionLimitEditModal({
 }: ContributionLimitEditModalProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-5xl w-[50vw]">
         <ContributionLimitForm
           defaultValues={
             limit ?? {
               groupName: '',
               contributionYear: new Date().getFullYear(),
-              limitAmount: 0,
               accountIds: '',
+              startDate: new Date(Date.UTC(new Date().getFullYear(), 0, 1, 12, 0, 0)),
+              endDate: new Date(Date.UTC(new Date().getFullYear(), 11, 31, 12, 0, 0)),
             }
           }
           onSuccess={() => {

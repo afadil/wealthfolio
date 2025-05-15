@@ -1,133 +1,117 @@
-use crate::asset::asset_service::AssetService;
-use crate::market_data::market_data_service::MarketDataService;
+use std::sync::Arc;
 
-use crate::models::{AssetProfile, QuoteSummary, UpdateAssetProfile};
-use crate::AppState;
-use log::debug;
-use tauri::State;
-use wealthfolio_core::models::{Asset, QuoteUpdate};
+use crate::{
+    context::ServiceContext,
+    events::{emit_portfolio_trigger_update, PortfolioRequestPayload},
+};
+
+use log::{debug, info, error};
+use tauri::{AppHandle, State};
+use wealthfolio_core::market_data::{Quote, QuoteSummary, MarketDataProviderInfo};
 
 #[tauri::command]
-pub async fn search_symbol(query: String) -> Result<Vec<QuoteSummary>, String> {
-    let service = MarketDataService::new().await;
-
-    service
+pub async fn search_symbol(
+    query: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<QuoteSummary>, String> {
+    state
+        .market_data_service()
         .search_symbol(&query)
         .await
         .map_err(|e| format!("Failed to search ticker: {}", e))
 }
 
 #[tauri::command]
-pub async fn get_asset_data(
-    asset_id: String,
-    state: State<'_, AppState>,
-) -> Result<AssetProfile, String> {
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new().await;
-    service
-        .get_asset_data(&mut conn, &asset_id)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn update_asset_profile(
-    id: String,
-    payload: UpdateAssetProfile,
-    state: State<'_, AppState>,
-) -> Result<Asset, String> {
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new().await;
-    service
-        .update_asset_profile(&mut conn, &id, payload)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn synch_quotes(state: State<'_, AppState>) -> Result<(), String> {
-    debug!("Synching quotes history");
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
-    service
-        .initialize_and_sync_quotes(&mut conn)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn refresh_quotes_for_symbols(
-    symbols: Vec<String>,
-    state: State<'_, AppState>,
+pub async fn sync_market_data(
+    symbols: Option<Vec<String>>,
+    refetch_all: bool,
+    handle: AppHandle,
 ) -> Result<(), String> {
-    debug!("Refreshing quotes for symbols: {:?}", symbols);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
-    service
-        .refresh_quotes_for_symbols(&mut conn, &symbols)
-        .await
-        .map_err(|e| e.to_string())
+    info!(
+        "Emitting MARKET_DATA_NEEDS_SYNC event: Symbols={:?}, RefetchAll={}",
+        symbols, refetch_all
+    );
+    let payload = PortfolioRequestPayload::builder()
+        .account_ids(None)
+        .refetch_all_market_data(refetch_all)
+        .symbols(symbols)
+        .build();
+    emit_portfolio_trigger_update(&handle, payload);
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn update_quote(quote: QuoteUpdate, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn update_quote(
+    quote: Quote,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<(), String> {
     debug!("Updating quote: {:?}", quote);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
-    service
-        .update_quote(&mut conn, quote)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn delete_quote(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    debug!("Deleting quote: {}", id);
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = MarketDataService::new().await;
-    service
-        .delete_quote(&mut conn, &id)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn update_asset_data_source(
-    id: String,
-    data_source: String,
-    state: State<'_, AppState>,
-) -> Result<Asset, String> {
-    let mut conn = state
-        .pool
-        .get()
-        .map_err(|e| format!("Failed to get connection: {}", e))?;
-    let service = AssetService::new().await;
-    let asset = service
-        .update_asset_data_source(&mut conn, &id, data_source)
+    state
+        .market_data_service()
+        .update_quote(quote.clone())
+        .map(|_| ())
         .map_err(|e| e.to_string())?;
 
-    // After updating data source, refresh quotes for this asset but don't fail if it errors
-    let service = MarketDataService::new().await;
-    if let Err(e) = service
-        .refresh_quotes_for_symbols(&mut conn, &vec![id.clone()])
-        .await
-    {
-        log::error!("Failed to refresh quotes after data source update: {}", e);
-    }
+    let handle = handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let payload = PortfolioRequestPayload::builder()
+            .account_ids(None)
+            .refetch_all_market_data(true)
+            .symbols(Some(vec![quote.symbol]))
+            .build();
+        emit_portfolio_trigger_update(&handle, payload);
+    });
+    Ok(())
+}
 
-    Ok(asset)
+#[tauri::command]
+pub async fn delete_quote(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<(), String> {
+    debug!("Deleting quote: {}", id);
+    state
+        .market_data_service()
+        .delete_quote(&id)
+        .map_err(|e| e.to_string())?;
+
+    let handle = handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let payload = PortfolioRequestPayload::builder()
+            .account_ids(None)
+            .refetch_all_market_data(false)
+            .symbols(None)
+            .build();
+        emit_portfolio_trigger_update(&handle, payload);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_quote_history(
+    symbol: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<Quote>, String> {
+    debug!("Fetching quote history for symbol: {}", symbol);
+    state
+        .market_data_service()
+        .get_historical_quotes_for_symbol(&symbol)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_market_data_providers(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<MarketDataProviderInfo>, String> {
+    debug!("Received request to get market data providers");
+    state
+        .market_data_service()
+        .get_market_data_providers_info()
+        .await
+        .map_err(|e| {
+            error!("Failed to get market data providers: {}", e);
+            e.to_string()
+        })
 }

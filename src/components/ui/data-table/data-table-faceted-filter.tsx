@@ -39,7 +39,14 @@ export function DataTableFacetedFilter<TData, TValue>({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 border-dashed">
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            'hover:bg-muted/80" h-8 gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium',
+            selectedValues?.size > 0 ? 'bg-muted/40' : 'shadow-inner-xs bg-muted/90',
+          )}
+        >
           <Icons.PlusCircle className="mr-2 h-4 w-4" />
           {title}
           {selectedValues?.size > 0 && (
@@ -50,7 +57,10 @@ export function DataTableFacetedFilter<TData, TValue>({
               </Badge>
               <div className="hidden space-x-1 lg:flex">
                 {selectedValues.size > 2 ? (
-                  <Badge variant="secondary" className="rounded-sm px-1 font-normal">
+                  <Badge
+                    variant="secondary"
+                    className="rounded-sm px-1 font-normal text-foreground"
+                  >
                     {selectedValues.size} selected
                   </Badge>
                 ) : (
@@ -60,7 +70,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                       <Badge
                         variant="secondary"
                         key={option.value}
-                        className="rounded-sm px-1 font-normal"
+                        className="rounded-sm px-1 font-normal text-foreground"
                       >
                         {option.label}
                       </Badge>
@@ -119,7 +129,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                 <CommandGroup>
                   <CommandItem
                     onSelect={() => column?.setFilterValue(undefined)}
-                    className="justify-center text-center"
+                    className="justify-center text-center text-sm text-destructive hover:bg-destructive/10"
                   >
                     Clear filters
                   </CommandItem>

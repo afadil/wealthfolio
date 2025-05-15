@@ -1,23 +1,20 @@
-import { useState } from 'react';
 import { GainAmount } from '@/components/gain-amount';
 import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
 import IntervalSelector from '@/components/interval-selector';
 import Balance from './balance';
-import { useQuery } from '@tanstack/react-query';
-import { PortfolioHistory, AccountSummary } from '@/lib/types';
-import { getHistory, getAccountsSummary } from '@/commands/portfolio';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Accounts } from './accounts';
 import SavingGoals from './goals';
-import { QueryKeys } from '@/lib/query-keys';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { format } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { useCalculateHistoryMutation } from '@/hooks/useCalculateHistory';
-import { Icons } from '@/components/icons';
-import { Badge } from '@/components/ui/badge';
+import { useMemo, useState } from 'react';
 import { PrivacyToggle } from '@/components/privacy-toggle';
+import { AccountsSummary } from './accounts-summary';
+import { useSettingsContext } from '@/lib/settings-provider';
+import { useValuationHistory } from '@/hooks/use-valuation-history';
+import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
+import { DateRange, TimePeriod } from '@/lib/types';
+import { subMonths } from 'date-fns';
+import { calculatePerformanceMetrics } from '@/lib/utils';
+
 
 function DashboardSkeleton() {
   return (
@@ -34,120 +31,121 @@ function DashboardSkeleton() {
   );
 }
 
+// Helper function to get the initial date range for 3M
+const getInitialDateRange = (): DateRange => ({
+  from: subMonths(new Date(), 3),
+  to: new Date(),
+});
+
+const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
+
 export default function DashboardPage() {
-  const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
-  const updatePortfolioMutation = useCalculateHistoryMutation({
-    successTitle: 'Portfolio recalculated successfully',
-    errorTitle: 'Failed to recalculate portfolio',
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>('Last 3 months');
 
-  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
-    queryFn: getAccountsSummary,
-  });
+  const {
+    valuationHistory,
+    isLoading: isValuationHistoryLoading,
+  } = useValuationHistory(dateRange);
 
-  const { data: portfolioHistory, isLoading: isPortfolioHistoryLoading } = useQuery<
-    PortfolioHistory[],
-    Error
-  >({
-    queryKey: QueryKeys.accountHistory('TOTAL'),
-    queryFn: () => getHistory('TOTAL'),
-  });
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency || 'USD';
 
-  if (isPortfolioHistoryLoading || isAccountsLoading) {
+
+  // Calculate gainLossAmount and simpleReturn from valuationHistory
+  const { gainLossAmount, simpleReturn } = useMemo(() => {
+    return calculatePerformanceMetrics(valuationHistory);
+  }, [valuationHistory]);
+
+  const currentValuation = useMemo(() => {
+    return valuationHistory && valuationHistory.length > 0
+      ? valuationHistory[valuationHistory.length - 1]
+      : null;
+  }, [valuationHistory]);
+
+  const chartData = useMemo(() => {
+    return valuationHistory?.map(item => ({
+      date: item.valuationDate,
+      totalValue: item.totalValue,
+      netContribution: item.netContribution,
+      currency: item.baseCurrency || baseCurrency,
+    })) || [];
+  }, [valuationHistory, baseCurrency]);
+
+  if (isValuationHistoryLoading && !valuationHistory) {
     return <DashboardSkeleton />;
   }
 
-  const todayValue = portfolioHistory?.[portfolioHistory.length - 1];
-
-  const handleRecalculate = async () => {
-    updatePortfolioMutation.mutate({
-      accountIds: undefined,
-      forceFullCalculation: true,
-    });
+  // Callback for IntervalSelector
+  const handleIntervalSelect = (
+    _code: TimePeriod, 
+    description: string,
+    range: DateRange | undefined
+  ) => {
+    setSelectedIntervalDescription(description);
+    setDateRange(range); 
   };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-h-screen flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
       <div className="flex px-4 py-2 md:px-6 lg:px-10">
-        <HoverCard>
-          <HoverCardTrigger className="flex cursor-pointer items-center">
-            <div className="flex items-start gap-2">
-              <div>
+        <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
+          <div className="flex items-start gap-2">
+            <div>
+              <div className="flex items-center gap-3">
                 <Balance
-                  targetValue={todayValue?.totalValue || 0}
-                  currency={todayValue?.currency || 'USD'}
+                  targetValue={currentValuation?.totalValue || 0}
+                  currency={baseCurrency}
                   displayCurrency={true}
                 />
-
-                <div className="flex space-x-3 text-sm">
-                  <GainAmount
-                    className="text-md font-light"
-                    value={todayValue?.totalGainValue || 0}
-                    currency={todayValue?.currency || 'USD'}
-                    displayCurrency={false}
-                  ></GainAmount>
-                  <div className="my-1 border-r border-secondary pr-2" />
-                  <GainPercent
-                    className="text-md font-light"
-                    value={todayValue?.totalGainPercentage || 0}
-                    animated={true}
-                  ></GainPercent>
-                </div>
+                <PrivacyToggle />
               </div>
-              <PrivacyToggle className="mt-1" />
-            </div>
-          </HoverCardTrigger>
-          <HoverCardContent align="start" className="w-80 shadow-none">
-            <div className="flex flex-col space-y-4">
-              <div className="space-y-2">
-                <h4 className="flex text-sm font-light">
-                  <Icons.Calendar className="mr-2 h-4 w-4" />
-                  As of:{' '}
-                  <Badge className="ml-1 font-medium" variant="secondary">
-                    {todayValue?.calculatedAt
-                      ? `${format(new Date(todayValue.calculatedAt), 'PPpp')}`
-                      : '-'}
-                  </Badge>
-                </h4>
-              </div>
-              <Button
-                onClick={handleRecalculate}
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                disabled={updatePortfolioMutation.isPending}
-              >
-                {updatePortfolioMutation.isPending ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.Refresh className="mr-2 h-4 w-4" />
+              <div className="text-md flex space-x-3">
+                <GainAmount
+                  className="text-md font-light"
+                  value={gainLossAmount}
+                  currency={baseCurrency}
+                  displayCurrency={false}
+                ></GainAmount>
+                <div className="my-1 border-r border-secondary pr-2" />
+                <GainPercent
+                  className="text-md font-light"
+                  value={simpleReturn}
+                  animated={true}
+                ></GainPercent>
+                {selectedIntervalDescription && (
+                  <span className="text-md ml-1 font-light text-muted-foreground">
+                    {selectedIntervalDescription}
+                  </span>
                 )}
-                {updatePortfolioMutation.isPending ? 'Updating portfolio...' : 'Update Portfolio'}
-              </Button>
+              </div>
             </div>
-          </HoverCardContent>
-        </HoverCard>
+          </div>
+        </PortfolioUpdateTrigger>
       </div>
 
       <div className="h-[300px]">
-        <HistoryChart data={portfolioHistory || []} interval={interval} />
-        <IntervalSelector
-          className="relative bottom-0 left-0 right-0 z-10"
-          onIntervalSelect={(newInterval) => {
-            setInterval(newInterval);
-          }}
-        />
+        {valuationHistory && chartData.length > 0 ? (
+          <>
+            <HistoryChart data={chartData} />
+            <IntervalSelector
+              className="relative bottom-0 left-0 right-0 z-10"
+              onIntervalSelect={handleIntervalSelect}
+              isLoading={isValuationHistoryLoading}
+              initialSelection={INITIAL_INTERVAL_CODE}
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="flex-grow bg-gradient-to-t from-success/30 via-success/15 to-success/10 px-4 pt-8 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
         <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2">
-            <Accounts className="border-none bg-transparent shadow-none" accounts={accounts} />
+            <AccountsSummary className="border-none bg-transparent shadow-none" />
           </div>
           <div className="sm:col-span-1">
-            <SavingGoals accounts={accounts} />
+            <SavingGoals />
           </div>
         </div>
       </div>

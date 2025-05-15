@@ -1,67 +1,160 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries } from '@tanstack/react-query';
+import { calculatePerformanceHistory } from '@/commands/portfolio';
+import { useRef } from 'react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import {
-  calculateAccountCumulativeReturns,
-  calculateSymbolCumulativeReturns,
-} from '@/commands/portfolio';
+import { QueryKeys } from '@/lib/query-keys';
+import { TrackedItem } from '@/lib/types';
 
-export type ReturnMethod = 'TWR' | 'MWR';
-
-interface UsePerformanceDataProps {
-  selectedItems: Array<{
-    id: string;
-    type: 'account' | 'symbol';
-    name: string;
-  }>;
-  dateRange: DateRange | undefined;
-  returnMethod: ReturnMethod;
-}
-
-export function usePerformanceData({
+/**
+ * Hook to calculate cumulative returns for a list of comparison items.
+ * Automatically determines the effective start date based on the first available data point
+ * from the first selected account.
+ * 
+ * @param selectedItems List of comparison items to calculate cumulative returns for.
+ * @param dateRange The date range for the calculation period.
+ * 
+ * @returns An object containing the calculated cumulative returns data, 
+ *          a boolean indicating whether the data is loading, 
+ *          a boolean indicating whether there are any errors, 
+ *          an array of error messages,
+ *          the effective start date used for calculations,
+ *          and a formatted display date range string.
+ */
+export function useCalculatePerformanceHistory({
   selectedItems,
   dateRange,
-  returnMethod,
-}: UsePerformanceDataProps) {
-  return useQuery({
-    queryKey: ['performance', selectedItems, dateRange, returnMethod],
-    queryFn: async () => {
-      if (!selectedItems.length || !dateRange?.from || !dateRange?.to) return [];
-
-      const results = await Promise.allSettled(
-        selectedItems.map(async (item) => {
-          try {
-            if (item.type === 'account') {
-              const data = await calculateAccountCumulativeReturns(
-                item.id,
-                format(dateRange.from!, 'yyyy-MM-dd'),
-                format(dateRange.to!, 'yyyy-MM-dd'),
-                returnMethod,
-              );
-              return { ...data, name: item.name };
-            } else {
-              const data = await calculateSymbolCumulativeReturns(
-                item.id,
-                format(dateRange.from!, 'yyyy-MM-dd'),
-                format(dateRange.to!, 'yyyy-MM-dd'),
-              );
-              return { ...data, name: `${item.name} (${item.id})` };
-            }
-          } catch (error) {
-            console.error(`Failed to calculate returns for ${item.name}:`, error);
-            throw error;
-          }
-        }),
-      );
-
-      // Filter out failed calculations and return successful ones
-      return results
-        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-        .map((result) => result.value);
-    },
-    enabled: selectedItems.length > 0 && !!dateRange?.from && !!dateRange?.to,
-    placeholderData: (previousData) => previousData,
-    staleTime: 30 * 1000,
-    refetchInterval: false,
+}: {
+  selectedItems: TrackedItem[];
+  dateRange: DateRange | undefined;
+}) {
+  // Use a ref to track the effective start date without causing re-renders
+  const effectiveStartDateRef = useRef<string | null>(null);
+  
+  // Use a ref to track if we've already processed the data for the current selection
+  const processedRef = useRef<{
+    selectedItemIds: string[];
+    dateFrom: string | null;
+    effectiveStartDate: string | null;
+  }>({
+    selectedItemIds: [],
+    dateFrom: null,
+    effectiveStartDate: null
   });
+
+  // Get the formatted date range for API calls, keep as undefined if not present
+  const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
+  const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
+
+  // Check if we need to update our tracking refs
+  const currentSelectionKey = selectedItems.map(item => item.id).join(',');
+  const hasSelectionChanged = currentSelectionKey !== processedRef.current.selectedItemIds.join(',');
+  const hasDateChanged = startDate !== processedRef.current.dateFrom;
+  
+  // If selection or date changed, reset the processed state
+  if (hasSelectionChanged || hasDateChanged) {
+    processedRef.current = {
+      selectedItemIds: selectedItems.map(item => item.id),
+      dateFrom: startDate || null, // Store startDate or null in ref
+      effectiveStartDate: null
+    };
+    effectiveStartDateRef.current = null;
+  }
+
+  // Use the effective start date if available, otherwise use the original start date (potentially undefined)
+  const startDateToUse = effectiveStartDateRef.current || startDate;
+
+  const performanceQueries = useQueries({
+    queries: selectedItems.map((item) => ({
+      queryKey: [QueryKeys.PERFORMANCE_HISTORY, item.type, item.id, startDateToUse, endDate],
+      queryFn: () => calculatePerformanceHistory(
+        item.type,
+        item.id,
+        startDateToUse!,
+        endDate!        
+      ),
+      // Enable query only if essential item identifiers AND dates are present.
+      enabled: !!item.id && !!item.type && !!startDateToUse && !!endDate,
+      staleTime: 30 * 1000,
+      retry: false,
+      placeholderData: keepPreviousData,
+    })),
+  });
+
+  const isLoading = performanceQueries.some((query) => query.isLoading);
+  const hasErrors = performanceQueries.some((query) => query.isError);
+  const errorMessages = performanceQueries
+    .filter((query) => query.isError)
+    .map((query) => query.error)
+    .filter(Boolean)
+    .map((error) => (error instanceof Error ? error.message : String(error)));
+
+  // Format chart data directly from query results
+  const chartData = performanceQueries
+    .map((query, index) => {
+      if (query.isError || !query.data) return null;
+
+      const item = selectedItems[index];
+      return {
+        ...query.data,
+        id: item.id,
+        type: item.type,
+        name: item.type === 'symbol' ? `${item.name} (${item.id})` : item.name,
+      };
+    })
+    .filter(Boolean);
+
+  // Process performance data to determine effective start date (only once per data set)
+  if (chartData?.length &&
+      startDate && // Only adjust effective date if an initial start date was provided
+      !effectiveStartDateRef.current &&
+      !processedRef.current.effectiveStartDate) {
+    
+    // Find the first account in the selected items
+    const firstAccountItem = selectedItems.find(item => item.type === 'account');
+    
+    if (firstAccountItem) {
+      // Find the performance data for the first account
+      const firstAccountData = chartData.find(data => data?.id === firstAccountItem.id);
+      
+      if (firstAccountData?.returns?.length) {
+        // Get the first date string from the returns data
+        const firstDataDateStr = firstAccountData.returns[0].date;
+        
+        // Compare date strings directly (YYYY-MM-DD format strings can be compared lexicographically)
+        const effectiveStartDate = firstDataDateStr > startDate ? firstDataDateStr : startDate;
+        
+        effectiveStartDateRef.current = effectiveStartDate;
+        processedRef.current.effectiveStartDate = effectiveStartDate;
+      }
+    }
+  }
+
+  // Format the effective date for display
+  const displayStartDate = effectiveStartDateRef.current
+    ? format(new Date(effectiveStartDateRef.current + 'T00:00:00'), 'MMM d, yyyy') // Add time part for correct Date parsing
+    : dateRange?.from
+      ? format(dateRange.from, 'MMM d, yyyy')
+      : '';
+
+  const displayEndDate = dateRange?.to 
+    ? format(dateRange.to, 'MMM d, yyyy') 
+    : '';
+
+  const displayDateRange = (displayStartDate && displayEndDate) 
+    ? `${displayStartDate} - ${displayEndDate}`
+    : 'Compare account performance over time';
+
+  return {
+    data: chartData,
+    isLoading,
+    hasErrors,
+    errorMessages,
+    queries: performanceQueries,
+    effectiveStartDate: effectiveStartDateRef.current,
+    formattedStartDate: startDate,
+    formattedEndDate: endDate,
+    displayDateRange,
+    isCustomRange: effectiveStartDateRef.current !== null && effectiveStartDateRef.current !== startDate
+  };
 }

@@ -37,7 +37,7 @@
     --primary-foreground: var(--flexoki-bg);
     --secondary: var(--flexoki-ui-2);
     --secondary-foreground: var(--flexoki-tx-2);
-    --muted: var(--flexoki-bg-2);
+    --muted: var(--flexoki-ui);
     --muted-foreground: var(--flexoki-tx-2);
     --accent: var(--flexoki-ui);
     --accent-foreground: var(--flexoki-tx-2);
@@ -53,16 +53,15 @@
     --radius: 0.5rem;
 
     /* Chart Colors */
-    --chart-1: 30 4% 11%; /* #1C1B1A - Darkest */
-    --chart-2: 35 3% 24%; /* #403E3C - Bigger jump from 1 */
-    --chart-3: 45 2% 33%; /* #575653 - More distinct from 2 */
-    --chart-4: 50 3% 42%; /* #6F6E6B */
-    --chart-5: 43 3% 52%; /* #878580 */
-    --chart-6: 47 4% 61%; /* #9F9D96 */
-    --chart-7: 49 7% 70%; /* #B7B5AC */
-    --chart-8: 55 10% 79%; /* #CECDC3 */
-    --chart-9: 50 14% 83%; /* #E6E4D9 */
-    --chart-10: 51 21% 88%; /* #F2F0E5 */
+    --chart-1: 40 3% 20%; /* #1C1B1A - Darkest */
+    --chart-2: 45 2% 33%; /* #575653 - More distinct from 2 */
+    --chart-3: 50 3% 42%; /* #6F6E6B */
+    --chart-4: 43 3% 52%; /* #878580 */
+    --chart-5: 47 4% 61%; /* #9F9D96 */
+    --chart-6: 49 7% 70%; /* #B7B5AC */
+    --chart-7: 55 10% 79%; /* #CECDC3 */
+    --chart-8: 50 14% 83%; /* #E6E4D9 */
+    --chart-9: 51 21% 88%; /* #F2F0E5 */
   }
 
   .dark {
@@ -80,15 +79,15 @@
     --flexoki-ye: 45 82% 45%;
 
     /* Chart Colors */
-    --chart-1: 27 95% 78%;
-    --chart-2: 25 92% 72%;
-    --chart-3: 24 81% 61%;
-    --chart-4: 23 70% 51%;
-    --chart-5: 23 73% 46%;
-    --chart-6: 22 80% 41%;
-    --chart-7: 22 82% 34%;
-    --chart-8: 22 79% 25%;
-    --chart-9: 22 75% 20%;
+    --chart-1: 25 92% 72%;
+    --chart-2: 24 81% 61%;
+    --chart-3: 23 70% 51%;
+    --chart-4: 23 73% 46%;
+    --chart-5: 22 80% 41%;
+    --chart-6: 22 82% 34%;
+    --chart-7: 22 79% 25%;
+    --chart-8: 22 75% 20%;
+    --chart-9: 22 70% 15%;
   }
 }
 
@@ -99,4 +98,19 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+
+number-flow-react::part(left),
+number-flow-react::part(right),
+number-flow-react::part(left)::after,
+number-flow-react::part(right)::after,
+number-flow-react::part(symbol) {
+  padding: calc(var(--number-flow-mask-height, 0.25em) / 2) 0;
+}
+
+
+number-flow-react.muted-fraction::part(decimal),
+number-flow-react.muted-fraction::part(fraction) {
+  color: hsl(var(--muted-foreground));
 }

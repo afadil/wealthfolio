@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { startOfYear, subDays, subMonths, subYears, isSameDay } from 'date-fns';
-import { DateRange } from 'react-day-picker';
+import { DateRange as DayPickerDateRange } from 'react-day-picker';
+import { DateRange as CustomDateRange } from '@/lib/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Icons } from '@/components/icons';
@@ -50,13 +51,13 @@ const ranges = [
   {
     label: 'ALL',
     name: 'All Time',
-    getValue: () => ({ from: new Date(2000, 0, 1), to: new Date() }),
+    getValue: () => ({ from: new Date(1970, 0, 1), to: new Date() }),
   },
 ];
 
 interface DateRangeSelectorProps {
-  value: DateRange | undefined;
-  onChange: (range: DateRange | undefined) => void;
+  value: CustomDateRange | undefined;
+  onChange: (range: CustomDateRange | undefined) => void;
 }
 
 export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
@@ -114,12 +115,13 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar
-            initialFocus
             mode="range"
             defaultMonth={value?.from}
-            selected={value}
-            onSelect={onChange}
-            numberOfMonths={2}
+            selected={value as DayPickerDateRange | undefined}
+            onSelect={(selectedRange: DayPickerDateRange | undefined) => {
+              onChange(selectedRange as CustomDateRange | undefined);
+            }}
+            numberOfMonths={3}
           />
         </PopoverContent>
       </Popover>

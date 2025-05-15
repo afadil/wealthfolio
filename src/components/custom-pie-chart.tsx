@@ -1,8 +1,10 @@
-import React from 'react';
+import type React from 'react';
 import { PieChart, Pie, Cell, Sector } from 'recharts';
+import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { ChartContainer } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { formatPercent } from '@/lib/utils';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -12,37 +14,27 @@ const COLORS = [
   'hsl(var(--chart-5))',
   'hsl(var(--chart-6))',
   'hsl(var(--chart-7))',
+  'hsl(var(--chart-8))',
+  'hsl(var(--chart-9))',
 ];
 
 const renderActiveShape = (props: any) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent, midAngle } =
+    props;
+
   const RADIAN = Math.PI / 180;
-  const {
-    cx,
-    cy,
-    midAngle,
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    fill,
-    payload,
-    value,
-    percent,
-  } = props;
-  const sin = Math.sin(-RADIAN * midAngle);
-  const cos = Math.cos(-RADIAN * midAngle);
-  const sx = cx + (outerRadius + 5) * cos;
-  const sy = cy + (outerRadius + 5) * sin;
-  const mx = cx + (outerRadius + 20) * cos;
-  const my = cy + (outerRadius + 20) * sin;
-  const ex = mx + (cos >= 0 ? 1 : -1) * 11;
-  const ey = my;
-  const textAnchor = cos >= 0 ? 'start' : 'end';
-  const labelOffset = cos >= 0 ? 12 : -12;
+  // Position for the label next to the arc
+  const labelRadiusOffset = 20; // Adjust as needed
+  const labelX = cx + (outerRadius + labelRadiusOffset) * Math.cos(-midAngle * RADIAN);
+  const labelY = cy + (outerRadius + labelRadiusOffset) * Math.sin(-midAngle * RADIAN);
+  const amountToDisplay = isBalanceHidden
+    ? '••••••'
+    : value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }}>
+      {/* Main sector */}
       <Sector
         cx={cx}
         cy={cy}
@@ -51,58 +43,70 @@ const renderActiveShape = (props: any) => {
         startAngle={startAngle}
         endAngle={endAngle}
         fill={fill}
+        cornerRadius={6}
       />
+
+      {/* Highlight ring */}
       <Sector
         cx={cx}
         cy={cy}
-        startAngle={startAngle}
-        endAngle={endAngle}
+        startAngle={startAngle - 1}
+        endAngle={endAngle + 1}
         innerRadius={outerRadius + 2}
         outerRadius={outerRadius + 4}
+        cornerRadius={6}
         fill={fill}
       />
+
+      {/* Center label with name */}
       <text
         x={cx}
-        y={cy}
-        fill="currentColor"
+        y={cy - 16}
+        fill={'hsl(var(--muted-foreground))'}
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs font-medium"
       >
-        {(percent * 100).toFixed(0)}%
+        {payload.name}
       </text>
-      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
-      <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
+
+      {/* Center label with percentage */}
       <text
-        x={ex + labelOffset}
-        y={ey}
-        textAnchor={textAnchor}
-        fill="currentColor"
-        className="text-xs font-semibold"
+        x={cx}
+        y={cy - 2}
+        textAnchor="middle"
+        fill={'hsl(var(--foreground))'}
+        dominantBaseline="central"
+        className="text-xs font-medium"
       >
-        {`${payload.name} (${(percent * 100).toFixed(0)}%)`}
+        {formatPercent(percent)}
       </text>
-      <foreignObject x={ex + (cos >= 0 ? 1 : -80)} y={ey + 4} width={80} height={20}>
-        <div
-          style={{
-            textAlign: cos >= 0 ? 'left' : 'right',
-            color: 'currentColor',
-            fontSize: '0.75rem',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
-        </div>
-      </foreignObject>
+
+      {/* Center label with value */}
+      <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" className="text-xs">
+        <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
+      </text>
+
+      {/* Label next to the arc for active shape */}
+      <text
+        x={labelX}
+        y={labelY}
+        fill="hsl(var(--foreground))"
+        textAnchor={labelX > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        className="text-xs font-medium"
+      >
+        {amountToDisplay}
+      </text>
     </g>
   );
 };
 
-const renderInactiveActiveShape = (props: any) => {
+const renderInactiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
 
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }}>
       <Sector
         cx={cx}
         cy={cy}
@@ -111,6 +115,7 @@ const renderInactiveActiveShape = (props: any) => {
         startAngle={startAngle}
         endAngle={endAngle}
         fill={fill}
+        cornerRadius={6}
       />
     </g>
   );
@@ -121,6 +126,10 @@ interface CustomPieChartProps {
   activeIndex: number;
   onPieEnter: (event: React.MouseEvent, index: number) => void;
   onPieLeave?: (event: React.MouseEvent, index: number) => void;
+  onSectionClick?: (data: { name: string; value: number }, index: number) => void;
+  startAngle?: number;
+  endAngle?: number;
+  displayTooltip?: boolean;
 }
 
 export const CustomPieChart: React.FC<CustomPieChartProps> = ({
@@ -128,39 +137,63 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   activeIndex,
   onPieEnter,
   onPieLeave,
+  onSectionClick,
+  startAngle = 180,
+  endAngle = 0,
+  displayTooltip = false,
 }) => {
-  const chartConfig = data.reduce(
-    (acc, item, index) => {
-      acc[item.name] = {
-        label: item.name,
-        color: COLORS[index % COLORS.length],
-      };
-      return acc;
-    },
-    {} as Record<string, { label: string; color: string }>,
-  );
+  const { isBalanceHidden } = useBalancePrivacy();
+
+  // Custom formatter for the tooltip content
+  const tooltipFormatter = (
+    value: ValueType,
+    name: NameType,
+  ) => {
+    return (
+      <div className="flex flex-col">
+        <span className="text-[0.70rem] uppercase text-muted-foreground">{name}</span>
+        <span className="font-bold">
+          <AmountDisplay value={Number(value)} currency="USD" isHidden={isBalanceHidden} />
+        </span>
+      </div>
+    );
+  };
 
   return (
-    <ChartContainer config={chartConfig}>
+    <ChartContainer config={{}} className="h-[160px] w-full p-0">
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        {displayTooltip && (
+          <ChartTooltip
+            cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+            content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
+            position={{ y: 0 }}
+          />
+        )}
         <Pie
           data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={40}
-          outerRadius={65}
-          paddingAngle={2}
+          cy="80%"
+          innerRadius="110%"
+          outerRadius="140%"
+          paddingAngle={4}
+          cornerRadius={6}
           animationDuration={100}
           dataKey="value"
           nameKey="name"
-          activeIndex={activeIndex}
+          activeIndex={activeIndex !== -1 ? activeIndex : undefined}
           activeShape={renderActiveShape}
-          inactiveShape={renderInactiveActiveShape}
+          inactiveShape={renderInactiveShape}
           onMouseEnter={onPieEnter}
           onMouseLeave={onPieLeave}
+          onClick={(event, index) => {
+            if (onSectionClick && data[index]) {
+              onSectionClick(data[index], index);
+            }
+          }}
+          startAngle={startAngle}
+          endAngle={endAngle}
         >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={chartConfig[entry.name].color} />
+          {data.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
       </PieChart>

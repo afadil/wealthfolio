@@ -1,12 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm, useFormContext } from 'react-hook-form';
-import * as z from 'zod';
+import { useForm } from 'react-hook-form';
 import { logger } from '@/adapters';
-
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet,
   SheetContent,
@@ -16,39 +13,19 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { MoneyInput } from '@/components/ui/money-input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { CurrencyInput } from '@/components/ui/currency-input';
-
-import { newActivitySchema } from '@/lib/schemas';
-import { useActivityMutations } from '../hooks/useActivityMutations';
-import TickerSearchInput from '@/components/ticker-search';
-import DatePickerInput from '@/components/ui/data-picker-input';
-import { QuantityInput } from '@/components/ui/quantity-input';
-import type { ActivityDetails, NewActivity } from '@/lib/types';
-import { Input } from '@/components/ui/input';
+import { Form } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ActivityType, ActivityTypeSelector } from './activity-type-selector';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Card, CardContent } from '@/components/ui/card';
+import { DataSource } from '@/lib/constants';
+import type { ActivityDetails } from '@/lib/types';
+import { useActivityMutations } from '../hooks/use-activity-mutations';
+import { TradeForm } from './forms/trade-form';
+import { CashForm } from './forms/cash-form';
+import { IncomeForm } from './forms/income-form';
+import { OtherForm } from './forms/other-form';
+import { HoldingsForm } from './forms/holdings-form';
+import { newActivitySchema, type NewActivityFormValues } from './forms/schemas';
 
-type ActivityFormValues = z.infer<typeof newActivitySchema> & {
-  showCurrencySelect?: boolean;
-};
 export interface AccountSelectOption {
   value: string;
   label: string;
@@ -70,26 +47,49 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   INTEREST: 'income',
   DIVIDEND: 'income',
   SPLIT: 'other',
-  TRANSFER_IN: 'other',
-  TRANSFER_OUT: 'other',
+  TRANSFER_IN: 'cash',
+  TRANSFER_OUT: 'cash',
   FEE: 'other',
+  ADD_HOLDING: 'holdings',
+  REMOVE_HOLDING: 'holdings',
 };
 
 export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
 
-  const defaultValues = {
-    ...activity,
-    activityDate: activity?.date ? new Date(activity.date) : new Date(),
+  const isValidActivityType = (type: string | undefined): type is NewActivityFormValues['activityType'] => {
+    return type ? Object.keys(ACTIVITY_TYPE_TO_TAB).includes(type) : false;
+  };
+  const defaultValues: Partial<NewActivityFormValues> = {
+    id: activity?.id,
+    accountId: activity?.accountId || '',
+    activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
+    amount: activity?.amount ,
+    quantity: activity?.quantity ,
+    unitPrice: activity?.unitPrice,
+    fee: activity?.fee || 0,
+    isDraft: activity?.isDraft || false,
+    comment: activity?.comment || null,
+    assetId: activity?.assetId,
+    activityDate: activity?.date ? (() => {
+      const date = new Date(activity.date);
+      date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
+      return date;
+    })() : (() => {
+      const date = new Date();
+      date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
+      return date;
+    })(),
     currency: activity?.currency || '',
-    assetDataSource: activity?.assetDataSource || 'Yahoo',
+    assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
+    showCurrencySelect: false,
   };
 
-  const form = useForm<ActivityFormValues>({
+  const form = useForm<NewActivityFormValues>({
     resolver: zodResolver(newActivitySchema),
-    defaultValues: defaultValues as ActivityFormValues,
+    defaultValues,
   });
-
+  
   // Reset form when dialog closes or activity changes
   useEffect(() => {
     if (!open) {
@@ -97,22 +97,23 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       addActivityMutation.reset();
       updateActivityMutation.reset();
     } else {
-      form.reset(defaultValues as ActivityFormValues); // Reset to initial values
+      form.reset(defaultValues); // Reset to initial values
     }
   }, [open, activity]);
 
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
-  async function onSubmit(data: ActivityFormValues) {
+  async function onSubmit(data: NewActivityFormValues) {
     try {
-      const submissionData = { ...data, isDraft: false } as NewActivity;
+      const { showCurrencySelect, ...submissionData } = { ...data, isDraft: false };
       const { id, ...submitData } = submissionData;
 
-      // For cash activities and fees, set assetId to $CASH-accountCurrency
-      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE'].includes(submitData.activityType)) {
+      // For cash activities and fees, set assetId to $CASH-accountCurrency and currency
+      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(submitData.activityType)) {
         const account = accounts.find((a) => a.value === submitData.accountId);
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
+          submitData.currency = submitData.currency || account.currency;
         }
       }
 
@@ -127,7 +128,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     }
   }
 
-  const defaultTab = activity ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'trade' : 'trade';
+  const defaultTab = activity ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'holdings' : 'holdings';
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -148,7 +149,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                         <li key={field}>
                           {field === 'activityType' ? 'Transaction Type' : field}
                           {': '}
-                          {error?.message}
+                          {error?.message?.toString() || 'Invalid value'}
                         </li>
                       ))}
                     </ul>
@@ -158,12 +159,27 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             )}
           </div>
           <SheetDescription>
-            {activity?.id ? 'Update transaction details' : 'Record a new account transaction.'}
+            {activity?.id
+              ? 'Update the details of your transaction'
+              : 'Record a new transaction in your account.'}
+            {'→ '}
+            <a
+              href="https://wealthfolio.app/docs/concepts/activity-types"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              Learn more
+            </a>
           </SheetDescription>
         </SheetHeader>
         <Tabs defaultValue={defaultTab} className="w-full">
           {!activity?.id && (
-            <TabsList className="mb-6 grid grid-cols-4">
+            <TabsList className="mb-6 grid grid-cols-5">
+              <TabsTrigger value="holdings" className="flex items-center gap-2">
+                <Icons.Wallet className="h-4 w-4" />
+                Holdings
+              </TabsTrigger>
               <TabsTrigger value="trade" className="flex items-center gap-2">
                 <Icons.ArrowRightLeft className="h-4 w-4" />
                 Trade
@@ -186,20 +202,20 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid gap-4">
+                <TabsContent value="holdings">
+                  <HoldingsForm accounts={accounts} />
+                </TabsContent>
                 <TabsContent value="trade">
-                  <TradeFields accounts={accounts} />
+                  <TradeForm accounts={accounts} />
                 </TabsContent>
-
                 <TabsContent value="cash">
-                  <CashFields accounts={accounts} />
+                  <CashForm accounts={accounts} />
                 </TabsContent>
-
                 <TabsContent value="income">
-                  <IncomeFields accounts={accounts} />
+                  <IncomeForm accounts={accounts} />
                 </TabsContent>
-
                 <TabsContent value="other">
-                  <OtherFields accounts={accounts} />
+                  <OtherForm accounts={accounts} />
                 </TabsContent>
               </div>
 
@@ -229,480 +245,3 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     </Sheet>
   );
 }
-
-const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
-  const { control, watch } = useFormContext();
-  const showCurrency = watch('showCurrencySelect');
-
-  return (
-    <>
-      <FormField
-        control={control}
-        name="accountId"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Account</FormLabel>
-            <FormControl>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem value={account.value} key={account.value}>
-                      {account.label}
-                      <span className="font-light text-muted-foreground">({account.currency})</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="activityDate"
-        render={({ field }) => (
-          <FormItem className="flex flex-col">
-            <FormLabel>Date</FormLabel>
-            <DatePickerInput
-              onChange={(date) => field.onChange(date)}
-              value={field.value}
-              disabled={field.disabled}
-            />
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      {showCurrency && (
-        <FormField
-          control={control}
-          name="currency"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Activity Currency</FormLabel>
-              <FormControl>
-                <CurrencyInput {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
-    </>
-  );
-};
-
-const TradeFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
-  const { control } = useFormContext();
-
-  const tradeTypes: ActivityType[] = [
-    { value: 'BUY', label: 'Buy', icon: 'ArrowDown' },
-    { value: 'SELL', label: 'Sell', icon: 'ArrowUp' },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <ActivityTypeSelector control={control} types={tradeTypes} columns={2} />
-        </div>
-      </div>
-      <Card>
-        <CardContent className="space-y-6 pt-2">
-          <ConfigurationCheckbox showCurrencyOption={true} />
-          <AssetActivityFields />
-          <CommonFields accounts={accounts} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-const CashFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
-  const { control } = useFormContext();
-
-  const cashTypes: ActivityType[] = [
-    { value: 'DEPOSIT', label: 'Deposit', icon: 'ArrowDown' },
-    { value: 'WITHDRAWAL', label: 'Withdrawal', icon: 'ArrowUp' },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <ActivityTypeSelector control={control} types={cashTypes} columns={2} />
-        </div>
-      </div>
-      <Card>
-        <CardContent className="space-y-6 pt-2">
-          <ConfigurationCheckbox showCurrencyOption={true} shouldShowSymbolLookup={false} />
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={control}
-              name="unitPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount</FormLabel>
-                  <FormControl>
-                    <MoneyInput {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={control}
-              name="fee"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fee</FormLabel>
-                  <FormControl>
-                    <MoneyInput {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <CommonFields accounts={accounts} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-const IncomeFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
-  const { control, watch } = useFormContext();
-  const activityType = watch('activityType');
-  const isManualAsset = watch('assetDataSource') === 'MANUAL';
-  const shouldShowSymbolLookup = activityType === 'DIVIDEND';
-
-  const incomeTypes: ActivityType[] = [
-    { value: 'DIVIDEND', label: 'Dividend', icon: 'Income' },
-    { value: 'INTEREST', label: 'Interest', icon: 'Percent' },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <ActivityTypeSelector control={control} types={incomeTypes} columns={2} />
-        </div>
-      </div>
-      <Card>
-        <CardContent className="space-y-6 pt-2">
-          <ConfigurationCheckbox
-            showCurrencyOption={true}
-            shouldShowSymbolLookup={shouldShowSymbolLookup}
-          />
-          <>
-            <FormField
-              control={control}
-              name="assetId"
-              render={({ field }) => (
-                <AssetSymbolInput field={field} isManualAsset={isManualAsset} />
-              )}
-            />
-            <div
-              className={`grid ${activityType === 'INTEREST' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}
-            >
-              <FormField
-                control={control}
-                name="unitPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {activityType === 'DIVIDEND' ? 'Dividend Amount' : 'Interest Amount'}
-                    </FormLabel>
-                    <FormControl>
-                      <MoneyInput
-                        placeholder={
-                          activityType === 'DIVIDEND'
-                            ? 'Enter dividend amount'
-                            : 'Enter interest amount'
-                        }
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {activityType === 'INTEREST' && (
-                <FormField
-                  control={control}
-                  name="fee"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fee</FormLabel>
-                      <FormControl>
-                        <MoneyInput {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-          </>
-          <CommonFields accounts={accounts} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-const OtherFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
-  const { control, watch } = useFormContext();
-  const activityType = watch('activityType');
-
-  const otherTypes: ActivityType[] = [
-    { value: 'SPLIT', label: 'Split', icon: 'Split' },
-    { value: 'TRANSFER_IN', label: 'Transfer In', icon: 'ArrowLeftRight' },
-    { value: 'TRANSFER_OUT', label: 'Transfer Out', icon: 'ArrowRightLeft' },
-    { value: 'FEE', label: 'Fee', icon: 'Receipt' },
-  ];
-
-  const shouldShowSymbolLookup = activityType !== 'FEE';
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <ActivityTypeSelector control={control} types={otherTypes} columns={4} />
-        </div>
-      </div>
-      <Card>
-        <CardContent className="space-y-6 pt-2">
-          <ConfigurationCheckbox
-            showCurrencyOption={true}
-            shouldShowSymbolLookup={shouldShowSymbolLookup}
-          />
-          {activityType === 'FEE' ? (
-            <FormField
-              control={control}
-              name="fee"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fee Amount</FormLabel>
-                  <FormControl>
-                    <MoneyInput {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ) : (
-            <AssetActivityFields />
-          )}
-          <CommonFields accounts={accounts} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-interface ConfigurationCheckboxProps {
-  showCurrencyOption?: boolean;
-  shouldShowSymbolLookup?: boolean;
-}
-
-const ConfigurationCheckbox = ({
-  showCurrencyOption = true,
-  shouldShowSymbolLookup = true,
-}: ConfigurationCheckboxProps) => {
-  const { control } = useFormContext();
-
-  return (
-    <div className="flex items-center justify-end space-x-6">
-      {shouldShowSymbolLookup && (
-        <FormField
-          control={control}
-          name="assetDataSource"
-          render={({ field }) => (
-            <FormItem className="mt-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <label
-                    htmlFor="use-lookup-checkbox"
-                    className="cursor-pointer text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Skip Symbol Lookup
-                  </label>
-                  <Checkbox
-                    id="use-lookup-checkbox"
-                    checked={field.value === 'MANUAL'}
-                    onCheckedChange={(checked) => {
-                      field.onChange(checked ? 'MANUAL' : 'Yahoo');
-                    }}
-                    defaultChecked={field.value === 'MANUAL'}
-                    className="h-4 w-4"
-                  />
-                </div>
-              </div>
-            </FormItem>
-          )}
-        />
-      )}
-      {showCurrencyOption && (
-        <FormField
-          control={control}
-          name="showCurrencySelect"
-          render={({ field }) => (
-            <FormItem className="mt-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <label
-                    htmlFor="use-different-currency-checkbox"
-                    className="cursor-pointer text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Use Different Currency
-                  </label>
-                  <Checkbox
-                    id="use-different-currency-checkbox"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    className="h-4 w-4"
-                  />
-                </div>
-              </div>
-            </FormItem>
-          )}
-        />
-      )}
-    </div>
-  );
-};
-
-function AssetSymbolInput({ field, isManualAsset }: { field: any; isManualAsset: boolean }) {
-  return (
-    <FormItem className="-mt-2">
-      <FormLabel>Symbol</FormLabel>
-      <FormControl>
-        {isManualAsset ? (
-          <Input
-            placeholder="Enter symbol"
-            className="h-10"
-            {...field}
-            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-          />
-        ) : (
-          <TickerSearchInput onSelectResult={field.onChange} {...field} />
-        )}
-      </FormControl>
-      <FormMessage className="text-xs" />
-    </FormItem>
-  );
-}
-
-const AssetActivityFields = () => {
-  const { control, watch } = useFormContext();
-  const watchedType = watch('activityType');
-  const isManualAsset = watch('assetDataSource') === 'MANUAL';
-
-  const isSplitType = watchedType === 'SPLIT';
-  const isTransferType = watchedType === 'TRANSFER_IN' || watchedType === 'TRANSFER_OUT';
-  const isTransferOut = watchedType === 'TRANSFER_OUT';
-
-  return (
-    <>
-      <FormField
-        control={control}
-        name="assetId"
-        render={({ field }) => <AssetSymbolInput field={field} isManualAsset={isManualAsset} />}
-      />
-      {isSplitType ? (
-        <FormField
-          control={control}
-          name="unitPrice"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Split Ratio</FormLabel>
-              <FormControl>
-                <QuantityInput placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      ) : isTransferType ? (
-        <div className={`grid ${isTransferOut ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-          <FormField
-            control={control}
-            name="quantity"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Shares</FormLabel>
-                <FormControl>
-                  <QuantityInput {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {!isTransferOut && (
-            <FormField
-              control={control}
-              name="unitPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Average Cost</FormLabel>
-                  <FormControl>
-                    <MoneyInput {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="flex space-x-4">
-          <FormField
-            control={control}
-            name="quantity"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Shares</FormLabel>
-                <FormControl>
-                  <QuantityInput {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={control}
-            name="unitPrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Price</FormLabel>
-                <FormControl>
-                  <MoneyInput {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={control}
-            name="fee"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Fee</FormLabel>
-                <FormControl>
-                  <MoneyInput {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-      )}
-    </>
-  );
-};

@@ -1,31 +1,57 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
 import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
-import { formatAmount, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { ChartConfig, ChartContainer } from './ui/chart';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { GainPercent } from '@/components/gain-percent';
-import { Separator } from '@radix-ui/react-separator';
+import { AmountDisplay } from './amount-display';
+import { Skeleton } from './ui/skeleton';
 
 type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
   isBalanceHidden: boolean;
 };
 
-const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="center-items space-y-1">
-        <p className="font-thin">{formatDate(data.date)}</p>
-        <div className="label flex items-center">
-          {isBalanceHidden
-            ? `•••• `
-            : `${formatAmount(Number(payload[0].value), data.currency, false)} `}
-          <Separator orientation="vertical" className="mx-1 h-4 w-px bg-secondary" />
-          <GainPercent value={data.totalGainPercentage} className="items-start text-left text-xs" />
-        </div>
-      </div>
-    );
+const CustomTooltip = ({ active, payload, isBalanceHidden, isChartHovered }: CustomTooltipProps & { isChartHovered: boolean }) => {
+  if (active && payload && payload.length > 0) {
+    const totalValueData = payload.find(p => p.dataKey === 'totalValue');
+    const netContributionData = payload.find(p => p.dataKey === 'netContribution');
+
+    if (totalValueData?.payload) {
+      return (
+          <div className="grid grid-cols-1 gap-1.5 rounded-md border bg-popover p-2 shadow-md">
+            <p className="text-xs text-muted-foreground">
+              {formatDate(totalValueData.payload.date)}
+            </p>
+            
+            <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center space-x-1.5">
+                <span className="block h-0.5 w-3" style={{ backgroundColor: 'hsl(var(--success))' }} />
+                <span className="text-xs text-muted-foreground">Total Value:</span>
+              </div>
+              <AmountDisplay
+                value={totalValueData.payload.totalValue}
+                currency={totalValueData.payload.currency}
+                isHidden={isBalanceHidden}
+                className="text-xs font-semibold"
+              />
+            </div>
+            {isChartHovered && netContributionData?.payload && (
+              <div className="flex items-center justify-between space-x-2">
+                 <div className="flex items-center space-x-1.5">
+                  <span className="block h-0 w-3 border-b-2 border-dashed" style={{ borderColor: 'hsl(var(--muted-foreground))' }} />
+                  <span className="text-xs text-muted-foreground">Net Deposit:</span>
+                </div>
+                <AmountDisplay
+                  value={netContributionData.payload.netContribution}
+                  currency={netContributionData.payload.currency}
+                  isHidden={isBalanceHidden}
+                  className="text-xs font-semibold"
+                />
+              </div>
+            )}
+          </div>
+      );
+    }
   }
 
   return null;
@@ -34,56 +60,40 @@ const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps)
 interface HistoryChartData {
   date: string;
   totalValue: number;
-  totalGainPercentage: number;
+  netContribution: number;
   currency: string;
 }
 
 export function HistoryChart({
   data,
-  interval,
+  isLoading,
 }: {
   data: HistoryChartData[];
-  interval: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
+  isLoading?: boolean;
 }) {
   const { isBalanceHidden } = useBalancePrivacy();
-
-  const filteredData = useMemo(() => {
-    if (!data) return [];
-    const today = new Date();
-    let startDate: Date;
-    switch (interval) {
-      case '1D':
-        startDate = new Date(today.setDate(today.getDate() - 1));
-        break;
-      case '1W':
-        startDate = new Date(today.setDate(today.getDate() - 7));
-        break;
-      case '1M':
-        startDate = new Date(today.setMonth(today.getMonth() - 1));
-        break;
-      case '3M':
-        startDate = new Date(today.setMonth(today.getMonth() - 3));
-        break;
-      case '1Y':
-        startDate = new Date(today.setFullYear(today.getFullYear() - 1));
-        break;
-      case 'ALL':
-        return data;
-    }
-
-    return data.filter((d) => new Date(d.date) >= startDate);
-  }, [data, interval]);
-
+  const [isChartHovered, setIsChartHovered] = useState(false);
+  
   const chartConfig = {
     totalValue: {
       label: 'Total Value',
     },
+    netContribution: {
+      label: 'Net Contribution',
+    },
   } satisfies ChartConfig;
+
+  // Conditional rendering for loading state
+  if (isLoading && data.length === 0) {
+    return (
+      <Skeleton className="h-full w-full" />
+    );
+  }
 
   return (
     <ChartContainer config={chartConfig} className="h-full w-full">
       <AreaChart
-        data={filteredData}
+        data={data}
         stackOffset="sign"
         margin={{
           top: 0,
@@ -91,6 +101,8 @@ export function HistoryChart({
           left: 0,
           bottom: 0,
         }}
+        onMouseEnter={() => setIsChartHovered(true)}
+        onMouseLeave={() => setIsChartHovered(false)}
       >
         <defs>
           <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
@@ -98,13 +110,12 @@ export function HistoryChart({
             <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.1} />
           </linearGradient>
         </defs>
-        {/* @ts-ignore */}
         <Tooltip
-          content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} />}
+          position={{ y: -20 }}
+          content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} isChartHovered={isChartHovered} />}
         />
-        {interval !== 'ALL' && interval !== '1Y' && (
+        {/* <YAxis hide type="number" domain={[minValue, maxValue]} /> */}
           <YAxis hide type="number" domain={['auto', 'auto']} />
-        )}
         <Area
           isAnimationActive={true}
           animationDuration={300}
@@ -115,6 +126,18 @@ export function HistoryChart({
           stroke="hsl(var(--success))"
           fillOpacity={1}
           fill="url(#colorUv)"
+        />
+        <Area
+          isAnimationActive={true}
+          animationDuration={300}
+          animationEasing="ease-out"
+          connectNulls={true}
+          type="monotone"
+          dataKey="netContribution"
+          stroke="hsl(var(--muted-foreground))"
+          fill="transparent"
+          strokeDasharray="5 5"
+          strokeOpacity={isChartHovered ? 0.8 : 0}
         />
       </AreaChart>
     </ChartContainer>

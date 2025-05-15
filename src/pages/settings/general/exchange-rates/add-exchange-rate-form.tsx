@@ -4,7 +4,6 @@ import * as z from 'zod';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { worldCurrencies } from '@/lib/currencies';
 import { ExchangeRate } from '@/lib/types';
@@ -34,11 +33,17 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { MoneyInput } from '@/components/ui/money-input';
 
 const exchangeRateSchema = z.object({
   fromCurrency: z.string().min(1, 'From Currency is required'),
   toCurrency: z.string().min(1, 'To Currency is required'),
-  rate: z.number().positive('Rate must be a positive number'),
+  rate: z.coerce
+    .number({
+      required_error: 'Please enter a valid rate.',
+      invalid_type_error: 'Rate must be a valid positive number.',
+    })
+    .min(0, { message: 'Rate must be a non-negative number.' }),
 });
 
 type ExchangeRateFormData = z.infer<typeof exchangeRateSchema>;
@@ -62,6 +67,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
     onSubmit({
       ...data,
       source: 'MANUAL',
+      timestamp: new Date().toISOString(),
     });
   };
 
@@ -185,12 +191,9 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
               <FormItem>
                 <FormLabel>Exchange Rate</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    step="0.0001"
+                  <MoneyInput
                     placeholder="Enter exchange rate"
                     {...field}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value))}
                   />
                 </FormControl>
                 <FormMessage />

@@ -1,0 +1,29 @@
+/// Activity types
+pub const ACTIVITY_TYPE_BUY: &str = "BUY";
+pub const ACTIVITY_TYPE_SELL: &str = "SELL";
+pub const ACTIVITY_TYPE_DIVIDEND: &str = "DIVIDEND";
+pub const ACTIVITY_TYPE_INTEREST: &str = "INTEREST";
+pub const ACTIVITY_TYPE_DEPOSIT: &str = "DEPOSIT";
+pub const ACTIVITY_TYPE_WITHDRAWAL: &str = "WITHDRAWAL";
+pub const ACTIVITY_TYPE_TRANSFER_IN: &str = "TRANSFER_IN";
+pub const ACTIVITY_TYPE_TRANSFER_OUT: &str = "TRANSFER_OUT";
+pub const ACTIVITY_TYPE_FEE: &str = "FEE";
+pub const ACTIVITY_TYPE_TAX: &str = "TAX";
+pub const ACTIVITY_TYPE_SPLIT: &str = "SPLIT";
+pub const ACTIVITY_TYPE_ADD_HOLDING: &str = "ADD_HOLDING";
+pub const ACTIVITY_TYPE_REMOVE_HOLDING: &str = "REMOVE_HOLDING";
+
+/// Trading activity types
+pub const TRADING_ACTIVITY_TYPES: [&str; 5] = [
+    ACTIVITY_TYPE_BUY,
+    ACTIVITY_TYPE_SELL,
+    ACTIVITY_TYPE_SPLIT,
+    ACTIVITY_TYPE_ADD_HOLDING,
+    ACTIVITY_TYPE_REMOVE_HOLDING,
+];
+
+/// Income activity types
+pub const INCOME_ACTIVITY_TYPES: [&str; 2] = [
+    ACTIVITY_TYPE_DIVIDEND,
+    ACTIVITY_TYPE_INTEREST,
+]; 

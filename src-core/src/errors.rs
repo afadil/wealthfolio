@@ -1,7 +1,11 @@
-use bigdecimal::ParseBigDecimalError;
+use chrono::{DateTime, NaiveDate, ParseError as ChronoParseError, Utc};
 use diesel::result::Error as DieselError;
 use std::num::ParseFloatError;
 use thiserror::Error;
+
+use crate::activities::ActivityError;
+use crate::fx::FxError;
+use crate::market_data::MarketDataError;
 
 // Create a type alias for Result using our Error type
 pub type Result<T> = std::result::Result<T, Error>;
@@ -13,16 +17,42 @@ pub enum Error {
     Database(#[from] DatabaseError),
 
     #[error("Asset operation failed: {0}")]
-    Asset(#[from] AssetError),
+    Asset(String),
 
-    #[error("Currency operation failed: {0}")]
-    Currency(#[from] CurrencyError),
+    #[error("Failed to convert between currencies: {0}")]
+    CurrencyConversionFailed(String),
+    #[error("Currency '{0}' is not supported")]
+    UnsupportedCurrency(String),
+    #[error("Invalid exchange rate: {0}")]
+    InvalidExchangeRate(String),
 
     #[error("Input validation failed: {0}")]
     Validation(#[from] ValidationError),
 
-    #[error("App Configuration failed: {0}")]
-    Config(#[from] ConfigError),
+    #[error("Failed to load configuration: {0}")]
+    ConfigIO(String),
+    #[error("Invalid configuration value: {0}")]
+    InvalidConfigValue(String),
+    #[error("Missing configuration key: {0}")]
+    MissingConfigKey(String),
+
+    #[error("Market data operation failed: {0}")]
+    MarketData(#[from] MarketDataError),
+
+    #[error("Activity error: {0}")]
+    Activity(#[from] ActivityError),
+
+    #[error("Repository error: {0}")]
+    Repository(String),
+
+    #[error("Holdings calculation failed: {0}")]
+    Calculation(#[from] CalculatorError),
+
+    #[error("Unexpected error: {0}")]
+    Unexpected(String),
+
+    #[error("Fx error: {0}")]
+    Fx(#[from] FxError),
 }
 
 #[derive(Error, Debug)]
@@ -44,30 +74,44 @@ pub enum DatabaseError {
 
     #[error("Database restore failed: {0}")]
     RestoreFailed(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String), // For unexpected logic failures
 }
 
 #[derive(Error, Debug)]
-pub enum AssetError {
-    #[error("Asset '{0}' not found")]
-    NotFound(String),
+pub enum CalculatorError {
+    #[error("Invalid activity data: {0}")]
+    InvalidActivity(String),
+    #[error("Insufficient shares for asset {asset_id} in account {account_id} on date {date}")]
+    InsufficientShares {
+        asset_id: String,
+        account_id: String,
+        date: DateTime<Utc>,
+    },
 
-    #[error("Invalid asset data: {0}")]
-    InvalidData(String),
-
-    #[error("Asset '{0}' already exists")]
-    AlreadyExists(String),
-}
-
-#[derive(Error, Debug)]
-pub enum CurrencyError {
-    #[error("Failed to convert between currencies: {0}")]
-    ConversionFailed(String),
-
-    #[error("Currency '{0}' is not supported")]
-    Unsupported(String),
-
-    #[error("Invalid exchange rate: {0}")]
-    InvalidRate(String),
+    #[error("Currency mismatch for position {position_id} ({}): Activity {activity_id} has currency {}. Requires currency conversion activity first.",
+        position_currency, activity_currency
+    )]
+    CurrencyMismatch {
+        position_id: String,
+        position_currency: String,
+        activity_id: String,
+        activity_currency: String,
+    },
+    #[error("FX rate {0}->{1} not found in pre-fetched cache for date {2}")]
+    MissingFxRate(String, String, NaiveDate),
+    #[error("Position not found for asset {asset_id} in account {account_id} during operation")]
+    PositionNotFound {
+        asset_id: String,
+        account_id: String,
+    },
+    #[error("Lot not found during operation (this should not happen): Lot ID {lot_id}")]
+    LotNotFound { lot_id: String },
+    #[error("Unsupported activity type: {0}")]
+    UnsupportedActivityType(String),
+    #[error("Calculation failed: {0}")]
+    Calculation(String),
 }
 
 #[derive(Error, Debug)]
@@ -82,19 +126,10 @@ pub enum ValidationError {
     MissingField(String),
 
     #[error("Failed to parse decimal number: {0}")]
-    DecimalParse(#[from] ParseBigDecimalError),
-}
+    DecimalParse(#[from] rust_decimal::Error),
 
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    #[error("Failed to load configuration: {0}")]
-    IO(String),
-
-    #[error("Invalid configuration value: {0}")]
-    InvalidValue(String),
-
-    #[error("Missing configuration key: {0}")]
-    MissingKey(String),
+    #[error("Failed to parse date/time: {0}")]
+    DateTimeParse(#[from] ChronoParseError),
 }
 
 // Implement From for DieselError to Error directly
@@ -104,9 +139,9 @@ impl From<DieselError> for Error {
     }
 }
 
-// Add From implementation for ParseBigDecimalError
-impl From<ParseBigDecimalError> for Error {
-    fn from(err: ParseBigDecimalError) -> Self {
+// Add From implementation for rust_decimal::Error
+impl From<rust_decimal::Error> for Error {
+    fn from(err: rust_decimal::Error) -> Self {
         Error::Validation(ValidationError::DecimalParse(err))
     }
 }
@@ -136,5 +171,40 @@ impl From<std::io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Error::Validation(ValidationError::InvalidInput(err.to_string()))
+    }
+}
+
+// Add this implementation
+impl From<r2d2::Error> for Error {
+    fn from(e: r2d2::Error) -> Self {
+        Error::Database(DatabaseError::PoolCreationFailed(e))
+    }
+}
+
+// Add From implementation for FxError
+// impl From<FxError> for Error {
+//     fn from(err: FxError) -> Self {
+//         Error::Currency(CurrencyError::ConversionFailed(err.to_string()))
+//     }
+// }
+
+// Add From implementation for AssetError
+// impl From<AssetError> for Error {
+//     fn from(err: AssetError) -> Self {
+//         Error::Asset(err.to_string())
+//     }
+// }
+
+// Add From implementation for chrono::ParseError
+impl From<ChronoParseError> for Error {
+    fn from(err: ChronoParseError) -> Self {
+        Error::Validation(ValidationError::DateTimeParse(err))
+    }
+}
+
+// Convert Error enum to String, leveraging the Display impl from thiserror
+impl From<Error> for String {
+    fn from(err: Error) -> Self {
+        err.to_string()
     }
 }

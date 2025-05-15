@@ -18,12 +18,14 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Circle,
+  Clock,
   CreditCard,
   DollarSign,
   Download,
   Eye,
   EyeOff,
   FileText,
+  FileUp,
   GaugeCircle,
   Group,
   Home,
@@ -34,6 +36,7 @@ import {
   PanelLeftOpen,
   Plus,
   PlusCircle,
+  MinusCircle,
   ScrollText,
   Search,
   StretchHorizontal,
@@ -57,11 +60,18 @@ import {
   Pencil,
   Info,
   Globe2,
+  Rows3,
   CircleGauge,
   Receipt,
   Percent,
   Split,
   ArrowLeftRight,
+  FileX,
+  ListChecks,
+  Tag,
+  Save,
+  Copy,
+  Grid3x3,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -69,11 +79,16 @@ export type Icon = LucideIcon;
 export const Icons = {
   AlertCircle: AlertCircle,
   AlertTriangle: AlertTriangle,
+  Grid3x3: Grid3x3,
+  Rows3: Rows3,
   Calendar: CalendarDays,
   Check: Check,
   CheckCircle: CheckCircle2,
+  Clock: Clock,
+  ListChecks: ListChecks,
   HandCoins: HandCoins,
   Home: Home,
+  Copy: Copy,
   HelpCircle: HelpCircle,
   ArrowRight: ArrowRight,
   ArrowLeft: ArrowLeft,
@@ -81,6 +96,7 @@ export const Icons = {
   ArrowUp: ArrowUp,
   Billing: CreditCard,
   Search: Search,
+  Save: Save,
   Group: Group,
   Ungroup: Ungroup,
   Globe: Globe2,
@@ -105,6 +121,7 @@ export const Icons = {
   Plus: Plus,
   Pencil: Pencil,
   PlusCircle: PlusCircle,
+  MinusCircle: MinusCircle,
   PieChart: PieChart,
   BarChart: BarChart,
   Spinner: Loader2,
@@ -112,12 +129,14 @@ export const Icons = {
   MoreVertical: MoreVertical,
   Goal: Goal,
   Trash: Trash,
+  Tag: Tag,
   Wallet: Wallet,
   WalletCards: WalletCards,
   StretchHorizontal: StretchHorizontal,
   Menu: TableProperties,
   Import: Upload,
   FileText: FileText,
+  FileX: FileX,
   XCircle: XCircle,
   ScrollText: ScrollText,
   GaugeCircle,
@@ -128,6 +147,7 @@ export const Icons = {
   Receipt: Receipt,
   Percent: Percent,
   Split: Split,
+  FileUp: FileUp,
 
   Dashboard: ({ ...props }: LucideProps) => (
     <svg
@@ -199,9 +219,9 @@ export const Icons = {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       {...props}
     >
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
@@ -222,9 +242,9 @@ export const Icons = {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       {...props}
     >
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />

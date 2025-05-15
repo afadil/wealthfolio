@@ -1,6 +1,28 @@
-import { ActivityImport, ImportMappingData, NewActivity } from '@/lib/types';
+import { ActivityImport, ImportMappingData } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri } from '@/adapters';
 import { logger } from '@/adapters';
+
+
+export const importActivities = async ({
+  activities,
+}: {
+  activities: ActivityImport[];
+}): Promise<ActivityImport[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('import_activities', {
+          accountId: activities[0].accountId,
+          activities: activities,
+        });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error checking activities import.');
+    throw error;
+  }
+};
 
 export const checkActivitiesImport = async ({
   account_id,
@@ -21,20 +43,6 @@ export const checkActivitiesImport = async ({
     }
   } catch (error) {
     logger.error('Error checking activities import.');
-    throw error;
-  }
-};
-
-export const createActivities = async (activities: NewActivity[]): Promise<number> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri('create_activities', { activities });
-      default:
-        throw new Error(`Unsupported`);
-    }
-  } catch (error) {
-    logger.error('Error importing activities.');
     throw error;
   }
 };

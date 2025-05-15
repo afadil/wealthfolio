@@ -31,23 +31,36 @@ export const listenFileDropCancelledTauri = async <T>(
   return listen<T>('tauri://file-drop-cancelled', handler);
 };
 
-export const listenQuotesSyncStartTauri = async <T>(
+export const listenPortfolioUpdateStartTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('PORTFOLIO_UPDATE_START', handler);
+  return listen<T>('portfolio:update-start', handler);
 };
 
-export const listenQuotesSyncCompleteTauri = async <T>(
+export const listenPortfolioUpdateCompleteTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('PORTFOLIO_UPDATE_COMPLETE', handler);
+  return listen<T>('portfolio:update-complete', handler);
 };
 
-export const listenQuotesSyncErrorTauri = async <T>(
+export const listenPortfolioUpdateErrorTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('PORTFOLIO_UPDATE_ERROR', handler);
+  return listen<T>('portfolio:update-error', handler);
 };
+
+export async function listenMarketSyncCompleteTauri<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
+  return listen('market:sync-complete', handler);
+}
+
+export async function listenMarketSyncStartTauri<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
+  return listen('market:sync-start', handler);
+}
+
 
 export const openFileSaveDialogTauri = async (
   fileContent: string | Blob | Uint8Array,
@@ -89,3 +102,4 @@ export const logger = {
   trace,
   debug,
 };
+

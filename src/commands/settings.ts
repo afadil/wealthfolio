@@ -15,11 +15,11 @@ export const getSettings = async (): Promise<Settings> => {
   }
 };
 
-export const saveSettings = async (settings: Settings): Promise<Settings> => {
+export const updateSettings = async (settingsUpdate: Settings): Promise<Settings> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('update_settings', { settings });
+        return invokeTauri('update_settings', { settingsUpdate });
       default:
         throw new Error(`Unsupported`);
     }

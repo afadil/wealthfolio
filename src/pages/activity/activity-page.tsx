@@ -2,26 +2,29 @@ import { ApplicationHeader } from '@/components/header';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { useCallback, useState } from 'react';
+import { useCallback, useState} from 'react';
 import { Link } from 'react-router-dom';
-import ActivityTable from './components/activity-table';
 import { useQuery } from '@tanstack/react-query';
 import { Account, ActivityDetails } from '@/lib/types';
 import { getAccounts } from '@/commands/account';
 import { ActivityDeleteModal } from './components/activity-delete-modal';
 import { QueryKeys } from '@/lib/query-keys';
-import { useActivityMutations } from './hooks/useActivityMutations';
+import { useActivityMutations } from './hooks/use-activity-mutations';
 import { ActivityForm } from './components/activity-form';
+import EditableActivityTable from './components/editable-activity-table';
+import ActivityTable from './components/activity-table';
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<ActivityDetails | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [showEditableTable, setShowEditableTable] = useState(false);
 
-  const { data: accounts } = useQuery<Account[], Error>({
+  const { data: accountsData } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
+  const accounts = accountsData || [];
 
   const { deleteActivityMutation } = useActivityMutations();
 
@@ -36,7 +39,8 @@ const ActivityPage = () => {
   }, []);
 
   const handleDeleteConfirm = async () => {
-    await deleteActivityMutation.mutateAsync(selectedActivity!.id);
+    if(!selectedActivity) return;
+    await deleteActivityMutation.mutateAsync(selectedActivity.id);
     setShowDeleteAlert(false);
     setSelectedActivity(undefined);
   };
@@ -46,17 +50,18 @@ const ActivityPage = () => {
     setSelectedActivity(undefined);
   }, []);
 
+
   return (
     <div className="flex flex-col p-6">
       <ApplicationHeader heading="Activity">
-        <div className="flex items-center space-x-2 absolute right-6">
+        <div className="absolute right-6 flex items-center space-x-2">
           <Button size="sm" title="Import" asChild>
             <Link to={'/import'}>
               <Icons.Import className="mr-2 h-4 w-4" />
-              Upload CSV
+              Import from CSV
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+          <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
             <Icons.PlusCircle className="mr-2 h-4 w-4" />
             Add Manually
           </Button>
@@ -64,11 +69,22 @@ const ActivityPage = () => {
       </ApplicationHeader>
       <Separator className="my-6" />
       <div className="pt-6">
-        <ActivityTable
-          accounts={accounts || []}
-          handleEdit={handleEdit}
-          handleDelete={handleDelete}
-        />
+        {showEditableTable ? (
+            <EditableActivityTable
+              accounts={accounts}
+              isEditable={showEditableTable}
+              onToggleEditable={setShowEditableTable}
+            />
+          ) : (
+            <ActivityTable
+              accounts={accounts}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+              isEditable={showEditableTable}
+              onToggleEditable={setShowEditableTable}
+            />
+          )
+        }
       </div>
       <ActivityForm
         accounts={

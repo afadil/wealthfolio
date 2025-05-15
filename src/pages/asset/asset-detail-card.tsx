@@ -10,7 +10,7 @@ import { useBalancePrivacy } from '@/context/privacy-context';
 interface AssetDetail {
   numShares: number;
   marketValue: number;
-  bookValue: number;
+  costBasis: number;
   averagePrice: number;
   portfolioPercent: number;
   todaysReturn: number | null;
@@ -40,7 +40,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
   const {
     numShares,
     marketValue,
-    bookValue,
+    costBasis,
     averagePrice,
     portfolioPercent,
     todaysReturn,
@@ -54,7 +54,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
   const holdingRows = [
     {
       label: 'Book value',
-      value: <AmountDisplay value={bookValue} currency={currency} isHidden={isBalanceHidden} />,
+      value: <AmountDisplay value={costBasis} currency={currency} isHidden={isBalanceHidden} />,
     },
     {
       label: 'Average cost',
@@ -119,7 +119,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
         {quote && (
           <>
             <Separator className="my-4" />
-            <div className="rounded-lg bg-muted/50">
+            <div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div className="flex flex-col">
                   <span className="text-xs text-muted-foreground">Open</span>

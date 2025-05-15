@@ -1,96 +1,62 @@
-import { AccountSummary, Goal, GoalAllocation, GoalProgress, PortfolioHistory } from './types';
+import { Goal, GoalAllocation, GoalProgress, SimplePerformanceMetrics } from './types';
 
 export function calculateGoalProgress(
-  accounts: AccountSummary[],
+  accountsPerformance: SimplePerformanceMetrics[],
   goals: Goal[],
   allocations: GoalAllocation[],
 ): GoalProgress[] {
-  // Extract base currency from the first account's performance, or default to 'USD'
-  const baseCurrency = accounts[0]?.performance?.baseCurrency || 'USD';
+  // Return early if essential data is missing
+  if (!accountsPerformance || accountsPerformance.length === 0 || !goals || !allocations) {
+    return [];
+  }
 
-  // Create a map of accountId to marketValue for quick lookup
+  // Determine base currency (assuming consistency across accounts performance data)
+  const baseCurrency = accountsPerformance[0].baseCurrency || 'USD'; // Use first account's base currency
+
+  // Create a map of accountId to totalValue in baseCurrency for quick lookup
   const accountValueMap = new Map<string, number>();
-  accounts.forEach((account) => {
-    accountValueMap.set(
-      account.account.id,
-      account?.performance?.totalValue * (account?.performance?.exchangeRate || 1),
-    );
+  accountsPerformance.forEach((account) => {
+    // Convert account total value to base currency
+    const valueInBaseCurrency = (account.totalValue || 0) * (account.fxRateToBase || 1);
+    accountValueMap.set(account.accountId, valueInBaseCurrency);
   });
 
-  // Sort goals by targetValue
-  goals.sort((a, b) => a.targetAmount - b.targetAmount);
+  // Group allocations by goalId for efficient lookup
+  const allocationsByGoal = new Map<string, GoalAllocation[]>();
+  allocations.forEach((alloc) => {
+    const existing = allocationsByGoal.get(alloc.goalId) || [];
+    allocationsByGoal.set(alloc.goalId, [...existing, alloc]);
+  });
 
-  return goals.map((goal) => {
-    const goalAllocations = allocations.filter((allocation) => allocation.goalId === goal.id) || [];
+  // Create a sorted copy of goals to avoid mutating the original array
+  const sortedGoals = [...goals].sort((a, b) => a.targetAmount - b.targetAmount);
+
+  // Calculate progress for each goal
+  return sortedGoals.map((goal) => {
+    // Use the pre-grouped allocations map
+    const goalAllocations = allocationsByGoal.get(goal.id) || [];
+
+    // Calculate the total value allocated to this goal in base currency
     const totalAllocatedValue = goalAllocations.reduce((total, allocation) => {
-      const accountValue = accountValueMap.get(allocation.accountId) || 0;
-      const allocatedValue = (accountValue * allocation.percentAllocation) / 100;
+      const accountValueInBase = accountValueMap.get(allocation.accountId) || 0;
+      const allocatedValue = (accountValueInBase * allocation.percentAllocation) / 100;
       return total + allocatedValue;
     }, 0);
 
-    // Calculate progress
+    // Calculate progress percentage (base currency vs base currency)
     const progress = goal.targetAmount > 0 ? (totalAllocatedValue / goal.targetAmount) * 100 : 0;
 
+    // Ensure progress does not exceed 100% visually if needed, although mathematically it can
+    // const cappedProgress = Math.min(progress, 100);
+
     return {
-      name: goal.title,
-      targetValue: goal.targetAmount,
-      currentValue: totalAllocatedValue,
-      progress: progress,
-      currency: baseCurrency,
+      // Use goal.title for name consistency if desired, or keep as is
+      name: goal.title, 
+      targetValue: goal.targetAmount, // Base Currency
+      currentValue: totalAllocatedValue, // Base Currency
+      progress: progress, // Use 'progress' or 'cappedProgress'
+      currency: baseCurrency, // Report in base currency
     };
   });
 }
 
-export function getValuesForInterval(
-  history: PortfolioHistory[],
-  interval: '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL',
-): { startValue: PortfolioHistory; endValue: PortfolioHistory; twr: number } | undefined {
-  if (history.length === 0) return undefined;
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  let startDate: Date;
-
-  switch (interval) {
-    case '1D':
-      startDate = new Date(now.setDate(now.getDate() - 1));
-      break;
-    case '1W':
-      startDate = new Date(now.setDate(now.getDate() - 7));
-      break;
-    case '1M':
-      startDate = new Date(now.setMonth(now.getMonth() - 1));
-      break;
-    case '3M':
-      startDate = new Date(now.setMonth(now.getMonth() - 3));
-      break;
-    case '1Y':
-      startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-      break;
-    case 'ALL':
-    default:
-      startDate = new Date(0); // Earliest possible date
-  }
-
-  startDate.setHours(0, 0, 0, 0);
-
-  const sortedHistory = [...history].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-  );
-
-  const relevantHistory = sortedHistory.filter((item) => new Date(item.date) >= startDate);
-  const startValue = relevantHistory[0] || sortedHistory[0];
-  const endValue = relevantHistory[relevantHistory.length - 1];
-
-  // Calculate TWR
-  let twr = 1;
-  for (let i = 1; i < relevantHistory.length; i++) {
-    const prev = relevantHistory[i - 1];
-    const curr = relevantHistory[i];
-    const subperiodReturn = (curr.totalValue - curr.netDeposit + prev.netDeposit) / prev.totalValue;
-    twr *= subperiodReturn;
-  }
-  twr = (twr - 1) * 100; // Convert to percentage
-
-  return { startValue, endValue, twr };
-}

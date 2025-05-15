@@ -23,15 +23,18 @@ export const getRunEnv = (): RUN_ENV => {
 
 export type { EventCallback, UnlistenFn } from './tauri';
 
+
 export {
   invokeTauri,
   openCsvFileDialogTauri,
   listenFileDropHoverTauri,
   listenFileDropTauri,
   listenFileDropCancelledTauri,
-  listenQuotesSyncStartTauri,
-  listenQuotesSyncCompleteTauri,
-  listenQuotesSyncErrorTauri,
+  listenPortfolioUpdateStartTauri,
+  listenPortfolioUpdateCompleteTauri,
+  listenPortfolioUpdateErrorTauri,
   openFileSaveDialogTauri,
   logger,
 } from './tauri';
+
+export * from './tauri';

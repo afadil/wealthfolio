@@ -40,12 +40,12 @@ export function AppearanceForm() {
     defaultValues,
   });
 
-  function onSubmit(data: AppearanceFormValues) {
-    const updatedSettings = {
-      baseCurrency: settings?.baseCurrency || 'USD',
-      ...data,
-    };
-    updateSettings(updatedSettings);
+  async function onSubmit(data: AppearanceFormValues) {
+    try {
+      await updateSettings({ theme: data.theme, font: data.font });
+    } catch (error) {
+      console.error('Failed to update appearance settings:', error);
+    }
   }
 
   return (
@@ -92,7 +92,7 @@ export function AppearanceForm() {
                 className="grid max-w-md grid-cols-2 gap-8 pt-2"
               >
                 <FormItem>
-                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary">
+                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
                     <FormControl>
                       <RadioGroupItem value="light" className="sr-only" />
                     </FormControl>
@@ -116,7 +116,7 @@ export function AppearanceForm() {
                   </FormLabel>
                 </FormItem>
                 <FormItem>
-                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary">
+                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
                     <FormControl>
                       <RadioGroupItem value="dark" className="sr-only" />
                     </FormControl>

@@ -62,19 +62,19 @@ export const deleteContributionLimit = async (id: string): Promise<void> => {
   }
 };
 
-export const calculateDepositsForAccounts = async (
-  accountIds: string[],
-  year: number,
+export const calculateDepositsForLimit = async (
+  limitId: string,
 ): Promise<DepositsCalculation> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('calculate_deposits_for_accounts', { accountIds, year });
+        return invokeTauri('calculate_deposits_for_contribution_limit', { limitId });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error calculating deposits for accounts.');
+    logger.error('Error calculating deposits for contribution limit.');
     throw error;
   }
 };
+

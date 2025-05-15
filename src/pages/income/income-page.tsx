@@ -3,22 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { DollarSign, PieChart as PieChartIcon } from 'lucide-react';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Bar,
-  ComposedChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Line,
   PieChart,
   Pie,
   Cell,
 } from 'recharts';
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
@@ -33,9 +25,8 @@ import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { formatAmount } from '@/lib/utils';
-import { format } from 'date-fns';
 import { AmountDisplay } from '@/components/amount-display';
+import { IncomeHistoryChart } from './income-history-chart';
 
 const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [
   { code: 'TOTAL', label: 'All Time' },
@@ -121,11 +112,12 @@ export default function IncomePage() {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10);
 
-  const monthlyIncomeData = Object.entries(periodSummary.byMonth)
+  const monthlyIncomeData: [string, number][] = Object.entries(periodSummary.byMonth)
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(selectedPeriod === 'TOTAL' ? 0 : -12);
+    .slice(selectedPeriod === 'TOTAL' ? 0 : -12)
+    .map(([month, income]) => [month, Number(income) || 0]);
 
-  const getPreviousPeriodData = (currentMonth: string) => {
+  const getPreviousPeriodData = (currentMonth: string): number => {
     const [year, month] = currentMonth.split('-');
     let previousYear = parseInt(year) - 1;
     let previousMonth = month;
@@ -141,28 +133,33 @@ export default function IncomePage() {
     }
 
     const previousYearMonth = `${previousYear}-${previousMonth}`;
-    return totalSummary.byMonth[previousYearMonth] || 0;
+    const previousIncome = totalSummary.byMonth[previousYearMonth];
+    return Number(previousIncome) || 0;
   };
 
-  const previousMonthlyIncomeData = monthlyIncomeData.map(([month]) => [
+  const previousMonthlyIncomeData: [string, number][] = monthlyIncomeData.map(([month]) => [
     month,
     getPreviousPeriodData(month),
   ]);
 
   const previousMonthlyAverage =
     previousMonthlyIncomeData.length > 0
-      ? previousMonthlyIncomeData.reduce((sum, [, value]) => sum + (value as number), 0) /
-        previousMonthlyIncomeData.length
+      ? previousMonthlyIncomeData.reduce((sum, [, value]) => {
+          const numericValue = Number(value) || 0;
+          return sum + numericValue;
+        }, 0) / previousMonthlyIncomeData.length
       : 0;
+
+  const currentMonthlyAverageNumber = Number(monthlyAverage) || 0;
 
   const monthlyAverageChange =
     previousMonthlyAverage > 0
-      ? ((monthlyAverage - previousMonthlyAverage) / previousMonthlyAverage) * 100
+      ? (currentMonthlyAverageNumber - previousMonthlyAverage) / previousMonthlyAverage
       : 0;
 
   const currencyData = Object.entries(byCurrency).map(([currency, amount]) => ({
     currency,
-    amount,
+    amount: Number(amount) || 0,
   }));
 
   const { isBalanceHidden } = useBalancePrivacy();
@@ -254,7 +251,7 @@ export default function IncomePage() {
             <CardContent>
               <div className="text-2xl font-bold">
                 <AmountDisplay
-                  value={monthlyAverage}
+                  value={currentMonthlyAverageNumber}
                   currency={currency}
                   isHidden={isBalanceHidden}
                 />
@@ -318,131 +315,13 @@ export default function IncomePage() {
           </Card>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
-          <Card className="col-span-2">
-            <CardHeader>
-              <CardTitle className="text-xl">Income History</CardTitle>
-              <CardDescription>
-                {selectedPeriod === 'TOTAL'
-                  ? 'All Time'
-                  : selectedPeriod === 'YTD'
-                    ? 'Year to Date'
-                    : selectedPeriod === 'LAST_YEAR'
-                      ? 'Last Year'
-                      : 'Two Years Ago'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {monthlyIncomeData.length === 0 ? (
-                <EmptyPlaceholder
-                  className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
-                  icon={<Icons.Activity className="h-10 w-10" />}
-                  title="No income history available"
-                  description="There is no income history for the selected period. Try selecting a different time range or check back later."
-                />
-              ) : (
-                <ChartContainer
-                  config={{
-                    income: {
-                      label: 'Monthly Income',
-                      color: 'hsl(var(--chart-1))',
-                    },
-                    cumulative: {
-                      label: 'Cumulative Income',
-                      color: 'hsl(var(--chart-5))',
-                    },
-                    previousIncome: {
-                      label: 'Previous Period Income',
-                      color: 'hsl(var(--chart-5))',
-                    },
-                  }}
-                >
-                  <ComposedChart
-                    data={monthlyIncomeData.map(([month, income], index) => ({
-                      month,
-                      income,
-                      cumulative: monthlyIncomeData
-                        .slice(0, index + 1)
-                        .reduce((sum, [, value]) => sum + value, 0),
-                      previousIncome: previousMonthlyIncomeData[index][1],
-                    }))}
-                  >
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tickLine={false}
-                      tickMargin={10}
-                      axisLine={false}
-                      tickFormatter={(value) => value}
-                    />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name, entry) => {
-                            const formattedValue = isBalanceHidden
-                              ? '••••'
-                              : formatAmount(Number(value), currency);
-                            return (
-                              <>
-                                <div
-                                  className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]"
-                                  style={
-                                    {
-                                      '--color-bg': entry.color,
-                                      '--color-border': entry.color,
-                                    } as React.CSSProperties
-                                  }
-                                />
-                                <div className="flex flex-1 items-center justify-between">
-                                  <span className="text-muted-foreground">
-                                    {name === 'income'
-                                      ? 'Monthly Income'
-                                      : name === 'previousIncome'
-                                        ? 'Previous Period'
-                                        : name}
-                                  </span>
-                                  <span className="ml-2 font-mono font-medium tabular-nums text-foreground">
-                                    {formattedValue}
-                                  </span>
-                                </div>
-                              </>
-                            );
-                          }}
-                          labelFormatter={(label) => format(new Date(label), 'MMMM yyyy')}
-                        />
-                      }
-                    />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="income"
-                      fill="var(--color-income)"
-                      radius={[8, 8, 0, 0]}
-                      barSize={25}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="cumulative"
-                      stroke="var(--color-cumulative)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="previousIncome"
-                      stroke="var(--color-previousIncome)"
-                      strokeWidth={2}
-                      dot={false}
-                      strokeDasharray="3 3"
-                    />
-                  </ComposedChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
+          <IncomeHistoryChart
+            monthlyIncomeData={monthlyIncomeData}
+            previousMonthlyIncomeData={previousMonthlyIncomeData}
+            selectedPeriod={selectedPeriod}
+            currency={currency}
+            isBalanceHidden={isBalanceHidden}
+          />
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">Top 10 Dividend Sources</CardTitle>
@@ -456,7 +335,7 @@ export default function IncomePage() {
                   description="There are no dividend sources for the selected period. Try selecting a different time range or check back later."
                 />
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {topDividendStocks.map(([symbol, income], index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center">

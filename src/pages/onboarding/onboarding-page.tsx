@@ -1,78 +1,57 @@
-import { Icons } from '@/components/icons';
-import { Button } from '@/components/ui/button';
-import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { OnboardingStep1 } from './onboarding-step1';
+import { OnboardingStep2 } from './onboarding-step2';
+import { OnboardingStep3 } from './onboarding-step3';
 
-export const OnboardingPage = () => {
-  const location = useLocation();
-  // Parse the query parameters
-  const searchParams = new URLSearchParams(location.search);
-  const currentStep = parseInt(searchParams.get('step') || '0', 10);
+const OnboardingPage = () => {
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(1);
+  const MAX_STEPS = 3;
 
-  const renderStepIcon = (stepNumber: number) => {
-    return currentStep >= stepNumber ? (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-success">
-        <Icons.CheckCircle className="text-xs text-white" />
-      </div>
-    ) : (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground/80">
-        <span className="text-xs text-white">{stepNumber}</span>
-      </div>
-    );
+  const handleNext = () => {
+    setCurrentStep((prevStep) => Math.min(prevStep + 1, MAX_STEPS));
+  };
+
+  const handleBack = () => {
+    setCurrentStep((prevStep) => Math.max(prevStep - 1, 1));
+  };
+
+  const handleFinish = async () => {
+    navigate('/settings/accounts');
+  };
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return <OnboardingStep1 onNext={handleNext} />;
+      case 2:
+        return <OnboardingStep2 onNext={handleNext} onBack={handleBack} />;
+      case 3:
+        return <OnboardingStep3 onNext={handleFinish} onBack={handleBack} />;
+      default:
+        setCurrentStep(1);
+        return null;
+    }
   };
 
   return (
-    <section className="flex min-h-screen items-center justify-center pb-16">
-      <div className="flex max-w-4xl flex-col space-x-6 md:flex-row md:items-center">
-        <div className="md:flex md:w-1/4 md:items-center md:justify-center">
-          <img
-            alt="Illustration"
-            className="mx-auto"
-            height="400"
-            width="400"
-            src="/illustration.png"
-            style={{
-              aspectRatio: '1 / 1',
-              objectFit: 'cover',
-            }}
-          />
-        </div>
-        <div className="space-y-6 md:w-3/4">
-          <h1 className="mb-4 text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Welcome to Wealthfolio
-          </h1>
-          <p className="mb-8 text-lg text-muted-foreground dark:text-gray-400">
-            Your personal financial portfolio tracker, right on your computer. Here's how to get
-            started:
-          </p>
-          <div className="mb-8 space-y-6 pl-2">
-            <Link to="/settings/general" className="group flex items-center space-x-2">
-              {renderStepIcon(1)}
-              <p className="text-gray-700 dark:text-gray-300">Set your main currency</p>
-              <Icons.ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-            <Link to="/settings/accounts" className="group flex items-center space-x-2">
-              {renderStepIcon(2)}
-              <p className="text-gray-700 dark:text-gray-300">Add your accounts</p>
-              <Icons.ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-            <Link to="/activities" className="group flex items-center space-x-2">
-              {renderStepIcon(3)}
-              <p className="text-gray-700 dark:text-gray-300">Add or import activities</p>
-              <Icons.ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
-          {currentStep === 0 && (
-            <div>
-              <Button className="mt-4" asChild>
-                <Link to="/settings/general">
-                  Let's get started
-                  <Icons.ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          )}
-        </div>
+    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center py-16 ">
+      <img
+        alt="Wealthfolio Illustration"
+        className="align-self-end mx-auto mb-8"
+        height="150"
+        width="150"
+        src="/illustration2.png"
+        style={{
+          aspectRatio: '1 / 1',
+          objectFit: 'cover',
+        }}
+      />
+      <div className="align-self-start w-full max-w-7xl">
+        <div className="w-full flex-1 px-4 md:px-0">{renderCurrentStep()}</div>
       </div>
+    
     </section>
   );
 };

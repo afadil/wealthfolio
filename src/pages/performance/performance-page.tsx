@@ -1,177 +1,404 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { subMonths } from 'date-fns';
 import { PerformanceChart } from '@/components/performance-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, BarChart } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { DateRangeSelector } from '@/components/date-range-selector';
-import { useAccounts } from '@/pages/account/useAccounts';
-import { Skeleton } from '@/components/ui/skeleton';
-import { DateRange } from 'react-day-picker';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { ReturnMethod, usePerformanceData } from './hooks/use-performance-data';
+import { useCalculatePerformanceHistory } from './hooks/use-performance-data';
 import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
+import { AlertFeedback } from '@/components/alert-feedback';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { TrackedItem, PerformanceMetrics, ReturnData, DateRange } from '@/lib/types';
+import { GainPercent } from '@/components/gain-percent';
+import NumberFlow from '@number-flow/react';
+import { AccountSelector } from '../../components/account-selector';
+import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
+import {
+  MetricLabelWithInfo,
+  TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
+  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
+  VOLATILITY_INFO as volatilityInfo,
+  MAX_DRAWDOWN_INFO as maxDrawdownInfo
+} from '@/components/metric-display';
 
-const PORTFOLIO_TOTAL: ComparisonItem = {
-  id: 'TOTAL',
+const PORTFOLIO_TOTAL: TrackedItem = {
+  id: PORTFOLIO_ACCOUNT_ID,
   type: 'account',
   name: 'All Portfolio',
 };
 
-type ComparisonItem = {
+// Define the type expected by the chart
+interface ChartDataItem {
   id: string;
-  type: 'account' | 'symbol';
   name: string;
-};
+  returns: ReturnData[];
+}
+
+// Define the actual structure returned by the hook (assuming it includes name/type)
+interface PerformanceDataFromHook extends PerformanceMetrics {
+  name: string;
+  type: 'account' | 'symbol';
+}
 
 function PerformanceContent({
-  performanceData,
+  chartData,
   isLoading,
+  hasErrors,
+  errorMessages,
 }: {
-  performanceData: any[] | undefined;
+  chartData: ChartDataItem[] | undefined;
   isLoading: boolean;
+  hasErrors: boolean;
+  errorMessages: string[];
 }) {
   return (
-    <div className="relative">
-      {performanceData && performanceData.length > 0 && <PerformanceChart data={performanceData} />}
+    <div className="relative flex h-full w-full flex-col">
+      {chartData && chartData.length > 0 && (
+        <div className="min-h-0 w-full flex-1">
+          <PerformanceChart data={chartData} />
+        </div>
+      )}
 
-      {!performanceData?.length && !isLoading && (
+      {!chartData?.length && !isLoading && !hasErrors && (
         <EmptyPlaceholder
-          className="mx-auto flex h-[400px] max-w-[420px] items-center justify-center"
+          className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<BarChart className="h-10 w-10" />}
           title="No performance data"
           description="Select accounts to compare their performance over time."
         />
       )}
 
-      {/* Overlay loading indicator */}
+      {/* Modern horizontal loader with improved UX */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-          <Skeleton className="h-[400px] w-full bg-muted/50" />
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
+            <div className="animate-progress-border absolute left-0 top-0 h-[2px] bg-primary"></div>
+          </div>
+          <div className="absolute bottom-4 right-4">
+            <div className="rounded-md border bg-background/80 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+              <p className="flex items-center text-xs font-medium text-muted-foreground">
+                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-primary"></span>
+                Calculating...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error display using AlertFeedback component */}
+      {hasErrors && (
+        <div className="w-full max-w-md">
+          <AlertFeedback title="Error calculating performance data" variant="error">
+            <div>
+              {errorMessages.map((error, index) => (
+                <p key={index} className="text-sm">
+                  {error}
+                </p>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                size="sm"
+                onClick={() => window.location.reload()}
+                variant="default"
+                className="bg-black text-white hover:bg-gray-800"
+              >
+                Retry
+              </Button>
+            </div>
+          </AlertFeedback>
         </div>
       )}
     </div>
   );
 }
 
+const SelectedItemBadge = ({ 
+  item, 
+  isSelected, 
+  onSelect, 
+  onDelete 
+}: { 
+  item: TrackedItem; 
+  isSelected: boolean;
+  onSelect: () => void;
+  onDelete: (e: React.MouseEvent) => void;
+}) => {
+  return (
+    <div className="my-2 flex items-center">
+      <Badge className={`rounded-md  px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
+        isSelected ? 'ring-2 ring-primary' : ''
+      }`}
+        onClick={onSelect}
+        role="button"
+        variant="secondary"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+        aria-pressed={isSelected}
+      >
+        <div className="flex items-center space-x-3">
+          <div
+            className={`h-4 w-1 rounded-full ${
+              item.type === 'account'
+                ? 'bg-zinc-500 dark:bg-zinc-400'
+                : 'bg-orange-500 dark:bg-orange-400'
+            }`}
+          ></div>
+          <span className="text-sm font-medium">{item.name}</span>
+        </div>
+        <button 
+          className="ml-3 text-gray-500 dark:text-zinc-400 transition-all duration-150 hover:scale-110 hover:text-gray-800 hover:dark:text-zinc-100"
+          onClick={onDelete}
+          aria-label={`Remove ${item.name}`}
+        >
+          <X size={18} />
+        </button>
+      </Badge>
+    </div>
+  );
+};
+
 export default function PerformancePage() {
-  const [selectedItems, setSelectedItems] = useState<ComparisonItem[]>([PORTFOLIO_TOTAL]);
+  const [selectedItems, setSelectedItems] = useState<TrackedItem[]>([PORTFOLIO_TOTAL]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subMonths(new Date(), 12),
     to: new Date(),
   });
-  const [returnMethod, setReturnMethod] = useState<ReturnMethod>('TWR');
 
-  const { data: accounts, isLoading: isLoadingAccounts } = useAccounts();
-  const { data: performanceData, isLoading: isLoadingPerformance } = usePerformanceData({
+  // Helper function to sort comparison items (accounts first, then symbols)
+  const sortComparisonItems = (items: TrackedItem[]): TrackedItem[] => {
+    return [...items].sort((a, b) => {
+      // Sort by type first (accounts before symbols)
+      if (a.type !== b.type) {
+        return a.type === 'account' ? -1 : 1;
+      }
+      // If same type, maintain original order
+      return 0;
+    });
+  };
+
+  // Use the custom hook for parallel data fetching with effective date calculation
+  const {
+    data: performanceData,
+    isLoading: isLoadingPerformance,
+    hasErrors,
+    errorMessages,
+    displayDateRange
+  } = useCalculatePerformanceHistory({
     selectedItems,
-    dateRange,
-    returnMethod,
+    dateRange
   });
 
-  const handleAccountSelect = (accountId: string) => {
-    const account =
-      accountId === PORTFOLIO_TOTAL.id
-        ? PORTFOLIO_TOTAL
-        : accounts?.find((a) => a.id === accountId);
+  // Calculate derived chart data
+  const chartData = useMemo(() => {
+    if (!performanceData || !selectedItems) return [];
 
-    if (account) {
-      setSelectedItems((prev) => {
-        const exists = prev.some((item) => item.id === accountId);
-        if (exists) {
-          return prev.filter((item) => item.id !== accountId);
-        }
-        return [...prev, { id: accountId, type: 'account', name: account.name }];
-      });
-    }
+    return performanceData
+      // Update type predicate to use the more accurate type
+      .filter((item): item is PerformanceDataFromHook => 
+        item !== null && typeof item.id === 'string' && Array.isArray(item.returns)
+      )
+      .map((perfItem): ChartDataItem => ({
+        id: perfItem.id,
+        name: perfItem.name, // Can now safely access name from perfItem
+        returns: perfItem.returns,
+      }));
+  }, [performanceData, selectedItems]);
+
+  // Calculate selected item data
+  const selectedItemData = useMemo(() => {
+    if (!performanceData?.length || !selectedItems) return null;
+    const targetId = selectedItemId || performanceData.find(item => item !== null)?.id; // Find first non-null item ID if none selected
+    if (!targetId) return null;
+    const found = performanceData.find((item) => item?.id === targetId);
+    if (!found) return null;
+    const name = selectedItems.find(item => item.id === found.id)?.name || 'Unknown';
+    return {
+      id: found.id,
+      name: name,
+      totalReturn: Number(found.cumulativeTwr),
+      annualizedReturn: Number(found.annualizedTwr),
+      volatility: Number(found.volatility),
+      maxDrawdown: Number(found.maxDrawdown),
+    };
+  }, [selectedItemId, performanceData, selectedItems]);
+
+  const handleAccountSelect = (account: { id: string; name: string }) => {
+    setSelectedItems((prev) => {
+      const exists = prev.some((item) => item.id === account.id);
+      if (exists) {
+        return sortComparisonItems(prev.filter((item) => item.id !== account.id));
+      }
+
+      // Create a proper ComparisonItem
+      const newItem: TrackedItem = {
+        id: account.id,
+        type: 'account',
+        name: account.name,
+      };
+
+      return sortComparisonItems([...prev, newItem]);
+    });
   };
 
   const handleSymbolSelect = (symbol: { id: string; name: string }) => {
     setSelectedItems((prev) => {
       const exists = prev.some((item) => item.id === symbol.id);
-      if (exists) return prev;
-      return [...prev, { id: symbol.id, type: 'symbol', name: symbol.name }];
+      if (exists) return sortComparisonItems(prev);
+
+      const newSymbol: TrackedItem = {
+        id: symbol.id,
+        type: 'symbol',
+        name: symbol.name,
+      };
+
+      return sortComparisonItems([...prev, newSymbol]);
     });
   };
 
-  const accountOptions = accounts ? [PORTFOLIO_TOTAL, ...accounts] : [PORTFOLIO_TOTAL];
+  const handleBadgeSelect = (item: TrackedItem) => {
+    setSelectedItemId(selectedItemId === item.id ? null : item.id);
+  };
 
-  if (isLoadingAccounts) {
-    return <PerformanceDashboardSkeleton />;
-  }
+  const handleBadgeDelete = (e: React.MouseEvent, item: TrackedItem) => {
+    e.stopPropagation();
+    if (item.type === 'account') {
+      handleAccountSelect({ id: item.id, name: item.name });
+    } else {
+      setSelectedItems((prev) => sortComparisonItems(prev.filter((i) => i.id !== item.id)));
+    }
+    if (selectedItemId === item.id) {
+      setSelectedItemId(null);
+    }
+  };
 
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader heading="Portfolio Performance">
         <div className="flex items-center space-x-2">
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
-          <Select value={selectedItems[0]?.id} onValueChange={handleAccountSelect}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              {accountOptions.map((account) => (
-                <SelectItem
-                  key={account.id}
-                  value={account.id}
-                  className={account.id === 'TOTAL' ? 'font-medium' : ''}
-                >
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </ApplicationHeader>
 
-      <div className="space-y-6">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex h-[calc(100vh-12rem)] flex-col space-y-6">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedItems.map((item) => (
-            <Button
+            <SelectedItemBadge
               key={item.id}
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                if (item.type === 'account') {
-                  handleAccountSelect(item.id);
-                } else {
-                  setSelectedItems((prev) => prev.filter((i) => i.id !== item.id));
-                }
-              }}
-            >
-              {item.name}
-              <X className="ml-2 h-4 w-4" />
-            </Button>
+              item={item}
+              isSelected={selectedItemId === item.id}
+              onSelect={() => handleBadgeSelect(item)}
+              onDelete={(e) => handleBadgeDelete(e, item)}
+            />
           ))}
+          {selectedItems.length > 0 && <Separator orientation="vertical" className="mx-2 h-6" />}
+
+          <AccountSelector
+            setSelectedAccount={handleAccountSelect}
+            variant="button"
+            buttonText="Add account"
+            includePortfolio={true}
+          />
           <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-col space-y-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl">Cumulative Returns</CardTitle>
-                <CardDescription>Compare account performance over time</CardDescription>
+        <Card className="flex min-h-0 flex-1 flex-col">
+          <CardHeader className="pb-1">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Performance</CardTitle>
+                  <CardDescription>{displayDateRange}</CardDescription>
+                </div>
+                {performanceData && performanceData.length > 0 && (
+                  <div className="grid grid-cols-2 gap-6 rounded-lg p-2 backdrop-blur-sm md:grid-cols-4">
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                      <div className="flex justify-center items-baseline">
+                        <span
+                          className={`text-lg ${
+                            selectedItemData && selectedItemData.totalReturn >= 0
+                              ? 'text-success'
+                              : 'text-destructive'
+                          }`}
+                        >
+                          <GainPercent value={selectedItemData?.totalReturn || 0} animated={true} className='text-lg'/>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Annualized Return" infoText={annualizedReturnInfo} />
+                      <div className="flex justify-center items-baseline">
+                        <span
+                          className={`text-lg ${
+                            selectedItemData && selectedItemData.annualizedReturn >= 0
+                              ? 'text-success'
+                              : 'text-destructive'
+                          }`}
+                        >
+                          <GainPercent
+                            value={selectedItemData?.annualizedReturn || 0}
+                            animated={true}
+                            className='text-lg'
+                          />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                      <div className="flex justify-center items-baseline">
+                        <span className="text-lg text-foreground">
+                          <NumberFlow
+                            value={(selectedItemData?.volatility || 0)}
+                            animated={true}
+                            format={{
+                              style: 'percent',
+                              maximumFractionDigits: 2,
+                            }}
+                          />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center space-y-1">
+                      <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                      <div className="flex justify-center items-baseline">
+                        <span className="text-lg text-destructive">
+                          <NumberFlow
+                            value={(selectedItemData?.maxDrawdown || 0) * -1}
+                            animated={true}
+                            format={{
+                              style: 'percent',
+                              maximumFractionDigits: 2,
+                            }}
+                          />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <ReturnMethodSelector
-                selectedMethod={returnMethod}
-                onMethodSelect={setReturnMethod}
-              />
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="min-h-0 flex-1 p-6">
             <PerformanceContent
-              performanceData={performanceData}
+              chartData={chartData}
               isLoading={isLoadingPerformance}
+              hasErrors={hasErrors}
+              errorMessages={errorMessages}
             />
           </CardContent>
         </Card>
@@ -179,47 +406,3 @@ export default function PerformancePage() {
     </ApplicationShell>
   );
 }
-
-function PerformanceDashboardSkeleton() {
-  return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <main className="flex-1 space-y-6 px-4 py-6 md:px-6">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-[150px]" />
-            <Skeleton className="h-4 w-[100px]" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[400px] w-full bg-muted/50" />
-          </CardContent>
-        </Card>
-      </main>
-    </div>
-  );
-}
-
-const ReturnMethodSelector: React.FC<{
-  selectedMethod: ReturnMethod;
-  onMethodSelect: (method: ReturnMethod) => void;
-}> = ({ selectedMethod, onMethodSelect }) => (
-  <div className="flex justify-end">
-    <div className="flex space-x-1 rounded-full bg-secondary p-1">
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedMethod === 'TWR' ? 'default' : 'ghost'}
-        onClick={() => onMethodSelect('TWR')}
-      >
-        Time-Weighted
-      </Button>
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedMethod === 'MWR' ? 'default' : 'ghost'}
-        onClick={() => onMethodSelect('MWR')}
-      >
-        Money-Weighted
-      </Button>
-    </div>
-  </div>
-);

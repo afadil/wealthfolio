@@ -1,4 +1,18 @@
 import * as z from 'zod';
+import {
+  ActivityType,
+  activityTypeSchema,
+  accountTypeSchema,
+} from './constants';
+import { tryParseDate } from './utils';
+import { 
+  isCashActivity, 
+  isIncomeActivity, 
+  isCashTransfer,
+  isTradeActivity,
+  isFeeActivity,
+  isSplitActivity
+} from './activity-utils';
 
 export const importMappingSchema = z.object({
   accountId: z.string(),
@@ -20,7 +34,7 @@ export const newAccountSchema = z.object({
   group: z.string().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
-  accountType: z.enum(['SECURITIES', 'CASH', 'CRYPTOCURRENCY']),
+  accountType: accountTypeSchema,
   currency: z.string({ required_error: 'Please select a currency.' }),
 });
 
@@ -39,155 +53,22 @@ export const newGoalSchema = z.object({
   isAchieved: z.boolean().optional(),
 });
 
-const baseActivitySchema = z.object({
-  id: z.string().uuid().optional(),
-  accountId: z.string().min(1, { message: 'Please select an account.' }),
-  activityDate: z.union([z.date(), z.string().datetime()]).default(new Date()),
-  currency: z.string().optional(),
-  comment: z.string().optional().nullable(),
-  isDraft: z.boolean().optional().default(false),
-});
-
-const feeActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('FEE'),
-  assetId: z.string().optional(),
-  fee: z.coerce
-    .number({
-      required_error: 'Fee is required.',
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' }),
-});
-
-const cashActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum(['DEPOSIT', 'WITHDRAWAL', 'INTEREST']),
-  assetId: z.string().optional(),
-  quantity: z.number().default(1),
-  unitPrice: z.coerce.number().min(0),
-  fee: z.coerce
-    .number({
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' })
-    .default(0)
-    .optional(),
-});
-
-const dividendActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('DIVIDEND'),
-  assetId: z.string().min(1, { message: 'Please select a security' }),
-  quantity: z.number().default(1),
-  unitPrice: z.coerce.number().min(0),
-  fee: z.coerce
-    .number({
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' })
-    .default(0)
-    .optional(),
-});
-
-const splitActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('SPLIT'),
-  assetId: z.string().min(1, { message: 'Please select a security' }),
-  unitPrice: z.coerce.number().positive('Split ratio must be greater than 0'),
-  quantity: z.number().default(1),
-  fee: z.coerce
-    .number({
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' })
-    .default(0)
-    .optional(),
-});
-
-const transferInActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('TRANSFER_IN'),
-  assetId: z.string().min(1, { message: 'Please select a security' }),
-  quantity: z.coerce.number().positive(),
-  unitPrice: z.coerce.number().min(0),
-  fee: z.coerce
-    .number({
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' })
-    .default(0)
-    .optional(),
-});
-
-const transferOutActivitySchema = baseActivitySchema.extend({
-  activityType: z.literal('TRANSFER_OUT'),
-  assetId: z.string().min(1, { message: 'Please select a security' }),
-  quantity: z.coerce.number().positive(),
-  fee: z.coerce
-    .number({
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' })
-    .default(0)
-    .optional(),
-});
-
-const tradeActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum(['BUY', 'SELL']),
-  assetId: z.string().min(1, { message: 'Please select a security' }),
-  quantity: z.coerce
-    .number({
-      required_error: 'Please enter a valid quantity.',
-      invalid_type_error: 'Quantity must be a number.',
-    })
-    .positive(),
-  unitPrice: z.coerce.number().min(0),
-  fee: z.coerce
-    .number({
-      required_error: 'Please enter a valid fee.',
-      invalid_type_error: 'Fee must be a positive number.',
-    })
-    .min(0, { message: 'Fee must be a non-negative number.' })
-    .default(0),
-  assetDataSource: z.enum(['Yahoo', 'MANUAL']).default('Yahoo'),
-});
-
-export const newActivitySchema = z.discriminatedUnion('activityType', [
-  cashActivitySchema,
-  feeActivitySchema,
-  dividendActivitySchema,
-  splitActivitySchema,
-  transferInActivitySchema,
-  transferOutActivitySchema,
-  tradeActivitySchema,
-]);
-
-export type ActivityFormValues = z.infer<typeof newActivitySchema>;
-
 export const importActivitySchema = z.object({
   id: z.string().uuid().optional(),
   accountId: z.string().min(1, { message: 'Please select an account.' }),
   currency: z.string().optional(),
-  activityType: z.enum(
-    [
-      'BUY',
-      'SELL',
-      'DIVIDEND',
-      'INTEREST',
-      'DEPOSIT',
-      'WITHDRAWAL',
-      'TRANSFER_IN',
-      'TRANSFER_OUT',
-      'CONVERSION_IN',
-      'CONVERSION_OUT',
-      'FEE',
-      'TAX',
-      'SPLIT',
-    ],
-    {
-      errorMap: () => {
-        return { message: 'Please select an activity type.' };
-      },
-    },
-  ),
-  date: z.union([z.date(), z.string().datetime()]).optional(),
-  symbol: z.string().min(1, { message: 'Symbol is required' }),
+  activityType: activityTypeSchema,
+  date: z.union([
+    z.date(),
+    z.string().refine((val) => tryParseDate(val) !== null, {
+      message: 'Invalid date format'
+    })
+  ]).optional(),
+  symbol: z.string().min(1, { message: 'Symbol is required' })
+    .refine(
+      (val) => /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([\.-][A-Z0-9]+){0,2})$/.test(val.trim()), 
+      { message: 'Invalid symbol format' }
+    ),
   amount: z.coerce
     .number({
       required_error: 'Should be a valid amount.',
@@ -199,27 +80,101 @@ export const importActivitySchema = z.object({
       required_error: 'Please enter a valid quantity.',
       invalid_type_error: 'Quantity must be a number.',
     })
-    .min(0, { message: 'Quantity must be a non-negative number.' }),
+    .min(0, { message: 'Quantity must be a non-negative number.' })
+    .optional(),
   unitPrice: z.coerce
     .number({
       required_error: 'Please enter a valid price.',
       invalid_type_error: 'Price must be a non-negative number.',
     })
-    .min(0, { message: 'Price must be a non-negative number.' }),
+    .min(0, { message: 'Price must be a non-negative number.' })
+    .optional(),
   fee: z.coerce
     .number({
       required_error: 'Please enter a valid fee.',
       invalid_type_error: 'Fee must be a positive number.',
     })
-    .min(0, { message: 'Fee must be a non-negative number.' }),
+    .min(0, { message: 'Fee must be a non-negative number.' })
+    .optional(),
   accountName: z.string().optional(),
   symbolName: z.string().optional(),
-  error: z.string().optional(),
+  errors: z.record(z.string(), z.array(z.string())).optional(),
   isValid: z.boolean().default(false),
   lineNumber: z.number().optional(),
   isDraft: z.boolean(),
   comment: z.string().optional(),
-});
+}).refine(
+  (data) => {
+    // For cash activities, income activities or cash transfers, either amount or both quantity and unit price must be provided
+    const isCashOrIncomeActivity = 
+      isCashActivity(data.activityType as string) || 
+      isIncomeActivity(data.activityType as string) || 
+      (data.symbol && isCashTransfer(data.activityType as string, data.symbol));
+    
+    if (isCashOrIncomeActivity) {
+      const hasAmount = data.amount !== undefined && data.amount !== 0;
+      const hasQuantity = data.quantity !== undefined && data.quantity !== 0;
+      const hasUnitPrice = data.unitPrice !== undefined && data.unitPrice !== 0;
+      
+      // For cash activities, at least one of: amount, quantity, or unit price must be specified
+      return hasAmount || hasQuantity || hasUnitPrice;
+    }
+    
+    return true;
+  },
+  {
+    message: "Cash activities require at least one of: amount, quantity, or unit price",
+    path: ["amount"]
+  }
+).refine(
+  (data) => {
+    // Fee activity validations
+    if (data.activityType === ActivityType.FEE) {
+      const hasFee = data.fee !== undefined && data.fee !== 0;
+      const hasAmount = data.amount !== undefined && data.amount !== 0;
+      
+      // For fee activities, at least one of: fee or amount must be specified
+      return hasFee || hasAmount;
+    }
+    return true;
+  },
+  {
+    message: "Fee activities require either fee or amount",
+    path: ["fee"]
+  }
+).refine(
+  (data) => {
+    // Trade activity unit price validations
+    if (isTradeActivity(data.activityType as string)) {
+      return data.unitPrice !== undefined && data.unitPrice > 0;
+    }
+    return true;
+  },
+  {
+    message: "Unit price must be positive for buy/sell activities",
+    path: ["unitPrice"]
+  }
+).refine(
+  (data) => {
+    // Non-cash, non-trade activities need positive quantity
+    const isNonCashNonTradeActivity = 
+      !isCashActivity(data.activityType as string) && 
+      !isIncomeActivity(data.activityType as string) && 
+      !(data.symbol && isCashTransfer(data.activityType as string, data.symbol)) &&
+      !isTradeActivity(data.activityType as string) &&
+      !isFeeActivity(data.activityType as string) &&
+      !isSplitActivity(data.activityType as string);
+    
+    if (isNonCashNonTradeActivity) {
+      return data.quantity !== undefined && data.quantity > 0;
+    }
+    return true;
+  },
+  {
+    message: "Quantity must be positive for non-cash activities",
+    path: ["quantity"]
+  }
+);
 
 export const newContributionLimitSchema = z.object({
   id: z.string().optional(),
@@ -232,4 +187,6 @@ export const newContributionLimitSchema = z.object({
     })
     .min(0, { message: 'Price must be a non-negative number.' }),
   accountIds: z.string().nullable().optional(),
+  startDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
+  endDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
 });

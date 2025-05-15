@@ -11,9 +11,9 @@ import { getGoals, getGoalsAllocation } from '@/commands/goal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import GoalsAllocations from './components/goal-allocations';
-import { useAccounts } from '@/pages/account/useAccounts';
+import { useAccounts } from '@/hooks/use-accounts';
 import { QueryKeys } from '@/lib/query-keys';
-import { useGoalMutations } from './useGoalMutations';
+import { useGoalMutations } from './use-goal-mutations';
 
 const SettingsGoalsPage = () => {
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
@@ -26,7 +26,7 @@ const SettingsGoalsPage = () => {
     queryFn: getGoalsAllocation,
   });
 
-  const { data: accounts } = useAccounts();
+  const { accounts } = useAccounts();
 
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<any>(null);

@@ -41,7 +41,7 @@ export const updateAccount = async (account: NewAccount): Promise<Account> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         const { currency, ...updatedAccountData } = account;
-        return invokeTauri('update_account', { account: updatedAccountData });
+        return invokeTauri('update_account', { accountUpdate: updatedAccountData });
       default:
         throw new Error(`Unsupported`);
     }

@@ -1,16 +1,23 @@
 import { CustomPieChart } from '@/components/custom-pie-chart';
-import { Holding } from '@/lib/types';
+import { Holding, HoldingType } from '@/lib/types';
 import { useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
 
   const classes = holdings.reduce(
     (acc, holding) => {
-      const assetSubClass = holding.assetSubClass || 'Other';
+      const isCash = holding.holdingType === HoldingType.CASH;
+      const assetSubClass = isCash
+        ? 'Cash'
+        : holding.instrument?.assetSubclass || 'Other';
+
       const current = acc[assetSubClass] || 0;
-      acc[assetSubClass] = Number(current) + Number(holding.marketValueConverted);
+      const value = Number(holding.marketValue?.base) || 0;
+      acc[assetSubClass] = current + value;
       return acc;
     },
     {} as Record<string, number>,
@@ -18,23 +25,46 @@ function getClassData(holdings: Holding[]) {
 
   return Object.entries(classes)
     .filter(([_, value]) => value > 0)
+    .sort(([, a], [, b]) => b - a) 
     .map(([name, value]) => ({ name, value }));
 }
 
 interface ClassesChartProps {
-  holdings: Holding[];
+  holdings?: Holding[];
   isLoading?: boolean;
+  onClassSectionClick?: (className: string) => void;
 }
 
-export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
+export function ClassesChart({ holdings, isLoading, onClassSectionClick }: ClassesChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const data = useMemo(() => getClassData(holdings), [holdings]);
+
+  const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
+
+  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+    if (onClassSectionClick) {
+      onClassSectionClick(sectionData.name);
+    }
+    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    if (clickedIndex !== -1) {
+        setActiveIndex(clickedIndex);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="flex h-[300px] items-center justify-center">
-        <Skeleton className="h-[250px] w-[250px] rounded-full" />
-      </div>
+      <Card className="overflow-hidden backdrop-blur-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-[180px]" />
+            <Skeleton className="h-5 w-[80px]" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="flex h-[250px] items-center justify-center">
+            <Skeleton className="h-[200px] w-[200px] rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -42,5 +72,31 @@ export function ClassesChart({ holdings, isLoading }: ClassesChartProps) {
     setActiveIndex(index);
   };
 
-  return <CustomPieChart data={data} activeIndex={activeIndex} onPieEnter={onPieEnter} />;
+  return (
+    <Card className="overflow-hidden backdrop-blur-sm">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Asset Allocation
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {data.length > 0 ? (
+          <CustomPieChart
+            data={data}
+            activeIndex={activeIndex}
+            onPieEnter={onPieEnter}
+            onSectionClick={handleInternalSectionClick}
+            startAngle={180}
+            endAngle={0}
+          />
+        ) : (
+          <EmptyPlaceholder
+            description="There is no class data available for your holdings."
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
 }

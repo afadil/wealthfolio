@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Icons } from '@/components/icons';
 import { ExportDataType, ExportedFileFormat } from '@/lib/types';
-import { useExportData } from './useExportData';
+import { useExportData } from './use-export-data';
 
 const dataFormats = [
   {
@@ -69,13 +69,13 @@ const dataTypes = {
     {
       key: 'goals',
       name: 'Goals',
-      icon: Icons.Goal,
+      icon: Icons.Goals,
       description: 'Financial objectives and progress tracking',
     },
     {
       key: 'portfolio-history',
       name: 'Portfolio History',
-      icon: Icons.ScrollText,
+      icon: Icons.Files,
       description:
         "Your portfolio's performance over time, including valuations, gains, and cash flow activities.",
     },

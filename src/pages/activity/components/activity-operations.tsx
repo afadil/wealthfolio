@@ -7,19 +7,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Icons } from '@/components/icons';
 
-import type { ActivityDetails } from '@/lib/types';
+import type { Activity, ActivityDetails } from '@/lib/types';
 import { Row } from '@tanstack/react-table';
 
 export interface ActivityOperationsProps<TData> {
   row: Row<TData>;
   onEdit: (activity: ActivityDetails) => void | undefined;
   onDelete: (activity: ActivityDetails) => void | undefined;
+  onDuplicate: (activity: ActivityDetails) => void | undefined | Promise<Activity>;
 }
 
 export function ActivityOperations<TData>({
   row,
   onEdit,
   onDelete,
+  onDuplicate,
 }: ActivityOperationsProps<TData>) {
   const activity = row.original as ActivityDetails;
 
@@ -32,6 +34,7 @@ export function ActivityOperations<TData>({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => onEdit(activity)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onDuplicate(activity)}>Duplicate</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="flex cursor-pointer items-center text-destructive focus:text-destructive"

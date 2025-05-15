@@ -2,11 +2,7 @@ import { Icons } from '@/components/icons';
 import { Toaster } from '@/components/ui/toaster';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { type NavigationProps, SidebarNav } from './sidebar-nav';
-import { useQuery } from '@tanstack/react-query';
-import { Account } from '@/lib/types';
-import { getAccounts } from '@/commands/account';
-import { useSettings } from '@/lib/useSettings';
-import { QueryKeys } from '@/lib/query-keys';
+import { useSettings } from '@/hooks/use-settings';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 const navigation: NavigationProps = {
@@ -48,31 +44,24 @@ const navigation: NavigationProps = {
 const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
-  const { data: accounts, isLoading: isAccountsLoading } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
 
-  if (isSettingsLoading || isAccountsLoading) {
+  if (isSettingsLoading) {
     return null;
   }
 
-  const redirectToOnboarding = ['/settings/general', '/settings/accounts', '/onboarding'];
+  // Redirect to onboarding if not completed, unless already there
+  if (!settings?.onboardingCompleted && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" />;
+  }
 
-  if (!settings?.baseCurrency && !redirectToOnboarding.includes(location.pathname)) {
-    return <Navigate to="/onboarding?step=0" />;
-  }
-  if (!accounts?.length && !redirectToOnboarding.includes(location.pathname)) {
-    return <Navigate to="/onboarding?step=1" />;
-  }
   return (
     <div className="flex min-h-screen bg-background">
       <SidebarNav navigation={navigation} />
-      <div className="relative flex h-screen w-full overflow-hidden">
+      <div className="relative flex h-screen w-full overflow-auto">
         <ErrorBoundary>
-          <main className="flex flex-1 flex-col">
-            <div className="flex-1 overflow-y-auto">
-              <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
+          <main className="flex w-full flex-1 flex-col">
+            <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
+            <div className="flex-1 overflow-auto">
               <Outlet />
             </div>
           </main>

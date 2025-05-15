@@ -61,7 +61,6 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
 
   const handleSubmit = () => {
     if (isExceeding) {
-      alert("Total allocation for an account can't exceed 100%");
       toast({
         title: "Total allocation for an account can't exceed 100%.",
         className: 'bg-red-500 text-white border-none',

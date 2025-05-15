@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils';
 
 interface AmountDisplayProps {
@@ -5,12 +6,21 @@ interface AmountDisplayProps {
   currency: string;
   isHidden?: boolean;
   colorFormat?: boolean;
+  className?: string;
 }
 
-export function AmountDisplay({ value, currency, isHidden, colorFormat }: AmountDisplayProps) {
+export function AmountDisplay({
+  value,
+  currency = 'USD',
+  isHidden,
+  colorFormat,
+  className,
+}: AmountDisplayProps) {
   const formattedAmount = formatAmount(value, currency);
+  const colorClass = colorFormat ? (value >= 0 ? 'text-success' : 'text-destructive') : '';
+
   return (
-    <span className={colorFormat ? (value > 0 ? 'text-success' : 'text-destructive') : ''}>
+    <span className={cn(colorClass, className)}>
       {isHidden ? '••••' : formattedAmount}
     </span>
   );

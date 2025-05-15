@@ -17,9 +17,8 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                 let current_version = app_handle.package_info().version.to_string();
                 if update.version.to_string() != current_version {
                     let update_message = format!(
-                        "A new version of Wealthfolio is available!\n\n\
-                        Current version: {}\n\
-                        New version: {}\n\n\
+                        "A new version of Wealthfolio is available!\n\
+                        Current version: {} → New version: {}\n\n\
                         {}\n\n\
                         Would you like to update now? The app will restart automatically.",
                         current_version,
@@ -27,7 +26,6 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                         update
                             .body
                             .clone()
-                            .map(|body| format!("What's new in this version:\n{}", body))
                             .unwrap_or_default()
                     );
                     let do_update = app_handle

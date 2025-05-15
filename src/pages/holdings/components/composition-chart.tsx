@@ -1,13 +1,15 @@
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Holding } from '@/lib/types';
-import { cn, formatPercent } from '@/lib/utils';
+import { cn, formatPercent, formatAmount } from '@/lib/utils';
 import { useMemo, useState } from 'react';
-import { ResponsiveContainer, Treemap } from 'recharts';
+import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
+import { Icons } from '@/components/icons';
 
 type ReturnType = 'daily' | 'total';
 
@@ -77,7 +79,7 @@ const CustomizedContent = (props: any) => {
   const colorScale = getColorScale(gain, maxGain, minGain);
 
   return (
-    <g>
+    <g style={{ cursor: 'pointer' }}>
       <rect
         x={x}
         y={y}
@@ -130,72 +132,85 @@ const CustomizedContent = (props: any) => {
 };
 
 interface PortfolioCompositionProps {
-  assets: Holding[];
+  holdings: Holding[];
   isLoading?: boolean;
 }
 
-export function PortfolioComposition({ assets, isLoading }: PortfolioCompositionProps) {
+const CompositionTooltip = ({ active, payload, settings }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const value = payload[0].value;
+    return (
+      <Card>
+        <CardHeader className="p-4">
+          <CardTitle className="text-sm text-muted-foreground">{data.name}</CardTitle>
+          <p className="text-sm font-semibold">
+            {formatAmount(value, settings?.baseCurrency || 'USD')}
+          </p>
+        </CardHeader>
+      </Card>
+    );
+  }
+  return null;
+};
+
+export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositionProps) {
   const [returnType, setReturnType] = useState<ReturnType>('daily');
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
-    const data: {
-      [symbol: string]: {
-        name: string;
-        marketValueConverted: number;
-        bookBalueConverted: number;
-        gain: number;
-      };
-    } = {};
-
     let maxGain = -Infinity;
     let minGain = Infinity;
 
-    assets.forEach((asset) => {
-      if (asset.symbol) {
-        const symbol = asset.symbol;
+    // Map holdings directly, assuming backend provides aggregated data
+    const processedData = holdings
+      .map((holding) => {
+        const symbol = holding.instrument?.symbol;
+        if (!symbol) return null; // Skip if no symbol
+
         const gain =
           returnType === 'daily'
-            ? Number(asset.performance.dayGainPercent)
-            : Number(asset.performance.totalGainPercent);
+            ? Number(holding.dayChangePct) || 0
+            : Number(holding.totalGainPct) || 0;
 
+        const marketValue = Number(holding.marketValue?.base) || 0;
+
+        // Basic validation
+        if (isNaN(gain) || isNaN(marketValue) || marketValue <= 0) return null;
+
+        // Update min/max gain across all valid holdings
         maxGain = Math.max(maxGain, gain);
         minGain = Math.min(minGain, gain);
 
-        if (data[symbol]) {
-          data[symbol].marketValueConverted += Number(asset.marketValueConverted);
-          data[symbol].bookBalueConverted += Number(asset.bookValueConverted);
-          data[symbol].gain = gain;
-        } else {
-          data[symbol] = {
-            name: symbol,
-            marketValueConverted: Number(asset.marketValueConverted),
-            bookBalueConverted: Number(asset.bookValueConverted),
-            gain,
-          };
-        }
-      }
-    });
+        return {
+          name: symbol, // Use symbol for the treemap node name/link
+          marketValueConverted: marketValue,
+          gain,
+          // We'll add min/max gain later after iterating through all
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null) // Explicit non-null filter
+      // Add minGain and maxGain to each item after calculating them
+      .map((item) => ({
+        ...item,
+        maxGain,
+        minGain,
+      }));
 
-    // Convert the object values to an array
-    const dataArray = Object.values(data).map((item) => ({
-      ...item,
-      maxGain,
-      minGain,
-    }));
+    // Sort by market value after processing all holdings
+    processedData.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
 
-    // Sort the array by marketValue in descending order
-    dataArray.sort((a, b) => b.marketValueConverted - a.marketValueConverted);
-
-    return dataArray;
-  }, [assets, returnType]);
+    return processedData;
+  }, [holdings, returnType]);
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
-            <BarChart className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              Holding Composition
+            </CardTitle>
           </div>
           <div className="flex space-x-1 rounded-full bg-secondary p-1">
             <Skeleton className="h-8 w-24 rounded-full" />
@@ -209,12 +224,33 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
     );
   }
 
+  if (holdings.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center space-x-2">
+            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="flex h-[500px] items-center justify-center">
+          <EmptyPlaceholder
+            icon={<Icons.BarChart className="h-10 w-10" />}
+            title="No holdings data"
+            description="There is no holdings data available for your portfolio."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center space-x-2">
-          <BarChart className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Holding Composition
+          </CardTitle>
         </div>
         <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />
       </CardHeader>
@@ -227,7 +263,9 @@ export function PortfolioComposition({ assets, isLoading }: PortfolioComposition
             dataKey="marketValueConverted"
             animationDuration={100}
             content={<CustomizedContent theme={settings?.theme || 'light'} />}
-          />
+          >
+            <Tooltip content={<CompositionTooltip settings={settings} />} />
+          </Treemap>
         </ResponsiveContainer>
       </CardContent>
     </Card>

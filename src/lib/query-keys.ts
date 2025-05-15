@@ -8,9 +8,11 @@ export const QueryKeys = {
   ACTIVITIES: 'activities',
 
   // Portfolio related keys
-  HISTORY: 'history',
   HOLDINGS: 'holdings',
+  HOLDING: 'holding',
   INCOME_SUMMARY: 'incomeSummary',
+  PORTFOLIO_SUMMARY: 'portfolioSummary',
+  QUOTE_HISTORY: 'quoteHistory',
 
   // Goals related keys
   GOALS: 'goals',
@@ -30,6 +32,20 @@ export const QueryKeys = {
   ASSET_DATA: 'asset_data',
   IMPORT_MAPPING: 'import_mapping',
 
+  PERFORMANCE_SUMMARY: 'performanceSummary',
+  PERFORMANCE_HISTORY: 'performanceHistory',
+
+  HISTORY_VALUATION: 'historyValuation',
   // Helper function to create account-specific keys
-  accountHistory: (id: string) => ['history', id],
+  valuationHistory: (id: string) => [QueryKeys.HISTORY_VALUATION, id],
+
+  // Account simple performance
+  ACCOUNTS_SIMPLE_PERFORMANCE: 'accountsSimplePerformance',
+  accountsSimplePerformance: (accountIds: string[]) => [
+    QueryKeys.ACCOUNTS_SIMPLE_PERFORMANCE,
+    [...accountIds].sort().join(',') || 'none',
+  ],
+
+  // Market Data Providers
+  MARKET_DATA_PROVIDERS: 'marketDataProviders',
 } as const;

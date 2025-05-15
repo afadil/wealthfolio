@@ -1,27 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { Card, CardTitle, CardContent, CardHeader } from '@/components/ui/card';
 import { formatPercent } from '@/lib/utils';
 import HistoryChart from '@/components/history-chart-symbol';
 import IntervalSelector from '@/components/interval-selector';
-import { Quote, TimePeriod } from '@/lib/types';
+import { Quote, TimePeriod, DateRange } from '@/lib/types';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
-import { useRefreshQuotesMutation } from '@/hooks/useRefreshQuotes';
+import { useSyncMarketDataMutation } from '@/hooks/use-sync-market-data';
 import { Button } from '@/components/ui/button';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
-
-// Interval descriptions mapping
-const intervalDescriptions = {
-  '1D': 'past day',
-  '1W': 'past week',
-  '1M': 'past month',
-  '3M': 'past 3 months',
-  '1Y': 'past year',
-  ALL: 'All Time',
-};
 
 interface AssetHistoryProps {
   marketPrice: number;
@@ -33,7 +23,7 @@ interface AssetHistoryProps {
   className?: string;
 }
 
-const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
+const AssetHistoryCard: React.FC<AssetHistoryProps> = ({ 
   marketPrice,
   totalGainAmount,
   totalGainPercent,
@@ -41,83 +31,74 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   quoteHistory,
   symbol,
   className,
-}) => {
-  const refreshQuotesMutation = useRefreshQuotesMutation({
-    successTitle: 'Quotes refreshed successfully',
-    errorTitle: 'Failed to refresh quotes',
-  });
-
-  const [interval, setInterval] = useState<TimePeriod>('3M');
+ }) => {
+  const syncMarketDataMutation = useSyncMarketDataMutation();
   const { isBalanceHidden } = useBalancePrivacy();
 
-  // Filter data based on the selected interval
+  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>('3M');
+  const [selectedIntervalDesc, setSelectedIntervalDesc] = useState<string>('past 3 months');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subMonths(new Date(), 3),
+    to: new Date(),
+  });
+
   const filteredData = useMemo(() => {
-    const today = new Date();
-    let comparisonDate = new Date(today);
-
-    switch (interval) {
-      case '1D':
-        comparisonDate.setDate(today.getDate() - 1);
-        break;
-      case '1W':
-        comparisonDate.setDate(today.getDate() - 7);
-        break;
-      case '1M':
-        comparisonDate.setMonth(today.getMonth() - 1);
-        break;
-      case '3M':
-        comparisonDate.setMonth(today.getMonth() - 3);
-        break;
-      case '1Y':
-        comparisonDate.setFullYear(today.getFullYear() - 1);
-        break;
-    }
-
-    if (interval === 'ALL') {
+    if (!quoteHistory) return [];
+    
+    if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === 'ALL') {
       return quoteHistory
         .map((quote) => ({
-          date: quote.date,
+          timestamp: quote.timestamp,
           totalValue: quote.close,
           currency: currency,
         }))
-        .reverse();
     }
 
     return quoteHistory
-      .filter((quote) => new Date(quote.date) >= comparisonDate)
+      .filter((quote) => {
+        const quoteDate = new Date(quote.timestamp);
+        return dateRange.from && dateRange.to && quoteDate >= dateRange.from && quoteDate <= dateRange.to;
+      })
       .map((quote) => ({
-        date: quote.date,
+        timestamp: quote.timestamp,
         totalValue: quote.close,
         currency: currency,
       }))
-      .reverse();
-  }, [interval, quoteHistory, currency]);
+  }, [dateRange, quoteHistory, currency, selectedIntervalCode]);
 
-  // Gain calculation
   const { ganAmount, percentage, calculatedAt } = useMemo(() => {
-    if (interval === 'ALL') {
-      return { ganAmount: totalGainAmount, percentage: totalGainPercent };
+    const lastFilteredDate = filteredData.at(-1)?.timestamp;
+
+    if (selectedIntervalCode === 'ALL') {
+      const lastQuoteDate = quoteHistory.length > 0 ? quoteHistory[quoteHistory.length - 1].timestamp : undefined;
+      return { ganAmount: totalGainAmount, percentage: totalGainPercent, calculatedAt: lastQuoteDate };
     }
 
     const startValue = filteredData[0]?.totalValue;
     const endValue = filteredData.at(-1)?.totalValue;
-    const calculatedAt = filteredData.at(-1)?.date;
+    const isValidStartValue = typeof startValue === 'number' && startValue !== 0;
 
     return {
       ganAmount:
         typeof startValue === 'number' && typeof endValue === 'number'
-          ? (endValue - startValue) * marketPrice
+          ? endValue - startValue
           : 0,
       percentage:
-        typeof startValue === 'number' && typeof endValue === 'number'
+        isValidStartValue && typeof endValue === 'number'
           ? ((endValue - startValue) / startValue) * 100
           : 0,
-      calculatedAt: calculatedAt,
+      calculatedAt: lastFilteredDate,
     };
-  }, [filteredData, marketPrice, interval, totalGainAmount, totalGainPercent]);
+  }, [filteredData, selectedIntervalCode, quoteHistory, totalGainAmount, totalGainPercent]);
 
-  const handleIntervalSelect = (selectedInterval: TimePeriod) => {
-    setInterval(selectedInterval);
+  const handleIntervalSelect = (
+    code: TimePeriod,
+    description: string,
+    range: DateRange | undefined
+  ) => {
+    setSelectedIntervalCode(code);
+    setSelectedIntervalDesc(description);
+    setDateRange(range);
   };
 
   return (
@@ -136,7 +117,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                 </p>
                 <p className={`text-sm ${ganAmount > 0 ? 'text-success' : 'text-destructive'}`}>
                   <AmountDisplay value={ganAmount} currency={currency} isHidden={isBalanceHidden} />{' '}
-                  ({formatPercent(percentage)}) {intervalDescriptions[interval]}
+                  ({formatPercent(percentage)}) {selectedIntervalDesc}
                 </p>
               </div>
             </HoverCardTrigger>
@@ -152,18 +133,18 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                   </h4>
                 </div>
                 <Button
-                  onClick={() => refreshQuotesMutation.mutate([symbol])}
+                  onClick={() => syncMarketDataMutation.mutate([symbol])}
                   variant="outline"
                   size="sm"
                   className="rounded-full"
-                  disabled={refreshQuotesMutation.isPending}
+                  disabled={syncMarketDataMutation.isPending}
                 >
-                  {refreshQuotesMutation.isPending ? (
+                  {syncMarketDataMutation.isPending ? (
                     <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Icons.Refresh className="mr-2 h-4 w-4" />
                   )}
-                  {refreshQuotesMutation.isPending ? 'Refreshing quotes...' : 'Refresh Quotes'}
+                  {syncMarketDataMutation.isPending ? 'Refreshing quotes...' : 'Refresh Quotes'}
                 </Button>
               </div>
             </HoverCardContent>
@@ -175,6 +156,8 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
         <IntervalSelector
           onIntervalSelect={handleIntervalSelect}
           className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
+          isLoading={syncMarketDataMutation.isPending}
+          initialSelection="3M"
         />
       </CardContent>
     </Card>

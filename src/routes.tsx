@@ -11,7 +11,7 @@ import ActivityPage from '@/pages/activity/activity-page';
 import ActivityImportPage from '@/pages/activity/import/activity-import-page';
 import HoldingsPage from '@/pages/holdings/holdings-page';
 import AssetProfilePage from './pages/asset/asset-profile-page';
-import useGlobalEventListener from './useGlobalEventListener';
+import useGlobalEventListener from './use-global-event-listener';
 import GeneralSettingsPage from './pages/settings/general/general-page';
 import OnboardingPage from './pages/onboarding/onboarding-page';
 import SettingsGoalsPage from './pages/settings/goals/goals-page';
@@ -19,6 +19,7 @@ import IncomePage from '@/pages/income/income-page';
 import ExportSettingsPage from './pages/settings/exports/exports-page';
 import ContributionLimitPage from './pages/settings/contribution-limits/contribution-limits-page';
 import PerformancePage from '@/pages/performance/performance-page';
+import MarketDataSettingsPage from './pages/settings/market-data-settings';
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -44,6 +45,7 @@ export function AppRoutes() {
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
+            <Route path="market-data" element={<MarketDataSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />
         </Route>

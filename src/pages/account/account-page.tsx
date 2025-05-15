@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useMemo, useState } from 'react';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
 
@@ -8,65 +7,110 @@ import { GainPercent } from '@/components/gain-percent';
 import { HistoryChart } from '@/components/history-chart';
 import IntervalSelector from '@/components/interval-selector';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 
 import { useParams } from 'react-router-dom';
-import AccountDetail from './account-detail';
+import AccountMetrics from './account-metrics';
 import AccountHoldings from './account-holdings';
-import { useQuery } from '@tanstack/react-query';
-import { Holding, PortfolioHistory, AccountSummary } from '@/lib/types';
-import { computeHoldings, getHistory, getAccountsSummary } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Icons } from '@/components/icons';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { useRecalculatePortfolioMutation } from '@/hooks/useCalculateHistory';
+import { AccountValuation, DateRange, TrackedItem, TimePeriod } from '@/lib/types';
+import { useAccounts } from '@/hooks/use-accounts';
 import { AccountContributionLimit } from './account-contribution-limit';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { PrivacyToggle } from '@/components/privacy-toggle';
+import { useValuationHistory } from '@/hooks/use-valuation-history';
+import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
+import { useCalculatePerformanceHistory } from '@/pages/performance/hooks/use-performance-data';
+import { subMonths } from 'date-fns';
+import { calculatePerformanceMetrics } from '@/lib/utils';
+
+interface HistoryChartData {
+  date: string;
+  totalValue: number;
+  netContribution: number;
+  currency: string;
+}
+
+// Helper function to get the initial date range (copied from dashboard)
+const getInitialDateRange = (): DateRange => ({
+  from: subMonths(new Date(), 3),
+  to: new Date(),
+});
+
+// Define the initial interval code (consistent with other pages)
+const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
-  const [interval, setInterval] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('3M');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>(INITIAL_INTERVAL_CODE);
 
-  const { data: accounts, isLoading: isAccountsLoading } = useQuery<AccountSummary[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS_SUMMARY],
-    queryFn: getAccountsSummary,
-  });
+  const { accounts, isLoading: isAccountsLoading } = useAccounts();
+  const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
 
-  const accountSummary = accounts?.find((account) => account.account.id === id);
+  const accountTrackedItem: TrackedItem | undefined = useMemo(() => {
+    if (account) {
+      return { id: account.id, type: 'account', name: account.name };
+    }
+    return undefined;
+  }, [account]);
 
-  const { data: accountHistory, isLoading: isLoadingAccountHistory } = useQuery<
-    PortfolioHistory[],
-    Error
-  >({
-    queryKey: QueryKeys.accountHistory(id),
-    queryFn: () => getHistory(id),
-    enabled: !!id,
-  });
+  const { data: performanceResponse, isLoading: isPerformanceHistoryLoading } =
+    useCalculatePerformanceHistory({
+      selectedItems: accountTrackedItem ? [accountTrackedItem] : [],
+      dateRange: dateRange,
+    });
 
-  const { data: holdings, isLoading: isLoadingHoldings } = useQuery<Holding[], Error>({
-    queryKey: [QueryKeys.HOLDINGS],
-    queryFn: computeHoldings,
-  });
+  const accountPerformance = performanceResponse?.[0] || null;
 
-  const accountHoldings = holdings
-    ?.filter((holding) => holding.account?.id === id)
-    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const { valuationHistory, isLoading: isValuationHistoryLoading } = useValuationHistory(
+    dateRange,
+    id,
+  );
 
-  const account = accountSummary?.account;
-  const performance = accountSummary?.performance;
+  // Calculate gainLossAmount and simpleReturn from valuationHistory
+  const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } = useMemo(() => {
+    return calculatePerformanceMetrics(valuationHistory, id);
+  }, [valuationHistory, id]);
 
-  const updatePortfolioMutation = useRecalculatePortfolioMutation({
-    successTitle: 'Portfolio recalculated successfully',
-    errorTitle: 'Failed to recalculate portfolio',
-  });
+  const chartData: HistoryChartData[] = useMemo(() => {
+    if (!valuationHistory) return [];
+    return valuationHistory.map((valuation: AccountValuation) => ({
+      date: valuation.valuationDate,
+      totalValue: valuation.totalValue,
+      netContribution: valuation.netContribution,
+      currency: valuation.accountCurrency,
+    }));
+  }, [valuationHistory]);
+
+  const currentValuation = valuationHistory?.[valuationHistory.length - 1];
+
+  const isLoading = isAccountsLoading || isValuationHistoryLoading;
+  const isDetailsLoading = isLoading || isPerformanceHistoryLoading;
+
+  // Callback for IntervalSelector
+  const handleIntervalSelect = (
+    code: TimePeriod,
+    _description: string,
+    range: DateRange | undefined
+  ) => {
+    setSelectedIntervalCode(code);
+    setDateRange(range);
+  };
+
+  const percentageToDisplay = useMemo(() => {
+    if (selectedIntervalCode === 'ALL') {
+      return frontendSimpleReturn;
+    }
+    // For other intervals, if accountPerformance is available, use cumulativeMwr
+    if (accountPerformance) {
+      return accountPerformance.cumulativeMwr ?? 0;
+    }
+    return 0; // Default if no specific logic matches or data is unavailable
+  }, [accountPerformance, selectedIntervalCode, frontendSimpleReturn]);
 
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader
-        heading={account?.name || '-'}
+        heading={account?.name || 'Account'}
         headingPrefix={account?.group || account?.currency}
         displayBack={true}
       />
@@ -74,112 +118,64 @@ const AccountPage = () => {
         <Card className="col-span-1 md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-md">
-              <HoverCard>
-                <HoverCardTrigger asChild className="cursor-pointer">
-                  <div className="flex items-start gap-2">
-                    <div>
-                      <p className="pt-3 text-xl font-bold">
-                        <PrivacyAmount
-                          value={performance?.totalValue || 0}
-                          currency={performance?.currency || 'USD'}
-                        />
-                      </p>
-                      <div className="flex space-x-3 text-sm">
-                        <GainAmount
-                          className="text-sm font-light"
-                          value={performance?.totalGainValue || 0}
-                          currency={account?.currency || 'USD'}
-                          displayCurrency={false}
-                        />
-                        <div className="my-1 border-r border-gray-300 pr-2" />
-                        <GainPercent
-                          className="text-sm font-light"
-                          value={performance?.totalGainPercentage || 0}
-                          animated={true}
-                        />
-                      </div>
+              <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
+                <div className="flex items-start gap-2">
+                  <div>
+                    <p className="pt-3 text-xl font-bold">
+                      <PrivacyAmount
+                        value={currentValuation?.totalValue || 0}
+                        currency={account?.currency || 'USD'}
+                      />
+                    </p>
+                    <div className="flex space-x-3 text-sm">
+                      <GainAmount
+                        className="text-sm font-light"
+                        value={frontendGainLossAmount}
+                        currency={account?.currency || 'USD'}
+                        displayCurrency={false}
+                      />
+                      <div className="my-1 border-r border-muted-foreground pr-2" />
+                      <GainPercent
+                        className="text-sm font-light"
+                        value={percentageToDisplay}
+                        animated={true}
+                      />
                     </div>
-                    <PrivacyToggle className="mt-3" />
                   </div>
-                </HoverCardTrigger>
-                <HoverCardContent align="start" className="w-80 shadow-none">
-                  <div className="flex flex-col space-y-4">
-                    <div className="space-y-2">
-                      <h4 className="flex text-sm font-light">
-                        <Icons.Calendar className="mr-2 h-4 w-4" />
-                        As of:{' '}
-                        <Badge className="ml-1 font-medium" variant="secondary">
-                          {performance?.calculatedAt
-                            ? `${format(new Date(performance.calculatedAt), 'PPpp')}`
-                            : '-'}
-                        </Badge>
-                      </h4>
-                    </div>
-                    <Button
-                      onClick={() => updatePortfolioMutation.mutate()}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full"
-                      disabled={updatePortfolioMutation.isPending}
-                    >
-                      {updatePortfolioMutation.isPending ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Icons.Refresh className="mr-2 h-4 w-4" />
-                      )}
-                      {updatePortfolioMutation.isPending
-                        ? 'Updating portfolio...'
-                        : 'Update Portfolio'}
-                    </Button>
-                  </div>
-                </HoverCardContent>
-              </HoverCard>
+                  <PrivacyToggle className="mt-3" />
+                </div>
+              </PortfolioUpdateTrigger>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="w-full p-0">
               <div className="flex w-full flex-col">
-                {isLoadingAccountHistory ? (
-                  <div className="space-y-2 p-4">
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                  </div>
-                ) : (
-                  <div className="h-[400px] w-full">
-                    <HistoryChart data={accountHistory || []} interval={interval} />
-                    <IntervalSelector
-                      className="relative bottom-10 left-0 right-0 z-10"
-                      onIntervalSelect={(newInterval) => {
-                        setInterval(newInterval);
-                      }}
-                    />
-                  </div>
-                )}
+                <div className="h-[440px] w-full">
+                  <HistoryChart data={chartData} isLoading={false} />
+                  <IntervalSelector
+                    className="relative bottom-10 left-0 right-0 z-10"
+                    onIntervalSelect={handleIntervalSelect}
+                    isLoading={isValuationHistoryLoading}
+                    initialSelection={INITIAL_INTERVAL_CODE}
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {isAccountsLoading && !performance ? (
-          <Skeleton className="h-full" />
-        ) : (
-          <div className="flex flex-col space-y-4">
-            <AccountDetail data={performance} className="flex-grow" />
-            <AccountContributionLimit accountId={id} />
-          </div>
-        )}
+        <div className="flex flex-col space-y-4">
+          <AccountMetrics
+            valuation={currentValuation}
+            performance={accountPerformance}
+            className="flex-grow"
+            isLoading={isDetailsLoading || isPerformanceHistoryLoading}
+          />
+          <AccountContributionLimit accountId={id} />
+        </div>
       </div>
 
-      <AccountHoldings
-        holdings={(accountHoldings || []).filter((holding) => !holding.symbol.startsWith('$CASH'))}
-        isLoading={isLoadingHoldings}
-      />
+      <AccountHoldings accountId={id} />
     </ApplicationShell>
   );
 };

@@ -29,38 +29,41 @@ import {
 import { Icons } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
+import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';
+import { ActivityType, ActivityTypeNames } from '@/lib/constants';
+import { useActivityMutations } from '../hooks/use-activity-mutations';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const fetchSize = 25;
 
-const activityTypeOptions = [
-  { label: 'Buy', value: 'BUY' },
-  { label: 'Sell', value: 'SELL' },
-  { label: 'Deposit', value: 'DEPOSIT' },
-  { label: 'Withdrawal', value: 'WITHDRAWAL' },
-  { label: 'Dividend', value: 'DIVIDEND' },
-  { label: 'Transfer In', value: 'TRANSFER_IN' },
-  { label: 'Transfer Out', value: 'TRANSFER_OUT' },
-  { label: 'Conversion In', value: 'CONVERSION_IN' },
-  { label: 'Conversion Out', value: 'CONVERSION_OUT' },
-  { label: 'Fee', value: 'FEE' },
-  { label: 'Tax', value: 'TAX' },
-  { label: 'Interest', value: 'INTEREST' },
-];
+const activityTypeOptions = Object.entries(ActivityTypeNames).map(([value, label]) => ({
+  label,
+  value: value as ActivityType,
+}));
 
-const CASH_ACTIVITY_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'FEE', 'INTEREST'];
 
 export const ActivityTable = ({
   accounts,
   handleEdit,
   handleDelete,
+  isEditable,
+  onToggleEditable,
 }: {
   accounts: Account[];
   handleEdit: (activity?: ActivityDetails) => void;
   handleDelete: (activity: ActivityDetails) => void;
+  isEditable: boolean;
+  onToggleEditable: (value: boolean) => void;
 }) => {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [sorting, setSorting] = React.useState<SortingState>([]);
+
+  const { duplicateActivityMutation } = useActivityMutations();
+
+  const handleDuplicate = async (activity: ActivityDetails) => {
+    return duplicateActivityMutation.mutateAsync(activity);
+  };
 
   const columns: ColumnDef<ActivityDetails>[] = useMemo(
     () => [
@@ -92,8 +95,8 @@ export const ActivityTable = ({
             activityType === 'DEPOSIT' ||
             activityType === 'DIVIDEND' ||
             activityType === 'INTEREST' ||
-            activityType === 'CONVERSION_IN' ||
-            activityType === 'TRANSFER_IN'
+            activityType === 'TRANSFER_IN' ||
+            activityType === 'ADD_HOLDING'
               ? 'success'
               : activityType === 'SPLIT'
                 ? 'secondary'
@@ -101,7 +104,7 @@ export const ActivityTable = ({
           return (
             <div className="flex items-center text-sm">
               <Badge className="text-xs font-normal" variant={badgeVariant}>
-                {activityType}
+                {ActivityTypeNames[activityType as ActivityType]}
               </Badge>
             </div>
           );
@@ -151,7 +154,12 @@ export const ActivityTable = ({
           const activityType = row.getValue('activityType') as string;
           const quantity = row.getValue('quantity') as number;
 
-          if (CASH_ACTIVITY_TYPES.includes(activityType) || activityType === 'SPLIT') {
+          if (
+            isCashActivity(activityType) ||
+            isIncomeActivity(activityType) ||
+            isSplitActivity(activityType) ||
+            isFeeActivity(activityType)
+          ) {
             return <div className="pr-4 text-right">-</div>;
           }
 
@@ -172,15 +180,21 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activityType = row.getValue('activityType') as string;
           const unitPrice = row.getValue('unitPrice') as number;
+          const amount = row.original.amount as number;
           const currency = (row.getValue('currency') as string) || 'USD';
+          const assetSymbol = row.getValue('assetSymbol') as string;
 
-          if (activityType === 'SPLIT') {
-            return <div className="text-right">{unitPrice.toFixed(0)} : 1</div>;
-          }
           if (activityType === 'FEE') {
             return <div className="pr-4 text-right">-</div>;
           }
-          return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
+          if (activityType === 'SPLIT') {
+            return <div className="text-right">{Number(amount).toFixed(0)} : 1</div>;
+          }
+          if (isCashActivity(activityType) || isCashTransfer(activityType, assetSymbol) || isIncomeActivity(activityType)) {
+            return <div className="text-right">{formatAmount(amount, currency)}</div>;
+          }
+
+            return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },
       {
@@ -212,23 +226,16 @@ export const ActivityTable = ({
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Value" />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType') as string;
-          const unitPrice = row.getValue('unitPrice') as number;
-          const quantity = row.getValue('quantity') as number;
-          const currency = (row.getValue('currency') as string) || 'USD';
-          const fee = row.getValue('fee') as number;
+          const activity = row.original;
+          const activityType = activity.activityType;
+          const currency = activity.currency || 'USD';
 
           if (activityType === 'SPLIT') {
             return <div className="pr-4 text-right">-</div>;
           }
 
-          if (activityType === 'FEE') {
-            return <div className="pr-4 text-right">{formatAmount(fee, currency)}</div>;
-          }
-
-          return (
-            <div className="pr-4 text-right">{formatAmount(unitPrice * quantity, currency)}</div>
-          );
+          const displayValue = calculateActivityValue(activity);
+          return <div className="pr-4 text-right">{formatAmount(displayValue, currency)}</div>;
         },
       },
       {
@@ -275,7 +282,7 @@ export const ActivityTable = ({
       {
         id: 'actions',
         cell: ({ row }) => {
-          return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} />;
+          return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />;
         },
         enableHiding: false,
       },
@@ -284,7 +291,7 @@ export const ActivityTable = ({
   );
 
   const accountOptions =
-    accounts?.map((account) => ({
+    accounts?.filter(account => account.isActive).map((account) => ({
       label: account.name + '-(' + account.currency + ')',
       value: account.id,
       currency: account.currency,
@@ -397,7 +404,30 @@ export const ActivityTable = ({
 
   return (
     <div className="space-y-4">
-      <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
+      <div className="flex justify-between items-center">
+        <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
+        <ToggleGroup
+          type="single"
+          size="sm"
+          value={isEditable ? "edit" : "view"}
+          onValueChange={(value: string) => {
+            if (value === "edit") {
+              onToggleEditable(true);
+            } else if (value === "view") {
+              onToggleEditable(false);
+            }
+          }}
+          aria-label="Table view mode"
+          className="rounded-md bg-muted p-0.5"
+        >
+          <ToggleGroupItem value="view" aria-label="View mode" className="rounded-md px-2.5 py-1.5 text-xs data-[state=on]:bg-background data-[state=on]:text-accent-foreground data-[state=off]:text-muted-foreground data-[state=off]:bg-transparent hover:bg-muted/50 hover:text-accent-foreground transition-colors">
+            <Icons.Rows3 className="h-4 w-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="edit" aria-label="Edit mode" className="rounded-md px-2.5 py-1.5 text-xs data-[state=on]:bg-background data-[state=on]:text-accent-foreground data-[state=off]:text-muted-foreground data-[state=off]:bg-transparent hover:bg-muted/50 hover:text-accent-foreground transition-colors">
+            <Icons.Grid3x3 className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
 
       <div
         className="h-[700px] overflow-y-auto rounded-md border"

@@ -3,10 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatAmount } from '@/lib/utils';
+import { safeDivide } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 import { GainPercent } from '@/components/gain-percent';
-import { PrivacyAmount } from '@/components/privacy-amount';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
@@ -14,8 +13,32 @@ import { useNavigate } from 'react-router-dom';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from '@/components/amount-display';
 import { QuantityDisplay } from '@/components/quantity-display';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Helper function to get display value and currency based on toggle state
+const getDisplayValueAndCurrency = (
+  holding: Holding,
+  valueInBase: number | null | undefined,
+  showConvertedToBase: boolean,
+): { value: number; currency: string } => {
+  const fxRate = holding.fxRate ?? 1; // Use fxRate from Holding
+
+  if (showConvertedToBase) {
+    // Show value in Base Currency
+    return {
+      value: valueInBase ?? 0,
+      currency: holding.baseCurrency, // Use baseCurrency from Holding
+    };
+  } else {
+    // Show value in Asset's Original Currency
+    const valueInOriginal = safeDivide(valueInBase ?? 0, fxRate);
+    return {
+      value: valueInOriginal,
+      currency: holding.localCurrency, // Use localCurrency from Holding
+    };
+  }
+};
 
 export const HoldingsTable = ({
   holdings,
@@ -26,10 +49,6 @@ export const HoldingsTable = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
-
-  const nonCashHoldings = useMemo(() => {
-    return holdings.filter((holding) => holding.holdingType !== 'CASH');
-  }, [holdings]);
 
   if (isLoading) {
     return (
@@ -43,9 +62,9 @@ export const HoldingsTable = ({
   }
 
   const uniqueTypesSet = new Set();
-  const assetsTypes: { label: string; value: string }[] = nonCashHoldings.reduce(
+  const assetsTypes: { label: string; value: string }[] = holdings.reduce(
     (result: { label: string; value: string }[], asset) => {
-      const type = asset?.holdingType;
+      const type = asset.instrument?.assetSubclass; // Use instrument.assetSubclass
       if (type && !uniqueTypesSet.has(type)) {
         uniqueTypesSet.add(type);
         result.push({ label: type.toUpperCase(), value: type });
@@ -66,10 +85,11 @@ export const HoldingsTable = ({
   return (
     <div className="pt-6">
       <DataTable
-        data={nonCashHoldings}
+        data={holdings}
         columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
         searchBy="symbol"
         filters={filters}
+        showColumnToggle={true}
         defaultColumnVisibility={{
           currency: false,
           symbolName: false,
@@ -92,7 +112,7 @@ const getColumns = (
 ): ColumnDef<Holding>[] => [
   {
     id: 'symbol',
-    accessorKey: 'symbol',
+    accessorKey: 'instrument.symbol',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
     meta: {
       label: 'Position',
@@ -100,12 +120,12 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
-      let symbol = holding.symbol.split('.')[0];
-      if (symbol.startsWith('$CASH')) {
-        symbol = symbol.split('-')[0];
-      }
+      const symbol = holding.instrument?.symbol?.split('.')[0] ?? holding.id;
+      const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+
       const handleNavigate = () => {
-        navigate(`/holdings/${holding.symbol}`, { state: { holding } });
+        const navSymbol = holding.instrument?.symbol ?? holding.id;
+        navigate(`/holdings/${navSymbol}`, { state: { holding } });
       };
       return (
         <div className="flex items-center">
@@ -113,31 +133,33 @@ const getColumns = (
             className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
             onClick={handleNavigate}
           >
-            {symbol}
+            {displaySymbol}
           </Badge>
 
-          <span className="ml-2">{holding.symbolName}</span>
+          <span className="ml-2 line-clamp-1">{holding.instrument?.name || holding.id}</span>
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      return rowA.original.symbol.localeCompare(rowB.original.symbol);
+      const symbolA = rowA.original.instrument?.symbol ?? rowA.original.id;
+      const symbolB = rowB.original.instrument?.symbol ?? rowB.original.id;
+      return symbolA.localeCompare(symbolB);
     },
-    filterFn: (row) => {
+    filterFn: (row, _columnId, filterValue) => {
       const holding = row.original;
-      const searchTerm = row.getValue('symbol') as string;
-      return (
-        holding.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        holding.symbolName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const searchTerm = filterValue as string;
+      const nameMatch = holding.instrument?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const symbolMatch = holding.instrument?.symbol?.toLowerCase().includes(searchTerm.toLowerCase());
+      const idMatch = holding.id.toLowerCase().includes(searchTerm.toLowerCase());
+      return !!(symbolMatch || nameMatch || idMatch);
     },
     enableHiding: false,
   },
   {
     id: 'symbolName',
-    accessorKey: 'symbolName',
+    accessorFn: (row) => row.instrument?.name || row.id,
     meta: {
-      label: 'Position Name',
+      label: 'Symbol Name',
     },
     enableHiding: false,
   },
@@ -152,7 +174,7 @@ const getColumns = (
       label: 'Shares',
     },
     cell: ({ row }) => (
-      <div className="flex min-h-[40px] flex-col items-end justify-center">
+      <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
         <QuantityDisplay value={row.original.quantity} isHidden={isHidden} />
         <div className="text-xs text-transparent">-</div>
       </div>
@@ -161,9 +183,9 @@ const getColumns = (
   },
   {
     id: 'marketPrice',
-    accessorKey: 'marketPrice',
+    accessorFn: (row) => row.price ?? 0,
     enableHiding: true,
-    enableSorting: false,
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader
         className="justify-end text-right"
@@ -176,12 +198,14 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
+      const price = holding.price ?? 0;
+      const currency = holding.localCurrency;
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center">
-          <div>{formatAmount(holding.marketPrice || 0, holding.currency)}</div>
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={price} currency={currency} />
           <GainPercent
-            className="text-xs text-muted-foreground"
-            value={holding.performance.dayGainPercent || 0}
+            className="text-xs"
+            value={holding.dayChangePct || 0}
           />
         </div>
       );
@@ -189,7 +213,7 @@ const getColumns = (
   },
   {
     id: 'bookValue',
-    accessorKey: 'bookValue',
+    accessorFn: (row) => row.costBasis?.local ?? 0,
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
@@ -199,29 +223,25 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const value = showConvertedValues ? holding.bookValueConverted : holding.bookValue;
-      const currency = showConvertedValues ? holding.baseCurrency : holding.currency;
+      const value = holding.costBasis?.local ?? 0;
+      const currency = holding.localCurrency;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center pr-4">
-          <PrivacyAmount value={value} currency={currency} />
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-xs text-transparent">-</div>
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = showConvertedValues
-        ? rowA.original.bookValueConverted
-        : rowA.original.bookValue;
-      const valueB = showConvertedValues
-        ? rowB.original.bookValueConverted
-        : rowB.original.bookValue;
+      const valueA = rowA.original.costBasis?.local ?? 0;
+      const valueB = rowB.original.costBasis?.local ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'marketValue',
-    accessorKey: 'marketValue',
+    accessorFn: (row) => row.marketValue.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
@@ -231,78 +251,79 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const value = showConvertedValues ? holding.marketValueConverted : holding.marketValue;
-      const currency = showConvertedValues ? holding.baseCurrency : holding.currency;
+      const { value, currency } = getDisplayValueAndCurrency(
+        holding,
+        holding.marketValue.base,
+        showConvertedValues,
+      );
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center">
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-xs text-muted-foreground">{currency}</div>
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = showConvertedValues
-        ? rowA.original.marketValueConverted
-        : rowA.original.marketValue;
-      const valueB = showConvertedValues
-        ? rowB.original.marketValueConverted
-        : rowB.original.marketValue;
+      const valueA = rowA.original.marketValue.base ?? 0;
+      const valueB = rowB.original.marketValue.base ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'performance',
-    accessorKey: 'performance',
+    accessorFn: (row) => row.totalGain?.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Performance" />
+      <DataTableColumnHeader className="justify-end" column={column} title="Total Gain/Loss" />
     ),
     meta: {
-      label: 'Performance',
+      label: 'Total Gain/Loss',
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const currency = showConvertedValues ? holding.baseCurrency : holding.currency;
-      const gainAmount = showConvertedValues
-        ? holding.performance.totalGainAmountConverted
-        : holding.performance.totalGainAmount;
+      const { value, currency } = getDisplayValueAndCurrency(
+        holding,
+        holding.totalGain?.base,
+        showConvertedValues,
+      );
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center pr-4">
-          <AmountDisplay value={gainAmount} currency={currency} colorFormat={true} />
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <GainPercent
-            className="text-xs text-muted-foreground"
-            value={holding.performance.totalGainPercent}
+            className="text-xs"
+            value={holding.totalGainPct || 0}
           />
         </div>
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = showConvertedValues
-        ? rowA.original.performance.totalGainAmountConverted
-        : rowA.original.performance.totalGainAmount;
-      const valueB = showConvertedValues
-        ? rowB.original.performance.totalGainAmountConverted
-        : rowB.original.performance.totalGainAmount;
+      const valueA = rowA.original.totalGain?.base ?? 0;
+      const valueB = rowB.original.totalGain?.base ?? 0;
       return valueA - valueB;
     },
   },
   {
     id: 'holdingType',
-    accessorKey: 'holdingType',
+    accessorFn: (row) => row.instrument?.assetSubclass,
     meta: {
       label: 'Asset Type',
     },
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Asset Type" />,
+    filterFn: 'arrIncludesSome',
   },
   {
     id: 'currency',
-    accessorKey: 'currency',
+    accessorKey: 'localCurrency',
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
     meta: {
       label: 'Currency',
     },
-    cell: ({ row }) => <div>{row.original.currency}</div>,
+    cell: ({ row }) => <div className="text-muted-foreground">{row.original.localCurrency}</div>,
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id));
+    },
   },
   {
     id: 'actions',
@@ -326,7 +347,7 @@ const getColumns = (
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>Show in {showConvertedValues ? 'Base' : 'Asset'} Currency</p>
+              <p>Show values in {showConvertedValues ? 'Asset Currency' : 'Base Currency'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -335,7 +356,8 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const handleNavigate = () => {
-        navigate(`/holdings/${row.original.symbol}`, { state: { holding: row.original } });
+        const navSymbol = row.original.instrument?.symbol ?? row.original.id;
+        navigate(`/holdings/${navSymbol}`, { state: { holding: row.original } });
       };
 
       return (

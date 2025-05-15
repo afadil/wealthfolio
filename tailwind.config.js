@@ -22,6 +22,26 @@ export default {
       fontFamily: {
         mono: ['IBM Plex Mono', ...fontFamily.mono],
       },
+      keyframes: {
+        'accordion-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+        'progress-bar': {
+          '0%': { transform: 'translateX(-100%)' },
+          '50%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'progress-bar': 'progress-bar 1.5s ease-in-out infinite',
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -62,6 +82,28 @@ export default {
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        'chart-1': 'hsl(var(--chart-1))',
+        'chart-2': 'hsl(var(--chart-2))',
+        'chart-3': 'hsl(var(--chart-3))',
+        blue: {
+          50: '#E1ECEB',
+          100: '#C6DDE8',
+          150: '#ABCFE2',
+          200: '#92BFDB',
+          300: '#66A0C8',
+          400: '#4385BE',
+          500: '#3171B2',
+          600: '#205EA6',
+          700: '#1A4F8C',
+          800: '#163B66',
+          850: '#133051',
+          900: '#12253B',
+          950: '#101A24',
         },
         cyan: {
           50: '#DDF1E4',
@@ -109,19 +151,19 @@ export default {
           950: '#261312',
         },
         orange: {
-          50: '#FFE1D5',
-          100: '#FFCABB',
-          150: '#FDB2A2',
-          200: '#F89A8A',
-          300: '#E8705F',
-          400: '#D14D41',
-          500: '#C03E35',
-          600: '#AF3029',
-          700: '#942822',
-          800: '#6C201C',
-          850: '#551B18',
-          900: '#3E1715',
-          950: '#261312',
+          50: '#FFE7CE',
+          100: '#FED3AF',
+          150: '#FCC192',
+          200: '#F9AE77',
+          300: '#EC8B49',
+          400: '#DA702C',
+          500: '#CB6120',
+          600: '#BC5215',
+          700: '#9D4310',
+          800: '#71320D',
+          850: '#59290D',
+          900: '#40200D',
+          950: '#27180E',
         },
         purple: {
           50: '#F0EAEC',
@@ -143,20 +185,6 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
-      },
-      keyframes: {
-        'accordion-down': {
-          from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' },
-        },
-        'accordion-up': {
-          from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' },
-        },
-      },
-      animation: {
-        'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out',
       },
       gridTemplateColumns: {
         sidebar: '200px auto',

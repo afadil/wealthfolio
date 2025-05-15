@@ -3,17 +3,25 @@ import { GainPercent } from '@/components/gain-percent';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Holding } from '@/lib/types';
+import { Holding, HoldingType } from '@/lib/types';
 import { formatAmount } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { QuantityDisplay } from '@/components/quantity-display';
+import { getHoldings } from '@/commands/portfolio';
+import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from '@tanstack/react-query';
 
-const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoading: boolean }) => {
+const AccountHoldings = ({ accountId }: { accountId: string }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  if (!isLoading && !holdings.length) {
+  const { data: holdings, isLoading } = useQuery<Holding[], Error>({
+    queryKey: [QueryKeys.HOLDINGS, accountId],
+    queryFn: () => getHoldings(accountId),
+  });
+
+  if (!isLoading && !holdings?.length) {
     return null;
   }
 
@@ -33,25 +41,25 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
             <div className="grid grid-cols-5 gap-4">
               <div className="col-span-2 text-left" />
               <div className="text-right font-medium text-muted-foreground">Total value</div>
-              <div className="text-right font-medium text-muted-foreground">Today’s price</div>
+              <div className="text-right font-medium text-muted-foreground">Today's price</div>
               <div className="text-right font-medium text-muted-foreground">All time return</div>
             </div>
           </CardHeader>
           <Separator />
           <CardContent className="p-0">
-            {holdings.map((holding) => (
-              <div key={holding.id} className="grid grid-cols-5 gap-4 border-b p-4">
+            {holdings?.filter(holding => holding.holdingType !== HoldingType.CASH).map((holding) => (
+              <div key={holding.id} className="grid grid-cols-5 gap-4 border-b p-4 text-sm">
                 <div className="col-span-2 flex-grow text-left">
                   <p className="mb-1 font-bold">
-                    <Link to={`/holdings/${holding.symbol}`}>{holding.symbol}</Link>
+                    <Link to={`/holdings/${holding.instrument?.symbol}`}>{holding.instrument?.symbol ?? '-'}</Link>
                   </p>
-                  <p className="text-sm">{holding.symbolName}</p>
+                  <p className="text-sm">{holding.instrument?.name}</p>
                 </div>
 
                 <div className="text-right">
                   <AmountDisplay
-                    value={holding.marketValueConverted}
-                    currency={holding.currency}
+                    value={holding.marketValue.local}
+                    currency={holding.localCurrency}
                     isHidden={isBalanceHidden}
                   />
                   <p className="text-sm text-muted-foreground">
@@ -60,21 +68,21 @@ const AccountHoldings = ({ holdings, isLoading }: { holdings: Holding[]; isLoadi
                 </div>
 
                 <div className="text-right">
-                  <p>{formatAmount(holding.marketPrice || 0, holding.currency, false)}</p>
-                  <p className="text-sm text-muted-foreground">{holding.currency}</p>
+                  <p>{formatAmount(holding.price ?? 0, holding.localCurrency, false)}</p>
+                  <p className="text-sm text-muted-foreground">{holding.localCurrency}</p>
                 </div>
 
-                <div className="text-right">
+                <div className="text-right flex items-center justify-end gap-4">
                   <GainAmount
-                    className="text-sm"
-                    value={holding.performance.totalGainAmount}
-                    currency={holding.currency}
-                  ></GainAmount>
+                    value={holding.totalGain?.local ?? 0}
+                    currency={holding.localCurrency}
+                    displayCurrency={false}
+                  />
                   <GainPercent
-                    className="text-sm"
-                    value={holding.performance.totalGainPercent}
+                    value={holding.totalGainPct ?? 0}
                     animated={true}
-                  ></GainPercent>
+                    variant="badge"
+                  />
                 </div>
               </div>
             ))}

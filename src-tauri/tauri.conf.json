@@ -15,13 +15,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "copyright": "2024 Teymz Inc.",
+    "copyright": "2025 Teymz Inc.",
     "category": "Finance",
     "createUpdaterArtifacts": "v1Compatible"
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
-  "version": "1.0.24",
+  "version": "1.1.0",
   "identifier": "com.teymz.wealthfolio",
   "plugins": {
     "updater": {
@@ -40,13 +40,12 @@
       {
         "dragDropEnabled": false,
         "fullscreen": false,
+        "maximized": true,
         "resizable": true,
         "theme": "Light",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "title": "Wealthfolio",
-        "width": 1366,
-        "height": 960,
         "center": true
       }
     ],
