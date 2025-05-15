@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, isValid, parseISO, parse } from 'date-fns';
 import { logger } from '@/adapters';
+import { AccountValuation } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -214,4 +215,47 @@ export function safeDivide(numerator: number, denominator: number): number {
     return 0;
   }
   return numerator / denominator;
+}
+
+export function calculatePerformanceMetrics(
+  valuationHistory: AccountValuation[] | undefined | null,
+  itemId?: string,
+): { gainLossAmount: number; simpleReturn: number } {
+  if (!valuationHistory || valuationHistory.length < 2) {
+    return { gainLossAmount: 0, simpleReturn: 0 };
+  }
+
+  const startPoint = valuationHistory[0];
+  const endPoint = valuationHistory[valuationHistory.length - 1];
+
+  const startNetContribution = Number(startPoint.netContribution);
+  const endNetContribution = Number(endPoint.netContribution);
+  const netCashFlow = endNetContribution - startNetContribution;
+
+  const startValueForGainCalc = Number(startPoint.totalValue);
+  const endPointTotalValue = Number(endPoint.totalValue);
+
+  const calculatedGainLossAmount = endPointTotalValue - startValueForGainCalc - netCashFlow;
+
+  let calculatedSimpleReturn = 0;
+  if (startValueForGainCalc === 0) {
+    if (calculatedGainLossAmount === 0) {
+      calculatedSimpleReturn = 0;
+    } else {
+      const message = `Simple total return calculation: startValueForGainCalc is zero but gainLossAmount is non-zero. Returning 0.`;
+      if (itemId) {
+        logger.warn(`${message} Item ID: ${itemId}`);
+      } else {
+        logger.warn(message);
+      }
+      calculatedSimpleReturn = 0;
+    }
+  } else {
+    calculatedSimpleReturn = calculatedGainLossAmount / startValueForGainCalc;
+  }
+
+  return {
+    gainLossAmount: calculatedGainLossAmount,
+    simpleReturn: calculatedSimpleReturn,
+  };
 }

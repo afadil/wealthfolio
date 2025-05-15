@@ -36,25 +36,29 @@ INSERT INTO activities_old (
     quantity, unit_price, currency, fee,
     is_draft, comment, created_at, updated_at
 )
-SELECT 
-    id, account_id, asset_id, activity_type, 
+SELECT
+    id, account_id, asset_id, activity_type,
     datetime(activity_date),
-    CASE 
-        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX', 'SPLIT') 
-             OR (activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT') AND asset_id LIKE '$CASH-%') THEN 1.0
+    -- quantity: set to 1.0 for types where 'amount' held the total value in up.sql
+    -- For FEE and non-cash transfers (ADD_HOLDING/REMOVE_HOLDING), original quantity is restored.
+    CASE
+        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'TAX', 'SPLIT') THEN 1.0
         ELSE CAST(quantity AS DOUBLE)
     END as quantity,
-    CASE 
-        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'TAX', 'SPLIT')
-             OR (activity_type IN ('TRANSFER_IN', 'TRANSFER_OUT') AND asset_id LIKE '$CASH-%') THEN 
-            CASE 
-                WHEN amount IS NULL THEN 0.0
-                ELSE CAST(amount AS DOUBLE)
-            END
+    -- unit_price: set to 'amount' for types where 'amount' held the total value/original unit_price.
+    -- For FEE and non-cash transfers, original unit_price is restored.
+    CASE
+        WHEN activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'TAX', 'SPLIT') THEN
+            COALESCE(CAST(amount AS DOUBLE), 0.0)
         ELSE CAST(unit_price AS DOUBLE)
     END as unit_price,
-    currency, CAST(fee AS DOUBLE),
-    is_draft, comment, 
+    currency,
+    -- fee: For FEE type, restore from 'amount'; otherwise, restore from 'fee'.
+    CASE
+        WHEN activity_type = 'FEE' THEN COALESCE(CAST(amount AS DOUBLE), 0.0)
+        ELSE CAST(fee AS DOUBLE)
+    END as fee,
+    is_draft, comment,
     datetime(created_at),
     datetime(updated_at)
 FROM activities;

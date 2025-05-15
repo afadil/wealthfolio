@@ -9,7 +9,7 @@ SET
     amount = unit_price * quantity,
     quantity = 0,
     unit_price = 0
-WHERE activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'FEE', 'TAX');
+WHERE activity_type IN ('DIVIDEND', 'INTEREST', 'DEPOSIT', 'WITHDRAWAL', 'CONVERSION_IN', 'CONVERSION_OUT', 'TAX');
 
 UPDATE activities 
 SET 
@@ -17,6 +17,12 @@ SET
     quantity = 0,
     unit_price = 0
 WHERE activity_type = 'SPLIT';
+
+UPDATE activities 
+SET 
+    amount = fee,
+    fee = 0
+WHERE activity_type = 'FEE';
 
 
 UPDATE activities 

@@ -9,7 +9,7 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::utils::time_utils::get_days_between;
 
 use async_trait::async_trait;
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate, Utc, Local};
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -810,7 +810,7 @@ impl SnapshotServiceTrait for SnapshotService {
             "Reconstructing daily holdings snapshots for {} from {:?} to {:?}",
             account_id, start_date_opt, end_date_opt
         );
-        let end_date = end_date_opt.unwrap_or_else(|| Utc::now().naive_utc().date());
+        let end_date = end_date_opt.unwrap_or_else(|| Local::now().date_naive());
 
         // Determine start date: Use provided, else earliest, else end_date
         let start_date = match start_date_opt {
