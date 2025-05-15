@@ -114,7 +114,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
       <p className="pt-4 text-xs text-muted-foreground">
         You can mix both transaction types whenever you need them. For more details,{' '}
         <a
-          href="https://wealthfolio.app/docs/guide/#managing-activities"
+          href="https://wealthfolio.app/docs/concepts/activity-types"
           target="_blank"
           rel="noopener noreferrer"
           className="underline"

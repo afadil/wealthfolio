@@ -164,7 +164,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
               : 'Record a new transaction in your account.'}
             {'→ '}
             <a
-              href="https://wealthfolio.app/docs/guide/#managing-activities"
+              href="https://wealthfolio.app/docs/concepts/activity-types"
               target="_blank"
               rel="noopener noreferrer"
               className="underline"
