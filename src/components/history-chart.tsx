@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { formatDate } from '@/lib/utils';
@@ -73,21 +73,6 @@ export function HistoryChart({
 }) {
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
-
-  // Calculate min and max values for better domain control
-  const minValue = useMemo(() => {
-    if (!data.length) return 0;
-    const min = Math.min(...data.map((d) => Number(d.totalValue)));
-    // Return 0 if min is negative,
-    return min < 0 ? 0 : min ;
-  }, [data]);
-
-  const maxValue = useMemo(() => {
-    if (!data.length) return 0;
-    const max = data.reduce((max, d) => Math.max(max, Number(d.totalValue)), -Infinity);
-    // Return max with 1% padding,
-    return max * 1.01;
-  }, [data]);
   
   const chartConfig = {
     totalValue: {
@@ -129,8 +114,8 @@ export function HistoryChart({
           position={{ y: -20 }}
           content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} isChartHovered={isChartHovered} />}
         />
-        <YAxis hide type="number" domain={[minValue, maxValue]} />
-          {/* <YAxis hide type="number" domain={['auto', 'auto']} /> */}
+        {/* <YAxis hide type="number" domain={[minValue, maxValue]} /> */}
+          <YAxis hide type="number" domain={['auto', 'auto']} />
         <Area
           isAnimationActive={true}
           animationDuration={300}

@@ -11,16 +11,10 @@ import { AccountsSummary } from './accounts-summary';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { useValuationHistory } from '@/hooks/use-valuation-history';
 import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
-import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
-import { useCalculatePerformanceHistory } from '@/pages/performance/hooks/use-performance-data';
-import { TrackedItem, DateRange, TimePeriod } from '@/lib/types';
+import { DateRange, TimePeriod } from '@/lib/types';
 import { subMonths } from 'date-fns';
+import { calculatePerformanceMetrics } from '@/lib/utils';
 
-const PORTFOLIO_TOTAL_ITEM: TrackedItem = {
-  id: PORTFOLIO_ACCOUNT_ID,
-  type: 'account',
-  name: 'Portfolio Total',
-};
 
 function DashboardSkeleton() {
   return (
@@ -47,7 +41,6 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
-  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>(INITIAL_INTERVAL_CODE);
   const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>('Last 3 months');
 
   const {
@@ -58,16 +51,11 @@ export default function DashboardPage() {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency || 'USD';
 
-  const { data: performanceDataArray, isLoading: isPerformanceLoading } =
-    useCalculatePerformanceHistory({
-      selectedItems: [PORTFOLIO_TOTAL_ITEM],
-      dateRange: dateRange,
-    });
 
-  const performanceMetrics = performanceDataArray?.[0] || null;
-
-  const gainLossAmount = performanceMetrics?.gainLossAmount ?? 0;
-  const simpleReturn = performanceMetrics?.simpleReturn ?? 0;
+  // Calculate gainLossAmount and simpleReturn from valuationHistory
+  const { gainLossAmount, simpleReturn } = useMemo(() => {
+    return calculatePerformanceMetrics(valuationHistory);
+  }, [valuationHistory]);
 
   const currentValuation = useMemo(() => {
     return valuationHistory && valuationHistory.length > 0
@@ -84,20 +72,16 @@ export default function DashboardPage() {
     })) || [];
   }, [valuationHistory, baseCurrency]);
 
-  const isLoading = isValuationHistoryLoading || (isPerformanceLoading && !performanceMetrics);
-
-
-  if (isLoading && !valuationHistory && !performanceMetrics) {
+  if (isValuationHistoryLoading && !valuationHistory) {
     return <DashboardSkeleton />;
   }
 
   // Callback for IntervalSelector
   const handleIntervalSelect = (
-    code: TimePeriod, 
+    _code: TimePeriod, 
     description: string,
     range: DateRange | undefined
   ) => {
-    setSelectedIntervalCode(code);
     setSelectedIntervalDescription(description);
     setDateRange(range); 
   };

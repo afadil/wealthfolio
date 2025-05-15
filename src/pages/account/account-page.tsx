@@ -20,6 +20,7 @@ import { useValuationHistory } from '@/hooks/use-valuation-history';
 import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
 import { useCalculatePerformanceHistory } from '@/pages/performance/hooks/use-performance-data';
 import { subMonths } from 'date-fns';
+import { calculatePerformanceMetrics } from '@/lib/utils';
 
 interface HistoryChartData {
   date: string;
@@ -65,6 +66,11 @@ const AccountPage = () => {
     id,
   );
 
+  // Calculate gainLossAmount and simpleReturn from valuationHistory
+  const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } = useMemo(() => {
+    return calculatePerformanceMetrics(valuationHistory, id);
+  }, [valuationHistory, id]);
+
   const chartData: HistoryChartData[] = useMemo(() => {
     if (!valuationHistory) return [];
     return valuationHistory.map((valuation: AccountValuation) => ({
@@ -91,13 +97,15 @@ const AccountPage = () => {
   };
 
   const percentageToDisplay = useMemo(() => {
-    if (!accountPerformance) return 0;
-
     if (selectedIntervalCode === 'ALL') {
-      return accountPerformance.simpleReturn ?? 0;
+      return frontendSimpleReturn;
     }
-    return accountPerformance.cumulativeMwr ?? 0;
-  }, [accountPerformance, selectedIntervalCode]);
+    // For other intervals, if accountPerformance is available, use cumulativeMwr
+    if (accountPerformance) {
+      return accountPerformance.cumulativeMwr ?? 0;
+    }
+    return 0; // Default if no specific logic matches or data is unavailable
+  }, [accountPerformance, selectedIntervalCode, frontendSimpleReturn]);
 
   return (
     <ApplicationShell className="p-6">
@@ -122,7 +130,7 @@ const AccountPage = () => {
                     <div className="flex space-x-3 text-sm">
                       <GainAmount
                         className="text-sm font-light"
-                        value={accountPerformance?.gainLossAmount ?? 0}
+                        value={frontendGainLossAmount}
                         currency={account?.currency || 'USD'}
                         displayCurrency={false}
                       />
