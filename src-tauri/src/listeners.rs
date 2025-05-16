@@ -70,7 +70,6 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 
                     match sync_result {
                         Ok((_, failed_syncs)) => {
-                            info!("Market data sync complete: {:?}", failed_syncs);
                             let result_payload = MarketSyncResult { failed_syncs };
                             if let Err(e) = handle_clone.emit("market:sync-complete", &result_payload) {
                                 error!("Failed to emit market:sync-complete event: {}", e);

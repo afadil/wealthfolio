@@ -27,10 +27,6 @@ pub async fn sync_market_data(
     refetch_all: bool,
     handle: AppHandle,
 ) -> Result<(), String> {
-    info!(
-        "Emitting MARKET_DATA_NEEDS_SYNC event: Symbols={:?}, RefetchAll={}",
-        symbols, refetch_all
-    );
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None)
         .refetch_all_market_data(refetch_all)

@@ -99,9 +99,6 @@ impl AssetServiceTrait for AssetService {
                     }
                 }
 
-                info!("New asset to be created: {:?}", new_asset);
-
-                // The NewAsset::validate() method (likely called within create)
                 // will ensure currency is not empty before insertion.
                 let inserted_asset = self.asset_repository.create(new_asset)?;
                 Ok(inserted_asset)

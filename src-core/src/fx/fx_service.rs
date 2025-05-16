@@ -42,7 +42,6 @@ impl FxService {
             Ok(converter) => {
                 let mut converter_lock = self.converter.write().map_err(|e| FxError::CacheError(e.to_string()))?;
                 *converter_lock = Some(converter);
-                log::info!("Currency converter initialized successfully.");
                 Ok(())
             },
             Err(e) => {
