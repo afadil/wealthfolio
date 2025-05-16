@@ -3,7 +3,6 @@ import {
   QuoteSummary,
   Asset,
   Quote,
-  QuoteUpdate,
   UpdateAssetProfile,
   MarketDataProviderInfo,
 } from '@/lib/types';
@@ -84,10 +83,6 @@ export const updateQuote = async (symbol: string, quote: Quote): Promise<void> =
   try {
     const runEnv = await getRunEnv();
     if (runEnv === RUN_ENV.DESKTOP) {
-      const datePart = new Date(quote.timestamp).toISOString().slice(0, 10).replace(/-/g, '');
-      const id = `${datePart}_${symbol.toUpperCase()}`;
-     
-
       return invokeTauri('update_quote', { symbol, quote: quote });
     }
   } catch (error) {

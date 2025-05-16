@@ -184,7 +184,7 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
           inactiveShape={renderInactiveShape}
           onMouseEnter={onPieEnter}
           onMouseLeave={onPieLeave}
-          onClick={(event, index) => {
+          onClick={(_event, index) => {
             if (onSectionClick && data[index]) {
               onSectionClick(data[index], index);
             }
