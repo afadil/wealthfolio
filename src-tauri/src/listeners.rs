@@ -1,5 +1,5 @@
 use futures::future::join_all;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::sync::Arc;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
 use serde::Serialize;

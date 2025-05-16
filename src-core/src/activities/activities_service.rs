@@ -1,5 +1,5 @@
 use chrono::Utc;
-use log::{debug, info};
+use log::debug;
 use std::sync::Arc;
 
 use crate::activities::activities_errors::ActivityError;

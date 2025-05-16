@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use log::{debug, error};
 use std::sync::Arc;
 
 use crate::market_data::market_data_traits::MarketDataServiceTrait;
