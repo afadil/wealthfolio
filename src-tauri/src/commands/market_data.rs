@@ -5,7 +5,7 @@ use crate::{
     events::{emit_portfolio_trigger_update, PortfolioRequestPayload},
 };
 
-use log::{debug, info, error};
+use log::{debug, error};
 use tauri::{AppHandle, State};
 use wealthfolio_core::market_data::{Quote, QuoteSummary, MarketDataProviderInfo};
 
