@@ -49,6 +49,7 @@
     "@tauri-apps/plugin-log": "~2.3.1",
     "@tauri-apps/plugin-shell": "~2.2.1",
     "@tauri-apps/plugin-updater": "~2.7.0",
+    "@tauri-apps/plugin-window-state": "~2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

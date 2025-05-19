@@ -34,3 +34,4 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2.7.0"
+tauri-plugin-window-state = "2"

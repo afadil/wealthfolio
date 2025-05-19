@@ -110,6 +110,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ~2.7.0
         version: 2.7.0
+      '@tauri-apps/plugin-window-state':
+        specifier: ~2
+        version: 2.2.2
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2087,6 +2090,9 @@ packages:
 
   '@tauri-apps/plugin-updater@2.7.0':
     resolution: {integrity: sha512-oBug5UCH2wOsoYk0LW5LEMAT51mszjg11s8eungRH26x/qOrEjLvnuJJoxVVr9nsWowJ6vnpXKS+lUMfFTlvHQ==}
+
+  '@tauri-apps/plugin-window-state@2.2.2':
+    resolution: {integrity: sha512-7pFwmMtGhhhE/WgmM7PUrj0BSSWVAQMfDdYbRalphIqqF1tWBvxtlxclx8bTutpXHLJTQoCpIeWtBEIXsoAlGw==}
 
   '@testing-library/dom@10.4.0':
     resolution: {integrity: sha512-pemlzrSESWbdAloYml3bAJMEfNh1Z7EduzqPKprCH5S341frlpYnUEW0H72dLxa6IsYr+mPno20GiSm+h9dEdQ==}
@@ -6312,6 +6318,10 @@ snapshots:
       '@tauri-apps/api': 2.4.1
 
   '@tauri-apps/plugin-updater@2.7.0':
+    dependencies:
+      '@tauri-apps/api': 2.4.1
+
+  '@tauri-apps/plugin-window-state@2.2.2':
     dependencies:
       '@tauri-apps/api': 2.4.1
 
