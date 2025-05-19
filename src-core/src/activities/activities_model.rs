@@ -3,9 +3,45 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 use crate::accounts::Account;
 use crate::Result;
 use crate::activities::activities_errors::ActivityError;
+
+/// Helper function to parse a string into a Decimal,
+/// with a fallback for scientific notation by parsing as f64 first.
+fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
+    // Attempt to parse directly as Decimal
+    match Decimal::from_str(value_str) {
+        Ok(d) => d,
+        Err(e_decimal) => {
+            // If direct parsing fails, try parsing as f64 (to handle scientific notation)
+            // and then convert to Decimal
+            match f64::from_str(value_str) {
+                Ok(f_val) => {
+                    match Decimal::from_f64(f_val) {
+                        Some(dec_val) => dec_val,
+                        None => {
+                            log::error!(
+                                "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
+                                field_name, value_str, f_val
+                            );
+                            Decimal::ZERO
+                        }
+                    }
+                }
+                Err(e_f64) => {
+                    // If both attempts fail, log the original decimal error and the f64 error.
+                    log::error!(
+                        "Failed to parse {} '{}': as Decimal (err: {}), and as f64 (err: {}). Falling back to ZERO.",
+                        field_name, value_str, e_decimal, e_f64
+                    );
+                    Decimal::ZERO
+                }
+            }
+        }
+    }
+}
 
 /// Domain model representing an activity in the system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,31 +240,19 @@ pub struct ActivityDetails {
 
 impl ActivityDetails {
     pub fn get_quantity(&self) -> Decimal {
-        Decimal::from_str(&self.quantity).unwrap_or_else(|e| {
-            log::error!("Failed to parse quantity '{}': {}", self.quantity, e);
-            Decimal::ZERO
-        })
+        parse_decimal_string_tolerant(&self.quantity, "quantity")
     }
 
     pub fn get_unit_price(&self) -> Decimal {
-        Decimal::from_str(&self.unit_price).unwrap_or_else(|e| {
-            log::error!("Failed to parse unit_price '{}': {}", self.unit_price, e);
-            Decimal::ZERO
-        })
+        parse_decimal_string_tolerant(&self.unit_price, "unit_price")
     }
 
     pub fn get_fee(&self) -> Decimal {
-        Decimal::from_str(&self.fee).unwrap_or_else(|e| {
-            log::error!("Failed to parse fee '{}': {}", self.fee, e);
-            Decimal::ZERO
-        })
+        parse_decimal_string_tolerant(&self.fee, "fee")
     }
 
     pub fn get_amount(&self) -> Option<Decimal> {
-        self.amount.as_ref().map(|s| Decimal::from_str(s).unwrap_or_else(|e| {
-            log::error!("Failed to parse amount '{}': {}", s, e);
-            Decimal::ZERO
-        }))
+        self.amount.as_ref().map(|s| parse_decimal_string_tolerant(s, "amount"))
     }
 
     // Helper to parse the date string
@@ -493,23 +517,11 @@ impl From<ActivityDB> for Activity {
                     log::error!("Failed to parse activity_date '{}': {}", db.activity_date, e);
                     Utc::now() // Fallback to now
                 }),
-            quantity: Decimal::from_str(&db.quantity).unwrap_or_else(|e| {
-                log::error!("Failed to parse quantity '{}': {}", db.quantity, e);
-                Decimal::ZERO
-            }),
-            unit_price: Decimal::from_str(&db.unit_price).unwrap_or_else(|e| {
-                log::error!("Failed to parse unit_price '{}': {}", db.unit_price, e);
-                Decimal::ZERO
-            }),
+            quantity: parse_decimal_string_tolerant(&db.quantity, "quantity"),
+            unit_price: parse_decimal_string_tolerant(&db.unit_price, "unit_price"),
             currency: db.currency,
-            fee: Decimal::from_str(&db.fee).unwrap_or_else(|e| {
-                log::error!("Failed to parse fee '{}': {}", db.fee, e);
-                Decimal::ZERO
-            }),
-            amount: db.amount.map(|s| Decimal::from_str(&s).unwrap_or_else(|e| {
-                log::error!("Failed to parse amount '{}': {}", s, e);
-                Decimal::ZERO
-            })),
+            fee: parse_decimal_string_tolerant(&db.fee, "fee"),
+            amount: db.amount.map(|s| parse_decimal_string_tolerant(&s, "amount")),
             is_draft: db.is_draft,
             comment: db.comment,
             created_at: DateTime::parse_from_rfc3339(&db.created_at)
