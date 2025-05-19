@@ -1,5 +1,5 @@
 use futures::future::join_all;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::sync::Arc;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
 use serde::Serialize;
@@ -28,6 +28,7 @@ pub fn setup_event_listeners(handle: AppHandle) {
 
 /// Handles the common logic for both portfolio update and recalculation requests.
 fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: bool) {
+    debug!("Received portfolio request: {:?}, force_recalc: {}", payload_str, force_recalc);
     let event_name = if force_recalc {
         PORTFOLIO_TRIGGER_RECALCULATE
     } else {
@@ -70,7 +71,6 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 
                     match sync_result {
                         Ok((_, failed_syncs)) => {
-                            info!("Market data sync complete: {:?}", failed_syncs);
                             let result_payload = MarketSyncResult { failed_syncs };
                             if let Err(e) = handle_clone.emit("market:sync-complete", &result_payload) {
                                 error!("Failed to emit market:sync-complete event: {}", e);

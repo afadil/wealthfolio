@@ -124,14 +124,20 @@ export const ActivityTable = ({
           if (symbol.startsWith('$CASH')) {
             symbol = symbol.split('-')[0];
           }
+
+          const badge = (
+            <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
+              {symbol}
+            </Badge>
+          );
+
           return (
             <div className="w-3/3 flex items-center">
-              <Link to={`/holdings/${ogSymbol}`}>
-                <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
-                  {symbol}
-                </Badge>
-              </Link>
-
+              {ogSymbol.startsWith('$CASH-') ? (
+                badge
+              ) : (
+                <Link to={`/holdings/${ogSymbol}`}>{badge}</Link>
+              )}
               <span className="ml-2 text-xs">{row.getValue('assetName')}</span>
             </div>
           );

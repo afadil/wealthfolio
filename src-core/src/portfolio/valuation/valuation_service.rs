@@ -221,7 +221,7 @@ impl ValuationServiceTrait for ValuationService {
             }
         }
 
-        let filled_quotes_vec = self
+        let quotes_vec = self
             .market_data_service
             .get_historical_quotes_for_symbols_in_range(
                 &required_asset_ids,
@@ -238,7 +238,7 @@ impl ValuationServiceTrait for ValuationService {
             .await?;
 
         let quotes_by_date = self.preprocess_quotes(
-            filled_quotes_vec,
+            quotes_vec,
             actual_calculation_start_date,
             calculation_end_date,
         );

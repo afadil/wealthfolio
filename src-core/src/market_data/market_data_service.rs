@@ -345,7 +345,6 @@ impl MarketDataService {
             let start_date_time =
                 self.calculate_sync_start_time(refetch_all, &symbols_with_currencies)?;
 
-            // Use Yahoo provider for bulk history
             match self
                 .provider_registry
                 .get_provider(DataSource::Yahoo)
@@ -477,7 +476,7 @@ impl MarketDataService {
                     };
                     // Create a unique-ish ID for the filled quote
                     filled_quote.id = format!(
-                        "{}_{}",
+                        "{}_{}-filled",
                         date_to_fill.format("%Y%m%d"),
                         filled_quote.symbol
                     );
@@ -514,7 +513,7 @@ impl MarketDataService {
                     }
                 };
                 filled_quote.id = format!(
-                    "{}_{}",
+                    "{}_{}-filled",
                     date_to_fill.format("%Y%m%d"),
                     filled_quote.symbol,
                 );

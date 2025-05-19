@@ -1,5 +1,5 @@
 use chrono::Utc;
-use log::{debug, info};
+use log::debug;
 use std::sync::Arc;
 
 use crate::activities::activities_errors::ActivityError;
@@ -87,7 +87,6 @@ impl ActivityServiceTrait for ActivityService {
 
     /// Creates a new activity
     async fn create_activity(&self, mut activity: NewActivity) -> Result<Activity> {
-        info!("Creating activity: {:?}", activity);
 
         let account: Account = self
             .account_service
