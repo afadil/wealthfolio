@@ -2,13 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{
-        emit_portfolio_trigger_recalculate,
-        PortfolioRequestPayload,
-    },
+    events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload},
 };
 use log::{debug, error, warn};
-use tauri::{State, AppHandle};
+use tauri::{AppHandle, State};
 
 use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount};
 
@@ -21,16 +18,16 @@ pub async fn get_accounts(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<A
         .map_err(|e| format!("Failed to load accounts: {}", e))
 }
 
-
 #[tauri::command]
-pub async fn get_active_accounts(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Account>, String> {
+pub async fn get_active_accounts(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<Account>, String> {
     debug!("Fetching active accounts...");
     state
         .account_service()
         .get_active_accounts()
         .map_err(|e| format!("Failed to load accounts: {}", e))
 }
-
 
 #[tauri::command]
 pub async fn create_account(
@@ -118,7 +115,10 @@ pub async fn update_account(
         .map_err(|e| format!("Failed to update account {:?}: {}", account_update.id, e))?;
 
     // Always trigger recalculation after successful update
-    debug!("Account {:?} updated. Triggering recalculation.", updated_account.id);
+    debug!(
+        "Account {:?} updated. Triggering recalculation.",
+        updated_account.id
+    );
     let handle = handle.clone();
     let account_id_clone = updated_account.id.clone();
 

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
-use tauri::{State, AppHandle};
-use wealthfolio_core::settings::{Settings, SettingsUpdate};
+use tauri::{AppHandle, State};
 use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
+use wealthfolio_core::settings::{Settings, SettingsUpdate};
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, Arc<ServiceContext>>) -> Result<Settings, String> {
@@ -32,7 +32,7 @@ pub async fn update_settings(
     // Check if base_currency is present in the update and if it's different
     if let Some(ref updated_currency) = settings_update.base_currency {
         // Compare the current String with the String inside the Option
-        if &current_base_currency != updated_currency { 
+        if &current_base_currency != updated_currency {
             base_currency_changed = true;
             new_base_currency_val = Some(updated_currency.clone());
         }
@@ -45,14 +45,15 @@ pub async fn update_settings(
 
     // If the base currency was changed, update the state and emit the event
     if base_currency_changed {
-        // new_base_currency_val is guaranteed to be Some(String) here because 
+        // new_base_currency_val is guaranteed to be Some(String) here because
         // base_currency_changed is true only if the check above passed.
-        if let Some(new_currency) = new_base_currency_val { // Still good practice to use if let
-             debug!(
+        if let Some(new_currency) = new_base_currency_val {
+            // Still good practice to use if let
+            debug!(
                 "Base currency changed from {} to {}, updating state.", // Use {} as new_currency is String
                 current_base_currency,
                 &new_currency // Log the String itself
-             );
+            );
             state.update_base_currency(new_currency); // Pass the unwrapped String
 
             let handle = handle.clone();

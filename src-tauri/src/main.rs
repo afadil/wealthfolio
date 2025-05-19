@@ -4,9 +4,9 @@
 mod commands;
 mod context;
 mod events;
+mod listeners;
 mod menu;
 mod updater;
-mod listeners;
 
 use log::error;
 use updater::check_for_update;
@@ -21,15 +21,13 @@ use tauri::AppHandle;
 use tauri::Manager;
 
 use context::ServiceContext;
-use events::{
-    PortfolioRequestPayload,
-    emit_portfolio_trigger_update,
-};
+use events::{emit_portfolio_trigger_update, PortfolioRequestPayload};
 
 pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)

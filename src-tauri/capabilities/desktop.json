@@ -37,6 +37,7 @@
     "core:app:allow-set-app-theme",
     "core:window:allow-set-theme",
     "updater:default",
-    "log:default"
+    "log:default",
+    "window-state:default"
   ]
 }

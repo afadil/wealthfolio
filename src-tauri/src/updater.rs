@@ -23,10 +23,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                         Would you like to update now? The app will restart automatically.",
                         current_version,
                         update.version,
-                        update
-                            .body
-                            .clone()
-                            .unwrap_or_default()
+                        update.body.clone().unwrap_or_default()
                     );
                     let do_update = app_handle
                         .dialog()

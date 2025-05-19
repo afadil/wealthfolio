@@ -1,13 +1,10 @@
-use std::sync::Arc;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use crate::events::{
-    emit_portfolio_trigger_recalculate,
-    PortfolioRequestPayload,
-};
+use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
-use tauri::{State, AppHandle};
+use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
     Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
     NewActivity, Sort,
@@ -65,7 +62,9 @@ fn get_all_symbols_to_sync(
 }
 
 #[tauri::command]
-pub async fn get_activities(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Activity>, String> {
+pub async fn get_activities(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<Activity>, String> {
     debug!("Fetching all activities...");
     Ok(state.activity_service().get_activities()?)
 }
@@ -81,17 +80,14 @@ pub async fn search_activities(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
-    Ok(state
-        .activity_service()
-        .search_activities(
-            page,
-            page_size,
-            account_id_filter,
-            activity_type_filter,
-            asset_id_keyword,
-            sort,
-        )
-        ?)
+    Ok(state.activity_service().search_activities(
+        page,
+        page_size,
+        account_id_filter,
+        activity_type_filter,
+        asset_id_keyword,
+        sort,
+    )?)
 }
 
 #[tauri::command]
@@ -177,8 +173,7 @@ pub async fn get_account_import_mapping(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Getting import mapping for account: {}", account_id);
-    Ok(state.activity_service()
-        .get_import_mapping(account_id)?)
+    Ok(state.activity_service().get_import_mapping(account_id)?)
 }
 
 #[tauri::command]
@@ -187,8 +182,7 @@ pub async fn save_account_import_mapping(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Saving import mapping for account: {}", mapping.account_id);
-    Ok(state.activity_service()
-        .save_import_mapping(mapping)?)
+    Ok(state.activity_service().save_import_mapping(mapping)?)
 }
 
 #[tauri::command]
@@ -198,7 +192,8 @@ pub async fn check_activities_import(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<ActivityImport>, String> {
     debug!("Checking activities import for account: {}", account_id);
-    let result = state.activity_service()
+    let result = state
+        .activity_service()
         .check_activities_import(account_id, activities)
         .await?;
     Ok(result)
@@ -214,13 +209,10 @@ pub async fn import_activities(
     debug!("Importing activities for account: {}", account_id);
 
     // Generate symbols (including FX) using the new helper function
-    let symbols_for_payload = get_all_symbols_to_sync(
-        &state,
-        &account_id,
-        &activities,
-    )?;
+    let symbols_for_payload = get_all_symbols_to_sync(&state, &account_id, &activities)?;
 
-    let result = state.activity_service()
+    let result = state
+        .activity_service()
         .import_activities(account_id.clone(), activities) // activities is moved here
         .await?;
     let handle = handle.clone();

@@ -87,7 +87,7 @@ impl YahooProvider {
                 // If full profile fails, try to get short profile
                 match self.get_symbol_short_profile(symbol).await? {
                     Some(asset) => Ok(asset),
-                    None => Err(yahoo::YahooError::EmptyDataSet),
+                    None => Err(yahoo::YahooError::NoResult),
                 }
             }
         }
@@ -102,7 +102,7 @@ impl YahooProvider {
             Ok(response) => {
                 let yahoo_quote = response
                     .last_quote()
-                    .map_err(|_| yahoo::YahooError::EmptyDataSet)?;
+                    .map_err(|_| yahoo::YahooError::NoQuotes)?;
                 let model_quote = self.yahoo_quote_to_model_quote(
                     symbol.to_string(),
                     yahoo_quote,
@@ -137,15 +137,29 @@ impl YahooProvider {
             .get_quote_history(symbol, start_offset, end_offset)
             .await?;
 
-        let quotes = response
-            .quotes()?
-            .into_iter()
-            .map(|q| {
-                self.yahoo_quote_to_model_quote(symbol.to_string(), q, fallback_currency.clone())
-            })
-            .collect();
-
-        Ok(quotes)
+        match response.quotes() {
+            Ok(yahoo_api_quotes) => {
+                let quotes = yahoo_api_quotes
+                    .into_iter()
+                    .map(|q| {
+                        self.yahoo_quote_to_model_quote(symbol.to_string(), q, fallback_currency.clone())
+                    })
+                    .collect();
+                Ok(quotes)
+            }
+            Err(yahoo::YahooError::NoQuotes) => {
+                warn!(
+                    "No historical quotes returned by Yahoo API for symbol '{}' between {} and {}.",
+                    symbol, 
+                    DateTime::<Utc>::from(start).format("%Y-%m-%d"), 
+                    DateTime::<Utc>::from(end).format("%Y-%m-%d")
+                );
+                Ok(vec![])
+            }
+            Err(e) => { // e is any other yahoo::YahooError
+                Err(MarketDataError::from(e))
+            }
+        }
     }
 
     async fn get_latest_quote_backup(&self, symbol: &str) -> Result<ModelQuote, yahoo::YahooError> {
@@ -156,12 +170,12 @@ impl YahooProvider {
             .result
             .first()
             .and_then(|result| result.price.as_ref())
-            .ok_or(yahoo::YahooError::EmptyDataSet)?;
+            .ok_or(yahoo::YahooError::NoResult)?;
 
         let regular_market_price = price
             .regular_market_price
             .as_ref()
-            .ok_or(yahoo::YahooError::EmptyDataSet)?;
+            .ok_or(yahoo::YahooError::NoResult)?;
         let now_utc: DateTime<Utc> = Utc::now();
 
         Ok(ModelQuote {
@@ -585,8 +599,7 @@ impl YahooProvider {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        // Use a more efficient batching approach
-        const BATCH_SIZE: usize = 10; // Adjust based on API limits
+        const BATCH_SIZE: usize = 3; 
 
         let mut all_quotes = Vec::new();
         let mut errors: Vec<(String, String)> = Vec::new();
