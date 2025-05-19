@@ -1,14 +1,14 @@
 use futures::future::join_all;
 use log::{debug, error};
+use serde::Serialize;
 use std::sync::Arc;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
-use serde::Serialize;
 
 use crate::context::ServiceContext;
 use crate::events::{
     emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
-    PORTFOLIO_TRIGGER_RECALCULATE, PORTFOLIO_TOTAL_ACCOUNT_ID, PORTFOLIO_UPDATE_COMPLETE,
-    PORTFOLIO_UPDATE_ERROR, PORTFOLIO_TRIGGER_UPDATE, PORTFOLIO_UPDATE_START,
+    PORTFOLIO_TOTAL_ACCOUNT_ID, PORTFOLIO_TRIGGER_RECALCULATE, PORTFOLIO_TRIGGER_UPDATE,
+    PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START,
 };
 
 /// Sets up the global event listeners for the application.
@@ -28,7 +28,10 @@ pub fn setup_event_listeners(handle: AppHandle) {
 
 /// Handles the common logic for both portfolio update and recalculation requests.
 fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: bool) {
-    debug!("Received portfolio request: {:?}, force_recalc: {}", payload_str, force_recalc);
+    debug!(
+        "Received portfolio request: {:?}, force_recalc: {}",
+        payload_str, force_recalc
+    );
     let event_name = if force_recalc {
         PORTFOLIO_TRIGGER_RECALCULATE
     } else {
@@ -72,7 +75,9 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                     match sync_result {
                         Ok((_, failed_syncs)) => {
                             let result_payload = MarketSyncResult { failed_syncs };
-                            if let Err(e) = handle_clone.emit("market:sync-complete", &result_payload) {
+                            if let Err(e) =
+                                handle_clone.emit("market:sync-complete", &result_payload)
+                            {
                                 error!("Failed to emit market:sync-complete event: {}", e);
                             }
                             // Initialize the FxService after successful sync

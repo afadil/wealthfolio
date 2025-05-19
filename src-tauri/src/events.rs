@@ -18,8 +18,6 @@ pub const PORTFOLIO_UPDATE_COMPLETE: &str = "portfolio:update-complete";
 /// Event emitted when the background portfolio recalculation process encounters an error.
 pub const PORTFOLIO_UPDATE_ERROR: &str = "portfolio:update-error";
 
-
-
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PortfolioRequestPayload {
     /// Optional list of account IDs. None implies all/total accounts.
@@ -84,10 +82,7 @@ impl PortfolioRequestPayloadBuilder {
 }
 
 /// Emits the PORTFOLIO_TRIGGER_UPDATE event for incremental updates.
-pub fn emit_portfolio_trigger_update(
-    handle: &tauri::AppHandle,
-    payload: PortfolioRequestPayload,
-) {
+pub fn emit_portfolio_trigger_update(handle: &tauri::AppHandle, payload: PortfolioRequestPayload) {
     handle
         .emit(PORTFOLIO_TRIGGER_UPDATE, &payload)
         .unwrap_or_else(|e| {

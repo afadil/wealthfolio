@@ -53,7 +53,6 @@ pub async fn delete_contribution_limit(
         .map_err(|e| format!("Failed to delete contribution limit: {}", e))
 }
 
-
 #[tauri::command]
 pub async fn calculate_deposits_for_contribution_limit(
     limit_id: String,
@@ -66,4 +65,3 @@ pub async fn calculate_deposits_for_contribution_limit(
         .calculate_deposits_for_contribution_limit(&limit_id, &base_currency)
         .map_err(|e| format!("Failed to calculate deposits for contribution limit: {}", e))
 }
-

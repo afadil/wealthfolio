@@ -32,4 +32,4 @@ pub async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>),
         .to_string();
 
     Ok((filename, buffer))
-} 
+}

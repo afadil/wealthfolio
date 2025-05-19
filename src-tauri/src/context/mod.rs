@@ -1,6 +1,6 @@
 // context/mod.rs
-mod registry;
 mod providers;
+mod registry;
 
-pub use registry::ServiceContext;
 pub use providers::initialize_context;
+pub use registry::ServiceContext;

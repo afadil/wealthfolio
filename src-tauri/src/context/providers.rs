@@ -6,7 +6,6 @@ use wealthfolio_core::{
     db::{self},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService},
-    valuation::{ValuationRepository, ValuationService},
     limits::{ContributionLimitRepository, ContributionLimitService},
     market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait},
     portfolio::{
@@ -16,6 +15,7 @@ use wealthfolio_core::{
     },
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
     snapshot::{SnapshotRepository, SnapshotService},
+    valuation::{ValuationRepository, ValuationService},
     AssetRepository, AssetService,
 };
 

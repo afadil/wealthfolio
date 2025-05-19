@@ -2,16 +2,18 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload},
+    events::{
+        emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
+    },
 };
 
 use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::{
-    valuation::DailyAccountValuation,
     holdings::Holding,
     income::IncomeSummary,
-    performance::{PerformanceMetrics, SimplePerformanceMetrics}
+    performance::{PerformanceMetrics, SimplePerformanceMetrics},
+    valuation::DailyAccountValuation,
 };
 
 #[tauri::command]
@@ -38,7 +40,6 @@ pub async fn update_portfolio(handle: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-
 #[tauri::command]
 pub async fn get_holdings(
     state: State<'_, Arc<ServiceContext>>,
@@ -61,8 +62,7 @@ pub async fn get_holding(
 ) -> Result<Option<Holding>, String> {
     debug!(
         "Get specific holding for asset {} in account {}",
-        asset_id,
-        account_id
+        asset_id, account_id
     );
     let base_currency = state.get_base_currency();
     state
@@ -117,7 +117,10 @@ pub async fn calculate_accounts_simple_performance(
     state: State<'_, Arc<ServiceContext>>,
     account_ids: Vec<String>,
 ) -> Result<Vec<SimplePerformanceMetrics>, String> {
-    debug!("Calculate simple performance for accounts: {:?}", account_ids);
+    debug!(
+        "Calculate simple performance for accounts: {:?}",
+        account_ids
+    );
 
     let ids_to_process = if account_ids.is_empty() {
         debug!("Input account_ids is empty, fetching active accounts.");
@@ -215,5 +218,3 @@ pub async fn calculate_performance_summary(
         .await
         .map_err(|e| format!("Failed to calculate performance: {}", e.to_string()))
 }
-
-

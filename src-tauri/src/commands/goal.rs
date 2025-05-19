@@ -12,7 +12,10 @@ pub async fn get_goals(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Goal
 }
 
 #[tauri::command]
-pub async fn create_goal(goal: NewGoal, state: State<'_, Arc<ServiceContext>>) -> Result<Goal, String> {
+pub async fn create_goal(
+    goal: NewGoal,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Goal, String> {
     debug!("Adding new goal...");
     state
         .goal_service()
@@ -21,7 +24,10 @@ pub async fn create_goal(goal: NewGoal, state: State<'_, Arc<ServiceContext>>) -
 }
 
 #[tauri::command]
-pub async fn update_goal(goal: Goal, state: State<'_, Arc<ServiceContext>>) -> Result<Goal, String> {
+pub async fn update_goal(
+    goal: Goal,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Goal, String> {
     debug!("Updating goal...");
     state
         .goal_service()
