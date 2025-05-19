@@ -40,7 +40,8 @@ impl From<YahooError> for MarketDataError {
     fn from(error: YahooError) -> Self {
         match error {
             YahooError::FetchFailed(e) => MarketDataError::ProviderError(e),
-            YahooError::EmptyDataSet => MarketDataError::NotFound("No data found".to_string()),
+            YahooError::NoQuotes => MarketDataError::NotFound("No quotes found".to_string()),
+            YahooError::NoResult => MarketDataError::NotFound("No data found".to_string()),
             _ => MarketDataError::Unknown(error.to_string()),
         }
     }
