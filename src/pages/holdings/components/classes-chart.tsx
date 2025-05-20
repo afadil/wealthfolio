@@ -8,6 +8,8 @@ import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
 
+  const currency = holdings[0]?.baseCurrency || 'USD';
+
   const classes = holdings.reduce(
     (acc, holding) => {
       const isCash = holding.holdingType === HoldingType.CASH;
@@ -26,7 +28,7 @@ function getClassData(holdings: Holding[]) {
   return Object.entries(classes)
     .filter(([_, value]) => value > 0)
     .sort(([, a], [, b]) => b - a) 
-    .map(([name, value]) => ({ name, value }));
+    .map(([name, value]) => ({ name, value, currency }));
 }
 
 interface ClassesChartProps {
@@ -40,7 +42,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
 
   const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
 
-  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+  const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
     if (onClassSectionClick) {
       onClassSectionClick(sectionData.name);
     }

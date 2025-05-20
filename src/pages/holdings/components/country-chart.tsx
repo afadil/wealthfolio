@@ -15,7 +15,11 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => {
-    if (!holdings) return [];
+    if (!holdings || holdings.length === 0) return [];
+
+    // Assume baseCurrency is consistent across holdings or default to USD
+    const currency = holdings[0]?.baseCurrency || 'USD';
+
     const countryMap = new Map<string, number>();
     holdings.forEach((holding) => {
       const countries = holding.instrument?.countries;
@@ -32,7 +36,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
       }
     });
 
-    return Array.from(countryMap, ([name, value]) => ({ name, value }))
+    return Array.from(countryMap, ([name, value]) => ({ name, value, currency }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10); // Show top 10 countries
   }, [holdings]);
@@ -59,7 +63,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
     setActiveIndex(index);
   };
 
-  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+  const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
     if (onCountrySectionClick) {
       onCountrySectionClick(sectionData.name);
     }

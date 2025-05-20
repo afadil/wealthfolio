@@ -30,7 +30,7 @@ export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSect
   const data = useMemo(() => {
     if (!accounts || !performanceData) return [];
 
-    const groupedData = new Map<string, number>();
+    const groupedData = new Map<string, { value: number; currency: string }>();
 
     performanceData.forEach((perf) => {
       const account = accounts.find(acc => acc.id === perf.accountId);
@@ -39,17 +39,20 @@ export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSect
       const valueAcct = Number(perf.totalValue) || 0;
       if (valueAcct <= 0) return;
 
-      // Convert to base currency if fxRateToBase is available
-      const fxRate = Number(perf.fxRateToBase) || 1; // Default to 1 if null/undefined/0
+      const fxRate = Number(perf.fxRateToBase) || 1;
       const valueBase = valueAcct * fxRate;
+      const currency = perf.baseCurrency || account.currency || 'USD'; // Prioritize perf.baseCurrency, then account.currency
 
-      const groupName = account.group || account.name; // Use group name if available, otherwise account name
-      const currentTotal = groupedData.get(groupName) || 0;
-      groupedData.set(groupName, currentTotal + valueBase);
+      const groupName = account.group || account.name;
+      const currentEntry = groupedData.get(groupName) || { value: 0, currency }; // Initialize with currency
+      groupedData.set(groupName, {
+        value: currentEntry.value + valueBase,
+        currency: currentEntry.currency, // Keep the currency of the first entry for the group
+      });
     });
 
     return Array.from(groupedData.entries())
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, { value, currency }]) => ({ name, value, currency }))
       .sort((a, b) => b.value - a.value);
   }, [accounts, performanceData]);
 
@@ -77,7 +80,7 @@ export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSect
     setActiveIndex(index);
   };
 
-  const handleInternalSectionClick = (sectionData: { name: string; value: number }) => {
+  const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
     if (onAccountSectionClick && accounts) {
       const groupOrAccountName = sectionData.name;
       const accountIdsInGroup = accounts

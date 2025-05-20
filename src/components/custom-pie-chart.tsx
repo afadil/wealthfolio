@@ -24,13 +24,17 @@ const renderActiveShape = (props: any) => {
     props;
 
   const RADIAN = Math.PI / 180;
+  const MIN_LABEL_Y_OFFSET = 10; // Minimum distance from the top for the label
+
   // Position for the label next to the arc
   const labelRadiusOffset = 20; // Adjust as needed
   const labelX = cx + (outerRadius + labelRadiusOffset) * Math.cos(-midAngle * RADIAN);
-  const labelY = cy + (outerRadius + labelRadiusOffset) * Math.sin(-midAngle * RADIAN);
+  const rawLabelY = cy + (outerRadius + labelRadiusOffset) * Math.sin(-midAngle * RADIAN);
+  const finalLabelY = Math.max(rawLabelY, MIN_LABEL_Y_OFFSET);
+
   const amountToDisplay = isBalanceHidden
     ? '••••••'
-    : value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    : value.toLocaleString('en-US', { style: 'currency', currency: payload.currency || 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
     <g style={{ cursor: 'pointer' }}>
@@ -84,13 +88,13 @@ const renderActiveShape = (props: any) => {
 
       {/* Center label with value */}
       <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" className="text-xs">
-        <AmountDisplay value={value} currency="USD" isHidden={isBalanceHidden} />
+        <AmountDisplay value={value} currency={payload.currency} isHidden={isBalanceHidden} />
       </text>
 
       {/* Label next to the arc for active shape */}
       <text
         x={labelX}
-        y={labelY}
+        y={finalLabelY}
         fill="hsl(var(--foreground))"
         textAnchor={labelX > cx ? 'start' : 'end'}
         dominantBaseline="central"
@@ -122,11 +126,11 @@ const renderInactiveShape = (props: any) => {
 };
 
 interface CustomPieChartProps {
-  data: { name: string; value: number }[];
+  data: { name: string; value: number; currency: string }[];
   activeIndex: number;
   onPieEnter: (event: React.MouseEvent, index: number) => void;
   onPieLeave?: (event: React.MouseEvent, index: number) => void;
-  onSectionClick?: (data: { name: string; value: number }, index: number) => void;
+  onSectionClick?: (data: { name: string; value: number; currency: string }, index: number) => void;
   startAngle?: number;
   endAngle?: number;
   displayTooltip?: boolean;
@@ -148,12 +152,13 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
   const tooltipFormatter = (
     value: ValueType,
     name: NameType,
+    entry: any,
   ) => {
     return (
       <div className="flex flex-col">
         <span className="text-[0.70rem] uppercase text-muted-foreground">{name}</span>
         <span className="font-bold">
-          <AmountDisplay value={Number(value)} currency="USD" isHidden={isBalanceHidden} />
+          <AmountDisplay value={Number(value)} currency={entry.payload.currency} isHidden={isBalanceHidden} />
         </span>
       </div>
     );
