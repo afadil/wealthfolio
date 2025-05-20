@@ -24,7 +24,7 @@ use wealthfolio_core::{
 pub async fn initialize_context(
     app_data_dir: &str,
 ) -> Result<ServiceContext, Box<dyn std::error::Error>> {
-    let db_path = db::get_db_path(app_data_dir);
+    let db_path = db::init(app_data_dir)?;
     let pool = db::create_pool(&db_path)?;
 
     // Run migrations using the pool directly if run_migrations expects a Pool

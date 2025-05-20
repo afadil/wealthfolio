@@ -17,6 +17,37 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 pub type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<SqliteConnection>>;
 
+pub fn init(app_data_dir: &str) -> Result<String> {
+    let db_path = get_db_path(app_data_dir);
+    if !Path::new(&db_path).exists() {
+        info!(
+            "Database file not found, creating new database at: {}",
+            db_path
+        );
+        create_db_file(&db_path)?;
+    }
+    Ok(db_path)
+}
+
+fn create_db_file(db_path: &str) -> Result<()> {
+    let db_dir = Path::new(db_path).parent().unwrap();
+
+    if !db_dir.exists() {
+        info!("Creating database directory: {}", db_dir.display());
+        fs::create_dir_all(db_dir).map_err(|e| {
+            error!("Failed to create database directory: {}", e);
+            DatabaseError::BackupFailed(e.to_string())
+        })?;
+    }
+
+    info!("Creating database file: {}", db_path);
+    fs::File::create(db_path).map_err(|e| {
+        error!("Failed to create database file: {}", e);
+        DatabaseError::BackupFailed(e.to_string())
+    })?;
+    Ok(())
+}
+
 pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
     info!("Creating database connection pool");
     let manager = ConnectionManager::<SqliteConnection>::new(db_path);
