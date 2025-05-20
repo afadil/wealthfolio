@@ -27,7 +27,6 @@ pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -37,6 +36,7 @@ pub fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
 
