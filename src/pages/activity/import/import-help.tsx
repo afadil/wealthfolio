@@ -53,8 +53,7 @@ export function ImportHelpPopover() {
                     <strong>fee</strong> - Transaction fee (optional)
                   </li>
                   <li>
-                    <strong>amount</strong> - Total amount (optional, for cash activities, otherwise
-                    use unitPrice)
+                    <strong>amount</strong> - Total amount (mandatory for cash activities)
                   </li>
                 </ul>
               </li>
@@ -71,8 +70,8 @@ export function ImportHelpPopover() {
               </p>
               <p>
                 <strong>About the amount field:</strong> For cash activities (DIVIDEND, DEPOSIT,
-                WITHDRAWAL, TAX), you can specify either the total amount or use unitPrice. If both
-                are provided, amount takes precedence.
+                WITHDRAWAL, TAX, FEE, INTEREST, TRANSFER_IN, TRANSFER_OUT), the amount is mandatory,
+                and quantity/unitPrice are ignored.
               </p>
             </div>
           </div>
@@ -90,10 +89,13 @@ export function ImportHelpPopover() {
                     <li>INTEREST</li>
                     <li>DEPOSIT</li>
                     <li>WITHDRAWAL</li>
-                    <li>TRANSFER_IN (Doesn't affect cashflow)</li>
-                    <li>TRANSFER_OUT (Doesn't affect cashflow)</li>
+                    <li>ADD_HOLDING (Increases quantity, fee may apply)</li>
+                    <li>REMOVE_HOLDING (Decreases quantity, fee may apply)</li>
+                    <li>TRANSFER_IN (Increases cash or asset quantity)</li>
+                    <li>TRANSFER_OUT (Decreases cash or asset quantity)</li>
                     <li>FEE</li>
                     <li>TAX</li>
+                    <li>SPLIT (Adjusts quantity & unit cost, no cash impact)</li>
                   </ul>
                 </pre>
               </div>
@@ -116,6 +118,18 @@ export function ImportHelpPopover() {
                   2023-04-02T11:20:15.321Z,$CASH-USD,1,WITHDRAWAL,1,USD,0,1000
                 </pre>
               </div>
+              <p className="mt-2 text-xs">
+                For more details, see the{' '}
+                <a
+                  href="https://wealthfolio.app/docs/concepts/activity-types"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  Activity Reference documentation
+                </a>
+                .
+              </p>
             </div>
           </div>
         </div>
