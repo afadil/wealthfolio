@@ -18,10 +18,13 @@ use wealthfolio_core::{
     valuation::{ValuationRepository, ValuationService},
     AssetRepository, AssetService,
 };
+use tauri::{AppHandle, Runtime};
+use super::setup_providers_registry::build_provider_registry;
 
 // Other imports
 
-pub async fn initialize_context(
+pub async fn initialize_context<R: Runtime>(
+    handle: &AppHandle<R>,
     app_data_dir: &str,
 ) -> Result<ServiceContext, Box<dyn std::error::Error>> {
     let db_path = db::init(app_data_dir)?;
@@ -55,7 +58,13 @@ pub async fn initialize_context(
     let settings = settings_service.get_settings()?;
     let base_currency_string = settings.base_currency.clone();
     let base_currency = Arc::new(RwLock::new(base_currency_string.clone()));
-    let instance_id = Arc::new(settings.instance_id.clone());
+    let instance_id_string = settings.instance_id.clone();
+
+    // Build ProviderRegistry
+    let provider_registry = build_provider_registry(
+        handle,
+        &instance_id_string
+    ).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
     let market_data_service: Arc<dyn MarketDataServiceTrait> =
         Arc::new(MarketDataService::new(market_data_repo.clone(), asset_repository.clone()).await?);
@@ -124,7 +133,8 @@ pub async fn initialize_context(
 
     Ok(ServiceContext {
         base_currency,
-        instance_id,
+        instance_id: Arc::new(instance_id_string),
+        provider_registry: Arc::new(provider_registry),
         settings_service,
         account_service,
         activity_service,

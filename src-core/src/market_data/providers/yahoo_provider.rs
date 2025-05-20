@@ -653,14 +653,20 @@ impl AssetProfiler for YahooProvider {
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
+
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+        Ok(self.search_ticker(query).await?)
+    }
 }
 
 #[async_trait::async_trait]
 impl MarketDataProvider for YahooProvider {
-    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
-        self.search_ticker(query)
-            .await
-            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    fn name(&self) -> &'static str {
+        "YahooFinance"
+    }
+
+    fn priority(&self) -> u8 {
+        1
     }
 
     async fn get_latest_quote(
@@ -691,7 +697,6 @@ impl MarketDataProvider for YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
-        self.get_historical_quotes_bulk(symbols_with_currencies, start, end)
-            .await
+        Ok(self.get_historical_quotes_bulk(symbols_with_currencies, start, end).await?)
     }
 }

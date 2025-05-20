@@ -8,7 +8,9 @@ use super::models::AssetProfile;
 
 #[async_trait]
 pub trait MarketDataProvider: Send + Sync {
-    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError>;
+    fn name(&self) -> &'static str;
+    fn priority(&self) -> u8 { 10 } 
+
     async fn get_latest_quote(&self, symbol: &str, fallback_currency: String) -> Result<ModelQuote, MarketDataError>;
     async fn get_historical_quotes(
         &self,
@@ -29,5 +31,6 @@ pub trait MarketDataProvider: Send + Sync {
 
 #[async_trait]
 pub trait AssetProfiler: Send + Sync {
+    async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError>;
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError>;
 }

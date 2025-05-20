@@ -18,3 +18,5 @@ pub use providers::market_data_provider::{MarketDataProvider, AssetProfiler};
 
 // Re-export error types for convenience
 pub use market_data_errors::MarketDataError;
+
+pub use providers::provider_registry::ProviderRegistry;

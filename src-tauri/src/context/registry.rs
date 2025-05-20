@@ -2,9 +2,12 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
     self, accounts, activities, assets, fx, goals, limits, market_data, portfolio, settings,
 };
+use crate::provider::ProviderRegistry;
+
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
     pub instance_id: Arc<String>,
+    pub provider_registry: Arc<ProviderRegistry>,
 
     // Services
     pub settings_service: Arc<dyn settings::SettingsServiceTrait>,
@@ -81,5 +84,9 @@ impl ServiceContext {
 
     pub fn valuation_service(&self) -> Arc<dyn portfolio::valuation::ValuationServiceTrait> {
         Arc::clone(&self.valuation_service)
+    }
+
+    pub fn provider_registry(&self) -> Arc<ProviderRegistry> {
+        Arc::clone(&self.provider_registry)
     }
 }

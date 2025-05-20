@@ -1,7 +1,6 @@
-
+use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::market_data_provider::AssetProfiler;
-use crate::market_data::market_data_errors::MarketDataError;
 
 use super::models::AssetProfile;
 pub struct ManualProvider;
@@ -39,5 +38,12 @@ impl AssetProfiler for ManualProvider {
                 ..Default::default()
             })
         }
+    }
+
+    async fn search_ticker(
+        &self,
+        _query: &str,
+    ) -> Result<Vec<crate::market_data::market_data_model::QuoteSummary>, MarketDataError> {
+        Ok(Vec::new())
     }
 }

@@ -107,6 +107,9 @@ importers:
       '@tauri-apps/plugin-shell':
         specifier: ~2.2.1
         version: 2.2.1
+      '@tauri-apps/plugin-stronghold':
+        specifier: ~2
+        version: 2.2.0
       '@tauri-apps/plugin-updater':
         specifier: ~2.7.0
         version: 2.7.0
@@ -2087,6 +2090,9 @@ packages:
 
   '@tauri-apps/plugin-shell@2.2.1':
     resolution: {integrity: sha512-G1GFYyWe/KlCsymuLiNImUgC8zGY0tI0Y3p8JgBCWduR5IEXlIJS+JuG1qtveitwYXlfJrsExt3enhv5l2/yhA==}
+
+  '@tauri-apps/plugin-stronghold@2.2.0':
+    resolution: {integrity: sha512-N0SxfcNifvlXQ3ZHGxx9ecWNZGXtYJ6PBL0Ac8bGs90I2e2a0+JJcsAnMxQA5XQcIQfpYIXPgf0hNCliz828fw==}
 
   '@tauri-apps/plugin-updater@2.7.0':
     resolution: {integrity: sha512-oBug5UCH2wOsoYk0LW5LEMAT51mszjg11s8eungRH26x/qOrEjLvnuJJoxVVr9nsWowJ6vnpXKS+lUMfFTlvHQ==}
@@ -6314,6 +6320,10 @@ snapshots:
       '@tauri-apps/api': 2.4.1
 
   '@tauri-apps/plugin-shell@2.2.1':
+    dependencies:
+      '@tauri-apps/api': 2.4.1
+
+  '@tauri-apps/plugin-stronghold@2.2.0':
     dependencies:
       '@tauri-apps/api': 2.4.1
 

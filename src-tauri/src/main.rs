@@ -9,11 +9,13 @@ mod menu;
 mod updater;
 
 use log::error;
+use std::path::PathBuf;
 use updater::check_for_update;
 
 use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
+use std::fs;
 
 use tauri::async_runtime::spawn;
 
@@ -23,10 +25,33 @@ use tauri::Manager;
 use context::ServiceContext;
 use events::{emit_portfolio_trigger_update, PortfolioRequestPayload};
 
+use tauri_plugin_stronghold; // Added for stronghold plugin
+
 pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
+    // Generate context once to use for path resolution and building the app
+    let tauri_context = tauri::generate_context!();
+
+    // Determine app_local_data_dir for stronghold salt file
+    let app_local_data_dir =
+        tauri::api::path::app_local_data_dir(&tauri_context.config()).expect(
+            "Failed to get app local data directory. Check bundle identifier in tauri.conf.json.",
+        );
+
+    // Ensure the app_local_data_dir exists
+    if !app_local_data_dir.exists() {
+        fs::create_dir_all(&app_local_data_dir)
+            .expect("Failed to create app local data directory.");
+    }
+
+    let salt_path = app_local_data_dir.join("salt.txt");
+
     let app = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_stronghold::Builder::with_argon2(&salt_path)
+                .build(),
+        )
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -44,13 +69,13 @@ pub fn main() {
             tauri::async_runtime::block_on(async {
                 let app_data_dir = handle
                     .path()
-                    .app_data_dir()? // Use ? directly on the Result
+                    .app_data_dir()?
                     .to_str()
                     .ok_or("Failed to convert app data dir path to string")?
                     .to_string();
 
                 // Initialize context asynchronously
-                let context = match context::initialize_context(&app_data_dir).await {
+                let context = match context::initialize_context(&handle, &app_data_dir).await {
                     Ok(ctx) => Arc::new(ctx),
                     Err(e) => {
                         error!("Failed to initialize context: {}", e);
@@ -59,11 +84,12 @@ pub fn main() {
                     }
                 };
 
-                // Make context available to all commands *before* setup returns
-                handle.manage(context.clone());
 
                 // Get instance_id after context is managed
                 let instance_id = context.instance_id.clone();
+
+                // Make context available to all commands *before* setup returns
+                handle.manage(context.clone());
 
                 // --- Setup event listeners ---
                 listeners::setup_event_listeners(handle.clone());
@@ -134,11 +160,12 @@ pub fn main() {
             commands::market_data::get_quote_history,
             commands::market_data::get_market_data_providers,
         ])
-        .build(tauri::generate_context!())
+        .build(tauri_context) // Use the context generated earlier
         .expect("error while running wealthfolio application");
 
     app.run(|_app_handle, _event| {});
 }
+
 
 /// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
 fn spawn_background_tasks(

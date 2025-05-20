@@ -5949,6 +5949,144 @@
           "markdownDescription": "Denies the stdin_write command without any pre-configured scope."
         },
         {
+          "description": "This permission set configures what kind of\noperations are available from the stronghold plugin.\n\n#### Granted Permissions\n\nAll non-destructive operations are enabled by default.\n\n\n#### This default permission set includes:\n\n- `allow-create-client`\n- `allow-get-store-record`\n- `allow-initialize`\n- `allow-execute-procedure`\n- `allow-load-client`\n- `allow-save-secret`\n- `allow-save-store-record`\n- `allow-save`",
+          "type": "string",
+          "const": "stronghold:default",
+          "markdownDescription": "This permission set configures what kind of\noperations are available from the stronghold plugin.\n\n#### Granted Permissions\n\nAll non-destructive operations are enabled by default.\n\n\n#### This default permission set includes:\n\n- `allow-create-client`\n- `allow-get-store-record`\n- `allow-initialize`\n- `allow-execute-procedure`\n- `allow-load-client`\n- `allow-save-secret`\n- `allow-save-store-record`\n- `allow-save`"
+        },
+        {
+          "description": "Enables the create_client command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-create-client",
+          "markdownDescription": "Enables the create_client command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the destroy command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-destroy",
+          "markdownDescription": "Enables the destroy command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the execute_procedure command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-execute-procedure",
+          "markdownDescription": "Enables the execute_procedure command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_store_record command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-get-store-record",
+          "markdownDescription": "Enables the get_store_record command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the initialize command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-initialize",
+          "markdownDescription": "Enables the initialize command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the load_client command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-load-client",
+          "markdownDescription": "Enables the load_client command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the remove_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-remove-secret",
+          "markdownDescription": "Enables the remove_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the remove_store_record command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-remove-store-record",
+          "markdownDescription": "Enables the remove_store_record command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the save command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-save",
+          "markdownDescription": "Enables the save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the save_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-save-secret",
+          "markdownDescription": "Enables the save_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the save_store_record command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:allow-save-store-record",
+          "markdownDescription": "Enables the save_store_record command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the create_client command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-create-client",
+          "markdownDescription": "Denies the create_client command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the destroy command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-destroy",
+          "markdownDescription": "Denies the destroy command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the execute_procedure command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-execute-procedure",
+          "markdownDescription": "Denies the execute_procedure command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_store_record command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-get-store-record",
+          "markdownDescription": "Denies the get_store_record command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the initialize command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-initialize",
+          "markdownDescription": "Denies the initialize command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the load_client command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-load-client",
+          "markdownDescription": "Denies the load_client command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the remove_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-remove-secret",
+          "markdownDescription": "Denies the remove_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the remove_store_record command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-remove-store-record",
+          "markdownDescription": "Denies the remove_store_record command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the save command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-save",
+          "markdownDescription": "Denies the save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the save_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-save-secret",
+          "markdownDescription": "Denies the save_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the save_store_record command without any pre-configured scope.",
+          "type": "string",
+          "const": "stronghold:deny-save-store-record",
+          "markdownDescription": "Denies the save_store_record command without any pre-configured scope."
+        },
+        {
           "description": "This permission set configures which kind of\nupdater functions are exposed to the frontend.\n\n#### Granted Permissions\n\nThe full workflow from checking for updates to installing them\nis enabled.\n\n\n#### This default permission set includes:\n\n- `allow-check`\n- `allow-download`\n- `allow-install`\n- `allow-download-and-install`",
           "type": "string",
           "const": "updater:default",

@@ -34,6 +34,12 @@ pub enum MarketDataError {
 
     #[error("Unknown error: {0}")]
     Unknown(String),
+
+    #[error("Provider exhausted: {0}")]
+    ProviderExhausted(String),
+
+    #[error("No data found")]
+    NoData,
 }
 
 impl From<YahooError> for MarketDataError {

@@ -38,6 +38,7 @@
     "core:window:allow-set-theme",
     "updater:default",
     "log:default",
-    "window-state:default"
+    "window-state:default",
+    "stronghold:default"
   ]
 }

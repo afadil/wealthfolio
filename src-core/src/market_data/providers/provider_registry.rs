@@ -1,38 +1,66 @@
-use std::sync::Arc;
-
-use crate::market_data::providers::market_data_provider::{MarketDataProvider, AssetProfiler};
 use crate::market_data::market_data_errors::MarketDataError;
-use crate::market_data::market_data_model::DataSource;
-use super::{yahoo_provider::YahooProvider, manual_provider::ManualProvider};
+use crate::market_data::market_data_model::Quote as ModelQuote;
+use crate::market_data::providers::market_data_provider::MarketDataProvider;
+
+use std::sync::Arc;
+use std::time::SystemTime;
+
 
 pub struct ProviderRegistry {
-    yahoo: Arc<YahooProvider>,
-    manual: Arc<ManualProvider>,
+    chain: Vec<Arc<dyn MarketDataProvider>>,
 }
 
 impl ProviderRegistry {
-    pub async fn new() -> Result<Self, MarketDataError> {
-        Ok(Self {
-            yahoo: Arc::new(YahooProvider::new().await?),
-            manual: Arc::new(ManualProvider::new()?),
-        })
+    pub fn new(mut providers: Vec<Arc<dyn MarketDataProvider>>) -> Self {
+        providers.sort_by_key(|p| p.priority());
+        Self { chain: providers }
     }
 
-    pub fn get_provider(&self, source: DataSource) -> Arc<dyn MarketDataProvider> {
-        match source {
-            DataSource::Yahoo => self.yahoo.clone(),
-            DataSource::Manual => panic!("Manual provider does not support market data operations"),
+    pub async fn latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
+        for p in &self.chain {
+            if let Ok(q) = p.get_latest_quote(symbol, fallback_currency.clone()).await {
+                return Ok(q);
+            }
         }
+        Err(MarketDataError::NoData)
     }
 
-    pub fn get_profiler(&self, source: DataSource) -> Arc<dyn AssetProfiler> {
-        match source {
-            DataSource::Manual => self.manual.clone(),
-            DataSource::Yahoo => self.yahoo.clone(),
+    pub async fn historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
+        for p in &self.chain {
+            if let Ok(q) = p
+                .get_historical_quotes(symbol, start, end, fallback_currency.clone())
+                .await
+            {
+                return Ok(q);
+            }
         }
+        Err(MarketDataError::NoData)
     }
 
-    pub fn default_provider(&self) -> Arc<dyn MarketDataProvider> {
-        self.yahoo.clone()
+    pub async fn historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+        for p in &self.chain {
+            if let Ok(q) = p
+                .get_historical_quotes_bulk(symbols_with_currencies, start, end)
+                .await
+            {
+                return Ok(q);
+            }
+        }
+        Err(MarketDataError::NoData)
     }
-} 
+}
