@@ -599,7 +599,7 @@ impl YahooProvider {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        const BATCH_SIZE: usize = 3; 
+        const BATCH_SIZE: usize = 2; 
 
         let mut all_quotes = Vec::new();
         let mut errors: Vec<(String, String)> = Vec::new();
