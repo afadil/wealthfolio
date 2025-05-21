@@ -42,7 +42,7 @@ function getCurrencyData(holdings: Holding[] = [], baseCurrency: string): Curren
       if (isNaN(localValue) || isNaN(baseValue)) return acc;
 
       const current = acc.currencies[currency] || 0;
-      acc.currencies[currency] = current + localValue;
+      acc.currencies[currency] = current + baseValue;
       acc.totalBase += baseValue;
 
       return acc;
