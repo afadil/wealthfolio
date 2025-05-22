@@ -4,11 +4,12 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use async_trait::async_trait;
 
 use super::market_data_errors::MarketDataError;
 use super::market_data_model::Quote;
 use super::market_data_traits::MarketDataRepositoryTrait;
-use crate::db::get_connection;
+use crate::db::{get_connection, WriteHandle};
 use crate::errors::Result;
 use crate::market_data::market_data_model::{LatestQuotePair, QuoteDb};
 use crate::schema::quotes::dsl::{quotes, symbol, timestamp};
@@ -17,19 +18,21 @@ use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
 
 // Import for daily_account_valuation table
-use crate::schema::daily_account_valuation::dsl as dav_dsl;
 use super::market_data_constants::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
+use crate::schema::daily_account_valuation::dsl as dav_dsl;
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
 }
 
 impl MarketDataRepository {
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
     }
 }
 
+#[async_trait]
 impl MarketDataRepositoryTrait for MarketDataRepository {
     fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
@@ -56,45 +59,57 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .collect())
     }
 
-    fn save_quotes(&self, input_quotes: &[Quote]) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-        let transaction_result = conn.transaction(|conn| {
-            for chunk in input_quotes.chunks(1000) {
-                let quote_dbs: Vec<QuoteDb> = chunk.iter().map(QuoteDb::from).collect();
+    async fn save_quotes(&self, input_quotes: &[Quote]) -> Result<()> {
+        if input_quotes.is_empty() {
+            return Ok(());
+        }
+        let quotes_owned: Vec<Quote> = input_quotes.to_vec(); 
+        let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
 
-                diesel::replace_into(quotes)
-                    .values(&quote_dbs)
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                for chunk in db_rows.chunks(1_000) {
+                    diesel::replace_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(MarketDataError::DatabaseError)?;
+                }
+                Ok(())
+            })
+            .await
+    }
+
+    async fn save_quote(&self, quote: &Quote) -> Result<Quote> {
+        let quote_cloned = quote.clone();
+        let save_result = self.save_quotes(&[quote_cloned.clone()]).await;
+        save_result?;
+        Ok(quote_cloned)
+    }
+
+    async fn delete_quote(&self, quote_id: &str) -> Result<()> {
+        let id_to_delete = quote_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::delete(quotes.filter(crate::schema::quotes::dsl::id.eq(id_to_delete)))
                     .execute(conn)
                     .map_err(MarketDataError::DatabaseError)?;
-            }
-            Ok(())
-        });
-
-        transaction_result
+                Ok(())
+            })
+            .await
     }
 
-    fn save_quote(&self, quote: &Quote) -> Result<Quote> {
-        self.save_quotes(&[quote.clone()])?;
-        Ok(quote.clone())
-    }
+    async fn delete_quotes_for_symbols(&self, symbols_to_delete: &[String]) -> Result<()> {
+        let symbols_cloned = symbols_to_delete.to_vec();
+        let symbols_owned = symbols_cloned;
 
-    fn delete_quote(&self, quote_id: &str) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-
-        diesel::delete(quotes.filter(crate::schema::quotes::dsl::id.eq(quote_id)))
-            .execute(&mut conn)
-            .map_err(MarketDataError::DatabaseError)?;
-
-        Ok(())
-    }
-
-    fn delete_quotes_for_symbols(&self, symbols_to_delete: &[String]) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-
-        diesel::delete(quotes.filter(symbol.eq_any(symbols_to_delete)))
-            .execute(&mut conn)
-            .map_err(MarketDataError::DatabaseError)?;
-        Ok(())
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::delete(quotes.filter(symbol.eq_any(symbols_owned)))
+                    .execute(conn)
+                    .map_err(MarketDataError::DatabaseError)?;
+                Ok(())
+            })
+            .await
     }
 
     fn get_quotes_by_source(&self, input_symbol: &str, source: &str) -> Result<Vec<Quote>> {
@@ -291,59 +306,63 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Fetch the latest calculated_at from daily_account_valuation table
         let latest_calculated_at_str: Option<String> = dav_dsl::daily_account_valuation
             .select(diesel::dsl::max(dav_dsl::calculated_at))
             .first::<Option<String>>(&mut conn)
             .optional()?
             .flatten();
 
-        let latest_sync_naive_datetime: Option<NaiveDateTime> = latest_calculated_at_str.and_then(|s| {
-            DateTime::parse_from_rfc3339(&s)
-                .ok()
-                .map(|dt_utc| dt_utc.naive_utc())
-        });
+        let latest_sync_naive_datetime: Option<NaiveDateTime> =
+            latest_calculated_at_str.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt_utc| dt_utc.naive_utc())
+            });
 
         let mut sync_dates_map: HashMap<String, Option<NaiveDateTime>> = HashMap::new();
 
-        // Use the single latest_sync_naive_datetime for all known providers
         sync_dates_map.insert(DATA_SOURCE_YAHOO.to_string(), latest_sync_naive_datetime);
         sync_dates_map.insert(DATA_SOURCE_MANUAL.to_string(), latest_sync_naive_datetime);
-        // Add other providers here if MarketDataService expects them
 
         Ok(sync_dates_map)
     }
 
-    fn upsert_manual_quotes_from_activities(&self, symbol_param: &str) -> Result<Vec<Quote>> {
-        use crate::schema::activities::dsl as activities_dsl;
-        use crate::schema::quotes::dsl;
+    async fn upsert_manual_quotes_from_activities(&self, symbol_param: &str) -> Result<Vec<Quote>> {
         use crate::activities::activities_constants::TRADING_ACTIVITY_TYPES;
         use crate::activities::activities_model::ActivityDB;
-        use crate::market_data::market_data_model::{Quote, QuoteDb, DataSource};
+        use crate::market_data::market_data_model::{DataSource, Quote, QuoteDb};
+        use crate::schema::activities::dsl as activities_dsl;
+        use crate::schema::quotes::dsl;
+        use chrono::{TimeZone, Utc};
         use rust_decimal::Decimal;
-        use chrono::{Utc, TimeZone};
         use std::str::FromStr;
 
-        let mut conn = get_connection(&self.pool)?;
+        let mut conn_read = get_connection(&self.pool)?;
 
-        // 1. Load all non-draft trading activities for this asset
         let activity_rows = activities_dsl::activities
             .filter(activities_dsl::asset_id.eq(symbol_param))
             .filter(activities_dsl::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
             .filter(activities_dsl::is_draft.eq(false))
             .order(activities_dsl::activity_date.asc())
-            .load::<ActivityDB>(&mut conn)
+            .load::<ActivityDB>(&mut conn_read)
             .map_err(MarketDataError::DatabaseError)?;
 
         let mut quotes_to_upsert = Vec::new();
         for activity in activity_rows {
             let price = Decimal::from_str(&activity.unit_price).unwrap_or(Decimal::ZERO);
             if price > Decimal::ZERO {
-                // Parse date (try RFC3339, fallback to YYYY-MM-DD)
-                let naive_date = chrono::NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d")
-                    .or_else(|_| chrono::NaiveDateTime::parse_from_str(&activity.activity_date, "%Y-%m-%dT%H:%M:%S%.f%:z").map(|dt| dt.date()))
-                    .unwrap_or_else(|_| Utc::now().date_naive());
-                let quote_timestamp = Utc.from_utc_datetime(&naive_date.and_hms_opt(16, 0, 0).unwrap());
+                let naive_date =
+                    chrono::NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d")
+                        .or_else(|_| {
+                            chrono::NaiveDateTime::parse_from_str(
+                                &activity.activity_date,
+                                "%Y-%m-%dT%H:%M:%S%.f%:z",
+                            )
+                            .map(|dt| dt.date())
+                        })
+                        .unwrap_or_else(|_| Utc::now().date_naive());
+                let quote_timestamp =
+                    Utc.from_utc_datetime(&naive_date.and_hms_opt(16, 0, 0).unwrap());
                 let now = Utc::now();
                 let quote = Quote {
                     id: format!("{}_{}", naive_date.format("%Y%m%d"), symbol_param),
@@ -363,13 +382,17 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             }
         }
 
-        // Upsert all quotes
         if !quotes_to_upsert.is_empty() {
             let quote_dbs: Vec<QuoteDb> = quotes_to_upsert.iter().map(QuoteDb::from).collect();
-            diesel::replace_into(dsl::quotes)
-                .values(&quote_dbs)
-                .execute(&mut conn)
-                .map_err(MarketDataError::DatabaseError)?;
+            let exec_result = self.writer
+                .exec(move |conn_write: &mut SqliteConnection| -> Result<()> {
+                    diesel::replace_into(dsl::quotes)
+                        .values(&quote_dbs)
+                        .execute(conn_write)?;
+                    Ok(())
+                })
+                .await;
+            exec_result?;
         }
 
         Ok(quotes_to_upsert)

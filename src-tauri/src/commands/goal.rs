@@ -20,6 +20,7 @@ pub async fn create_goal(
     state
         .goal_service()
         .create_goal(goal)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -32,6 +33,7 @@ pub async fn update_goal(
     state
         .goal_service()
         .update_goal(goal)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -44,6 +46,7 @@ pub async fn delete_goal(
     state
         .goal_service()
         .delete_goal(goal_id)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -56,6 +59,7 @@ pub async fn update_goal_allocations(
     state
         .goal_service()
         .upsert_goal_allocations(allocations)
+        .await
         .map_err(|e| e.to_string())
 }
 

@@ -28,6 +28,7 @@ pub async fn update_asset_profile(
     state
         .asset_service()
         .update_asset_profile(&id, payload)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -41,6 +42,7 @@ pub async fn update_asset_data_source(
     let asset = state
         .asset_service()
         .update_asset_data_source(&id, data_source)
+        .await
         .map_err(|e| e.to_string())?;
 
     let handle = handle.clone();

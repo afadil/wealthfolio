@@ -5,7 +5,7 @@ export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_exchange_rates');
+        return invokeTauri('get_latest_exchange_rates');
       default:
         throw new Error('Unsupported environment');
     }

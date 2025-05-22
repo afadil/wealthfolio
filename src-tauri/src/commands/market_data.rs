@@ -46,6 +46,7 @@ pub async fn update_quote(
     state
         .market_data_service()
         .update_quote(quote.clone())
+        .await
         .map(|_| ())
         .map_err(|e| e.to_string())?;
 
@@ -71,6 +72,7 @@ pub async fn delete_quote(
     state
         .market_data_service()
         .delete_quote(&id)
+        .await
         .map_err(|e| e.to_string())?;
 
     let handle = handle.clone();

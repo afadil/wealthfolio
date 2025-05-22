@@ -58,8 +58,8 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Updates an asset profile
-    fn update_asset_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset> {
-        self.asset_repository.update_profile(asset_id, payload)
+    async fn update_asset_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset> {
+        self.asset_repository.update_profile(asset_id, payload).await
     }
 
     /// Lists currency assets for a given base currency
@@ -68,9 +68,9 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Creates a new cash asset
-    fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
+    async fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
         let new_asset = NewAsset::new_cash_asset(currency);
-        self.asset_repository.create(new_asset)
+        self.asset_repository.create(new_asset).await
     }
 
     /// Retrieves or creates an asset by its ID
@@ -100,8 +100,7 @@ impl AssetServiceTrait for AssetService {
                 }
 
                 // will ensure currency is not empty before insertion.
-                let inserted_asset = self.asset_repository.create(new_asset)?;
-                Ok(inserted_asset)
+                return self.asset_repository.create(new_asset).await;
             }
             Err(e) => {
                 error!("Error fetching asset by ID '{}': {}", asset_id, e);
@@ -111,11 +110,11 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Updates the data source for an asset
-    fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
-        self.asset_repository.update_data_source(asset_id, data_source)
+    async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
+        self.asset_repository.update_data_source(asset_id, data_source).await
     }
 
-    fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+    async fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
         self.asset_repository.list_by_symbols(symbols)
     }
 } 

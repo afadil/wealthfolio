@@ -112,6 +112,7 @@ pub async fn update_account(
     let updated_account = state
         .account_service()
         .update_account(account_update.clone()) // Removed .await
+        .await // Add .await here
         .map_err(|e| format!("Failed to update account {:?}: {}", account_update.id, e))?;
 
     // Always trigger recalculation after successful update
@@ -143,6 +144,7 @@ pub async fn delete_account(
     state
         .account_service()
         .delete_account(&account_id)
+        .await // Add .await here
         .map_err(|e| {
             error!("Failed to delete account {}: {}", account_id, e); // Log error
             e.to_string()

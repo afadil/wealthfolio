@@ -7,16 +7,18 @@ use std::collections::HashMap;
 use diesel::sql_query;
 use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
+use async_trait::async_trait;
 
-use crate::db::get_connection;
+use crate::db::{get_connection, WriteHandle};
 use crate::errors::Result;
 use crate::portfolio::valuation::valuation_model::{DailyAccountValuation, DailyAccountValuationDb};
 use crate::schema::daily_account_valuation::dsl::*;
 use crate::schema::daily_account_valuation;
 
 
+#[async_trait]
 pub trait ValuationRepositoryTrait: Send + Sync {
-    fn save_valuations(&self, valuation_records: &[DailyAccountValuation]) -> Result<()>;
+    async fn save_valuations(&self, valuation_records: &[DailyAccountValuation]) -> Result<()>;
     fn get_historical_valuations(
         &self,
         input_account_id: &str,
@@ -24,7 +26,7 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         end_date_opt: Option<NaiveDate>,
     ) -> Result<Vec<DailyAccountValuation>>;
     fn load_latest_valuation_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
-    fn delete_valuations_for_account(&self, account_id: &str) -> Result<()>;
+    async fn delete_valuations_for_account(&self, account_id: &str) -> Result<()>;
     fn get_latest_valuations(
         &self,
         input_account_ids: &[String],
@@ -39,33 +41,37 @@ pub trait ValuationRepositoryTrait: Send + Sync {
 
 pub struct ValuationRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
 }
 
 impl ValuationRepository {
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
     }
 }
 
+#[async_trait]
 impl ValuationRepositoryTrait for ValuationRepository {
-    fn save_valuations(&self, valuation_records: &[DailyAccountValuation]) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-        let transaction_result = conn.transaction(|conn| {
-            for chunk in valuation_records.chunks(1000) { 
-                let history_dbs: Vec<DailyAccountValuationDb> = chunk
-                    .iter()
-                    .cloned() // Clone DailyAccountValuation to convert
-                    .map(DailyAccountValuationDb::from)
-                    .collect();
+    async fn save_valuations(&self, valuation_records: &[DailyAccountValuation]) -> Result<()> {
+        if valuation_records.is_empty() {
+            return Ok(());
+        }
 
+        // Materialize the records once before moving into the closure
+        let records_to_save: Vec<DailyAccountValuationDb> = valuation_records
+            .iter()
+            .cloned()
+            .map(DailyAccountValuationDb::from)
+            .collect();
+
+        self.writer.exec(move |conn| {
+            for chunk in records_to_save.chunks(1000) {
                 diesel::replace_into(daily_account_valuation::table)
-                    .values(&history_dbs)
+                    .values(chunk) // Pass the chunk directly
                     .execute(conn)?;
             }
             Ok(())
-        });
-
-        transaction_result
+        }).await
     }
 
     fn get_historical_valuations(
@@ -122,13 +128,13 @@ impl ValuationRepositoryTrait for ValuationRepository {
         Ok(latest_date)
     }
 
-    fn delete_valuations_for_account(&self, input_account_id: &str) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-
-        diesel::delete(daily_account_valuation::table.filter(account_id.eq(input_account_id)))
-            .execute(&mut conn)?;
-
-        Ok(())
+    async fn delete_valuations_for_account(&self, input_account_id: &str) -> Result<()> {
+        let account_id_owned = input_account_id.to_string();
+        self.writer.exec(move |conn| {
+            diesel::delete(daily_account_valuation::table.filter(account_id.eq(account_id_owned)))
+                .execute(conn)?;
+            Ok(())
+        }).await
     }
 
     fn get_latest_valuations(

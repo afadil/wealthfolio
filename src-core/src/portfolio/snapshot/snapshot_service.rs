@@ -140,7 +140,8 @@ impl SnapshotService {
             let ids_to_delete: Vec<String> = accounts_to_process.keys().cloned().collect();
             if !ids_to_delete.is_empty() {
                 self.snapshot_repository
-                    .delete_snapshots_by_account_ids(&ids_to_delete)?;
+                    .delete_snapshots_by_account_ids(&ids_to_delete)
+                    .await?;
             }
             return Ok(0);
         } else if all_activities.is_empty() {
@@ -166,7 +167,7 @@ impl SnapshotService {
                 &account_ids_with_activity, // Pass accounts that actually have activity
                 force_full_calculation,
                 calculation_end_date,
-            )?;
+            ).await?;
 
         // Filter accounts that actually need calculation based on effective_start_dates
         let accounts_needing_calculation: AccountsMap = accounts_to_process
@@ -194,7 +195,7 @@ impl SnapshotService {
         self.snapshot_repository.replace_all_snapshots(
             &keyframes_to_save, // Pass the whole slice
             force_full_calculation
-        )?;
+        ).await?;
 
         // Return count of saved keyframes as an indicator of work done
         Ok(keyframes_to_save.len())
@@ -375,7 +376,7 @@ impl SnapshotService {
 
     // --- Step 6: Determine calculation range and initial state (Keyframes) ---
     // Handles individual accounts and the TOTAL account distinctly.
-    fn determine_calculation_range_and_initial_state(
+    async fn determine_calculation_range_and_initial_state(
         &self,
         accounts_to_process: &AccountsMap, // Includes virtual TOTAL if needed
         activities_by_account_date: &ActivitiesByAccount, // Includes TOTAL key if needed
@@ -383,131 +384,119 @@ impl SnapshotService {
         force_full_calculation: bool,
         calculation_end_date: NaiveDate,
     ) -> Result<(StartSnapshotsMap, StartDatesMap, NaiveDate)> {
-        let mut start_keyframes = HashMap::new();
-        let mut effective_start_dates = HashMap::new();
-        let mut overall_min_calc_date = calculation_end_date; // Start assuming today, find earlier dates
+        debug!(
+            "Determining calculation range. Accounts with activity: {:?}. Force full: {}",
+            account_ids_with_activity.len(),
+            force_full_calculation
+        );
+        let mut start_keyframes: StartSnapshotsMap = HashMap::new();
+        let mut effective_start_dates: StartDatesMap = HashMap::new();
+        let mut overall_min_calc_date = calculation_end_date; // Initialize with the latest possible date
 
-        // --- Delete snapshots if forcing full calculation ---
-        if force_full_calculation {
-            // Use iterator chain
-            let ids_to_delete: Vec<String> = accounts_to_process.keys().cloned().collect();
-            if !ids_to_delete.is_empty() {
-                debug!(
-                    "Force full calculation: Deleting existing snapshots for accounts: {:?}",
-                    ids_to_delete
-                );
-                self.snapshot_repository
-                    .delete_snapshots_by_account_ids(&ids_to_delete)?;
+        for (acc_id, account) in accounts_to_process {
+            // Skip if this account has no activities at all, unless forcing full (then it might clear)
+            if !account_ids_with_activity.contains(acc_id) && !force_full_calculation {
+                debug!("Skipping account {} for range determination: no activities and not forcing full.", acc_id);
+                continue;
             }
-        }
 
-        // --- Determine start state for each account ---
-        // Use iterator chain
-        let account_ids_to_check: Vec<String> = accounts_to_process.keys().cloned().collect();
-        let latest_keyframes = if force_full_calculation {
-            HashMap::new() // Don't fetch if forcing full recalc
-        } else {
-            self.snapshot_repository
-                .get_all_latest_snapshots(&account_ids_to_check)?
-        };
+            let min_activity_date_for_account = activities_by_account_date
+                .get(acc_id)
+                .and_then(|dates_map| dates_map.keys().next().cloned());
 
-        for (account_id, account) in accounts_to_process {
-            let account_has_activity = account_ids_with_activity.contains(account_id);
+            let mut effective_start_date;
+            let mut initial_snapshot_for_acc: Option<AccountStateSnapshot> = None;
 
             if force_full_calculation {
-                // --- Full Calculation Start State ---
-                // Find the first date with activity *for this specific account* (or TOTAL)
-                let first_activity_date = activities_by_account_date
-                    .get(account_id) // Use the map which has TOTAL key if needed
-                    .and_then(|date_map| date_map.keys().next().cloned())
-                    .unwrap_or(calculation_end_date); // Default if no activities for this account
-
-                // If the account has no activity at all, don't calculate it unless it's TOTAL
-                // (TOTAL might need calculation even with no activity if sub-accounts were forced)
-                if !account_has_activity && account_id != PORTFOLIO_TOTAL_ACCOUNT_ID {
+                // If forcing full, delete existing snapshots for this specific account before calculating its start.
+                // This ensures that if `force_full_calculation` is true but only for a subset of accounts,
+                // we only delete for those specific accounts here. Global delete for *all* accounts provided
+                // to `calculate_holdings_snapshots_internal` should happen once at the beginning of that function
+                // or be implicitly handled by `replace_all_snapshots` if it does a full delete.
+                // Here, we ensure this account starts fresh if it's part of a forced recalc.
+                if acc_id != PORTFOLIO_TOTAL_ACCOUNT_ID || account_ids_with_activity.contains(PORTFOLIO_TOTAL_ACCOUNT_ID) {
                     debug!(
-                        "Account {} has no activities and full recalc forced. Skipping.",
-                        account_id
+                        "Force full calculation: Deleting existing snapshots for account: {}",
+                        acc_id
                     );
-                    continue;
+                    self.snapshot_repository
+                        .delete_snapshots_by_account_ids(&[acc_id.clone()])
+                        .await?; // This should be line ~402
                 }
-
-                let initial_snapshot_date = first_activity_date
-                    .pred_opt()
-                    .unwrap_or(first_activity_date);
-                let initial_keyframe =
-                    Self::create_initial_snapshot(account, initial_snapshot_date); // Use account object (real or virtual)
-                start_keyframes.insert(account_id.clone(), initial_keyframe);
-                effective_start_dates.insert(account_id.clone(), first_activity_date);
-                overall_min_calc_date = overall_min_calc_date.min(first_activity_date);
-                debug!(
-                    "Account {} (Full Recalc): Start date {}, Initial snapshot date {}",
-                    account_id, first_activity_date, initial_snapshot_date
-                );
+                effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
             } else {
-                // --- Incremental Calculation Start State ---
-                if let Some(latest_keyframe) = latest_keyframes.get(account_id) {
-                    let next_day_to_calculate = latest_keyframe
-                        .snapshot_date
-                        .succ_opt()
-                        .unwrap_or(latest_keyframe.snapshot_date);
-
-                    if next_day_to_calculate <= calculation_end_date {
-                        // Only calculate if there's potential work to do
-                        effective_start_dates.insert(account_id.clone(), next_day_to_calculate);
-                        start_keyframes.insert(account_id.clone(), latest_keyframe.clone());
-                        overall_min_calc_date = overall_min_calc_date.min(next_day_to_calculate);
-                        debug!(
-                            "Account {} (Incr): Start date {} based on keyframe from {}",
-                            account_id, next_day_to_calculate, latest_keyframe.snapshot_date
-                        );
-                    } else {
-                        debug!(
-                            "Account {} is already up-to-date (Keyframe {}). Skipping.",
-                            account_id, latest_keyframe.snapshot_date
-                        );
-                        // No calculation needed
-                    }
+                // Incremental: try to find the latest snapshot to start from
+                if let Some(latest_snapshot) = self
+                    .snapshot_repository
+                    .get_latest_snapshot_before_date(acc_id, calculation_end_date)?
+                {
+                    initial_snapshot_for_acc = Some(latest_snapshot.clone());
+                    effective_start_date = latest_snapshot.snapshot_date; // Start from the date of the last snapshot
+                    debug!(
+                        "Found latest snapshot for account {}: date {}. Starting incremental calc from here.",
+                        acc_id,
+                        effective_start_date
+                    );
                 } else {
-                    // --- No existing keyframe found (treat as full calc for this account) ---
-                    let first_activity_date = activities_by_account_date
-                        .get(account_id)
-                        .and_then(|date_map| date_map.keys().next().cloned())
-                        .unwrap_or(calculation_end_date);
-
-                    // Only calculate if there actually are activities for this account
-                    if account_has_activity || account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
-                        // Always process TOTAL if requested initially
-                        let initial_snapshot_date = first_activity_date
-                            .pred_opt()
-                            .unwrap_or(first_activity_date);
-                        let initial_keyframe =
-                            Self::create_initial_snapshot(account, initial_snapshot_date);
-                        start_keyframes.insert(account_id.clone(), initial_keyframe);
-                        effective_start_dates.insert(account_id.clone(), first_activity_date);
-                        overall_min_calc_date = overall_min_calc_date.min(first_activity_date);
-                        debug!(
-                            "Account {} (Incr - No Keyframe): Start date {}, Initial snapshot date {}",
-                            account_id, first_activity_date, initial_snapshot_date
-                        );
-                    } else {
-                        debug!(
-                            "Account {} has no previous keyframe and no activities. Skipping.",
-                            account_id
-                        );
-                    }
+                    // No snapshot found, start from the earliest activity or end_date if no activities
+                    effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
+                    debug!(
+                        "No snapshot found for account {}. Starting from earliest activity: {} or end_date.",
+                        acc_id,
+                        effective_start_date
+                    );
                 }
+            }
+
+            // If there are activities before the effective_start_date (e.g. manual snapshot is old),
+            // we must start from the earliest activity to ensure correctness.
+            if let Some(min_act_date) = min_activity_date_for_account {
+                if min_act_date < effective_start_date {
+                    debug!(
+                        "Account {} has activities (at {}) before determined start_date ({}). Adjusting to earliest activity.",
+                        acc_id, min_act_date, effective_start_date
+                    );
+                    effective_start_date = min_act_date;
+                    initial_snapshot_for_acc = None; // Recalculate from scratch for this account's range
+                }
+            }
+
+            // Only include accounts that will actually have a calculation period
+            if effective_start_date <= calculation_end_date {
+                if let Some(snapshot) = initial_snapshot_for_acc {
+                    start_keyframes.insert(acc_id.clone(), snapshot);
+                } else {
+                    // If no initial snapshot, create a default one at effective_start_date - 1 day (or on the day if it's the very first activity)
+                    // The HoldingsCalculator expects the initial state *before* the first day's activities.
+                    let day_before_effective_start = effective_start_date.pred_opt().unwrap_or(effective_start_date);
+                    start_keyframes.insert(acc_id.clone(), Self::create_initial_snapshot(account, day_before_effective_start));
+                }
+                effective_start_dates.insert(acc_id.clone(), effective_start_date);
+                if effective_start_date < overall_min_calc_date {
+                    overall_min_calc_date = effective_start_date;
+                }
+            } else {
+                debug!("Skipping account {} for calculation: effective_start_date {} is after calculation_end_date {}.", 
+                       acc_id, effective_start_date, calculation_end_date);
             }
         }
 
-        // Ensure calculation_min_date is not after calculation_end_date
-        overall_min_calc_date = overall_min_calc_date.min(calculation_end_date);
+        if effective_start_dates.is_empty() && !accounts_to_process.is_empty() {
+            warn!(
+                "No effective calculation periods determined for any accounts. Min calc date defaults to end date: {}",
+                calculation_end_date
+            );
+            overall_min_calc_date = calculation_end_date;
+        } else if effective_start_dates.is_empty() && accounts_to_process.is_empty(){
+            debug!("No accounts to process, min calc date defaults to end date: {}", calculation_end_date);
+            overall_min_calc_date = calculation_end_date;
+        }
 
-        Ok((
-            start_keyframes,
-            effective_start_dates,
-            overall_min_calc_date,
-        ))
+        debug!("Overall minimum calculation date: {}", overall_min_calc_date);
+        debug!("Effective start dates: {:?}", effective_start_dates.keys());
+        debug!("Start keyframes count: {}", start_keyframes.len());
+
+        Ok((start_keyframes, effective_start_dates, overall_min_calc_date))
     }
 
     // --- Step 7: Calculate daily holdings snapshots (in memory) and identify keyframes ---

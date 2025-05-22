@@ -42,27 +42,28 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountServiceTrait for Acc
             base_currency, new_account.currency
         );
 
-        let fx_service = self.fx_service.clone();
-        let repository = self.repository.clone();
-        let new_account_clone = new_account.clone();
-        let executor = self.transaction_executor.clone();
+        // Perform async currency pair registration if needed
+        if new_account.currency != base_currency {
+            self.fx_service.register_currency_pair(
+                new_account.currency.as_str(),
+                base_currency.as_str(), // base_currency is String, .as_str() is correct
+            ).await?;
+        }
 
-        executor
-            .execute(move |tx_conn| {
-                if new_account_clone.currency != base_currency {
-                    (*fx_service).register_currency_pair(
-                        new_account_clone.currency.as_str(),
-                        base_currency.as_str(),
-                    )?;
-                }
+        // Clones for the transaction closure
+        let repository_for_tx = self.repository.clone();
+        let new_account_for_tx = new_account.clone();
+        let executor_for_tx = self.transaction_executor.clone();
 
-                (*repository).create_in_transaction(new_account_clone, tx_conn)
-            })
+        executor_for_tx.execute(move |tx_conn| {
+            // The currency pair registration logic has been moved outside this closure
+            repository_for_tx.create_in_transaction(new_account_for_tx, tx_conn)
+        })
     }
 
     /// Updates an existing account
-    fn update_account(&self, account_update: AccountUpdate) -> Result<Account> {
-        (*self.repository).update(account_update)
+    async fn update_account(&self, account_update: AccountUpdate) -> Result<Account> {
+        (*self.repository).update(account_update).await
     }
 
     /// Retrieves an account by its ID
@@ -95,8 +96,8 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountServiceTrait for Acc
     }
 
     /// Deletes an account by its ID
-    fn delete_account(&self, account_id: &str) -> Result<()> {
-        (*self.repository).delete(account_id)?;
+    async fn delete_account(&self, account_id: &str) -> Result<()> {
+        (*self.repository).delete(account_id).await?;
         Ok(())
     }
 }

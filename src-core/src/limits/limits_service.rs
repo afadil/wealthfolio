@@ -12,6 +12,7 @@ use super::limits_model::{
     AccountDeposit, ContributionLimit, DepositsCalculation, NewContributionLimit,
 };
 use super::limits_traits::{ContributionLimitRepositoryTrait, ContributionLimitServiceTrait};
+use async_trait::async_trait;
 
 pub struct ContributionLimitService {
     fx_service: Arc<dyn FxServiceTrait>,
@@ -87,29 +88,31 @@ impl ContributionLimitService {
     }
 }
 
+#[async_trait]
 impl ContributionLimitServiceTrait for ContributionLimitService {
     fn get_contribution_limits(&self) -> Result<Vec<ContributionLimit>> {
         self.limit_repository.get_contribution_limits()
     }
 
-    fn create_contribution_limit(
+    async fn create_contribution_limit(
         &self,
         new_limit: NewContributionLimit,
     ) -> Result<ContributionLimit> {
-        self.limit_repository.create_contribution_limit(new_limit)
+        self.limit_repository.create_contribution_limit(new_limit).await
     }
 
-    fn update_contribution_limit(
+    async fn update_contribution_limit(
         &self,
         id: &str,
         updated_limit: NewContributionLimit,
     ) -> Result<ContributionLimit> {
         self.limit_repository
             .update_contribution_limit(id, updated_limit)
+            .await
     }
 
-    fn delete_contribution_limit(&self, id: &str) -> Result<()> {
-        self.limit_repository.delete_contribution_limit(id)
+    async fn delete_contribution_limit(&self, id: &str) -> Result<()> {
+        self.limit_repository.delete_contribution_limit(id).await
     }
 
     fn calculate_deposits_for_contribution_limit(

@@ -25,6 +25,7 @@ pub async fn create_contribution_limit(
     state
         .limits_service()
         .create_contribution_limit(new_limit)
+        .await
         .map_err(|e| format!("Failed to create contribution limit: {}", e))
 }
 
@@ -38,6 +39,7 @@ pub async fn update_contribution_limit(
     state
         .limits_service()
         .update_contribution_limit(&id, updated_limit)
+        .await
         .map_err(|e| format!("Failed to update contribution limit: {}", e))
 }
 
@@ -50,6 +52,7 @@ pub async fn delete_contribution_limit(
     state
         .limits_service()
         .delete_contribution_limit(&id)
+        .await
         .map_err(|e| format!("Failed to delete contribution limit: {}", e))
 }
 

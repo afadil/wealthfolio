@@ -14,6 +14,7 @@ mod tests {
     use std::sync::Arc;
     use std::collections::VecDeque;
     use crate::errors::Result;
+    use async_trait;
 
     // --- Mock FxService ---
     #[derive(Clone)]
@@ -47,17 +48,18 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
     impl FxServiceTrait for MockFxService {
         fn initialize(&self) -> Result<()> {
             Err(crate::errors::Error::Unexpected("MockFxService::initialize not implemented".to_string()))
         }
-        fn add_exchange_rate(&self, _new_rate: crate::fx::fx_model::NewExchangeRate) -> Result<crate::fx::fx_model::ExchangeRate> {
+        async fn add_exchange_rate(&self, _new_rate: crate::fx::fx_model::NewExchangeRate) -> Result<crate::fx::fx_model::ExchangeRate> {
             Err(crate::errors::Error::Unexpected("MockFxService::add_exchange_rate not implemented".to_string()))
         }
         fn get_historical_rates(&self, _from_currency: &str, _to_currency: &str, _days: i64) -> Result<Vec<crate::fx::fx_model::ExchangeRate>> {
             Err(crate::errors::Error::Unexpected("MockFxService::get_historical_rates not implemented".to_string()))
         }
-        fn update_exchange_rate(&self, _from_currency: &str, _to_currency: &str, _rate: Decimal) -> Result<crate::fx::fx_model::ExchangeRate> {
+        async fn update_exchange_rate(&self, _from_currency: &str, _to_currency: &str, _rate: Decimal) -> Result<crate::fx::fx_model::ExchangeRate> {
             Err(crate::errors::Error::Unexpected("MockFxService::update_exchange_rate not implemented".to_string()))
         }
         fn get_latest_exchange_rate(&self, _from_currency: &str, _to_currency: &str) -> Result<Decimal> {
@@ -104,16 +106,16 @@ mod tests {
                 }
             }
         }
-        fn get_exchange_rates(&self) -> Result<Vec<crate::fx::fx_model::ExchangeRate>> {
+        fn get_latest_exchange_rates(&self) -> Result<Vec<crate::fx::fx_model::ExchangeRate>> {
             Err(crate::errors::Error::Unexpected("MockFxService::get_exchange_rates not implemented".to_string()))
         }
-        fn delete_exchange_rate(&self, _rate_id: &str) -> Result<()> {
+        async fn delete_exchange_rate(&self, _rate_id: &str) -> Result<()> {
             Err(crate::errors::Error::Unexpected("MockFxService::delete_exchange_rate not implemented".to_string()))
         }
-        fn register_currency_pair(&self, _from_currency: &str, _to_currency: &str) -> Result<()> {
+        async fn register_currency_pair(&self, _from_currency: &str, _to_currency: &str) -> Result<()> {
             Err(crate::errors::Error::Unexpected("MockFxService::register_currency_pair not implemented".to_string()))
         }
-         fn register_currency_pair_manual(&self, _from_currency: &str, _to_currency: &str) -> Result<()> {
+         async fn register_currency_pair_manual(&self, _from_currency: &str, _to_currency: &str) -> Result<()> {
             Err(crate::errors::Error::Unexpected("MockFxService::register_currency_pair_manual not implemented".to_string()))
         }
     }
