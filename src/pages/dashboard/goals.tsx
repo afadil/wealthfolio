@@ -154,7 +154,7 @@ export function SavingGoals() {
                               </CardDescription>
 
                               <Progress
-                                value={currentProgress}
+                                value={currentProgress * 100}
                                 className="h-2.5 w-full"
                                 indicatorClassName="bg-success"
                               />
