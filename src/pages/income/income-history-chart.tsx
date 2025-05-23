@@ -1,5 +1,5 @@
 import React from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import {
   Bar,
   CartesianGrid,
@@ -39,19 +39,24 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   const chartData = monthlyIncomeData.map(([month, income], index) => {
     const cumulative = monthlyIncomeData
       .slice(0, index + 1)
-      .reduce((sum, [, value]) => sum + value, 0);
+      .reduce((sum, [, value]) => {
+        const numericValue = Number(value) || 0;
+        return sum + numericValue;
+      }, 0);
     
     // Log the cumulative value for debugging
     if (isNaN(cumulative)) {
         console.warn(`Cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: monthlyIncomeData.slice(0, index + 1).map(d => d[1]) });
     }
 
-    return {
+    const dataPoint = {
       month,
-      income,
+      income: Number(income) || 0,
       cumulative: cumulative,
-      previousIncome: previousMonthlyIncomeData[index]?.[1] ?? 0,
+      previousIncome: Number(previousMonthlyIncomeData[index]?.[1]) || 0,
     };
+    
+    return dataPoint;
   });
 
 
@@ -100,7 +105,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 tickLine={false}
                 tickMargin={10}
                 axisLine={false}
-                tickFormatter={(value) => value} // Keep simple month label for now
+                tickFormatter={(value) => format(parseISO(`${value}-01`), 'MMM yy')}
               />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
@@ -139,7 +144,9 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                         </>
                       );
                     }}
-                    labelFormatter={(label) => format(new Date(label), 'MMMM yyyy')}
+                    labelFormatter={(label) => {
+                      return format(parseISO(`${label}-01`), 'MMMM yyyy');
+                    }}
                   />
                 }
               />
