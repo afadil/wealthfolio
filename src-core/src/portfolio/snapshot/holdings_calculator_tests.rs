@@ -1060,4 +1060,122 @@ mod tests {
         
         assert_eq!(next_state.net_contribution, previous_snapshot.net_contribution); // 0 CAD
     }
+
+    #[test]
+    fn test_cash_balances_reflects_activity_currencies() {
+        let mut mock_fx_service = MockFxService::new();
+        let target_date_str = "2023-01-15";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        
+        let account_currency = "CAD";
+        let usd_currency = "USD";
+        let eur_currency = "EUR";
+
+        // FX Rates
+        mock_fx_service.add_bidirectional_rate(usd_currency, account_currency, target_date, dec!(1.25)); // 1 USD = 1.25 CAD
+        mock_fx_service.add_bidirectional_rate(eur_currency, account_currency, target_date, dec!(1.50)); // 1 EUR = 1.50 CAD
+        let rate_usd_cad = dec!(1.25);
+        let rate_eur_cad = dec!(1.50);
+
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+
+        // Initial Snapshot
+        let mut previous_snapshot = create_initial_snapshot("acc_multi_cash", account_currency, "2023-01-14");
+        let initial_cad_cash = dec!(1000);
+        previous_snapshot.cash_balances.insert(account_currency.to_string(), initial_cad_cash);
+        let initial_net_contribution = dec!(1000); // Assuming initial contribution matches initial cash
+        previous_snapshot.net_contribution = initial_net_contribution;
+
+        // Activities
+        let deposit_usd_activity = create_cash_activity(
+            "act_deposit_usd",
+            ActivityType::Deposit,
+            dec!(100), // 100 USD
+            dec!(2),   // 2 USD fee
+            usd_currency,
+            target_date_str,
+        ); // Net 98 USD
+
+        let buy_stock_usd_activity = create_default_activity(
+            "act_buy_xyz",
+            ActivityType::Buy,
+            "XYZ",      // Asset ID
+            dec!(10),   // 10 shares
+            dec!(5),    // 5 USD per share
+            dec!(1),    // 1 USD fee
+            usd_currency,
+            target_date_str,
+        ); // Cost 51 USD (10*5 + 1)
+
+        let deposit_eur_activity = create_cash_activity(
+            "act_deposit_eur",
+            ActivityType::Deposit,
+            dec!(200), // 200 EUR
+            dec!(5),   // 5 EUR fee
+            eur_currency,
+            target_date_str,
+        ); // Net 195 EUR
+        
+        let activities_today = vec![
+            deposit_usd_activity.clone(), 
+            buy_stock_usd_activity.clone(), 
+            deposit_eur_activity.clone()
+        ];
+
+        let result = calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap();
+
+        // --- Assert Cash Balances ---
+        // For an individual account snapshot produced by HoldingsCalculator, cash should be consolidated
+        // into the account's primary currency.
+        assert_eq!(next_state.cash_balances.len(), 1, "Should have cash balance in 1 currency (account's primary)");
+
+        // CAD Balance
+        // Initial: 1000 CAD
+        // USD Deposit (Net 98 USD * 1.25 CAD/USD): +122.5 CAD
+        // USD Buy Stock (Cost 51 USD * 1.25 CAD/USD): -63.75 CAD
+        // EUR Deposit (Net 195 EUR * 1.50 CAD/EUR): +292.5 CAD
+        // Expected CAD: 1000 + 122.5 - 63.75 + 292.5 = 1351.25 CAD
+        let expected_cad_cash = dec!(1351.25);
+        assert_eq!(
+            next_state.cash_balances.get(account_currency), // account_currency is "CAD"
+            Some(&expected_cad_cash),
+            "Consolidated CAD cash balance mismatch"
+        );
+
+        // --- Assert Positions ---
+        assert_eq!(next_state.positions.len(), 1, "Should have one position");
+        let position_xyz = next_state.positions.get("XYZ").unwrap();
+        assert_eq!(position_xyz.quantity, dec!(10));
+        assert_eq!(position_xyz.average_cost, dec!(5.1)); // (5*10 + 1) / 10
+        assert_eq!(position_xyz.total_cost_basis, dec!(51)); // In USD
+        assert_eq!(position_xyz.currency, usd_currency);
+
+        // --- Assert Net Contribution (in Account Currency - CAD) ---
+        // Initial: 1000 CAD
+        // USD Deposit (gross 100 USD): + (100 USD * 1.25 CAD/USD) = +125 CAD
+        // EUR Deposit (gross 200 EUR): + (200 EUR * 1.50 CAD/USD) = +300 CAD
+        // Buy/Sell of stock does not affect net contribution.
+        let net_contrib_change_usd_deposit = deposit_usd_activity.unit_price * rate_usd_cad;
+        let net_contrib_change_eur_deposit = deposit_eur_activity.unit_price * rate_eur_cad;
+        let expected_net_contribution = initial_net_contribution 
+                                        + net_contrib_change_usd_deposit 
+                                        + net_contrib_change_eur_deposit; // 1000 + 125 + 300 = 1425 CAD
+        assert_eq!(
+            next_state.net_contribution,
+            expected_net_contribution,
+            "Net contribution mismatch"
+        );
+        
+        // --- Assert Snapshot Cost Basis (in Account Currency - CAD) ---
+        // Position "XYZ" cost basis: 51 USD
+        // Converted to CAD: 51 USD * 1.25 CAD/USD = 63.75 CAD
+        let expected_snapshot_cost_basis = position_xyz.total_cost_basis * rate_usd_cad;
+        assert_eq!(
+            next_state.cost_basis,
+            expected_snapshot_cost_basis,
+            "Snapshot cost basis mismatch"
+        );
+    }
 } 

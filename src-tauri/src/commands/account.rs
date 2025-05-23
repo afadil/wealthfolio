@@ -115,17 +115,12 @@ pub async fn update_account(
         .await // Add .await here
         .map_err(|e| format!("Failed to update account {:?}: {}", account_update.id, e))?;
 
-    // Always trigger recalculation after successful update
-    debug!(
-        "Account {:?} updated. Triggering recalculation.",
-        updated_account.id
-    );
+    // Trigger recalculation after successful update
     let handle = handle.clone();
     let account_id_clone = updated_account.id.clone();
 
-    // Build payload to recalculate for this account, syncing all relevant market data
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id_clone])) // Target this account
+        .account_ids(Some(vec![account_id_clone])) 
         .build();
 
     // Emit the recalculation request

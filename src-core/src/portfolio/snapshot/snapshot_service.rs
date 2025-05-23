@@ -1,18 +1,18 @@
 use super::holdings_calculator::HoldingsCalculator;
-use super::snapshot_repository::SnapshotRepository;
+use super::snapshot_repository::SnapshotRepositoryTrait;
 use crate::accounts::{Account, AccountRepositoryTrait};
 use crate::activities::{Activity, ActivityRepositoryTrait};
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
-use crate::portfolio::snapshot::AccountStateSnapshot;
+use crate::portfolio::snapshot::{AccountStateSnapshot, Position};
 use crate::utils::time_utils::get_days_between;
 
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc, Local};
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use rust_decimal::Decimal;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
 
 // --- Service Trait ---
@@ -57,6 +57,12 @@ pub trait SnapshotServiceTrait: Send + Sync {
     /// Retrieves the most recent calculated **holdings** snapshot for a specific account.
     /// Valuation fields will be zero or default.
     fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<AccountStateSnapshot>;
+
+    /// Calculates and stores aggregated "TOTAL" portfolio snapshots based on individual account holdings.
+    /// This should typically be run after `calculate_holdings_snapshots` has processed individual accounts.
+    /// It iterates through each day from the earliest activity to the present, generating a TOTAL snapshot
+    /// by aggregating individual account snapshots for that day.
+    async fn calculate_total_portfolio_snapshots(&self) -> Result<usize>;
 }
 
 // --- Service Implementation ---
@@ -66,7 +72,7 @@ pub struct SnapshotService {
     base_currency: Arc<RwLock<String>>,
     account_repository: Arc<dyn AccountRepositoryTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
-    snapshot_repository: Arc<SnapshotRepository>,
+    snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
      holdings_calculator: HoldingsCalculator,
 }
 
@@ -82,7 +88,7 @@ impl SnapshotService {
         base_currency: Arc<RwLock<String>>,
         account_repository: Arc<dyn AccountRepositoryTrait>,
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
-        snapshot_repository: Arc<SnapshotRepository>,
+        snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
         let holdings_calculator = HoldingsCalculator::new(fx_service.clone());
@@ -123,9 +129,6 @@ impl SnapshotService {
             account_ids_param, force_full_calculation
         );
 
-        // Step 1-3: Fetch required data
-        // `accounts_to_process` includes individual accounts AND the virtual TOTAL account if needed.
-        // `all_activities` contains activities ONLY for the accounts being processed (individual or all if TOTAL).
         let (accounts_to_process, all_activities, min_activity_date, calculation_end_date) =
             self.fetch_required_data(account_ids_param)?;
 
@@ -134,11 +137,12 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        // If forcing full calc and no activities exist, still need to clear snapshots.
         if all_activities.is_empty() && force_full_calculation {
             warn!("No activities found. Clearing snapshots due to force_full_calculation.");
             let ids_to_delete: Vec<String> = accounts_to_process.keys().cloned().collect();
             if !ids_to_delete.is_empty() {
+                // If forcing full calc for specific accounts with no activities, 
+                // we should ensure their snapshots are wiped.
                 self.snapshot_repository
                     .delete_snapshots_by_account_ids(&ids_to_delete)
                     .await?;
@@ -146,12 +150,9 @@ impl SnapshotService {
             return Ok(0);
         } else if all_activities.is_empty() {
             warn!("No activities found for accounts. Calculation will be trivial.");
-            // No activities, nothing to calculate or save, even for TOTAL.
             return Ok(0);
         }
 
-        // Step 5: Pre-process activities (adjust for splits, group by account/date)
-        // Includes grouping all activities under "TOTAL" key if needed.
         let (activities_by_account_date, account_ids_with_activity) = self.preprocess_data(
             &accounts_to_process,
             &all_activities,
@@ -159,17 +160,15 @@ impl SnapshotService {
             calculation_end_date,
         )?;
 
-        // Step 6: Determine calculation range and initial state for each account (including TOTAL)
         let (start_keyframes, effective_start_dates, calculation_min_date) = self
             .determine_calculation_range_and_initial_state(
                 &accounts_to_process,
                 &activities_by_account_date,
-                &account_ids_with_activity, // Pass accounts that actually have activity
+                &account_ids_with_activity, 
                 force_full_calculation,
                 calculation_end_date,
             ).await?;
 
-        // Filter accounts that actually need calculation based on effective_start_dates
         let accounts_needing_calculation: AccountsMap = accounts_to_process
             .iter()
             .filter(|(id, _)| effective_start_dates.contains_key(*id))
@@ -181,7 +180,6 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        // Step 7: Calculate daily snapshots (in memory), identify keyframes
         let (_final_holdings_states, keyframes_to_save) = self.calculate_daily_holdings_snapshots(
             &accounts_needing_calculation,
             &activities_by_account_date,
@@ -191,13 +189,34 @@ impl SnapshotService {
             calculation_end_date,
         )?;
 
-        // Step 8: Persist only the identified keyframe snapshots (individual and/or TOTAL)
-        self.snapshot_repository.replace_all_snapshots(
-            &keyframes_to_save, // Pass the whole slice
-            force_full_calculation
-        ).await?;
+        // Step 8: Persist keyframe snapshots using the new clear method
+        if !keyframes_to_save.is_empty() {
+            info!("Persisting {} calculated keyframe snapshots.", keyframes_to_save.len());
+            self.snapshot_repository
+                .overwrite_multiple_account_snapshot_ranges(&keyframes_to_save)
+                .await?;
+        } else {
+            info!("No keyframes identified to save after calculation.");
+            if force_full_calculation {
+                warn!(
+                    "Force full calculation resulted in no keyframes. Explicitly clearing ranges for processed accounts."
+                );
+                for (acc_id, start_date) in &effective_start_dates {
+                    // accounts_needing_calculation is correct here as it contains the accounts for which we determined a calc range
+                    if accounts_needing_calculation.contains_key(acc_id) { 
+                        info!("Force recalc with no keyframes: Clearing range for account {} from {} to {}.", 
+                            acc_id, start_date, calculation_end_date);
+                        self.snapshot_repository.overwrite_snapshots_for_account_in_range(
+                            acc_id, 
+                            *start_date, 
+                            calculation_end_date, 
+                            &[] // Empty slice means only delete the range
+                        ).await?;
+                    }
+                }
+            }
+        }
 
-        // Return count of saved keyframes as an indicator of work done
         Ok(keyframes_to_save.len())
     }
 
@@ -391,10 +410,9 @@ impl SnapshotService {
         );
         let mut start_keyframes: StartSnapshotsMap = HashMap::new();
         let mut effective_start_dates: StartDatesMap = HashMap::new();
-        let mut overall_min_calc_date = calculation_end_date; // Initialize with the latest possible date
+        let mut overall_min_calc_date = calculation_end_date; 
 
         for (acc_id, account) in accounts_to_process {
-            // Skip if this account has no activities at all, unless forcing full (then it might clear)
             if !account_ids_with_activity.contains(acc_id) && !force_full_calculation {
                 debug!("Skipping account {} for range determination: no activities and not forcing full.", acc_id);
                 continue;
@@ -408,48 +426,30 @@ impl SnapshotService {
             let mut initial_snapshot_for_acc: Option<AccountStateSnapshot> = None;
 
             if force_full_calculation {
-                // If forcing full, delete existing snapshots for this specific account before calculating its start.
-                // This ensures that if `force_full_calculation` is true but only for a subset of accounts,
-                // we only delete for those specific accounts here. Global delete for *all* accounts provided
-                // to `calculate_holdings_snapshots_internal` should happen once at the beginning of that function
-                // or be implicitly handled by `replace_all_snapshots` if it does a full delete.
-                // Here, we ensure this account starts fresh if it's part of a forced recalc.
-                if acc_id != PORTFOLIO_TOTAL_ACCOUNT_ID || account_ids_with_activity.contains(PORTFOLIO_TOTAL_ACCOUNT_ID) {
-                    debug!(
-                        "Force full calculation: Deleting existing snapshots for account: {}",
-                        acc_id
-                    );
-                    self.snapshot_repository
-                        .delete_snapshots_by_account_ids(&[acc_id.clone()])
-                        .await?; // This should be line ~402
-                }
                 effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
+                debug!(
+                    "Force full calculation: Setting effective_start_date for account {} to {}. Deletion handled by overwrite methods.",
+                    acc_id, effective_start_date
+                );
             } else {
-                // Incremental: try to find the latest snapshot to start from
-                if let Some(latest_snapshot) = self
-                    .snapshot_repository
-                    .get_latest_snapshot_before_date(acc_id, calculation_end_date)?
+                if let Some(latest_snapshot) =
+                    self.snapshot_repository.get_latest_snapshot_before_date(acc_id, calculation_end_date)?
                 {
                     initial_snapshot_for_acc = Some(latest_snapshot.clone());
-                    effective_start_date = latest_snapshot.snapshot_date; // Start from the date of the last snapshot
+                    effective_start_date = latest_snapshot.snapshot_date; 
                     debug!(
                         "Found latest snapshot for account {}: date {}. Starting incremental calc from here.",
-                        acc_id,
-                        effective_start_date
+                        acc_id, effective_start_date
                     );
                 } else {
-                    // No snapshot found, start from the earliest activity or end_date if no activities
                     effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
                     debug!(
                         "No snapshot found for account {}. Starting from earliest activity: {} or end_date.",
-                        acc_id,
-                        effective_start_date
+                        acc_id, effective_start_date
                     );
                 }
             }
 
-            // If there are activities before the effective_start_date (e.g. manual snapshot is old),
-            // we must start from the earliest activity to ensure correctness.
             if let Some(min_act_date) = min_activity_date_for_account {
                 if min_act_date < effective_start_date {
                     debug!(
@@ -457,17 +457,14 @@ impl SnapshotService {
                         acc_id, min_act_date, effective_start_date
                     );
                     effective_start_date = min_act_date;
-                    initial_snapshot_for_acc = None; // Recalculate from scratch for this account's range
+                    initial_snapshot_for_acc = None; 
                 }
             }
 
-            // Only include accounts that will actually have a calculation period
             if effective_start_date <= calculation_end_date {
                 if let Some(snapshot) = initial_snapshot_for_acc {
                     start_keyframes.insert(acc_id.clone(), snapshot);
                 } else {
-                    // If no initial snapshot, create a default one at effective_start_date - 1 day (or on the day if it's the very first activity)
-                    // The HoldingsCalculator expects the initial state *before* the first day's activities.
                     let day_before_effective_start = effective_start_date.pred_opt().unwrap_or(effective_start_date);
                     start_keyframes.insert(acc_id.clone(), Self::create_initial_snapshot(account, day_before_effective_start));
                 }
@@ -491,10 +488,6 @@ impl SnapshotService {
             debug!("No accounts to process, min calc date defaults to end date: {}", calculation_end_date);
             overall_min_calc_date = calculation_end_date;
         }
-
-        debug!("Overall minimum calculation date: {}", overall_min_calc_date);
-        debug!("Effective start dates: {:?}", effective_start_dates.keys());
-        debug!("Start keyframes count: {}", start_keyframes.len());
 
         Ok((start_keyframes, effective_start_dates, overall_min_calc_date))
     }
@@ -639,11 +632,138 @@ impl SnapshotService {
         Ok((current_holdings_snapshots, keyframes_to_save))
     }
 
+    // Renamed and refined from the previous aggregate_total_portfolio_snapshot
+    fn generate_total_portfolio_snapshot_for_date(
+        &self,
+        target_date: NaiveDate,
+        // Map of Account ID -> AccountStateSnapshot for all *individual* accounts as of target_date
+        individual_snapshots_on_date: &HashMap<String, AccountStateSnapshot>,
+        // Map of Account ID -> Account for all *active* accounts (to get their currencies etc.)
+        all_active_accounts: &AccountsMap, 
+        base_portfolio_currency: &str,
+    ) -> Result<AccountStateSnapshot> {
+        debug!("Generating aggregated TOTAL portfolio snapshot for date: {}", target_date);
 
-    // --- Step 9: (Removed) Calculate and save total portfolio keyframes ---
-    // This logic is now integrated into the main calculation loop by treating TOTAL as a virtual account.
-    // The functions `calculate_and_save_total_portfolio_holdings`, `aggregate_holdings_for_total`,
-    // and `aggregate_holdings_for_total2` are no longer needed here for holdings calculation.
+        let mut aggregated_cash_balances: HashMap<String, Decimal> = HashMap::new();
+        let mut aggregated_positions: HashMap<String, Position> = HashMap::new(); // Position struct from crate::portfolio::snapshot::Position
+        let mut overall_cost_basis_base_ccy = Decimal::ZERO;
+        let mut overall_net_contribution_base_ccy = Decimal::ZERO;
+
+        for (individual_acc_id, individual_snapshot) in individual_snapshots_on_date {
+            // Ensure we are only processing individual accounts here, not an old TOTAL snapshot if it exists in the input map
+            if individual_acc_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+                continue;
+            }
+
+            let individual_account_details = match all_active_accounts.get(individual_acc_id.as_str()) {
+                Some(acc) => acc,
+                None => {
+                    warn!("Account details not found for account {} during TOTAL aggregation for date {}. Skipping its contribution.", individual_acc_id, target_date);
+                    continue;
+                }
+            };
+            let individual_account_currency = &individual_account_details.currency;
+
+            // 1. Aggregate Cash Balances
+            // Iterate over all cash balances in the individual snapshot (which might be multi-currency)
+            // and add them to the corresponding currency in the aggregated map.
+            for (currency, amount) in &individual_snapshot.cash_balances {
+                *aggregated_cash_balances.entry(currency.clone()).or_insert(Decimal::ZERO) += *amount;
+            }
+
+            // 2. Aggregate Net Contribution (convert to base_portfolio_currency)
+            // individual_snapshot.net_contribution is in individual_account_currency.
+            match self.holdings_calculator.fx_service.convert_currency_for_date(
+                individual_snapshot.net_contribution,
+                individual_account_currency,
+                base_portfolio_currency,
+                target_date, // Use target_date for conversion
+            ) {
+                Ok(converted_contribution) => {
+                    overall_net_contribution_base_ccy += converted_contribution;
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to convert net contribution for account {} ({} {} to {}) for TOTAL on {}: {}. Adding unconverted amount.",
+                        individual_acc_id, individual_snapshot.net_contribution, individual_account_currency, base_portfolio_currency, target_date, e
+                    );
+                    if individual_account_currency != base_portfolio_currency {
+                         overall_net_contribution_base_ccy += individual_snapshot.net_contribution; // Fallback
+                    } else {
+                        overall_net_contribution_base_ccy += individual_snapshot.net_contribution; // Already in base
+                    }
+                }
+            }
+
+            // 3. Aggregate Positions & Calculate Overall Cost Basis for TOTAL (in base_portfolio_currency)
+            for (_pos_asset_id, pos) in &individual_snapshot.positions {
+                let agg_pos = aggregated_positions
+                    .entry(pos.asset_id.clone())
+                    .or_insert_with(|| Position {
+                        id: format!("{}_{}", pos.asset_id, PORTFOLIO_TOTAL_ACCOUNT_ID), 
+                        account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
+                        asset_id: pos.asset_id.clone(),
+                        quantity: Decimal::ZERO,
+                        average_cost: Decimal::ZERO, 
+                        total_cost_basis: Decimal::ZERO, // This will be in asset's currency (pos.currency)
+                        currency: pos.currency.clone(), 
+                        lots: VecDeque::new(), // Lots are generally not merged for TOTAL view
+                        inception_date: pos.inception_date, 
+                        created_at: Utc::now(),
+                        last_updated: Utc::now(),
+                    });
+                
+                agg_pos.quantity += pos.quantity;
+                agg_pos.total_cost_basis += pos.total_cost_basis; // Summing in asset's currency
+                
+                // Convert this specific position's total_cost_basis (in asset currency) to base_portfolio_currency
+                // and add to the portfolio's overall cost_basis.
+                match self.holdings_calculator.fx_service.convert_currency_for_date(
+                    pos.total_cost_basis, 
+                    &pos.currency,        
+                    base_portfolio_currency,
+                    target_date,         
+                ) {
+                    Ok(converted_pos_cost_basis) => {
+                        overall_cost_basis_base_ccy += converted_pos_cost_basis;
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to convert position cost basis for asset {} ({} {} to {}) for TOTAL on {}: {}. Adding unconverted.",
+                            pos.asset_id, pos.total_cost_basis, pos.currency, base_portfolio_currency, target_date, e
+                        );
+                        if pos.currency != base_portfolio_currency {
+                            overall_cost_basis_base_ccy += pos.total_cost_basis; // Fallback
+                        } else {
+                             overall_cost_basis_base_ccy += pos.total_cost_basis; // Already in base
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Finalize average costs for aggregated positions
+        for agg_pos in aggregated_positions.values_mut() {
+            if !agg_pos.quantity.is_zero() {
+                agg_pos.average_cost = (agg_pos.total_cost_basis / agg_pos.quantity).round_dp(DECIMAL_PRECISION);
+            } else {
+                agg_pos.average_cost = Decimal::ZERO;
+                agg_pos.total_cost_basis = Decimal::ZERO; 
+            }
+        }
+
+        Ok(AccountStateSnapshot {
+            id: format!("{}_{}", PORTFOLIO_TOTAL_ACCOUNT_ID, target_date.format("%Y-%m-%d")),
+            account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
+            snapshot_date: target_date,
+            currency: base_portfolio_currency.to_string(), // TOTAL snapshot is denominated in base currency
+            cash_balances: aggregated_cash_balances, // Itemized by account currency holding the cash
+            positions: aggregated_positions,
+            cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION), 
+            net_contribution: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
+            calculated_at: Utc::now().naive_utc(),
+        })
+    }
 
     // --- Helpers ---
 
@@ -756,6 +876,105 @@ impl SnapshotService {
             adjusted_activities.push(adj_activity);
         }
         adjusted_activities
+    }
+
+    // --- New method to calculate and store TOTAL portfolio snapshots ---
+    async fn calculate_total_portfolio_snapshots_impl(&self) -> Result<usize> {
+        info!("Starting calculation of TOTAL portfolio snapshots (based on stored individual keyframes).");
+
+        let active_accounts = self.account_repository.list(Some(true), None)?;
+        if active_accounts.is_empty() {
+            warn!("No active accounts found. Cannot generate TOTAL snapshots.");
+            return Ok(0);
+        }
+        let all_accounts_map: AccountsMap = active_accounts
+            .into_iter() 
+            .map(|acc| (acc.id.clone(), acc))
+            .collect();
+
+        let all_individual_keyframes = self.snapshot_repository.get_all_active_account_snapshots(None, None)?;
+
+        if all_individual_keyframes.is_empty() {
+            warn!("No keyframes found for any active individual accounts. Cannot generate TOTAL snapshots.");
+            return Ok(0);
+        }
+
+        let mut keyframes_by_account: HashMap<String, BTreeMap<NaiveDate, AccountStateSnapshot>> = HashMap::new();
+        let mut all_snapshot_dates: HashSet<NaiveDate> = HashSet::new();
+        
+        for keyframe in all_individual_keyframes {
+            if keyframe.account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+                continue;
+            }
+            all_snapshot_dates.insert(keyframe.snapshot_date);
+            keyframes_by_account
+                .entry(keyframe.account_id.clone())
+                .or_default()
+                .insert(keyframe.snapshot_date, keyframe);
+        }
+
+        if all_snapshot_dates.is_empty() {
+            info!("No individual account keyframes found after processing. Cannot generate TOTAL snapshots.");
+            return Ok(0);
+        }
+
+        let base_portfolio_currency = self.base_currency.read().unwrap().clone();
+        let mut total_portfolio_snapshots_to_save: Vec<AccountStateSnapshot> = Vec::new();
+
+        let mut sorted_snapshot_dates: Vec<NaiveDate> = all_snapshot_dates.into_iter().collect();
+        sorted_snapshot_dates.sort();
+
+        for target_date in sorted_snapshot_dates {
+            let mut individual_snapshots_on_or_before_date: HashMap<String, AccountStateSnapshot> = HashMap::new();
+            
+            for (account_id, account_keyframes) in &keyframes_by_account {
+                if let Some((_, latest_snapshot)) = account_keyframes
+                    .range(..=target_date) 
+                    .last() 
+                {
+                    individual_snapshots_on_or_before_date.insert(account_id.clone(), latest_snapshot.clone());
+                }
+            }
+
+            if !individual_snapshots_on_or_before_date.is_empty() {
+                match self.generate_total_portfolio_snapshot_for_date(
+                    target_date,
+                    &individual_snapshots_on_or_before_date, 
+                    &all_accounts_map, 
+                    &base_portfolio_currency,
+                ) {
+                    Ok(total_snapshot) => {
+                        total_portfolio_snapshots_to_save.push(total_snapshot);
+                    }
+                    Err(e) => {
+                        error!("Failed to generate TOTAL portfolio snapshot for target_date {}: {}", target_date, e);
+                    }
+                }
+            }
+        }
+
+        if !total_portfolio_snapshots_to_save.is_empty() {
+            info!(
+                "Saving {} new TOTAL portfolio snapshots after deleting all existing ones.",
+                total_portfolio_snapshots_to_save.len()
+            );
+            self.snapshot_repository
+                .delete_snapshots_by_account_ids(&[PORTFOLIO_TOTAL_ACCOUNT_ID.to_string()])
+                .await?;
+            info!("Deleted all existing TOTAL snapshots.");
+            
+            self.snapshot_repository
+                .save_snapshots(&total_portfolio_snapshots_to_save)
+                .await?;
+            Ok(total_portfolio_snapshots_to_save.len())
+        } else {
+            warn!("No TOTAL portfolio snapshots were generated to save. Deleting existing TOTAL snapshots anyway if any existed.");
+            self.snapshot_repository
+                .delete_snapshots_by_account_ids(&[PORTFOLIO_TOTAL_ACCOUNT_ID.to_string()])
+                .await?;
+            info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
+            Ok(0)
+        }
     }
 }
 
@@ -900,5 +1119,9 @@ impl SnapshotServiceTrait for SnapshotService {
                 )))
             }
         }
+    }
+
+    async fn calculate_total_portfolio_snapshots(&self) -> Result<usize> {
+        self.calculate_total_portfolio_snapshots_impl().await
     }
 }
