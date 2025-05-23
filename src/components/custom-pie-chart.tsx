@@ -23,15 +23,6 @@ const renderActiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent, midAngle } =
     props;
 
-  const RADIAN = Math.PI / 180;
-  const MIN_LABEL_Y_OFFSET = 10; // Minimum distance from the top for the label
-
-  // Position for the label next to the arc
-  const labelRadiusOffset = 20; // Adjust as needed
-  const labelX = cx + (outerRadius + labelRadiusOffset) * Math.cos(-midAngle * RADIAN);
-  const rawLabelY = cy + (outerRadius + labelRadiusOffset) * Math.sin(-midAngle * RADIAN);
-  const finalLabelY = Math.max(rawLabelY, MIN_LABEL_Y_OFFSET);
-
   const amountToDisplay = isBalanceHidden
     ? '••••••'
     : value.toLocaleString('en-US', { style: 'currency', currency: payload.currency || 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -50,7 +41,7 @@ const renderActiveShape = (props: any) => {
         cornerRadius={6}
       />
 
-      {/* Highlight ring */}
+      {/* Subtle highlight ring */}
       <Sector
         cx={cx}
         cy={cy}
@@ -60,13 +51,13 @@ const renderActiveShape = (props: any) => {
         outerRadius={outerRadius + 4}
         cornerRadius={6}
         fill={fill}
+        opacity={0.7}
       />
 
-      {/* Center label with name */}
       <text
         x={cx}
-        y={cy - 16}
-        fill={'hsl(var(--muted-foreground))'}
+        y={cy - 35}
+        fill="hsl(var(--muted-foreground))"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs font-medium"
@@ -74,33 +65,26 @@ const renderActiveShape = (props: any) => {
         {payload.name}
       </text>
 
-      {/* Center label with percentage */}
       <text
         x={cx}
-        y={cy - 2}
+        y={cy - 20}
         textAnchor="middle"
-        fill={'hsl(var(--foreground))'}
-        dominantBaseline="central"
-        className="text-xs font-medium"
-      >
-        {formatPercent(percent)}
-      </text>
-
-      {/* Center label with value */}
-      <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" className="text-xs">
-        <AmountDisplay value={value} currency={payload.currency} isHidden={isBalanceHidden} />
-      </text>
-
-      {/* Label next to the arc for active shape */}
-      <text
-        x={labelX}
-        y={finalLabelY}
         fill="hsl(var(--foreground))"
-        textAnchor={labelX > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        className="text-xs font-medium"
+        className="text-xs font-bold "
       >
-        {amountToDisplay}
+        {isBalanceHidden ? '••••••' : amountToDisplay}
+      </text>
+
+      <text
+        x={cx}
+        y={cy - 5}
+        fill="hsl(var(--muted-foreground))"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="text-xs"
+      >
+        ({formatPercent(percent)})
       </text>
     </g>
   );
@@ -148,7 +132,6 @@ export const CustomPieChart: React.FC<CustomPieChartProps> = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  // Custom formatter for the tooltip content
   const tooltipFormatter = (
     value: ValueType,
     name: NameType,
