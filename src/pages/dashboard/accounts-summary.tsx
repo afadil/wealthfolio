@@ -285,7 +285,6 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
       const standaloneAccounts: AccountSummaryDisplayData[] = [];
 
       combinedAccountViews.forEach((account) => {
-        console.log('account', account);
         const groupName = account.accountGroup || 'Uncategorized';
         if (groupName === 'Uncategorized') {
           standaloneAccounts.push(account);
