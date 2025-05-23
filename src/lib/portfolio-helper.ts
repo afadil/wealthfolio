@@ -44,7 +44,7 @@ export function calculateGoalProgress(
     }, 0);
 
     // Calculate progress percentage (base currency vs base currency)
-    const progress = goal.targetAmount > 0 ? (totalAllocatedValue / goal.targetAmount) * 100 : 0;
+    const progress = goal.targetAmount > 0 ? (totalAllocatedValue / goal.targetAmount) : 0;
 
     // Ensure progress does not exceed 100% visually if needed, although mathematically it can
     // const cappedProgress = Math.min(progress, 100);
