@@ -130,29 +130,32 @@ const AccountSummaryComponent = React.memo(
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
             {(performance.totalGainLossAmount !== null ||
-              performance.totalGainLossPercent !== null) && (
-              <div className="flex items-center space-x-2">
-                {performance.totalGainLossAmount !== null && (
-                  <GainAmount
-                    className="text-sm font-light"
-                    value={performance.totalGainLossAmount}
-                    currency={gainDisplayCurrency}
-                    displayCurrency={false}
-                    showSign={false}
-                  />
-                )}
-                {performance.totalGainLossAmount !== null &&
-                  performance.totalGainLossPercent !== null && (
-                    <Separator orientation="vertical" className="h-3" />
+              performance.totalGainLossPercent !== null) &&
+              !(
+                performance.totalGainLossAmount === 0 && performance.totalGainLossPercent === 0
+              ) && (
+                <div className="flex items-center space-x-2">
+                  {performance.totalGainLossAmount !== null && (
+                    <GainAmount
+                      className="text-sm font-light"
+                      value={performance.totalGainLossAmount}
+                      currency={gainDisplayCurrency}
+                      displayCurrency={false}
+                      showSign={false}
+                    />
                   )}
-                {performance.totalGainLossPercent !== null && (
-                  <GainPercent
-                    className="text-sm font-light"
-                    value={performance.totalGainLossPercent}
-                  />
-                )}
-              </div>
-            )}
+                  {performance.totalGainLossAmount !== null &&
+                    performance.totalGainLossPercent !== null && (
+                      <Separator orientation="vertical" className="h-3" />
+                    )}
+                  {performance.totalGainLossPercent !== null && (
+                    <GainPercent
+                      className="text-sm font-light"
+                      value={performance.totalGainLossPercent}
+                    />
+                  )}
+                </div>
+              )}
           </div>
           {isGroup ? (
             <Icons.ChevronDown
@@ -176,7 +179,7 @@ const AccountSummaryComponent = React.memo(
 AccountSummaryComponent.displayName = 'AccountSummaryComponent';
 
 export const AccountsSummary = React.memo(({ className }: { className?: string }) => {
-  const { accountsGrouped, setAccountsGrouped } = useSettingsContext();
+  const { accountsGrouped, setAccountsGrouped, settings } = useSettingsContext();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // --- Data Fetching ---
@@ -200,7 +203,9 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
     if (!accounts) return [];
     const performanceMap = new Map<string, SimplePerformanceMetrics>();
     if (performanceData) {
-      performanceData.forEach((perf: SimplePerformanceMetrics) => performanceMap.set(perf.accountId, perf));
+      performanceData.forEach((perf: SimplePerformanceMetrics) =>
+        performanceMap.set(perf.accountId, perf),
+      );
     }
     return accounts.map((acc): AccountSummaryDisplayData => {
       const performance = performanceMap.get(acc.id);
@@ -208,17 +213,18 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
       const baseCurrency = performance?.baseCurrency ?? accountCurrency;
       const fxRate = performance?.fxRateToBase ?? null;
 
-      const totalValueBaseCurrency = Number(performance?.totalValue ?? 0);
+      const totalValueAccountCurrency = Number(performance?.totalValue ?? 0);
 
-      let totalValueAccountCurrency = 0;
+      let totalValueBaseCurrency = 0;
+
       if (performance?.totalValue !== null && performance?.totalValue !== undefined) {
         if (baseCurrency === accountCurrency || !fxRate || fxRate === 0) {
-          totalValueAccountCurrency = performance.totalValue;
+          totalValueBaseCurrency = performance.totalValue;
         } else {
-          totalValueAccountCurrency = performance.totalValue / fxRate;
+          totalValueBaseCurrency = performance.totalValue * fxRate;
         }
       } else {
-        totalValueAccountCurrency = 0;
+        totalValueBaseCurrency = 0;
       }
 
       const totalGainLossAmountBase = performance?.totalGainLossAmount ?? null;
@@ -274,10 +280,6 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
 
     const isLoadingPerformance = isLoadingPerformanceData || isFetchingPerformanceData;
 
-    if (isErrorPerformance) {
-      console.error('Error loading performance data:', errorPerformance);
-    }
-
     if (accountsGrouped) {
       const groups: Record<string, AccountSummaryDisplayData[]> = {};
       const standaloneAccounts: AccountSummaryDisplayData[] = [];
@@ -296,7 +298,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
 
       const actualGroups: AccountSummaryDisplayData[] = Object.entries(groups).map(
         ([groupName, groupAccounts]) => {
-          const baseCurrency = groupAccounts[0]?.baseCurrency ?? 'USD';
+          const baseCurrency = groupAccounts[0]?.baseCurrency ?? settings?.baseCurrency ?? 'USD';
 
           const totalValueBaseCurrency = groupAccounts.reduce(
             (sum, acc) => sum + Number(acc.totalValueBaseCurrency),
@@ -366,6 +368,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
             const sortedAccounts = [...(group.accounts ?? [])].sort(
               (a, b) => Number(b.totalValueBaseCurrency) - Number(a.totalValueBaseCurrency),
             );
+
             return (
               <Card key={group.accountName} className="border-none shadow-none">
                 <CardHeader>
@@ -393,10 +396,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
           {standaloneAccounts.map((account) => (
             <Card key={account.accountId} className="border-none shadow-sm">
               <CardHeader className="py-6">
-                <AccountSummaryComponent
-                  item={account}
-                  isLoadingValuation={isLoadingPerformance}
-                />
+                <AccountSummaryComponent item={account} isLoadingValuation={isLoadingPerformance} />
               </CardHeader>
             </Card>
           ))}
@@ -410,10 +410,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
       return sortedAccounts.map((account) => (
         <Card key={account.accountId} className="border-none shadow-sm">
           <CardHeader className="py-6">
-            <AccountSummaryComponent
-              item={account}
-              isLoadingValuation={isLoadingPerformance}
-            />
+            <AccountSummaryComponent item={account} isLoadingValuation={isLoadingPerformance} />
           </CardHeader>
         </Card>
       ));

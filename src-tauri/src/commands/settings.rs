@@ -41,6 +41,7 @@ pub async fn update_settings(
     // Update settings in the database (this applies all changes in settings_update)
     service
         .update_settings(&settings_update)
+        .await
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
     // If the base currency was changed, update the state and emit the event
@@ -85,6 +86,7 @@ pub async fn update_exchange_rate(
     let result = state
         .fx_service()
         .update_exchange_rate(&rate.from_currency, &rate.to_currency, rate.rate)
+        .await
         .map_err(|e| format!("Failed to update exchange rate: {}", e))?;
 
     let handle = handle.clone();
@@ -96,13 +98,13 @@ pub async fn update_exchange_rate(
 }
 
 #[tauri::command]
-pub async fn get_exchange_rates(
+pub async fn get_latest_exchange_rates(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<ExchangeRate>, String> {
     debug!("Fetching exchange rates...");
     state
         .fx_service()
-        .get_exchange_rates()
+        .get_latest_exchange_rates()
         .map_err(|e| format!("Failed to load exchange rates: {}", e))
 }
 
@@ -116,6 +118,7 @@ pub async fn add_exchange_rate(
     let result = state
         .fx_service()
         .add_exchange_rate(new_rate)
+        .await
         .map_err(|e| format!("Failed to add exchange rate: {}", e))?;
 
     let handle = handle.clone();
@@ -136,6 +139,7 @@ pub async fn delete_exchange_rate(
     state
         .fx_service()
         .delete_exchange_rate(&rate_id)
+        .await
         .map_err(|e| format!("Failed to delete exchange rate: {}", e))?;
 
     let handle = handle.clone();

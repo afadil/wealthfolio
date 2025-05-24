@@ -18,6 +18,15 @@ pub const PORTFOLIO_UPDATE_COMPLETE: &str = "portfolio:update-complete";
 /// Event emitted when the background portfolio recalculation process encounters an error.
 pub const PORTFOLIO_UPDATE_ERROR: &str = "portfolio:update-error";
 
+/// Event emitted when the market data sync process starts.
+pub const MARKET_SYNC_START: &str = "market:sync-start";
+
+/// Event emitted when the market data sync process completes successfully.
+pub const MARKET_SYNC_COMPLETE: &str = "market:sync-complete";
+
+/// Event emitted when the market data sync process encounters an error.
+pub const MARKET_SYNC_ERROR: &str = "market:sync-error";
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PortfolioRequestPayload {
     /// Optional list of account IDs. None implies all/total accounts.

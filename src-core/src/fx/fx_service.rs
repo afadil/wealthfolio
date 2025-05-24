@@ -7,6 +7,7 @@ use super::fx_model::{ExchangeRate, NewExchangeRate};
 use super::currency_converter::CurrencyConverter;
 use super::fx_traits::{FxRepositoryTrait, FxServiceTrait};
 use super::fx_errors::FxError;
+use async_trait::async_trait;
 
 #[derive(Clone)]
 pub struct FxService {
@@ -27,7 +28,7 @@ impl FxService {
     /// Initialize the currency converter with all exchange rates, filling missing days
     fn initialize_converter(&self) -> Result<()> {
         // Fetch ALL historical rates instead of just the latest
-        let all_historical_rates = self.repository.get_all_historical_exchange_rates()?;
+        let all_historical_rates = self.repository.get_historical_exchange_rates()?;
 
         // Only initialize the converter if we have exchange rates
         if all_historical_rates.is_empty() {
@@ -53,16 +54,16 @@ impl FxService {
         }
     }
 
-    fn get_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate> {
+    fn load_latest_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate> {
         // Fetch from repository
-        match self.repository.get_exchange_rate(from, to)? {
+        match self.repository.get_latest_exchange_rate(from, to)? {
             Some(rate) => {
                 Ok(rate)
             },
             None => {
                 // Try inverse rate
                 let inverse_symbol = ExchangeRate::make_fx_symbol(to, from);
-                match self.repository.get_exchange_rate_by_id(&inverse_symbol)? {
+                match self.repository.get_latest_exchange_rate_by_symbol(&inverse_symbol)? {
                     Some(inverse_rate) => {
                         let direct_rate = ExchangeRate {
                             id: ExchangeRate::make_fx_symbol(from, to),
@@ -84,6 +85,7 @@ impl FxService {
     }
 }
 
+#[async_trait]
 impl FxServiceTrait for FxService {
     fn initialize(&self) -> Result<()> {
         // Initialize currency converter with all exchange rates
@@ -91,9 +93,9 @@ impl FxServiceTrait for FxService {
         Ok(())
     }
 
-    fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
+    async fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
         // First register the currency pair
-        self.register_currency_pair_manual(&new_rate.from_currency, &new_rate.to_currency)?;
+        self.register_currency_pair_manual(&new_rate.from_currency, &new_rate.to_currency).await?;
 
         let rate = ExchangeRate {
             id: ExchangeRate::make_fx_symbol(&new_rate.from_currency, &new_rate.to_currency),
@@ -104,7 +106,7 @@ impl FxServiceTrait for FxService {
             timestamp: Utc::now(),
         };
 
-        Ok(self.repository.save_exchange_rate(rate)?)
+        self.repository.save_exchange_rate(rate).await
     }
 
     fn get_historical_rates(
@@ -128,7 +130,7 @@ impl FxServiceTrait for FxService {
         }
     }
 
-    fn update_exchange_rate(
+    async fn update_exchange_rate(
         &self,
         from: &str,
         to: &str,
@@ -140,7 +142,7 @@ impl FxServiceTrait for FxService {
             rate,
             source: Self::DEFAULT_DATA_SOURCE,
         };
-        self.add_exchange_rate(new_rate)
+        self.add_exchange_rate(new_rate).await
     }
 
     fn get_latest_exchange_rate(
@@ -168,7 +170,7 @@ impl FxServiceTrait for FxService {
         }
 
         // Fallback to direct repository access
-        match self.get_exchange_rate(from_currency, to_currency) {
+        match self.load_latest_exchange_rate(from_currency, to_currency) {
             Ok(rate) => Ok(rate.rate),
             Err(e) => {
                 log::error!("Failed to get exchange rate for {}/{}: {}", from_currency, to_currency, e);
@@ -287,15 +289,15 @@ impl FxServiceTrait for FxService {
         Ok(amount * rate)
     }
 
-    fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
-        self.repository.get_exchange_rates()
+    fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+        self.repository.get_latest_exchange_rates()
     }
 
-    fn delete_exchange_rate(
+    async fn delete_exchange_rate(
         &self,
         rate_id: &str,
     ) -> Result<()> {
-        self.repository.delete_exchange_rate(rate_id)?;
+        self.repository.delete_exchange_rate(rate_id).await?;
 
         // Reinitialize the converter with updated rates
         self.initialize_converter()?;
@@ -304,35 +306,35 @@ impl FxServiceTrait for FxService {
     }
 
     /// Register a new currency pair and create necessary FX assets
-    fn register_currency_pair(&self, from: &str, to: &str) -> Result<()> {
+    async fn register_currency_pair(&self, from: &str, to: &str) -> Result<()> {
         // Return early if trying to register the same currency
         if from == to {
             return Ok(());
         }
 
         // Try to get existing rate first
-        let existing_rate = self.get_exchange_rate(from, to).ok();
+        let existing_rate = self.load_latest_exchange_rate(from, to).ok();
 
 
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
-            self.repository.create_fx_asset(from, to, DataSource::Yahoo.as_str())?;
+            self.repository.create_fx_asset(from, to, DataSource::Yahoo.as_str()).await?;
         }
         
         Ok(())
     }
 
-    fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<()> {
+    async fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<()> {
         // Return early if trying to register the same currency
         if from == to {
             return Ok(());
         }
         // Try to get existing rate first
-        let existing_rate = self.get_exchange_rate(from, to).ok();
+        let existing_rate = self.load_latest_exchange_rate(from, to).ok();
 
         // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
-            self.repository.create_fx_asset(from, to, DataSource::Manual.as_str())?;
+            self.repository.create_fx_asset(from, to, DataSource::Manual.as_str()).await?;
         }
         
         Ok(())

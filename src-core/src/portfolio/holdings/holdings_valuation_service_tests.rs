@@ -43,18 +43,19 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl FxServiceTrait for MockFxService {
         fn initialize(&self) -> Result<()> { Ok(()) } // Not used
-        fn add_exchange_rate(&self, _new_rate: NewExchangeRate) -> Result<ExchangeRate> { unimplemented!() }
+        async fn add_exchange_rate(&self, _new_rate: NewExchangeRate) -> Result<ExchangeRate> { unimplemented!() }
         fn get_historical_rates(&self, _from_currency: &str, _to_currency: &str, _days: i64) -> Result<Vec<ExchangeRate>> { unimplemented!() }
-        fn update_exchange_rate(&self, _from_currency: &str, _to_currency: &str, _rate: Decimal) -> Result<ExchangeRate> { unimplemented!() }
+        async fn update_exchange_rate(&self, _from_currency: &str, _to_currency: &str, _rate: Decimal) -> Result<ExchangeRate> { unimplemented!() }
         fn get_exchange_rate_for_date(&self, _from_currency: &str, _to_currency: &str, _date: NaiveDate) -> Result<Decimal> { unimplemented!() }
         fn convert_currency(&self, _amount: Decimal, _from_currency: &str, _to_currency: &str) -> Result<Decimal> { unimplemented!() }
         fn convert_currency_for_date(&self, _amount: Decimal, _from_currency: &str, _to_currency: &str, _date: NaiveDate) -> Result<Decimal> { unimplemented!() }
-        fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> { unimplemented!() }
-        fn delete_exchange_rate(&self, _rate_id: &str) -> Result<()> { unimplemented!() }
-        fn register_currency_pair(&self, _from_currency: &str, _to_currency: &str) -> Result<()> { unimplemented!() }
-        fn register_currency_pair_manual(&self, _from_currency: &str, _to_currency: &str) -> Result<()> { unimplemented!() }
+        fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> { unimplemented!() }
+        async fn delete_exchange_rate(&self, _rate_id: &str) -> Result<()> { unimplemented!() }
+        async fn register_currency_pair(&self, _from_currency: &str, _to_currency: &str) -> Result<()> { unimplemented!() }
+        async fn register_currency_pair_manual(&self, _from_currency: &str, _to_currency: &str) -> Result<()> { unimplemented!() }
 
         fn get_latest_exchange_rate(&self, from_currency: &str, to_currency: &str) -> Result<Decimal> {
             if from_currency == to_currency {
@@ -99,9 +100,9 @@ mod tests {
         fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> { unimplemented!() }
         async fn get_asset_profile(&self, _symbol: &str) -> Result<AssetProfile> { unimplemented!() }
         fn get_historical_quotes_for_symbol(&self, _symbol: &str) -> Result<Vec<Quote>> { unimplemented!() }
-        fn add_quote(&self, _quote: &Quote) -> Result<Quote> { unimplemented!() }
-        fn update_quote(&self, _quote: Quote) -> Result<Quote> { unimplemented!() }
-        fn delete_quote(&self, _quote_id: &str) -> Result<()> { unimplemented!() }
+        async fn add_quote(&self, _quote: &Quote) -> Result<Quote> { unimplemented!() }
+        async fn update_quote(&self, _quote: Quote) -> Result<Quote> { unimplemented!() }
+        async fn delete_quote(&self, _quote_id: &str) -> Result<()> { unimplemented!() }
         async fn get_historical_quotes_from_provider(&self, _symbol: &str, _start_date: NaiveDate, _end_date: NaiveDate) -> Result<Vec<Quote>> { unimplemented!() }
         async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)> { unimplemented!() }
         async fn resync_market_data(&self, _symbols: Option<Vec<String>>) -> Result<((), Vec<(String, String)>)> { unimplemented!() }

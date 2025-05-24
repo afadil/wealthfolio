@@ -99,7 +99,7 @@ pub fn main() {
             commands::activity::save_account_import_mapping,
             commands::settings::get_settings,
             commands::settings::update_settings,
-            commands::settings::get_exchange_rates,
+            commands::settings::get_latest_exchange_rates,
             commands::settings::update_exchange_rate,
             commands::settings::add_exchange_rate,
             commands::settings::delete_exchange_rate,

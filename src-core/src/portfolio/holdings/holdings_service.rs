@@ -96,7 +96,7 @@ impl HoldingsServiceTrait for HoldingsService {
             .collect();
 
         let instruments_map: HashMap<String, Instrument> = if !security_symbols.is_empty() {
-            match self.asset_service.get_assets_by_symbols(&security_symbols) {
+            match self.asset_service.get_assets_by_symbols(&security_symbols).await {
                 Ok(assets) => assets
                     .into_iter()
                     .filter_map(|asset: Asset| {

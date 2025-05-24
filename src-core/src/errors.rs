@@ -181,6 +181,13 @@ impl From<r2d2::Error> for Error {
     }
 }
 
+// Add From implementation for diesel::ConnectionError
+impl From<diesel::ConnectionError> for Error {
+    fn from(err: diesel::ConnectionError) -> Self {
+        Error::Database(DatabaseError::ConnectionFailed(err))
+    }
+}
+
 // Add From implementation for FxError
 // impl From<FxError> for Error {
 //     fn from(err: FxError) -> Self {

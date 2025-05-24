@@ -169,7 +169,8 @@ impl ValuationServiceTrait for ValuationService {
 
         if recalculate_all {
             self.valuation_repository
-                .delete_valuations_for_account(account_id)?;
+                .delete_valuations_for_account(account_id)
+                .await?;
         } else {
             let last_saved_date_opt = self
                 .valuation_repository
@@ -248,35 +249,40 @@ impl ValuationServiceTrait for ValuationService {
             .filter_map(|holdings_snapshot| {
                 let current_date = holdings_snapshot.snapshot_date;
                 let account_id_clone = account_id.to_string();
-                let base_curr_clone = base_curr.clone();
+                let base_curr_clone = self.base_currency.read().unwrap().clone();
 
-                let quotes_today = quotes_by_date.get(&current_date).cloned().unwrap_or_default();
-                let fx_rates_today = fx_rates_by_date.get(&current_date).cloned().unwrap_or_default();
+                let quotes_for_current_date = quotes_by_date
+                    .get(&current_date)
+                    .cloned()
+                    .unwrap_or_default();
+                let fx_for_current_date = fx_rates_by_date
+                    .get(&current_date)
+                    .cloned()
+                    .unwrap_or_default();
 
-                 if quotes_today.is_empty() && !holdings_snapshot.positions.is_empty() {
+                if quotes_for_current_date.is_empty() && !holdings_snapshot.positions.is_empty() {
                     warn!("No quotes for date {} (account '{}'). Skipping day.", current_date, account_id_clone);
                     return None;
-                 }
-                 let account_curr = &holdings_snapshot.currency;
-                 if account_curr != &base_curr_clone && !fx_rates_today.contains_key(&(account_curr.clone(), base_curr_clone.clone())) {
-                     warn!("Base currency FX rate ({}->{}) missing for {} (account '{}'). Skipping day.", account_curr, base_curr_clone, current_date, account_id_clone);
-                     return None;
-                 }
+                }
+                let account_curr = &holdings_snapshot.currency;
+                if account_curr != &base_curr_clone && !fx_for_current_date.contains_key(&(account_curr.clone(), base_curr_clone.clone())) {
+                    warn!("Base currency FX rate ({}->{}) missing for {} (account '{}'). Skipping day.", account_curr, base_curr_clone, current_date, account_id_clone);
+                    return None;
+                }
 
                 match calculate_valuation(
                     &holdings_snapshot,
-                    &quotes_today,
-                    &fx_rates_today,
+                    &quotes_for_current_date,
+                    &fx_for_current_date,
                     current_date,
                     &base_curr_clone,
                 ) {
-                    Ok(metrics) => Some(metrics),
-                    Err(CoreError::Calculation(calc_error)) => {
-                        warn!("Valuation calc failed for '{}' on {}: {}. Skipping.", account_id_clone, current_date, calc_error);
-                        None
-                    },
+                    Ok(valuation_result) => Some(valuation_result),
                     Err(e) => {
-                        error!("Unexpected valuation error for '{}' on {}: {}. Skipping.", account_id_clone, current_date, e);
+                        error!(
+                            "Failed to calculate valuation for account {} on date {}: {}. Skipping this date.",
+                            account_id, current_date, e
+                        );
                         None
                     }
                 }
@@ -285,12 +291,15 @@ impl ValuationServiceTrait for ValuationService {
 
         if !newly_calculated_valuations.is_empty() {
             self.valuation_repository
-                .save_valuations(&newly_calculated_valuations)?;
+                .save_valuations(&newly_calculated_valuations)
+                .await?;
         }
+
+        let total_duration = total_start_time.elapsed();
         debug!(
             "Successfully updated/recalculated valuation data for account '{}' in {:?}",
             account_id,
-            total_start_time.elapsed()
+            total_duration
         );
 
         Ok(())

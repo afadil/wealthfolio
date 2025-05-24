@@ -714,8 +714,8 @@ impl PerformanceServiceTrait for PerformanceService {
 
         // Include "TOTAL" to get the total portfolio value reference date
         let mut ids_to_fetch = account_ids.to_vec();
-        if !account_ids.contains(&"TOTAL".to_string()) {
-            ids_to_fetch.push("TOTAL".to_string());
+        if !account_ids.contains(&PORTFOLIO_TOTAL_ACCOUNT_ID.to_string()) {
+            ids_to_fetch.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
         }
 
         // 1. Fetch the *absolute* latest record for each account

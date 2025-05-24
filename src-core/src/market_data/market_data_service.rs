@@ -102,16 +102,16 @@ impl MarketDataServiceTrait for MarketDataService {
         Ok(quotes)
     }
 
-    fn add_quote(&self, quote: &Quote) -> Result<Quote> {
-        self.repository.save_quote(quote)
+    async fn add_quote(&self, quote: &Quote) -> Result<Quote> {
+        self.repository.save_quote(quote).await
     }
 
-    fn update_quote(&self, quote: Quote) -> Result<Quote> {
-        self.repository.save_quote(&quote)
+    async fn update_quote(&self, quote: Quote) -> Result<Quote> {
+        self.repository.save_quote(&quote).await
     }
 
-    fn delete_quote(&self, quote_id: &str) -> Result<()> {
-        self.repository.delete_quote(quote_id)
+    async fn delete_quote(&self, quote_id: &str) -> Result<()> {
+        self.repository.delete_quote(quote_id).await
     }
 
     async fn get_historical_quotes_from_provider(
@@ -409,7 +409,7 @@ impl MarketDataService {
                     .then(a.timestamp.cmp(&b.timestamp))
                     .then(a.data_source.as_str().cmp(b.data_source.as_str()))
             });
-            if let Err(e) = self.repository.save_quotes(&filled_quotes_to_save) {
+            if let Err(e) = self.repository.save_quotes(&filled_quotes_to_save).await {
                 // Save the filled quotes
                 error!("Failed to save synced quotes to repository: {}", e);
                 // Consider how to handle partial saves or repository errors. Maybe add all symbols as failed.
@@ -429,7 +429,7 @@ impl MarketDataService {
 
     async fn sync_manual_quotes(&self, request: &QuoteRequest) -> Result<Vec<Quote>> {
         // All DB logic is now in the repository
-        self.repository.upsert_manual_quotes_from_activities(&request.symbol)
+        self.repository.upsert_manual_quotes_from_activities(&request.symbol).await
     }
 
     /// Fills missing days in a sequence of quotes, optionally up to a final date.

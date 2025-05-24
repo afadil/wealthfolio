@@ -12,26 +12,29 @@ use super::activities_traits::ActivityRepositoryTrait;
 use crate::activities::activities_constants::*;
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
-use crate::db::get_connection;
+use crate::db::{get_connection, WriteHandle};
 use crate::schema::{accounts, activities, activity_import_profiles, assets};
 use crate::{Error, Result};
 use diesel::dsl::min;
 use num_traits::Zero;
+use async_trait::async_trait;
 
 /// Repository for managing activity data in the database
 pub struct ActivityRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
 }
 
 // Inherent methods for ActivityRepository
 impl ActivityRepository {
     /// Creates a new ActivityRepository instance
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
     }
 }
 
 // Implement the trait for the repository
+#[async_trait]
 impl ActivityRepositoryTrait for ActivityRepository {
     fn get_trading_activities(&self) -> Result<Vec<Activity>> {
         let mut conn = get_connection(&self.pool)?;
@@ -183,56 +186,56 @@ impl ActivityRepositoryTrait for ActivityRepository {
         })
     }
 
-    fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
-        let mut conn =
-            get_connection(&self.pool).map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
-
+    async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
         new_activity.validate()?;
-
-        let mut activity_db: ActivityDB = new_activity.into();
-        activity_db.id = Uuid::new_v4().to_string();
-
-        let inserted_activity = diesel::insert_into(activities::table)
-            .values(&activity_db)
-            .get_result::<ActivityDB>(&mut conn)?;
-
-        Ok(Activity::from(inserted_activity))
+        let activity_db_owned: ActivityDB = new_activity.into();
+        
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Activity> {
+                let mut activity_to_insert = activity_db_owned;
+                activity_to_insert.id = Uuid::new_v4().to_string();
+                let inserted_activity = diesel::insert_into(activities::table)
+                    .values(&activity_to_insert)
+                    .get_result::<ActivityDB>(conn)?;
+                Ok(Activity::from(inserted_activity))
+            })
+            .await
     }
 
-    fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity> {
-        let mut conn =
-            get_connection(&self.pool).map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
-
+    async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity> {
         activity_update.validate()?;
+        let activity_db_owned: ActivityDB = activity_update.into();
+        let activity_id_owned = activity_db_owned.id.clone();
 
-        let mut activity_db: ActivityDB = activity_update.into();
-        let existing = activities::table
-            .find(&activity_db.id)
-            .first::<ActivityDB>(&mut conn)?;
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Activity> {
+                let mut activity_to_update = activity_db_owned;
+                let existing = activities::table
+                    .find(&activity_id_owned)
+                    .first::<ActivityDB>(conn)?;
 
-        activity_db.created_at = existing.created_at;
-        activity_db.updated_at = chrono::Utc::now().to_rfc3339();
+                activity_to_update.created_at = existing.created_at;
+                activity_to_update.updated_at = chrono::Utc::now().to_rfc3339();
 
-        let updated_activity = diesel::update(activities::table.find(&activity_db.id))
-            .set(&activity_db)
-            .get_result::<ActivityDB>(&mut conn)?;
-
-        Ok(Activity::from(updated_activity))
+                let updated_activity = diesel::update(activities::table.find(&activity_to_update.id))
+                    .set(&activity_to_update)
+                    .get_result::<ActivityDB>(conn)?;
+                Ok(Activity::from(updated_activity))
+            })
+            .await
     }
 
-    /// Deletes an activity by ID
-    fn delete_activity(&self, activity_id: String) -> Result<Activity> {
-        let mut conn =
-            get_connection(&self.pool).map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
-
-        let activity = activities::table
-            .find(&activity_id)
-            .first::<ActivityDB>(&mut conn)?;
-
-        diesel::delete(activities::table.filter(activities::id.eq(activity_id)))
-            .execute(&mut conn)?;
-
-        Ok(activity.into())
+    async fn delete_activity(&self, activity_id: String) -> Result<Activity> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Activity> {
+                let activity = activities::table
+                    .find(&activity_id)
+                    .first::<ActivityDB>(conn)?;
+                diesel::delete(activities::table.filter(activities::id.eq(&activity_id)))
+                    .execute(conn)?;
+                Ok(activity.into())
+            })
+            .await
     }
 
     /// Retrieves activities by account ID
@@ -316,53 +319,48 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .map_err(Error::from)
     }
 
-    /// Saves or updates an import mapping
-    fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-
-        diesel::insert_into(activity_import_profiles::table)
-            .values(mapping)
-            .on_conflict(activity_import_profiles::account_id)
-            .do_update()
-            .set((
-                activity_import_profiles::field_mappings.eq(&mapping.field_mappings),
-                activity_import_profiles::activity_mappings.eq(&mapping.activity_mappings),
-                activity_import_profiles::symbol_mappings.eq(&mapping.symbol_mappings),
-                activity_import_profiles::updated_at.eq(&mapping.updated_at),
-            ))
-            .execute(&mut conn)?;
-
-        Ok(())
+    async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()> {
+        let mapping_owned = mapping.clone();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                let profile_db = mapping_owned;
+                diesel::insert_into(activity_import_profiles::table)
+                    .values(&profile_db)
+                    .on_conflict(activity_import_profiles::account_id)
+                    .do_update()
+                    .set(&profile_db)
+                    .execute(conn)?;
+                Ok(())
+            })
+            .await
     }
 
-    /// Creates multiple activities in a single transaction
-    fn create_activities(&self, mut activities: Vec<NewActivity>) -> Result<usize> {
-        let mut conn = get_connection(&self.pool)?;
+    async fn create_activities(&self, activities_vec: Vec<NewActivity>) -> Result<usize> {
+        if activities_vec.is_empty() {
+            return Ok(0);
+        }
+        // Validate all activities first
+        for new_act in &activities_vec {
+            new_act.validate()?;
+        }
+        // Convert to ActivityDB and assign IDs
+        let activities_db_owned: Vec<ActivityDB> = activities_vec
+            .into_iter() // Consumes activities_vec
+            .map(|new_act| {
+                let mut db: ActivityDB = new_act.into();
+                db.id = Uuid::new_v4().to_string();
+                db
+            })
+            .collect();
 
-        let inserted_count = conn.transaction::<usize, Error, _>(|conn| {
-            // Generate UUIDs for activities that don't have IDs
-            for activity in activities.iter_mut() {
-                if activity.id.is_none() {
-                    activity.id = Some(Uuid::new_v4().to_string());
-                }
-                // Validate each activity
-                activity.validate().map_err(Error::Activity)?;
-            }
-
-            // Convert NewActivity to ActivityDB for insertion
-            let activities_db: Vec<ActivityDB> =
-                activities.into_iter().map(ActivityDB::from).collect();
-            let count = activities_db.len(); 
-
-            // Perform batch insert
-            diesel::insert_into(activities::table)
-                .values(activities_db)
-                .execute(conn)?;
-
-            Ok(count) // Return the stored count
-        })?; 
-
-        Ok(inserted_count) // Return the count from the successful transaction
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let num_inserted = diesel::insert_into(activities::table)
+                    .values(&activities_db_owned)
+                    .execute(conn)?;
+                Ok(num_inserted)
+            })
+            .await
     }
 
     /// Retrieves deposit activities for specified accounts within a year as raw data

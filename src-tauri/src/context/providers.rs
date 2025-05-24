@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_core::{
     accounts::{AccountRepository, AccountService},
     activities::{ActivityRepository, ActivityService},
-    db::{self},
+    db::{self, write_actor},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService},
     limits::{ContributionLimitRepository, ContributionLimitService},
@@ -26,21 +26,22 @@ pub async fn initialize_context(
 ) -> Result<ServiceContext, Box<dyn std::error::Error>> {
     let db_path = db::init(app_data_dir)?;
     let pool = db::create_pool(&db_path)?;
+    let writer = write_actor::spawn_writer(pool.as_ref().clone());
 
     // Run migrations using the pool directly if run_migrations expects a Pool
     db::run_migrations(&pool)?;
 
     // Instantiate Repositories
-    let settings_repository = Arc::new(SettingsRepository::new(pool.clone()));
-    let account_repository = Arc::new(AccountRepository::new(pool.clone()));
-    let activity_repository = Arc::new(ActivityRepository::new(pool.clone()));
-    let asset_repository = Arc::new(AssetRepository::new(pool.clone()));
-    let goal_repo = Arc::new(GoalRepository::new(pool.clone()));
-    let market_data_repo = Arc::new(MarketDataRepository::new(pool.clone()));
-    let limit_repository = Arc::new(ContributionLimitRepository::new(pool.clone()));
-    let fx_repository = Arc::new(FxRepository::new(pool.clone()));
-    let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone()));
-    let valuation_repository = Arc::new(ValuationRepository::new(pool.clone()));
+    let settings_repository = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
+    let account_repository = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
+    let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
+    let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
+    let goal_repo = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
+    let market_data_repo = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
+    let limit_repository = Arc::new(ContributionLimitRepository::new(pool.clone(), writer.clone()));
+    let fx_repository = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
+    let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
+    let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
     // Instantiate Transaction Executor using the Arc<DbPool> directly
     let transaction_executor = pool.clone();
 

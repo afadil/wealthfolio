@@ -1,35 +1,38 @@
-use crate::market_data::market_data_model::{Quote, QuoteDb}; 
-use crate::schema::{quotes, assets};
-use crate::assets::assets_model::AssetDB;
+use super::fx_model::ExchangeRate;
+use super::fx_traits::FxRepositoryTrait;
 use crate::assets::assets_constants::FOREX_ASSET_TYPE;
-use rust_decimal::Decimal;
-use chrono::{DateTime, Utc, NaiveDateTime, TimeZone, NaiveDate};
+use crate::assets::assets_model::AssetDB;
+use crate::db::get_connection;
+use crate::db::WriteHandle;
+use crate::errors::{DatabaseError, Error, Result, ValidationError};
+use crate::market_data::market_data_model::{Quote, QuoteDb};
+use crate::schema::{assets, quotes};
+use async_trait::async_trait;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sql_query;
 use diesel::sqlite::SqliteConnection;
-use std::collections::HashMap;
-use std::sync::Arc;
-use crate::db::get_connection;
-use crate::errors::{Result, Error, DatabaseError, ValidationError};
-use super::fx_model::ExchangeRate;
 use log::error;
+use rust_decimal::Decimal;
+use std::collections::HashMap;
 use std::str::FromStr;
-use super::fx_traits::FxRepositoryTrait;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct FxRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
 }
 
 impl FxRepository {
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
     }
 
     pub fn get_all_currency_quotes(&self) -> Result<HashMap<String, Vec<Quote>>> {
         let mut conn = get_connection(&self.pool)?;
-        
+
         let query = "
             SELECT q.*
             FROM quotes q
@@ -37,8 +40,7 @@ impl FxRepository {
             WHERE a.asset_type = 'FOREX'
             ORDER BY q.symbol, q.timestamp";
 
-        let quotes_db: Vec<QuoteDb> = diesel::sql_query(query)
-            .load(&mut conn)?;
+        let quotes_db: Vec<QuoteDb> = diesel::sql_query(query).load(&mut conn)?;
 
         let mut grouped_quotes: HashMap<String, Vec<Quote>> = HashMap::with_capacity(100);
         for quote_db in quotes_db {
@@ -54,7 +56,7 @@ impl FxRepository {
 
     pub fn get_latest_currency_rates(&self) -> Result<HashMap<String, Decimal>> {
         let mut conn = get_connection(&self.pool)?;
-        
+
         let query = "
             WITH LatestQuotes AS (
                 SELECT q.* 
@@ -69,15 +71,22 @@ impl FxRepository {
             )
             SELECT * FROM LatestQuotes";
 
-        let quotes_db: Vec<QuoteDb> = diesel::sql_query(query)
-            .load(&mut conn)?;
+        let quotes_db: Vec<QuoteDb> = diesel::sql_query(query).load(&mut conn)?;
 
-        Ok(quotes_db.into_iter().map(|q| (q.symbol, Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)))).collect())
+        Ok(quotes_db
+            .into_iter()
+            .map(|q| {
+                (
+                    q.symbol,
+                    Decimal::from_str(&q.close).unwrap_or_else(|_| Decimal::from(0)),
+                )
+            })
+            .collect())
     }
 
     pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
-        
+
         let latest_quotes = sql_query(
             "SELECT q.* FROM quotes q
              INNER JOIN assets a ON q.symbol = a.id AND a.asset_type = 'FOREX'
@@ -86,7 +95,7 @@ impl FxRepository {
                  FROM quotes
                  GROUP BY symbol
              ) latest ON q.symbol = latest.symbol AND q.timestamp = latest.max_timestamp
-             ORDER BY q.symbol"
+             ORDER BY q.symbol",
         )
         .load::<QuoteDb>(&mut conn)?;
 
@@ -116,13 +125,9 @@ impl FxRepository {
             .collect())
     }
 
-    pub fn get_exchange_rate(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> Result<Option<ExchangeRate>> {
+    pub fn get_exchange_rate(&self, from: &str, to: &str) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
-        
+
         let symbol = ExchangeRate::make_fx_symbol(from, to);
         let quote_db = quotes::table
             .filter(quotes::symbol.eq(symbol))
@@ -133,12 +138,9 @@ impl FxRepository {
         Ok(quote_db.map(|q| ExchangeRate::from_quote(&Quote::from(q))))
     }
 
-    pub fn get_exchange_rate_by_id(
-        &self,
-        id: &str,
-    ) -> Result<Option<ExchangeRate>> {
+    pub fn get_exchange_rate_by_id(&self, id: &str) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
-        
+
         let quote_db = quotes::table
             .filter(quotes::symbol.eq(id))
             .order_by(quotes::timestamp.desc())
@@ -155,7 +157,7 @@ impl FxRepository {
         end_date: NaiveDateTime,
     ) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
-        
+
         let start_dt_str = Utc.from_utc_datetime(&start_date).to_rfc3339();
         let end_dt_str = Utc.from_utc_datetime(&end_date).to_rfc3339();
 
@@ -169,202 +171,207 @@ impl FxRepository {
         Ok(quotes_db.into_iter().map(Quote::from).collect())
     }
 
-    pub fn add_quote(
+    pub async fn add_quote(
         &self,
         symbol: String,
         date_str: String,
         rate: Decimal,
         source: String,
     ) -> Result<Quote> {
-        let mut conn = get_connection(&self.pool)?;
-        
-        let naive_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-            .map_err(|e| Error::Validation(ValidationError::InvalidInput(format!("Invalid date format: {}", e))))?;
-        let naive_datetime = naive_date.and_hms_opt(16, 0, 0)
-            .ok_or_else(|| Error::Validation(ValidationError::InvalidInput(format!("Failed to create NaiveDateTime for {}", date_str))))?;
-        let timestamp_utc: DateTime<Utc> = Utc.from_utc_datetime(&naive_datetime);
-        let timestamp_str = timestamp_utc.to_rfc3339();
-        let created_at_str = Utc::now().to_rfc3339();
+        self.writer
+            .exec(move |conn| {
+                let naive_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|e| {
+                    Error::Validation(ValidationError::InvalidInput(format!(
+                        "Invalid date format: {}",
+                        e
+                    )))
+                })?;
+                let naive_datetime = naive_date.and_hms_opt(16, 0, 0).ok_or_else(|| {
+                    Error::Validation(ValidationError::InvalidInput(format!(
+                        "Failed to create NaiveDateTime for {}",
+                        date_str
+                    )))
+                })?;
+                let timestamp_utc: DateTime<Utc> = Utc.from_utc_datetime(&naive_datetime);
+                let timestamp_str = timestamp_utc.to_rfc3339();
+                let created_at_str = Utc::now().to_rfc3339();
 
-        let currency = symbol.split_at(3).0.to_string();
-        let quote_id = format!("{}_{}", date_str.replace("-", ""), symbol);
+                let currency = symbol.split_at(3).0.to_string();
+                let quote_id = format!("{}_{}", date_str.replace("-", ""), symbol);
 
-        let quote_db = QuoteDb {
-            id: quote_id,
-            symbol: symbol.clone(),
-            timestamp: timestamp_str.clone(),
-            open: rate.to_string(),
-            high: rate.to_string(),
-            low: rate.to_string(),
-            close: rate.to_string(),
-            adjclose: rate.to_string(),
-            volume: "0".to_string(),
-            currency,
-            data_source: source.clone(),
-            created_at: created_at_str,
-        };
+                let quote_db = QuoteDb {
+                    id: quote_id,
+                    symbol: symbol.clone(),
+                    timestamp: timestamp_str.clone(),
+                    open: rate.to_string(),
+                    high: rate.to_string(),
+                    low: rate.to_string(),
+                    close: rate.to_string(),
+                    adjclose: rate.to_string(),
+                    volume: "0".to_string(),
+                    currency,
+                    data_source: source.clone(),
+                    created_at: created_at_str,
+                };
 
-        diesel::insert_into(quotes::table)
-            .values(&quote_db)
-            .on_conflict((quotes::symbol, quotes::timestamp, quotes::data_source))
-            .do_update()
-            .set((
-                quotes::close.eq(quote_db.close.clone()),
-                quotes::data_source.eq(&quote_db.data_source),
-            ))
-            .execute(&mut conn)?;
+                diesel::insert_into(quotes::table)
+                    .values(&quote_db)
+                    .on_conflict((quotes::symbol, quotes::timestamp, quotes::data_source))
+                    .do_update()
+                    .set((
+                        quotes::close.eq(quote_db.close.clone()),
+                        quotes::data_source.eq(&quote_db.data_source),
+                    ))
+                    .execute(conn)?;
 
-        Ok(quotes::table
-            .filter(quotes::symbol.eq(&symbol))
-            .filter(quotes::timestamp.eq(&timestamp_str))
-            .filter(quotes::data_source.eq(&source))
-            .first::<QuoteDb>(&mut conn)
-            .map(Quote::from)?)
-    }
-
-    pub fn save_exchange_rate(
-        &self,
-        rate: ExchangeRate,
-    ) -> Result<ExchangeRate> {
-        let mut conn = get_connection(&self.pool)?;
-        
-        let quote = rate.to_quote();
-        let quote_db = QuoteDb::from(&quote);
-
-        diesel::insert_into(quotes::table)
-            .values(&quote_db)
-            .on_conflict(quotes::id)
-            .do_update()
-            .set((
-                quotes::open.eq(quote_db.open.clone()),
-                quotes::high.eq(quote_db.high.clone()),
-                quotes::low.eq(quote_db.low.clone()),
-                quotes::close.eq(quote_db.close.clone()),
-                quotes::adjclose.eq(quote_db.adjclose.clone()),
-                quotes::volume.eq(quote_db.volume.clone()),
-                quotes::data_source.eq(&quote_db.data_source),
-            ))
-            .execute(&mut conn)?;
-
-        quotes::table
-            .filter(quotes::id.eq(&quote_db.id))
-            .first::<QuoteDb>(&mut conn)
-            .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
-            .map_err(|e| {
-                error!(
-                    "Failed to fetch upserted exchange rate. Error: {}. Payload: id={}", 
-                    e, 
-                    quote_db.id
-                );
-                Error::Database(DatabaseError::QueryFailed(e))
+                Ok(quotes::table
+                    .filter(quotes::symbol.eq(&symbol))
+                    .filter(quotes::timestamp.eq(&timestamp_str))
+                    .filter(quotes::data_source.eq(&source))
+                    .first::<QuoteDb>(conn)
+                    .map(Quote::from)?)
             })
+            .await
     }
 
-    pub fn update_exchange_rate(
-        &self,
-        rate: &ExchangeRate,
-    ) -> Result<ExchangeRate> {
-        let mut conn = get_connection(&self.pool)?;
-        
-        let quote = rate.to_quote();
-        let quote_db = QuoteDb::from(&quote);
+    pub async fn save_exchange_rate(&self, rate: ExchangeRate) -> Result<ExchangeRate> {
+        self.writer
+            .exec(move |conn| {
+                let quote = rate.to_quote();
+                let quote_db = QuoteDb::from(&quote);
 
-        diesel::update(quotes::table)
-            .filter(quotes::symbol.eq(&quote_db.symbol))
-            .filter(quotes::timestamp.eq(&quote_db.timestamp))
-            .set((
-                quotes::close.eq(quote_db.close.clone()),
-                quotes::data_source.eq(&quote_db.data_source),
-            ))
-            .get_result::<QuoteDb>(&mut conn)
-            .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
-            .map_err(|e| e.into())
+                diesel::insert_into(quotes::table)
+                    .values(&quote_db)
+                    .on_conflict(quotes::id)
+                    .do_update()
+                    .set((
+                        quotes::open.eq(quote_db.open.clone()),
+                        quotes::high.eq(quote_db.high.clone()),
+                        quotes::low.eq(quote_db.low.clone()),
+                        quotes::close.eq(quote_db.close.clone()),
+                        quotes::adjclose.eq(quote_db.adjclose.clone()),
+                        quotes::volume.eq(quote_db.volume.clone()),
+                        quotes::data_source.eq(&quote_db.data_source),
+                    ))
+                    .execute(conn)?;
+
+                quotes::table
+                    .filter(quotes::id.eq(&quote_db.id))
+                    .first::<QuoteDb>(conn)
+                    .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
+                    .map_err(|e| {
+                        error!(
+                            "Failed to fetch upserted exchange rate. Error: {}. Payload: id={}",
+                            e, quote_db.id
+                        );
+                        Error::Database(DatabaseError::QueryFailed(e))
+                    })
+            })
+            .await
     }
 
-    pub fn delete_exchange_rate(
-        &self,
-        rate_id: &str,
-    ) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-        
-        diesel::delete(quotes::table.filter(quotes::symbol.eq(rate_id)))
-            .execute(&mut conn)?;
-        Ok(())
+    pub async fn update_exchange_rate(&self, rate: &ExchangeRate) -> Result<ExchangeRate> {
+        let rate_owned = rate.clone();
+        self.writer
+            .exec(move |conn| {
+                let quote = rate_owned.to_quote();
+                let quote_db = QuoteDb::from(&quote);
+
+                diesel::update(quotes::table)
+                    .filter(quotes::symbol.eq(&quote_db.symbol))
+                    .filter(quotes::timestamp.eq(&quote_db.timestamp))
+                    .set((
+                        quotes::close.eq(quote_db.close.clone()),
+                        quotes::data_source.eq(&quote_db.data_source),
+                    ))
+                    .get_result::<QuoteDb>(conn)
+                    .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
+                    .map_err(|e| e.into())
+            })
+            .await
+    }
+
+    pub async fn delete_exchange_rate(&self, rate_id: &str) -> Result<()> {
+        let rate_id_owned = rate_id.to_string();
+        self.writer
+            .exec(move |conn| {
+                diesel::delete(quotes::table.filter(quotes::symbol.eq(rate_id_owned)))
+                    .execute(conn)?;
+                Ok(())
+            })
+            .await
     }
 
     /// Creates or updates an FX asset in the database
-    pub fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
-        let mut conn = get_connection(&self.pool)?;
-        let symbol = ExchangeRate::make_fx_symbol(from, to);
-        let readable_name = format!("{}/{} Exchange Rate", from, to);
-        let notes = format!(
-            "Currency pair for converting from {} to {}",
-            from, to
-        );
-        let now_naive = chrono::Utc::now().naive_utc();
+    pub async fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
+        let from_owned = from.to_string();
+        let to_owned = to.to_string();
+        let source_owned = source.to_string();
 
-        let asset_db = AssetDB {
-            id: symbol.clone(),
-            symbol: symbol.clone(),
-            name: Some(readable_name),
-            asset_type: Some(FOREX_ASSET_TYPE.to_string()),
-            asset_class: Some(FOREX_ASSET_TYPE.to_string()),
-            asset_sub_class: Some(FOREX_ASSET_TYPE.to_string()),
-            notes: Some(notes),
-            currency: from.to_string(),
-            data_source: source.to_string(),
-            created_at: now_naive,
-            updated_at: now_naive,
-            ..Default::default()
-        };
+        self.writer
+            .exec(move |conn| {
+                let symbol = ExchangeRate::make_fx_symbol(&from_owned, &to_owned);
+                let readable_name = format!("{}/{} Exchange Rate", &from_owned, &to_owned);
+                let notes = format!(
+                    "Currency pair for converting from {} to {}",
+                    &from_owned, &to_owned
+                );
+                let now_naive = chrono::Utc::now().naive_utc();
 
-        diesel::insert_into(assets::table)
-            .values(&asset_db)
-            .on_conflict(assets::id)
-            .do_update()
-            .set((
-                assets::name.eq(&asset_db.name),
-                assets::asset_type.eq(&asset_db.asset_type),
-                assets::asset_class.eq(&asset_db.asset_class),
-                assets::asset_sub_class.eq(&asset_db.asset_sub_class),
-                assets::notes.eq(&asset_db.notes),
-                assets::currency.eq(&asset_db.currency),
-                assets::data_source.eq(&asset_db.data_source),
-                assets::updated_at.eq(now_naive),
-            ))
-            .execute(&mut conn)
-            .map_err(|e| Error::Database(DatabaseError::QueryFailed(e)))?;
+                let asset_db = AssetDB {
+                    id: symbol.clone(),
+                    symbol: symbol.clone(),
+                    name: Some(readable_name),
+                    asset_type: Some(FOREX_ASSET_TYPE.to_string()),
+                    asset_class: Some(FOREX_ASSET_TYPE.to_string()),
+                    asset_sub_class: Some(FOREX_ASSET_TYPE.to_string()),
+                    notes: Some(notes),
+                    currency: from_owned.to_string(),
+                    data_source: source_owned.to_string(),
+                    created_at: now_naive,
+                    updated_at: now_naive,
+                    ..Default::default()
+                };
 
-        Ok(())
+                diesel::insert_into(assets::table)
+                    .values(&asset_db)
+                    .on_conflict(assets::id)
+                    .do_update()
+                    .set((
+                        assets::name.eq(&asset_db.name),
+                        assets::asset_type.eq(&asset_db.asset_type),
+                        assets::asset_class.eq(&asset_db.asset_class),
+                        assets::asset_sub_class.eq(&asset_db.asset_sub_class),
+                        assets::notes.eq(&asset_db.notes),
+                        assets::currency.eq(&asset_db.currency),
+                        assets::data_source.eq(&asset_db.data_source),
+                        assets::updated_at.eq(now_naive),
+                    ))
+                    .execute(conn)
+                    .map_err(|e| Error::Database(DatabaseError::QueryFailed(e)))?;
+
+                Ok(())
+            })
+            .await
     }
 }
 
+#[async_trait]
 impl FxRepositoryTrait for FxRepository {
-    fn get_all_currency_quotes(&self) -> Result<HashMap<String, Vec<Quote>>> {
-        self.get_all_currency_quotes()
-    }
-
-    fn get_latest_currency_rates(&self) -> Result<HashMap<String, Decimal>> {
-        self.get_latest_currency_rates()
-    }
-
-    fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+    fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         self.get_exchange_rates()
     }
 
-    fn get_exchange_rate(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> Result<Option<ExchangeRate>> {
+    fn get_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+        self.get_all_historical_exchange_rates()
+    }
+
+    fn get_latest_exchange_rate(&self, from: &str, to: &str) -> Result<Option<ExchangeRate>> {
         self.get_exchange_rate(from, to)
     }
 
-    fn get_exchange_rate_by_id(
-        &self,
-        id: &str,
-    ) -> Result<Option<ExchangeRate>> {
-        self.get_exchange_rate_by_id(id)
+    fn get_latest_exchange_rate_by_symbol(&self, symbol: &str) -> Result<Option<ExchangeRate>> {
+        self.get_exchange_rate_by_id(symbol)
     }
 
     fn get_historical_quotes(
@@ -376,44 +383,29 @@ impl FxRepositoryTrait for FxRepository {
         self.get_historical_quotes(symbol, start_date, end_date)
     }
 
-    fn add_quote(
+    async fn add_quote(
         &self,
         symbol: String,
         date: String,
         rate: Decimal,
         source: String,
     ) -> Result<Quote> {
-        self.add_quote(symbol, date, rate, source)
+        self.add_quote(symbol, date, rate, source).await
     }
 
-    fn save_exchange_rate(
-        &self,
-        rate: ExchangeRate,
-    ) -> Result<ExchangeRate> {
-        self.save_exchange_rate(rate)
+    async fn save_exchange_rate(&self, rate: ExchangeRate) -> Result<ExchangeRate> {
+        self.save_exchange_rate(rate).await
     }
 
-    fn update_exchange_rate(
-        &self,
-        rate: &ExchangeRate,
-    ) -> Result<ExchangeRate> {
-        self.update_exchange_rate(rate)
+    async fn update_exchange_rate(&self, rate: &ExchangeRate) -> Result<ExchangeRate> {
+        self.update_exchange_rate(rate).await
     }
 
-    fn delete_exchange_rate(
-        &self,
-        rate_id: &str,
-    ) -> Result<()> {
-        self.delete_exchange_rate(rate_id)
+    async fn delete_exchange_rate(&self, rate_id: &str) -> Result<()> {
+        self.delete_exchange_rate(rate_id).await
     }
 
-    /// Creates or updates an FX asset in the database
-    fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
-        self.create_fx_asset(from, to, source)
-    }
-
-    /// Fetches all historical exchange rates (quotes) for FOREX assets.
-    fn get_all_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
-        self.get_all_historical_exchange_rates()
+    async fn create_fx_asset(&self, from_currency: &str, to_currency: &str, source: &str) -> Result<()> {
+        self.create_fx_asset(from_currency, to_currency, source).await
     }
 }

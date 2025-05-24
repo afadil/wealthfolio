@@ -10,6 +10,7 @@ export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode
     icon?: React.ComponentType
+    lineStyle?: "solid" | "dashed" | "dotted"
   } & (
     | { color?: string; theme?: never }
     | { color?: never; theme: Record<keyof typeof THEMES, string> }
@@ -297,12 +298,33 @@ const ChartLegendContent = React.forwardRef<
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
               ) : (
-                <div
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
-                  style={{
-                    backgroundColor: item.color,
-                  }}
-                />
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className="h-2 w-2 shrink-0 rounded-[2px]"
+                    style={{
+                      backgroundColor: item.color,
+                    }}
+                  />
+                  {itemConfig?.lineStyle && (
+                    <svg width="20" height="2" className="ml-1">
+                      <line
+                        x1="0"
+                        y1="1"
+                        x2="20"
+                        y2="1"
+                        stroke={item.color}
+                        strokeWidth="2"
+                        strokeDasharray={
+                          itemConfig.lineStyle === "dashed"
+                            ? "4 2"
+                            : itemConfig.lineStyle === "dotted"
+                              ? "2 2"
+                              : "none"
+                        }
+                      />
+                    </svg>
+                  )}
+                </div>
               )}
               {itemConfig?.label}
             </div>

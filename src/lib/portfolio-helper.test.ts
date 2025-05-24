@@ -1,5 +1,5 @@
 import { calculateGoalProgress } from './portfolio-helper';
-import { Goal, GoalAllocation, SimplePerformanceMetrics, GoalProgress } from './types';
+import { Goal, GoalAllocation, SimplePerformanceMetrics } from './types';
 
 describe('calculateGoalProgress', () => {
   it('should return empty array if essential data is missing', () => {
@@ -11,30 +11,30 @@ describe('calculateGoalProgress', () => {
 
   it('should calculate goal progress correctly as a decimal ratio and handle various scenarios', () => {
     const accountsPerformance: SimplePerformanceMetrics[] = [
-      { accountId: 'acc1', totalValue: 5000, baseCurrency: 'USD', fxRateToBase: 1, performance: {change: 0, changePercent: 0, history: []} },
-      { accountId: 'acc2', totalValue: 10000, baseCurrency: 'EUR', fxRateToBase: 1.1, performance: {change: 0, changePercent: 0, history: []} }, // 11000 USD
-      { accountId: 'acc3', totalValue: 2000, baseCurrency: 'USD', fxRateToBase: 1, performance: {change: 0, changePercent: 0, history: []} },
+      { accountId: 'acc1', totalValue: 5000, baseCurrency: 'USD', fxRateToBase: 1 },
+      { accountId: 'acc2', totalValue: 10000, baseCurrency: 'EUR', fxRateToBase: 1.1 }, // 11000 USD
+      { accountId: 'acc3', totalValue: 2000, baseCurrency: 'USD', fxRateToBase: 1 },
     ];
 
     const goals: Goal[] = [
-      { id: 'goal1', title: 'Vacation Fund', targetAmount: 10000, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
-      { id: 'goal2', title: 'New Car', targetAmount: 25000, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
-      { id: 'goal3', title: 'Zero Target Goal', targetAmount: 0, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
-      { id: 'goal4', title: 'High Progress Goal', targetAmount: 100, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
+      { id: 'goal1', title: 'Vacation Fund', targetAmount: 10000 },
+      { id: 'goal2', title: 'New Car', targetAmount: 25000 },
+      { id: 'goal3', title: 'Zero Target Goal', targetAmount: 0 },
+      { id: 'goal4', title: 'High Progress Goal', targetAmount: 100 },
     ];
 
     const allocations: GoalAllocation[] = [
       // Goal 1: Vacation Fund (Target: 10,000 USD)
-      { id: 'alloc1', goalId: 'goal1', accountId: 'acc1', percentAllocation: 50, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' }, // 50% of 5000 USD = 2500 USD
-      { id: 'alloc2', goalId: 'goal1', accountId: 'acc2', percentAllocation: 10, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' }, // 10% of 11000 USD (EUR converted) = 1100 USD
+      { id: 'alloc1', goalId: 'goal1', accountId: 'acc1', percentAllocation: 50 }, // 50% of 5000 USD = 2500 USD
+      { id: 'alloc2', goalId: 'goal1', accountId: 'acc2', percentAllocation: 10 }, // 10% of 11000 USD (EUR converted) = 1100 USD
       // Total for goal1 = 2500 + 1100 = 3600 USD. Progress = 3600 / 10000 = 0.36
 
       // Goal 2: New Car (Target: 25,000 USD)
-      { id: 'alloc3', goalId: 'goal2', accountId: 'acc1', percentAllocation: 20.8, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' }, // 20.8% of 5000 USD = 1040 USD
+      { id: 'alloc3', goalId: 'goal2', accountId: 'acc1', percentAllocation: 20.8 }, // 20.8% of 5000 USD = 1040 USD
       // Total for goal2 = 1040 USD. Progress = 1040 / 25000 = 0.0416
 
       // Goal 4: High Progress Goal (Target: 100 USD)
-      { id: 'alloc4', goalId: 'goal4', accountId: 'acc3', percentAllocation: 100, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' }, // 100% of 2000 USD = 2000 USD
+      { id: 'alloc4', goalId: 'goal4', accountId: 'acc3', percentAllocation: 100 }, // 100% of 2000 USD = 2000 USD
       // Total for goal4 = 2000 USD. Progress = 2000 / 100 = 20 (i.e. 2000%)
     ];
 
@@ -89,10 +89,10 @@ describe('calculateGoalProgress', () => {
 
   it('should return empty progress for goals with no allocations', () => {
     const accountsPerformance: SimplePerformanceMetrics[] = [
-      { accountId: 'acc1', totalValue: 1000, baseCurrency: 'USD', fxRateToBase: 1, performance: {change: 0, changePercent: 0, history: []} },
+      { accountId: 'acc1', totalValue: 1000, baseCurrency: 'USD', fxRateToBase: 1 },
     ];
     const goals: Goal[] = [
-      { id: 'goal1', title: 'Unallocated Goal', targetAmount: 5000, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
+      { id: 'goal1', title: 'Unallocated Goal', targetAmount: 5000 },
     ];
     const allocations: GoalAllocation[] = []; // No allocations
 
@@ -107,14 +107,14 @@ describe('calculateGoalProgress', () => {
 
   it('should handle missing accounts in performance data gracefully', () => {
     const accountsPerformance: SimplePerformanceMetrics[] = [
-      { accountId: 'acc1', totalValue: 1000, baseCurrency: 'CAD', fxRateToBase: 0.75, performance: {change: 0, changePercent: 0, history: []} }, // 750 CAD base
+      { accountId: 'acc1', totalValue: 1000, baseCurrency: 'CAD', fxRateToBase: 0.75 }, // 750 CAD base
     ];
     const goals: Goal[] = [
-      { id: 'goal1', title: 'Goal With Missing Account', targetAmount: 2000, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
+      { id: 'goal1', title: 'Goal With Missing Account', targetAmount: 2000 },
     ];
     // acc2 is allocated but not in accountsPerformance
     const allocations: GoalAllocation[] = [
-      { id: 'alloc1', goalId: 'goal1', accountId: 'acc2', percentAllocation: 50, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
+      { id: 'alloc1', goalId: 'goal1', accountId: 'acc2', percentAllocation: 50 },
     ];
 
     const result = calculateGoalProgress(accountsPerformance, goals, allocations);
@@ -127,15 +127,15 @@ describe('calculateGoalProgress', () => {
 
    it('should use the first account base currency if multiple differing base currencies are present', () => {
     const accountsPerformance: SimplePerformanceMetrics[] = [
-      { accountId: 'acc1', totalValue: 1000, baseCurrency: 'JPY', fxRateToBase: 1, performance: {change: 0, changePercent: 0, history: []} },
-      { accountId: 'acc2', totalValue: 200, baseCurrency: 'EUR', fxRateToBase: 1.1, performance: {change: 0, changePercent: 0, history: []} }, // Should be converted to JPY based on its fxRateToBase
+      { accountId: 'acc1', totalValue: 1000, baseCurrency: 'JPY', fxRateToBase: 1 },
+      { accountId: 'acc2', totalValue: 200, baseCurrency: 'EUR', fxRateToBase: 1.1 }, // Should be converted to JPY based on its fxRateToBase
     ];
     const goals: Goal[] = [
-      { id: 'goal1', title: 'Test Goal Currency', targetAmount: 150000, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' },
+      { id: 'goal1', title: 'Test Goal Currency', targetAmount: 150000 },
     ];
     const allocations: GoalAllocation[] = [
-      { id: 'alloc1', goalId: 'goal1', accountId: 'acc1', percentAllocation: 10, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' }, // 10% of 1000 JPY = 100 JPY
-      { id: 'alloc2', goalId: 'goal1', accountId: 'acc2', percentAllocation: 50, userId: 'user1', createdAt: '2023-01-01T00:00:00Z', updatedAt: '2023-01-01T00:00:00Z' }, // 50% of (200 EUR * 1.1) = 110 JPY (assuming fxRateToBase for acc2 is to JPY)
+      { id: 'alloc1', goalId: 'goal1', accountId: 'acc1', percentAllocation: 10 }, // 10% of 1000 JPY = 100 JPY
+      { id: 'alloc2', goalId: 'goal1', accountId: 'acc2', percentAllocation: 50 }, // 50% of (200 EUR * 1.1) = 110 JPY (assuming fxRateToBase for acc2 is to JPY)
     ];
     // Total allocated = 100 + 110 = 210 JPY
     // Progress = 210 / 150000 = 0.0014

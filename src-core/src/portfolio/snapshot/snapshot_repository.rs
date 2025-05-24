@@ -1,8 +1,8 @@
+use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::errors::{Error, Result};
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::AccountStateSnapshotDB;
 use chrono::NaiveDate;
-use diesel::connection::Connection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
@@ -11,12 +11,14 @@ use std::sync::Arc;
 use diesel::sql_query;
 use diesel::sql_types::Text; 
 use diesel::sqlite::Sqlite; 
+use async_trait::async_trait;
 
-use crate::db::get_connection;
-use log::debug;
+use crate::db::{get_connection, WriteHandle};
+use log::{debug, warn};
 
+#[async_trait]
 pub trait SnapshotRepositoryTrait: Send + Sync {
-    fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()>;
+    async fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()>;
 
     fn get_snapshots_by_account(
         &self,
@@ -42,19 +44,38 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
         account_ids: &[String],
     ) -> Result<HashMap<String, AccountStateSnapshot>>;
 
-    fn delete_snapshots_by_account_ids(&self, account_ids: &[String]) -> Result<()>;
+    async fn delete_snapshots_by_account_ids(&self, account_ids: &[String]) -> Result<usize>;
 
-    fn delete_snapshots_for_account_and_dates(
+    async fn delete_snapshots_for_account_and_dates(
         &self,
         account_id: &str,
         dates_to_delete: &[NaiveDate],
     ) -> Result<()>;
 
-    fn delete_snapshots_for_account_in_range(
+    async fn delete_snapshots_for_account_in_range(
         &self,
         account_id: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
+    ) -> Result<()>;
+    
+    /// Deletes all snapshots for a specific account within a given date range,
+    /// and then saves the provided new snapshots for that account.
+    /// If `snapshots_to_save` is empty, it effectively only deletes snapshots in the range.
+    async fn overwrite_snapshots_for_account_in_range(
+        &self,
+        account_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+        snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()>;
+
+    /// Iterates through the provided snapshots, groups them by account,
+    /// determines the min/max date range for each account's new snapshots,
+    /// and then calls `overwrite_snapshots_for_account_in_range` for each account.
+    async fn overwrite_multiple_account_snapshot_ranges(
+        &self,
+        new_snapshots: &[AccountStateSnapshot],
     ) -> Result<()>;
 
     fn get_total_portfolio_snapshots(
@@ -71,35 +92,29 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
 
     /// Retrieves the date of the earliest snapshot for a given account.
     fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
-
-    /// Replaces all snapshots for multiple accounts within a single transaction.
-    /// If `is_full_recalc_delete_done` is true, assumes a global delete occurred and skips ranged deletes.
-    fn replace_all_snapshots(
-        &self,
-        all_keyframes: &[AccountStateSnapshot],
-        is_full_recalc_delete_done: bool,
-    ) -> Result<()>;
 }
 
 pub struct SnapshotRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
 }
 
 impl SnapshotRepository {
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
     }
 
     // --- Implement Snapshot Storage/Retrieval Logic ---
     // Methods adapted from the intended ValuationRepository implementation
 
-    pub fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()> {
+    pub async fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()> {
         use crate::schema::holdings_snapshots::dsl::*;
 
         if snapshots.is_empty() {
+            debug!("save_snapshots called with no snapshots. Nothing to save.");
             return Ok(());
         }
-        let mut conn = get_connection(&self.pool)?;
+
         let db_models: Vec<AccountStateSnapshotDB> = snapshots
             .iter()
             .cloned()
@@ -109,10 +124,12 @@ impl SnapshotRepository {
             "Saving {} snapshots to DB via SnapshotRepository",
             db_models.len()
         );
-        diesel::replace_into(holdings_snapshots)
-            .values(&db_models)
-            .execute(&mut conn)?;
-        Ok(())
+        self.writer.exec(move |conn| {
+            diesel::replace_into(holdings_snapshots)
+                .values(&db_models)
+                .execute(conn)?;
+            Ok(())
+        }).await
     }
 
     pub fn get_snapshots_by_account(
@@ -273,77 +290,175 @@ impl SnapshotRepository {
         Ok(results_map)
     }
 
-    pub fn delete_snapshots_by_account_ids(&self, account_ids_to_delete: &[String]) -> Result<()> {
+    pub async fn delete_snapshots_by_account_ids(&self, account_ids_to_delete: &[String]) -> Result<usize> {
         use crate::schema::holdings_snapshots::dsl::*;
         if account_ids_to_delete.is_empty() {
-            return Ok(());
+            return Ok(0);
         }
-        let mut conn = get_connection(&self.pool)?;
-        conn.transaction(|conn_tx| -> Result<()> {
-            // Clone the input slice to potentially add "TOTAL"
-            let final_ids = account_ids_to_delete.to_vec();
-            if final_ids.is_empty() {
-                return Ok(());
-            } // Check again if only "TOTAL" was potentially added
-            debug!(
-                "Deleting snapshots for account IDs: {:?} via SnapshotRepository",
-                final_ids
-            );
-            diesel::delete(holdings_snapshots.filter(account_id.eq_any(final_ids)))
-                .execute(conn_tx)?;
-            Ok(())
-        })
-        .map_err(Error::from)
+
+        // Clone the input slice
+        let final_ids = account_ids_to_delete.to_vec();
+
+        self.writer.exec(move |conn| {
+            let deleted_count = diesel::delete(holdings_snapshots.filter(account_id.eq_any(final_ids)))
+                .execute(conn)?;
+            Ok(deleted_count)
+        }).await
     }
 
-    pub fn delete_snapshots_for_account_and_dates(
+    pub async fn delete_snapshots_for_account_and_dates(
         &self,
         input_account_id: &str,
         dates_to_delete: &[NaiveDate],
     ) -> Result<()> {
         use crate::schema::holdings_snapshots::dsl::*;
         if dates_to_delete.is_empty() {
+            debug!("delete_snapshots_for_account_and_dates: No dates specified for account {}. Nothing to delete.", input_account_id);
             return Ok(());
         }
-        let mut conn = get_connection(&self.pool)?;
+
+        let account_id_owned = input_account_id.to_string();
         let date_strings: Vec<String> = dates_to_delete
             .iter()
             .map(|d| d.format("%Y-%m-%d").to_string())
             .collect();
-        debug!(
-            "Deleting snapshots for account {} on dates: {:?} via SnapshotRepository",
-            input_account_id, date_strings
-        );
-        diesel::delete(
-            holdings_snapshots
-                .filter(account_id.eq(input_account_id))
-                .filter(snapshot_date.eq_any(date_strings)),
+
+        self.writer.exec(move |conn| {
+            debug!(
+                "Deleting snapshots for account {} on dates: {:?} via SnapshotRepository",
+                account_id_owned,
+                date_strings // Use the moved date_strings
+            );
+            diesel::delete(
+                holdings_snapshots
+                    .filter(account_id.eq(account_id_owned))
+                    .filter(snapshot_date.eq_any(date_strings)),
+            )
+            .execute(conn)?;
+            Ok(())
+        }).await
+    }
+
+    pub async fn delete_snapshots_for_account_in_range(
+        &self,
+        input_account_id: &str,
+        start_date_val: NaiveDate,
+        end_date_val: NaiveDate,
+    ) -> Result<()> {
+        use crate::schema::holdings_snapshots::dsl::*;
+
+        let account_id_owned = input_account_id.to_string();
+        let start_date_str = start_date_val.format("%Y-%m-%d").to_string();
+        let end_date_str = end_date_val.format("%Y-%m-%d").to_string();
+
+        self.writer.exec(move |conn| {
+            diesel::delete(
+                holdings_snapshots
+                    .filter(account_id.eq(account_id_owned))
+                    .filter(snapshot_date.ge(start_date_str))
+                    .filter(snapshot_date.le(end_date_str)),
+            )
+            .execute(conn)?;
+            Ok(())
+        }).await
+    }
+    
+    pub async fn overwrite_snapshots_for_account_in_range(
+        &self,
+        target_account_id: &str,
+        range_start_date: NaiveDate,
+        range_end_date: NaiveDate,
+        snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()> {
+
+        // It's crucial that these operations appear atomic for a given account's range.
+        // The current writer.exec handles individual Diesel calls transactionally.
+        // For true atomicity of delete + save, this whole block should be one transaction.
+        // However, self.writer.exec itself creates a transaction for each call.
+        // For now, we rely on sequential execution. A deeper refactor of WriteHandle might be needed for true multi-statement transactions.
+
+        self.delete_snapshots_for_account_in_range(
+            target_account_id,
+            range_start_date,
+            range_end_date,
         )
-        .execute(&mut conn)?;
+        .await?;
+
+        if !snapshots_to_save.is_empty() {
+            // Filter snapshots_to_save to ensure they are indeed for the target_account_id
+            // although the caller should guarantee this.
+            let account_specific_snapshots: Vec<AccountStateSnapshot> = snapshots_to_save
+                .iter()
+                .filter(|s| s.account_id == target_account_id)
+                .cloned()
+                .collect();
+            
+            if account_specific_snapshots.len() != snapshots_to_save.len() {
+                warn!(
+                    "overwrite_snapshots_for_account_in_range: Mismatch between provided snapshots and target_account_id {}. Expected all {} for this account.",
+                    target_account_id, snapshots_to_save.len()
+                );
+                // Decide on error handling: proceed with filtered, or error out?
+                // For now, proceed with filtered, but this indicates a caller issue.
+            }
+
+            if !account_specific_snapshots.is_empty() {
+                 self.save_snapshots(&account_specific_snapshots).await?;
+            } else if snapshots_to_save.is_empty() {
+                debug!("overwrite_snapshots_for_account_in_range: No new snapshots provided for account {} after deleting range. Only delete was performed.", target_account_id);
+            } else {
+                 warn!("overwrite_snapshots_for_account_in_range: All provided snapshots were filtered out for account {}. No save performed after delete.", target_account_id);
+            }
+        } else {
+            debug!("overwrite_snapshots_for_account_in_range: No new snapshots provided for account {}. Only delete was performed for range [{}, {}].", target_account_id, range_start_date, range_end_date);
+        }
         Ok(())
     }
 
-    pub fn delete_snapshots_for_account_in_range(
+    pub async fn overwrite_multiple_account_snapshot_ranges(
         &self,
-        input_account_id: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        new_snapshots: &[AccountStateSnapshot],
     ) -> Result<()> {
-        use crate::schema::holdings_snapshots::dsl::*;
-        let mut conn = get_connection(&self.pool)?;
-        let start_date_str = start_date.format("%Y-%m-%d").to_string();
-        let end_date_str = end_date.format("%Y-%m-%d").to_string();
-        debug!(
-            "Deleting snapshots for account {} from {} to {} via SnapshotRepository",
-            input_account_id, start_date_str, end_date_str
-        );
-        diesel::delete(
-            holdings_snapshots
-                .filter(account_id.eq(input_account_id))
-                .filter(snapshot_date.ge(start_date_str))
-                .filter(snapshot_date.le(end_date_str)),
-        )
-        .execute(&mut conn)?;
+        if new_snapshots.is_empty() {
+            return Ok(());
+        }
+
+        let mut snapshots_by_account: HashMap<String, Vec<AccountStateSnapshot>> = HashMap::new();
+        for snapshot in new_snapshots {
+            snapshots_by_account
+                .entry(snapshot.account_id.clone())
+                .or_default()
+                .push(snapshot.clone());
+        }
+
+        for (acc_id, acc_snapshots) in snapshots_by_account {
+            if acc_snapshots.is_empty() { // Should not happen if new_snapshots was not empty
+                continue;
+            }
+
+            // Determine min/max date for this account's specific snapshots
+            // Panics if acc_snapshots is empty, but we checked above.
+            let mut min_date = acc_snapshots.first().unwrap().snapshot_date;
+            let mut max_date = acc_snapshots.first().unwrap().snapshot_date;
+
+            for snapshot in acc_snapshots.iter().skip(1) {
+                if snapshot.snapshot_date < min_date {
+                    min_date = snapshot.snapshot_date;
+                }
+                if snapshot.snapshot_date > max_date {
+                    max_date = snapshot.snapshot_date;
+                }
+            }
+            
+            // Now call the per-account overwrite method
+            self.overwrite_snapshots_for_account_in_range(
+                &acc_id,
+                min_date,
+                max_date,
+                &acc_snapshots, // Pass the already filtered and cloned vec for this account
+            )
+            .await?;
+        }
         Ok(())
     }
 
@@ -352,7 +467,7 @@ impl SnapshotRepository {
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>> {
-        self.get_snapshots_by_account("TOTAL", start_date_opt, end_date_opt)
+        self.get_snapshots_by_account(PORTFOLIO_TOTAL_ACCOUNT_ID, start_date_opt, end_date_opt)
     }
 
     pub fn get_all_active_account_snapshots(
@@ -412,152 +527,89 @@ impl SnapshotRepository {
             None => Ok(None), // No snapshots found for this account
         }
     }
-
-    pub fn replace_all_snapshots(
-        &self,
-        all_keyframes: &[AccountStateSnapshot],
-        is_full_recalc_delete_done: bool,
-    ) -> Result<()> {
-        use crate::schema::holdings_snapshots;
-        use crate::schema::holdings_snapshots::dsl::*;
-
-        if all_keyframes.is_empty() {
-            debug!("replace_all_snapshots called with no keyframes. Nothing to do.");
-            return Ok(());
-        }
-
-        let mut conn = get_connection(&self.pool)?;
-
-        conn.transaction(|conn_tx| {
-            if !is_full_recalc_delete_done {
-                // Group keyframes by account ID to determine per-account deletion ranges for incremental updates
-                let mut keyframes_by_account_for_delete: HashMap<String, Vec<&AccountStateSnapshot>> = HashMap::new();
-                for kf in all_keyframes {
-                    keyframes_by_account_for_delete
-                        .entry(kf.account_id.clone())
-                        .or_default()
-                        .push(kf);
-                }
-
-                for (acc_id_str, acc_keyframes) in keyframes_by_account_for_delete {
-                    if acc_keyframes.is_empty() { continue; }
-
-                    // Sort snapshots by date to correctly determine range for this account
-                    let mut sorted_acc_keyframes = acc_keyframes.to_vec(); // Clone refs for sorting
-                    sorted_acc_keyframes.sort_by_key(|s| s.snapshot_date);
-
-                    if let (Some(min_date), Some(max_date)) = (
-                        sorted_acc_keyframes.first().map(|s| s.snapshot_date),
-                        sorted_acc_keyframes.last().map(|s| s.snapshot_date),
-                    ) {
-                        debug!(
-                            "Replace all snapshots (incremental part for account {}): Deleting existing snapshots from {} to {} in transaction",
-                            acc_id_str, min_date, max_date
-                        );
-                        let start_date_str = min_date.format("%Y-%m-%d").to_string();
-                        let end_date_str = max_date.format("%Y-%m-%d").to_string();
-                        diesel::delete(
-                            holdings_snapshots::table
-                                .filter(account_id.eq(acc_id_str))
-                                .filter(snapshot_date.ge(start_date_str))
-                                .filter(snapshot_date.le(end_date_str)),
-                        )
-                        .execute(conn_tx)?;
-                    }
-                }
-            } else {
-                debug!(
-                    "Replace all snapshots (full recalc): Skipping all per-account range deletes as full delete already occurred."
-                );
-            }
-
-            // Save all new keyframes in a single batch operation
-            let db_models_to_save: Vec<AccountStateSnapshotDB> = all_keyframes
-                .iter()
-                .cloned()
-                .map(AccountStateSnapshotDB::from)
-                .collect();
-            
-            if !db_models_to_save.is_empty() {
-                debug!(
-                    "Replace all snapshots: Saving {} snapshots to DB in a single batch (transactional)",
-                    db_models_to_save.len()
-                );
-                diesel::replace_into(holdings_snapshots::table)
-                    .values(&db_models_to_save)
-                    .execute(conn_tx)?;
-            } else {
-                debug!("Replace all snapshots: No actual DB models to save after processing.");
-            }
-
-            Ok::<(), Error>(())
-        })
-    }
 }
 
 // Implement the trait methods for SnapshotRepository
+#[async_trait]
 impl SnapshotRepositoryTrait for SnapshotRepository {
-    fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()> {
-        SnapshotRepository::save_snapshots(self, snapshots)
+    async fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()> {
+        self.save_snapshots(snapshots).await
     }
 
     fn get_snapshots_by_account(
         &self,
-        account_id: &str,
+        account_id_param: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>> {
-        SnapshotRepository::get_snapshots_by_account(self, account_id, start_date, end_date)
+        self.get_snapshots_by_account(account_id_param, start_date, end_date)
     }
 
     fn get_latest_snapshot_before_date(
         &self,
-        account_id: &str,
+        account_id_param: &str,
         date: NaiveDate,
     ) -> Result<Option<AccountStateSnapshot>> {
-        SnapshotRepository::get_latest_snapshot_before_date(self, account_id, date)
+        self.get_latest_snapshot_before_date(account_id_param, date)
     }
 
     fn get_latest_snapshots_before_date(
         &self,
-        account_ids: &[String],
+        account_ids_param: &[String],
         date: NaiveDate,
     ) -> Result<HashMap<String, AccountStateSnapshot>> {
-        SnapshotRepository::get_latest_snapshots_before_date(self, account_ids, date)
+        self.get_latest_snapshots_before_date(account_ids_param, date)
     }
 
     fn get_all_latest_snapshots(
         &self,
-        account_ids: &[String],
+        account_ids_param: &[String],
     ) -> Result<HashMap<String, AccountStateSnapshot>> {
-        SnapshotRepository::get_all_latest_snapshots(self, account_ids)
+        self.get_all_latest_snapshots(account_ids_param)
     }
 
-    fn delete_snapshots_by_account_ids(&self, account_ids: &[String]) -> Result<()> {
-        SnapshotRepository::delete_snapshots_by_account_ids(self, account_ids)
+    async fn delete_snapshots_by_account_ids(&self, account_ids_param: &[String]) -> Result<usize> {
+        Ok(self.delete_snapshots_by_account_ids(account_ids_param).await?)
     }
 
-    fn delete_snapshots_for_account_and_dates(
+    async fn delete_snapshots_for_account_and_dates(
         &self,
-        account_id: &str,
+        account_id_param: &str,
         dates_to_delete: &[NaiveDate],
     ) -> Result<()> {
-        SnapshotRepository::delete_snapshots_for_account_and_dates(
-            self,
-            account_id,
-            dates_to_delete,
-        )
+        self.delete_snapshots_for_account_and_dates(account_id_param, dates_to_delete).await
     }
 
-    fn delete_snapshots_for_account_in_range(
+    async fn delete_snapshots_for_account_in_range(
         &self,
-        account_id: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        account_id_param: &str,
+        start_date_param: NaiveDate,
+        end_date_param: NaiveDate,
     ) -> Result<()> {
-        SnapshotRepository::delete_snapshots_for_account_in_range(
-            self, account_id, start_date, end_date,
+        self.delete_snapshots_for_account_in_range(account_id_param, start_date_param, end_date_param).await
+    }
+    
+    async fn overwrite_snapshots_for_account_in_range(
+        &self,
+        target_account_id: &str,
+        range_start_date: NaiveDate,
+        range_end_date: NaiveDate,
+        snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        self.overwrite_snapshots_for_account_in_range(
+            target_account_id,
+            range_start_date,
+            range_end_date,
+            snapshots_to_save,
         )
+        .await
+    }
+
+    async fn overwrite_multiple_account_snapshot_ranges(
+        &self,
+        new_snapshots: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        self.overwrite_multiple_account_snapshot_ranges(new_snapshots).await
     }
 
     fn get_total_portfolio_snapshots(
@@ -565,7 +617,7 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>> {
-        SnapshotRepository::get_total_portfolio_snapshots(self, start_date, end_date)
+        self.get_total_portfolio_snapshots(start_date, end_date)
     }
 
     fn get_all_active_account_snapshots(
@@ -573,18 +625,10 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>> {
-        SnapshotRepository::get_all_active_account_snapshots(self, start_date, end_date)
+        self.get_all_active_account_snapshots(start_date, end_date)
     }
 
-    fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>> {
-        SnapshotRepository::get_earliest_snapshot_date(self, account_id)
-    }
-
-    fn replace_all_snapshots(
-        &self,
-        all_keyframes: &[AccountStateSnapshot],
-        is_full_recalc_delete_done: bool,
-    ) -> Result<()> {
-        SnapshotRepository::replace_all_snapshots(self, all_keyframes, is_full_recalc_delete_done)
+    fn get_earliest_snapshot_date(&self, account_id_param: &str) -> Result<Option<NaiveDate>> {
+        self.get_earliest_snapshot_date(account_id_param)
     }
 }

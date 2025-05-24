@@ -17,9 +17,9 @@ pub trait MarketDataServiceTrait: Send + Sync {
     fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>>;
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
-    fn add_quote(&self, quote: &Quote) -> Result<Quote>;
-    fn update_quote(&self, quote: Quote) -> Result<Quote>;
-    fn delete_quote(&self, quote_id: &str) -> Result<()>;
+    async fn add_quote(&self, quote: &Quote) -> Result<Quote>;
+    async fn update_quote(&self, quote: Quote) -> Result<Quote>;
+    async fn delete_quote(&self, quote_id: &str) -> Result<()>;
     async fn get_historical_quotes_from_provider(
         &self,
         symbol: &str,
@@ -48,15 +48,16 @@ pub trait MarketDataServiceTrait: Send + Sync {
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>>;
 }
 
-pub trait MarketDataRepositoryTrait {
+#[async_trait::async_trait]
+pub trait MarketDataRepositoryTrait: Send + Sync {
     fn get_all_historical_quotes(&self) -> Result<Vec<Quote>>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
-    fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;
-    fn save_quote(&self, quote: &Quote) -> Result<Quote>;
-    fn delete_quote(&self, quote_id: &str) -> Result<()>;
-    fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()>;
+    async fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;
+    async fn save_quote(&self, quote: &Quote) -> Result<Quote>;
+    async fn delete_quote(&self, quote_id: &str) -> Result<()>;
+    async fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()>;
     fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>>;
-    fn upsert_manual_quotes_from_activities(&self, symbol: &str) -> Result<Vec<Quote>>;
+    async fn upsert_manual_quotes_from_activities(&self, symbol: &str) -> Result<Vec<Quote>>;
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
     fn get_latest_quotes_for_symbols(
         &self,

@@ -4,10 +4,10 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use diesel::connection::{Connection, SimpleConnection};
 use diesel::r2d2;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sqlite::SqliteConnection;
-use diesel::Connection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 use crate::errors::{DatabaseError, Error, Result};
@@ -17,43 +17,33 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 pub type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<SqliteConnection>>;
 
+pub mod write_actor;
+pub use write_actor::WriteHandle;
+
 pub fn init(app_data_dir: &str) -> Result<String> {
     let db_path = get_db_path(app_data_dir);
-    if !Path::new(&db_path).exists() {
-        info!(
-            "Database file not found, creating new database at: {}",
-            db_path
-        );
-        create_db_file(&db_path)?;
+
+    // 1. Ensure directory exists
+    let db_dir = Path::new(&db_path).parent().unwrap();
+    if !db_dir.exists() {
+        fs::create_dir_all(db_dir)?;
     }
+
+    {
+        let mut conn = SqliteConnection::establish(&db_path)?;
+        conn.batch_execute(
+            "\n            PRAGMA journal_mode = WAL;\n            PRAGMA foreign_keys = ON;\n            PRAGMA busy_timeout = 30000;\n            PRAGMA synchronous  = NORMAL;\n        ",
+        )?;
+    }
+
     Ok(db_path)
 }
 
-fn create_db_file(db_path: &str) -> Result<()> {
-    let db_dir = Path::new(db_path).parent().unwrap();
-
-    if !db_dir.exists() {
-        info!("Creating database directory: {}", db_dir.display());
-        fs::create_dir_all(db_dir).map_err(|e| {
-            error!("Failed to create database directory: {}", e);
-            DatabaseError::BackupFailed(e.to_string())
-        })?;
-    }
-
-    info!("Creating database file: {}", db_path);
-    fs::File::create(db_path).map_err(|e| {
-        error!("Failed to create database file: {}", e);
-        DatabaseError::BackupFailed(e.to_string())
-    })?;
-    Ok(())
-}
-
 pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
-    info!("Creating database connection pool");
     let manager = ConnectionManager::<SqliteConnection>::new(db_path);
     let pool = r2d2::Pool::builder()
-        .max_size(8) 
-        .min_idle(Some(1))  // Keep at least one connection ready
+        .max_size(8)
+        .min_idle(Some(1)) // Keep at least one connection ready
         .connection_timeout(std::time::Duration::from_secs(30))
         .connection_customizer(Box::new(ConnectionCustomizer {}))
         .build(manager)
@@ -64,7 +54,7 @@ pub fn create_pool(db_path: &str) -> Result<Arc<DbPool>> {
 pub fn run_migrations(pool: &DbPool) -> Result<()> {
     info!("Running database migrations");
     let mut connection = get_connection(pool)?;
-    
+
     let result = connection.run_pending_migrations(MIGRATIONS).map_err(|e| {
         error!("Database migration failed: {}", e);
         Error::Database(DatabaseError::MigrationFailed(e.to_string()))
@@ -125,9 +115,7 @@ pub fn backup_database(app_data_dir: &str) -> Result<String> {
 }
 
 /// Gets a connection from the pool
-pub fn get_connection(
-    pool: &Pool<ConnectionManager<SqliteConnection>>,
-) -> Result<DbConnection> {
+pub fn get_connection(pool: &Pool<ConnectionManager<SqliteConnection>>) -> Result<DbConnection> {
     Ok(pool.get()?)
 }
 
@@ -135,16 +123,18 @@ pub fn get_connection(
 struct ConnectionCustomizer;
 
 impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
-    fn on_acquire(&self, conn: &mut SqliteConnection) -> std::result::Result<(), diesel::r2d2::Error> {
+    fn on_acquire(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> std::result::Result<(), diesel::r2d2::Error> {
         use diesel::RunQueryDsl;
-        
-        diesel::sql_query("
-            PRAGMA foreign_keys = ON;
-            PRAGMA busy_timeout = 5000;
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;
-        ").execute(conn).map_err(diesel::r2d2::Error::QueryError)?;
-        
+
+        diesel::sql_query(
+            "\n            PRAGMA foreign_keys = ON;\n            PRAGMA busy_timeout = 30000;\n            PRAGMA synchronous = NORMAL;\n        ",
+        )
+        .execute(conn)
+        .map_err(diesel::r2d2::Error::QueryError)?;
+
         Ok(())
     }
 }
@@ -166,7 +156,7 @@ impl DbTransactionExecutor for DbPool {
         E: Into<Error>,
     {
         let mut conn = self.get()?;
-        
+
         conn.transaction(|tx_conn| {
             f(tx_conn).map_err(|_| diesel::result::Error::RollbackTransaction)
         })
@@ -184,5 +174,3 @@ impl DbTransactionExecutor for Arc<DbPool> {
         (**self).execute(f)
     }
 }
-
-

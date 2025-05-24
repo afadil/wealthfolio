@@ -560,10 +560,6 @@ impl YahooProvider {
     /// # Returns
     /// A String with each word capitalized and separated by spaces (e.g., "Basic Materials")
     ///
-    /// # Examples
-    /// ```
-    /// let sector = provider.parse_sector("consumer_defensive");
-    /// assert_eq!(sector, "Consumer Defensive");
     /// ```
     fn format_sector(&self, sector: &str) -> String {
         sector

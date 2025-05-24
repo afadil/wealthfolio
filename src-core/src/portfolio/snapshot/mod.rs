@@ -14,3 +14,6 @@ pub use snapshot_model::*;
 
 #[cfg(test)]
 mod holdings_calculator_tests;
+
+#[cfg(test)]
+pub mod snapshot_service_tests;

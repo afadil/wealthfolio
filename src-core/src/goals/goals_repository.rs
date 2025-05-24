@@ -1,4 +1,4 @@
-use crate::db::get_connection;
+use crate::db::{get_connection, WriteHandle};
 use crate::errors::Result;
 use crate::goals::goals_model::{Goal, GoalsAllocation, NewGoal};
 use crate::goals::goals_traits::GoalRepositoryTrait;
@@ -6,54 +6,29 @@ use crate::schema::goals;
 use crate::schema::goals::dsl::*;
 use crate::schema::goals_allocation;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
+use async_trait::async_trait;
 
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct GoalRepository {
-    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
 }
 
 impl GoalRepository {
-    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>) -> Self {
-        GoalRepository { pool }
+    pub fn new(pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        GoalRepository { pool, writer }
     }
 
-    pub fn load_goals(&self) -> Result<Vec<Goal>> {
+    pub fn load_goals_impl(&self) -> Result<Vec<Goal>> {
         let mut conn = get_connection(&self.pool)?;
         Ok(goals.load::<Goal>(&mut conn)?)
     }
 
-    pub fn insert_new_goal(&self, mut new_goal: NewGoal) -> Result<Goal> {
-        let mut conn = get_connection(&self.pool)?;
-
-        new_goal.id = Some(Uuid::new_v4().to_string());
-
-        Ok(diesel::insert_into(goals::table)
-            .values(&new_goal)
-            .returning(goals::all_columns)
-            .get_result(&mut conn)?)
-    }
-
-    pub fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
-        let mut conn = get_connection(&self.pool)?;
-        let goal_id = goal_update.id.clone();
-
-        diesel::update(goals.find(goal_id))
-            .set(&goal_update)
-            .execute(&mut conn)?;
-
-        Ok(goals.filter(id.eq(goal_update.id)).first(&mut conn)?)
-    }
-
-    pub fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize> {
-        let mut conn = get_connection(&self.pool)?;
-        Ok(diesel::delete(goals.find(goal_id_to_delete)).execute(&mut conn)?)
-    }
-
-    pub fn load_allocations_for_non_achieved_goals(&self) -> Result<Vec<GoalsAllocation>> {
+    pub fn load_allocations_for_non_achieved_goals_impl(&self) -> Result<Vec<GoalsAllocation>> {
         let mut conn = get_connection(&self.pool)?;
         Ok(goals_allocation::table
             .inner_join(goals::table.on(goals::id.eq(goals_allocation::goal_id)))
@@ -65,84 +40,71 @@ impl GoalRepository {
                 goals_allocation::percent_allocation,
             ))
             .load::<GoalsAllocation>(&mut conn)?)
-    }
-
-    pub fn upsert_goal_allocations(&self, allocations: Vec<GoalsAllocation>) -> Result<usize> {
-        let mut conn = get_connection(&self.pool)?;
-        let mut affected_rows = 0;
-
-        for allocation in allocations {
-            affected_rows += diesel::insert_into(goals_allocation::table)
-                .values(&allocation)
-                .on_conflict(goals_allocation::id)
-                .do_update()
-                .set(&allocation)
-                .execute(&mut conn)?;
-        }
-
-        Ok(affected_rows)
     }
 }
 
+#[async_trait]
 impl GoalRepositoryTrait for GoalRepository {
     fn load_goals(&self) -> Result<Vec<Goal>> {
-        let mut conn = get_connection(&self.pool)?;
-        Ok(goals.load::<Goal>(&mut conn)?)
+        self.load_goals_impl()
     }
 
-    fn insert_new_goal(&self, mut new_goal: NewGoal) -> Result<Goal> {
-        let mut conn = get_connection(&self.pool)?;
-        new_goal.id = Some(Uuid::new_v4().to_string());
+    async fn insert_new_goal(&self, new_goal: NewGoal) -> Result<Goal> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Goal> {
+                let mut new_goal_mut = new_goal;
+                new_goal_mut.id = Some(Uuid::new_v4().to_string());
 
-        Ok(diesel::insert_into(goals::table)
-            .values(&new_goal)
-            .returning(goals::all_columns)
-            .get_result(&mut conn)?)
+                Ok(diesel::insert_into(goals::table)
+                    .values(&new_goal_mut)
+                    .returning(goals::all_columns)
+                    .get_result(conn)?)
+            })
+            .await
     }
 
-    fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
-        let mut conn = get_connection(&self.pool)?;
-        let goal_id = goal_update.id.clone();
+    async fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
+        let goal_id_owned = goal_update.id.clone();
+        let goal_update_owned = goal_update.clone();
 
-        diesel::update(goals.find(goal_id))
-            .set(&goal_update)
-            .execute(&mut conn)?;
-
-        Ok(goals.filter(id.eq(goal_update.id)).first(&mut conn)?)
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Goal> {
+                diesel::update(goals.find(goal_id_owned.clone()))
+                    .set(&goal_update_owned)
+                    .execute(conn)?;
+                Ok(goals.filter(id.eq(goal_id_owned)).first(conn)?)
+            })
+            .await
     }
 
-    fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize> {
-        let mut conn = get_connection(&self.pool)?;
-        Ok(diesel::delete(goals.find(goal_id_to_delete)).execute(&mut conn)?)
+    async fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                Ok(diesel::delete(goals.find(goal_id_to_delete)).execute(conn)?)
+            })
+            .await
     }
 
     fn load_allocations_for_non_achieved_goals(&self) -> Result<Vec<GoalsAllocation>> {
-        let mut conn = get_connection(&self.pool)?;
-        Ok(goals_allocation::table
-            .inner_join(goals::table.on(goals::id.eq(goals_allocation::goal_id)))
-            .filter(goals::is_achieved.eq(false))
-            .select((
-                goals_allocation::id,
-                goals_allocation::goal_id,
-                goals_allocation::account_id,
-                goals_allocation::percent_allocation,
-            ))
-            .load::<GoalsAllocation>(&mut conn)?)
+        self.load_allocations_for_non_achieved_goals_impl()
     }
 
-    fn upsert_goal_allocations(&self, allocations: Vec<GoalsAllocation>) -> Result<usize> {
-        let mut conn = get_connection(&self.pool)?;
-        let mut affected_rows = 0;
+    async fn upsert_goal_allocations(&self, allocations: Vec<GoalsAllocation>) -> Result<usize> {
+        let allocations_owned = allocations.clone();
 
-        for allocation in allocations {
-            affected_rows += diesel::insert_into(goals_allocation::table)
-                .values(&allocation)
-                .on_conflict(goals_allocation::id)
-                .do_update()
-                .set(&allocation)
-                .execute(&mut conn)?;
-        }
-
-        Ok(affected_rows)
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let mut affected_rows = 0;
+                for allocation in allocations_owned {
+                    affected_rows += diesel::insert_into(goals_allocation::table)
+                        .values(&allocation)
+                        .on_conflict(goals_allocation::id)
+                        .do_update()
+                        .set(&allocation)
+                        .execute(conn)?;
+                }
+                Ok(affected_rows)
+            })
+            .await
     }
 }

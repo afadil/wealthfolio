@@ -112,19 +112,15 @@ pub async fn update_account(
     let updated_account = state
         .account_service()
         .update_account(account_update.clone()) // Removed .await
+        .await // Add .await here
         .map_err(|e| format!("Failed to update account {:?}: {}", account_update.id, e))?;
 
-    // Always trigger recalculation after successful update
-    debug!(
-        "Account {:?} updated. Triggering recalculation.",
-        updated_account.id
-    );
+    // Trigger recalculation after successful update
     let handle = handle.clone();
     let account_id_clone = updated_account.id.clone();
 
-    // Build payload to recalculate for this account, syncing all relevant market data
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id_clone])) // Target this account
+        .account_ids(Some(vec![account_id_clone])) 
         .build();
 
     // Emit the recalculation request
@@ -143,6 +139,7 @@ pub async fn delete_account(
     state
         .account_service()
         .delete_account(&account_id)
+        .await // Add .await here
         .map_err(|e| {
             error!("Failed to delete account {}: {}", account_id, e); // Log error
             e.to_string()

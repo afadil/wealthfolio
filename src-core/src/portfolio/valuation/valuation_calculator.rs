@@ -132,7 +132,7 @@ fn calculate_investment_market_value_acct(
             let market_value = position.quantity * quote.close * quote_fx_rate;
             total_position_market_value += market_value;
         } else {
-            warn!(
+            debug!(
                 "Missing quote for asset {} on date {}. Position market value treated as ZERO.",
                 asset_id, target_date
             );

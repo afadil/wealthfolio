@@ -385,7 +385,7 @@ mod tests {
         let converted_amount = converter
             .convert_amount(amount, "USD", "GBP", date)
             .unwrap();
-        assert_eq!(converted_amount, Decimal::ONE_HUNDRED * Decimal::from(85) * Decimal::from(90));
+        assert_eq!(converted_amount, Decimal::ONE_HUNDRED * Decimal::new(85, 2) * Decimal::new(90, 2));
     }
 
     #[test]

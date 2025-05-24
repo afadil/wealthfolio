@@ -202,7 +202,7 @@ impl UpdateAssetProfile {
     Deserialize,
     Debug,
     Clone,
-    Default,
+    Default
 )]
 #[diesel(table_name = crate::schema::assets)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]

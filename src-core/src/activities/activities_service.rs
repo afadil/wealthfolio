@@ -117,10 +117,10 @@ impl ActivityServiceTrait for ActivityService {
         if activity.currency != account.currency {
             self.fx_service
                 .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
-                ?;
+                .await?;
         }
 
-        self.activity_repository.create_activity(activity)
+        self.activity_repository.create_activity(activity).await
     }
 
     /// Updates an existing activity
@@ -150,15 +150,15 @@ impl ActivityServiceTrait for ActivityService {
         if activity.currency != account.currency {
             self.fx_service
                 .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
-                ?;
+                .await?;
         }
 
-        self.activity_repository.update_activity(activity)
+        self.activity_repository.update_activity(activity).await
     }
 
     /// Deletes an activity
-    fn delete_activity(&self, activity_id: String) -> Result<Activity> {
-        self.activity_repository.delete_activity(activity_id)
+    async fn delete_activity(&self, activity_id: String) -> Result<Activity> {
+        self.activity_repository.delete_activity(activity_id).await
     }
 
     /// Verifies the activities import from CSV file
@@ -207,7 +207,7 @@ impl ActivityServiceTrait for ActivityService {
                         match self.fx_service.register_currency_pair(
                             account.currency.as_str(),
                             activity.currency.as_str(), // Use currency from import data
-                        ) {
+                        ).await {
                             Ok(_) => { /* FX pair registered or already exists */ }
                             Err(e) => {
                                 is_valid = false;
@@ -277,7 +277,7 @@ impl ActivityServiceTrait for ActivityService {
             })
             .collect();
 
-        let count = self.activity_repository.create_activities(new_activities)?;
+        let count = self.activity_repository.create_activities(new_activities).await?;
         debug!("Successfully imported {} activities", count);
 
         Ok(validated_activities)
@@ -309,7 +309,7 @@ impl ActivityServiceTrait for ActivityService {
     }
 
     /// Saves or updates an import mapping
-    fn save_import_mapping(
+    async fn save_import_mapping(
         &self,
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData> {
@@ -323,8 +323,7 @@ impl ActivityServiceTrait for ActivityService {
             updated_at: now,
         };
 
-        self.activity_repository.save_import_mapping(&new_mapping)?;
-
+        self.activity_repository.save_import_mapping(&new_mapping).await?;
         Ok(mapping_data)
     }
 }

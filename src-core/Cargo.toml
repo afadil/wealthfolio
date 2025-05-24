@@ -32,6 +32,6 @@ rust_decimal_macros = "1.37"
 log = "0.4"
 futures = "0.3"
 serde_with = "3.4"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

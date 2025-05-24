@@ -1,0 +1,467 @@
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::{Arc, RwLock};
+    use rust_decimal::Decimal;
+    use rust_decimal_macros::dec;
+    use chrono::{NaiveDate, Utc, DateTime, NaiveDateTime};
+    use async_trait::async_trait;
+
+    use crate::accounts::{Account, AccountRepositoryTrait, NewAccount, AccountUpdate};
+    use crate::activities::{Activity, ActivityRepositoryTrait, NewActivity, ActivityUpdate, ImportMapping as ActivityImportMapping, Sort as ActivitySort, ActivitySearchResponse, activities_model::IncomeData as ActivityIncomeData};
+    use crate::errors::{Error, Result as AppResult}; 
+    use crate::fx::fx_traits::FxServiceTrait;
+    use crate::fx::fx_model::{ExchangeRate, NewExchangeRate};
+    use crate::portfolio::snapshot::{
+        SnapshotService, SnapshotServiceTrait, AccountStateSnapshot, Position, 
+        snapshot_repository::SnapshotRepositoryTrait,
+    };
+    use crate::constants::{PORTFOLIO_TOTAL_ACCOUNT_ID, DECIMAL_PRECISION};
+
+    #[derive(Clone, Debug)]
+    struct MockFxService {
+        rates: HashMap<(String, String, NaiveDate), Decimal>,
+    }
+
+    impl MockFxService {
+        fn new() -> Self {
+            Self { rates: HashMap::new() }
+        }
+        fn add_bidirectional_rate(&mut self, from: &str, to: &str, date: NaiveDate, rate: Decimal) {
+            self.rates.insert((from.to_string(), to.to_string(), date), rate);
+            if rate != Decimal::ZERO {
+                self.rates.insert((to.to_string(), from.to_string(), date), dec!(1) / rate);
+            }
+        }
+    }
+
+    #[async_trait]
+    impl FxServiceTrait for MockFxService {
+        fn initialize(&self) -> AppResult<()> { Ok(()) }
+        async fn add_exchange_rate(&self, _new_rate: NewExchangeRate) -> AppResult<ExchangeRate> { unimplemented!() }
+        fn get_historical_rates(&self, _from_currency: &str, _to_currency: &str, _days: i64) -> AppResult<Vec<ExchangeRate>> { unimplemented!() }
+        async fn update_exchange_rate(&self, _from_currency: &str, _to_currency: &str, _rate: Decimal) -> AppResult<ExchangeRate> { unimplemented!() }
+        fn get_latest_exchange_rate(&self, _from_currency: &str, _to_currency: &str) -> AppResult<Decimal> { unimplemented!() }
+        fn get_exchange_rate_for_date(&self, from_currency: &str, to_currency: &str, date: NaiveDate) -> AppResult<Decimal> {
+            if from_currency == to_currency { return Ok(Decimal::ONE); }
+            self.rates.get(&(from_currency.to_string(), to_currency.to_string(), date))
+                .copied()
+                .ok_or_else(|| Error::Fx(crate::fx::FxError::RateNotFound(format!("Rate not found for {}->{} on {}", from_currency, to_currency, date))))
+        }
+        fn convert_currency(&self, amount: Decimal, from_currency: &str, to_currency: &str) -> AppResult<Decimal> {
+            if from_currency == to_currency { return Ok(amount); }
+            let rate = self.get_latest_exchange_rate(from_currency, to_currency)?;
+            Ok(amount * rate)
+        }
+        fn convert_currency_for_date(&self, amount: Decimal, from_currency: &str, to_currency: &str, date: NaiveDate) -> AppResult<Decimal> {
+            if from_currency == to_currency { return Ok(amount); }
+            let rate = self.get_exchange_rate_for_date(from_currency, to_currency, date)?;
+            Ok(amount * rate)
+        }
+        fn get_latest_exchange_rates(&self) -> AppResult<Vec<ExchangeRate>> { unimplemented!() }
+        async fn delete_exchange_rate(&self, _rate_id: &str) -> AppResult<()> { unimplemented!() }
+        async fn register_currency_pair(&self, _from_currency: &str, _to_currency: &str) -> AppResult<()> { Ok(()) }
+        async fn register_currency_pair_manual(&self, _from_currency: &str, _to_currency: &str) -> AppResult<()> { Ok(()) }
+    }
+
+    #[derive(Clone, Debug)]
+    struct MockAccountRepository {
+        accounts: Arc<RwLock<HashMap<String, Account>>>,
+    }
+    impl MockAccountRepository {
+        fn new() -> Self {
+            Self { accounts: Arc::new(RwLock::new(HashMap::new())) }
+        }
+        #[allow(dead_code)]
+        fn add_account(&mut self, account: Account) {
+            self.accounts.write().unwrap().insert(account.id.clone(), account);
+        }
+    }
+    #[async_trait]
+    impl AccountRepositoryTrait for MockAccountRepository {
+        fn get_by_id(&self, id: &str) -> AppResult<Account> {
+            self.accounts.read().unwrap().get(id).cloned().ok_or(Error::Repository(format!("Account {} not found", id)))
+        }
+        fn list(&self, active_only: Option<bool>, account_ids: Option<&[String]>) -> AppResult<Vec<Account>> {
+            let mut filtered_accounts: Vec<Account> = self.accounts.read().unwrap().values()
+                .filter(|a| active_only.map_or(true, |active| a.is_active == active))
+                .cloned()
+                .collect();
+
+            if let Some(ids_filter) = account_ids {
+                filtered_accounts.retain(|acc| ids_filter.contains(&acc.id));
+            }
+            Ok(filtered_accounts)
+        }
+        async fn update(&self, _account_update: AccountUpdate) -> AppResult<Account> {
+            unimplemented!("MockAccountRepository::update")
+        }
+        async fn delete(&self, _id: &str) -> AppResult<usize> {
+            unimplemented!("MockAccountRepository::delete"); 
+        }
+        fn create_in_transaction(&self, _new_account: NewAccount, _conn: &mut diesel::sqlite::SqliteConnection) -> AppResult<Account> {
+            unimplemented!("MockAccountRepository::create_in_transaction not suitable for simple mock without DB instance")
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct MockActivityRepository;
+    impl MockActivityRepository { fn new() -> Self { Self } }
+    #[async_trait]
+    impl ActivityRepositoryTrait for MockActivityRepository {
+        fn get_activities(&self) -> AppResult<Vec<Activity>> { unimplemented!() }
+        fn get_activities_by_account_id(&self, _account_id: &String) -> AppResult<Vec<Activity>> { unimplemented!() }
+        fn get_activities_by_account_ids(&self, _account_ids: &[String]) -> AppResult<Vec<Activity>> { Ok(Vec::new()) }
+        fn get_trading_activities(&self) -> AppResult<Vec<Activity>> { unimplemented!() }
+        fn get_income_activities(&self) -> AppResult<Vec<Activity>> { unimplemented!() }
+        fn get_deposit_activities(
+            &self, _account_ids: &[String], _start_date: NaiveDateTime, _end_date: NaiveDateTime,
+        ) -> AppResult<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> { unimplemented!() }
+        fn search_activities(
+            &self, _page: i64, _page_size: i64, _account_id_filter: Option<Vec<String>>,
+            _activity_type_filter: Option<Vec<String>>, _asset_id_keyword: Option<String>,
+            _sort: Option<ActivitySort>,
+        ) -> AppResult<ActivitySearchResponse> { unimplemented!() }
+        async fn create_activity(&self, _new_activity: NewActivity) -> AppResult<Activity> { unimplemented!() }
+        async fn update_activity(&self, _activity_update: ActivityUpdate) -> AppResult<Activity> { unimplemented!() }
+        async fn delete_activity(&self, _activity_id: String) -> AppResult<Activity> { unimplemented!() }
+        async fn create_activities(&self, _activities: Vec<NewActivity>) -> AppResult<usize> { unimplemented!() }
+        fn get_first_activity_date(&self, _account_ids: Option<&[String]>) -> AppResult<Option<DateTime<Utc>>> { unimplemented!() }
+        fn get_import_mapping(&self, _account_id: &str) -> AppResult<Option<ActivityImportMapping>> { unimplemented!() }
+        async fn save_import_mapping(&self, _mapping: &ActivityImportMapping) -> AppResult<()> { unimplemented!() }
+        fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> AppResult<Decimal> { unimplemented!() }
+        fn get_income_activities_data(&self) -> AppResult<Vec<ActivityIncomeData>> { unimplemented!() }
+        fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> { unimplemented!() }
+    }
+
+    // Mock SnapshotRepository that implements the trait
+    #[derive(Clone, Debug)]
+    struct MockSnapshotRepository {
+        snapshots: Arc<RwLock<HashMap<String, Vec<AccountStateSnapshot>>>>, // account_id -> snapshots
+        saved_snapshots: Arc<RwLock<Vec<AccountStateSnapshot>>>, // track what was saved via replace_all_snapshots
+    }
+
+    impl MockSnapshotRepository {
+        fn new() -> Self {
+            Self { 
+                snapshots: Arc::new(RwLock::new(HashMap::new())),
+                saved_snapshots: Arc::new(RwLock::new(Vec::new())),
+            }
+        }
+
+        fn add_snapshots(&self, snapshots: Vec<AccountStateSnapshot>) {
+            let mut store = self.snapshots.write().unwrap();
+            for snapshot in snapshots {
+                store.entry(snapshot.account_id.clone())
+                    .or_insert_with(Vec::new)
+                    .push(snapshot);
+            }
+        }
+
+        fn get_saved_snapshots(&self) -> Vec<AccountStateSnapshot> {
+            self.saved_snapshots.read().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl SnapshotRepositoryTrait for MockSnapshotRepository {
+        async fn save_snapshots(&self, snapshots_to_save: &[AccountStateSnapshot]) -> AppResult<()> {
+            // This mock is primarily used to verify what the service saves for TOTAL.
+            let mut saved_store = self.saved_snapshots.write().unwrap();
+            saved_store.clear(); // Clear previous state, as test verifies the result of one operation.
+            saved_store.extend(snapshots_to_save.iter().cloned());
+            
+            // Also update the main `self.snapshots` store for the saved snapshots.
+            let mut main_store = self.snapshots.write().unwrap();
+            for s in snapshots_to_save {
+                let account_snaps = main_store.entry(s.account_id.clone()).or_default();
+                // Remove existing snapshot for the same date before adding the new one
+                account_snaps.retain(|existing_s| existing_s.snapshot_date != s.snapshot_date);
+                account_snaps.push(s.clone());
+                account_snaps.sort_by_key(|k| k.snapshot_date); // Keep them sorted
+            }
+            Ok(())
+        }
+
+        fn get_snapshots_by_account(&self, account_id: &str, start_date: Option<NaiveDate>, end_date: Option<NaiveDate>) -> AppResult<Vec<AccountStateSnapshot>> {
+            let store = self.snapshots.read().unwrap();
+            if let Some(account_snapshots) = store.get(account_id) {
+                let filtered: Vec<AccountStateSnapshot> = account_snapshots
+                    .iter()
+                    .filter(|snap| {
+                        let date_ok = start_date.map_or(true, |start| snap.snapshot_date >= start) &&
+                                     end_date.map_or(true, |end| snap.snapshot_date <= end);
+                        date_ok
+                    })
+                    .cloned()
+                    .collect();
+                Ok(filtered)
+            } else {
+                Ok(Vec::new())
+            }
+        }
+
+        fn get_latest_snapshot_before_date(&self, _account_id: &str, _date: NaiveDate) -> AppResult<Option<AccountStateSnapshot>> {
+            // For test_calculate_total_portfolio_snapshots_aggregation, this might not be directly hit
+            // but good to have a basic mock if other flows use it.
+            let store = self.snapshots.read().unwrap();
+            if let Some(account_snapshots) = store.get(_account_id) {
+                return Ok(account_snapshots
+                    .iter()
+                    .filter(|s| s.snapshot_date <= _date)
+                    .max_by_key(|s| s.snapshot_date)
+                    .cloned());
+            }
+            Ok(None)
+        }
+
+        fn get_latest_snapshots_before_date(&self, _account_ids: &[String], _date: NaiveDate) -> AppResult<HashMap<String, AccountStateSnapshot>> {
+            unimplemented!("get_latest_snapshots_before_date mock")
+        }
+
+        fn get_all_latest_snapshots(&self, _account_ids: &[String]) -> AppResult<HashMap<String, AccountStateSnapshot>> {
+            unimplemented!("get_all_latest_snapshots mock")
+        }
+
+        async fn delete_snapshots_by_account_ids(&self, account_ids_to_delete: &[String]) -> AppResult<usize> {
+            let mut store = self.snapshots.write().unwrap();
+            let mut count = 0;
+            for id in account_ids_to_delete {
+                if let Some(removed) = store.remove(id) {
+                    count += removed.len();
+                }
+            }
+            // This method should NOT clear self.saved_snapshots, as that's used for assertions AFTER save.
+            Ok(count)
+        }
+
+        async fn delete_snapshots_for_account_and_dates(&self, _account_id: &str, _dates_to_delete: &[NaiveDate]) -> AppResult<()> {
+            unimplemented!("delete_snapshots_for_account_and_dates mock")
+        }
+
+        async fn delete_snapshots_for_account_in_range(&self, _account_id: &str, _start_date: NaiveDate, _end_date: NaiveDate) -> AppResult<()> {
+            // This was identified as the panic point. 
+            // For `test_calculate_total_portfolio_snapshots_aggregation`, this should ideally not be called.
+            // If it is, the test or service logic might have changed.
+            // For now, keep it unimplemented to catch if it's unexpectedly called.
+            unimplemented!("delete_snapshots_for_account_in_range mock - was this expected for TOTAL calculation?")
+        }
+
+        fn get_total_portfolio_snapshots(&self, start_date: Option<NaiveDate>, end_date: Option<NaiveDate>) -> AppResult<Vec<AccountStateSnapshot>> {
+            self.get_snapshots_by_account(PORTFOLIO_TOTAL_ACCOUNT_ID, start_date, end_date)
+        }
+
+        fn get_all_active_account_snapshots(&self, start_date: Option<NaiveDate>, end_date: Option<NaiveDate>) -> AppResult<Vec<AccountStateSnapshot>> {
+            let store = self.snapshots.read().unwrap();
+            let mut all_snapshots = Vec::new();
+            
+            for (account_id, account_snapshots) in store.iter() {
+                // Skip TOTAL snapshots when getting "active account" snapshots (individual accounts only)
+                if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+                    continue;
+                }
+                
+                let filtered: Vec<AccountStateSnapshot> = account_snapshots
+                    .iter()
+                    .filter(|snap| {
+                        let date_ok = start_date.map_or(true, |start| snap.snapshot_date >= start) &&
+                                     end_date.map_or(true, |end| snap.snapshot_date <= end);
+                        date_ok
+                    })
+                    .cloned()
+                    .collect();
+                all_snapshots.extend(filtered);
+            }
+            Ok(all_snapshots)
+        }
+
+        fn get_earliest_snapshot_date(&self, account_id: &str) -> AppResult<Option<NaiveDate>> {
+            let store = self.snapshots.read().unwrap();
+            if let Some(account_snapshots) = store.get(account_id) {
+                return Ok(account_snapshots.iter().map(|s| s.snapshot_date).min());
+            }
+            Ok(None)
+        }
+
+        async fn overwrite_snapshots_for_account_in_range(
+            &self, _account_id: &str, _start_date: NaiveDate, _end_date: NaiveDate,
+            _snapshots_to_save: &[AccountStateSnapshot],
+        ) -> AppResult<()> {
+            unimplemented!("overwrite_snapshots_for_account_in_range mock")
+        }
+
+        async fn overwrite_multiple_account_snapshot_ranges(
+            &self, _new_snapshots: &[AccountStateSnapshot],
+        ) -> AppResult<()> {
+            unimplemented!("overwrite_multiple_account_snapshot_ranges mock")
+        }
+    }
+
+    fn create_test_account(id: &str, currency: &str, name: &str) -> Account {
+        Account {
+            id: id.to_string(),
+            name: name.to_string(),
+            currency: currency.to_string(),
+            is_active: true,
+            account_type: "REGULAR".to_string(),
+            group: None,
+            is_default: false,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+            platform_id: None,
+        }
+    }
+
+    fn create_blank_snapshot(account_id: &str, currency: &str, date_str: &str) -> AccountStateSnapshot {
+        AccountStateSnapshot {
+            id: format!("{}_{}", account_id, date_str),
+            account_id: account_id.to_string(),
+            snapshot_date: NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap(),
+            currency: currency.to_string(),
+            calculated_at: Utc::now().naive_utc(),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_calculate_total_portfolio_snapshots_aggregation() {
+        let base_portfolio_currency = "CAD";
+        let date1_str = "2023-01-01";
+        let date2_str = "2023-01-05";
+        let target_date1 = NaiveDate::parse_from_str(date1_str, "%Y-%m-%d").unwrap();
+        let target_date2 = NaiveDate::parse_from_str(date2_str, "%Y-%m-%d").unwrap();
+
+        // Setup mock repositories
+        let mut mock_account_repo_instance = MockAccountRepository::new();
+        let acc1_cad = create_test_account("acc1", "CAD", "CAD Account");
+        let acc2_usd = create_test_account("acc2", "USD", "USD Account");
+        mock_account_repo_instance.add_account(acc1_cad.clone());
+        mock_account_repo_instance.add_account(acc2_usd.clone());
+        let mock_account_repo_arc = Arc::new(mock_account_repo_instance);
+
+        let mock_activity_repo_arc = Arc::new(MockActivityRepository::new());
+        
+        let mut mock_fx_service_instance = MockFxService::new();
+        mock_fx_service_instance.add_bidirectional_rate("USD", "CAD", target_date1, dec!(1.25));
+        mock_fx_service_instance.add_bidirectional_rate("USD", "CAD", target_date2, dec!(1.30));
+        let mock_fx_service_arc = Arc::new(mock_fx_service_instance);
+
+        // Setup mock snapshot repository with test data
+        let mock_snapshot_repo = MockSnapshotRepository::new();
+        
+        // Create test snapshots for individual accounts on different dates
+        let mut snap1_cad = create_blank_snapshot(&acc1_cad.id, &acc1_cad.currency, date1_str);
+        snap1_cad.cash_balances.insert("CAD".to_string(), dec!(1000));
+        let pos1_tse = Position {
+            id: format!("pos_TSE_{}", acc1_cad.id),
+            account_id: acc1_cad.id.clone(),
+            asset_id: "TSE.TO".to_string(),
+            currency: "CAD".to_string(),
+            quantity: dec!(10),
+            average_cost: dec!(50),
+            total_cost_basis: dec!(500),
+            lots: Default::default(),
+            inception_date: DateTime::from_naive_utc_and_offset(target_date1.and_hms_opt(0,0,0).unwrap(), Utc),
+            created_at: Utc::now(), 
+            last_updated: Utc::now(),
+        };
+        snap1_cad.positions.insert("TSE.TO".to_string(), pos1_tse);
+        snap1_cad.cost_basis = dec!(500);
+        snap1_cad.net_contribution = dec!(1000);
+
+        let mut snap2_usd = create_blank_snapshot(&acc2_usd.id, &acc2_usd.currency, date2_str);
+        snap2_usd.cash_balances.insert("USD".to_string(), dec!(500));
+        let pos2_aapl = Position {
+            id: format!("pos_AAPL_{}", acc2_usd.id),
+            account_id: acc2_usd.id.clone(),
+            asset_id: "AAPL".to_string(),
+            currency: "USD".to_string(),
+            quantity: dec!(5),
+            average_cost: dec!(150),
+            total_cost_basis: dec!(750),
+            lots: Default::default(),
+            inception_date: DateTime::from_naive_utc_and_offset(target_date2.and_hms_opt(0,0,0).unwrap(), Utc),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+        };
+        snap2_usd.positions.insert("AAPL".to_string(), pos2_aapl);
+        snap2_usd.cost_basis = dec!(750);
+        snap2_usd.net_contribution = dec!(600);
+
+        // Add the individual account snapshots to our mock repository
+        mock_snapshot_repo.add_snapshots(vec![snap1_cad.clone(), snap2_usd.clone()]);
+
+        let mock_snapshot_repo_arc = Arc::new(mock_snapshot_repo);
+        let base_currency_arc = Arc::new(RwLock::new(base_portfolio_currency.to_string()));
+
+        // Create the SnapshotService with our mock repositories
+        let snapshot_service = SnapshotService::new(
+            base_currency_arc.clone(),
+            mock_account_repo_arc.clone(),
+            mock_activity_repo_arc,
+            mock_snapshot_repo_arc.clone(),
+            mock_fx_service_arc.clone(),
+        );
+
+        // Call the public method under test
+        let result = snapshot_service.calculate_total_portfolio_snapshots().await;
+
+        log::info!("result: {:?}", result);
+        
+        // Verify the method succeeded
+        assert!(result.is_ok(), "calculate_total_portfolio_snapshots should succeed");
+        let snapshots_saved = result.unwrap();
+        assert_eq!(snapshots_saved, 2, "Should have saved 2 TOTAL snapshots for 2 different dates");
+
+        // Verify what was saved
+        let saved_snapshots = mock_snapshot_repo_arc.get_saved_snapshots();
+        assert_eq!(saved_snapshots.len(), 2, "Should have 2 saved TOTAL snapshots");
+        
+        // Sort snapshots by date for consistent testing
+        let mut sorted_snapshots = saved_snapshots.clone();
+        sorted_snapshots.sort_by_key(|s| s.snapshot_date);
+        
+        // Verify first date snapshot (2023-01-01) - only CAD account data
+        let total_snapshot_date1 = &sorted_snapshots[0];
+        assert_eq!(total_snapshot_date1.account_id, PORTFOLIO_TOTAL_ACCOUNT_ID);
+        assert_eq!(total_snapshot_date1.snapshot_date, target_date1);
+        assert_eq!(total_snapshot_date1.currency, base_portfolio_currency);
+        assert_eq!(total_snapshot_date1.cash_balances.len(), 1, "Date1 snapshot should have 1 cash currency");
+        assert_eq!(total_snapshot_date1.cash_balances.get("CAD"), Some(&dec!(1000)));
+        assert_eq!(total_snapshot_date1.positions.len(), 1, "Date1 snapshot should have 1 position");
+        let total_pos_tse = total_snapshot_date1.positions.get("TSE.TO").unwrap();
+        assert_eq!(total_pos_tse.quantity, dec!(10));
+        assert_eq!(total_pos_tse.total_cost_basis, dec!(500));
+        assert_eq!(total_pos_tse.currency, "CAD");
+        assert_eq!(total_snapshot_date1.net_contribution, dec!(1000));
+        assert_eq!(total_snapshot_date1.cost_basis, dec!(500));
+
+        // Verify second date snapshot (2023-01-05) - should have BOTH accounts' data (carry-forward logic)
+        let total_snapshot_date2 = &sorted_snapshots[1];
+        assert_eq!(total_snapshot_date2.account_id, PORTFOLIO_TOTAL_ACCOUNT_ID);
+        assert_eq!(total_snapshot_date2.snapshot_date, target_date2);
+        assert_eq!(total_snapshot_date2.currency, base_portfolio_currency);
+        assert_eq!(total_snapshot_date2.cash_balances.len(), 2, "Date2 snapshot should have 2 cash currencies");
+        assert_eq!(total_snapshot_date2.cash_balances.get("USD"), Some(&dec!(500)));
+        assert_eq!(total_snapshot_date2.cash_balances.get("CAD"), Some(&dec!(1000)));
+        assert_eq!(total_snapshot_date2.positions.len(), 2, "Date2 snapshot should have 2 positions");
+        
+        // Verify TSE position (carried forward from date1)
+        let total_pos_tse_date2 = total_snapshot_date2.positions.get("TSE.TO").unwrap();
+        assert_eq!(total_pos_tse_date2.quantity, dec!(10));
+        assert_eq!(total_pos_tse_date2.total_cost_basis, dec!(500));
+        assert_eq!(total_pos_tse_date2.currency, "CAD");
+        
+        // Verify AAPL position (from date2)
+        let total_pos_aapl = total_snapshot_date2.positions.get("AAPL").unwrap();
+        assert_eq!(total_pos_aapl.quantity, dec!(5));
+        assert_eq!(total_pos_aapl.total_cost_basis, dec!(750));
+        assert_eq!(total_pos_aapl.currency, "USD");
+        
+        // Verify currency conversions for date2 - should include both accounts
+        let expected_net_contribution_date2 = dec!(1000) + (dec!(600) * dec!(1.30)); // CAD + USD converted
+        assert_eq!(total_snapshot_date2.net_contribution.round_dp(DECIMAL_PRECISION), expected_net_contribution_date2.round_dp(DECIMAL_PRECISION));
+        let expected_cost_basis_date2 = dec!(500) + (dec!(750) * dec!(1.30)); // CAD + USD converted
+        assert_eq!(total_snapshot_date2.cost_basis.round_dp(DECIMAL_PRECISION), expected_cost_basis_date2.round_dp(DECIMAL_PRECISION));
+    }
+} 
