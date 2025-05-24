@@ -20,7 +20,7 @@ const COLORS = [
 
 const renderActiveShape = (props: any) => {
   const { isBalanceHidden } = useBalancePrivacy();
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent, midAngle } =
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } =
     props;
 
   const amountToDisplay = isBalanceHidden
