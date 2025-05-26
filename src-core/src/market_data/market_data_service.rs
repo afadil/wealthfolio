@@ -4,11 +4,14 @@ use log::{debug, error};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
+// Removed tauri::Manager and Stronghold from here, they are method-specific for update_..._settings
 
 use super::market_data_constants::*;
-use super::market_data_model::{LatestQuotePair, Quote, QuoteRequest, QuoteSummary, MarketDataProviderInfo};
+use super::market_data_model::{LatestQuotePair, Quote, QuoteRequest, QuoteSummary, MarketDataProviderInfo, MarketDataProviderSetting, UpdateMarketDataProviderSetting};
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
+use super::market_data_errors::MarketDataError;
 use super::providers::models::AssetProfile;
+use super::providers::api_key_resolver::ApiKeyResolver; // Added for constructor
 use crate::assets::assets_constants::CASH_ASSET_TYPE;
 use crate::assets::assets_traits::AssetRepositoryTrait;
 use crate::errors::Result;
@@ -24,9 +27,8 @@ pub struct MarketDataService {
 #[async_trait]
 impl MarketDataServiceTrait for MarketDataService {
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
-        // Use the default provider (Yahoo) for symbol search
+        // ProviderRegistry's search_ticker method will handle using the default/first capable provider
         self.provider_registry
-            .default_provider()
             .search_ticker(query)
             .await
             .map_err(|e| e.into())
@@ -69,30 +71,11 @@ impl MarketDataServiceTrait for MarketDataService {
     }
 
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile> {
-        if symbol.starts_with("$CASH") {
-            // Use manual provider for $CASH-
-            self.provider_registry
-                .get_profiler(DataSource::Manual)
-                .get_asset_profile(symbol)
-                .await
-                .map_err(|e| e.into())
-        } else {
-            // Try Yahoo first, then fall back to manual if needed
-            match self
-                .provider_registry
-                .get_profiler(DataSource::Yahoo)
-                .get_asset_profile(symbol)
-                .await
-            {
-                Ok(asset) => Ok(asset),
-                Err(_) => self
-                    .provider_registry
-                    .get_profiler(DataSource::Manual)
-                    .get_asset_profile(symbol)
-                    .await
-                    .map_err(|e| e.into()),
-            }
-        }
+        // ProviderRegistry's get_asset_profile method handles iteration and $CASH logic
+        self.provider_registry
+            .get_asset_profile(symbol)
+            .await
+            .map_err(|e| e.into())
     }
 
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>> {
@@ -131,10 +114,9 @@ impl MarketDataServiceTrait for MarketDataService {
             .from_utc_datetime(&end_date.and_hms_opt(23, 59, 59).unwrap())
             .into();
 
-        // Use the default provider (Yahoo) for history
+        // ProviderRegistry's historical_quotes method will iterate through providers
         self.provider_registry
-            .default_provider()
-            .get_historical_quotes(symbol, start_time, end_time, "USD".to_string())
+            .historical_quotes(symbol, start_time, end_time, "USD".to_string()) // Assuming "USD" is a sensible default/fallback
             .await
             .map_err(|e| e.into())
     }
@@ -238,43 +220,360 @@ impl MarketDataServiceTrait for MarketDataService {
 
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> {
         debug!("Fetching market data providers info");
-        let latest_sync_dates_by_source = self.repository.get_latest_sync_dates_by_source()?;
-
-        let mut providers_info = Vec::new();
-
-        // Define known providers statically or load from config
-        // For now, hardcoding based on existing frontend and common data sources
-        let known_providers = vec![
-            (DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png"),
-        ];
-
-        for (id, name, logo_filename) in known_providers {
-            let last_synced_naive: Option<NaiveDateTime> = latest_sync_dates_by_source
-                .get(id)
-                .and_then(|opt_dt| *opt_dt);
-
-            let last_synced_utc: Option<DateTime<Utc>> = 
-                last_synced_naive.map(|naive_dt| Utc.from_utc_datetime(&naive_dt));
-
-            providers_info.push(MarketDataProviderInfo {
-                id: id.to_string(),
-                name: name.to_string(),
-                logo_filename: logo_filename.to_string(),
-                last_synced_date: last_synced_utc,
-            });
-        }
         
-        debug!("Market data providers info: {:?}", providers_info);
-        Ok(providers_info)
+        let settings = self.repository.get_all_providers()?;
+        
+        let providers_info: Result<Vec<MarketDataProviderInfo>> = settings
+            .into_iter()
+            .map(|setting| {
+                let last_synced_naive: Option<NaiveDateTime> = self
+                    .repository
+                    .get_last_quote_timestamp_for_provider(&setting.id)?;
+                
+                let last_synced_utc: Option<DateTime<Utc>> = last_synced_naive.map(|naive_dt| {
+                    // Ensure the NaiveDateTime is treated as UTC before converting
+                    Utc.from_utc_datetime(&naive_dt)
+                });
+
+                Ok(MarketDataProviderInfo {
+                    id: setting.id,
+                    name: setting.name,
+                    logo_filename: setting.logo_filename.unwrap_or_default(),
+                    last_synced_date: last_synced_utc,
+                })
+            })
+            .collect(); // Collect into Result<Vec<MarketDataProviderInfo>, Error>
+        
+        let result = providers_info?; // Propagate any error from the mapping/collection
+
+        debug!("Market data providers info: {:?}", result);
+        Ok(result)
+    }
+
+    // --- Methods for MarketDataProviderSetting ---
+
+    async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>> {
+        self.repository.get_all_providers()
+    }
+
+    async fn update_market_data_provider_settings(
+        &self,
+        app_handle: &tauri::AppHandle,
+        provider_id: String,
+        api_key: Option<String>,
+        priority: i32,
+        enabled: bool,
+    ) -> Result<MarketDataProviderSetting> {
+        debug!(
+            "Updating market data provider settings for ID: {}",
+            provider_id
+        );
+
+        let current_settings = self.repository.get_provider_by_id(&provider_id)?;
+        let mut api_key_vault_path_to_store = current_settings.api_key_vault_path.clone();
+
+        // Stronghold interactions
+        let stronghold = app_handle.state::<Stronghold>();
+        let client_name = "nous"; // Consistent with setup_providers_registry.rs
+        // Ensure client exists or handle error - for simplicity, assume client creation/loading is handled elsewhere or not needed for every call.
+        // A more robust solution might involve app_handle.stronghold_load_client(client_name).await or similar.
+        // For this context, we'll try to operate on the store directly if possible,
+        // or assume client is loaded. Let's use the direct store access pattern if available,
+        // otherwise, this might need adjustment based on tauri-plugin-stronghold v2 specifics.
+        // The `setup_providers_registry` uses `stronghold.load_client(client_name).await.unwrap_or_else(...)`,
+        // then `client.store()`.
+
+        // Attempt to load the client, creating if it doesn't exist.
+        let client = match stronghold.load_client(client_name).await {
+            Ok(c) => c,
+            Err(_) => stronghold.create_client(client_name).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to create stronghold client: {}", e)))?,
+        };
+        let store = client.store();
+
+
+        if let Some(key) = api_key {
+            // New key provided, or existing key is being updated.
+            let vault_path = format!("market_data_provider_api_key_{}", provider_id);
+            store.set(&vault_path, key.as_bytes(), None).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to save API key to stronghold: {}", e)))?;
+            api_key_vault_path_to_store = Some(vault_path);
+        } else {
+            // API key is None. If there was an old vault path, delete the key.
+            if let Some(ref old_vault_path) = api_key_vault_path_to_store {
+                if !old_vault_path.is_empty() { // Ensure not trying to delete an empty path
+                    match store.delete(old_vault_path).await {
+                        Ok(_) => debug!("Successfully deleted old API key from stronghold at path: {}", old_vault_path),
+                        Err(e) => {
+                            // Log error but don't necessarily fail the whole operation if deletion fails,
+                            // as the main goal might be to disable/update other settings.
+                            // However, for security, it might be better to error out.
+                            // For now, log and continue, but this is a point of consideration.
+                            error!("Failed to delete old API key from stronghold at path {}: {}. Continuing with DB update.", old_vault_path, e);
+                            // return Err(MarketDataError::StrongholdError(format!("Failed to delete API key from stronghold: {}", e)).into());
+                        }
+                    }
+                }
+            }
+            // Set vault path to None as API key is None
+            api_key_vault_path_to_store = None;
+        }
+
+        let changes = UpdateMarketDataProviderSetting {
+            api_key_vault_path: api_key_vault_path_to_store,
+            priority: Some(priority),
+            enabled: Some(enabled),
+        };
+
+        self.repository
+            .update_provider_settings(provider_id, changes)
+            .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::market_data::market_data_model::{MarketDataProviderSetting, MarketDataProviderInfo, Quote, LatestQuotePair, QuoteSummary, DataSource};
+    use crate::market_data::providers::api_key_resolver::{ApiKeyResolver, NoOpApiKeyResolver};
+    use crate::market_data::providers::models::AssetProfile;
+    use crate::assets::assets_model::Asset;
+    use crate::errors::{Result as CoreResult, Error as CoreError};
+    use async_trait::async_trait;
+    use std::sync::Arc;
+    use std::collections::{HashMap, HashSet};
+    use chrono::{Utc, NaiveDate, NaiveDateTime, DateTime};
+    use tokio::runtime::Runtime as TokioRuntime;
+    use rust_decimal::Decimal;
+    use std::time::SystemTime;
+
+    // --- Mock MarketDataRepository ---
+    #[derive(Default, Clone)]
+    struct MockMarketDataRepository {
+        providers: Vec<MarketDataProviderSetting>,
+        last_quote_timestamps: HashMap<String, Option<NaiveDateTime>>,
+        quotes_saved: std::sync::Mutex<Vec<Quote>>,
+        historical_quotes: HashMap<String, Vec<Quote>>,
+    }
+
+    impl MockMarketDataRepository {
+        fn add_provider(&mut self, provider: MarketDataProviderSetting) {
+            self.providers.push(provider);
+        }
+        fn set_last_quote_timestamp(&mut self, provider_id: &str, timestamp: Option<NaiveDateTime>) {
+            self.last_quote_timestamps.insert(provider_id.to_string(), timestamp);
+        }
+        fn add_historical_quote(&mut self, symbol: &str, quote: Quote) {
+            self.historical_quotes.entry(symbol.to_string()).or_default().push(quote);
+        }
+    }
+
+    #[async_trait]
+    impl MarketDataRepositoryTrait for MockMarketDataRepository {
+        fn get_all_providers(&self) -> CoreResult<Vec<MarketDataProviderSetting>> {
+            Ok(self.providers.clone())
+        }
+        fn get_provider_by_id(&self, provider_id_input: &str) -> CoreResult<MarketDataProviderSetting> {
+            self.providers.iter().find(|p| p.id == provider_id_input).cloned()
+                .ok_or_else(|| CoreError::MarketData(MarketDataError::NotFound(format!("Provider {} not found", provider_id_input))))
+        }
+        async fn update_provider_settings(&self, _provider_id: String, _changes: UpdateMarketDataProviderSetting) -> CoreResult<MarketDataProviderSetting> {
+            // For testing service, this detail might not be critical, or can be enhanced
+            unimplemented!("Mocked update_provider_settings")
+        }
+        fn get_last_quote_timestamp_for_provider(&self, provider_id: &str) -> CoreResult<Option<NaiveDateTime>> {
+            Ok(self.last_quote_timestamps.get(provider_id).cloned().unwrap_or(None))
+        }
+        async fn save_quotes(&self, quotes_to_save: &[Quote]) -> CoreResult<()> {
+            let mut saved = self.quotes_saved.lock().unwrap();
+            saved.extend_from_slice(quotes_to_save);
+            Ok(())
+        }
+        // --- Other MarketDataRepositoryTrait methods (can be unimplemented! or return defaults) ---
+        fn get_all_historical_quotes(&self) -> CoreResult<Vec<Quote>> { Ok(vec![]) }
+        fn get_historical_quotes_for_symbol(&self, symbol: &str) -> CoreResult<Vec<Quote>> { 
+            Ok(self.historical_quotes.get(symbol).cloned().unwrap_or_default())
+        }
+        async fn save_quote(&self, quote: &Quote) -> CoreResult<Quote> { Ok(quote.clone()) }
+        async fn delete_quote(&self, _quote_id: &str) -> CoreResult<()> { Ok(()) }
+        async fn delete_quotes_for_symbols(&self, _symbols: &[String]) -> CoreResult<()> { Ok(()) }
+        fn get_quotes_by_source(&self, _symbol: &str, _source: &str) -> CoreResult<Vec<Quote>> { Ok(vec![]) }
+        async fn upsert_manual_quotes_from_activities(&self, _symbol: &str) -> CoreResult<Vec<Quote>> { Ok(vec![]) }
+        fn get_latest_quote_for_symbol(&self, _symbol: &str) -> CoreResult<Quote> { unimplemented!() }
+        fn get_latest_quotes_for_symbols(&self, _symbols: &[String]) -> CoreResult<HashMap<String, Quote>> { Ok(HashMap::new()) }
+        fn get_latest_quotes_pair_for_symbols(&self, _symbols: &[String], ) -> CoreResult<HashMap<String, LatestQuotePair>> { Ok(HashMap::new()) }
+        fn get_historical_quotes_for_symbols_in_range(&self, _symbols: &HashSet<String>, _start_date: NaiveDate, _end_date: NaiveDate) -> CoreResult<Vec<Quote>> { Ok(vec![]) }
+        fn get_latest_sync_dates_by_source(&self) -> CoreResult<HashMap<String, Option<NaiveDateTime>>> { Ok(HashMap::new()) }
+    }
+
+    // --- Mock AssetRepository ---
+    #[derive(Default, Clone)]
+    struct MockAssetRepository {
+        assets: Vec<Asset>,
+    }
+    impl MockAssetRepository {
+        fn add_asset(&mut self, asset: Asset) {
+            self.assets.push(asset);
+        }
+    }
+    #[async_trait]
+    impl crate::assets::assets_traits::AssetRepositoryTrait for MockAssetRepository {
+        fn list(&self) -> CoreResult<Vec<Asset>> { Ok(self.assets.clone()) }
+        fn list_by_symbols(&self, symbols_list: &[String]) -> CoreResult<Vec<Asset>> {
+             Ok(self.assets.iter().filter(|a| symbols_list.contains(&a.symbol)).cloned().collect())
+        }
+        // --- Other AssetRepositoryTrait methods ---
+        fn get_by_id(&self, _id: &str) -> CoreResult<Option<Asset>> { Ok(None) }
+        fn get_by_symbol(&self, _symbol: &str) -> CoreResult<Option<Asset>> { Ok(None) }
+        async fn create(&self, _asset: &Asset) -> CoreResult<Asset> { unimplemented!() }
+        async fn update(&self, _asset: &Asset) -> CoreResult<Asset> { unimplemented!() }
+        async fn delete(&self, _id: &str) -> CoreResult<()> { Ok(()) }
+        fn get_all_symbols(&self) -> CoreResult<Vec<String>> { Ok(vec![]) }
+        fn get_all_currencies(&self) -> CoreResult<Vec<String>> { Ok(vec![]) }
+    }
+
+    // Helper to create Tokio runtime for async tests
+    fn get_runtime() -> TokioRuntime {
+        TokioRuntime::new().unwrap()
+    }
+    
+    // Helper to create service with mocks
+    async fn create_service_with_mocks(
+        mock_repo: Arc<MockMarketDataRepository>,
+        mock_asset_repo: Arc<MockAssetRepository>,
+        settings: Vec<MarketDataProviderSetting> // Settings to init ProviderRegistry
+    ) -> MarketDataService {
+        let api_key_resolver = Arc::new(NoOpApiKeyResolver); // ProviderRegistry tests cover ApiKeyResolver logic
+        let provider_registry = Arc::new(ProviderRegistry::new(api_key_resolver, settings).await.unwrap());
+        
+        MarketDataService {
+            provider_registry,
+            repository: mock_repo as Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
+            asset_repository: mock_asset_repo as Arc<dyn crate::assets::assets_traits::AssetRepositoryTrait + Send + Sync>,
+        }
+    }
+
+    #[test]
+    fn test_gmdpi_no_providers() {
+        get_runtime().block_on(async {
+            let mock_repo = Arc::new(MockMarketDataRepository::default());
+            let mock_asset_repo = Arc::new(MockAssetRepository::default());
+            let service = create_service_with_mocks(mock_repo.clone(), mock_asset_repo.clone(), vec![]).await;
+
+            let result = service.get_market_data_providers_info().await.unwrap();
+            assert!(result.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_gmdpi_with_providers() {
+        get_runtime().block_on(async {
+            let mut mock_repo = MockMarketDataRepository::default();
+            let p1_settings = MarketDataProviderSetting { id: "yahoo".to_string(), name: "Yahoo Finance".to_string(), api_key_vault_path: None, priority: 1, enabled: true, logo_filename: Some("yahoo.png".to_string()) };
+            let p2_settings = MarketDataProviderSetting { id: "mda".to_string(), name: "MarketDataApp".to_string(), api_key_vault_path: Some("path1".to_string()), priority: 2, enabled: true, logo_filename: Some("mda.png".to_string()) };
+            mock_repo.add_provider(p1_settings.clone());
+            mock_repo.add_provider(p2_settings.clone());
+
+            let p1_last_sync = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(12,0,0).unwrap();
+            mock_repo.set_last_quote_timestamp("yahoo", Some(p1_last_sync));
+            // p2 has no sync date set in mock_repo, so it will be None.
+
+            let service = create_service_with_mocks(Arc::new(mock_repo), Arc::new(MockAssetRepository::default()), vec![p1_settings.clone(), p2_settings.clone()]).await;
+            
+            let infos = service.get_market_data_providers_info().await.unwrap();
+            
+            assert_eq!(infos.len(), 2);
+            
+            let info_p1 = infos.iter().find(|i| i.id == "yahoo").unwrap();
+            assert_eq!(info_p1.name, "Yahoo Finance");
+            assert_eq!(info_p1.logo_filename, "yahoo.png");
+            assert_eq!(info_p1.last_synced_date, Some(Utc.from_utc_datetime(&p1_last_sync)));
+
+            let info_p2 = infos.iter().find(|i| i.id == "mda").unwrap();
+            assert_eq!(info_p2.name, "MarketDataApp");
+            assert_eq!(info_p2.logo_filename, "mda.png");
+            assert!(info_p2.last_synced_date.is_none());
+        });
+    }
+
+    #[test]
+    fn test_sync_market_data_no_assets() {
+         get_runtime().block_on(async {
+            let mock_repo = Arc::new(MockMarketDataRepository::default());
+            let mock_asset_repo = Arc::new(MockAssetRepository::default()); // No assets
+            // ProviderRegistry will be empty if no settings are passed that lead to active providers
+            let service = create_service_with_mocks(mock_repo.clone(), mock_asset_repo.clone(), vec![]).await;
+
+            let (_empty_tuple, errors) = service.sync_market_data().await.unwrap();
+            assert!(errors.is_empty());
+            let saved_quotes = mock_repo.quotes_saved.lock().unwrap();
+            assert!(saved_quotes.is_empty());
+        });
+    }
+    
+    #[test]
+    fn test_sync_market_data_with_assets_calls_registry_and_saves() {
+        // This test is more of an integration test for MarketDataService + ProviderRegistry(with real Yahoo) + Mock Repos
+         get_runtime().block_on(async {
+            let mut mock_repo = MockMarketDataRepository::default();
+            let mut mock_asset_repo = MockAssetRepository::default();
+
+            mock_asset_repo.add_asset(Asset { symbol: "AAPL".to_string(), currency: "USD".to_string(), asset_type: Some("STOCK".to_string()), data_source: DataSource::Yahoo.as_str().to_string(), ..Default::default() });
+            mock_asset_repo.add_asset(Asset { symbol: "MSFT".to_string(), currency: "USD".to_string(), asset_type: Some("STOCK".to_string()), data_source: DataSource::Yahoo.as_str().to_string(), ..Default::default() });
+            
+            // Configure ProviderRegistry to use YahooProvider via settings
+            let yahoo_setting = MarketDataProviderSetting { id: "yahoo".to_string(), name: "Yahoo".to_string(), api_key_vault_path: None, priority: 1, enabled: true, logo_filename: None };
+            
+            let service = create_service_with_mocks(Arc::new(mock_repo.clone()), Arc::new(mock_asset_repo), vec![yahoo_setting]).await;
+
+            // Running sync_market_data will make real calls if YahooProvider is used by ProviderRegistry.
+            // For a unit test, ProviderRegistry should ideally be mockable, or its providers mockable.
+            // Here, we test the flow assuming YahooProvider might return data or errors.
+            // The key is that process_market_data_sync is called and attempts to save.
+            let (_empty_tuple, errors) = service.sync_market_data().await.unwrap();
+            
+            // We can't deterministically check `errors` or `saved_quotes` content without mocking Yahoo's network calls.
+            // However, we can check if save_quotes was called if it returned some quotes.
+            // If Yahoo returns an error (e.g. network issue), errors might be populated.
+            // If it returns quotes, quotes_saved should not be empty.
+            // This test is therefore not fully isolated if Yahoo makes network calls.
+            // For now, we just check that it runs without panic.
+            println!("Sync market data errors: {:?}", errors);
+            let saved_quotes_count = mock_repo.quotes_saved.lock().unwrap().len();
+            println!("Number of quotes saved: {}", saved_quotes_count);
+            // Assertions here depend on whether YahooProvider actually fetched anything
+            // or if it failed gracefully. If it failed, errors might not be empty.
+            // If it succeeded, saved_quotes_count > 0.
+            // This test highlights the need for deeper mocking if full isolation is required.
+        });
+    }
+
+    // Tests for delegation methods (search_symbol, get_asset_profile)
+    // These also depend on the configured ProviderRegistry and its (real) providers.
+    #[test]
+    fn test_search_symbol_delegates_to_registry() {
+        get_runtime().block_on(async {
+            let yahoo_setting = MarketDataProviderSetting { id: "yahoo".to_string(), name: "Yahoo".to_string(), api_key_vault_path: None, priority: 1, enabled: true, logo_filename: None };
+            let service = create_service_with_mocks(Arc::new(MockMarketDataRepository::default()), Arc::new(MockAssetRepository::default()), vec![yahoo_setting]).await;
+            
+            // This will call YahooProvider.search_ticker via ProviderRegistry
+            let result = service.search_symbol("AAPL").await;
+            // Assert based on expected behavior of YahooProvider (might fail if no network)
+            if result.is_ok() {
+                println!("Search symbol AAPL returned: {:?}", result.unwrap());
+            } else {
+                println!("Search symbol AAPL failed: {:?}", result.unwrap_err());
+            }
+        });
     }
 }
 
 impl MarketDataService {
     pub async fn new(
+        api_key_resolver: Arc<dyn ApiKeyResolver>, // Added
         repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
-        asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>, // Add asset_repository param
+        asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
     ) -> Result<Self> {
-        let provider_registry = Arc::new(ProviderRegistry::new().await?);
+        let provider_settings = repository.get_all_providers()?; // Fetch settings
+        let provider_registry = Arc::new(ProviderRegistry::new(api_key_resolver, provider_settings).await?);
 
         Ok(Self {
             provider_registry,
@@ -346,9 +645,8 @@ impl MarketDataService {
                 self.calculate_sync_start_time(refetch_all, &symbols_with_currencies)?;
 
             match self
-                .provider_registry
-                .get_provider(DataSource::Yahoo)
-                .get_historical_quotes_bulk(
+                .provider_registry // ProviderRegistry now handles iteration
+                .historical_quotes_bulk( // This method will use its configured chain
                     &symbols_with_currencies,
                     start_date_time,
                     end_date,

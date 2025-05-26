@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
+use tauri; // Added for AppHandle
 
 use crate::errors::Result;
-use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo};
+use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting}; // Added MarketDataProviderSetting
 use super::providers::models::AssetProfile;
 
 #[async_trait]
@@ -46,6 +47,20 @@ pub trait MarketDataServiceTrait: Send + Sync {
         end_date: NaiveDate,
     ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>>;
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>>;
+
+    // --- Added for MarketDataProviderSetting ---
+    async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>>;
+    async fn update_market_data_provider_settings(
+        &self,
+        app_handle: &tauri::AppHandle, // Pass AppHandle for Stronghold
+        provider_id: String,
+        api_key: Option<String>, // Actual key, not vault path
+        priority: i32,
+        enabled: bool,
+        // logo_filename is part of the MarketDataProviderSetting struct,
+        // but not directly updatable by this command to keep it focused.
+        // It's assumed to be set initially or via another mechanism if needed.
+    ) -> Result<MarketDataProviderSetting>;
 }
 
 #[async_trait::async_trait]
@@ -74,4 +89,5 @@ pub trait MarketDataRepositoryTrait: Send + Sync {
         end_date: NaiveDate,
     ) -> Result<Vec<Quote>>;
     fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<chrono::NaiveDateTime>>>;
+    fn get_last_quote_timestamp_for_provider(&self, provider_id: &str) -> Result<Option<chrono::NaiveDateTime>>;
 } 

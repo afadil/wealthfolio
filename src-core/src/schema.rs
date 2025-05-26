@@ -141,6 +141,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    market_data_providers (id) {
+        id -> Text,
+        name -> Text,
+        api_key_vault_path -> Nullable<Text>,
+        priority -> Integer,
+        enabled -> Bool,
+        logo_filename -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     platforms (id) {
         id -> Text,
         name -> Nullable<Text>,
@@ -181,6 +192,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     goals,
     goals_allocation,
     holdings_snapshots,
+    market_data_providers,
     platforms,
     quotes,
 );

@@ -19,7 +19,17 @@ use wealthfolio_core::{
     AssetRepository, AssetService,
 };
 use tauri::{AppHandle, Runtime};
-use super::setup_providers_registry::build_provider_registry;
+use super::setup_providers_registry::build_provider_registry; // This is for AI ProviderRegistry
+use crate::context::StrongholdApiKeyResolver; // Added for MarketDataService
+
+// --- Added for data seeding ---
+use wealthfolio_core::market_data::MarketDataProviderSetting;
+use wealthfolio_core::db::get_connection; // To get a connection for seeding
+use diesel::prelude::*;
+use wealthfolio_core::schema::market_data_providers::dsl as market_data_providers_dsl;
+use log::info; // For logging seeding process
+// --- End added for data seeding ---
+
 
 // Other imports
 
@@ -33,6 +43,17 @@ pub async fn initialize_context<R: Runtime>(
 
     // Run migrations using the pool directly if run_migrations expects a Pool
     db::run_migrations(&pool)?;
+
+    // --- Seed initial market data providers ---
+    match seed_initial_market_data_providers(&pool) {
+        Ok(_) => info!("Successfully checked and seeded initial market data providers."),
+        Err(e) => {
+            // Log the error but don't stop context initialization
+            // as this is a one-time setup step.
+            log::error!("Failed to seed initial market data providers: {}", e);
+        }
+    }
+    // --- End seed initial market data providers ---
 
     // Instantiate Repositories
     let settings_repository = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
@@ -66,8 +87,11 @@ pub async fn initialize_context<R: Runtime>(
         &instance_id_string
     ).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
+    // Create ApiKeyResolver for MarketDataService
+    let api_key_resolver = Arc::new(StrongholdApiKeyResolver::new(handle.clone(), "nous"));
+
     let market_data_service: Arc<dyn MarketDataServiceTrait> =
-        Arc::new(MarketDataService::new(market_data_repo.clone(), asset_repository.clone()).await?);
+        Arc::new(MarketDataService::new(api_key_resolver, market_data_repo.clone(), asset_repository.clone()).await?);
 
     let asset_service = Arc::new(AssetService::new(
         asset_repository.clone(),
@@ -150,3 +174,50 @@ pub async fn initialize_context<R: Runtime>(
         valuation_service,
     })
 }
+
+// --- Added for data seeding ---
+fn seed_initial_market_data_providers(
+    pool: &wealthfolio_core::db::DbPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut conn = get_connection(pool)?; // Use existing get_connection
+
+    // Check if the table is empty
+    let count = market_data_providers_dsl::market_data_providers
+        .count()
+        .get_result::<i64>(&mut conn)?;
+
+    if count == 0 {
+        info!("No market data providers found, seeding initial data...");
+
+        let yahoo_provider = MarketDataProviderSetting {
+            id: "yahoo".to_string(),
+            name: "Yahoo Finance".to_string(),
+            api_key_vault_path: None,
+            priority: 1,
+            enabled: true,
+            logo_filename: Some("yahoo-finance.png".to_string()),
+        };
+
+        let marketdata_app_provider = MarketDataProviderSetting {
+            id: "marketdata_app".to_string(),
+            name: "MarketData.app".to_string(),
+            api_key_vault_path: None,
+            priority: 2,
+            enabled: false,
+            logo_filename: Some("marketdata-app.png".to_string()), // Assuming this logo exists or will be added
+        };
+
+        let default_providers = vec![yahoo_provider, marketdata_app_provider];
+
+        diesel::insert_into(market_data_providers_dsl::market_data_providers)
+            .values(&default_providers)
+            .execute(&mut conn)?;
+
+        info!("Successfully seeded initial market data providers.");
+    } else {
+        info!("Market data providers table is not empty, skipping seeding.");
+    }
+
+    Ok(())
+}
+// --- End added for data seeding ---

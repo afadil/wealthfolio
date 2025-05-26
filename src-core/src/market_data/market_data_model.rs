@@ -1,4 +1,5 @@
 use crate::schema::quotes;
+use crate::schema::market_data_providers; // Added for MarketDataProviderSetting
 use diesel::prelude::*;
 use diesel::{
     sql_types::Text,
@@ -171,4 +172,31 @@ pub struct MarketDataProviderInfo {
     pub name: String,
     pub logo_filename: String,
     pub last_synced_date: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+
+// --- Added for MarketDataProviderSetting ---
+
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, Selectable, Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::market_data_providers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct MarketDataProviderSetting {
+    pub id: String,
+    pub name: String,
+    pub api_key_vault_path: Option<String>,
+    pub priority: i32,
+    pub enabled: bool,
+    pub logo_filename: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::market_data_providers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct UpdateMarketDataProviderSetting {
+    // id is the primary key, not part of AsChangeset for update by id
+    // name and logo_filename are not updatable through this specific struct
+    pub api_key_vault_path: Option<String>,
+    pub priority: Option<i32>,
+    pub enabled: Option<bool>,
 }
