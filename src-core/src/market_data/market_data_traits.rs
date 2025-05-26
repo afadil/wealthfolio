@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
-use tauri; // Added for AppHandle
+// Removed: use tauri;
 
 use crate::errors::Result;
 use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting}; // Added MarketDataProviderSetting
@@ -52,7 +52,7 @@ pub trait MarketDataServiceTrait: Send + Sync {
     async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>>;
     async fn update_market_data_provider_settings(
         &self,
-        app_handle: &tauri::AppHandle, // Pass AppHandle for Stronghold
+        // Removed: app_handle: &tauri::AppHandle,
         provider_id: String,
         api_key: Option<String>, // Actual key, not vault path
         priority: i32,

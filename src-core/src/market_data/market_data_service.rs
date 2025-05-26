@@ -22,6 +22,7 @@ pub struct MarketDataService {
     provider_registry: Arc<ProviderRegistry>,
     repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
     asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+    api_key_resolver: Arc<dyn ApiKeyResolver>, // Added field
 }
 
 #[async_trait]
@@ -258,7 +259,7 @@ impl MarketDataServiceTrait for MarketDataService {
 
     async fn update_market_data_provider_settings(
         &self,
-        app_handle: &tauri::AppHandle,
+        // Removed: app_handle: &tauri::AppHandle,
         provider_id: String,
         api_key: Option<String>,
         priority: i32,
@@ -272,51 +273,35 @@ impl MarketDataServiceTrait for MarketDataService {
         let current_settings = self.repository.get_provider_by_id(&provider_id)?;
         let mut api_key_vault_path_to_store = current_settings.api_key_vault_path.clone();
 
-        // Stronghold interactions
-        let stronghold = app_handle.state::<Stronghold>();
-        let client_name = "nous"; // Consistent with setup_providers_registry.rs
-        // Ensure client exists or handle error - for simplicity, assume client creation/loading is handled elsewhere or not needed for every call.
-        // A more robust solution might involve app_handle.stronghold_load_client(client_name).await or similar.
-        // For this context, we'll try to operate on the store directly if possible,
-        // or assume client is loaded. Let's use the direct store access pattern if available,
-        // otherwise, this might need adjustment based on tauri-plugin-stronghold v2 specifics.
-        // The `setup_providers_registry` uses `stronghold.load_client(client_name).await.unwrap_or_else(...)`,
-        // then `client.store()`.
-
-        // Attempt to load the client, creating if it doesn't exist.
-        let client = match stronghold.load_client(client_name).await {
-            Ok(c) => c,
-            Err(_) => stronghold.create_client(client_name).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to create stronghold client: {}", e)))?,
-        };
-        let store = client.store();
-
-
-        if let Some(key) = api_key {
+        if let Some(key_to_set) = api_key {
             // New key provided, or existing key is being updated.
-            let vault_path = format!("market_data_provider_api_key_{}", provider_id);
-            store.set(&vault_path, key.as_bytes(), None).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to save API key to stronghold: {}", e)))?;
-            api_key_vault_path_to_store = Some(vault_path);
-        } else {
-            // API key is None. If there was an old vault path, delete the key.
-            if let Some(ref old_vault_path) = api_key_vault_path_to_store {
-                if !old_vault_path.is_empty() { // Ensure not trying to delete an empty path
-                    match store.delete(old_vault_path).await {
-                        Ok(_) => debug!("Successfully deleted old API key from stronghold at path: {}", old_vault_path),
-                        Err(e) => {
-                            // Log error but don't necessarily fail the whole operation if deletion fails,
-                            // as the main goal might be to disable/update other settings.
-                            // However, for security, it might be better to error out.
-                            // For now, log and continue, but this is a point of consideration.
-                            error!("Failed to delete old API key from stronghold at path {}: {}. Continuing with DB update.", old_vault_path, e);
-                            // return Err(MarketDataError::StrongholdError(format!("Failed to delete API key from stronghold: {}", e)).into());
-                        }
+            // If key_to_set is empty, it implies clearing the key.
+            if key_to_set.is_empty() {
+                if let Some(ref old_vault_path) = api_key_vault_path_to_store {
+                    if !old_vault_path.is_empty() {
+                        debug!("API key for {} is empty, deleting old key from path: {}", provider_id, old_vault_path);
+                        self.api_key_resolver.delete_api_key(old_vault_path).await.map_err(|e| 
+                            MarketDataError::StrongholdError(format!("Failed to delete API key from resolver: {}", e))
+                        )?;
                     }
                 }
+                api_key_vault_path_to_store = None; // Key is cleared, so no vault path.
+            } else {
+                // Key has content, so save it.
+                let vault_path = format!("market_data_provider_api_key_{}", provider_id);
+                debug!("Setting API key for {} at path: {}", provider_id, vault_path);
+                self.api_key_resolver.set_api_key(&vault_path, &key_to_set).await.map_err(|e|
+                     MarketDataError::StrongholdError(format!("Failed to save API key via resolver: {}", e))
+                )?;
+                api_key_vault_path_to_store = Some(vault_path);
             }
-            // Set vault path to None as API key is None
-            api_key_vault_path_to_store = None;
+        } else {
+            // api_key is None, meaning the user did not provide an API key in this update operation.
+            // This means "do not change the API key or its vault path".
+            // The api_key_vault_path_to_store is already current_settings.api_key_vault_path.clone(), so no action needed here.
+            debug!("No API key provided in update for {}, vault path remains unchanged: {:?}", provider_id, api_key_vault_path_to_store);
         }
-
+        
         let changes = UpdateMarketDataProviderSetting {
             api_key_vault_path: api_key_vault_path_to_store,
             priority: Some(priority),
@@ -568,17 +553,19 @@ mod tests {
 
 impl MarketDataService {
     pub async fn new(
-        api_key_resolver: Arc<dyn ApiKeyResolver>, // Added
+        api_key_resolver: Arc<dyn ApiKeyResolver>, 
         repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
         asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
     ) -> Result<Self> {
-        let provider_settings = repository.get_all_providers()?; // Fetch settings
-        let provider_registry = Arc::new(ProviderRegistry::new(api_key_resolver, provider_settings).await?);
+        let provider_settings = repository.get_all_providers()?;
+        // Pass the resolver to ProviderRegistry constructor
+        let provider_registry = Arc::new(ProviderRegistry::new(api_key_resolver.clone(), provider_settings).await?);
 
         Ok(Self {
             provider_registry,
             repository,
             asset_repository,
+            api_key_resolver, // Store it
         })
     }
 

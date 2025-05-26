@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 #[command]
 pub async fn get_market_data_providers_settings<R: Runtime>(
-    app_handle: AppHandle<R>, // Not strictly needed by the service method, but good for consistency
+    // Removed app_handle: AppHandle<R>,
     context: State<'_, Arc<ServiceContext>>,
 ) -> CoreResult<Vec<MarketDataProviderSetting>> {
     context.market_data_service.get_market_data_providers_settings().await
@@ -16,15 +16,17 @@ pub async fn get_market_data_providers_settings<R: Runtime>(
 
 #[command]
 pub async fn update_market_data_provider_settings<R: Runtime>(
-    app_handle: AppHandle<R>, // Needed for Stronghold access via the service
+    // Removed app_handle: AppHandle<R>,
     context: State<'_, Arc<ServiceContext>>,
     provider_id: String,
     api_key: Option<String>,
     priority: i32,
     enabled: bool,
 ) -> CoreResult<MarketDataProviderSetting> {
+    // The AppHandle is now obtained within the service via ApiKeyResolver if needed,
+    // or more precisely, the ApiKeyResolver (which has AppHandle) is used by the service.
     context.market_data_service.update_market_data_provider_settings(
-        &app_handle, // Pass the app_handle to the service method
+        // Removed &app_handle,
         provider_id,
         api_key,
         priority,

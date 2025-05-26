@@ -83,12 +83,52 @@ impl<R: Runtime> ApiKeyResolver for StrongholdApiKeyResolver<R> {
                 Ok(None)
             }
             Err(e) => {
-                // This could be tauri_plugin_stronghold::Error, convert to string
                 let err_msg = format!("{}", e);
                 error!("Failed to get API key from Stronghold for vault path '{}': {}", vault_path, err_msg);
                 Err(MarketDataError::StrongholdError(format!(
                     "Failed to retrieve API key for path '{}': {}", vault_path, err_msg
                 )).into())
+            }
+        }
+    }
+
+    async fn set_api_key(&self, vault_path: &str, key: &str) -> CoreResult<()> {
+        debug!("Attempting to set API key in Stronghold. Path: '{}', Client: '{}'", vault_path, self.client_name);
+        let stronghold = self.app_handle.state::<Stronghold>();
+        let client = match stronghold.load_client(&self.client_name).await {
+             Ok(c) => c,
+            Err(_) => stronghold.create_client(&self.client_name).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to create stronghold client: {}", e)))?,
+        };
+        let store = client.store();
+        store.set(vault_path, key.as_bytes(), None).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to save API key to stronghold: {}", e)).into())
+    }
+
+    async fn delete_api_key(&self, vault_path: &str) -> CoreResult<()> {
+        debug!("Attempting to delete API key from Stronghold. Path: '{}', Client: '{}'", vault_path, self.client_name);
+        let stronghold = self.app_handle.state::<Stronghold>();
+         let client = match stronghold.load_client(&self.client_name).await {
+             Ok(c) => c,
+            Err(_) => stronghold.create_client(&self.client_name).await.map_err(|e| MarketDataError::StrongholdError(format!("Failed to create stronghold client: {}", e)))?,
+        };
+        let store = client.store();
+        match store.delete(vault_path).await {
+            Ok(_) => {
+                debug!("Successfully deleted API key from Stronghold for path: {}", vault_path);
+                Ok(())
+            }
+            Err(e) => {
+                let err_msg = format!("{}", e);
+                // Check if error is "key not found" - this is not a failure for delete operation.
+                // This depends on the specific error type/message from tauri-plugin-stronghold.
+                // For example, if it's `iota_stronghold::engine::snapshot::Error::KeyNotFound`.
+                // For now, we'll log and treat other errors as actual failures.
+                if err_msg.contains("KeyNotFound") || err_msg.contains("key not found") { // Heuristic check
+                    warn!("Attempted to delete API key from Stronghold, but key was not found at path '{}'. This is not an error.", vault_path);
+                    Ok(())
+                } else {
+                    error!("Failed to delete API key from Stronghold for path '{}': {}", vault_path, err_msg);
+                    Err(MarketDataError::StrongholdError(format!("Failed to delete API key for path '{}': {}", vault_path, err_msg)).into())
+                }
             }
         }
     }

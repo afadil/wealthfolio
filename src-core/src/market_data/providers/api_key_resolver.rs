@@ -9,6 +9,12 @@ pub trait ApiKeyResolver: Send + Sync {
     /// Returns Ok(Some(key)) if found, Ok(None) if not found or needs to be treated as not found (e.g. empty).
     /// Returns Err if there was an issue trying to resolve the key.
     async fn resolve_api_key(&self, vault_path: &str) -> Result<Option<String>>;
+
+    /// Sets (saves or updates) an API key at the given vault path.
+    async fn set_api_key(&self, vault_path: &str, key: &str) -> Result<()>;
+
+    /// Deletes an API key from the given vault path.
+    async fn delete_api_key(&self, vault_path: &str) -> Result<()>;
 }
 
 /// A resolver that does not actually resolve any keys.
@@ -19,5 +25,13 @@ pub struct NoOpApiKeyResolver;
 impl ApiKeyResolver for NoOpApiKeyResolver {
     async fn resolve_api_key(&self, _vault_path: &str) -> Result<Option<String>> {
         Ok(None)
+    }
+
+    async fn set_api_key(&self, _vault_path: &str, _key: &str) -> Result<()> {
+        Ok(()) // No-op
+    }
+
+    async fn delete_api_key(&self, _vault_path: &str) -> Result<()> {
+        Ok(()) // No-op
     }
 }
