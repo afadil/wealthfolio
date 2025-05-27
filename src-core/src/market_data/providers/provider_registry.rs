@@ -58,42 +58,65 @@ impl ProviderRegistry {
             };
 
             let provider_id_str = setting.id.as_str();
-            let provider_arc: Option<Arc<dyn MarketDataProvider + Send + Sync>> = match provider_id_str {
-                "yahoo" => Some(Arc::new(YahooProvider::new())),
+            let provider_result: Result<Option<Arc<dyn MarketDataProvider + Send + Sync>>, MarketDataError> = match provider_id_str {
+                "yahoo" => {
+                    match YahooProvider::new().await {
+                        Ok(provider) => Ok(Some(Arc::new(provider))),
+                        Err(e) => {
+                            warn!("Failed to initialize YahooProvider: {}. Skipping.", e);
+                            // Assuming MarketDataError has a From<yahoo::YahooError> or similar
+                            // If not, map explicitly: Err(MarketDataError::ProviderError(format!("Yahoo init failed: {}", e)))
+                            Err(MarketDataError::from(e)) 
+                        }
+                    }
+                },
                 "marketdata_app" => {
                     if let Some(key) = api_key {
                         if !key.is_empty() {
-                            Some(Arc::new(MarketDataAppProvider::new(&key)))
+                            match MarketDataAppProvider::new(key) { // key is String, new expects String
+                                Ok(provider) => Ok(Some(Arc::new(provider))),
+                                Err(e) => {
+                                    warn!("Failed to initialize MarketDataAppProvider with key: {}. Skipping.", e);
+                                    Err(e)
+                                }
+                            }
                         } else {
                             warn!("MarketData.app provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
-                            None
+                            Ok(None) // Not an error to skip, but provider not configured
                         }
                     } else {
                         warn!("MarketData.app provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
-                        None
+                        Ok(None) // Not an error to skip
                     }
                 }
                 _ => {
                     warn!("Unknown market data provider ID: {}. Skipping.", setting.id);
-                    None
+                    Ok(None) // Not an error to skip
                 }
             };
-            
-            // Handle AssetProfilers similarly - assuming profilers might be same objects or different
-            // For now, let's assume providers that are MarketDataProvider are also AssetProfiler if they implement it.
-            // ManualProvider is special as it's often just for profiling cash or manual assets.
-            let profiler_arc: Option<Arc<dyn AssetProfiler + Send + Sync>> = match provider_id_str {
-                "yahoo" => provider_arc.clone().map(|p| p as Arc<dyn AssetProfiler + Send + Sync>), // if YahooProvider impls AssetProfiler
-                "marketdata_app" => provider_arc.clone().map(|p| p as Arc<dyn AssetProfiler + Send + Sync>), // if MarketDataAppProvider impls AssetProfiler
-                // ManualProvider might always be available for profiling, regardless of settings table, or added here if listed.
-                // If ManualProvider is not in settings, it can be added separately or by default.
-                _ => None, 
-            };
 
-
-            if let Some(p_arc) = provider_arc {
-                 active_providers_with_priority.push((setting.priority, setting.id.clone(), p_arc, profiler_arc));
-                 info!("Successfully configured and activated provider: {} (ID: {}) with priority {}", setting.name, setting.id, setting.priority);
+            match provider_result {
+                Ok(Some(p_arc)) => {
+                    // Handle AssetProfilers
+                    let profiler_arc: Option<Arc<dyn AssetProfiler + Send + Sync>> = match provider_id_str {
+                        "yahoo" => Some(p_arc.clone() as Arc<dyn AssetProfiler + Send + Sync>), // YahooProvider must implement AssetProfiler
+                        // MarketDataAppProvider does not currently implement AssetProfiler.
+                        // If it did, it would be: Some(p_arc.clone() as Arc<dyn AssetProfiler + Send + Sync>),
+                        // For now, it means marketdata_app won't be a profiler.
+                        "marketdata_app" => None, 
+                        _ => None,
+                    };
+                    active_providers_with_priority.push((setting.priority, setting.id.clone(), p_arc, profiler_arc));
+                    info!("Successfully configured and activated provider: {} (ID: {}) with priority {}", setting.name, setting.id, setting.priority);
+                }
+                Ok(None) => {
+                    // Provider was intentionally skipped (e.g., missing key but not an error from new())
+                    // Already logged warnings above.
+                }
+                Err(_e) => {
+                    // Error during provider instantiation, already logged.
+                    // This provider will be skipped.
+                }
             }
         }
 
@@ -216,15 +239,72 @@ impl ProviderRegistry {
         }
         // Try with the default (highest priority) provider first for bulk operations.
         // Fallback for bulk can be complex (e.g., per-symbol fallback or retrying failed ones with next provider).
-        // For simplicity, this implementation will try the default provider. If it fails, it returns its error.
-        // A more sophisticated approach might involve retrying individual failed symbols with other providers.
-        if let Some(default_provider_id) = self.ordered_data_provider_ids.first() {
-            if let Some(p) = self.data_providers.get(default_provider_id) {
-                return p.get_historical_quotes_bulk(symbols_with_currencies, start, end).await;
+        // This version implements a more robust fallback.
+        if self.ordered_data_provider_ids.is_empty() {
+            warn!("No data providers available in ProviderRegistry for historical_quotes_bulk.");
+            return Err(MarketDataError::NoProvidersAvailable);
+        }
+
+        let mut all_fetched_quotes: Vec<ModelQuote> = Vec::new();
+        let mut symbols_to_retry: Vec<(String, String)> = symbols_with_currencies.to_vec();
+        let mut final_errors: Vec<(String, String)> = Vec::new();
+
+        for provider_id in &self.ordered_data_provider_ids {
+            if symbols_to_retry.is_empty() {
+                break; // All symbols fetched
+            }
+
+            if let Some(provider) = self.data_providers.get(provider_id) {
+                info!("Attempting historical_quotes_bulk for {} symbols with provider: {}", symbols_to_retry.len(), provider_id);
+                match provider.get_historical_quotes_bulk(&symbols_to_retry, start, end).await {
+                    Ok((fetched_quotes, per_symbol_errors)) => {
+                        all_fetched_quotes.extend(fetched_quotes);
+                        
+                        // Update symbols_to_retry based on per_symbol_errors
+                        // And also, any symbol that was requested but didn't get a quote and also wasn't in per_symbol_errors
+                        // (though a good provider impl should list all failures in per_symbol_errors).
+                        // For simplicity, we'll assume per_symbol_errors accurately reflects what needs retry.
+                        let mut current_failed_symbols = Vec::new();
+                        for (failed_symbol, _err_msg) in per_symbol_errors {
+                             // Find the original currency pairing for the failed symbol
+                            if let Some(original_pair) = symbols_with_currencies.iter().find(|(s, _)| s == &failed_symbol) {
+                                current_failed_symbols.push(original_pair.clone());
+                            }
+                        }
+                        symbols_to_retry = current_failed_symbols;
+                        
+                        if symbols_to_retry.is_empty() { // All succeeded with this provider
+                            final_errors.clear(); // Clear any errors from previous failed providers
+                            break; 
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Provider '{}' failed entire historical_quotes_bulk: {:?}. Trying next.", provider_id, e);
+                        // Keep symbols_to_retry as is for the next provider.
+                        // Add all current symbols_to_retry to final_errors for this provider, will be overwritten if next provider succeeds for them.
+                        final_errors = symbols_to_retry.iter().map(|(s, _c)| (s.clone(), format!("Provider {} failed: {}", provider_id, e))).collect();
+
+                    }
+                }
             }
         }
-        // Should not be reached if ordered_provider_ids is not empty, but as a fallback:
-        Err(MarketDataError::NoProvidersAvailable)
+        
+        // After trying all providers, any remaining symbols_to_retry are the final errors.
+        // However, final_errors should be populated based on the *last* attempt for each symbol.
+        // The logic above means final_errors contains errors from the last provider that hard-failed an entire batch.
+        // If the last provider succeeded partially, symbols_to_retry will hold the true final errors.
+        if !symbols_to_retry.is_empty() {
+             final_errors = symbols_to_retry.iter().map(|(s, _)| (s.clone(), "Failed to fetch from any provider".to_string())).collect();
+        }
+
+
+        if all_fetched_quotes.is_empty() && !symbols_with_currencies.is_empty() && !final_errors.is_empty() {
+             // If no quotes were fetched at all, and there were errors, return an error for the whole operation.
+             // This might be too generic; the per-symbol errors are more informative.
+             // For now, we return Ok with quotes and errors. If all_fetched_quotes is empty, client can check final_errors.
+        }
+        
+        Ok((all_fetched_quotes, final_errors))
     }
 
     // --- Methods for AssetProfilers ---
@@ -249,16 +329,24 @@ impl ProviderRegistry {
     
     // Search ticker usually goes to a specific capable provider, often the default one.
     pub async fn search_ticker(&self, query: &str) -> Result<Vec<super::models::QuoteSummary>, MarketDataError> {
-        if let Some(default_provider_id) = self.ordered_data_provider_ids.first() {
-             if let Some(p) = self.data_providers.get(default_provider_id) {
-                if let Some(profiler) = self.asset_profilers.get(default_provider_id) { // Assuming provider that can search also profiles
-                    return profiler.search_ticker(query).await;
+        for profiler_id in &self.ordered_profiler_ids { // Iterate through ordered profilers
+            if let Some(profiler) = self.asset_profilers.get(profiler_id) {
+                match profiler.search_ticker(query).await {
+                    Ok(summaries) => {
+                        if !summaries.is_empty() {
+                            return Ok(summaries); // Return on first success with non-empty results
+                        }
+                        info!("Profiler '{}' returned no search results for query '{}'. Trying next.", profiler_id, query);
+                    }
+                    Err(e) => {
+                        warn!("Profiler '{}' failed search_ticker for query '{}': {:?}. Trying next.", profiler_id, query, e);
+                    }
                 }
             }
         }
-        // Fallback or specific search provider if default doesn't support/find
-        // For now, if default fails or doesn't exist, return error.
-        Err(MarketDataError::OperationNotSupported("search_ticker".to_string()))
+        // If all profilers failed or returned empty results
+        info!("No search results found for query '{}' after trying all profilers.", query);
+        Ok(Vec::new()) // Consistent with finding nothing
     }
 }
 
@@ -268,9 +356,11 @@ mod tests {
     use crate::market_data::market_data_model::{MarketDataProviderSetting, Quote as ModelQuote, DataSource};
     use crate::market_data::providers::api_key_resolver::{ApiKeyResolver, NoOpApiKeyResolver};
     use crate::market_data::providers::models::{AssetProfile, QuoteSummary};
-    use crate::errors::{Result as CoreResult, Error as CoreError}; // Alias CoreResult
+    use crate::errors::{Result as CoreResult, Error as CoreError, MarketDataSnafu}; // Alias CoreResult
+    use crate::market_data::providers::yahoo_provider::YahooError; // Assuming this path
     use async_trait::async_trait;
     use std::sync::Arc;
+    use snafu::ResultExt; // For .context
     use std::time::SystemTime;
     use std::collections::HashMap;
     use tokio::runtime::Runtime as TokioRuntime;
@@ -290,90 +380,142 @@ mod tests {
     }
     #[async_trait]
     impl ApiKeyResolver for MockApiKeyResolver {
-        async fn resolve_api_key(&self, vault_path: &str) -> CoreResult<Option<String>> {
+        async fn resolve_api_key(&self, vault_path: &str) -> CoreResult<Option<String>> { // CoreResult is Result<T, crate::errors::Error>
             if self.should_error {
-                return Err(CoreError::MarketData(MarketDataError::StrongholdError("Simulated resolver error".to_string())));
+                // To return CoreError::MarketData(MarketDataError::StrongholdError(...))
+                // we need to make sure MarketDataSnafu can build this.
+                // Example: return MarketDataSnafu::StrongholdFailure { message: "Simulated resolver error".to_string() }.fail();
+                // For simplicity if direct construction is hard:
+                return Err(CoreError::Internal { message: "Simulated resolver error".to_string() }); // Generic error
             }
             Ok(self.keys.get(vault_path).cloned())
         }
     }
-
+    
     // --- Mock MarketDataProvider & AssetProfiler ---
-    #[derive(Debug)]
+    // Keep MockProvider simple for testing registry logic, not provider logic.
+    #[derive(Debug, Clone)] // Clone for easier use in tests
     struct MockProvider {
         id_str: String,
-        priority_val: u8,
-        succeed_latest_quote: bool,
-        succeed_historical: bool,
-        succeed_profile: bool,
-        succeed_search: bool,
+        succeeds: bool, // Simplified: does it succeed or fail all calls?
+        returns_empty: bool, // For search, does it return empty results?
+        provides_bulk_errors_for: Vec<String>, // Symbols for which bulk historical will return error
     }
 
     impl MockProvider {
-        fn new(id: &str, priority: u8, succeed_all: bool) -> Self {
-            Self {
-                id_str: id.to_string(),
-                priority_val: priority,
-                succeed_latest_quote: succeed_all,
-                succeed_historical: succeed_all,
-                succeed_profile: succeed_all,
-                succeed_search: succeed_all,
-            }
+        fn new(id: &str, succeeds: bool, returns_empty: bool) -> Self {
+            Self { id_str: id.to_string(), succeeds, returns_empty, provides_bulk_errors_for: Vec::new() }
+        }
+        fn new_with_bulk_errors(id: &str, succeeds: bool, returns_empty: bool, bulk_errors_for: Vec<String>) -> Self {
+            Self { id_str: id.to_string(), succeeds, returns_empty, provides_bulk_errors_for: bulk_errors_for }
+        }
+    }
+    
+    // Implement From<yahoo::YahooError> for MarketDataError for tests if not present globally
+    // This is often in market_data_errors.rs. For the test module, if it's not auto-derived:
+    impl From<YahooError> for MarketDataError {
+        fn from(e: YahooError) -> Self {
+            MarketDataError::ProviderError(format!("Yahoo Error: {}", e))
         }
     }
 
+
     #[async_trait]
     impl MarketDataProvider for MockProvider {
-        fn name(&self) -> &'static str { self.id_str.leak() } // Unsafe leak for testing, be cautious
-        fn id(&self) -> String { self.id_str.clone() }
-        fn priority(&self) -> u8 { self.priority_val }
+        fn name(&self) -> &'static str { Box::leak(self.id_str.clone().into_boxed_str()) }
+        fn id(&self) -> String { self.id_str.clone() } // Not used by registry directly
+        fn priority(&self) -> u8 { 0 } // Not used by registry directly for mock
 
-        async fn get_latest_quote(&self, symbol: &str, _fallback_currency: String) -> CoreResult<ModelQuote, MarketDataError> {
-            if self.succeed_latest_quote {
+        async fn get_latest_quote(&self, symbol: &str, _fallback_currency: String) -> Result<ModelQuote, MarketDataError> {
+            if self.succeeds {
                 Ok(ModelQuote { id: format!("{}_quote", symbol), symbol: symbol.to_string(), timestamp: Utc::now(), open: Decimal::ONE, high: Decimal::ONE, low: Decimal::ONE, close: Decimal::ONE, adjclose: Decimal::ONE, volume: Decimal::TEN, currency: "USD".to_string(), data_source: DataSource::Manual, created_at: Utc::now() })
             } else {
-                Err(MarketDataError::ProviderError(format!("MockProvider {} failed latest_quote", self.id_str)))
+                Err(MarketDataError::ProviderError(format!("MockProvider '{}' failed latest_quote", self.id_str)))
             }
         }
-        async fn get_historical_quotes(&self, symbol: &str, _start: SystemTime, _end: SystemTime, _fallback_currency: String) -> CoreResult<Vec<ModelQuote>, MarketDataError> {
-            if self.succeed_historical {
+        async fn get_historical_quotes(&self, symbol: &str, _start: SystemTime, _end: SystemTime, _fallback_currency: String) -> Result<Vec<ModelQuote>, MarketDataError> {
+            if self.succeeds {
+                 if self.returns_empty { return Ok(Vec::new()); }
                 Ok(vec![ModelQuote { id: format!("{}_hist_quote", symbol), symbol: symbol.to_string(), timestamp: Utc::now(), open: Decimal::ONE, high: Decimal::ONE, low: Decimal::ONE, close: Decimal::ONE, adjclose: Decimal::ONE, volume: Decimal::TEN, currency: "USD".to_string(), data_source: DataSource::Manual, created_at: Utc::now() }])
             } else {
-                Err(MarketDataError::ProviderError(format!("MockProvider {} failed historical_quotes", self.id_str)))
+                Err(MarketDataError::ProviderError(format!("MockProvider '{}' failed historical_quotes", self.id_str)))
             }
         }
-        async fn get_historical_quotes_bulk(&self, symbols_with_currencies: &[(String, String)], start: SystemTime, end: SystemTime) -> CoreResult<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
-             if self.succeed_historical {
+        async fn get_historical_quotes_bulk(&self, symbols_with_currencies: &[(String, String)], _start: SystemTime, _end: SystemTime) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+             if self.succeeds {
                 let mut quotes = Vec::new();
+                let mut errors = Vec::new();
                 for (symbol, currency) in symbols_with_currencies {
-                    quotes.push(self.get_latest_quote(symbol, currency.clone()).await?);
+                    if self.provides_bulk_errors_for.contains(symbol) {
+                        errors.push((symbol.clone(), "Mock bulk error".to_string()));
+                    } else {
+                        quotes.push(self.get_latest_quote(symbol, currency.clone()).await.unwrap()); // Assuming get_latest_quote succeeds for this mock
+                    }
                 }
-                Ok((quotes, Vec::new()))
+                Ok((quotes, errors))
             } else {
-                Err(MarketDataError::ProviderError(format!("MockProvider {} failed historical_quotes_bulk", self.id_str)))
+                Err(MarketDataError::ProviderError(format!("MockProvider '{}' failed historical_quotes_bulk entirely", self.id_str)))
             }
         }
     }
 
     #[async_trait]
     impl AssetProfiler for MockProvider {
-        async fn get_asset_profile(&self, symbol: &str) -> CoreResult<AssetProfile, MarketDataError> {
-            if self.succeed_profile {
+        fn name(&self) -> &'static str { Box::leak(self.id_str.clone().into_boxed_str()) } // For AssetProfiler specific name if needed
+        async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+            if self.succeeds {
                 Ok(AssetProfile { id: Some(symbol.to_string()), symbol: symbol.to_string(), name: Some(format!("Mock Profile for {}", symbol)), ..Default::default() })
             } else {
-                Err(MarketDataError::ProviderError(format!("MockProvider {} failed get_asset_profile", self.id_str)))
+                Err(MarketDataError::ProviderError(format!("MockProvider '{}' failed get_asset_profile", self.id_str)))
             }
         }
-        async fn search_ticker(&self, query: &str) -> CoreResult<Vec<QuoteSummary>, MarketDataError> {
-            if self.succeed_search {
-                Ok(vec![QuoteSummary { symbol: query.to_string(), short_name: format!("Mock Search for {}", query), ..Default::default() }])
+        async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
+            if self.succeeds {
+                if self.returns_empty { return Ok(Vec::new()); }
+                Ok(vec![QuoteSummary { symbol: query.to_string(), short_name: Some(format!("Mock Search for {}", query)), ..Default::default() }])
             } else {
-                 Err(MarketDataError::ProviderError(format!("MockProvider {} failed search_ticker", self.id_str)))
+                 Err(MarketDataError::ProviderError(format!("MockProvider '{}' failed search_ticker", self.id_str)))
             }
         }
     }
     
-    fn run_async_test<F, Fut>(f: F) where F: FnOnce(Arc<TokioRuntime>) -> Fut, Fut: std::future::Future<Output = ()> {
+    // Helper to set up a ProviderRegistry with specific mock providers for testing fallback logic.
+    // This bypasses the normal ProviderRegistry::new logic that instantiates concrete providers.
+    fn setup_registry_with_mocks(
+        providers: Vec<Arc<dyn MarketDataProvider + Send + Sync>>,
+        profilers: Vec<Arc<dyn AssetProfiler + Send + Sync>>, // Allow separate profiler list
+        ordered_data_ids: Vec<String>,
+        ordered_profiler_ids: Vec<String>
+    ) -> ProviderRegistry {
+        let mut data_providers_map = HashMap::new();
+        for p in providers {
+            data_providers_map.insert(p.name().to_string(), p.clone());
+        }
+        let mut asset_profilers_map = HashMap::new();
+        for p in profilers {
+            asset_profilers_map.insert(p.name().to_string(), p.clone());
+        }
+         // Ensure manual profiler for tests that might rely on it implicitly via get_asset_profile
+        if !asset_profilers_map.contains_key("Manual") {
+            let manual_profiler = Arc::new(MockProvider::new("Manual", true, false)) as Arc<dyn AssetProfiler + Send + Sync>;
+            asset_profilers_map.insert("Manual".to_string(), manual_profiler);
+        }
+
+
+        ProviderRegistry {
+            data_providers: data_providers_map,
+            ordered_data_provider_ids: ordered_data_ids,
+            asset_profilers: asset_profilers_map,
+            ordered_profiler_ids: ordered_profiler_ids,
+        }
+    }
+
+
+    fn run_async_test<F, Fut>(f: F) 
+    where 
+        F: FnOnce(Arc<TokioRuntime>) -> Fut, 
+        Fut: std::future::Future<Output = ()> 
+    {
         let runtime = Arc::new(TokioRuntime::new().unwrap());
         runtime.clone().block_on(f(runtime));
     }

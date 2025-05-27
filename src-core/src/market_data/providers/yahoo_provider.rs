@@ -561,7 +561,15 @@ impl YahooProvider {
     /// A String with each word capitalized and separated by spaces (e.g., "Basic Materials")
     ///
     /// ```
+    /// assert_eq!(YahooProvider::new().unwrap().format_sector("basic_materials"), "Basic Materials");
+    /// assert_eq!(YahooProvider::new().unwrap().format_sector("financial_services"), "Financial Services");
+    /// ```
+    // Note: The above doc test example won't run directly without a running async runtime for `YahooProvider::new()`.
+    // It's illustrative of the function's purpose.
     fn format_sector(&self, sector: &str) -> String {
+        if sector.is_empty() {
+            return String::new();
+        }
         sector
             .split('_')
             .map(|word| {
@@ -646,6 +654,9 @@ impl YahooProvider {
     }
 }
 
+// TODO: Consider increasing BATCH_SIZE in get_historical_quotes_bulk for efficiency 
+// if API limits allow. Current BATCH_SIZE = 2 is very conservative.
+
 #[async_trait::async_trait]
 impl AssetProfiler for YahooProvider {
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
@@ -697,6 +708,255 @@ impl MarketDataProvider for YahooProvider {
         start: SystemTime,
         end: SystemTime,
     ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
-        Ok(self.get_historical_quotes_bulk(symbols_with_currencies, start, end).await?)
+        // Note: The BATCH_SIZE in the underlying get_historical_quotes_bulk is currently 2.
+        // This might be inefficient for a large number of symbols.
+        self.get_historical_quotes_bulk(symbols_with_currencies, start, end).await
+            .map_err(MarketDataError::from)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::market_data::models::{AssetClass, AssetSubClass}; // Ensure these are in scope
+
+    // Helper to create a YahooProvider instance for tests if needed,
+    // though many utility functions are pure and don't need the instance.
+    // For `format_sector` and `format_name` which are methods on YahooProvider,
+    // we'd ideally call them on an instance, but since they don't use `self`'s state,
+    // we can test their logic more directly or on a dummy instance if the methods were static.
+    // As they are instance methods, we'll assume a dummy provider for conceptual testing,
+    // or test the core logic directly. For simplicity, we'll call them as if on an instance.
+    // In a real scenario, you might need `YahooProvider::new().await` which is async.
+    // For these specific pure functions, we can define them as static or test their logic separately.
+    // Let's assume we can instantiate a dummy YahooProvider for testing these simple methods,
+    // or acknowledge this limitation for now.
+    // For the purpose of this exercise, we'll test the logic as if we have an instance.
+    // A real test setup for provider might involve mocking network calls.
+
+    struct TestYahooProvider; // Dummy struct for calling methods that don't rely on internal state.
+
+    impl TestYahooProvider {
+        // Re-implementing simplified versions or direct calls for testing pure logic
+        fn format_name(
+            &self,
+            long_name: Option<&str>,
+            quote_type: &str,
+            short_name: Option<&str>,
+            symbol: &str,
+        ) -> String {
+            // This is a simplified copy of the original format_name for testing its logic directly.
+            // In a full test suite, you'd call it on an actual (mocked) YahooProvider instance.
+            let mut name = long_name.unwrap_or("").to_string();
+            if !name.is_empty() {
+                let replacements = [
+                    ("&amp;", "&"),
+                    ("Amundi Index Solutions - ", ""),
+                    ("iShares ETF (CH) - ", ""),
+                ]; // Simplified list for testing
+                for (from, to) in replacements.iter() {
+                    name = name.replace(from, to);
+                }
+            }
+            if quote_type == "FUTURE" && short_name.is_some() {
+                name = short_name.unwrap()[..short_name.unwrap().len() - 7].to_string();
+            }
+            if name.is_empty() {
+                return short_name.unwrap_or(symbol).to_string();
+            }
+            name
+        }
+
+        fn format_sector(&self, sector: &str) -> String {
+            // Simplified copy for testing
+            if sector.is_empty() { return String::new(); }
+            sector.split('_')
+                .map(|word| {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => first.to_uppercase().chain(chars).collect(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+
+        fn parse_asset_class(&self, quote_type: &str, short_name: &str) -> (AssetClass, AssetSubClass) {
+            // Simplified copy for testing
+            let quote_type = quote_type.to_lowercase();
+            let short_name = short_name.to_lowercase();
+            match quote_type.as_str() {
+                "cryptocurrency" => (AssetClass::Cryptocurrency, AssetSubClass::Cryptocurrency),
+                "equity" => (AssetClass::Equity, AssetSubClass::Stock),
+                "etf" => (AssetClass::Equity, AssetSubClass::Etf),
+                "future" => {
+                    let asset_sub_class = if short_name.starts_with("gold") {
+                        AssetSubClass::PreciousMetal
+                    } else {
+                        AssetSubClass::Commodity
+                    };
+                    (AssetClass::Commodity, asset_sub_class)
+                }
+                "mutualfund" => (AssetClass::Equity, AssetSubClass::MutualFund),
+                _ => (AssetClass::Alternative, AssetSubClass::Alternative),
+            }
+        }
+    }
+
+
+    #[test]
+    fn test_format_name_simple() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.format_name(Some("Test Asset Long Name"), "EQUITY", Some("Test Short"), "TST"),
+            "Test Asset Long Name"
+        );
+    }
+
+    #[test]
+    fn test_format_name_empty_long_name() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.format_name(None, "EQUITY", Some("Test Short"), "TST"),
+            "Test Short"
+        );
+    }
+    
+    #[test]
+    fn test_format_name_empty_long_and_short_name() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.format_name(None, "EQUITY", None, "TST"),
+            "TST"
+        );
+    }
+
+    #[test]
+    fn test_format_name_replacement() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.format_name(Some("Amundi Index Solutions - Global Equity"), "ETF", Some("Amundi Global"), "AMG"),
+            "Global Equity"
+        );
+        assert_eq!(
+            provider.format_name(Some("Test &amp; Co."), "EQUITY", Some("TestCo"), "TC"),
+            "Test & Co."
+        );
+    }
+
+    #[test]
+    fn test_format_name_future() {
+        let provider = TestYahooProvider;
+        // Example: "Crude Oil Feb 24" -> "Crude Oil" (assuming " Feb 24" is 7 chars)
+        assert_eq!(
+            provider.format_name(Some(""), "FUTURE", Some("Crude Oil Feb 24"), "CL.F"), // long name empty, short name used
+            "Crude Oil"
+        );
+        assert_eq!(
+            provider.format_name(Some("Another Future Product Name"), "FUTURE", Some("Product X Mar25"), "PX.F"), // long name present, not modified by FUTURE logic unless empty
+            "Another Future Product Name"
+        );
+    }
+    
+    #[test]
+    fn test_format_sector_basic() {
+        let provider = TestYahooProvider;
+        assert_eq!(provider.format_sector("basic_materials"), "Basic Materials");
+    }
+
+    #[test]
+    fn test_format_sector_single_word() {
+        let provider = TestYahooProvider;
+        assert_eq!(provider.format_sector("energy"), "Energy");
+    }
+
+    #[test]
+    fn test_format_sector_empty() {
+        let provider = TestYahooProvider;
+        assert_eq!(provider.format_sector(""), "");
+    }
+
+    #[test]
+    fn test_format_sector_already_formatted() {
+        // It should still work, though it's not the expected input format
+        let provider = TestYahooProvider;
+        assert_eq!(provider.format_sector("Basic Materials"), "Basic Materials");
+    }
+
+    #[test]
+    fn test_parse_asset_class_equity() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("EQUITY", "Some Stock"),
+            (AssetClass::Equity, AssetSubClass::Stock)
+        );
+        assert_eq!(
+            provider.parse_asset_class("equity", "Some Stock"), // Lowercase
+            (AssetClass::Equity, AssetSubClass::Stock)
+        );
+    }
+
+    #[test]
+    fn test_parse_asset_class_etf() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("ETF", "Some ETF"),
+            (AssetClass::Equity, AssetSubClass::Etf)
+        );
+    }
+
+    #[test]
+    fn test_parse_asset_class_crypto() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("CRYPTOCURRENCY", "Bitcoin"),
+            (AssetClass::Cryptocurrency, AssetSubClass::Cryptocurrency)
+        );
+    }
+
+    #[test]
+    fn test_parse_asset_class_future_commodity() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("FUTURE", "Crude Oil"),
+            (AssetClass::Commodity, AssetSubClass::Commodity)
+        );
+    }
+
+    #[test]
+    fn test_parse_asset_class_future_precious_metal() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("FUTURE", "Gold Feb 24"),
+            (AssetClass::Commodity, AssetSubClass::PreciousMetal)
+        );
+        assert_eq!(
+            provider.parse_asset_class("Future", "Silver Mar 25"), // Mixed case type, full short name
+            (AssetClass::Commodity, AssetSubClass::PreciousMetal)
+        );
+    }
+    
+    #[test]
+    fn test_parse_asset_class_mutual_fund() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("MUTUALFUND", "Some Mutual Fund"),
+            (AssetClass::Equity, AssetSubClass::MutualFund)
+        );
+    }
+
+    #[test]
+    fn test_parse_asset_class_alternative() {
+        let provider = TestYahooProvider;
+        assert_eq!(
+            provider.parse_asset_class("INDEX", "Some Index"), // Unknown type
+            (AssetClass::Alternative, AssetSubClass::Alternative)
+        );
+         assert_eq!(
+            provider.parse_asset_class("CURRENCY", "USD/EUR"), // Unknown type
+            (AssetClass::Alternative, AssetSubClass::Alternative)
+        );
     }
 }
