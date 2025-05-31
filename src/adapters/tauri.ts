@@ -7,8 +7,83 @@ import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
 
 export type { EventCallback, UnlistenFn };
 
+export interface AddonFile {
+  name: string;
+  content: string;
+  is_main: boolean;
+}
+
+export interface AddonMetadata {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  author?: string;
+  main: string;
+  sdkVersion?: string;
+  enabled: boolean;
+  installed_at: string;
+}
+
+export interface ExtractedAddon {
+  metadata: AddonMetadata;
+  files: AddonFile[];
+}
+
+export interface InstalledAddon {
+  metadata: AddonMetadata;
+  file_path: string;
+  is_zip_addon: boolean;
+}
+
 export const invokeTauri = async <T>(command: string, payload?: Record<string, unknown>) => {
   return await invoke<T>(command, payload);
+};
+
+export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAddon> => {
+  return await invoke<ExtractedAddon>('extract_addon_zip', { zipData: Array.from(zipData) });
+};
+
+export const installAddonZip = async (
+  zipData: Uint8Array, 
+  enableAfterInstall?: boolean
+): Promise<AddonMetadata> => {
+  return await invoke<AddonMetadata>('install_addon_zip', { 
+    zipData: Array.from(zipData),
+    enableAfterInstall
+  });
+};
+
+export const installAddonFile = async (
+  fileName: string,
+  fileContent: string,
+  enableAfterInstall?: boolean
+): Promise<AddonMetadata> => {
+  return await invoke<AddonMetadata>('install_addon_file', { 
+    fileName,
+    fileContent,
+    enableAfterInstall
+  });
+};
+
+export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
+  return await invoke<InstalledAddon[]>('list_installed_addons');
+};
+
+export const toggleAddon = async (addonId: string, enabled: boolean): Promise<void> => {
+  return await invoke<void>('toggle_addon', { addonId, enabled });
+};
+
+export const uninstallAddon = async (addonId: string): Promise<void> => {
+  return await invoke<void>('uninstall_addon', { addonId });
+};
+
+export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAddon> => {
+  return await invoke<ExtractedAddon>('load_addon_for_runtime', { addonId });
+};
+
+export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => {
+  return await invoke<ExtractedAddon[]>('get_enabled_addons_on_startup');
 };
 
 export const openCsvFileDialogTauri = async (): Promise<null | string | string[]> => {

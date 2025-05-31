@@ -3,16 +3,18 @@
   "private": true,
   "version": "1.1.6",
   "type": "module",
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev": "vite",
     "tsc": "tsc -b",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && pnpm -C packages/addon-sdk build",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "publish:sdk": "cd packages/addon-sdk && npm publish --access public"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.6",

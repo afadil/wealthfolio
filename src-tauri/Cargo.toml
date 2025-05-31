@@ -26,6 +26,7 @@ tauri-plugin-shell = "2.2.1"
 tauri-plugin-log = "2.3.1"
 log = "0.4"
 futures = "0.3"
+zip = "2.2.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

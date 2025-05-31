@@ -14,7 +14,8 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"]
     },
 
     /* Bundler mode */

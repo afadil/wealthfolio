@@ -4,8 +4,10 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { type NavigationProps, SidebarNav } from './sidebar-nav';
 import { useSettings } from '@/hooks/use-settings';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { getDynamicNavItems, subscribeToNavigationUpdates } from '@/addon/runtimeContext';
+import { useState, useEffect } from 'react';
 
-const navigation: NavigationProps = {
+const staticNavigation: NavigationProps = {
   primary: [
     {
       icon: <Icons.Dashboard className="h-5 w-5" />,
@@ -44,6 +46,30 @@ const navigation: NavigationProps = {
 const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
+  const [dynamicItems, setDynamicItems] = useState<any[]>([]);
+
+  // Subscribe to navigation updates from addons
+  useEffect(() => {
+    const updateDynamicItems = () => {
+      setDynamicItems(getDynamicNavItems());
+    };
+
+    // Initial load
+    updateDynamicItems();
+
+    // Subscribe to updates
+    const unsubscribe = subscribeToNavigationUpdates(updateDynamicItems);
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Combine static and dynamic navigation items
+  const navigation: NavigationProps = {
+    primary: [...staticNavigation.primary, ...dynamicItems],
+    secondary: staticNavigation.secondary,
+  };
 
   if (isSettingsLoading) {
     return null;

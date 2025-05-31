@@ -1,6 +1,7 @@
 import path from 'path';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 var host = process.env.TAURI_DEV_HOST;
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -8,6 +9,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
+            '@wealthfolio/addon-sdk': resolve(__dirname, 'packages/addon-sdk/src')
         },
     },
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
