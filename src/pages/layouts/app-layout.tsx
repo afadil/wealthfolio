@@ -51,7 +51,8 @@ const AppLayout = () => {
   // Subscribe to navigation updates from addons
   useEffect(() => {
     const updateDynamicItems = () => {
-      setDynamicItems(getDynamicNavItems());
+      const itemsFromRuntime = getDynamicNavItems();
+      setDynamicItems(itemsFromRuntime);
     };
 
     // Initial load

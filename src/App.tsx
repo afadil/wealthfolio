@@ -3,7 +3,6 @@ import { SettingsProvider } from '@/lib/settings-provider';
 import { PrivacyProvider } from './context/privacy-context';
 import { AppRoutes } from './routes';
 import { useState } from 'react';
-import { useAddonStartup } from '@/hooks/use-addon-startup';
 
 function App() {
   const [queryClient] = useState(
@@ -18,9 +17,6 @@ function App() {
         },
       }),
   );
-
-  // Load enabled addons on app startup
-  useAddonStartup();
 
   return (
     <QueryClientProvider client={queryClient}>
