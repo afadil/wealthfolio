@@ -12,6 +12,7 @@ interface AddonManifest {
   author?: string;
   sdkVersion?: string;
   main?: string;
+  enabled?: boolean;
 }
 
 interface AddonFile {
@@ -223,8 +224,16 @@ export async function loadAllAddons(): Promise<void> {
       return;
     }
 
+    // Filter only enabled addons
+    const enabledAddonFiles = addonFiles.filter(addonFile => addonFile.manifest.enabled !== false);
+
+    if (enabledAddonFiles.length === 0) {
+      logger.info('📦 No enabled addons found to load');
+      return;
+    }
+
     let loadedCount = 0;
-    const loadPromises = addonFiles.map(async (addonFile) => {
+    const loadPromises = enabledAddonFiles.map(async (addonFile) => {
       const success = await loadAddon(addonFile, realCtx);
       if (success) {
         loadedCount++;
@@ -232,9 +241,10 @@ export async function loadAllAddons(): Promise<void> {
       }
     });
 
-    // Load all addons concurrently
+    // Load all enabled addons concurrently
     await Promise.all(loadPromises);
     
+    logger.info(`🎉 Successfully loaded ${loadedCount} out of ${enabledAddonFiles.length} enabled addons`);
     
     // Debug: Show current navigation state
   } catch (error) {

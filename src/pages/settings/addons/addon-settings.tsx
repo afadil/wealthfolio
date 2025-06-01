@@ -5,6 +5,8 @@ import { SettingsHeader } from '../header';
 import { Icons } from '@/components/icons';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { EmptyPlaceholder } from '@/components/empty-placeholder';
@@ -13,7 +15,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { DeleteConfirm } from '@/components/delete-confirm';
 import { triggerAllDisableCallbacks } from '@/addon/runtimeContext';
+import { reloadAllAddons } from '@/addon/pluginLoader';
 import {
   installAddonZip,
   listInstalledAddons,
@@ -26,6 +30,7 @@ export default function AddonSettingsPage() {
   const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAddons, setIsLoadingAddons] = useState(true);
+  const [togglingAddonId, setTogglingAddonId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Load installed addons on component mount
@@ -90,9 +95,12 @@ export default function AddonSettingsPage() {
       // Refresh the addon list
       await loadInstalledAddons();
       
+      // Reload all addons to load the newly installed addon immediately
+      await reloadAllAddons();
+      
       toast({
         title: 'Addon installed successfully',
-        description: `${metadata.name} has been installed and will load on next app startup.`,
+        description: `${metadata.name} has been installed and is now active.`,
       });
       
     } catch (error) {
@@ -103,6 +111,7 @@ export default function AddonSettingsPage() {
 
   const handleToggleAddon = async (addonId: string, currentEnabled: boolean) => {
     try {
+      setTogglingAddonId(addonId);
       const newEnabled = !currentEnabled;
       await toggleAddon(addonId, newEnabled);
       
@@ -117,7 +126,10 @@ export default function AddonSettingsPage() {
         });
       }
 
-      // If disabling, trigger cleanup callbacks
+      // Reload all addons to apply the changes immediately
+      await reloadAllAddons();
+
+      // If disabling, trigger cleanup callbacks (this is now redundant since reloadAllAddons handles it)
       if (!newEnabled) {
         triggerAllDisableCallbacks();
       }
@@ -128,6 +140,8 @@ export default function AddonSettingsPage() {
         description: error instanceof Error ? error.message : 'Failed to toggle addon',
         variant: 'destructive',
       });
+    } finally {
+      setTogglingAddonId(null);
     }
   };
 
@@ -146,7 +160,10 @@ export default function AddonSettingsPage() {
         description: `${addon.metadata.name} has been completely removed.`,
       });
 
-      // Trigger disable callbacks for cleanup
+      // Reload all addons to remove the uninstalled addon from runtime
+      await reloadAllAddons();
+
+      // Trigger disable callbacks for cleanup (this is now redundant since reloadAllAddons handles it)
       triggerAllDisableCallbacks();
     } catch (error) {
       console.error('Error uninstalling addon:', error);
@@ -155,14 +172,6 @@ export default function AddonSettingsPage() {
         description: error instanceof Error ? error.message : 'Failed to uninstall addon',
         variant: 'destructive',
       });
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return 'Unknown';
     }
   };
 
@@ -184,18 +193,18 @@ export default function AddonSettingsPage() {
             <PopoverContent className="w-80">
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <h4 className="font-medium">📦 ZIP Addon Packages</h4>
+                  <h4 className="font-medium">🔌 Addons & Extensions</h4>
                   <p className="text-sm text-muted-foreground">
-                    Install complete addon packages with manifest.json, assets, and dependencies.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    ZIP files should contain a manifest.json file with addon metadata.
+                    Addons let you extend Wealthfolio with new features, custom analytics, and additional functionality to enhance your financial management experience.
                   </p>
                 </div>
                 <div className="pt-2 border-t">
-                  <p className="text-xs text-muted-foreground">
-                    Installed addons are stored in your app data directory and automatically load when you restart Wealthfolio.
-                  </p>
+                  <div className="flex items-start gap-2">
+                    <Icons.AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-amber-600">Security Notice:</span> Only install addons from trusted sources. Addons have access to your application data.
+                    </p>
+                  </div>
                 </div>
               </div>
             </PopoverContent>
@@ -273,50 +282,84 @@ export default function AddonSettingsPage() {
             {installedAddons.map((addon) => (
               <div
                 key={addon.metadata.id}
-                className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
+                className="group rounded-lg border bg-card p-6 hover:bg-accent/30 transition-all duration-200 hover:shadow-md"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-medium truncate">{addon.metadata.name}</h4>
-                    <Badge variant={addon.metadata.enabled ? 'default' : 'secondary'} className="shrink-0">
-                      {addon.metadata.enabled ? 'Enabled' : 'Disabled'}
-                    </Badge>
-                    <Badge variant="outline" className="shrink-0">v{addon.metadata.version}</Badge>
-                    <Badge variant="secondary" className="shrink-0">📦 ZIP</Badge>
-                  </div>
-                  
-                  {addon.metadata.description && (
-                    <p className="text-sm text-muted-foreground mb-2 line-clamp-1">
-                      {addon.metadata.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    {addon.metadata.author && <span>By {addon.metadata.author}</span>}
-                    <span>ID: {addon.metadata.id}</span>
-                    {addon.metadata.sdkVersion && <span>SDK: v{addon.metadata.sdkVersion}</span>}
-                    {addon.metadata.main && <span>Entry: {addon.metadata.main}</span>}
-                    {addon.metadata.installed_at && (
-                      <span>Installed: {formatDate(addon.metadata.installed_at)}</span>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0 space-y-3">
+                    {/* Header section with name and version */}
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-semibold text-lg truncate">{addon.metadata.name}</h4>
+                      <Badge variant="outline" className="shrink-0 text-xs">
+                        v{addon.metadata.version}
+                      </Badge>
+                    </div>
+                    
+                    {/* Description */}
+                    {addon.metadata.description && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {addon.metadata.description}
+                      </p>
+                    )}
+                    
+                    {/* Author info */}
+                    {addon.metadata.author && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Icons.Users className="h-4 w-4" />
+                        <span>By {addon.metadata.author}</span>
+                      </div>
                     )}
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-2 ml-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleToggleAddon(addon.metadata.id, addon.metadata.enabled)}
-                  >
-                    {addon.metadata.enabled ? 'Disable' : 'Enable'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleUninstallAddon(addon.metadata.id)}
-                  >
-                    <Icons.Trash className="h-4 w-4" />
-                  </Button>
+                  
+                  {/* Controls section */}
+                  <div className="flex items-center gap-4 ml-6">
+                    {/* Enable/Disable Switch */}
+                    <div className="flex items-center gap-3">
+                      <Label 
+                        htmlFor={`addon-${addon.metadata.id}`} 
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {togglingAddonId === addon.metadata.id
+                          ? 'Loading...'
+                          : addon.metadata.enabled 
+                            ? 'Enabled' 
+                            : 'Disabled'}
+                      </Label>
+                      <Switch
+                        id={`addon-${addon.metadata.id}`}
+                        checked={addon.metadata.enabled}
+                        onCheckedChange={(checked) => 
+                          handleToggleAddon(addon.metadata.id, !checked)
+                        }
+                        className="data-[state=checked]:bg-green-600"
+                        disabled={togglingAddonId === addon.metadata.id}
+                      />
+                    </div>
+                    
+                    {/* Delete button with confirmation */}
+                    <DeleteConfirm
+                      deleteConfirmTitle="Remove Addon"
+                      deleteConfirmMessage={
+                        <div className="space-y-2">
+                          <p>Are you sure you want to remove <strong>{addon.metadata.name}</strong>?</p>
+                          <p className="text-sm text-muted-foreground">
+                            This action cannot be undone. The addon will be completely removed from your system.
+                          </p>
+                        </div>
+                      }
+                      handleDeleteConfirm={() => handleUninstallAddon(addon.metadata.id)}
+                      isPending={false}
+                      button={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Icons.Trash className="h-4 w-4" />
+                          <span className="sr-only">Remove addon</span>
+                        </Button>
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             ))}
