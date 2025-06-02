@@ -157,7 +157,10 @@ export default function DatePickerInput({
           }
         }}
       >
-        <Dialog className="max-h-[inherit] overflow-auto p-2 outline-none">
+        <Dialog 
+          className="max-h-[inherit] overflow-auto p-2 outline-none" 
+          style={{ pointerEvents: 'auto' }}
+        >
           <Calendar />
         </Dialog>
       </Popover>
