@@ -422,53 +422,60 @@ impl SnapshotService {
                 .get(acc_id)
                 .and_then(|dates_map| dates_map.keys().next().cloned());
 
-            let mut effective_start_date;
+            // Determine initial_snapshot_for_acc and effective_start_date (loop_start_date) based on conditions
             let mut initial_snapshot_for_acc: Option<AccountStateSnapshot> = None;
+            let current_loop_start_date: NaiveDate; // This will be the date the calculation loop begins for this account
 
             if force_full_calculation {
-                effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
-                debug!(
-                    "Force full calculation: Setting effective_start_date for account {} to {}. Deletion handled by overwrite methods.",
-                    acc_id, effective_start_date
-                );
-            } else {
-                if let Some(latest_snapshot) =
-                    self.snapshot_repository.get_latest_snapshot_before_date(acc_id, calculation_end_date)?
-                {
-                    initial_snapshot_for_acc = Some(latest_snapshot.clone());
-                    effective_start_date = latest_snapshot.snapshot_date; 
-                    debug!(
-                        "Found latest snapshot for account {}: date {}. Starting incremental calc from here.",
-                        acc_id, effective_start_date
-                    );
-                } else {
-                    effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
-                    debug!(
-                        "No snapshot found for account {}. Starting from earliest activity: {} or end_date.",
-                        acc_id, effective_start_date
-                    );
+                initial_snapshot_for_acc = None;
+                current_loop_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
+                debug!("Force full calculation for account {}: Calculation loop will start from earliest activity or end_date: {}", acc_id, current_loop_start_date);
+            } else { // Not force_full_calculation
+                if let Some(latest_snapshot) = self.snapshot_repository.get_latest_snapshot_before_date(acc_id, calculation_end_date)? {
+                    let latest_snapshot_date = latest_snapshot.snapshot_date;
+                    if let Some(min_act_date) = min_activity_date_for_account {
+                        if min_act_date < latest_snapshot_date {
+                            warn!("Account {} has activities at {} which is before the latest snapshot date {}. Falling back to full recalc from earliest activity.", acc_id, min_act_date, latest_snapshot_date);
+                            initial_snapshot_for_acc = None;
+                            current_loop_start_date = min_act_date;
+                        } else { // Standard incremental: min_activity_date >= latest_snapshot_date
+                            initial_snapshot_for_acc = Some(latest_snapshot.clone());
+                            current_loop_start_date = latest_snapshot_date.succ_opt().unwrap_or(calculation_end_date);
+                            debug!("Found latest snapshot for account {} on {}. Incremental calculation loop will start from {}.", acc_id, latest_snapshot_date, current_loop_start_date);
+                        }
+                    } else { // No activities for this account, but have a snapshot.
+                        initial_snapshot_for_acc = Some(latest_snapshot.clone());
+                        current_loop_start_date = latest_snapshot_date.succ_opt().unwrap_or(calculation_end_date);
+                        debug!("Account {} has latest snapshot on {} but no known activities. Incremental loop starts {}.", acc_id, latest_snapshot_date, current_loop_start_date);
+                    }
+                } else { // No latest_snapshot found
+                    initial_snapshot_for_acc = None;
+                    current_loop_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
+                    debug!("No snapshot found for account {}. Calculation loop will start from earliest activity or end_date: {}", acc_id, current_loop_start_date);
                 }
             }
 
-            if let Some(min_act_date) = min_activity_date_for_account {
-                if min_act_date < effective_start_date {
-                    debug!(
-                        "Account {} has activities (at {}) before determined start_date ({}). Adjusting to earliest activity.",
-                        acc_id, min_act_date, effective_start_date
-                    );
-                    effective_start_date = min_act_date;
-                    initial_snapshot_for_acc = None; 
-                }
-            }
+            // Now, populate start_keyframes and effective_start_dates based on the determined state
+            // The variable `effective_start_date` here is what gets stored in the map and used downstream.
+            let effective_start_date = current_loop_start_date;
 
             if effective_start_date <= calculation_end_date {
-                if let Some(snapshot) = initial_snapshot_for_acc {
-                    start_keyframes.insert(acc_id.clone(), snapshot);
+                if let Some(snapshot_to_prime_with) = initial_snapshot_for_acc {
+                    // This is the incremental case.
+                    // snapshot_to_prime_with is the state at latest_snapshot_date (LSD).
+                    // effective_start_date (loop_start_date) is LSD + 1.
+                    start_keyframes.insert(acc_id.clone(), snapshot_to_prime_with.clone()); // Prime with LSD's state
+                    effective_start_dates.insert(acc_id.clone(), effective_start_date); // Loop will run from LSD+1
                 } else {
-                    let day_before_effective_start = effective_start_date.pred_opt().unwrap_or(effective_start_date);
-                    start_keyframes.insert(acc_id.clone(), Self::create_initial_snapshot(account, day_before_effective_start));
+                    // This is full recalculation or fallback due to activities before snapshot.
+                    // effective_start_date (loop_start_date) is the first day of activities (or end_date).
+                    // We need a blank snapshot for the day *before* this loop_start_date.
+                    let day_before_calc_starts = effective_start_date.pred_opt().unwrap_or(effective_start_date);
+                    start_keyframes.insert(acc_id.clone(), Self::create_initial_snapshot(account, day_before_calc_starts));
+                    effective_start_dates.insert(acc_id.clone(), effective_start_date); // Loop will run from effective_start_date
                 }
-                effective_start_dates.insert(acc_id.clone(), effective_start_date);
+
+                // Update overall_min_calc_date based on the actual start of the loop for this account
                 if effective_start_date < overall_min_calc_date {
                     overall_min_calc_date = effective_start_date;
                 }
