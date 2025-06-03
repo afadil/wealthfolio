@@ -436,10 +436,15 @@ impl SnapshotService {
                     self.snapshot_repository.get_latest_snapshot_before_date(acc_id, calculation_end_date)?
                 {
                     initial_snapshot_for_acc = Some(latest_snapshot.clone());
-                    effective_start_date = latest_snapshot.snapshot_date; 
+                    effective_start_date = latest_snapshot
+                        .snapshot_date
+                        .succ_opt()
+                        .unwrap_or(latest_snapshot.snapshot_date);
                     debug!(
-                        "Found latest snapshot for account {}: date {}. Starting incremental calc from here.",
-                        acc_id, effective_start_date
+                        "Found latest snapshot for account {}: date {}. Starting incremental calc from next day {}.",
+                        acc_id,
+                        latest_snapshot.snapshot_date,
+                        effective_start_date
                     );
                 } else {
                     effective_start_date = min_activity_date_for_account.unwrap_or(calculation_end_date);
@@ -451,7 +456,7 @@ impl SnapshotService {
             }
 
             if let Some(min_act_date) = min_activity_date_for_account {
-                if min_act_date < effective_start_date {
+                if initial_snapshot_for_acc.is_none() && min_act_date < effective_start_date {
                     debug!(
                         "Account {} has activities (at {}) before determined start_date ({}). Adjusting to earliest activity.",
                         acc_id, min_act_date, effective_start_date
