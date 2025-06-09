@@ -73,7 +73,7 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
 }
 
 const CustomizedContent = (props: any) => {
-  const { depth, x, y, width, height, symbol, name, gain, maxGain, minGain } = props;
+  const { depth, x, y, width, height, symbol, gain, maxGain, minGain } = props;
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
   const colorScale = getColorScale(gain, maxGain, minGain);
@@ -140,14 +140,52 @@ const CompositionTooltip = ({ active, payload, settings }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const value = payload[0].value;
+    const gain = data.gain || 0;
+    const isPositive = gain >= 0;
+    
     return (
       <Card>
-        <CardHeader className="p-4">
-          <CardTitle className="text-sm text-muted-foreground">{data.name}</CardTitle>
-          <p className="text-sm font-semibold">
-            {formatAmount(value, settings?.baseCurrency || 'USD')}
-          </p>
-        </CardHeader>
+        <CardContent className="p-4 space-y-3">
+          {/* Header with symbol and name */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-primary">{data.symbol}</span>
+              <span className="text-xs text-muted-foreground">
+                {data.asOfDate ? new Date(data.asOfDate).toLocaleDateString() : ''}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-tight">
+              {data.name}
+            </p>
+          </div>
+          
+          {/* Divider */}
+          <div className="border-t" />
+          
+          {/* Market Value */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground pr-6">Market Value</span>
+              <span className="text-sm font-semibold">
+                {formatAmount(value, settings?.baseCurrency || 'USD')}
+              </span>
+            </div>
+            
+            {/* Gain/Loss */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Return</span>
+              <span className={cn(
+                "text-sm font-semibold flex items-center gap-1",
+                isPositive ? "text-success" : "text-destructive"
+              )}>
+                {isPositive ? "+" : ""}{formatPercent(gain)}
+                <span className="text-xs">
+                  {isPositive ? "↗" : "↘"}
+                </span>
+              </span>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     );
   }
@@ -186,6 +224,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           name: holding.instrument?.name, // Use symbol for the treemap node name/link
           marketValueConverted: marketValue,
           gain,
+          asOfDate: holding.asOfDate,
           // We'll add min/max gain later after iterating through all
         };
       })
