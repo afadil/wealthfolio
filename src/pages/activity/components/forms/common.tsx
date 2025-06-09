@@ -106,7 +106,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
                 <SelectTrigger>
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[500px] overflow-y-auto">
                   {accounts.map((account) => (
                     <SelectItem value={account.value} key={account.value}>
                       {account.label}
