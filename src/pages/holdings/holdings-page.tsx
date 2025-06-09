@@ -32,6 +32,7 @@ import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 import { HoldingCurrencyChart } from './components/currency-chart';
 import { AccountAllocationChart } from './components/account-allocation-chart';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Define a type for the filter criteria
 type SheetFilterType = 'class' | 'sector' | 'country' | 'currency' | 'account' | 'composition';
@@ -222,6 +223,7 @@ export const HoldingsPage = () => {
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent className="w-full sm:max-w-lg">
+          <ScrollArea className="max-h-full h-full">
           <SheetHeader>
             <SheetTitle>{sheetTitle}</SheetTitle>
             <SheetDescription>
@@ -276,6 +278,7 @@ export const HoldingsPage = () => {
               <Button variant="outline">Close</Button>
             </SheetClose>
           </SheetFooter>
+        </ScrollArea>
         </SheetContent>
       </Sheet>
     </ApplicationShell>
