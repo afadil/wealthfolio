@@ -92,6 +92,14 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
 
     /// Retrieves the date of the earliest snapshot for a given account.
     fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
+
+    /// Deletes all existing snapshots for a given account and saves the new ones
+    /// in a single transaction.
+    async fn overwrite_all_snapshots_for_account(
+        &self,
+        account_id: &str,
+        snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()>;
 }
 
 pub struct SnapshotRepository {
@@ -204,14 +212,14 @@ impl SnapshotRepository {
             "WITH RankedSnapshots AS ( \
                 SELECT \
                     id, account_id, snapshot_date, currency, positions, \
-                    cash_balances, cost_basis, net_contribution, calculated_at, \
+                    cash_balances, cost_basis, net_contribution, net_contribution_base, calculated_at, \
                     ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY snapshot_date DESC) as rn \
                 FROM {} \
                 WHERE account_id IN ({}) AND snapshot_date <= ? \
             ) \
             SELECT \
                 id, account_id, snapshot_date, currency, positions, \
-                cash_balances, cost_basis, net_contribution, calculated_at \
+                cash_balances, cost_basis, net_contribution, net_contribution_base, calculated_at \
             FROM RankedSnapshots \
             WHERE rn = 1",
             "holdings_snapshots", // Use direct table name string
@@ -259,14 +267,14 @@ impl SnapshotRepository {
             "WITH RankedSnapshots AS ( \
                 SELECT \
                     id, account_id, snapshot_date, currency, positions, \
-                    cash_balances, cost_basis, net_contribution, calculated_at, \
+                    cash_balances, cost_basis, net_contribution,  calculated_at, net_contribution_base,\
                     ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY snapshot_date DESC) as rn \
                 FROM {} \
                 WHERE account_id IN ({}) \
             ) \
             SELECT \
                 id, account_id, snapshot_date, currency, positions, \
-                cash_balances, cost_basis, net_contribution, calculated_at \
+                cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base \
             FROM RankedSnapshots \
             WHERE rn = 1",
             "holdings_snapshots",
@@ -527,13 +535,43 @@ impl SnapshotRepository {
             None => Ok(None), // No snapshots found for this account
         }
     }
+
+    pub async fn overwrite_all_snapshots_for_account(
+        &self,
+        target_account_id: &str,
+        snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        use crate::schema::holdings_snapshots::dsl::*;
+        let account_id_owned = target_account_id.to_string();
+        let db_models: Vec<AccountStateSnapshotDB> = snapshots_to_save
+            .iter()
+            .cloned()
+            .map(AccountStateSnapshotDB::from)
+            .collect();
+
+        self.writer
+            .exec(move |conn| {
+                // Delete all for this account
+                diesel::delete(holdings_snapshots.filter(account_id.eq(&account_id_owned)))
+                    .execute(conn)?;
+
+                // Save new ones
+                if !db_models.is_empty() {
+                    diesel::replace_into(holdings_snapshots)
+                        .values(&db_models)
+                        .execute(conn)?;
+                }
+                Ok(())
+            })
+            .await
+    }
 }
 
 // Implement the trait methods for SnapshotRepository
 #[async_trait]
 impl SnapshotRepositoryTrait for SnapshotRepository {
     async fn save_snapshots(&self, snapshots: &[AccountStateSnapshot]) -> Result<()> {
-        self.save_snapshots(snapshots).await
+         SnapshotRepository::save_snapshots(self, snapshots).await
     }
 
     fn get_snapshots_by_account(
@@ -630,5 +668,14 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
 
     fn get_earliest_snapshot_date(&self, account_id_param: &str) -> Result<Option<NaiveDate>> {
         self.get_earliest_snapshot_date(account_id_param)
+    }
+
+    async fn overwrite_all_snapshots_for_account(
+        &self,
+        account_id: &str,
+        snapshots_to_save: &[AccountStateSnapshot],
+    ) -> Result<()> {
+        self.overwrite_all_snapshots_for_account(account_id, snapshots_to_save)
+            .await
     }
 }

@@ -138,7 +138,6 @@ interface PortfolioCompositionProps {
 
 const CompositionTooltip = ({ active, payload, settings }: any) => {
   if (active && payload && payload.length) {
-    console.log('payload', payload);
     const data = payload[0].payload;
     const value = payload[0].value;
     return (

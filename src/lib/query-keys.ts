@@ -48,4 +48,10 @@ export const QueryKeys = {
 
   // Market Data Providers
   MARKET_DATA_PROVIDERS: 'marketDataProviders',
+
+  transactions: 'transactions',
+  latestValuations: 'latest-valuations',
+
+  // Market Data
+  symbolSearch: 'symbol-search',
 } as const;

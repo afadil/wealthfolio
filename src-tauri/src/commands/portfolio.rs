@@ -102,6 +102,36 @@ pub async fn get_historical_valuations(
 }
 
 #[tauri::command]
+pub async fn get_latest_valuations(
+    state: State<'_, Arc<ServiceContext>>,
+    account_ids: Vec<String>,
+) -> Result<Vec<DailyAccountValuation>, String> {
+    debug!("Get latest valuations for accounts: {:?}", account_ids);
+
+    let ids_to_process = if account_ids.is_empty() {
+        debug!("Input account_ids is empty, fetching active accounts for latest valuations.");
+        state
+            .account_service()
+            .get_active_accounts()
+            .map_err(|e| format!("Failed to fetch active accounts: {}", e))?
+            .into_iter()
+            .map(|acc| acc.id)
+            .collect()
+    } else {
+        account_ids
+    };
+
+    if ids_to_process.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    state
+        .valuation_service()
+        .get_latest_valuations(&ids_to_process)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_income_summary(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<IncomeSummary>, String> {

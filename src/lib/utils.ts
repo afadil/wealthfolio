@@ -218,44 +218,45 @@ export function safeDivide(numerator: number, denominator: number): number {
 }
 
 export function calculatePerformanceMetrics(
-  valuationHistory: AccountValuation[] | undefined | null,
-  itemId?: string,
+  history: AccountValuation[] | null | undefined,
+  isAllTime = false,
 ): { gainLossAmount: number; simpleReturn: number } {
-  if (!valuationHistory || valuationHistory.length < 2) {
-    return { gainLossAmount: 0, simpleReturn: 0 };
+  if (!history?.length) return { gainLossAmount: 0, simpleReturn: 0 };
+
+
+  const first = history[0];
+  const last = history[history.length - 1];
+
+  const ncFlow = Number(last.netContribution) - Number(first.netContribution);
+  const mvGain = Number(last.totalValue) - Number(first.totalValue);
+  const gain$ = mvGain - ncFlow; // profit / loss
+
+  // ── all‑time ROI ────────────────────────────────────────────────
+  if (isAllTime) {
+    const totalNC = Number(last.netContribution);
+    const gain = Number(last.totalValue) - totalNC;
+
+    return {
+      gainLossAmount: gain,
+      simpleReturn: totalNC !== 0 ? gain / totalNC : 0,
+    };
   }
 
-  const startPoint = valuationHistory[0];
-  const endPoint = valuationHistory[valuationHistory.length - 1];
+  // ── period Perf: daily time‑weighted return (TWR) ───────────────
+  let twr = 1;
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1];
+    const curr = history[i];
 
-  const startNetContribution = Number(startPoint.netContribution);
-  const endNetContribution = Number(endPoint.netContribution);
-  const netCashFlow = endNetContribution - startNetContribution;
+    const cf = Number(curr.netContribution) - Number(prev.netContribution); // deposit(+)/withdraw(-)
+    const mv0 = Number(prev.totalValue);
+    if (mv0 === 0) continue; // skip day zero if portfolio just opened
 
-  const startValueForGainCalc = Number(startPoint.totalValue);
-  const endPointTotalValue = Number(endPoint.totalValue);
-
-  const calculatedGainLossAmount = endPointTotalValue - startValueForGainCalc - netCashFlow;
-
-  let calculatedSimpleReturn = 0;
-  if (startValueForGainCalc === 0) {
-    if (calculatedGainLossAmount === 0) {
-      calculatedSimpleReturn = 0;
-    } else {
-      const message = `Simple total return calculation: startValueForGainCalc is zero but gainLossAmount is non-zero. Returning 0.`;
-      if (itemId) {
-        logger.warn(`${message} Item ID: ${itemId}`);
-      } else {
-        logger.warn(message);
-      }
-      calculatedSimpleReturn = 0;
-    }
-  } else {
-    calculatedSimpleReturn = calculatedGainLossAmount / startValueForGainCalc;
+    twr *= (Number(curr.totalValue) - cf) / mv0;
   }
 
   return {
-    gainLossAmount: calculatedGainLossAmount,
-    simpleReturn: calculatedSimpleReturn,
+    gainLossAmount: gain$,
+    simpleReturn: twr - 1, // e.g. 0.034 -> 3.4 %
   };
 }

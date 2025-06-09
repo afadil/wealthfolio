@@ -91,7 +91,7 @@ impl SnapshotService {
         snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
-        let holdings_calculator = HoldingsCalculator::new(fx_service.clone());
+        let holdings_calculator = HoldingsCalculator::new(fx_service.clone(), base_currency.clone());
         Self {
             base_currency: base_currency.clone(),
             account_repository,
@@ -619,8 +619,6 @@ impl SnapshotService {
         target_date: NaiveDate,
         // Map of Account ID -> AccountStateSnapshot for all *individual* accounts as of target_date
         individual_snapshots_on_date: &HashMap<String, AccountStateSnapshot>,
-        // Map of Account ID -> Account for all *active* accounts (to get their currencies etc.)
-        all_active_accounts: &AccountsMap,
         base_portfolio_currency: &str,
     ) -> Result<AccountStateSnapshot> {
         debug!(
@@ -639,17 +637,6 @@ impl SnapshotService {
                 continue;
             }
 
-            let individual_account_details = match all_active_accounts
-                .get(individual_acc_id.as_str())
-            {
-                Some(acc) => acc,
-                None => {
-                    warn!("Account details not found for account {} during TOTAL aggregation for date {}. Skipping its contribution.", individual_acc_id, target_date);
-                    continue;
-                }
-            };
-            let individual_account_currency = &individual_account_details.currency;
-
             // 1. Aggregate Cash Balances
             // Iterate over all cash balances in the individual snapshot (which might be multi-currency)
             // and add them to the corresponding currency in the aggregated map.
@@ -659,34 +646,8 @@ impl SnapshotService {
                     .or_insert(Decimal::ZERO) += *amount;
             }
 
-            // 2. Aggregate Net Contribution (convert to base_portfolio_currency)
-            // individual_snapshot.net_contribution is in individual_account_currency.
-            match self
-                .holdings_calculator
-                .fx_service
-                .convert_currency_for_date(
-                    individual_snapshot.net_contribution,
-                    individual_account_currency,
-                    base_portfolio_currency,
-                    individual_snapshot.snapshot_date
-                ) {
-                Ok(converted_contribution) => {
-                    overall_net_contribution_base_ccy += converted_contribution;
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to convert net contribution for account {} ({} {} to {}) for TOTAL on {}: {}. Adding unconverted amount.",
-                        individual_acc_id, individual_snapshot.net_contribution, individual_account_currency, base_portfolio_currency, target_date, e
-                    );
-                    if individual_account_currency != base_portfolio_currency {
-                        overall_net_contribution_base_ccy += individual_snapshot.net_contribution;
-                    // Fallback
-                    } else {
-                        overall_net_contribution_base_ccy += individual_snapshot.net_contribution;
-                        // Already in base
-                    }
-                }
-            }
+            // 2. Aggregate Net Contribution (already frozen FX)
+            overall_net_contribution_base_ccy += individual_snapshot.net_contribution_base;
 
             // 3. Aggregate Positions & Calculate Overall Cost Basis for TOTAL (in base_portfolio_currency)
             for (_pos_asset_id, pos) in &individual_snapshot.positions {
@@ -760,10 +721,13 @@ impl SnapshotService {
             account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
             snapshot_date: target_date,
             currency: base_portfolio_currency.to_string(), // TOTAL snapshot is denominated in base currency
-            cash_balances: aggregated_cash_balances, // Itemized by account currency holding the cash
+            cash_balances: aggregated_cash_balances,       // Itemized by account currency holding the cash
             positions: aggregated_positions,
             cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
-            net_contribution: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
+            net_contribution: overall_net_contribution_base_ccy
+                .round_dp(DECIMAL_PRECISION),
+            net_contribution_base: overall_net_contribution_base_ccy
+                .round_dp(DECIMAL_PRECISION),
             calculated_at: Utc::now().naive_utc(),
         })
     }
@@ -776,9 +740,13 @@ impl SnapshotService {
             id: format!("{}_{}", account.id, date.format("%Y-%m-%d")),
             account_id: account.id.clone(),
             snapshot_date: date,
-            currency: account.currency.clone(), // Use account's currency (base for TOTAL)
+            currency: account.currency.clone(),
+            positions: HashMap::new(),
+            cash_balances: HashMap::new(),
+            cost_basis: Decimal::ZERO,
+            net_contribution: Decimal::ZERO,
+            net_contribution_base: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
-            ..Default::default()
         }
     }
 
@@ -891,10 +859,6 @@ impl SnapshotService {
             warn!("No active accounts found. Cannot generate TOTAL snapshots.");
             return Ok(0);
         }
-        let all_accounts_map: AccountsMap = active_accounts
-            .into_iter()
-            .map(|acc| (acc.id.clone(), acc))
-            .collect();
 
         let all_individual_keyframes = self
             .snapshot_repository
@@ -946,7 +910,6 @@ impl SnapshotService {
                 match self.generate_total_portfolio_snapshot_for_date(
                     target_date,
                     &individual_snapshots_on_or_before_date,
-                    &all_accounts_map,
                     &base_portfolio_currency,
                 ) {
                     Ok(total_snapshot) => {
@@ -964,22 +927,20 @@ impl SnapshotService {
 
         if !total_portfolio_snapshots_to_save.is_empty() {
             info!(
-                "Saving {} new TOTAL portfolio snapshots after deleting all existing ones.",
+                "Saving {} new TOTAL portfolio snapshots.",
                 total_portfolio_snapshots_to_save.len()
             );
             self.snapshot_repository
-                .delete_snapshots_by_account_ids(&[PORTFOLIO_TOTAL_ACCOUNT_ID.to_string()])
-                .await?;
-            info!("Deleted all existing TOTAL snapshots.");
-
-            self.snapshot_repository
-                .save_snapshots(&total_portfolio_snapshots_to_save)
+                .overwrite_all_snapshots_for_account(
+                    PORTFOLIO_TOTAL_ACCOUNT_ID,
+                    &total_portfolio_snapshots_to_save,
+                )
                 .await?;
             Ok(total_portfolio_snapshots_to_save.len())
         } else {
             warn!("No TOTAL portfolio snapshots were generated to save. Deleting existing TOTAL snapshots anyway if any existed.");
             self.snapshot_repository
-                .delete_snapshots_by_account_ids(&[PORTFOLIO_TOTAL_ACCOUNT_ID.to_string()])
+                .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
                 .await?;
             info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
             Ok(0)

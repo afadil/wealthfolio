@@ -5,39 +5,42 @@ import { Button } from '@/components/ui/button';
 import { GainPercent } from '@/components/gain-percent';
 import { GainAmount } from '@/components/gain-amount';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { SimplePerformanceMetrics } from '@/lib/types';
+import { AccountValuation } from '@/lib/types';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { useAccounts } from '@/hooks/use-accounts';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAccountsSimplePerformance } from '@/hooks/use-accounts-simple-performance';
+import { useLatestValuations } from '@/hooks/use-latest-valuations';
+import { calculatePerformanceMetrics } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
 // Define a unified type for displaying both individual accounts and groups
 type AccountSummaryDisplayData = {
   // Common fields
   accountName: string; // Account name or Group name
-  totalValueBaseCurrency: number; // Mandatory for value display & sorting
   baseCurrency: string; // Mandatory
 
-  // Performance (base currency for both individuals and groups)
-  totalGainLossAmount: number | null;
-  totalGainLossPercent: number | null;
-  dayGainLossAmount: number | null;
-  dayGainLossPercent: number | null;
+  // Base Currency Values (for sorting, grouping, and default display)
+  totalValueBaseCurrency: number;
+  totalGainLossAmountBaseCurrency: number | null;
 
-  // Individual Account specific fields (optional)
+  // Account Currency Values (for expanded view)
+  totalValueAccountCurrency?: number;
+  totalGainLossAmountAccountCurrency?: number | null;
+  accountCurrency?: string;
+
+  // Common Performance
+  totalGainLossPercent: number | null;
+
+  // Individual Account specific fields
   accountId?: string;
   accountType?: string;
   accountGroup?: string | null;
-  accountCurrency?: string; // Original account currency
-  totalValueAccountCurrency?: number; // Original account value
-  fxRateToBase?: number | null;
 
-  // Group specific fields (optional)
+  // Group specific fields
   isGroup?: boolean;
   accountCount?: number;
-  accounts?: AccountSummaryDisplayData[]; // Accounts within the group
+  accounts?: AccountSummaryDisplayData[];
 };
 
 // Skeleton component for loading state within AccountSummaryComponent
@@ -64,13 +67,16 @@ const AccountSummaryComponent = React.memo(
     isExpanded = false,
     onToggle,
     isLoadingValuation = false,
+    displayInAccountCurrency = false,
   }: {
     item: AccountSummaryDisplayData;
     isExpanded?: boolean;
     onToggle?: () => void;
     isLoadingValuation?: boolean;
+    displayInAccountCurrency?: boolean;
   }) => {
     const isGroup = item.isGroup ?? false;
+    const useAccountCurrency = !isGroup && displayInAccountCurrency;
 
     // If loading valuation for a single account, show skeleton for values
     if (!isGroup && isLoadingValuation) {
@@ -96,22 +102,24 @@ const AccountSummaryComponent = React.memo(
     // --- Derive display values based on item type (account or group) ---
     const name = item.accountName;
     const accountId = item.accountId;
-    const subText = isGroup
+
+    const subText = useAccountCurrency
+      ? `${item.accountGroup ? `${item.accountGroup} | ` : ''}${item.accountCurrency}`
+      : isGroup
       ? `${item.accountCount} accounts`
-      : `${item.accountGroup ? `${item.accountGroup} | ` : ''}${item.accountCurrency}`;
-    const totalValue = isGroup
-      ? item.totalValueBaseCurrency
-      : (item.totalValueAccountCurrency ?? 0);
-    const currency = isGroup ? item.baseCurrency : (item.accountCurrency ?? item.baseCurrency);
+      : `${item.accountGroup ? `${item.accountGroup} | ` : ''}${item.baseCurrency}`;
 
-    // Performance is always in base currency, directly use item fields
-    const performance = {
-      totalGainLossAmount: item.totalGainLossAmount,
-      totalGainLossPercent: item.totalGainLossPercent,
-    };
+    const totalValue = useAccountCurrency
+      ? item.totalValueAccountCurrency ?? 0
+      : item.totalValueBaseCurrency;
+    const currency = useAccountCurrency ? item.accountCurrency ?? item.baseCurrency : item.baseCurrency;
 
-    // Currency for gain/loss display (always base currency)
-    const gainDisplayCurrency = item.baseCurrency;
+    // Performance is always in base currency for groups, but can be account currency for individuals
+    const gainAmountToDisplay = useAccountCurrency
+      ? item.totalGainLossAmountAccountCurrency
+      : item.totalGainLossAmountBaseCurrency;
+    const gainDisplayCurrency = currency;
+    const gainPercentToDisplay = item.totalGainLossPercent;
 
     return (
       <div
@@ -129,30 +137,23 @@ const AccountSummaryComponent = React.memo(
             <p className="font-medium leading-none">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
-            {(performance.totalGainLossAmount !== null ||
-              performance.totalGainLossPercent !== null) &&
-              !(
-                performance.totalGainLossAmount === 0 && performance.totalGainLossPercent === 0
-              ) && (
+            {(gainAmountToDisplay !== null || gainPercentToDisplay !== null) &&
+              !(gainAmountToDisplay === 0 && gainPercentToDisplay === 0) && (
                 <div className="flex items-center space-x-2">
-                  {performance.totalGainLossAmount !== null && (
+                  {gainAmountToDisplay !== null && (
                     <GainAmount
                       className="text-sm font-light"
-                      value={performance.totalGainLossAmount}
+                      value={gainAmountToDisplay}
                       currency={gainDisplayCurrency}
                       displayCurrency={false}
                       showSign={false}
                     />
                   )}
-                  {performance.totalGainLossAmount !== null &&
-                    performance.totalGainLossPercent !== null && (
-                      <Separator orientation="vertical" className="h-3" />
-                    )}
-                  {performance.totalGainLossPercent !== null && (
-                    <GainPercent
-                      className="text-sm font-light"
-                      value={performance.totalGainLossPercent}
-                    />
+                  {gainAmountToDisplay !== null && gainPercentToDisplay !== null && (
+                    <Separator orientation="vertical" className="h-3" />
+                  )}
+                  {gainPercentToDisplay !== null && (
+                    <GainPercent className="text-sm font-light" value={gainPercentToDisplay} />
                   )}
                 </div>
               )}
@@ -190,66 +191,63 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
     error: errorAccounts,
   } = useAccounts();
 
+  const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
+
   const {
-    data: performanceData,
-    isLoading: isLoadingPerformanceData,
-    isFetching: isFetchingPerformanceData,
-    isError: isErrorPerformance,
-    error: errorPerformance,
-  } = useAccountsSimplePerformance(accounts);
+    latestValuations,
+    isLoading: isLoadingValuations,
+    error: errorValuations,
+  } = useLatestValuations(accountIds);
 
   // --- Data Processing ---
   const combinedAccountViews = useMemo((): AccountSummaryDisplayData[] => {
     if (!accounts) return [];
-    const performanceMap = new Map<string, SimplePerformanceMetrics>();
-    if (performanceData) {
-      performanceData.forEach((perf: SimplePerformanceMetrics) =>
-        performanceMap.set(perf.accountId, perf),
-      );
+    const valuationMap = new Map<string, AccountValuation>();
+    if (latestValuations) {
+      latestValuations.forEach((val: AccountValuation) => valuationMap.set(val.accountId, val));
     }
     return accounts.map((acc): AccountSummaryDisplayData => {
-      const performance = performanceMap.get(acc.id);
-      const accountCurrency = acc.currency;
-      const baseCurrency = performance?.baseCurrency ?? accountCurrency;
-      const fxRate = performance?.fxRateToBase ?? null;
+      const valuation = valuationMap.get(acc.id);
+      const baseCurrency = settings?.baseCurrency ?? 'USD';
 
-      const totalValueAccountCurrency = Number(performance?.totalValue ?? 0);
-
-      let totalValueBaseCurrency = 0;
-
-      if (performance?.totalValue !== null && performance?.totalValue !== undefined) {
-        if (baseCurrency === accountCurrency || !fxRate || fxRate === 0) {
-          totalValueBaseCurrency = performance.totalValue;
-        } else {
-          totalValueBaseCurrency = performance.totalValue * fxRate;
-        }
-      } else {
-        totalValueBaseCurrency = 0;
+      if (!valuation) {
+        return {
+          accountName: acc.name,
+          totalValueBaseCurrency: 0,
+          baseCurrency,
+          totalGainLossAmountBaseCurrency: null,
+          totalGainLossPercent: null,
+          accountId: acc.id,
+          accountType: acc.accountType,
+          accountGroup: acc.group ?? null,
+          isGroup: false,
+        };
       }
 
-      const totalGainLossAmountBase = performance?.totalGainLossAmount ?? null;
-      const dayGainLossAmountBase = performance?.dayGainLossAmount ?? null;
-      const totalGainLossPercent = performance?.cumulativeReturnPercent ?? null;
-      const dayGainLossPercent = performance?.dayReturnPercentModDietz ?? null;
+      const { gainLossAmount, simpleReturn } = calculatePerformanceMetrics([valuation], true);
+
+      const totalValueAccountCurrency = valuation.totalValue;
+      const fxRate = valuation.fxRateToBase ?? 1;
+      const totalValueBaseCurrency = totalValueAccountCurrency * fxRate;
+      const totalGainLossAmountAccountCurrency = gainLossAmount;
+      const totalGainLossAmountBaseCurrency = gainLossAmount * fxRate;
 
       return {
         accountName: acc.name,
-        totalValueBaseCurrency: totalValueBaseCurrency,
-        baseCurrency: baseCurrency,
-        totalGainLossAmount: totalGainLossAmountBase,
-        totalGainLossPercent: totalGainLossPercent,
-        dayGainLossAmount: dayGainLossAmountBase,
-        dayGainLossPercent: dayGainLossPercent,
+        totalValueBaseCurrency,
+        baseCurrency,
+        totalGainLossAmountBaseCurrency,
+        totalValueAccountCurrency,
+        accountCurrency: valuation.accountCurrency,
+        totalGainLossAmountAccountCurrency,
+        totalGainLossPercent: simpleReturn,
         accountId: acc.id,
         accountType: acc.accountType,
         accountGroup: acc.group ?? null,
-        accountCurrency: accountCurrency,
-        totalValueAccountCurrency: totalValueAccountCurrency,
-        fxRateToBase: fxRate,
         isGroup: false,
       };
     });
-  }, [accounts, performanceData]);
+  }, [accounts, latestValuations, settings?.baseCurrency]);
 
   const toggleGroup = useCallback((groupName: string) => {
     setExpandedGroups((prev) => ({
@@ -278,7 +276,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
       return <p className="text-muted-foreground">No accounts found.</p>;
     }
 
-    const isLoadingPerformance = isLoadingPerformanceData || isFetchingPerformanceData;
+    const isLoadingPerformance = isLoadingValuations;
 
     if (accountsGrouped) {
       const groups: Record<string, AccountSummaryDisplayData[]> = {};
@@ -306,50 +304,31 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
           );
 
           const totalGainLossAmountBase = groupAccounts.reduce(
-            (sum, acc) => sum + Number(acc.totalGainLossAmount ?? 0),
+            (sum, acc) => sum + Number(acc.totalGainLossAmountBaseCurrency ?? 0),
             0,
           );
-          const dayGainLossAmountBase = groupAccounts.reduce(
-            (sum, acc) => sum + Number(acc.dayGainLossAmount ?? 0),
-            0,
-          );
-          let weightedTotalReturnSum = 0;
-          let weightedDayReturnSum = 0;
-          let totalValueForWeighting = 0;
-          groupAccounts.forEach((acc) => {
-            const value = Number(acc.totalValueBaseCurrency);
-            if (value > 0) {
-              totalValueForWeighting += value;
-              if (acc.totalGainLossPercent !== null) {
-                weightedTotalReturnSum += acc.totalGainLossPercent * value;
-              }
-              if (acc.dayGainLossPercent !== null) {
-                weightedDayReturnSum += acc.dayGainLossPercent * value;
-              }
-            }
-          });
+
+          const totalNetContributionBase = groupAccounts.reduce((sum, acc) => {
+            const netContribution =
+              Number(acc.totalValueBaseCurrency) -
+              Number(acc.totalGainLossAmountBaseCurrency ?? 0);
+            return sum + netContribution;
+          }, 0);
+
           const groupTotalReturnPercent =
-            totalValueForWeighting > 0 ? weightedTotalReturnSum / totalValueForWeighting : null;
-          const groupDayGainPercent =
-            totalValueForWeighting > 0 ? weightedDayReturnSum / totalValueForWeighting : null;
+            totalNetContributionBase !== 0
+              ? totalGainLossAmountBase / totalNetContributionBase
+              : null;
 
           return {
             accountName: groupName,
-            totalValueBaseCurrency: totalValueBaseCurrency,
-            baseCurrency: baseCurrency,
-            totalGainLossAmount: totalGainLossAmountBase,
+            totalValueBaseCurrency,
+            baseCurrency,
+            totalGainLossAmountBaseCurrency: totalGainLossAmountBase,
             totalGainLossPercent: groupTotalReturnPercent,
-            dayGainLossAmount: dayGainLossAmountBase,
-            dayGainLossPercent: groupDayGainPercent,
             isGroup: true,
             accountCount: groupAccounts.length,
             accounts: groupAccounts,
-            accountId: undefined,
-            accountType: undefined,
-            accountGroup: undefined,
-            accountCurrency: undefined,
-            totalValueAccountCurrency: undefined,
-            fxRateToBase: undefined,
           };
         },
       );
@@ -385,6 +364,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
                         <AccountSummaryComponent
                           item={account}
                           isLoadingValuation={isLoadingPerformance}
+                          displayInAccountCurrency
                         />
                       </div>
                     ))}
@@ -396,7 +376,11 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
           {standaloneAccounts.map((account) => (
             <Card key={account.accountId} className="border-none shadow-sm">
               <CardHeader className="py-6">
-                <AccountSummaryComponent item={account} isLoadingValuation={isLoadingPerformance} />
+                <AccountSummaryComponent
+                  item={account}
+                  isLoadingValuation={isLoadingPerformance}
+                  displayInAccountCurrency={false}
+                />
               </CardHeader>
             </Card>
           ))}
@@ -410,7 +394,11 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
       return sortedAccounts.map((account) => (
         <Card key={account.accountId} className="border-none shadow-sm">
           <CardHeader className="py-6">
-            <AccountSummaryComponent item={account} isLoadingValuation={isLoadingPerformance} />
+            <AccountSummaryComponent
+              item={account}
+              isLoadingValuation={isLoadingPerformance}
+              displayInAccountCurrency={false}
+            />
           </CardHeader>
         </Card>
       ));
@@ -421,12 +409,10 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
     expandedGroups,
     toggleGroup,
     isLoadingAccounts,
-    isFetchingPerformanceData,
-    isLoadingPerformanceData,
+    isLoadingValuations,
     isErrorAccounts,
     errorAccounts,
-    isErrorPerformance,
-    errorPerformance,
+    errorValuations,
   ]);
 
   return (
