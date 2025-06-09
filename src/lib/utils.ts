@@ -109,19 +109,63 @@ function isDateInRange(date: Date): boolean {
   return year >= 1900 && year <= 2100;
 }
 
-export function formatDate(input: string | number): string {
-  // Handle the case where the input is already a timestamp
-  const date = typeof input === 'string' ? parseISO(input) : new Date(input);
-
-  if (!isValid(date)) {
-    throw new Error('Invalid date input');
+export function formatDate(input: string | number | Date | null | undefined): string {
+  if (input === null || input === undefined) {
+    return '-';
   }
 
-  return format(date, 'MMM d, yyyy');
+  let date: Date | null = null;
+
+  if (input instanceof Date) {
+    date = input;
+  } else if (typeof input === 'string') {
+    if (input.trim() === '') {
+      return '-';
+    }
+    date = tryParseDate(input);
+  } else if (typeof input === 'number') {
+    if (!Number.isFinite(input)) {
+      logger.warn(`Invalid number input for date: ${input}`);
+      return '-';
+    }
+    date = new Date(input);
+  }
+
+  if (date && isValid(date)) {
+    return format(date, 'MMM d, yyyy');
+  }
+
+  logger.warn(`Failed to format invalid date input: ${String(input)}`);
+
+  if (typeof input === 'string') {
+    return input;
+  }
+
+  return '-';
 }
 
 export const formatDateTime = (date: string | Date, timezone?: string) => {
   if (!date) return { date: '-', time: '-' };
+
+  let dateObj: Date | null = null;
+  if (typeof date === 'string') {
+    // First attempt with the robust parser
+    dateObj = tryParseDate(date);
+    // If it fails, try the native Date constructor which is good with ISO date-time strings
+    if (!dateObj || !isValid(dateObj)) {
+      dateObj = new Date(date);
+    }
+  } else {
+    // It's already a Date object
+    dateObj = date;
+  }
+
+  // Now validate the final date object
+  if (!isValid(dateObj)) {
+    logger.warn(`Invalid date input for formatDateTime: ${date}`);
+    return { date: '-', time: '-' };
+  }
+
   // Determine the effective timezone: use provided timezone or default to user's local timezone
   const effectiveTimezone = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -141,8 +185,6 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
 
   const dateFormatter = new Intl.DateTimeFormat('en-US', dateOptions);
   const timeFormatter = new Intl.DateTimeFormat('en-US', timeOptions);
-
-  const dateObj = new Date(date);
 
   return {
     date: dateFormatter.format(dateObj),
