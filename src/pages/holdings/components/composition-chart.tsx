@@ -73,7 +73,7 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
 }
 
 const CustomizedContent = (props: any) => {
-  const { depth, x, y, width, height, name, gain, maxGain, minGain } = props;
+  const { depth, x, y, width, height, symbol, name, gain, maxGain, minGain } = props;
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
   const colorScale = getColorScale(gain, maxGain, minGain);
@@ -98,7 +98,7 @@ const CustomizedContent = (props: any) => {
       />
       {depth === 1 ? (
         <>
-          <Link to={`/holdings/${name}`}>
+          <Link to={`/holdings/${symbol}`}>
             <text
               x={x + width / 2}
               y={y + height / 2}
@@ -109,7 +109,7 @@ const CustomizedContent = (props: any) => {
                 fontSize: fontSize + 1,
               }}
             >
-              {name}
+              {symbol}
             </text>
           </Link>
 
@@ -138,6 +138,7 @@ interface PortfolioCompositionProps {
 
 const CompositionTooltip = ({ active, payload, settings }: any) => {
   if (active && payload && payload.length) {
+    console.log('payload', payload);
     const data = payload[0].payload;
     const value = payload[0].value;
     return (
@@ -182,7 +183,8 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         minGain = Math.min(minGain, gain);
 
         return {
-          name: symbol, // Use symbol for the treemap node name/link
+          symbol: symbol,
+          name: holding.instrument?.name, // Use symbol for the treemap node name/link
           marketValueConverted: marketValue,
           gain,
           // We'll add min/max gain later after iterating through all
