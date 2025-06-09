@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { subMonths } from 'date-fns';
 import { PerformanceChart } from '@/components/performance-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import {
   VOLATILITY_INFO as volatilityInfo,
   MAX_DRAWDOWN_INFO as maxDrawdownInfo
 } from '@/components/metric-display';
+import { usePersistentState } from '@/hooks/use-persistent-state';
 
 const PORTFOLIO_TOTAL: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
@@ -92,7 +93,7 @@ function PerformanceContent({
 
       {/* Error display using AlertFeedback component */}
       {hasErrors && (
-        <div className="w-full max-w-md">
+        <div className="w-full">
           <AlertFeedback title="Error calculating performance data" variant="error">
             <div>
               {errorMessages.map((error, index) => (
@@ -169,12 +170,21 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
-  const [selectedItems, setSelectedItems] = useState<TrackedItem[]>([PORTFOLIO_TOTAL]);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subMonths(new Date(), 12),
-    to: new Date(),
-  });
+  const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
+    'performance:selectedItems',
+    [PORTFOLIO_TOTAL],
+  );
+  const [selectedItemId, setSelectedItemId] = usePersistentState<string | null>(
+    'performance:selectedItemId',
+    null,
+  );
+  const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
+    'performance:dateRange',
+    {
+      from: subMonths(new Date(), 12),
+      to: new Date(),
+    },
+  );
 
   // Helper function to sort comparison items (accounts first, then symbols)
   const sortComparisonItems = (items: TrackedItem[]): TrackedItem[] => {
