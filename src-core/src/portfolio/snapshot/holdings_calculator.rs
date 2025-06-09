@@ -352,9 +352,12 @@ impl HoldingsCalculator {
         amount_acct: Decimal, // Already converted using activity date
         fee_acct: Decimal,    // Already converted using activity date
     ) -> Result<()> {
-        let net_amount_acct = amount_acct - fee_acct;
-        *state.cash_balances.entry(account_currency.to_string()).or_insert(Decimal::ZERO) += net_amount_acct;
-        // Income does not affect net deposit
+        let net_change = amount_acct - fee_acct;
+        *state
+            .cash_balances
+            .entry(account_currency.to_string())
+            .or_insert(Decimal::ZERO) += net_change;
+        // Income does not affect the net contribution.
         Ok(())
     }
 

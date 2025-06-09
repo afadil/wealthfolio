@@ -686,6 +686,7 @@ mod tests {
         snap1_cad.positions.insert("TSE.TO".to_string(), pos1_tse);
         snap1_cad.cost_basis = dec!(500);
         snap1_cad.net_contribution = dec!(1000);
+        snap1_cad.net_contribution_base = dec!(1000);
 
         let mut snap2_usd = create_blank_snapshot(&acc2_usd.id, &acc2_usd.currency, date2_str);
         snap2_usd.cash_balances.insert("USD".to_string(), dec!(500));
@@ -708,6 +709,7 @@ mod tests {
         snap2_usd.positions.insert("AAPL".to_string(), pos2_aapl);
         snap2_usd.cost_basis = dec!(750);
         snap2_usd.net_contribution = dec!(600);
+        snap2_usd.net_contribution_base = dec!(780);
 
         // Add the individual account snapshots to our mock repository
         mock_snapshot_repo.add_snapshots(vec![snap1_cad.clone(), snap2_usd.clone()]);
@@ -943,15 +945,21 @@ mod tests {
         let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
         assert!(saved >= 1, "expected at least one keyframe saved");
 
-        // dividend must NOT change net_contribution
-        let mut frames = snaps.get_saved_snapshots();
-        frames.sort_by_key(|s| s.snapshot_date);
-        let first_nc = frames.first().unwrap().net_contribution;
-        for s in &frames {
-            assert_eq!(
-                s.net_contribution, first_nc,
-                "dividend day altered net_contribution - regression detected"
-            );
-        }
+        // dividend must NOT change net_contribution, but other activities (like deposits) should.
+        let frames = snaps.get_saved_snapshots();
+        let mut frames_sorted = frames.clone();
+        frames_sorted.sort_by_key(|s| s.snapshot_date);
+
+        assert_eq!(frames_sorted.len(), 2, "Expected exactly two keyframes for the two activity dates.");
+
+        // First keyframe from the first deposit
+        let first_frame = &frames_sorted[0];
+        assert_eq!(first_frame.net_contribution, dec!(5000), "First keyframe should only reflect the first deposit.");
+        assert_eq!(first_frame.snapshot_date, d1);
+
+        // Second keyframe should include the second deposit, but the dividend should have no impact on net contribution.
+        let second_frame = &frames_sorted[1];
+        assert_eq!(second_frame.net_contribution, dec!(15000), "Second keyframe should reflect both deposits, ignoring the dividend for net contribution calculation.");
+        assert_eq!(second_frame.snapshot_date, d2);
     }
 }
