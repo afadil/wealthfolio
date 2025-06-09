@@ -3,6 +3,9 @@
 ALTER TABLE holdings_snapshots
 ADD COLUMN net_contribution_base TEXT NOT NULL DEFAULT '0';
 
+
+-- Delete all quotes and snapshots to recalculate everything
+DELETE FROM quotes;
 DELETE FROM holdings_snapshots;
 DELETE FROM daily_account_valuation;
 

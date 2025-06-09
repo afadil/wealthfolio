@@ -338,10 +338,6 @@ impl MarketDataService {
 
         // Fetch all public quotes in parallel if there are any
         if !symbols_with_currencies.is_empty() {
-            debug!(
-                "Processing {} public quote requests.",
-                symbols_with_currencies.len()
-            );
             let start_date_time =
                 self.calculate_sync_start_time(refetch_all, &symbols_with_currencies)?;
 
@@ -372,44 +368,21 @@ impl MarketDataService {
             }
         }
 
-        // Group all fetched quotes by symbol before filling and saving
-        let mut quotes_by_symbol: HashMap<String, Vec<Quote>> = HashMap::new();
-        for quote in all_quotes {
-            quotes_by_symbol
-                .entry(quote.symbol.clone())
-                .or_default()
-                .push(quote);
-        }
-
-        // Fill gaps for each symbol up to the sync end date and collect
-        let mut filled_quotes_to_save = Vec::new();
-        let sync_end_naive_date = current_local_naive_date; // Use the current local date for filling
-
-        for (_symbol, mut symbol_quotes) in quotes_by_symbol {
-            if !symbol_quotes.is_empty() {
-                // fill_missing_quote_days expects sorted quotes
-                symbol_quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-                // Fill gaps up to the calculated end date of the sync period
-                let filled_symbol_quotes =
-                    Self::fill_missing_quote_days(symbol_quotes, Some(sync_end_naive_date));
-                filled_quotes_to_save.extend(filled_symbol_quotes);
-            }
-        }
-
+       
         // Insert all successfully fetched and filled quotes
-        if !filled_quotes_to_save.is_empty() {
+        if !all_quotes.is_empty() {
             debug!(
                 "Attempting to save {} filled quotes to the repository.",
-                filled_quotes_to_save.len()
+                all_quotes.len()
             );
             // Sort before saving might help with consistency or performance depending on DB indexing
-            filled_quotes_to_save.sort_by(|a, b| {
+            all_quotes.sort_by(|a, b| {
                 a.symbol
                     .cmp(&b.symbol)
                     .then(a.timestamp.cmp(&b.timestamp))
                     .then(a.data_source.as_str().cmp(b.data_source.as_str()))
             });
-            if let Err(e) = self.repository.save_quotes(&filled_quotes_to_save).await {
+            if let Err(e) = self.repository.save_quotes(&all_quotes).await {
                 // Save the filled quotes
                 error!("Failed to save synced quotes to repository: {}", e);
                 // Consider how to handle partial saves or repository errors. Maybe add all symbols as failed.
@@ -418,7 +391,7 @@ impl MarketDataService {
             } else {
                 debug!(
                     "Successfully saved {} filled quotes.",
-                    filled_quotes_to_save.len()
+                    all_quotes.len()
                 );
             }
         }
@@ -430,104 +403,6 @@ impl MarketDataService {
     async fn sync_manual_quotes(&self, request: &QuoteRequest) -> Result<Vec<Quote>> {
         // All DB logic is now in the repository
         self.repository.upsert_manual_quotes_from_activities(&request.symbol).await
-    }
-
-    /// Fills missing days in a sequence of quotes, optionally up to a final date.
-    fn fill_missing_quote_days(
-        mut quotes: Vec<Quote>,
-        final_date: Option<NaiveDate>,
-    ) -> Vec<Quote> {
-        if quotes.is_empty() {
-            return quotes;
-        }
-
-        // Ensure quotes are sorted by timestamp ascendingly
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-        let mut filled_quotes = Vec::with_capacity(quotes.len() * 2); // Pre-allocate more space
-
-        // Fill gaps between existing quotes
-        if quotes.len() >= 2 {
-            if let Some(first_quote) = quotes.first() {
-                filled_quotes.push(first_quote.clone());
-            }
-            for window in quotes.windows(2) {
-                let prev_quote = &window[0];
-                let current_quote = &window[1];
-
-                let prev_date = prev_quote.timestamp.date_naive();
-                let current_date = current_quote.timestamp.date_naive();
-                let mut date_to_fill = prev_date + Duration::days(1);
-
-                while date_to_fill < current_date {
-                    let mut filled_quote = prev_quote.clone();
-                    // Use a consistent time like 4 PM UTC for filled quotes, convert to DateTime<Utc>
-                    filled_quote.timestamp = match date_to_fill.and_hms_opt(16, 0, 0) {
-                        Some(dt) => Utc.from_utc_datetime(&dt),
-                        None => {
-                            log::error!(
-                                "Failed creating NaiveDateTime for {} {}. Skipping fill.",
-                                filled_quote.symbol,
-                                date_to_fill
-                            );
-                            date_to_fill += Duration::days(1);
-                            continue;
-                        }
-                    };
-                    // Create a unique-ish ID for the filled quote
-                    filled_quote.id = format!(
-                        "{}_{}-filled",
-                        date_to_fill.format("%Y%m%d"),
-                        filled_quote.symbol
-                    );
-                    filled_quote.created_at = Utc::now(); // Mark when it was filled
-
-                    filled_quotes.push(filled_quote);
-                    date_to_fill += Duration::days(1);
-                }
-                filled_quotes.push(current_quote.clone());
-            }
-        } else if let Some(first_quote) = quotes.first() {
-            // If only one quote, start with that
-            filled_quotes.push(first_quote.clone());
-        }
-
-        // Fill gaps after the last quote up to final_date (if provided)
-        if let (Some(end_date), Some(last_quote)) = (final_date, filled_quotes.last().cloned()) {
-            let last_quote_date = last_quote.timestamp.date_naive();
-            let mut date_to_fill = last_quote_date + Duration::days(1);
-
-            while date_to_fill <= end_date {
-                let mut filled_quote = last_quote.clone(); // Clone the last known quote
-                                                           // Use a consistent time like 4 PM UTC for filled quotes, convert to DateTime<Utc>
-                filled_quote.timestamp = match date_to_fill.and_hms_opt(16, 0, 0) {
-                    Some(dt) => Utc.from_utc_datetime(&dt),
-                    None => {
-                        log::error!(
-                            "Failed creating NaiveDateTime for {} {} (end fill). Skipping fill.",
-                            filled_quote.symbol,
-                            date_to_fill
-                        );
-                        date_to_fill += Duration::days(1);
-                        continue;
-                    }
-                };
-                filled_quote.id = format!(
-                    "{}_{}-filled",
-                    date_to_fill.format("%Y%m%d"),
-                    filled_quote.symbol,
-                );
-                filled_quote.created_at = Utc::now();
-
-                filled_quotes.push(filled_quote);
-                date_to_fill += Duration::days(1);
-            }
-        }
-
-        // Ensure quotes are sorted by timestamp ascendingly
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-        filled_quotes
     }
 
     // --- Helper function to calculate the sync start date ---
