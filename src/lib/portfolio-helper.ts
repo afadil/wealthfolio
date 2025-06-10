@@ -1,21 +1,21 @@
-import { Goal, GoalAllocation, GoalProgress, SimplePerformanceMetrics } from './types';
+import { Goal, GoalAllocation, GoalProgress, AccountValuation } from './types';
 
 export function calculateGoalProgress(
-  accountsPerformance: SimplePerformanceMetrics[],
+  accountsValuations: AccountValuation[],
   goals: Goal[],
   allocations: GoalAllocation[],
 ): GoalProgress[] {
   // Return early if essential data is missing
-  if (!accountsPerformance || accountsPerformance.length === 0 || !goals || !allocations) {
+  if (!accountsValuations || accountsValuations.length === 0 || !goals || !allocations) {
     return [];
   }
 
-  // Determine base currency (assuming consistency across accounts performance data)
-  const baseCurrency = accountsPerformance[0].baseCurrency || 'USD'; // Use first account's base currency
+  // Determine base currency (assuming consistency across account valuations data)
+  const baseCurrency = accountsValuations[0].baseCurrency || 'USD'; // Use first account's base currency
 
   // Create a map of accountId to totalValue in baseCurrency for quick lookup
   const accountValueMap = new Map<string, number>();
-  accountsPerformance.forEach((account) => {
+  accountsValuations.forEach((account) => {
     // Convert account total value to base currency
     const valueInBaseCurrency = (account.totalValue || 0) * (account.fxRateToBase || 1);
     accountValueMap.set(account.accountId, valueInBaseCurrency);

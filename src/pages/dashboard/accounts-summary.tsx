@@ -143,7 +143,7 @@ const AccountSummaryComponent = React.memo(
                   {gainAmountToDisplay !== null && (
                     <GainAmount
                       className="text-sm font-light"
-                      value={gainAmountToDisplay}
+                      value={gainAmountToDisplay ?? 0}
                       currency={gainDisplayCurrency}
                       displayCurrency={false}
                       showSign={false}
