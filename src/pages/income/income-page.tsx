@@ -336,6 +336,70 @@ export default function IncomePage() {
                 />
               ) : (
                 <div className="space-y-6">
+                  {/* Horizontal Bar Chart - Separated Bars */}
+                    <div className="flex w-full space-x-0.5">
+                    {(() => {
+                      const top5Stocks = topDividendStocks.slice(0, 5);
+                      const otherStocks = topDividendStocks.slice(5);
+                      const otherTotal = otherStocks.reduce((sum, [, income]) => sum + income, 0);
+                      
+                      const chartItems = [
+                        ...top5Stocks.map(([symbol, income]) => ({
+                          symbol: symbol.match(/\[(.*?)\]/)?.[1] || symbol,
+                          companyName: symbol.replace(/\[.*?\]-/, '').trim(),
+                          income,
+                          isOther: false,
+                        })),
+                        ...(otherTotal > 0 ? [{
+                          symbol: 'Other',
+                          companyName: `${otherStocks.length} other sources`,
+                          income: otherTotal,
+                          isOther: true,
+                        }] : []),
+                      ];
+
+                      const colors = [
+                        'hsl(var(--chart-1))',
+                        'hsl(var(--chart-2))',
+                        'hsl(var(--chart-3))',
+                        'hsl(var(--chart-4))',
+                        'hsl(var(--chart-5))',
+                        'hsl(var(--chart-6))',
+                      ];
+
+                      return chartItems.map((item, index) => {
+                        const percentage = dividendIncome > 0 ? (item.income / dividendIncome) * 100 : 0;
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="group relative h-5 cursor-pointer rounded-lg transition-all duration-300 ease-in-out hover:brightness-110"
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: colors[index % colors.length],
+                            }}
+                          >
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block">
+                              <div className="min-w-[180px] rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-md">
+                                <div className="text-sm font-medium">{item.symbol}</div>
+                                <div className="text-xs text-muted-foreground">{item.companyName}</div>
+                                <div className="text-sm font-medium">
+                                  <PrivacyAmount value={item.income} currency={currency} />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {percentage.toFixed(1)}% of total
+                                </div>
+                                {/* Tooltip arrow */}
+                                <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border"></div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                    </div>
+
                   {topDividendStocks.map(([symbol, income], index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center">
