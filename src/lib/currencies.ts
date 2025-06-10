@@ -134,7 +134,7 @@ export const worldCurrencies = [
   { label: 'Tajikistani somoni (TJS)', value: 'TJS' },
   { label: 'Turkmen manat (TMT)', value: 'TMT' },
   { label: 'Tunisian dinar (TND)', value: 'TND' },
-  { label: 'Turkish new lira (TRY)', value: 'TRY' },
+  { label: 'Turkish lira (TRY)', value: 'TRY' },
   { label: 'Trinidad and Tobago dollar (TTD)', value: 'TTD' },
   { label: 'New Taiwan dollar (TWD)', value: 'TWD' },
   { label: 'Tanzanian shilling (TZS)', value: 'TZS' },
