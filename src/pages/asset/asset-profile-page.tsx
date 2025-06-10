@@ -315,7 +315,7 @@ export const AssetProfilePage = () => {
 
             <div className="group relative">
               <h3 className="text-lg font-bold">About</h3>
-              <div className="flex h-12 flex-row items-center space-x-2 py-4">
+              <div className="flex flex-row items-center space-x-2 py-4">
                 {isEditing ? (
                   <Input
                     value={formData.assetClass}
@@ -327,7 +327,7 @@ export const AssetProfilePage = () => {
                   />
                 ) : (
                   formData.assetClass && (
-                    <Badge variant="secondary" className="uppercase">
+                    <Badge variant="secondary" className="uppercase flex-none">
                       {formData.assetClass}
                     </Badge>
                   )
@@ -343,7 +343,7 @@ export const AssetProfilePage = () => {
                   />
                 ) : (
                   formData.assetSubClass && (
-                    <Badge variant="secondary" className="uppercase">
+                    <Badge variant="secondary" className="uppercase flex-none">
                       {formData.assetSubClass}
                     </Badge>
                   )
@@ -369,18 +369,18 @@ export const AssetProfilePage = () => {
                     }
                   />
                 ) : (
-                  <>
+                  <div className='flex flex-wrap'>
                     {formData.sectors.map((sector) => (
                       <Badge
                         variant="secondary"
                         key={sector.name}
-                        className="cursor-help bg-indigo-100 uppercase dark:text-primary-foreground"
+                        className="cursor-help bg-indigo-100 uppercase dark:text-primary-foreground m-1"
                         title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
                       >
                         {sector.name}
                       </Badge>
                     ))}
-                  </>
+                  </div>
                 )}
                 {formData.sectors.length > 0 && formData.countries.length > 0 && (
                   <Separator orientation="vertical" />
@@ -403,16 +403,19 @@ export const AssetProfilePage = () => {
                     }
                   />
                 ) : (
-                  formData.countries.map((country) => (
+                  <div className='flex flex-wrap'>
+                  {formData.countries.map((country) => (
                     <Badge
                       variant="secondary"
                       key={country.name}
-                      className="bg-purple-100 uppercase dark:text-primary-foreground"
+                      className="bg-purple-100 uppercase dark:text-primary-foreground m-1"
                       title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
                     >
                       {country.name}
                     </Badge>
                   ))
+                  }
+                </div>
                 )}
                 {(formData.sectors.length > 0 || formData.countries.length > 0) && (
                   <Separator orientation="vertical" />
