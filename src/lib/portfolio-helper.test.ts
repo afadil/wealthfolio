@@ -1,5 +1,27 @@
 import { calculateGoalProgress } from './portfolio-helper';
-import { Goal, GoalAllocation, SimplePerformanceMetrics } from './types';
+import { AccountValuation, Goal, GoalAllocation, SimplePerformanceMetrics } from './types';
+
+function performanceToValuations(metrics: SimplePerformanceMetrics[]): AccountValuation[] {
+  let base_date = new Date();
+  return metrics.map((pm: SimplePerformanceMetrics, idx: number): AccountValuation => {
+    let new_date = new Date();
+    new_date.setDate(base_date.getDate() + idx);
+    return {
+      id: `${pm.accountId}-${idx}`,
+      accountId: pm.accountId,
+      totalValue: pm.totalValue ?? 0,
+      baseCurrency: pm.baseCurrency ?? 'USD',
+      fxRateToBase: pm.fxRateToBase ?? 1,
+      valuationDate: new_date.toISOString(),
+      accountCurrency: 'USD',
+      cashBalance: pm.totalValue ?? 0,
+      investmentMarketValue: 0,
+      costBasis: 0,
+      netContribution: pm.totalValue ?? 0,
+      calculatedAt: new_date.toISOString(),
+    };
+  });
+}
 
 describe('calculateGoalProgress', () => {
   it('should return empty array if essential data is missing', () => {
@@ -10,11 +32,11 @@ describe('calculateGoalProgress', () => {
   });
 
   it('should calculate goal progress correctly as a decimal ratio and handle various scenarios', () => {
-    const accountsPerformance: SimplePerformanceMetrics[] = [
+    const accountsPerformance: AccountValuation[] = performanceToValuations([
       { accountId: 'acc1', totalValue: 5000, baseCurrency: 'USD', fxRateToBase: 1 },
       { accountId: 'acc2', totalValue: 10000, baseCurrency: 'EUR', fxRateToBase: 1.1 }, // 11000 USD
       { accountId: 'acc3', totalValue: 2000, baseCurrency: 'USD', fxRateToBase: 1 },
-    ];
+    ]);
 
     const goals: Goal[] = [
       { id: 'goal1', title: 'Vacation Fund', targetAmount: 10000 },
@@ -43,10 +65,10 @@ describe('calculateGoalProgress', () => {
     // Goals are sorted by targetAmount in the function
     const expectedOrder = ['Zero Target Goal', 'High Progress Goal', 'Vacation Fund', 'New Car'];
     result.forEach((res, index) => {
-        expect(res.name).toBe(expectedOrder[index]);
+      expect(res.name).toBe(expectedOrder[index]);
     });
-    
-    const vacationFundProgress = result.find(g => g.name === 'Vacation Fund');
+
+    const vacationFundProgress = result.find((g) => g.name === 'Vacation Fund');
     expect(vacationFundProgress).toBeDefined();
     if (vacationFundProgress) {
       expect(vacationFundProgress.name).toBe('Vacation Fund');
@@ -56,7 +78,7 @@ describe('calculateGoalProgress', () => {
       expect(vacationFundProgress.currency).toBe('USD');
     }
 
-    const newCarProgress = result.find(g => g.name === 'New Car');
+    const newCarProgress = result.find((g) => g.name === 'New Car');
     expect(newCarProgress).toBeDefined();
     if (newCarProgress) {
       expect(newCarProgress.name).toBe('New Car');
@@ -65,8 +87,8 @@ describe('calculateGoalProgress', () => {
       expect(newCarProgress.progress).toBeCloseTo(0.0416); // 1040 / 25000
       expect(newCarProgress.currency).toBe('USD');
     }
-    
-    const zeroTargetGoalProgress = result.find(g => g.name === 'Zero Target Goal');
+
+    const zeroTargetGoalProgress = result.find((g) => g.name === 'Zero Target Goal');
     expect(zeroTargetGoalProgress).toBeDefined();
     if (zeroTargetGoalProgress) {
       expect(zeroTargetGoalProgress.name).toBe('Zero Target Goal');
@@ -76,24 +98,22 @@ describe('calculateGoalProgress', () => {
       expect(zeroTargetGoalProgress.currency).toBe('USD');
     }
 
-    const highProgressGoal = result.find(g => g.name === 'High Progress Goal');
+    const highProgressGoal = result.find((g) => g.name === 'High Progress Goal');
     expect(highProgressGoal).toBeDefined();
     if (highProgressGoal) {
-        expect(highProgressGoal.name).toBe('High Progress Goal');
-        expect(highProgressGoal.targetValue).toBe(100);
-        expect(highProgressGoal.currentValue).toBeCloseTo(2000);
-        expect(highProgressGoal.progress).toBeCloseTo(20); // 2000 / 100
-        expect(highProgressGoal.currency).toBe('USD');
+      expect(highProgressGoal.name).toBe('High Progress Goal');
+      expect(highProgressGoal.targetValue).toBe(100);
+      expect(highProgressGoal.currentValue).toBeCloseTo(2000);
+      expect(highProgressGoal.progress).toBeCloseTo(20); // 2000 / 100
+      expect(highProgressGoal.currency).toBe('USD');
     }
   });
 
   it('should return empty progress for goals with no allocations', () => {
-    const accountsPerformance: SimplePerformanceMetrics[] = [
+    const accountsPerformance: AccountValuation[] = performanceToValuations([
       { accountId: 'acc1', totalValue: 1000, baseCurrency: 'USD', fxRateToBase: 1 },
-    ];
-    const goals: Goal[] = [
-      { id: 'goal1', title: 'Unallocated Goal', targetAmount: 5000 },
-    ];
+    ]);
+    const goals: Goal[] = [{ id: 'goal1', title: 'Unallocated Goal', targetAmount: 5000 }];
     const allocations: GoalAllocation[] = []; // No allocations
 
     const result = calculateGoalProgress(accountsPerformance, goals, allocations);
@@ -106,12 +126,10 @@ describe('calculateGoalProgress', () => {
   });
 
   it('should handle missing accounts in performance data gracefully', () => {
-    const accountsPerformance: SimplePerformanceMetrics[] = [
+    const accountsPerformance: AccountValuation[] = performanceToValuations([
       { accountId: 'acc1', totalValue: 1000, baseCurrency: 'CAD', fxRateToBase: 0.75 }, // 750 CAD base
-    ];
-    const goals: Goal[] = [
-      { id: 'goal1', title: 'Goal With Missing Account', targetAmount: 2000 },
-    ];
+    ]);
+    const goals: Goal[] = [{ id: 'goal1', title: 'Goal With Missing Account', targetAmount: 2000 }];
     // acc2 is allocated but not in accountsPerformance
     const allocations: GoalAllocation[] = [
       { id: 'alloc1', goalId: 'goal1', accountId: 'acc2', percentAllocation: 50 },
@@ -125,14 +143,12 @@ describe('calculateGoalProgress', () => {
     expect(result[0].currency).toBe('CAD'); // Base currency from the first account
   });
 
-   it('should use the first account base currency if multiple differing base currencies are present', () => {
-    const accountsPerformance: SimplePerformanceMetrics[] = [
+  it('should use the first account base currency if multiple differing base currencies are present', () => {
+    const accountsPerformance: AccountValuation[] = performanceToValuations([
       { accountId: 'acc1', totalValue: 1000, baseCurrency: 'JPY', fxRateToBase: 1 },
       { accountId: 'acc2', totalValue: 200, baseCurrency: 'EUR', fxRateToBase: 1.1 }, // Should be converted to JPY based on its fxRateToBase
-    ];
-    const goals: Goal[] = [
-      { id: 'goal1', title: 'Test Goal Currency', targetAmount: 150000 },
-    ];
+    ]);
+    const goals: Goal[] = [{ id: 'goal1', title: 'Test Goal Currency', targetAmount: 150000 }];
     const allocations: GoalAllocation[] = [
       { id: 'alloc1', goalId: 'goal1', accountId: 'acc1', percentAllocation: 10 }, // 10% of 1000 JPY = 100 JPY
       { id: 'alloc2', goalId: 'goal1', accountId: 'acc2', percentAllocation: 50 }, // 50% of (200 EUR * 1.1) = 110 JPY (assuming fxRateToBase for acc2 is to JPY)
@@ -146,10 +162,9 @@ describe('calculateGoalProgress', () => {
     expect(goalProgress.name).toBe('Test Goal Currency');
     expect(goalProgress.currency).toBe('JPY'); // Base currency from the first account
     expect(goalProgress.targetValue).toBe(150000);
-    expect(goalProgress.currentValue).toBeCloseTo(1000 * 0.10 + (200 * 1.1 * 0.50)); // 100 + 110 = 210
-    expect(goalProgress.progress).toBeCloseTo( (1000 * 0.10 + (200 * 1.1 * 0.50)) / 150000 ); // 210 / 150000
+    expect(goalProgress.currentValue).toBeCloseTo(1000 * 0.1 + 200 * 1.1 * 0.5); // 100 + 110 = 210
+    expect(goalProgress.progress).toBeCloseTo((1000 * 0.1 + 200 * 1.1 * 0.5) / 150000); // 210 / 150000
   });
-
 });
 
 // Mock for SimplePerformanceMetrics performance field
