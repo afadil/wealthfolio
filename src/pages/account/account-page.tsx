@@ -68,7 +68,7 @@ const AccountPage = () => {
 
   // Calculate gainLossAmount and simpleReturn from valuationHistory
   const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } = useMemo(() => {
-    return calculatePerformanceMetrics(valuationHistory, id);
+    return calculatePerformanceMetrics(valuationHistory, false);
   }, [valuationHistory, id]);
 
   const chartData: HistoryChartData[] = useMemo(() => {
