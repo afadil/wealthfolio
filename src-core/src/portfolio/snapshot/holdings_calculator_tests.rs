@@ -13,6 +13,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
     use std::collections::VecDeque;
+    use std::sync::RwLock;
     use crate::errors::Result;
     use async_trait;
 
@@ -203,6 +204,7 @@ mod tests {
             positions: HashMap::new(), 
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
+            net_contribution_base: Decimal::ZERO,
         }
     }
 
@@ -226,9 +228,10 @@ mod tests {
     #[test]
     fn test_buy_activity_updates_holdings_and_cash() {
         let mock_fx_service = Arc::new(MockFxService::new());
-        let calculator = HoldingsCalculator::new(mock_fx_service.clone());
-
         let account_currency = "CAD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(mock_fx_service.clone(), base_currency);
+
         let activity_currency = "CAD";
         let target_date_str = "2023-01-01";
         let target_date = NaiveDate::from_str(target_date_str).unwrap();
@@ -271,9 +274,10 @@ mod tests {
     #[test]
     fn test_sell_activity_updates_holdings_and_cash() {
         let mock_fx_service = Arc::new(MockFxService::new());
-        let calculator = HoldingsCalculator::new(mock_fx_service.clone());
-
         let account_currency = "CAD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(mock_fx_service.clone(), base_currency);
+
         let activity_currency = "CAD";
         let target_date_str = "2023-01-02";
         let target_date = NaiveDate::from_str(target_date_str).unwrap();
@@ -357,7 +361,8 @@ mod tests {
         add_usd_cad_rates(&mut mock_fx_service, target_date_str);
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.25
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         let previous_snapshot = create_initial_snapshot("acc_fx_buy", account_currency, "2023-01-02");
         
@@ -416,11 +421,13 @@ mod tests {
         add_usd_cad_rates(&mut mock_fx_service, target_date_str);
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.25
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_deposit_fx", account_currency, "2023-01-03");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000)); // Initial 1000 CAD
         previous_snapshot.net_contribution = dec!(500); // Initial 500 CAD net contribution
+        previous_snapshot.net_contribution_base = dec!(500);
 
         let deposit_usd_activity = create_cash_activity(
             "act_deposit_usd_1",
@@ -477,11 +484,13 @@ mod tests {
         add_usd_cad_rates(&mut mock_fx_service, target_date_str);
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.25
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_withdraw_fx", account_currency, "2023-01-04");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(2000)); // Initial 2000 CAD
         previous_snapshot.net_contribution = dec!(1000); // Initial 1000 CAD net contribution
+        previous_snapshot.net_contribution_base = dec!(1000);
 
         let withdrawal_usd_activity = create_cash_activity(
             "act_withdraw_usd_1",
@@ -538,11 +547,13 @@ mod tests {
         add_usd_cad_rates(&mut mock_fx_service, target_date_str);
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.30
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_income", account_currency, "2023-01-05");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000));
         previous_snapshot.net_contribution = dec!(500);
+        previous_snapshot.net_contribution_base = dec!(500);
 
         let dividend_activity = create_cash_activity(
             "act_div_1",
@@ -605,12 +616,14 @@ mod tests {
         add_usd_cad_rates(&mut mock_fx_service, target_date_str);
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.30
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_charge", account_currency, "2023-01-06");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000));
         let initial_net_contribution = dec!(500);
         previous_snapshot.net_contribution = initial_net_contribution;
+        previous_snapshot.net_contribution_base = initial_net_contribution;
 
         // Fee activity where charge is in the 'fee' field
         let fee_activity = create_default_activity(
@@ -678,13 +691,15 @@ mod tests {
         let rate_add_date = usd_cad_rate(target_date_add_str); // 1.30
         let rate_remove_date = usd_cad_rate(target_date_remove_str); // 1.30
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()), base_currency);
 
         // --- Initial State ---
         let mut previous_snapshot_add = create_initial_snapshot("acc_add_remove", account_currency, "2023-01-07");
         previous_snapshot_add.cash_balances.insert(account_currency.to_string(), dec!(1000)); // 1000 CAD
         let initial_net_contribution = dec!(500); // 500 CAD
         previous_snapshot_add.net_contribution = initial_net_contribution;
+        previous_snapshot_add.net_contribution_base = initial_net_contribution;
 
         // --- 1. AddHolding Activity ---
         let add_holding_activity = create_default_activity(
@@ -791,13 +806,15 @@ mod tests {
         let rate_asset_date = usd_cad_rate(target_date_asset_transfer_str); // 1.30
         let rate_cash_date = usd_cad_rate(target_date_cash_transfer_str); // 1.30
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()), base_currency);
 
         // --- Initial State ---
         let mut previous_snapshot_asset_tx = create_initial_snapshot("acc_transfer", account_currency, "2023-01-09");
         previous_snapshot_asset_tx.cash_balances.insert(account_currency.to_string(), dec!(5000)); // 5000 CAD
         let initial_net_contribution = dec!(2000); // 2000 CAD
         previous_snapshot_asset_tx.net_contribution = initial_net_contribution;
+        previous_snapshot_asset_tx.net_contribution_base = initial_net_contribution;
 
         // --- 1. Asset TransferIn ---
         let transfer_in_asset_activity = create_default_activity(
@@ -921,11 +938,13 @@ mod tests {
         add_usd_cad_rates(&mut mock_fx_service, target_date_str);
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.30
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_multi_act", account_currency, "2023-01-11");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000000)); // 1M CAD
         previous_snapshot.net_contribution = dec!(0);
+        previous_snapshot.net_contribution_base = dec!(0);
 
         let buy_activity_usd = create_default_activity(
             "act_buy_multi_1", ActivityType::Buy, "MSFT", dec!(20),
@@ -999,11 +1018,13 @@ mod tests {
         let account_currency = "CAD";
         let activity_currency = "EUR"; // Activity in EUR, account in CAD
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_fx_fail", account_currency, "2023-01-12");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(10000)); // 10000 CAD
         previous_snapshot.net_contribution = dec!(0);
+        previous_snapshot.net_contribution_base = dec!(0);
 
         let buy_activity_eur = create_default_activity(
             "act_buy_eur_fx_fail",
@@ -1077,7 +1098,8 @@ mod tests {
         let rate_usd_cad = dec!(1.25);
         let rate_eur_cad = dec!(1.50);
 
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service));
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
 
         // Initial Snapshot
         let mut previous_snapshot = create_initial_snapshot("acc_multi_cash", account_currency, "2023-01-14");
@@ -1085,6 +1107,7 @@ mod tests {
         previous_snapshot.cash_balances.insert(account_currency.to_string(), initial_cad_cash);
         let initial_net_contribution = dec!(1000); // Assuming initial contribution matches initial cash
         previous_snapshot.net_contribution = initial_net_contribution;
+        previous_snapshot.net_contribution_base = initial_net_contribution;
 
         // Activities
         let deposit_usd_activity = create_cash_activity(

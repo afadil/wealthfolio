@@ -9,7 +9,8 @@ import { formatPercent } from '@/lib/utils';
 import { Icons } from '@/components/icons';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from '@/components/amount-display';
-import { useAccountsSimplePerformance } from '@/hooks/use-accounts-simple-performance';
+import { useLatestValuations } from '@/hooks/use-latest-valuations';
+import { useAccounts } from '@/hooks/use-accounts';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -17,10 +18,18 @@ export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
 
   const {
-    data: accountsPerformance,
-    isLoading: isLoadingPerformance,
-    isError: isErrorPerformance,
-  } = useAccountsSimplePerformance([]);
+    accounts,
+    isLoading: isLoadingAccounts,
+    isError: isErrorAccounts,
+  } = useAccounts();
+
+  const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
+
+  const {
+    latestValuations,
+    isLoading: isLoadingValuations,
+    error: errorValuations,
+  } = useLatestValuations(accountIds);
 
   const {
     data: goals,
@@ -41,14 +50,14 @@ export function SavingGoals() {
   });
 
   const goalsProgress = useMemo(() => {
-    if (!accountsPerformance || !goals || !allocations) {
+    if (!latestValuations || !goals || !allocations) {
       return undefined;
     }
-    return calculateGoalProgress(accountsPerformance, goals, allocations);
-  }, [accountsPerformance, goals, allocations]);
+    return calculateGoalProgress(latestValuations, goals, allocations);
+  }, [latestValuations, goals, allocations]);
 
-  const isLoading = isLoadingPerformance || isLoadingGoals || isLoadingAllocations;
-  const isError = isErrorPerformance || isErrorGoals || isErrorAllocations;
+  const isLoading = isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
+  const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
 
   if (isLoading) {
     return (
@@ -140,7 +149,7 @@ export function SavingGoals() {
 
                       const currentProgress = progressData?.progress ?? 0;
                       const currentValue = progressData?.currentValue ?? 0;
-                      const currency = progressData?.currency ?? accountsPerformance?.[0]?.baseCurrency ?? 'USD';
+                      const currency = progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? 'USD';
 
                       return (
                         <Tooltip key={goal.id}>

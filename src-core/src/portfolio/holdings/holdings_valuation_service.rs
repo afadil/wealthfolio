@@ -106,20 +106,22 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
         let today = Utc::now().date_naive();
 
         for holding in holdings.iter_mut() {
-            holding.as_of_date = today;
-
-            let base_currency = holding.base_currency.clone();
-
             match holding.holding_type {
                 HoldingType::Security => {
-                    self.calculate_security_valuation(
-                        holding,
-                        &base_currency,
-                        &latest_quote_pairs,
-                    )
-                    .await?;
+                    if let Some(sym) = holding.instrument.as_ref().map(|i| i.symbol.clone()) {
+                        holding.as_of_date = latest_quote_pairs
+                            .get(&sym)
+                            .map(|qp| qp.latest.timestamp.date_naive())
+                            .unwrap_or(today);
+                    } else {
+                        holding.as_of_date = today;
+                    }
+                    let base_currency = holding.base_currency.clone();
+                    self.calculate_security_valuation(holding, &base_currency, &latest_quote_pairs).await?;
                 }
                 HoldingType::Cash => {
+                    holding.as_of_date = today;
+                    let base_currency = holding.base_currency.clone();
                     self.calculate_cash_valuation(holding, &base_currency)?;
                 }
             }

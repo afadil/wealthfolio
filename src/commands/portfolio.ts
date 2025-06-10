@@ -87,6 +87,20 @@ export const getHistoricalValuations = async (
   }
 };
 
+export const getLatestValuations = async (accountIds: string[]): Promise<AccountValuation[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_latest_valuations', { accountIds });
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error fetching latest valuations.');
+    throw error;
+  }
+};
+
 export const calculatePerformanceHistory = async (
   itemType: 'account' | 'symbol',
   itemId: string,

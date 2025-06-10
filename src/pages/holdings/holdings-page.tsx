@@ -91,38 +91,51 @@ export const HoldingsPage = () => {
   };
 
   const holdingsForSheet = useMemo(() => {
-    if (!sheetFilterType || !holdings) return [];
+    if (!sheetFilterType || !holdings) {
+      return [];
+    }
+
+    let filteredHoldings: Holding[] = [];
 
     switch (sheetFilterType) {
       case 'class':
-        return holdings.filter((h) => {
+        filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
           const assetSubClass = isCash ? 'Cash' : h.instrument?.assetSubclass || 'Other';
           return assetSubClass === sheetFilterName;
         });
+        break;
       case 'sector':
-        return holdings.filter(
+        filteredHoldings = holdings.filter(
           (h) => h.instrument?.sectors?.some((s) => s.name === sheetFilterName)
         );
+        break;
       case 'country':
-        return holdings.filter(
+        filteredHoldings = holdings.filter(
           (h) => h.instrument?.countries?.some((c) => c.name === sheetFilterName)
         );
+        break;
       case 'currency':
-        return holdings.filter((h) => h.localCurrency === sheetFilterName);
-
+        filteredHoldings = holdings.filter((h) => h.localCurrency === sheetFilterName);
+        break;
       case 'composition':
         if (sheetCompositionFilter) {
-           return holdings.filter(h => h.instrument?.id === sheetCompositionFilter);
+          filteredHoldings = holdings.filter((h) => h.instrument?.id === sheetCompositionFilter);
+        } else if (sheetFilterName) {
+          filteredHoldings = holdings.filter(
+            (h) =>
+              h.instrument?.assetSubclass === sheetFilterName ||
+              h.instrument?.assetClass === sheetFilterName
+          );
         }
-        if(sheetFilterName) {
-            return holdings.filter(h => h.instrument?.assetSubclass === sheetFilterName || h.instrument?.assetClass === sheetFilterName);
-        }
-        return [];
-
+        break;
       default:
-        return [];
+        break;
     }
+
+    return filteredHoldings.sort(
+      (a, b) => (Number(b.marketValue?.base) || 0) - (Number(a.marketValue?.base) || 0)
+    );
   }, [holdings, sheetFilterType, sheetFilterName, sheetCompositionFilter, sheetAccountIdsFilter]);
 
   const handleAccountSelect = (account: Account) => {
@@ -179,41 +192,44 @@ export const HoldingsPage = () => {
               holdings={holdings || []}
               baseCurrency={settings?.baseCurrency || 'USD'}
               isLoading={isLoading}
-              onCurrencySectionClick={(currencyName) => handleChartSectionClick('currency', currencyName, `Holdings in ${currencyName}`)}
+              onCurrencySectionClick={(currencyName) =>
+                handleChartSectionClick('currency', currencyName, `Holdings in ${currencyName}`)
+              }
             />
 
-            <AccountAllocationChart 
-              isLoading={isLoading} 
+            <AccountAllocationChart isLoading={isLoading} />
+
+            <ClassesChart
+              holdings={holdings}
+              isLoading={isLoading}
+              onClassSectionClick={(className) =>
+                handleChartSectionClick('class', className, `Asset Class: ${className}`)
+              }
             />
 
-            <ClassesChart 
-              holdings={holdings} 
-              isLoading={isLoading} 
-              onClassSectionClick={(className) => handleChartSectionClick('class', className, `Asset Class: ${className}`)}
-            />
-
-            <CountryChart 
-              holdings={nonCashHoldings} 
-              isLoading={isLoading} 
-              onCountrySectionClick={(countryName) => handleChartSectionClick('country', countryName, `Holdings in ${countryName}`)}
+            <CountryChart
+              holdings={nonCashHoldings}
+              isLoading={isLoading}
+              onCountrySectionClick={(countryName) =>
+                handleChartSectionClick('country', countryName, `Holdings in ${countryName}`)
+              }
             />
           </div>
 
           {/* Second row: Composition and Sector */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="col-span-1 md:col-span-3">
-              <PortfolioComposition 
-                holdings={nonCashHoldings} 
-                isLoading={isLoading} 
-              />
+              <PortfolioComposition holdings={nonCashHoldings} isLoading={isLoading} />
             </div>
 
             {/* Sectors Chart - Now self-contained */}
             <div className="col-span-1 h-full">
-              <SectorsChart 
-                holdings={nonCashHoldings} 
-                isLoading={isLoading} 
-                onSectorSectionClick={(sectorName) => handleChartSectionClick('sector', sectorName, `Holdings in Sector: ${sectorName}`)}
+              <SectorsChart
+                holdings={nonCashHoldings}
+                isLoading={isLoading}
+                onSectorSectionClick={(sectorName) =>
+                  handleChartSectionClick('sector', sectorName, `Holdings in Sector: ${sectorName}`)
+                }
               />
             </div>
           </div>
@@ -221,7 +237,7 @@ export const HoldingsPage = () => {
       </Tabs>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg">
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>{sheetTitle}</SheetTitle>
             <SheetDescription>
@@ -235,24 +251,24 @@ export const HoldingsPage = () => {
                   let displayName = 'N/A';
                   let symbol = '-';
                   if (holding.holdingType === HoldingType.CASH) {
-                    displayName = holding.localCurrency ? `Cash (${holding.localCurrency})` : 'Cash';
+                    displayName = holding.localCurrency
+                      ? `Cash (${holding.localCurrency})`
+                      : 'Cash';
                     symbol = `$CASH-${holding.localCurrency}`;
                   } else if (holding.instrument) {
-                    displayName = holding.instrument.name || holding.instrument.symbol || 'Unnamed Security';
+                    displayName =
+                      holding.instrument.name || holding.instrument.symbol || 'Unnamed Security';
                     symbol = holding.instrument.symbol || '-';
                   }
 
                   return (
-                    <Card
-                      key={holding.id}
-                      className="flex items-center justify-between text-sm"
-                    >
+                    <Card key={holding.id} className="flex items-center justify-between text-sm">
                       <CardHeader className="flex w-full flex-row items-center justify-between space-x-2 p-4">
                         <div className="flex items-center space-x-2">
                           <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
                             {symbol}
                           </Badge>
-                          <CardTitle className="text-sm font-normal line-clamp-1">
+                          <CardTitle className="line-clamp-1 text-sm font-normal">
                             {displayName}
                           </CardTitle>
                         </div>

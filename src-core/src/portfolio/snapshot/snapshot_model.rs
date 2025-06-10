@@ -34,6 +34,8 @@ pub struct AccountStateSnapshot {
     pub cost_basis: Decimal, // Sum of cost basis of all positions
     #[serde(default)]
     pub net_contribution: Decimal, // Cumulative net deposits in account currency
+    #[serde(default)]
+    pub net_contribution_base: Decimal, // portfolio base currency
 
     pub calculated_at: NaiveDateTime, // When this snapshot was generated
 }
@@ -49,6 +51,7 @@ impl Default for AccountStateSnapshot {
             cash_balances: HashMap::new(),
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
+            net_contribution_base: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
         }
     }
@@ -81,9 +84,12 @@ pub struct AccountStateSnapshotDB {
     pub cost_basis: String,
     #[diesel(sql_type = Text)]
     pub net_contribution: String,
-
     #[diesel(sql_type = Text)]
     pub calculated_at: String,
+    #[diesel(sql_type = Text)]
+    pub net_contribution_base: String,
+
+
 }
 
 // --- Conversions ---
@@ -101,6 +107,7 @@ impl From<AccountStateSnapshotDB> for AccountStateSnapshot {
             cash_balances: serde_json::from_str(&db.cash_balances).unwrap_or_default(),
             cost_basis: Decimal::from_str(&db.cost_basis).unwrap_or_default(),
             net_contribution: Decimal::from_str(&db.net_contribution).unwrap_or_default(),
+            net_contribution_base: Decimal::from_str(&db.net_contribution_base).unwrap_or_default(),
             calculated_at: NaiveDateTime::parse_from_str(
                 &db.calculated_at,
                 "%Y-%m-%dT%H:%M:%S%.fZ",
@@ -132,6 +139,10 @@ impl From<AccountStateSnapshot> for AccountStateSnapshotDB {
             cost_basis: domain.cost_basis.round_dp(DECIMAL_PRECISION).to_string(),
             net_contribution: domain
                 .net_contribution
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            net_contribution_base: domain
+                .net_contribution_base
                 .round_dp(DECIMAL_PRECISION)
                 .to_string(),
             calculated_at: domain

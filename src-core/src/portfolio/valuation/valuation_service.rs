@@ -1,11 +1,11 @@
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::fx_traits::FxServiceTrait;
-use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
 use crate::market_data::market_data_model::Quote;
 use crate::market_data::MarketDataServiceTrait;
+use crate::portfolio::snapshot::SnapshotServiceTrait;
+use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
 use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
-use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::utils::time_utils;
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate};
@@ -31,7 +31,11 @@ pub trait ValuationServiceTrait: Send + Sync {
     ///
     /// Returns:
     ///     A `Result` indicating success or an error.
-    async fn calculate_valuation_history(&self, account_id: &str, recalculate_all: bool) -> CoreResult<()>;
+    async fn calculate_valuation_history(
+        &self,
+        account_id: &str,
+        recalculate_all: bool,
+    ) -> CoreResult<()>;
 
     /// Loads the valuation data for the account within the specified date range.
     ///
@@ -158,7 +162,11 @@ impl ValuationService {
 
 #[async_trait]
 impl ValuationServiceTrait for ValuationService {
-    async fn calculate_valuation_history(&self, account_id: &str, recalculate_all: bool) -> CoreResult<()> {
+    async fn calculate_valuation_history(
+        &self,
+        account_id: &str,
+        recalculate_all: bool,
+    ) -> CoreResult<()> {
         let total_start_time = Instant::now();
         debug!(
             "Starting valuation data update/recalculation for account '{}', recalculate_all: {}",
@@ -260,8 +268,23 @@ impl ValuationServiceTrait for ValuationService {
                     .cloned()
                     .unwrap_or_default();
 
+                let missing_quotes: Vec<_> = holdings_snapshot
+                    .positions
+                    .keys()
+                    .filter(|sym| !quotes_for_current_date.contains_key(*sym))
+                    .cloned()
+                    .collect();
+
+                if !missing_quotes.is_empty() {
+                    debug!(
+                        "Missing quotes {:?} on {} (account '{}'). Skipping day.",
+                        missing_quotes, current_date, account_id_clone
+                    );
+                    return None;
+                }
+
                 if quotes_for_current_date.is_empty() && !holdings_snapshot.positions.is_empty() {
-                    warn!("No quotes for date {} (account '{}'). Skipping day.", current_date, account_id_clone);
+                    debug!("No quotes for date {} (account '{}'). Skipping day.", current_date, account_id_clone);
                     return None;
                 }
                 let account_curr = &holdings_snapshot.currency;
@@ -298,8 +321,7 @@ impl ValuationServiceTrait for ValuationService {
         let total_duration = total_start_time.elapsed();
         debug!(
             "Successfully updated/recalculated valuation data for account '{}' in {:?}",
-            account_id,
-            total_duration
+            account_id, total_duration
         );
 
         Ok(())
@@ -315,8 +337,11 @@ impl ValuationServiceTrait for ValuationService {
             "Loading historical valuations for account '{}' from {:?} to {:?}",
             account_id, start_date_opt, end_date_opt
         );
-        self.valuation_repository
-            .get_historical_valuations(account_id, start_date_opt, end_date_opt)
+        self.valuation_repository.get_historical_valuations(
+            account_id,
+            start_date_opt,
+            end_date_opt,
+        )
     }
 
     fn get_latest_valuations(
@@ -324,8 +349,7 @@ impl ValuationServiceTrait for ValuationService {
         account_ids: &[String],
     ) -> CoreResult<Vec<DailyAccountValuation>> {
         debug!("Loading latest valuations for accounts: {:?}", account_ids);
-        self.valuation_repository
-            .get_latest_valuations(account_ids)
+        self.valuation_repository.get_latest_valuations(account_ids)
     }
 
     fn get_valuations_on_date(
@@ -340,5 +364,4 @@ impl ValuationServiceTrait for ValuationService {
         self.valuation_repository
             .get_valuations_on_date(account_ids, date)
     }
-
 }

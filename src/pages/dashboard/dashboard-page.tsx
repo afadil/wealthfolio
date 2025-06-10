@@ -42,6 +42,7 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>('Last 3 months');
+  const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const {
     valuationHistory,
@@ -54,8 +55,8 @@ export default function DashboardPage() {
 
   // Calculate gainLossAmount and simpleReturn from valuationHistory
   const { gainLossAmount, simpleReturn } = useMemo(() => {
-    return calculatePerformanceMetrics(valuationHistory);
-  }, [valuationHistory]);
+    return calculatePerformanceMetrics(valuationHistory, isAllTime);
+  }, [valuationHistory, isAllTime]);
 
   const currentValuation = useMemo(() => {
     return valuationHistory && valuationHistory.length > 0
@@ -78,12 +79,13 @@ export default function DashboardPage() {
 
   // Callback for IntervalSelector
   const handleIntervalSelect = (
-    _code: TimePeriod, 
+    code: TimePeriod, 
     description: string,
     range: DateRange | undefined
   ) => {
     setSelectedIntervalDescription(description);
     setDateRange(range); 
+    setIsAllTime(code === 'ALL');
   };
 
   return (
