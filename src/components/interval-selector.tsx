@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { TimePeriod, DateRange } from '@/lib/types';
 import { Icons } from '@/components/icons';
-import { subWeeks, subMonths, subYears } from 'date-fns';
+import { subWeeks, subMonths, subYears, startOfYear } from 'date-fns';
 
 interface IntervalData {
   code: TimePeriod;
@@ -16,7 +16,10 @@ const intervalDescriptions: Record<TimePeriod, string> = {
   '1W': 'past week',
   '1M': 'past month',
   '3M': 'past 3 months',
+  '6M': 'past 6 months',
+  'YTD': 'year to date',
   '1Y': 'past year',
+  '5Y': 'past 5 years',
   ALL: 'All Time',
 };
 
@@ -24,7 +27,10 @@ const intervals: IntervalData[] = [
   { code: '1W', description: intervalDescriptions['1W'], calculateRange: () => ({ from: subWeeks(new Date(), 1), to: new Date() }) },
   { code: '1M', description: intervalDescriptions['1M'], calculateRange: () => ({ from: subMonths(new Date(), 1), to: new Date() }) },
   { code: '3M', description: intervalDescriptions['3M'], calculateRange: () => ({ from: subMonths(new Date(), 3), to: new Date() }) },
+  { code: '6M', description: intervalDescriptions['6M'], calculateRange: () => ({ from: subMonths(new Date(), 6), to: new Date() }) },
+  { code: 'YTD', description: intervalDescriptions['YTD'], calculateRange: () => ({ from: startOfYear(new Date()), to: new Date() }) },
   { code: '1Y', description: intervalDescriptions['1Y'], calculateRange: () => ({ from: subYears(new Date(), 1), to: new Date() }) },
+  { code: '5Y', description: intervalDescriptions['5Y'], calculateRange: () => ({ from: subYears(new Date(), 5), to: new Date() }) },
   { code: 'ALL', description: intervalDescriptions.ALL, calculateRange: () => ({ from: new Date('1970-01-01'), to: new Date() }) },
 ];
 

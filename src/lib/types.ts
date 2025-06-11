@@ -382,7 +382,7 @@ export type DateRange = {
   to: Date | undefined;
 };
 
-export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
+export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
 
 
 export interface AccountValuation {
