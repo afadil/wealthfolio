@@ -270,8 +270,10 @@ impl ValuationServiceTrait for ValuationService {
 
                 let missing_quotes: Vec<_> = holdings_snapshot
                     .positions
-                    .keys()
-                    .filter(|sym| !quotes_for_current_date.contains_key(*sym))
+                    .iter()
+                    .filter(|(_, position)| !position.quantity.is_zero())
+                    .map(|(symbol, _)| symbol)
+                    .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
                     .cloned()
                     .collect();
 
