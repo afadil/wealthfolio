@@ -47,7 +47,7 @@
     --success-foreground: var(--flexoki-bg);
     --warning: var(--flexoki-ye);
     --warning-foreground: var(--flexoki-bg);
-    --border: var(--flexoki-ui-2);
+    --border: var(--flexoki-ui);
     --input: var(--flexoki-ui-2);
     --ring: var(--flexoki-ui-3);
     --radius: 0.5rem;

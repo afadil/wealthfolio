@@ -25,22 +25,31 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
     return (
       <Card className={className}>
         <CardHeader className="flex flex-row items-center justify-between">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-7 w-1/4" />
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-7 w-24" />
         </CardHeader>
-        <CardContent>
-          <div className="mb-8 space-y-4 text-sm">
+        <CardContent className='space-y-6'>
+          <Separator className="mb-4" />
+          <div className="space-y-4 text-sm">
             <div className="flex justify-between">
-              <Skeleton className="h-4 w-1/4" /> <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-24" />
             </div>
             <div className="flex justify-between">
-              <Skeleton className="h-4 w-1/4" /> <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <div className="flex justify-between">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-24" />
             </div>
           </div>
 
           <PerformanceGrid isLoading={true} />
         </CardContent>
-        <p className="invisible m-2 mt-0 text-right text-xs text-muted-foreground">loading...</p>
+        <CardFooter className="flex justify-end pb-0">
+          <Skeleton className="h-3 w-48" />
+        </CardFooter>
       </Card>
     );
 

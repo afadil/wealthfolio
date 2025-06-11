@@ -150,7 +150,7 @@ const AccountPage = () => {
           <CardContent className="p-0">
             <div className="w-full p-0">
               <div className="flex w-full flex-col">
-                <div className="h-[440px] w-full">
+                <div className="h-[480px] w-full">
                   <HistoryChart data={chartData} isLoading={false} />
                   <IntervalSelector
                     className="relative bottom-10 left-0 right-0 z-10"

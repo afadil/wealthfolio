@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { cn } from '@/lib/utils';
-import NumberFlow from '@number-flow/react';
+import { cn, formatPercent } from '@/lib/utils';
 
 type GainPercentVariant = 'text' | 'badge';
 
@@ -9,6 +8,32 @@ interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
   animated?: boolean;
   variant?: GainPercentVariant;
   showSign?: boolean;
+}
+
+function AnimatedNumber({ value }: { value: number }) {
+  const [NumberFlow, setNumberFlow] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    import('@number-flow/react').then((module) => {
+      setNumberFlow(() => module.default);
+    });
+  }, []);
+
+  if (!NumberFlow) {
+    return <span>{formatPercent(value)}</span>;
+  }
+
+  const Component = NumberFlow;
+  return (
+    <Component
+      value={Math.abs(value * 100)}
+      animated={true}
+      format={{
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }}
+    />
+  );
 }
 
 export function GainPercent({
@@ -32,16 +57,14 @@ export function GainPercent({
       )}
       {...props}
     >
-      {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
-      <NumberFlow
-        value={Math.abs(value * 100)}
-        animated={animated}
-        format={{
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }}
-      />
-      %
+      {animated ? (
+        <AnimatedNumber value={value} />
+      ) : (
+        <>
+          {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
+          {formatPercent(Math.abs(value))}
+        </>
+      )}
     </div>
   );
 }
