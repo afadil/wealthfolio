@@ -2,7 +2,7 @@ import React from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { formatAmount, formatPercent } from '@/lib/utils';
+import { formatPercent } from '@/lib/utils';
 import { AmountDisplay } from '@/components/amount-display';
 import { QuantityDisplay } from '@/components/quantity-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
@@ -81,7 +81,16 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
       : []),
     {
       label: 'Total return',
-      value: `${formatAmount(totalReturn, currency)} (${formatPercent(totalReturnPercent)})`,
+      value: (
+              <>
+                <AmountDisplay
+                  value={totalReturn}
+                  currency={currency}
+                  isHidden={isBalanceHidden}
+                />{' '}
+                ({formatPercent(totalReturnPercent)})
+              </>
+            ),
       color: totalReturn < 0 ? 'text-destructive' : 'text-success',
     },
   ];
