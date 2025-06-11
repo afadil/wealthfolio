@@ -26,29 +26,22 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
   if (isLoading || !performance) {
     return (
       <div className={cn('w-full', className)}>
-        <Card className="border-none p-0">
+        <Card className="border-none p-0 shadow-none">
           <CardContent className="p-0">
-            <div className="grid grid-cols-1 md:grid-cols-2" >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[...Array(4)].map((_, index) => (
                 <div
                   key={index}
-                  className={cn(
-                    'flex min-h-[6rem] flex-col items-center justify-center space-y-2 p-4 md:p-6',
-                    index === 0 ? 'border-b md:border-r' : '',
-                    index === 1 ? 'border-b' : '',
-                    index === 2 ? 'md:border-r' : '',
-                  )}
+                  className="rounded-md border border-muted/30 bg-muted/30 flex min-h-[6rem] flex-col items-center justify-center space-y-2 p-4 md:p-6"
                 >
-                  <Skeleton className="h-3 w-1/3" />
-                  <Skeleton className="h-5 w-1/4" />
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-3 w-20" />
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-        <div className="mt-2 flex justify-end">
-          <Skeleton className="h-3 w-1/4" />
-        </div>
       </div>
     );
   }
