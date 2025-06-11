@@ -215,6 +215,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
           accountName: acc.name,
           totalValueBaseCurrency: 0,
           baseCurrency,
+          accountCurrency: acc.currency,
           totalGainLossAmountBaseCurrency: null,
           totalGainLossPercent: null,
           accountId: acc.id,
