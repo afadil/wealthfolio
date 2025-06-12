@@ -158,6 +158,45 @@ impl ValuationService {
         }
         quotes_by_date
     }
+
+    /// Fills in missing quotes for the current date by using the last known quote for each symbol
+    fn fill_missing_quotes_with_last_known(
+        &self,
+        quotes_by_date: &HashMap<NaiveDate, HashMap<String, Quote>>,
+        current_date: NaiveDate,
+        required_symbols: &HashSet<String>,
+        start_date: NaiveDate,
+    ) -> HashMap<String, Quote> {
+        let mut quotes_for_current_date = quotes_by_date
+            .get(&current_date)
+            .cloned()
+            .unwrap_or_default();
+
+        // For each required symbol that's missing a quote on the current date,
+        // look backward to find the most recent quote
+        for symbol in required_symbols {
+            if !quotes_for_current_date.contains_key(symbol) {
+                // Look backward from current_date to start_date to find the last known quote
+                let mut search_date = current_date - Duration::days(1);
+                while search_date >= start_date {
+                    if let Some(daily_quotes) = quotes_by_date.get(&search_date) {
+                        if let Some(quote) = daily_quotes.get(symbol) {
+                            // Copy the quote for search_date into current_date
+                            warn!(
+                                "Using last known quote for symbol '{}' from date {} for  date {}",
+                                symbol, search_date, current_date
+                            );
+                            quotes_for_current_date.insert(symbol.clone(), quote.clone());
+                            break;
+                        }
+                    }
+                    search_date = search_date - Duration::days(1);
+                }
+            }
+        }
+
+        quotes_for_current_date
+    }
 }
 
 #[async_trait]
@@ -248,7 +287,7 @@ impl ValuationServiceTrait for ValuationService {
 
         let quotes_by_date = self.preprocess_quotes(
             quotes_vec,
-            actual_calculation_start_date,
+            quote_fetch_start_date,
             calculation_end_date,
         );
 
@@ -259,10 +298,21 @@ impl ValuationServiceTrait for ValuationService {
                 let account_id_clone = account_id.to_string();
                 let base_curr_clone = self.base_currency.read().unwrap().clone();
 
-                let quotes_for_current_date = quotes_by_date
-                    .get(&current_date)
+                // Get required symbols for this snapshot
+                let required_symbols: HashSet<String> = holdings_snapshot
+                    .positions
+                    .keys()
                     .cloned()
-                    .unwrap_or_default();
+                    .collect();
+
+                // Use the new method to fill missing quotes with last known quotes
+                let quotes_for_current_date = self.fill_missing_quotes_with_last_known(
+                    &quotes_by_date,
+                    current_date,
+                    &required_symbols,
+                    quote_fetch_start_date,
+                );
+
                 let fx_for_current_date = fx_rates_by_date
                     .get(&current_date)
                     .cloned()
