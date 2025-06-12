@@ -26,9 +26,10 @@ function AnimatedNumber({ value }: { value: number }) {
   const Component = NumberFlow;
   return (
     <Component
-      value={Math.abs(value * 100)}
-      animated={true}
+      value={value}
+      animated={true}      
       format={{
+        style: "percent",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }}

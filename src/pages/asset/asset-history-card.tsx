@@ -85,7 +85,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
           : 0,
       percentage:
         isValidStartValue && typeof endValue === 'number'
-          ? ((endValue - startValue) / startValue) * 100
+          ? ((endValue - startValue) / startValue)
           : 0,
       calculatedAt: lastFilteredDate,
     };
