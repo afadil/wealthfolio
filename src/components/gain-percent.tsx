@@ -13,6 +13,7 @@ interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
 function AnimatedNumber({ value }: { value: number }) {
   const [NumberFlow, setNumberFlow] = React.useState<any>(null);
 
+  const absValue = Math.abs(value * 100);
   React.useEffect(() => {
     import('@number-flow/react').then((module) => {
       setNumberFlow(() => module.default);
@@ -20,16 +21,15 @@ function AnimatedNumber({ value }: { value: number }) {
   }, []);
 
   if (!NumberFlow) {
-    return <span>{formatPercent(value)}</span>;
+    return <span>{formatPercent(absValue)}</span>;
   }
 
   const Component = NumberFlow;
   return (
     <Component
-      value={value}
-      animated={true}      
+      value={absValue}
+      animated={true}
       format={{
-        style: "percent",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }}
@@ -59,7 +59,10 @@ export function GainPercent({
       {...props}
     >
       {animated ? (
-        <AnimatedNumber value={value} />
+        <>
+          {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
+          <AnimatedNumber value={value} />
+        </>
       ) : (
         <>
           {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
