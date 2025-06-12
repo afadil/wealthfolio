@@ -91,7 +91,8 @@ impl SnapshotService {
         snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
-        let holdings_calculator = HoldingsCalculator::new(fx_service.clone(), base_currency.clone());
+        let holdings_calculator =
+            HoldingsCalculator::new(fx_service.clone(), base_currency.clone());
         Self {
             base_currency: base_currency.clone(),
             account_repository,
@@ -191,27 +192,29 @@ impl SnapshotService {
         )?;
 
         // Step 8: Persist keyframe snapshots using the new clear method
-        // ── wipe + insert per‑account, even if we have zero new keyframes ─────
-        for (acc_id, _) in &accounts_needing_calculation {
-            let start = *effective_start_dates
-                .get(acc_id)
-                .expect("missing start date");
-
-            // slice of new keyframes for this account
-            let frames: Vec<AccountStateSnapshot> = keyframes_to_save
+        for acc_id in accounts_needing_calculation.keys() {
+            let frames: Vec<_> = keyframes_to_save
                 .iter()
                 .filter(|kf| kf.account_id == *acc_id)
                 .cloned()
                 .collect();
 
-            self.snapshot_repository
-                .overwrite_snapshots_for_account_in_range(
-                    acc_id,
-                    start,
-                    calculation_end_date,
-                    &frames,
-                )
-                .await?;
+            if force_full_calculation {
+                // wipe whole account then insert
+                self.snapshot_repository
+                    .overwrite_all_snapshots_for_account(acc_id, &frames)
+                    .await?;
+            } else {
+                let start = *effective_start_dates.get(acc_id).unwrap();
+                self.snapshot_repository
+                    .overwrite_snapshots_for_account_in_range(
+                        acc_id,
+                        start,
+                        calculation_end_date,
+                        &frames,
+                    )
+                    .await?;
+            }
         }
 
         Ok(keyframes_to_save.len())
@@ -395,17 +398,17 @@ impl SnapshotService {
                     .snapshot_repository
                     .get_latest_snapshot_before_date(acc_id, calculation_end_date)?
                 {
-                    initial_snapshot_for_acc = Some(latest_snapshot.clone());
-                    effective_start_date = latest_snapshot
-                        .snapshot_date
-                        .succ_opt()
-                        .unwrap_or(latest_snapshot.snapshot_date);
-                    debug!(
-                        "Found latest snapshot for account {}: date {}. Starting incremental calc from next day {}.",
-                        acc_id,
-                        latest_snapshot.snapshot_date,
-                        effective_start_date
+                    // Re-evaluate the key-frame’s own date without duplicating its activities
+                    let snapshot_day = latest_snapshot.snapshot_date;
+                    let day_before = snapshot_day.pred_opt().unwrap_or(snapshot_day);
+
+                    // fresh, empty state as of D-1
+                    start_keyframes.insert(
+                        acc_id.clone(),
+                        Self::create_initial_snapshot(account, day_before),
                     );
+
+                    effective_start_date = snapshot_day;
                 } else {
                     effective_start_date =
                         min_activity_date_for_account.unwrap_or(calculation_end_date);
@@ -721,13 +724,11 @@ impl SnapshotService {
             account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
             snapshot_date: target_date,
             currency: base_portfolio_currency.to_string(), // TOTAL snapshot is denominated in base currency
-            cash_balances: aggregated_cash_balances,       // Itemized by account currency holding the cash
+            cash_balances: aggregated_cash_balances, // Itemized by account currency holding the cash
             positions: aggregated_positions,
             cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
-            net_contribution: overall_net_contribution_base_ccy
-                .round_dp(DECIMAL_PRECISION),
-            net_contribution_base: overall_net_contribution_base_ccy
-                .round_dp(DECIMAL_PRECISION),
+            net_contribution: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
+            net_contribution_base: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
             calculated_at: Utc::now().naive_utc(),
         })
     }
@@ -852,7 +853,7 @@ impl SnapshotService {
 
     // --- New method to calculate and store TOTAL portfolio snapshots ---
     async fn calculate_total_portfolio_snapshots_impl(&self) -> Result<usize> {
-        info!("Starting calculation of TOTAL portfolio snapshots (based on stored individual keyframes).");
+        debug!("Starting calculation of TOTAL portfolio snapshots (based on stored individual keyframes).");
 
         let active_accounts = self.account_repository.list(Some(true), None)?;
         if active_accounts.is_empty() {
