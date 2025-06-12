@@ -182,7 +182,7 @@ impl ValuationService {
                     if let Some(daily_quotes) = quotes_by_date.get(&search_date) {
                         if let Some(quote) = daily_quotes.get(symbol) {
                             // Copy the quote for search_date into current_date
-                            warn!(
+                            debug!(
                                 "Using last known quote for symbol '{}' from date {} for  date {}",
                                 symbol, search_date, current_date
                             );
