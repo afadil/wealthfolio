@@ -27,6 +27,7 @@ const initialMapping: ImportMappingData = {
   fieldMappings: {},
   activityMappings: {},
   symbolMappings: {},
+  accountMappings: {},
 };
 
 interface UseImportMappingProps {
@@ -91,6 +92,7 @@ export function useImportMapping({
         fieldMappings: { ...prev.fieldMappings, ...(fetchedMappingData.fieldMappings || {}) },
         activityMappings: { ...prev.activityMappings, ...(fetchedMappingData.activityMappings || {}) },
         symbolMappings: { ...prev.symbolMappings, ...(fetchedMappingData.symbolMappings || {}) },
+        accountMappings: { ...prev.accountMappings, ...(fetchedMappingData.accountMappings || {}) },
       }));
       setHasInitializedFromHeaders(false);
     }
@@ -158,12 +160,31 @@ export function useImportMapping({
     }));
   }, []);
 
+  const handleAccountIdMapping = useCallback((csvAccountId: string, accountId: string) => {
+    setMapping((prev) => {
+      const updatedMappings = { ...prev.accountMappings };
+      
+      if (accountId.trim() === '') {
+        // Remove mapping if accountId is empty
+        delete updatedMappings[csvAccountId.trim()];
+      } else {
+        // Add or update mapping
+        updatedMappings[csvAccountId.trim()] = accountId.trim();
+      }
+      return {
+        ...prev,
+        accountMappings: updatedMappings,
+      };
+    });
+  }, []);
+
   return {
     mapping,
     updateMapping,
     handleColumnMapping,
     handleActivityTypeMapping,
     handleSymbolMapping,
+    handleAccountIdMapping,
     saveMapping,
     isMappingLoading,
     saveMappingMutation,

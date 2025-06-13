@@ -319,6 +319,7 @@ impl ActivityServiceTrait for ActivityService {
             field_mappings: serde_json::to_string(&mapping_data.field_mappings)?,
             activity_mappings: serde_json::to_string(&mapping_data.activity_mappings)?,
             symbol_mappings: serde_json::to_string(&mapping_data.symbol_mappings)?,
+            account_mappings: serde_json::to_string(&mapping_data.account_mappings)?,
             created_at: now,
             updated_at: now,
         };
