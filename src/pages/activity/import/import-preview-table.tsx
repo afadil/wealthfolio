@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
 import { DataTableFacetedFilterProps } from '@/components/ui/data-table/data-table-faceted-filter';
-import type { ActivityImport } from '@/lib/types';
+import type { Account, ActivityImport } from '@/lib/types';
 import { formatAmount, formatDateTime, toPascalCase, cn } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table/data-table-pagination';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,7 @@ const safeDisplayNumber = (value: number | null | undefined): string => {
   return value.toString();
 };
 
-export const ImportPreviewTable = ({ activities }: { activities: ActivityImport[] }) => {
+export const ImportPreviewTable = ({ activities, accounts }: { activities: ActivityImport[], accounts: Account[] }) => {
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'lineNumber',
@@ -123,7 +123,7 @@ export const ImportPreviewTable = ({ activities }: { activities: ActivityImport[
 
   const table = useReactTable({
     data: activities,
-    columns,
+    columns: getColumns(accounts),
     state: {
       sorting,
       columnFilters,
@@ -252,252 +252,274 @@ const ErrorCell = ({
   );
 };
 
-export const columns: ColumnDef<ActivityImport>[] = [
-  {
-    id: 'lineNumber',
-    accessorKey: 'lineNumber',
-  },
-  {
-    id: 'isValid',
-    accessorKey: 'isValid',
-    header: () => <span className="sr-only">Status</span>,
-    cell: ({ row }) => {
-      const isValid = row.getValue('isValid') as boolean;
-      const errors = row.original.errors || {};
-      const lineNumber = row.original.lineNumber;
 
-      // Format all errors for tooltip display
-      const allErrors = Object.entries(errors).flatMap(([field, fieldErrors]) =>
-        fieldErrors.map((err) => `${field}: ${err}`),
-      );
+function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
+  return [
+    {
+      id: 'lineNumber',
+      accessorKey: 'lineNumber',
+    },
+    {
+      id: 'isValid',
+      accessorKey: 'isValid',
+      header: () => <span className="sr-only">Status</span>,
+      cell: ({ row }) => {
+        const isValid = row.getValue('isValid') as boolean;
+        const errors = row.original.errors || {};
+        const lineNumber = row.original.lineNumber;
 
-      return isValid ? (
-        <div className="flex items-center gap-1 text-xs w-[60px]">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-success/20 text-success">
-            <Icons.CheckCircle className="h-3.5 w-3.5" />
+        // Format all errors for tooltip display
+        const allErrors = Object.entries(errors).flatMap(([field, fieldErrors]) =>
+          fieldErrors.map((err) => `${field}: ${err}`),
+        );
+
+        return isValid ? (
+          <div className="flex items-center gap-1 text-xs w-[60px]">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-success/20 text-success">
+              <Icons.CheckCircle className="h-3.5 w-3.5" />
+            </div>
+            <span className="text-xs text-muted-foreground">{String(lineNumber).padStart(2, '0')}</span>
           </div>
-          <span className="text-xs text-muted-foreground">{String(lineNumber).padStart(2, '0')}</span>
-        </div>
-      ) : (
-        <TooltipProvider>
-          <Tooltip delayDuration={30}>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-1 text-xs w-[60px] cursor-help">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/20 text-destructive">
-                  <Icons.XCircle className="h-3.5 w-3.5" />
+        ) : (
+          <TooltipProvider>
+            <Tooltip delayDuration={30}>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-xs w-[60px] cursor-help">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                    <Icons.XCircle className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{String(lineNumber).padStart(2, '0')}</span>
                 </div>
-                <span className="text-xs text-muted-foreground">{String(lineNumber).padStart(2, '0')}</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent 
-              side="right"
-              sideOffset={10}
-              className="max-w-xs border-none bg-destructive p-3 text-destructive-foreground"
-            >
-              <h4 className="mb-2 font-medium">Validation Errors</h4>
-              <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
-                {allErrors.length > 0 ? (
-                  allErrors.map((error, index) => <li key={index}>{error}</li>)
-                ) : (
-                  <li>Invalid activity</li>
-                )}
-              </ul>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
+              </TooltipTrigger>
+              <TooltipContent 
+                side="right"
+                sideOffset={10}
+                className="max-w-xs border-none bg-destructive p-3 text-destructive-foreground"
+              >
+                <h4 className="mb-2 font-medium">Validation Errors</h4>
+                <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                  {allErrors.length > 0 ? (
+                    allErrors.map((error, index) => <li key={index}>{error}</li>)
+                  ) : (
+                    <li>Invalid activity</li>
+                  )}
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+      filterFn: (row, id, filterValue: string[]) => {
+        const isValid = row.getValue(id) as boolean;
+        const filterBoolean = filterValue[0] === 'true';
+        return isValid === filterBoolean;
+      },
+      sortingFn: (rowA, rowB, id) => {
+        const statusA = rowA.getValue(id) as boolean;
+        const statusB = rowB.getValue(id) as boolean;
+        return statusA === statusB ? 0 : statusA ? -1 : 1;
+      },
     },
-    filterFn: (row, id, filterValue: string[]) => {
-      const isValid = row.getValue(id) as boolean;
-      const filterBoolean = filterValue[0] === 'true';
-      return isValid === filterBoolean;
-    },
-    sortingFn: (rowA, rowB, id) => {
-      const statusA = rowA.getValue(id) as boolean;
-      const statusB = rowB.getValue(id) as boolean;
-      return statusA === statusB ? 0 : statusA ? -1 : 1;
-    },
-  },
-  {
-    id: 'date',
-    accessorKey: 'date',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
-    cell: ({ row }) => {
-      const formattedDate = formatDateTime(row.getValue('date'));
-      const hasError = hasFieldError(row.original, 'date');
-      const errorMessages = getFieldErrorMessage(row.original, 'date');
+    {
+      id: 'account',
+      accessorKey: 'account',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+      cell: ({ row }) => {
+        const accountId = row.original.accountId as string;
+        const hasError = hasFieldError(row.original, 'accountId');
+        const errorMessages = getFieldErrorMessage(row.original, 'accountId');
+        const account = accounts.find((acc) => acc.id === accountId);
 
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <div className="flex flex-col">
-            <span className="text-xs">{formattedDate.date}</span>
-            <span className="text-xs text-muted-foreground">{formattedDate.time}</span>
-          </div>
-        </ErrorCell>
-      );
-    },
-  },
-  {
-    id: 'activityType',
-    accessorKey: 'activityType',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-    cell: ({ row }) => {
-      const type = row.getValue('activityType') as string;
-      const hasError = hasFieldError(row.original, 'activityType');
-      const errorMessages = getFieldErrorMessage(row.original, 'activityType');
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <Badge variant="outline">{type}</Badge>
-        </ErrorCell>
-      );
-    },
-    filterFn: (row, id, value: string) => {
-      return value.includes(row.getValue(id));
-    },
-  },
-  {
-    id: 'symbol',
-    accessorKey: 'symbol',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
-    cell: ({ row }) => {
-      const hasError = hasFieldError(row.original, 'symbol');
-      const errorMessages = getFieldErrorMessage(row.original, 'symbol');
-      const symbol = row.getValue('symbol') as String;
-
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          {symbol && symbol.length > 0 ? (
-            <Badge variant="secondary" className="min-w-[50px] rounded-sm text-xs font-medium">
-              {symbol}
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <Badge variant="outline" className="font-medium">
+              {account?.name || '-'}
             </Badge>
-          ) : (
-            '-'
-          )}
-        </ErrorCell>
-      );
+          </ErrorCell>
+        );
+      },
     },
-    sortingFn: (rowA, rowB, id) => {
-      const profileA = rowA.getValue(id) as string;
-      const profileB = rowB.getValue(id) as string;
-      return profileA.localeCompare(profileB);
+    {
+      id: 'date',
+      accessorKey: 'date',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+      cell: ({ row }) => {
+        const formattedDate = formatDateTime(row.getValue('date'));
+        const hasError = hasFieldError(row.original, 'date');
+        const errorMessages = getFieldErrorMessage(row.original, 'date');
+
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <div className="flex flex-col">
+              <span className="text-xs">{formattedDate.date}</span>
+              <span className="text-xs text-muted-foreground">{formattedDate.time}</span>
+            </div>
+          </ErrorCell>
+        );
+      },
     },
-    enableHiding: false,
-  },
-  {
-    id: 'quantity',
-    accessorKey: 'quantity',
-    enableHiding: false,
-    header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
-    ),
-    cell: ({ row }) => {
-      const activityType = row.getValue('activityType') as string;
-      const quantity = row.getValue('quantity') as number;
-      const hasError = hasFieldError(row.original, 'quantity');
-      const errorMessages = getFieldErrorMessage(row.original, 'quantity');
-
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <div className="text-right font-medium tabular-nums">
-            {activityType === 'SPLIT' ? '-' : safeDisplayNumber(quantity)}
-          </div>
-        </ErrorCell>
-      );
+    {
+      id: 'activityType',
+      accessorKey: 'activityType',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+      cell: ({ row }) => {
+        const type = row.getValue('activityType') as string;
+        const hasError = hasFieldError(row.original, 'activityType');
+        const errorMessages = getFieldErrorMessage(row.original, 'activityType');
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <Badge variant="outline">{type}</Badge>
+          </ErrorCell>
+        );
+      },
+      filterFn: (row, id, value: string) => {
+        return value.includes(row.getValue(id));
+      },
     },
-  },
-  {
-    id: 'unitPrice',
-    accessorKey: 'unitPrice',
-    enableHiding: false,
-    enableSorting: false,
-    header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Price" />
-    ),
-    cell: ({ row }) => {
-      const activityType = row.getValue('activityType') as string;
-      const unitPrice = row.getValue('unitPrice') as number;
-      const currency = (row.getValue('currency') as string) || 'USD';
-      const hasError = hasFieldError(row.original, 'unitPrice');
-      const errorMessages = getFieldErrorMessage(row.original, 'unitPrice');
+    {
+      id: 'symbol',
+      accessorKey: 'symbol',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
+      cell: ({ row }) => {
+        const hasError = hasFieldError(row.original, 'symbol');
+        const errorMessages = getFieldErrorMessage(row.original, 'symbol');
+        const symbol = row.getValue('symbol') as String;
 
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <div className="text-right font-medium tabular-nums">
-            {activityType === 'SPLIT'
-              ? (isNaN(unitPrice) ? '-' : unitPrice.toFixed(0)) + ' : 1'
-              : safeFormatAmount(unitPrice, currency)}
-          </div>
-        </ErrorCell>
-      );
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            {symbol && symbol.length > 0 ? (
+              <Badge variant="secondary" className="min-w-[50px] rounded-sm text-xs font-medium">
+                {symbol}
+              </Badge>
+            ) : (
+              '-'
+            )}
+          </ErrorCell>
+        );
+      },
+      sortingFn: (rowA, rowB, id) => {
+        const profileA = rowA.getValue(id) as string;
+        const profileB = rowB.getValue(id) as string;
+        return profileA.localeCompare(profileB);
+      },
+      enableHiding: false,
     },
-  },
-  {
-    id: 'amount',
-    accessorKey: 'amount',
-    header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
-    ),
-    cell: ({ row }) => {
-      const activityType = row.getValue('activityType') as string;
-      const amount = row.getValue('amount') as number;
-      const currency = (row.getValue('currency') as string) || 'USD';
+    {
+      id: 'quantity',
+      accessorKey: 'quantity',
+      enableHiding: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
+      ),
+      cell: ({ row }) => {
+        const activityType = row.getValue('activityType') as string;
+        const quantity = row.getValue('quantity') as number;
+        const hasError = hasFieldError(row.original, 'quantity');
+        const errorMessages = getFieldErrorMessage(row.original, 'quantity');
 
-      // Check if amount field has errors directly
-      const hasError = hasFieldError(row.original, 'amount');
-      const errorMessages = getFieldErrorMessage(row.original, 'amount');
-
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <div className="text-right font-medium tabular-nums">
-            {activityType === 'SPLIT'
-              ? '-'
-              : safeFormatAmount(amount, currency)}
-          </div>
-        </ErrorCell>
-      );
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <div className="text-right font-medium tabular-nums">
+              {activityType === 'SPLIT' ? '-' : safeDisplayNumber(quantity)}
+            </div>
+          </ErrorCell>
+        );
+      },
     },
-  },
-  {
-    id: 'fee',
-    accessorKey: 'fee',
-    enableHiding: false,
-    enableSorting: false,
-    header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
-    ),
-    cell: ({ row }) => {
-      const activityType = row.getValue('activityType') as string;
-      const fee = row.getValue('fee') as number;
-      const currency = (row.getValue('currency') as string) || 'USD';
-      const hasError = hasFieldError(row.original, 'fee');
-      const errorMessages = getFieldErrorMessage(row.original, 'fee');
+    {
+      id: 'unitPrice',
+      accessorKey: 'unitPrice',
+      enableHiding: false,
+      enableSorting: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader className="justify-end text-right" column={column} title="Price" />
+      ),
+      cell: ({ row }) => {
+        const activityType = row.getValue('activityType') as string;
+        const unitPrice = row.getValue('unitPrice') as number;
+        const currency = (row.getValue('currency') as string) || 'USD';
+        const hasError = hasFieldError(row.original, 'unitPrice');
+        const errorMessages = getFieldErrorMessage(row.original, 'unitPrice');
 
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <div className="text-right tabular-nums text-muted-foreground">
-            {activityType === 'SPLIT' ? '-' : safeFormatAmount(fee, currency)}
-          </div>
-        </ErrorCell>
-      );
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <div className="text-right font-medium tabular-nums">
+              {activityType === 'SPLIT'
+                ? (isNaN(unitPrice) ? '-' : unitPrice.toFixed(0)) + ' : 1'
+                : safeFormatAmount(unitPrice, currency)}
+            </div>
+          </ErrorCell>
+        );
+      },
     },
-  },
+    {
+      id: 'amount',
+      accessorKey: 'amount',
+      header: ({ column }) => (
+        <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
+      ),
+      cell: ({ row }) => {
+        const activityType = row.getValue('activityType') as string;
+        const amount = row.getValue('amount') as number;
+        const currency = (row.getValue('currency') as string) || 'USD';
 
-  {
-    id: 'currency',
-    accessorKey: 'currency',
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
-    cell: ({ row }) => {
-      const hasError = hasFieldError(row.original, 'currency');
-      const errorMessages = getFieldErrorMessage(row.original, 'currency');
-      const currency = (row.getValue('currency') as string) || '-';
+        // Check if amount field has errors directly
+        const hasError = hasFieldError(row.original, 'amount');
+        const errorMessages = getFieldErrorMessage(row.original, 'amount');
 
-      return (
-        <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-          <Badge variant="outline" className="font-medium">
-            {currency}
-          </Badge>
-        </ErrorCell>
-      );
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <div className="text-right font-medium tabular-nums">
+              {activityType === 'SPLIT'
+                ? '-'
+                : safeFormatAmount(amount, currency)}
+            </div>
+          </ErrorCell>
+        );
+      },
     },
-  },
-];
+    {
+      id: 'fee',
+      accessorKey: 'fee',
+      enableHiding: false,
+      enableSorting: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
+      ),
+      cell: ({ row }) => {
+        const activityType = row.getValue('activityType') as string;
+        const fee = row.getValue('fee') as number;
+        const currency = (row.getValue('currency') as string) || 'USD';
+        const hasError = hasFieldError(row.original, 'fee');
+        const errorMessages = getFieldErrorMessage(row.original, 'fee');
+
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <div className="text-right tabular-nums text-muted-foreground">
+              {activityType === 'SPLIT' ? '-' : safeFormatAmount(fee, currency)}
+            </div>
+          </ErrorCell>
+        );
+      },
+    },
+
+    {
+      id: 'currency',
+      accessorKey: 'currency',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+      cell: ({ row }) => {
+        const hasError = hasFieldError(row.original, 'currency');
+        const errorMessages = getFieldErrorMessage(row.original, 'currency');
+        const currency = (row.getValue('currency') as string) || '-';
+
+        return (
+          <ErrorCell hasError={hasError} errorMessages={errorMessages}>
+            <Badge variant="outline" className="font-medium">
+              {currency}
+            </Badge>
+          </ErrorCell>
+        );
+      },
+    },
+  ];
+}

@@ -8,13 +8,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, ImportRequiredField } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, ImportRequiredField, Account } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 import TickerSearchInput from '@/components/ticker-search';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
 import { SearchableSelect } from '@/components/searchable-select';
+import { AccountSelector } from '@/components/account-selector';
 
 const SKIP_FIELD_VALUE = '__skip__';
 
@@ -59,7 +60,10 @@ export function renderHeaderCell({
             {!isRequired && (
               <>
                 <SelectItem value={SKIP_FIELD_VALUE}>
-                  {field === ImportFormat.CURRENCY ? 'Account Currency' : 'Ignore'}
+                  {field === ImportFormat.CURRENCY ? 'Account Currency' : (
+                    field === ImportFormat.ACCOUNT ? 'Default Account' :'Ignore'
+                    ) 
+                    }
                 </SelectItem>
                 <SelectSeparator />
               </>
@@ -171,6 +175,68 @@ function ActivityTypeDisplayCell({
     </div>
   );
 }
+interface AccountIdDisplayCellProps {
+  csvAccountId: string;
+  mappedAccountId: string | undefined;
+  isInvalid: boolean,
+  handleAccountIdMapping: (csvAccountId: string, accountId: string) => void;
+}
+
+function AccountIdDisplayCell({
+  csvAccountId,
+  mappedAccountId,
+  isInvalid,
+  handleAccountIdMapping,
+}: AccountIdDisplayCellProps) {
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  if (!csvAccountId || csvAccountId.trim() === '') {
+    return null;
+  }
+
+  if (mappedAccountId) {
+    return (
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+        <span className="text-muted-foreground truncate max-w-[120px]" title={csvAccountId}>
+          {csvAccountId}
+        </span>
+        <Badge variant="secondary" className="transition-colors text-xs">
+          <Button
+            type="button"
+            variant="ghost"
+            className="py-0 p-0 h-auto text-xs"
+            onClick={() => handleAccountIdMapping(csvAccountId, '')}
+          >
+            {mappedAccountId}
+          </Button>
+        </Badge>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+      <span className={cn(
+            "truncate max-w-[120px]",
+            isInvalid ? "text-destructive" : "text-muted-foreground"
+          )}
+      title={csvAccountId}>
+        {csvAccountId}
+      </span>
+      <div className="w-full sm:w-auto sm:min-w-[180px]">
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={(account) => {
+            setSelectedAccount(account);
+            handleAccountIdMapping(csvAccountId, account.id);
+          }}
+          variant="dropdown"
+          buttonText="Select Account"
+        />
+      </div>
+    </div>
+  );
+}
 
 interface SymbolDisplayCellProps {
   csvSymbol: string;
@@ -242,18 +308,24 @@ export function renderCell({
   field,
   row,
   mapping,
+  accounts,
   getMappedValue,
   handleActivityTypeMapping,
   handleSymbolMapping,
+  handleAccountIdMapping,
   invalidSymbols,
+  invalidAccounts
 }: {
   field: ImportFormat;
   row: CsvRowData;
   mapping: ImportMappingData;
+  accounts: Account[];
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleAccountIdMapping?: (csvAccountId: string, accountId: string) => void;
   invalidSymbols: string[];
+  invalidAccounts: string[];
 }) {
   // Get the field's value from the row
   const value = getMappedValue(row, field);
@@ -289,6 +361,20 @@ export function renderCell({
         mappedSymbol={mappedSymbol}
         isInvalid={isInvalid}
         handleSymbolMapping={handleSymbolMapping}
+      />
+    );
+  }
+  
+  if (field === ImportFormat.ACCOUNT) {
+    const isInvalid = invalidAccounts.includes(value || '')
+    const mappedAccountId = mapping.accountMappings?.[value];
+    const account = accounts.find((acc) => acc.id === mappedAccountId);
+    return (
+      <AccountIdDisplayCell
+        csvAccountId={value}
+        mappedAccountId={account?.name}
+        isInvalid={isInvalid}
+        handleAccountIdMapping={handleAccountIdMapping!}
       />
     );
   }

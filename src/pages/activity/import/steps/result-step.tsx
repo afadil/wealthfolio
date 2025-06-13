@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ActivityImport } from '@/lib/types';
+import { Account, ActivityImport } from '@/lib/types';
 import { Icons } from '@/components/icons';
 import { ImportPreviewTable } from '../import-preview-table';
 import { ImportAlert } from '../components/import-alert';
@@ -10,11 +10,12 @@ import { motion } from 'framer-motion';
 
 interface ResultStepProps {
   activities: ActivityImport[];
+  accounts: Account[];
   onBack: () => void;
   onReset: () => void;
 }
 
-export const ResultStep = ({ activities, onBack, onReset }: ResultStepProps) => {
+export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStepProps) => {
   // Use navigate directly in the component
   const navigate = useNavigate();
 
@@ -144,7 +145,7 @@ export const ResultStep = ({ activities, onBack, onReset }: ResultStepProps) => 
           
           <Card>
             <CardContent className="pt-6">
-              <ImportPreviewTable activities={activities} />
+              <ImportPreviewTable activities={activities} accounts={accounts} />
             </CardContent>
           </Card>
         </div>

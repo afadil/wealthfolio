@@ -166,6 +166,12 @@ function transformRowToActivity(
     return typeof value === 'string' ? value.trim() : undefined;
   };
 
+  // Handle account ID mapping
+  const csvAccountId = getMappedValue(ImportFormat.ACCOUNT);
+  activity.accountId = csvAccountId && mapping.accountMappings?.[csvAccountId.trim()]
+    ? mapping.accountMappings[csvAccountId.trim()] // Use mapped account ID if available
+    : accountId; // Fall back to default account ID 
+
   // 1. Map Raw Values & Basic Parsing
   const rawDate = getMappedValue(ImportFormat.DATE);
   activity.date = rawDate ? tryParseDate(rawDate)?.toISOString() : undefined;
@@ -291,6 +297,7 @@ export function validateActivityImport(
 
         if (schemaValidation.success) {
           const activity = schemaValidation.data as ActivityImport;
+          activity.accountId = transformedActivity.accountId ?? accountId
           activity.isValid = true;
           allActivities.push(activity);
         } else {
