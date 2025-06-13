@@ -13,6 +13,7 @@ import {
   ImportMappingData,
   CsvRowData,
   ImportRequiredField,
+  Account,
 } from '@/lib/types';
 import { renderHeaderCell, renderCell } from './mapping-table-cells';
 import { cn } from '@/lib/utils';
@@ -23,11 +24,14 @@ interface MappingTableProps {
   mapping: ImportMappingData;
   headers: string[];
   data: CsvRowData[];
+  accounts: Account[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleAccountIdMapping: (csvAccountId: string, accountId: string) => void;
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   invalidSymbols: string[];
+  invalidAccounts: string[];
   className?: string;
 }
 
@@ -37,11 +41,14 @@ export function MappingTable({
   mapping,
   headers,
   data,
+  accounts,
   handleColumnMapping,
   handleActivityTypeMapping,
   handleSymbolMapping,
+  handleAccountIdMapping,
   getMappedValue,
   invalidSymbols,
+  invalidAccounts,
   className,
 }: MappingTableProps) {
   // Check if a field is mapped
@@ -111,10 +118,13 @@ export function MappingTable({
                             field,
                             row,
                             mapping,
+                            accounts,
                             getMappedValue,
                             handleActivityTypeMapping,
                             handleSymbolMapping,
+                            handleAccountIdMapping,
                             invalidSymbols,
+                            invalidAccounts
                           })}
                         </TableCell>
                       );
