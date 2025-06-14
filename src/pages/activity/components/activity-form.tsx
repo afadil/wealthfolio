@@ -25,6 +25,7 @@ import { IncomeForm } from './forms/income-form';
 import { OtherForm } from './forms/other-form';
 import { HoldingsForm } from './forms/holdings-form';
 import { newActivitySchema, type NewActivityFormValues } from './forms/schemas';
+import { calculateAccountsSimplePerformance } from '@/commands/portfolio';
 
 export interface AccountSelectOption {
   value: string;
@@ -119,21 +120,19 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
           // Handle UPDATE_BALANCE by converting it into DEPOSIT or WITHDRAWAL based on balance delta
           if (submitData.activityType === 'UPDATE_BALANCE') {
-            if (typeof account.balance === 'number') {
-              const newBalance = submitData.amount ?? 0;
-              const delta = newBalance - account.balance;
+            const latestAccount = (await calculateAccountsSimplePerformance([submitData.accountId]))[0];
+            const currentBalance =
+              typeof latestAccount?.totalValue === 'number' ? latestAccount.totalValue : 0;
 
-              // If no change, simply return (no activity created)
-              if (delta === 0) {
-                return;
-              }
+            const newBalance = submitData.amount ?? 0;
+            const delta = newBalance - currentBalance;
 
-              submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
-              submitData.amount = Math.abs(delta);
-            } else {
-              // If balance is undefined, fallback to deposit logic without conversion
-              submitData.activityType = 'DEPOSIT';
+            if (delta === 0) {
+              return;
             }
+
+            submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+            submitData.amount = delta;
           }
         }
       }
