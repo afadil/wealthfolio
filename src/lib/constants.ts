@@ -118,6 +118,7 @@ export const ActivityType = {
   FEE: 'FEE',
   TAX: 'TAX',
   SPLIT: 'SPLIT',
+  UPDATE_BALANCE: 'UPDATE_BALANCE',
 } as const;
 
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
@@ -138,6 +139,7 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.TRANSFER_OUT,
   ActivityType.TAX,
   ActivityType.FEE,
+  ActivityType.UPDATE_BALANCE,
 ] as const;
 
 export const INCOME_ACTIVITY_TYPES = [
@@ -160,6 +162,7 @@ export const activityTypeSchema = z.enum([
   ActivityType.FEE,
   ActivityType.TAX,
   ActivityType.SPLIT,
+  ActivityType.UPDATE_BALANCE,
 ]);
 
 export const ActivityTypeNames: Record<ActivityType, string> = {
@@ -176,4 +179,5 @@ export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.FEE]: 'Fee',
   [ActivityType.TAX]: 'Tax',
   [ActivityType.SPLIT]: 'Split',
+  [ActivityType.UPDATE_BALANCE]: 'Update Balance',
 }; 

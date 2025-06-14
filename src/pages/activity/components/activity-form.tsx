@@ -25,11 +25,13 @@ import { IncomeForm } from './forms/income-form';
 import { OtherForm } from './forms/other-form';
 import { HoldingsForm } from './forms/holdings-form';
 import { newActivitySchema, type NewActivityFormValues } from './forms/schemas';
+import { calculateAccountsSimplePerformance } from '@/commands/portfolio';
 
 export interface AccountSelectOption {
   value: string;
   label: string;
   currency: string;
+  balance?: number;
 }
 
 interface ActivityFormProps {
@@ -50,6 +52,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   TRANSFER_IN: 'cash',
   TRANSFER_OUT: 'cash',
   FEE: 'other',
+  UPDATE_BALANCE: 'cash',
   ADD_HOLDING: 'holdings',
   REMOVE_HOLDING: 'holdings',
 };
@@ -109,11 +112,28 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const { id, ...submitData } = submissionData;
 
       // For cash activities and fees, set assetId to $CASH-accountCurrency and currency
-      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(submitData.activityType)) {
+      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT', 'UPDATE_BALANCE'].includes(submitData.activityType)) {
         const account = accounts.find((a) => a.value === submitData.accountId);
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
           submitData.currency = submitData.currency || account.currency;
+
+          // Handle UPDATE_BALANCE by converting it into DEPOSIT or WITHDRAWAL based on balance delta
+          if (submitData.activityType === 'UPDATE_BALANCE') {
+            const latestAccount = (await calculateAccountsSimplePerformance([submitData.accountId]))[0];
+            const currentBalance =
+              typeof latestAccount?.totalValue === 'number' ? latestAccount.totalValue : 0;
+
+            const newBalance = submitData.amount ?? 0;
+            const delta = newBalance - currentBalance;
+
+            if (delta === 0) {
+              return;
+            }
+
+            submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+            submitData.amount = delta;
+          }
         }
       }
 

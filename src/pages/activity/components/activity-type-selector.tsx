@@ -40,20 +40,21 @@ export function ActivityTypeSelector({
                 columns === 2 && 'grid-cols-1 sm:grid-cols-2',
                 columns === 3 && 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
                 columns === 4 && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+                columns === 5 && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5',
               )}
             >
               {types.map((type) => {
                 const Icon = Icons[type.icon];
                 const InfoIcon = Icons['Info'];
                 return (
-                  <div key={type.value}>
+                  <div key={type.value} className="h-full">
                     <RadioGroupItem value={type.value} id={type.value} className="peer sr-only" />
                     <label
                       htmlFor={type.value}
                       className={cn(
                         'relative flex items-center gap-2 rounded-lg border p-3 text-sm transition-colors hover:bg-muted',
-                        layout === 'vertical' && 'flex-col items-center justify-center py-3',
-                        'min-h-[4rem] sm:min-h-[5rem]',
+                        layout === 'vertical' && 'flex-col items-center justify-center',
+                        'min-h-[5.5rem] max-h-[5.5rem] h-[5.5rem]',
                         'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5',
                         'cursor-pointer',
                         fieldState.error && 'border-destructive text-destructive',

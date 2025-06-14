@@ -59,6 +59,7 @@ export const cashActivitySchema = baseActivitySchema.extend({
     ActivityType.WITHDRAWAL,
     ActivityType.TRANSFER_IN,
     ActivityType.TRANSFER_OUT,
+    ActivityType.UPDATE_BALANCE,
   ]),
   assetId: z.string().optional(),
   amount: z.coerce
