@@ -30,6 +30,7 @@ export interface AccountSelectOption {
   value: string;
   label: string;
   currency: string;
+  balance?: number;
 }
 
 interface ActivityFormProps {
@@ -115,6 +116,25 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
           submitData.currency = submitData.currency || account.currency;
+
+          // Handle UPDATE_BALANCE by converting it into DEPOSIT or WITHDRAWAL based on balance delta
+          if (submitData.activityType === 'UPDATE_BALANCE') {
+            if (typeof account.balance === 'number') {
+              const newBalance = submitData.amount ?? 0;
+              const delta = newBalance - account.balance;
+
+              // If no change, simply return (no activity created)
+              if (delta === 0) {
+                return;
+              }
+
+              submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+              submitData.amount = Math.abs(delta);
+            } else {
+              // If balance is undefined, fallback to deposit logic without conversion
+              submitData.activityType = 'DEPOSIT';
+            }
+          }
         }
       }
 
