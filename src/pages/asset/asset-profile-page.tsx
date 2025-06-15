@@ -75,7 +75,6 @@ export const AssetProfilePage = () => {
 
   const { data: quoteHistory, isLoading: isQuotesLoading, isError: isQuotesError } = useQuoteHistory({
     symbol,
-    dataSource: formData.dataSource,
     enabled: !!symbol,
   });
 
