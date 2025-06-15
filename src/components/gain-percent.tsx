@@ -61,7 +61,7 @@ export function GainPercent({
       {animated ? (
         <>
           {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
-          <AnimatedNumber value={value} />
+          <AnimatedNumber value={value} /> %
         </>
       ) : (
         <>
