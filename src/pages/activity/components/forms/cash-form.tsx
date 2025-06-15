@@ -30,7 +30,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
       </div>
       <Card>
         <CardContent className="space-y-6 pt-2">
-          <ConfigurationCheckbox showCurrencyOption={true} shouldShowSymbolLookup={false} />
+          <ConfigurationCheckbox showCurrencyOption={true} shouldShowSymbolLookup={false} shouldShowUpdateBalance={true} />
 
           <div className="grid grid-cols-2 gap-4">
             <FormField

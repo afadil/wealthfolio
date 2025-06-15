@@ -94,6 +94,7 @@ const ActivityPage = () => {
               value: account.id,
               label: account.name,
               currency: account.currency,
+              balance: account.balance,
             })) || []
         }
         activity={selectedActivity}
