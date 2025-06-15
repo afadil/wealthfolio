@@ -40,6 +40,7 @@ diesel::table! {
         field_mappings -> Text,
         activity_mappings -> Text,
         symbol_mappings -> Text,
+        account_mappings -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
     }
