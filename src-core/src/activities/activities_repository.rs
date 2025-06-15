@@ -36,6 +36,15 @@ impl ActivityRepository {
 // Implement the trait for the repository
 #[async_trait]
 impl ActivityRepositoryTrait for ActivityRepository {
+    fn get_activity(&self, activity_id: &str) -> Result<Activity> {
+        let mut conn = get_connection(&self.pool)?;
+        let activity_db = activities::table
+            .find(activity_id)
+            .first::<ActivityDB>(&mut conn)
+            .map_err(|e| Error::from(ActivityError::NotFound(e.to_string())))?;
+        Ok(Activity::from(activity_db))
+    }
+
     fn get_trading_activities(&self) -> Result<Vec<Activity>> {
         let mut conn = get_connection(&self.pool)?;
 

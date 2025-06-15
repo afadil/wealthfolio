@@ -38,6 +38,10 @@ impl ActivityService {
 
 #[async_trait::async_trait]
 impl ActivityServiceTrait for ActivityService {
+    fn get_activity(&self, activity_id: &str) -> Result<Activity> {
+        self.activity_repository.get_activity(activity_id)
+    }
+
     /// Retrieves all activities
     fn get_activities(&self) -> Result<Vec<Activity>> {
         self.activity_repository.get_activities()
@@ -313,17 +317,8 @@ impl ActivityServiceTrait for ActivityService {
         &self,
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData> {
-        let now = Utc::now().naive_utc();
-        let new_mapping = ImportMapping {
-            account_id: mapping_data.account_id.clone(),
-            field_mappings: serde_json::to_string(&mapping_data.field_mappings)?,
-            activity_mappings: serde_json::to_string(&mapping_data.activity_mappings)?,
-            symbol_mappings: serde_json::to_string(&mapping_data.symbol_mappings)?,
-            created_at: now,
-            updated_at: now,
-        };
-
-        self.activity_repository.save_import_mapping(&new_mapping).await?;
+        let mapping = ImportMapping::from_mapping_data(&mapping_data)?;
+        self.activity_repository.save_import_mapping(&mapping).await?;
         Ok(mapping_data)
     }
 }
