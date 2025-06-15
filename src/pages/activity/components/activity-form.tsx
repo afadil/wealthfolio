@@ -16,7 +16,8 @@ import {
 import { Form } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { DataSource } from '@/lib/constants';
+import { DataSource, CASH_ACTIVITY_TYPES } from '@/lib/constants';
+import type { ActivityType } from '@/lib/constants';
 import type { ActivityDetails } from '@/lib/types';
 import { useActivityMutations } from '../hooks/use-activity-mutations';
 import { TradeForm } from './forms/trade-form';
@@ -52,7 +53,6 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   TRANSFER_IN: 'cash',
   TRANSFER_OUT: 'cash',
   FEE: 'other',
-  UPDATE_BALANCE: 'cash',
   ADD_HOLDING: 'holdings',
   REMOVE_HOLDING: 'holdings',
 };
@@ -106,21 +106,28 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
+  // Type guard to narrow the ActivityType to one of the predefined cash activity literals.
+  const isCashActivityType = (type: ActivityType): type is (typeof CASH_ACTIVITY_TYPES)[number] => {
+    return (CASH_ACTIVITY_TYPES as readonly ActivityType[]).includes(type);
+  };
+
   async function onSubmit(data: NewActivityFormValues) {
     try {
-      const { showCurrencySelect, ...submissionData } = { ...data, isDraft: false };
+      const { showCurrencySelect, updateBalance, ...submissionData } = { ...data, isDraft: false };
       const { id, ...submitData } = submissionData;
 
-      // For cash activities and fees, set assetId to $CASH-accountCurrency and currency
-      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT', 'UPDATE_BALANCE'].includes(submitData.activityType)) {
+      // For activities that affect cash balance, set assetId to $CASH-accountCurrency and ensure currency is set
+      if (isCashActivityType(submitData.activityType)) {
         const account = accounts.find((a) => a.value === submitData.accountId);
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
           submitData.currency = submitData.currency || account.currency;
 
           // Handle UPDATE_BALANCE by converting it into DEPOSIT or WITHDRAWAL based on balance delta
-          if (submitData.activityType === 'UPDATE_BALANCE') {
-            const latestAccount = (await calculateAccountsSimplePerformance([submitData.accountId]))[0];
+          if (updateBalance && 'amount' in submitData) {
+            const latestAccount = (
+              await calculateAccountsSimplePerformance([submitData.accountId])
+            )[0];
             const currentBalance =
               typeof latestAccount?.totalValue === 'number' ? latestAccount.totalValue : 0;
 
@@ -132,7 +139,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             }
 
             submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
-            submitData.amount = delta;
+            submitData.amount = Number(delta.toFixed(2));
           }
         }
       }
