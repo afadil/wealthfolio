@@ -15,8 +15,8 @@ import { useQuoteMutations } from './use-quote-mutations';
 import { Icons } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { getHolding } from '@/commands/portfolio';
-import { getQuoteHistory } from '@/commands/market-data';
 import { QueryKeys } from '@/lib/query-keys';
+import { useQuoteHistory } from '@/hooks/use-quote-history';
 import AssetDetailCard from './asset-detail-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import QuoteHistoryTable from './quote-history-table';
@@ -73,9 +73,9 @@ export const AssetProfilePage = () => {
     enabled: !!symbol,
   });
 
-  const { data: quoteHistory, isLoading: isQuotesLoading, isError: isQuotesError } = useQuery<Quote[], Error>({
-    queryKey: [QueryKeys.QUOTE_HISTORY, symbol],
-    queryFn: () => getQuoteHistory(symbol),
+  const { data: quoteHistory, isLoading: isQuotesLoading, isError: isQuotesError } = useQuoteHistory({
+    symbol,
+    dataSource: formData.dataSource,
     enabled: !!symbol,
   });
 

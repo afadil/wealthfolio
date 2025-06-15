@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -78,26 +78,26 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   }, [isAddingQuote]);
 
   // Define handlers before they are used in columns
-  const handleEdit = (quote: Quote) => {
+  const handleEdit = useCallback((quote: Quote) => {
     setEditingId(quote.id);
     setEditedValues(quote);
-  };
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (editingId && onSaveQuote && editedValues) {
       onSaveQuote({ ...editedValues } as Quote);
       setEditingId(null);
       setEditedValues({});
     }
-  };
+  }, [editingId, onSaveQuote, editedValues]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditingId(null);
     setEditedValues({});
-  };
+  }, []);
 
-  const handleInputChange = (field: keyof Quote, value: string | Date, isNew = false) => {
-    const setValue = field === 'timestamp' ? (value as Date).toISOString() : Number(value);
+  const handleInputChange = useCallback((field: keyof Quote, value: string | Date, isNew = false) => {
+    const setValue = field === 'timestamp' ? (value as Date).toISOString() : value;
 
     if (isNew) {
       setNewQuote((prev) => ({
@@ -110,21 +110,21 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         [field]: setValue,
       }));
     }
-  };
+  }, []);
 
-  const handleAddNew = () => {
+  const handleAddNew = useCallback(() => {
     if (onSaveQuote) {
       onSaveQuote({ ...newQuote } as Quote);
       setIsAddingQuote(false);
       setNewQuote(emptyQuote);
     }
-  };
+  }, [onSaveQuote, newQuote]);
 
-  const handleDelete = (quoteId: string) => {
+  const handleDelete = useCallback((quoteId: string) => {
     if (onDeleteQuote) {
       onDeleteQuote(quoteId);
     }
-  };
+  }, [onDeleteQuote]);
 
   // Define columns using ColumnHelper
   const columnHelper = createColumnHelper<Quote>();
@@ -133,6 +133,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     columnHelper.accessor('timestamp', {
       header: 'Date',
       cell: (info) => {
+        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
         const value = info.getValue();
         return editingId === info.row.original.id ? (
           <DatePickerInput
@@ -150,6 +151,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     columnHelper.accessor('open', {
       header: 'Open',
       cell: (info) => {
+        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
         const value = info.getValue();
         return editingId === info.row.original.id ? (
           <MoneyInput
@@ -165,11 +167,13 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     columnHelper.accessor('high', {
       header: 'High',
       cell: (info) => {
+        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
         const value = info.getValue();
         return editingId === info.row.original.id ? (
           <MoneyInput
             value={editedValues.high}
             onChange={(e) => handleInputChange('high', e.target.value)}
+            autoFocus={true}
           />
         ) : (
           formatAmount(value, info.row.original.currency, false)
@@ -180,6 +184,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     columnHelper.accessor('low', {
       header: 'Low',
       cell: (info) => {
+        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
         const value = info.getValue();
         return editingId === info.row.original.id ? (
           <MoneyInput
@@ -195,6 +200,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     columnHelper.accessor('close', {
       header: 'Close',
       cell: (info) => {
+        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
         const value = info.getValue();
         return editingId === info.row.original.id ? (
           <MoneyInput
@@ -210,6 +216,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     columnHelper.accessor('volume', {
       header: 'Volume',
       cell: (info) => {
+        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
         const value = info.getValue();
         return editingId === info.row.original.id ? (
           <MoneyInput
@@ -227,6 +234,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         id: 'actions',
         header: 'Actions',
         cell: (info) => {
+          const { editingId, handleEdit, handleSave, handleCancel, handleDelete } = info.table.options.meta as any;
           const quote = info.row.original;
           return editingId === quote.id ? (
             <div className="flex space-x-2">
@@ -292,13 +300,22 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         },
       }),
     ] : []),
-  ], [isManualDataSource, editingId, editedValues, handleEdit, handleSave, handleCancel, handleDelete, handleInputChange]);
+  ], [isManualDataSource]);
 
   const table = useReactTable({
     data,
     columns,
     state: {
       sorting,
+    },
+    meta: {
+      editingId,
+      editedValues,
+      handleInputChange,
+      handleEdit,
+      handleSave,
+      handleCancel,
+      handleDelete,
     },
     initialState: {
       pagination: {
