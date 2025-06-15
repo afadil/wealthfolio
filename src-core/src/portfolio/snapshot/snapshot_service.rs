@@ -861,7 +861,6 @@ impl SnapshotService {
             self.snapshot_repository
                 .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
                 .await?;
-            info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
             return Ok(0);
         }
 
