@@ -138,7 +138,12 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
               return;
             }
 
-            submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+            if (submitData.activityType === 'DEPOSIT' || submitData.activityType === 'WITHDRAWAL') {
+              submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+            } else if (submitData.activityType === 'TRANSFER_IN' || submitData.activityType === 'TRANSFER_OUT') {
+              submitData.activityType = delta > 0 ? 'TRANSFER_IN' : 'TRANSFER_OUT';
+            }
+
             submitData.amount = Number(delta.toFixed(2));
           }
         }
