@@ -159,7 +159,7 @@ const fillQuoteGaps = (quotes: Quote[]): Quote[] => {
       // Forward fill with last known values
       const filledQuote: Quote = {
         ...lastKnownQuote,
-        id: `${dateKey}_${lastKnownQuote.symbol}_FILLED`,
+        id: `${dateKey}_${lastKnownQuote.symbol}`,
         timestamp: day.toISOString(),
       };
       filledQuotes.push(filledQuote);
@@ -183,7 +183,7 @@ export const getQuoteHistory = async (symbol: string, dataSource?: DataSource): 
     
     // Apply gap filling for manual data sources
     if (dataSource === DataSource.MANUAL && quotes.length > 0) {
-      return fillQuoteGaps(quotes);
+      return quotes; //fillQuoteGaps(quotes);
     }
     
     return quotes;

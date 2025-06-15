@@ -99,8 +99,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     }
 
     async fn delete_quotes_for_symbols(&self, symbols_to_delete: &[String]) -> Result<()> {
-        let symbols_cloned = symbols_to_delete.to_vec();
-        let symbols_owned = symbols_cloned;
+        let symbols_owned = symbols_to_delete.to_vec();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
@@ -198,8 +197,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
                 SELECT \
                     q.*, \
                     ROW_NUMBER() OVER (PARTITION BY q.symbol ORDER BY q.timestamp DESC) as rn \
-                FROM quotes q \
-                WHERE q.symbol IN ({}) and q.id not like '%filled%' \
+                FROM quotes q  WHERE q.symbol IN ({}) \
             ) \
             SELECT * \
             FROM RankedQuotes \
