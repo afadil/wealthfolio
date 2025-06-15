@@ -86,13 +86,14 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     currency: activity?.currency || '',
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
     showCurrencySelect: false,
+    updateBalance: false,
   };
 
   const form = useForm<NewActivityFormValues>({
     resolver: zodResolver(newActivitySchema),
     defaultValues,
   });
-  
+
   // Reset form when dialog closes or activity changes
   useEffect(() => {
     if (!open) {
@@ -140,7 +141,10 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
             if (submitData.activityType === 'DEPOSIT' || submitData.activityType === 'WITHDRAWAL') {
               submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
-            } else if (submitData.activityType === 'TRANSFER_IN' || submitData.activityType === 'TRANSFER_OUT') {
+            } else if (
+              submitData.activityType === 'TRANSFER_IN' ||
+              submitData.activityType === 'TRANSFER_OUT'
+            ) {
               submitData.activityType = delta > 0 ? 'TRANSFER_IN' : 'TRANSFER_OUT';
             }
 

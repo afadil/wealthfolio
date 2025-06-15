@@ -8,6 +8,8 @@ export const baseActivitySchema = z.object({
   currency: z.string().optional(),
   comment: z.string().optional().nullable(),
   isDraft: z.boolean().optional().default(false),
+  showCurrencySelect: z.boolean().optional(),
+  updateBalance: z.boolean().optional(),
 });
 
 export const holdingsActivitySchema = baseActivitySchema.extend({
@@ -114,8 +116,6 @@ export const otherActivitySchema = baseActivitySchema.extend({
     .optional(),
 });
 
-
-
 export const newActivitySchema = z.discriminatedUnion('activityType', [
   tradeActivitySchema,
   cashActivitySchema,
@@ -127,5 +127,4 @@ export const newActivitySchema = z.discriminatedUnion('activityType', [
 export type NewActivityFormValues = z.infer<typeof newActivitySchema> & {
   showCurrencySelect?: boolean;
   updateBalance?: boolean;
-}; 
-
+};
