@@ -1,5 +1,4 @@
 import {
-  AssetData,
   QuoteSummary,
   Asset,
   Quote,
@@ -37,11 +36,11 @@ export const syncHistoryQuotes = async (): Promise<void> => {
   }
 };
 
-export const getAssetData = async (assetId: string): Promise<AssetData> => {
+export const getAssetProfile = async (assetId: string): Promise<Asset> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_asset_data', { assetId });
+        return invokeTauri('get_asset_profile', { assetId });
       default:
         throw new Error(`Unsupported`);
     }
