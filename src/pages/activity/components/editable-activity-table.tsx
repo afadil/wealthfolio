@@ -42,8 +42,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ActivityDetails, Account, ActivitySearchResponse, ActivityUpdate } from '@/lib/types';
-import { tradeActivitySchema, cashActivitySchema, baseActivitySchema } from './forms/schemas';
+import {
+  ActivityDetails,
+  Account,
+  ActivitySearchResponse,
+} from '@/lib/types';
+import {
+  tradeActivitySchema,
+  cashActivitySchema,
+  baseActivitySchema,
+  NewActivityFormValues,
+} from './forms/schemas';
 import { ZodType, ZodTypeDef } from 'zod';
 import { formatDateTime, formatAmount, cn } from '@/lib/utils';
 
@@ -69,12 +78,7 @@ type LocalActivityDetails = ActivityDetails & { isNew?: boolean };
 
 // Simple Skeleton component (can be replaced with shadcn/ui Skeleton if available)
 const Skeleton = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
-  return (
-    <div
-      className={cn('animate-pulse rounded-md bg-muted', className)}
-      {...props}
-    />
-  );
+  return <div className={cn('animate-pulse rounded-md bg-muted', className)} {...props} />;
 };
 
 interface ActivitySkeletonRowProps {
@@ -83,7 +87,11 @@ interface ActivitySkeletonRowProps {
   enableColumnSizing: boolean;
 }
 
-const ActivitySkeletonRow: React.FC<ActivitySkeletonRowProps> = ({ columns, columnSizing, enableColumnSizing }) => {
+const ActivitySkeletonRow: React.FC<ActivitySkeletonRowProps> = ({
+  columns,
+  columnSizing,
+  enableColumnSizing,
+}) => {
   return (
     <TableRow>
       {columns.map((colDef) => {
@@ -251,8 +259,7 @@ const isCellProgrammaticallyBlocked = (
       isIncomeActivity(activityType) ||
       isFeeActivity(activityType) ||
       isSplitActivity(activityType) ||
-      isCashTransfer(activityType, assetSymbol ?? '')
-    )
+      isCashTransfer(activityType, assetSymbol ?? ''))
   )
     return true;
   if (colKey === 'amount') {
@@ -278,8 +285,12 @@ const EditableActivityTable = ({
   isEditable,
   onToggleEditable,
 }: EditableActivityTableProps) => {
-  const { deleteActivityMutation, addActivityMutation, updateActivityMutation, duplicateActivityMutation } =
-    useActivityMutations();
+  const {
+    deleteActivityMutation,
+    addActivityMutation,
+    updateActivityMutation,
+    duplicateActivityMutation,
+  } = useActivityMutations();
 
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -336,19 +347,19 @@ const EditableActivityTable = ({
 
   useEffect(() => {
     const serverPageData = activitiesPage?.data || [];
-    setLocalActivities(prevLocalActivities => {
+    setLocalActivities((prevLocalActivities) => {
       const newPageActivities: LocalActivityDetails[] = [];
 
-      serverPageData.forEach(serverActivity => {
+      serverPageData.forEach((serverActivity) => {
         const dirtyVersion = prevLocalActivities.find(
           (pAct) => pAct.id === serverActivity.id && dirtyActivityIds.has(pAct.id),
         );
         newPageActivities.push(dirtyVersion || serverActivity);
       });
 
-      prevLocalActivities.forEach(localActivity => {
+      prevLocalActivities.forEach((localActivity) => {
         if (localActivity.isNew) {
-          if (!newPageActivities.some(npa => npa.id === localActivity.id)) {
+          if (!newPageActivities.some((npa) => npa.id === localActivity.id)) {
             newPageActivities.unshift(localActivity);
           }
         }
@@ -392,7 +403,11 @@ const EditableActivityTable = ({
     async (rowId: string) => {
       const activityToSave = localActivities.find((act) => act.id === rowId);
       if (!activityToSave) {
-        toast({ title: 'Error', description: 'Activity not found to save.', variant: 'destructive' });
+        toast({
+          title: 'Error',
+          description: 'Activity not found to save.',
+          variant: 'destructive',
+        });
         return;
       }
 
@@ -436,10 +451,15 @@ const EditableActivityTable = ({
 
         if (isNew) {
           // For new activities, payloadForBackend (which excludes client-id) is used directly.
-          mutationPromise = addActivityMutation.mutateAsync(payloadForBackend as Omit<ActivityUpdate, 'id'>);
+          mutationPromise = addActivityMutation.mutateAsync(
+            payloadForBackend as NewActivityFormValues,
+          );
         } else {
           // For existing activities, include the original 'id'.
-          mutationPromise = updateActivityMutation.mutateAsync({ ...payloadForBackend, id } as ActivityUpdate);
+          mutationPromise = updateActivityMutation.mutateAsync({
+            ...payloadForBackend,
+            id,
+          } as NewActivityFormValues & { id: string });
         }
 
         await mutationPromise;
@@ -458,7 +478,6 @@ const EditableActivityTable = ({
           }
           return newErrors;
         });
-
       } catch (error) {
         const action = isNew ? 'adding' : 'updating';
         toast({
@@ -469,12 +488,18 @@ const EditableActivityTable = ({
         console.error(`Error ${action} activity ${rowId}:`, error);
       }
     },
-    [localActivities, addActivityMutation, updateActivityMutation, setDirtyActivityIds, setCellErrors],
+    [
+      localActivities,
+      addActivityMutation,
+      updateActivityMutation,
+      setDirtyActivityIds,
+      setCellErrors,
+    ],
   );
 
   const handleCancelRowChanges = useCallback(
     (rowId: string) => {
-      const activityToCancel = localActivities.find(act => act.id === rowId);
+      const activityToCancel = localActivities.find((act) => act.id === rowId);
 
       if (activityToCancel?.isNew) {
         setLocalActivities((prev) => prev.filter((act) => act.id !== rowId));
@@ -485,7 +510,9 @@ const EditableActivityTable = ({
             prev.map((act) => (act.id === rowId ? originalActivityFromServer : act)),
           );
         } else {
-          console.warn(`Original server data for activity ${rowId} not found on current page. Only clearing dirty state.`);
+          console.warn(
+            `Original server data for activity ${rowId} not found on current page. Only clearing dirty state.`,
+          );
         }
       }
 
@@ -613,7 +640,9 @@ const EditableActivityTable = ({
           ) {
             return <div className="pr-4 text-right"></div>;
           }
-          return <div className="text-right">{formatAmount(unitPrice || 0, displayCurrency, false)}</div>;
+          return (
+            <div className="text-right">{formatAmount(unitPrice || 0, displayCurrency, false)}</div>
+          );
         },
         meta: { type: 'moneyInput' },
         validationSchema: tradeActivitySchema.shape.unitPrice,
@@ -636,7 +665,9 @@ const EditableActivityTable = ({
             isIncomeActivity(activityType) ||
             activityType === ActivityType.FEE
           ) {
-            return <div className="text-right">{formatAmount(amount || 0, displayCurrency, false)}</div>;
+            return (
+              <div className="text-right">{formatAmount(amount || 0, displayCurrency, false)}</div>
+            );
           }
           return <div className="pr-4 text-right"></div>;
         },
@@ -749,7 +780,9 @@ const EditableActivityTable = ({
     manualPagination: true,
     manualFiltering: true,
     manualSorting: true,
-    pageCount: activitiesPage ? Math.ceil(activitiesPage.meta.totalRowCount / pagination.pageSize) : -1,
+    pageCount: activitiesPage
+      ? Math.ceil(activitiesPage.meta.totalRowCount / pagination.pageSize)
+      : -1,
 
     ...(enableColumnSizing
       ? {
@@ -889,7 +922,11 @@ const EditableActivityTable = ({
             const activityType = rowData.activityType;
             const assetSymbol = rowData.assetSymbol; // Needed for isCashTransfer
 
-            let isProgrammaticallyBlockedFromEditing = isCellProgrammaticallyBlocked(colKey, activityType, assetSymbol);
+            let isProgrammaticallyBlockedFromEditing = isCellProgrammaticallyBlocked(
+              colKey,
+              activityType,
+              assetSymbol,
+            );
 
             const overallCellCannotBeEdited = isDisabled || isProgrammaticallyBlockedFromEditing;
             const cellCanBeInteractedWithForEditing = isEditable && !overallCellCannotBeEdited;
@@ -928,7 +965,8 @@ const EditableActivityTable = ({
                 if (currentValue) {
                   if (typeof currentValue === 'string') {
                     const parsedDate = new Date(currentValue);
-                    if (!isNaN(parsedDate.getTime())) { // Check if parsing was successful
+                    if (!isNaN(parsedDate.getTime())) {
+                      // Check if parsing was successful
                       initialDateForPicker = parsedDate;
                     }
                   } else if (currentValue instanceof Date) {
@@ -992,7 +1030,7 @@ const EditableActivityTable = ({
                       setEditingCell(null);
                     }}
                     placeholder="Search symbol..."
-                    className="w-full h-full p-0 border-transparent rounded-none bg-transparent hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-left justify-start"
+                    className="h-full w-full justify-start rounded-none border-transparent bg-transparent p-0 text-left hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
                 );
               } else if (colDef.meta?.type === 'quantityInput') {
@@ -1065,7 +1103,7 @@ const EditableActivityTable = ({
                       setEditingCell(null);
                     }}
                     variant="dropdown"
-                    className="w-full h-full p-0 border-transparent rounded-none bg-transparent hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-left justify-start"
+                    className="h-full w-full justify-start rounded-none border-transparent bg-transparent p-0 text-left hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
                 );
               } else if (colDef.meta?.type === 'currencySelect') {
@@ -1175,7 +1213,8 @@ const EditableActivityTable = ({
                   'relative py-2',
                   {
                     border: !isCurrentlyEditing,
-                    'ring-2 ring-ring ring-offset-2': isCurrentlyEditing && cellCanBeInteractedWithForEditing,
+                    'ring-2 ring-ring ring-offset-2':
+                      isCurrentlyEditing && cellCanBeInteractedWithForEditing,
                     'bg-muted': overallCellCannotBeEdited,
                     'bg-destructive/25': errorMsg,
                   },
@@ -1214,26 +1253,35 @@ const EditableActivityTable = ({
 
                     allRows.forEach((r) => {
                       const currentRowOriginalData = r.original;
-                      const currentRowDisabledByProp = isRowDisabled(disabledRows, 'ungrouped', r.index);
+                      const currentRowDisabledByProp = isRowDisabled(
+                        disabledRows,
+                        'ungrouped',
+                        r.index,
+                      );
 
                       r.getVisibleCells().forEach((c) => {
-                        const currentCellColDef = c.column.columnDef as ExtendedColumnDef<LocalActivityDetails>;
+                        const currentCellColDef = c.column
+                          .columnDef as ExtendedColumnDef<LocalActivityDetails>;
                         const currentCellColKey = getColumnKey(currentCellColDef);
-                        const currentCellDisabledByProp = disabledColumns.includes(currentCellColKey);
+                        const currentCellDisabledByProp =
+                          disabledColumns.includes(currentCellColKey);
                         const progBlocked = isCellProgrammaticallyBlocked(
                           currentCellColKey,
                           currentRowOriginalData.activityType,
                           currentRowOriginalData.assetSymbol,
                         );
 
-                        const overallCannotCurrentlyBeEdited = currentRowDisabledByProp || currentCellDisabledByProp || progBlocked;
+                        const overallCannotCurrentlyBeEdited =
+                          currentRowDisabledByProp || currentCellDisabledByProp || progBlocked;
                         const canCurrentlyInteract = isEditable && !overallCannotCurrentlyBeEdited;
 
                         if (canCurrentlyInteract) {
                           editableCellsFlat.push({
                             rowId: r.id,
                             columnId: currentCellColKey,
-                            isDirectEditType: directEditMetaTypes.includes(currentCellColDef.meta?.type),
+                            isDirectEditType: directEditMetaTypes.includes(
+                              currentCellColDef.meta?.type,
+                            ),
                           });
                         }
                       });
@@ -1245,10 +1293,12 @@ const EditableActivityTable = ({
 
                     if (currentEditingCellIndexInFlatList !== -1 && editableCellsFlat.length > 0) {
                       let nextFlatIndex: number;
-                      if (!e.shiftKey) { // Tab
+                      if (!e.shiftKey) {
+                        // Tab
                         nextFlatIndex = currentEditingCellIndexInFlatList + 1;
                         if (nextFlatIndex >= editableCellsFlat.length) nextFlatIndex = 0; // Wrap around
-                      } else { // Shift + Tab
+                      } else {
+                        // Shift + Tab
                         nextFlatIndex = currentEditingCellIndexInFlatList - 1;
                         if (nextFlatIndex < 0) nextFlatIndex = editableCellsFlat.length - 1; // Wrap around
                       }
@@ -1256,8 +1306,10 @@ const EditableActivityTable = ({
                       const nextCellToFocusData = editableCellsFlat[nextFlatIndex];
 
                       if (nextCellToFocusData) {
-                        
-                        setEditingCell({ rowId: nextCellToFocusData.rowId, columnId: nextCellToFocusData.columnId });
+                        setEditingCell({
+                          rowId: nextCellToFocusData.rowId,
+                          columnId: nextCellToFocusData.columnId,
+                        });
 
                         setTimeout(() => {
                           const targetElement = document.querySelector(
@@ -1267,7 +1319,9 @@ const EditableActivityTable = ({
                             if (nextCellToFocusData.isDirectEditType) {
                               targetElement.focus();
                             } else {
-                              const inputElement = targetElement.querySelector('input, select, textarea, button, [contenteditable="true"]');
+                              const inputElement = targetElement.querySelector(
+                                'input, select, textarea, button, [contenteditable="true"]',
+                              );
                               if (inputElement instanceof HTMLElement) {
                                 let isDisabled = false;
                                 if (
@@ -1311,7 +1365,8 @@ const EditableActivityTable = ({
                   if (cellIndex > 0 && currentCellIsContentEditable) handlePaste(e, colDef);
                 }}
                 onInput={(e) => {
-                  if (cellIndex > 0 && currentCellIsContentEditable) handleCellInput(e, rowData, colDef);
+                  if (cellIndex > 0 && currentCellIsContentEditable)
+                    handleCellInput(e, rowData, colDef);
                 }}
                 onBlur={(e) => {
                   // Check if the new focused element (e.relatedTarget) is outside the current cell.
@@ -1333,28 +1388,37 @@ const EditableActivityTable = ({
                     // A more robust check: if the relatedTarget is part of a popover associated with this cell
                     // This requires knowing how popovers are structured. For react-aria, popovers are usually direct children of body
                     // but are positioned relative to the trigger. We can check if the relatedTarget is inside ANY react-aria popover.
-                    const activePopover = document.querySelector('[data-radix-popper-content-wrapper], [data-react-aria-dialog]'); // Common popover selectors
+                    const activePopover = document.querySelector(
+                      '[data-radix-popper-content-wrapper], [data-react-aria-dialog]',
+                    ); // Common popover selectors
                     if (activePopover && activePopover.contains(e.relatedTarget)) {
-                        trulyBlurred = false; 
+                      trulyBlurred = false;
                     }
                   }
 
                   if (trulyBlurred) {
                     if (
                       cellIndex > 0 &&
-                      (!editingCell || editingCell.rowId !== rowId || editingCell.columnId !== colKey) &&
+                      (!editingCell ||
+                        editingCell.rowId !== rowId ||
+                        editingCell.columnId !== colKey) &&
                       !cellElement.contains(document.activeElement) // Double check activeElement as well
                     ) {
-                      const isDirectEditTypeForThisCellBlur = directEditMetaTypes.includes(colDef.meta?.type);
-                      const wasConfiguredForDirectEdit = cellCanBeInteractedWithForEditing && isDirectEditTypeForThisCellBlur;
+                      const isDirectEditTypeForThisCellBlur = directEditMetaTypes.includes(
+                        colDef.meta?.type,
+                      );
+                      const wasConfiguredForDirectEdit =
+                        cellCanBeInteractedWithForEditing && isDirectEditTypeForThisCellBlur;
                       if (wasConfiguredForDirectEdit) {
                         handleCellBlur(e, rowData, colDef);
-                      } else if (colDef.meta?.type === 'date' && cellCanBeInteractedWithForEditing) {
+                      } else if (
+                        colDef.meta?.type === 'date' &&
+                        cellCanBeInteractedWithForEditing
+                      ) {
                         // For date cells, we need to ensure onBlur also calls handleCellBlur
                         // as the DatePickerInput itself calls setEditingCell(null) on its own change/blur.
                         // However, the DatePickerInput's internal onChange already calls handleSheetCellEdit,
                         // and then setEditingCell(null). The blur on TableCell might be redundant or cause issues if not handled well.
-
                         // If the DatePicker has already setEditingCell(null), this condition might not even be met.
                         // The critical part is that DatePickerInput itself should manage ending the edit.
                         // The TableCell onBlur should only act if the focus truly leaves the cell for good for *direct edit types*.
@@ -1400,7 +1464,9 @@ const EditableActivityTable = ({
           showColumnToggle={false}
         />
         <div className="flex items-center space-x-2">
-          <span className="text-xs font-light text-muted-foreground">click on the cell to edit</span>
+          <span className="text-xs font-light text-muted-foreground">
+            click on the cell to edit
+          </span>
           <ToggleGroup
             type="single"
             size="sm"
@@ -1467,26 +1533,24 @@ const EditableActivityTable = ({
               ))}
             </TableHeader>
             <TableBody>
-              {isLoading && localActivities.length === 0 ? (
-                Array.from({ length: 10 }).map((_, index) => (
-                  <ActivitySkeletonRow
-                    key={`skeleton-${index}`}
-                    columns={columnsDefinition}
-                    columnSizing={columnSizing}
-                    enableColumnSizing={enableColumnSizing}
-                  />
-                ))
-              ) : (
-                table.getRowModel().flatRows.map((row) => {
-                  return renderRow(row);
-                })
-              )}
+              {isLoading && localActivities.length === 0
+                ? Array.from({ length: 10 }).map((_, index) => (
+                    <ActivitySkeletonRow
+                      key={`skeleton-${index}`}
+                      columns={columnsDefinition}
+                      columnSizing={columnSizing}
+                      enableColumnSizing={enableColumnSizing}
+                    />
+                  ))
+                : table.getRowModel().flatRows.map((row) => {
+                    return renderRow(row);
+                  })}
             </TableBody>
           </Table>
         )}
       </div>
       {localActivities.length > 0 && activitiesPage && activitiesPage.meta.totalRowCount > 0 && (
-         <DataTablePagination table={table} />
+        <DataTablePagination table={table} />
       )}
     </div>
   );

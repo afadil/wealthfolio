@@ -5,7 +5,7 @@ use crate::market_data::market_data_traits::MarketDataServiceTrait;
 
 use crate::errors::{Error, Result, DatabaseError};
 use diesel::result::Error as DieselError;
-use super::assets_model::{Asset, AssetData, NewAsset, UpdateAssetProfile};
+use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 
 
@@ -39,22 +39,6 @@ impl AssetServiceTrait for AssetService {
     /// Retrieves an asset by its ID
     fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset> {
         self.asset_repository.get_by_id(asset_id)
-    }
-
-    /// Retrieves an asset profile with quote history
-    async fn get_asset_data(&self, asset_id: &str) -> Result<AssetData> {
-        debug!("Fetching asset data for asset_id: {}", asset_id);
-
-        let asset = self.asset_repository.get_by_id(asset_id)?;
-        
-        let quote_history = self
-            .market_data_service
-            .get_historical_quotes_for_symbol(&asset.symbol)?;
-
-        Ok(AssetData {
-            asset,
-            quote_history,
-        })
     }
 
     /// Updates an asset profile

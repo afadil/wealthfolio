@@ -3,7 +3,6 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::market_data::market_data_model::DataSource;
-use crate::market_data::Quote;
 use crate::errors::Result;
 use crate::Error;
 use crate::errors::ValidationError;
@@ -282,14 +281,6 @@ impl From<NewAsset> for AssetDB {
     }
 }
 
-
-/// Domain model representing an asset profile with its quote history
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetData {
-    pub asset: Asset,
-    pub quote_history: Vec<Quote>,
-}
 
 /// Domain model representing a quote summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
