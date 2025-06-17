@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
+use log::debug;
 use std::sync::Arc;
 use async_trait::async_trait;
 
@@ -108,6 +109,7 @@ impl AssetRepositoryTrait for AssetRepository {
 
     /// Updates the data source of an asset
     async fn update_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
+        debug!("Updating data source for asset {} to {}", asset_id, data_source);
         let asset_id_owned = asset_id.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {

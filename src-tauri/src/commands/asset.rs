@@ -5,17 +5,16 @@ use crate::{
     events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload},
 };
 use tauri::{AppHandle, State};
-use wealthfolio_core::assets::{Asset, AssetData, UpdateAssetProfile};
+use wealthfolio_core::assets::{Asset, UpdateAssetProfile};
 
 #[tauri::command]
-pub async fn get_asset_data(
+pub async fn get_asset_profile(
     asset_id: String,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<AssetData, String> {
+) -> Result<Asset, String> {
     state
         .asset_service()
-        .get_asset_data(&asset_id)
-        .await
+        .get_asset_by_id(&asset_id)
         .map_err(|e| e.to_string())
 }
 

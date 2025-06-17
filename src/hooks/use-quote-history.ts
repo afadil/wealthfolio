@@ -10,10 +10,10 @@ interface UseQuoteHistoryOptions {
   enabled?: boolean;
 }
 
-export function useQuoteHistory({ symbol, dataSource, enabled = true }: UseQuoteHistoryOptions) {
+export function useQuoteHistory({ symbol, enabled = true }: UseQuoteHistoryOptions) {
   return useQuery<Quote[], Error>({
-    queryKey: [QueryKeys.QUOTE_HISTORY, symbol, dataSource],
-    queryFn: () => getQuoteHistory(symbol, dataSource),
+    queryKey: [QueryKeys.QUOTE_HISTORY, symbol],
+    queryFn: () => getQuoteHistory(symbol),
     enabled: !!symbol && enabled,
   });
 } 

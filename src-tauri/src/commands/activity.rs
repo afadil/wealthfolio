@@ -125,6 +125,12 @@ pub async fn update_activity(
     handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Updating activity...");
+
+    let original_activity = state
+        .activity_service()
+        .get_activity(&activity.id)
+        .map_err(|e| e.to_string())?;
+
     let result = state.activity_service().update_activity(activity).await?;
     let handle = handle.clone();
 
@@ -135,8 +141,13 @@ pub async fn update_activity(
         &result.asset_id,
     )?;
 
-    let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![result.account_id.clone()]))
+    let mut account_ids_for_payload = vec![result.account_id.clone()];
+    if original_activity.account_id != result.account_id {
+        account_ids_for_payload.push(original_activity.account_id);
+    }
+
+    let payload: PortfolioRequestPayload = PortfolioRequestPayload::builder()
+        .account_ids(Some(account_ids_for_payload))
         .refetch_all_market_data(true)
         .symbols(Some(symbols_for_payload))
         .build();

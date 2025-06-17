@@ -153,7 +153,6 @@ impl CurrencyConverter {
             if !self.sorted_dates.contains(&date) {
                 self.sorted_dates.push(date);
                 self.sorted_dates.sort();
-                log::debug!("Added rates for date {} to converter.", date);
             }
         }
         Ok(())

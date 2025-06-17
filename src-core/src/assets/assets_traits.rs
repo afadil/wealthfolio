@@ -1,4 +1,4 @@
-use super::assets_model::{Asset, AssetData, NewAsset, UpdateAssetProfile};
+use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
 use crate::errors::Result;
 
 /// Trait defining the contract for Asset service operations.
@@ -6,7 +6,6 @@ use crate::errors::Result;
 pub trait AssetServiceTrait: Send + Sync {
     fn get_assets(&self) -> Result<Vec<Asset>>;
     fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset>;
-    async fn get_asset_data(&self, asset_id: &str) -> Result<AssetData>;
     async fn update_asset_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset>;
     fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     async fn create_cash_asset(&self, currency: &str) -> Result<Asset>;

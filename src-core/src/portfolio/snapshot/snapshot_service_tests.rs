@@ -211,6 +211,9 @@ mod tests {
     }
     #[async_trait]
     impl ActivityRepositoryTrait for MockActivityRepository {
+        fn get_activity(&self, _activity_id: &str) -> AppResult<Activity> {
+            unimplemented!()
+        }
         fn get_activities(&self) -> AppResult<Vec<Activity>> {
             unimplemented!()
         }
@@ -297,6 +300,13 @@ mod tests {
     }
     #[async_trait]
     impl ActivityRepositoryTrait for MockActivityRepositoryWithData {
+        fn get_activity(&self, activity_id: &str) -> AppResult<Activity> {
+            self.activities
+                .iter()
+                .find(|a| a.id == activity_id)
+                .cloned()
+                .ok_or_else(|| Error::Repository(format!("Activity {} not found", activity_id)))
+        }
         fn get_activities(&self) -> AppResult<Vec<Activity>> {
             Ok(self.activities.clone())
         }

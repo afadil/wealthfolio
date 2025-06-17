@@ -3,10 +3,62 @@ import { toast } from '@/components/ui/use-toast';
 import { createActivity, updateActivity, deleteActivity } from '@/commands/activity';
 import { logger } from '@/adapters';
 import { NewActivityFormValues } from '../components/forms/schemas';
-import { ActivityDetails } from '@/lib/types';
+import { ActivityDetails, Quote, ActivityCreate, ActivityUpdate } from '@/lib/types';
+import { DataSource } from '@/lib/constants';
+import { updateQuote } from '@/commands/market-data';
+import { QueryKeys } from '@/lib/query-keys';
 
 export function useActivityMutations(onSuccess?: (activity: { accountId?: string | null }) => void) {
   const queryClient = useQueryClient();
+
+  const createQuoteFromActivity = async (data: ActivityCreate | ActivityUpdate) => {
+    if (
+      'assetDataSource' in data &&
+      data.assetDataSource === DataSource.MANUAL &&
+      data.assetId &&
+      'unitPrice' in data &&
+      data.unitPrice &&
+      'quantity' in data &&
+      data.quantity
+    ) {
+      const quote: Omit<Quote, 'id' | 'createdAt'> & { id?: string; createdAt?: string } = {
+        symbol: data.assetId,
+        timestamp: new Date(data.activityDate).toISOString(),
+        open: data.unitPrice,
+        high: data.unitPrice,
+        low: data.unitPrice,
+        close: data.unitPrice,
+        adjclose: data.unitPrice,
+        volume: data.quantity,
+        currency: data.currency || '',
+        dataSource: DataSource.MANUAL,
+      };
+
+      const datePart = new Date(quote.timestamp).toISOString().slice(0, 10).replace(/-/g, '');
+      const fullQuote: Quote = {
+        ...quote,
+        id: `${datePart}_${quote.symbol.toUpperCase()}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        await updateQuote(fullQuote.symbol, fullQuote);
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, fullQuote.symbol] });
+        toast({
+          title: 'Quote added successfully.',
+          variant: 'success',
+        });
+      } catch (error) {
+        logger.error(`Error saving quote from activity: ${error}`);
+        toast({
+          title: 'Uh oh! Something went wrong.',
+          description: `There was a problem saving the quote from the activity.`,
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
       queryClient.invalidateQueries();
@@ -23,12 +75,19 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
   });
 
   const addActivityMutation = useMutation({
-    mutationFn: createActivity,
+    mutationFn: async (data: NewActivityFormValues) => {
+      await createQuoteFromActivity(data);
+      const { ...rest } = data;
+      return createActivity(rest);
+    },
     ...createMutationOptions('adding'),
   });
 
   const updateActivityMutation = useMutation({
-    mutationFn: updateActivity,
+    mutationFn: async (data: NewActivityFormValues & { id: string }) => {
+      await createQuoteFromActivity(data);
+      return updateActivity(data);
+    },
     ...createMutationOptions('updating'),
   });
 
@@ -39,11 +98,11 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
 
   const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
     const { id, createdAt, updatedAt, date, comment, ...restOfActivityData } = activityToDuplicate;
-    
+
     const newActivityData: NewActivityFormValues = {
       ...restOfActivityData,
       activityDate: date,
-      comment: "Duplicate",
+      comment: 'Duplicated',
     } as NewActivityFormValues;
 
     return await createActivity(newActivityData);
@@ -54,19 +113,10 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
     ...createMutationOptions('duplicating'),
   });
 
-  const submitActivity = async (data: NewActivityFormValues) => {
-    const { id, ...rest } = data;
-    if (id) {
-      return await updateActivityMutation.mutateAsync({ id, ...rest });
-    }
-    return await addActivityMutation.mutateAsync(rest);
-  };
-
   return {
     addActivityMutation,
     updateActivityMutation,
     deleteActivityMutation,
     duplicateActivityMutation,
-    submitActivity,
   };
 }

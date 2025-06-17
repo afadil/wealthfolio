@@ -319,11 +319,6 @@ export interface QuoteUpdate {
   dataSource: string;
 }
 
-export interface AssetData {
-  asset: Asset;
-  quoteHistory: Quote[];
-}
-
 export interface Settings {
   theme: string;
   font: string;

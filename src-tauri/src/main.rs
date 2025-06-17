@@ -29,7 +29,11 @@ pub fn main() {
     let app = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
-                .level(log::LevelFilter::Info)
+                .level(if cfg!(debug_assertions) {
+                    log::LevelFilter::Debug
+                } else {
+                    log::LevelFilter::Info
+                })
                 .build(),
         )
         .plugin(tauri_plugin_shell::init())
@@ -125,7 +129,7 @@ pub fn main() {
             commands::limits::delete_contribution_limit,
             commands::limits::calculate_deposits_for_contribution_limit,
             commands::utilities::backup_database,
-            commands::asset::get_asset_data,
+            commands::asset::get_asset_profile,
             commands::asset::update_asset_profile,
             commands::asset::update_asset_data_source,
             commands::market_data::search_symbol,

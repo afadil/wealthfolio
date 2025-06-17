@@ -666,10 +666,7 @@ impl From<ActivityUpdate> for ActivityDB {
             updated_at: now.to_rfc3339(),
         }
     }
-}
-
-
-#[derive(Debug, Serialize, QueryableByName)]
+}#[derive(Debug, Serialize, QueryableByName)]
 #[serde(rename_all = "camelCase")]
 #[diesel(table_name = crate::schema::activities)]
 pub struct IncomeData {
@@ -686,3 +683,5 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub amount: Decimal,
 }
+
+

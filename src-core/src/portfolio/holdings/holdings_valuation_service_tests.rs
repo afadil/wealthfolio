@@ -284,7 +284,7 @@ mod tests {
         let expected_day_change_base = dec!(50.0);
         let expected_day_change_pct = dec!(0.0345); // 50 / 1450
 
-        assert_eq!(holding.as_of_date, Utc::now().date_naive());
+        assert_eq!(holding.as_of_date, NaiveDate::from_str("2024-01-10").unwrap());
         assert_decimal_approx(holding.price, expected_price, TOLERANCE, "Price");
         assert_decimal_approx(holding.fx_rate, dec!(1.0), TOLERANCE, "FX Rate");
         assert_monetary_value_approx(Some(&holding.market_value), expected_mv_local, expected_mv_base, TOLERANCE, "Market Value");
@@ -332,7 +332,7 @@ mod tests {
         let expected_day_change_pct = expected_day_change_base / expected_prev_value_base; // 130 / 2470 = 0.0526
 
         
-        assert_eq!(holding.as_of_date, Utc::now().date_naive());
+        assert_eq!(holding.as_of_date, NaiveDate::from_str("2024-01-10").unwrap());
         assert_decimal_approx(holding.price, expected_price, TOLERANCE, "Price");
         assert_decimal_approx(holding.fx_rate, usd_cad_rate, TOLERANCE, "FX Rate");
         assert_monetary_value_approx(Some(&holding.market_value), expected_mv_local, expected_mv_base, TOLERANCE, "Market Value");
@@ -385,7 +385,7 @@ mod tests {
         assert_eq!(holding.instrument.as_ref().unwrap().currency, "CAD"); // Instrument currency matches holding local
         assert_eq!(market_data_service.quotes.lock().unwrap().get("BNS").unwrap().latest.currency, "USD"); // Quote currency is USD
 
-        assert_eq!(holding.as_of_date, Utc::now().date_naive());
+        assert_eq!(holding.as_of_date, NaiveDate::from_str("2024-01-10").unwrap());
         assert_decimal_approx(holding.price, expected_price, TOLERANCE, "Price (Quote Currency)");
         assert_decimal_approx(holding.fx_rate, dec!(1.0), TOLERANCE, "FX Rate (Local to Base)"); // Holding is CAD, Base is CAD
         assert_monetary_value_approx(Some(&holding.market_value), expected_mv_local, expected_mv_base, TOLERANCE, "Market Value");

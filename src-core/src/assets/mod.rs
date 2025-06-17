@@ -7,7 +7,7 @@ pub(crate) mod assets_traits;
 
 // Re-export the public interface
 pub use assets_constants::*;
-pub use assets_model::{Asset, NewAsset, UpdateAssetProfile, AssetData};
+pub use assets_model::{Asset, NewAsset, UpdateAssetProfile};
 pub use assets_repository::AssetRepository;
 pub use assets_service::AssetService;
 pub use assets_traits::{AssetServiceTrait, AssetRepositoryTrait};

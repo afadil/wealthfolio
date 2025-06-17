@@ -9,6 +9,7 @@ use async_trait::async_trait;
 /// Trait defining the contract for Activity repository operations.
 #[async_trait]
 pub trait ActivityRepositoryTrait: Send + Sync {
+    fn get_activity(&self, activity_id: &str) -> Result<Activity>;
     fn get_activities(&self) -> Result<Vec<Activity>>;
     fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>>;
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
@@ -45,6 +46,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
 /// Trait defining the contract for Activity service operations.
 #[async_trait]
 pub trait ActivityServiceTrait: Send + Sync {
+    fn get_activity(&self, activity_id: &str) -> Result<Activity>;
     fn get_activities(&self) -> Result<Vec<Activity>>;
     fn get_activities_by_account_id(&self, account_id: &String) -> Result<Vec<Activity>>;
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
