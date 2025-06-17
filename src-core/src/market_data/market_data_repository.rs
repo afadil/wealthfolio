@@ -273,27 +273,66 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         if input_symbols.is_empty() {
             return Ok(Vec::new());
         }
+
         let mut conn = get_connection(&self.pool)?;
 
-        let symbols_vec: Vec<String> = input_symbols.iter().cloned().collect();
+        let start_datetime_utc: DateTime<Utc> =
+            Utc.from_utc_datetime(&start_date_naive.and_hms_opt(0, 0, 0).unwrap());
+        let end_datetime_utc: DateTime<Utc> =
+            Utc.from_utc_datetime(&end_date_naive.and_hms_opt(23, 59, 59).unwrap());
 
-        let start_datetime_naive = start_date_naive
-            .and_hms_opt(0, 0, 0)
-            .unwrap_or_else(|| NaiveDateTime::MIN);
-        let end_datetime_naive = end_date_naive
-            .and_hms_opt(23, 59, 59)
-            .unwrap_or_else(|| NaiveDateTime::MAX);
-
-        let start_datetime_utc: DateTime<Utc> = Utc.from_utc_datetime(&start_datetime_naive);
-        let end_datetime_utc: DateTime<Utc> = Utc.from_utc_datetime(&end_datetime_naive);
         let start_str = start_datetime_utc.to_rfc3339();
         let end_str = end_datetime_utc.to_rfc3339();
+
+        let symbols_vec: Vec<String> = input_symbols.iter().cloned().collect();
 
         Ok(quotes
             .filter(symbol.eq_any(symbols_vec))
             .filter(timestamp.ge(start_str))
             .filter(timestamp.le(end_str))
-            .order(timestamp.desc())
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_all_historical_quotes_for_symbols(
+        &self,
+        symbols: &HashSet<String>,
+    ) -> Result<Vec<Quote>> {
+        if symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut conn = get_connection(&self.pool)?;
+        let symbols_vec: Vec<String> = symbols.iter().cloned().collect();
+
+        Ok(quotes
+            .filter(symbol.eq_any(symbols_vec))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
+    }
+
+    fn get_all_historical_quotes_for_symbols_by_source(
+        &self,
+        symbols: &HashSet<String>,
+        source: &str,
+    ) -> Result<Vec<Quote>> {
+        if symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut conn = get_connection(&self.pool)?;
+        let symbols_vec: Vec<String> = symbols.iter().cloned().collect();
+
+        Ok(quotes
+            .filter(symbol.eq_any(symbols_vec))
+            .filter(crate::schema::quotes::dsl::data_source.eq(source))
+            .order(timestamp.asc())
             .load::<QuoteDb>(&mut conn)
             .map_err(MarketDataError::DatabaseError)?
             .into_iter()
@@ -323,76 +362,5 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         sync_dates_map.insert(DATA_SOURCE_MANUAL.to_string(), latest_sync_naive_datetime);
 
         Ok(sync_dates_map)
-    }
-
-    async fn upsert_manual_quotes_from_activities(&self, symbol_param: &str) -> Result<Vec<Quote>> {
-        use crate::activities::activities_constants::TRADING_ACTIVITY_TYPES;
-        use crate::activities::activities_model::ActivityDB;
-        use crate::market_data::market_data_model::{DataSource, Quote, QuoteDb};
-        use crate::schema::activities::dsl as activities_dsl;
-        use crate::schema::quotes::dsl;
-        use chrono::{TimeZone, Utc};
-        use rust_decimal::Decimal;
-        use std::str::FromStr;
-
-        let mut conn_read = get_connection(&self.pool)?;
-
-        let activity_rows = activities_dsl::activities
-            .filter(activities_dsl::asset_id.eq(symbol_param))
-            .filter(activities_dsl::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
-            .filter(activities_dsl::is_draft.eq(false))
-            .order(activities_dsl::activity_date.asc())
-            .load::<ActivityDB>(&mut conn_read)
-            .map_err(MarketDataError::DatabaseError)?;
-
-        let mut quotes_to_upsert = Vec::new();
-        for activity in activity_rows {
-            let price = Decimal::from_str(&activity.unit_price).unwrap_or(Decimal::ZERO);
-            if price > Decimal::ZERO {
-                let naive_date =
-                    chrono::NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d")
-                        .or_else(|_| {
-                            chrono::NaiveDateTime::parse_from_str(
-                                &activity.activity_date,
-                                "%Y-%m-%dT%H:%M:%S%.f%:z",
-                            )
-                            .map(|dt| dt.date())
-                        })
-                        .unwrap_or_else(|_| Utc::now().date_naive());
-                let quote_timestamp =
-                    Utc.from_utc_datetime(&naive_date.and_hms_opt(16, 0, 0).unwrap());
-                let now = Utc::now();
-                let quote = Quote {
-                    id: format!("{}_{}", naive_date.format("%Y%m%d"), symbol_param),
-                    symbol: symbol_param.to_string(),
-                    timestamp: quote_timestamp,
-                    open: price,
-                    high: price,
-                    low: price,
-                    close: price,
-                    adjclose: price,
-                    volume: Decimal::ZERO,
-                    data_source: DataSource::Manual,
-                    created_at: now,
-                    currency: activity.currency.clone(),
-                };
-                quotes_to_upsert.push(quote);
-            }
-        }
-
-        if !quotes_to_upsert.is_empty() {
-            let quote_dbs: Vec<QuoteDb> = quotes_to_upsert.iter().map(QuoteDb::from).collect();
-            let exec_result = self.writer
-                .exec(move |conn_write: &mut SqliteConnection| -> Result<()> {
-                    diesel::replace_into(dsl::quotes)
-                        .values(&quote_dbs)
-                        .execute(conn_write)?;
-                    Ok(())
-                })
-                .await;
-            exec_result?;
-        }
-
-        Ok(quotes_to_upsert)
     }
 }

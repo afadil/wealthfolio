@@ -1,6 +1,5 @@
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::fx_traits::FxServiceTrait;
-use crate::market_data::market_data_model::Quote;
 use crate::market_data::MarketDataServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
@@ -8,15 +7,13 @@ use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 use crate::utils::time_utils;
 use async_trait::async_trait;
-use chrono::{Duration, NaiveDate};
+use chrono::NaiveDate;
 use log::{debug, error, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use super::DailyFxRateMap;
-
-const LOOKBACK_LIMIT_DAYS: i64 = 7;
 
 #[async_trait]
 pub trait ValuationServiceTrait: Send + Sync {
@@ -138,65 +135,6 @@ impl ValuationService {
 
         Ok(fx_rates_by_date)
     }
-
-    fn preprocess_quotes(
-        &self,
-        quotes_vec: Vec<Quote>,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
-    ) -> HashMap<NaiveDate, HashMap<String, Quote>> {
-        let mut quotes_by_date: HashMap<NaiveDate, HashMap<String, Quote>> = HashMap::new();
-
-        for quote in quotes_vec {
-            let date_key = quote.timestamp.date_naive();
-            if date_key >= start_date && date_key <= end_date {
-                quotes_by_date
-                    .entry(date_key)
-                    .or_default()
-                    .insert(quote.symbol.clone(), quote);
-            }
-        }
-        quotes_by_date
-    }
-
-    /// Fills in missing quotes for the current date by using the last known quote for each symbol
-    fn fill_missing_quotes_with_last_known(
-        &self,
-        quotes_by_date: &HashMap<NaiveDate, HashMap<String, Quote>>,
-        current_date: NaiveDate,
-        required_symbols: &HashSet<String>,
-        start_date: NaiveDate,
-    ) -> HashMap<String, Quote> {
-        let mut quotes_for_current_date = quotes_by_date
-            .get(&current_date)
-            .cloned()
-            .unwrap_or_default();
-
-        // For each required symbol that's missing a quote on the current date,
-        // look backward to find the most recent quote
-        for symbol in required_symbols {
-            if !quotes_for_current_date.contains_key(symbol) {
-                // Look backward from current_date to start_date to find the last known quote
-                let mut search_date = current_date - Duration::days(1);
-                while search_date >= start_date {
-                    if let Some(daily_quotes) = quotes_by_date.get(&search_date) {
-                        if let Some(quote) = daily_quotes.get(symbol) {
-                            // Copy the quote for search_date into current_date
-                            debug!(
-                                "Using last known quote for symbol '{}' from date {} for  date {}",
-                                symbol, search_date, current_date
-                            );
-                            quotes_for_current_date.insert(symbol.clone(), quote.clone());
-                            break;
-                        }
-                    }
-                    search_date = search_date - Duration::days(1);
-                }
-            }
-        }
-
-        quotes_for_current_date
-    }
 }
 
 #[async_trait]
@@ -245,8 +183,6 @@ impl ValuationServiceTrait for ValuationService {
         let actual_calculation_start_date = snapshots_to_process.first().unwrap().snapshot_date;
         let calculation_end_date = snapshots_to_process.last().unwrap().snapshot_date;
 
-        let quote_fetch_start_date =
-            actual_calculation_start_date - Duration::days(LOOKBACK_LIMIT_DAYS);
         let mut required_asset_ids = HashSet::new();
         let mut required_fx_pairs = HashSet::new();
         let base_curr = self.base_currency.read().unwrap().clone();
@@ -273,7 +209,7 @@ impl ValuationServiceTrait for ValuationService {
             .market_data_service
             .get_historical_quotes_for_symbols_in_range(
                 &required_asset_ids,
-                quote_fetch_start_date,
+                actual_calculation_start_date,
                 calculation_end_date,
             )?;
 
@@ -285,11 +221,15 @@ impl ValuationServiceTrait for ValuationService {
             )
             .await?;
 
-        let quotes_by_date = self.preprocess_quotes(
-            quotes_vec,
-            quote_fetch_start_date,
-            calculation_end_date,
-        );
+        let quotes_by_date = {
+            let mut map = HashMap::new();
+            for quote in quotes_vec {
+                map.entry(quote.timestamp.date_naive())
+                    .or_insert_with(HashMap::new)
+                    .insert(quote.symbol.clone(), quote);
+            }
+            map
+        };
 
         let newly_calculated_valuations: Vec<DailyAccountValuation> = snapshots_to_process
             .into_iter()
@@ -298,20 +238,8 @@ impl ValuationServiceTrait for ValuationService {
                 let account_id_clone = account_id.to_string();
                 let base_curr_clone = self.base_currency.read().unwrap().clone();
 
-                // Get required symbols for this snapshot
-                let required_symbols: HashSet<String> = holdings_snapshot
-                    .positions
-                    .keys()
-                    .cloned()
-                    .collect();
-
-                // Use the new method to fill missing quotes with last known quotes
-                let quotes_for_current_date = self.fill_missing_quotes_with_last_known(
-                    &quotes_by_date,
-                    current_date,
-                    &required_symbols,
-                    quote_fetch_start_date,
-                );
+                let quotes_for_current_date =
+                    quotes_by_date.get(&current_date).cloned().unwrap_or_default();
 
                 let fx_for_current_date = fx_rates_by_date
                     .get(&current_date)
@@ -336,12 +264,21 @@ impl ValuationServiceTrait for ValuationService {
                 }
 
                 if quotes_for_current_date.is_empty() && !holdings_snapshot.positions.is_empty() {
-                    debug!("No quotes for date {} (account '{}'). Skipping day.", current_date, account_id_clone);
+                    debug!(
+                        "No quotes for date {} (account '{}'). Skipping day.",
+                        current_date, account_id_clone
+                    );
                     return None;
                 }
                 let account_curr = &holdings_snapshot.currency;
-                if account_curr != &base_curr_clone && !fx_for_current_date.contains_key(&(account_curr.clone(), base_curr_clone.clone())) {
-                    warn!("Base currency FX rate ({}->{}) missing for {} (account '{}'). Skipping day.", account_curr, base_curr_clone, current_date, account_id_clone);
+                if account_curr != &base_curr_clone
+                    && !fx_for_current_date
+                        .contains_key(&(account_curr.clone(), base_curr_clone.clone()))
+                {
+                    warn!(
+                        "Base currency FX rate ({}->{}) missing for {} (account '{}'). Skipping day.",
+                        account_curr, base_curr_clone, current_date, account_id_clone
+                    );
                     return None;
                 }
 

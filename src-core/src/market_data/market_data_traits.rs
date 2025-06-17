@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
@@ -48,8 +48,8 @@ pub trait MarketDataServiceTrait: Send + Sync {
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>>;
 }
 
-#[async_trait::async_trait]
-pub trait MarketDataRepositoryTrait: Send + Sync {
+#[async_trait]
+pub trait MarketDataRepositoryTrait {
     fn get_all_historical_quotes(&self) -> Result<Vec<Quote>>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
     async fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;
@@ -57,7 +57,6 @@ pub trait MarketDataRepositoryTrait: Send + Sync {
     async fn delete_quote(&self, quote_id: &str) -> Result<()>;
     async fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()>;
     fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>>;
-    async fn upsert_manual_quotes_from_activities(&self, symbol: &str) -> Result<Vec<Quote>>;
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
     fn get_latest_quotes_for_symbols(
         &self,
@@ -73,5 +72,14 @@ pub trait MarketDataRepositoryTrait: Send + Sync {
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Vec<Quote>>;
-    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<chrono::NaiveDateTime>>>;
-} 
+    fn get_all_historical_quotes_for_symbols(
+        &self,
+        symbols: &HashSet<String>,
+    ) -> Result<Vec<Quote>>;
+    fn get_all_historical_quotes_for_symbols_by_source(
+        &self,
+        symbols: &HashSet<String>,
+        source: &str,
+    ) -> Result<Vec<Quote>>;
+    fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>>;
+}

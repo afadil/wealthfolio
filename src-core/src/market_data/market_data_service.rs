@@ -14,6 +14,9 @@ use crate::assets::assets_traits::AssetRepositoryTrait;
 use crate::errors::Result;
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::ProviderRegistry;
+use crate::utils::time_utils;
+
+const QUOTE_LOOKBACK_DAYS: i64 = 7;
 
 pub struct MarketDataService {
     provider_registry: Arc<ProviderRegistry>,
@@ -145,10 +148,13 @@ impl MarketDataServiceTrait for MarketDataService {
         // Fetch assets based on input symbols
         let assets = self.asset_repository.list()?;
 
-        // Filter out cash assets and create QuoteRequest objects
+        // Filter out cash and manual assets, then create QuoteRequest objects
         let quote_requests: Vec<_> = assets
             .iter()
-            .filter(|asset| asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE))
+            .filter(|asset| {
+                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
+                    && asset.data_source != DATA_SOURCE_MANUAL
+            })
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
                 data_source: DataSource::from(asset.data_source.as_str()),
@@ -173,10 +179,13 @@ impl MarketDataServiceTrait for MarketDataService {
             }
         };
 
-        // Filter out cash assets and create QuoteRequest objects
+        // Filter out cash and manual assets, then create QuoteRequest objects
         let quote_requests: Vec<_> = assets
             .iter()
-            .filter(|asset| asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE))
+            .filter(|asset| {
+                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
+                    && asset.data_source != DATA_SOURCE_MANUAL
+            })
             .map(|asset| QuoteRequest {
                 symbol: asset.symbol.clone(),
                 data_source: DataSource::from(asset.data_source.as_str()),
@@ -199,12 +208,40 @@ impl MarketDataServiceTrait for MarketDataService {
             start_date,
             end_date
         );
-        let quotes = self
-            .repository
-            .get_historical_quotes_for_symbols_in_range(symbols, start_date, end_date)?;
 
-        // The repository provides the quotes; no further processing needed here.
-        Ok(quotes)
+        if symbols.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 1. Fetch all historical quotes for any of the symbols that are marked as MANUAL.
+        // We get the full history to ensure we can fill forward from the last known price.
+        let manual_quotes = self
+            .repository
+            .get_all_historical_quotes_for_symbols_by_source(symbols, DATA_SOURCE_MANUAL)?;
+
+        // Identify which symbols were manual so we can exclude them from the next query.
+        let manual_symbols: HashSet<String> = manual_quotes.iter().map(|q| q.symbol.clone()).collect();
+
+        let mut all_fetched_quotes = manual_quotes;
+
+        // 2. Fetch quotes for the remaining (non-manual) symbols with a limited lookback.
+        let other_symbols: HashSet<String> = symbols.difference(&manual_symbols).cloned().collect();
+
+        if !other_symbols.is_empty() {
+            let lookback_start_date = start_date - Duration::days(QUOTE_LOOKBACK_DAYS);
+            let quotes = self.repository.get_historical_quotes_for_symbols_in_range(
+                &other_symbols,
+                lookback_start_date,
+                end_date,
+            )?;
+            all_fetched_quotes.extend(quotes);
+        }
+
+        // 3. Fill missing quotes for the required date range and return the complete set.
+        let filled_quotes =
+            self.fill_missing_quotes(&all_fetched_quotes, symbols, start_date, end_date);
+
+        Ok(filled_quotes)
     }
 
     // --- Fetches historical quotes for the needed symbols and date range, grouped by date ---
@@ -283,13 +320,82 @@ impl MarketDataService {
         })
     }
 
+    /// Fills missing quotes for a given date range using last known values.
+    fn fill_missing_quotes(
+        &self,
+        quotes: &[Quote],
+        required_symbols: &HashSet<String>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Vec<Quote> {
+        if required_symbols.is_empty() {
+            return Vec::new();
+        }
+
+        // Pre-process quotes into a map for efficient lookups
+        let mut quotes_by_date: HashMap<NaiveDate, HashMap<String, Quote>> = HashMap::new();
+        for quote in quotes {
+            quotes_by_date
+                .entry(quote.timestamp.date_naive())
+                .or_default()
+                .insert(quote.symbol.clone(), quote.clone());
+        }
+
+        let mut all_filled_quotes = Vec::new();
+        let mut last_known_quotes: HashMap<String, Quote> = HashMap::new();
+
+        // Initialize last known quotes before the start date
+        let mut current_date = start_date.pred_opt().unwrap_or(start_date);
+        let mut initial_lookback = 0;
+        while initial_lookback < 365 * 10 { // Look back up to 10 years for initial seed
+            if let Some(daily_quotes) = quotes_by_date.get(&current_date) {
+                for (symbol, quote) in daily_quotes {
+                    if required_symbols.contains(symbol) && !last_known_quotes.contains_key(symbol) {
+                        last_known_quotes.insert(symbol.clone(), quote.clone());
+                    }
+                }
+            }
+            if last_known_quotes.len() == required_symbols.len() {
+                break;
+            }
+            current_date = current_date.pred_opt().unwrap_or(current_date);
+            if current_date == start_date.pred_opt().unwrap_or(start_date) { break; }
+            initial_lookback += 1;
+        }
+
+
+        for current_date in time_utils::get_days_between(start_date, end_date) {
+            // Update last known quotes with any quotes from the current day
+            if let Some(daily_quotes) = quotes_by_date.get(&current_date) {
+                for (symbol, quote) in daily_quotes {
+                    if required_symbols.contains(symbol) {
+                        last_known_quotes.insert(symbol.clone(), quote.clone());
+                    }
+                }
+            }
+
+            // For each required symbol, use the last known quote if available
+            for symbol in required_symbols {
+                if let Some(last_quote) = last_known_quotes.get(symbol) {
+                    let mut quote_for_today = last_quote.clone();
+                    quote_for_today.timestamp = Utc.from_utc_datetime(&current_date.and_hms_opt(12, 0, 0).unwrap());
+                    all_filled_quotes.push(quote_for_today);
+                } else {
+                    debug!("No quote available for symbol '{}' on or before date {}", symbol, current_date);
+                }
+            }
+        }
+
+        all_filled_quotes
+    }
+
     async fn process_market_data_sync(
         &self,
         quote_requests: Vec<QuoteRequest>,
         refetch_all: bool,
     ) -> Result<((), Vec<(String, String)>)> {
         if quote_requests.is_empty() {
-            debug!("No non-cash assets found matching the criteria. Skipping sync.");
+            debug!("No syncable assets found matching the criteria. Skipping sync.");
             return Ok(((), Vec::new()));
         }
 
@@ -305,30 +411,12 @@ impl MarketDataService {
                     .naive_utc(),
             )
             .into();
-        let initial_request_count = quote_requests.len(); // Store length before moving
 
-        // Group requests by data source
-        let (manual_requests, public_requests): (Vec<_>, Vec<_>) = quote_requests
-            .into_iter() // Use into_iter to consume quote_requests
-            .partition(|req| req.data_source == DataSource::Manual);
+        // The quote_requests are already filtered for syncable sources (non-manual).
+        let public_requests = quote_requests;
 
-        let mut all_quotes = Vec::with_capacity(initial_request_count * 100); // Use stored length
+        let mut all_quotes = Vec::new();
         let mut failed_syncs = Vec::new();
-
-        // Process manual quotes sequentially
-        for request in manual_requests {
-            debug!("Processing manual quote request for: {}", request.symbol);
-            match self.sync_manual_quotes(&request).await {
-                Ok(quotes) => all_quotes.extend(quotes),
-                Err(e) => {
-                    error!(
-                        "Failed to sync manual quotes for symbol {}: {}",
-                        request.symbol, e
-                    );
-                    failed_syncs.push((request.symbol.clone(), e.to_string()));
-                }
-            }
-        }
 
         // Extract symbols for public requests
         let symbols_with_currencies: Vec<(String, String)> = public_requests
@@ -398,11 +486,6 @@ impl MarketDataService {
 
         // Always return Ok with the failed_syncs collected
         Ok(((), failed_syncs))
-    }
-
-    async fn sync_manual_quotes(&self, request: &QuoteRequest) -> Result<Vec<Quote>> {
-        // All DB logic is now in the repository
-        self.repository.upsert_manual_quotes_from_activities(&request.symbol).await
     }
 
     // --- Helper function to calculate the sync start date ---
