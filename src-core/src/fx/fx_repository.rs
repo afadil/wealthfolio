@@ -88,14 +88,17 @@ impl FxRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let latest_quotes = sql_query(
-            "SELECT q.* FROM quotes q
+            r#"SELECT
+                q.id, q.symbol, q.timestamp, q.open, q.high, q.low, q.close, q.adjclose, q.volume,
+                a.currency, a.data_source, q.created_at
+             FROM quotes q
              INNER JOIN assets a ON q.symbol = a.id AND a.asset_type = 'FOREX'
              INNER JOIN (
                  SELECT symbol, MAX(timestamp) as max_timestamp
                  FROM quotes
                  GROUP BY symbol
              ) latest ON q.symbol = latest.symbol AND q.timestamp = latest.max_timestamp
-             ORDER BY q.symbol",
+             ORDER BY q.symbol"#,
         )
         .load::<QuoteDb>(&mut conn)?;
 
