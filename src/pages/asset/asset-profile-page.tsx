@@ -235,7 +235,7 @@ export const AssetProfilePage = () => {
         <QuoteHistoryTable
           data={quoteHistory ?? []}
           // Default to non-manual source, disable changing it as there's no profile context
-          isManualDataSource={false}
+          isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
           onSaveQuote={(quote: Quote) => {
             let updatedQuote = { ...quote };
             // Generate id if missing
@@ -254,15 +254,14 @@ export const AssetProfilePage = () => {
           }}
           onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
           onChangeDataSource={(isManual) => {
-            console.log('onChangeDataSource', isManual, profile);
-              updateAssetDataSourceMutation.mutate({
-                symbol,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              });
-              setFormData((prev) => ({
-                ...prev,
-                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-              }));
+            updateAssetDataSourceMutation.mutate({
+              symbol,
+              dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+            });
+            setFormData((prev) => ({
+              ...prev,
+              dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+            }));
           }}
         />
       </ApplicationShell>

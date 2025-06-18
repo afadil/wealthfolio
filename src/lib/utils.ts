@@ -192,6 +192,24 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
   };
 };
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+  // Handle pence (GBp) specially
+  if (currency === 'GBp' || currency === 'GBX') {
+    if (!displayCurrency) {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    }
+    
+    // For pence, format as "123.45p" or "1,234.56p"
+    const formattedNumber = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    
+    return `${formattedNumber}p`;
+  }
+  
   return new Intl.NumberFormat('en-US', {
     style: displayCurrency ? 'currency' : undefined,
     currency: currency,
@@ -263,8 +281,9 @@ export function calculatePerformanceMetrics(
   history: AccountValuation[] | null | undefined,
   isAllTime = false,
 ): { gainLossAmount: number; simpleReturn: number } {
+  console.log('Calculating performance metrics', { historyLength: history?.length, isAllTime });
+  
   if (!history?.length) return { gainLossAmount: 0, simpleReturn: 0 };
-
 
   const first = history[0];
   const last = history[history.length - 1];
@@ -273,10 +292,24 @@ export function calculatePerformanceMetrics(
   const mvGain = Number(last.totalValue) - Number(first.totalValue);
   const gain$ = mvGain - ncFlow; // profit / loss
 
+  console.log('Initial calculations', {
+    ncFlow,
+    mvGain,
+    gainDollars: gain$,
+    firstValuation: first,
+    lastValuation: last
+  });
+
   // ── all‑time ROI ────────────────────────────────────────────────
   if (isAllTime) {
     const totalNC = Number(last.netContribution);
     const gain = Number(last.totalValue) - totalNC;
+
+    console.log('All-time ROI calculation', {
+      totalNetContribution: totalNC,
+      gain,
+      simpleReturn: totalNC !== 0 ? gain / totalNC : 0
+    });
 
     return {
       gainLossAmount: gain,
@@ -292,13 +325,29 @@ export function calculatePerformanceMetrics(
 
     const cf = Number(curr.netContribution) - Number(prev.netContribution); // deposit(+)/withdraw(-)
     const mv0 = Number(prev.totalValue);
-    if (mv0 === 0) continue; // skip day zero if portfolio just opened
+    if (mv0 === 0) {
+      console.log(`Skipping day ${i} due to zero portfolio value`, { prev, curr });
+      continue; // skip day zero if portfolio just opened
+    }
 
-    twr *= (Number(curr.totalValue) - cf) / mv0;
+    const dailyReturn = (Number(curr.totalValue) - cf) / mv0;
+    twr *= dailyReturn;
+
+    console.log(`Day ${i} TWR calculation`, {
+      cashFlow: cf,
+      previousValue: mv0,
+      currentValue: curr.totalValue,
+      dailyReturn,
+      cumulativeTWR: twr
+    });
   }
 
-  return {
+  const result = {
     gainLossAmount: gain$,
-    simpleReturn: twr - 1, // e.g. 0.034 -> 3.4 %
+    simpleReturn: twr - 1, // e.g. 0.034 -> 3.4 %
   };
+
+  console.log('Final performance metrics', result);
+
+  return result;
 }
