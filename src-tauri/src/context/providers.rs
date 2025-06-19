@@ -20,7 +20,7 @@ use wealthfolio_core::{
 };
 use tauri::{AppHandle, Runtime};
 use super::setup_providers_registry::build_provider_registry; // This is for AI ProviderRegistry
-use crate::context::StrongholdApiKeyResolver; // Added for MarketDataService
+use crate::context::KeyringApiKeyResolver; // Added for MarketDataService
 
 // --- Added for data seeding ---
 use wealthfolio_core::market_data::MarketDataProviderSetting;
@@ -88,7 +88,7 @@ pub async fn initialize_context<R: Runtime>(
     ).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
     // Create ApiKeyResolver for MarketDataService
-    let api_key_resolver = Arc::new(StrongholdApiKeyResolver::new(handle.clone(), "nous"));
+    let api_key_resolver = Arc::new(KeyringApiKeyResolver::new());
 
     let market_data_service: Arc<dyn MarketDataServiceTrait> =
         Arc::new(MarketDataService::new(api_key_resolver, market_data_repo.clone(), asset_repository.clone()).await?);

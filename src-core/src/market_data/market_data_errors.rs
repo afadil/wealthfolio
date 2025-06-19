@@ -40,6 +40,9 @@ pub enum MarketDataError {
 
     #[error("No data found")]
     NoData,
+
+    #[error("API key storage error: {0}")]
+    ApiKeyStorageError(String),
 }
 
 impl From<YahooError> for MarketDataError {

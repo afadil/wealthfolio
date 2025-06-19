@@ -281,7 +281,7 @@ impl MarketDataServiceTrait for MarketDataService {
                     if !old_vault_path.is_empty() {
                         debug!("API key for {} is empty, deleting old key from path: {}", provider_id, old_vault_path);
                         self.api_key_resolver.delete_api_key(old_vault_path).await.map_err(|e| 
-                            MarketDataError::StrongholdError(format!("Failed to delete API key from resolver: {}", e))
+                            MarketDataError::ApiKeyStorageError(format!("Failed to delete API key from resolver: {}", e))
                         )?;
                     }
                 }
@@ -291,7 +291,7 @@ impl MarketDataServiceTrait for MarketDataService {
                 let vault_path = format!("market_data_provider_api_key_{}", provider_id);
                 debug!("Setting API key for {} at path: {}", provider_id, vault_path);
                 self.api_key_resolver.set_api_key(&vault_path, &key_to_set).await.map_err(|e|
-                     MarketDataError::StrongholdError(format!("Failed to save API key via resolver: {}", e))
+                     MarketDataError::ApiKeyStorageError(format!("Failed to save API key via resolver: {}", e))
                 )?;
                 api_key_vault_path_to_store = Some(vault_path);
             }
