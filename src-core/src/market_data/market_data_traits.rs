@@ -65,6 +65,11 @@ pub trait MarketDataServiceTrait: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait MarketDataRepositoryTrait: Send + Sync {
+    // Methods for managing MarketDataProviderSetting
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>>;
+    fn get_provider_by_id(&self, provider_id: &str) -> Result<MarketDataProviderSetting>;
+    async fn update_provider_settings(&self, provider_id: String, changes: crate::market_data::market_data_model::UpdateMarketDataProviderSetting) -> Result<MarketDataProviderSetting>;
+
     fn get_all_historical_quotes(&self) -> Result<Vec<Quote>>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
     async fn save_quotes(&self, quotes: &[Quote]) -> Result<()>;

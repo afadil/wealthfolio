@@ -21,7 +21,11 @@ pub enum MarketDataError {
     ParsingError(String),
 
     #[error("Not found: {0}")]
-    NotFound(String),
+    NotFound(String), // Generic not found
+
+    // New variant: Specific not found for a symbol
+    #[error("No data found for symbol: {0}")]
+    NoDataFoundForSymbol(String),
 
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
@@ -29,8 +33,19 @@ pub enum MarketDataError {
     #[error("Rate limit exceeded")]
     RateLimitExceeded,
 
+    // New variant: No providers available
+    #[error("No providers available to fulfill the request.")]
+    NoProvidersAvailable,
+
+    // New variant: Operation not supported by provider/registry
+    #[error("Operation not supported: {0}")]
+    OperationNotSupported(String),
+
     #[error("Invalid data: {0}")]
     InvalidData(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String), // For issues like bad provider config
 
     #[error("Unknown error: {0}")]
     Unknown(String),
@@ -38,7 +53,7 @@ pub enum MarketDataError {
     #[error("Provider exhausted: {0}")]
     ProviderExhausted(String),
 
-    #[error("No data found")]
+    #[error("No data found")] // General no data, distinct from specific symbol not found
     NoData,
 
     #[error("API key storage error: {0}")]

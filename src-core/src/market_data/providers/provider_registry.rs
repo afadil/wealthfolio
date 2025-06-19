@@ -57,43 +57,39 @@ impl ProviderRegistry {
                 }
             };
 
-            let provider_id_str = setting.id.as_str();
-            let provider_arc: Option<Arc<dyn MarketDataProvider + Send + Sync>> = match provider_id_str {
-                "yahoo" => Some(Arc::new(YahooProvider::new())),
+            let maybe_providers: Option<(Arc<dyn MarketDataProvider + Send + Sync>, Option<Arc<dyn AssetProfiler + Send + Sync>>)> = match setting.id.as_str() {
+                "yahoo" => {
+                    match YahooProvider::new().await {
+                        Ok(p) => {
+                            let shared = Arc::new(p);
+                            Some((shared.clone(), Some(shared))) // Assuming YahooProvider is also AssetProfiler
+                        },
+                        Err(e) => { warn!("Failed to init YahooProvider: {}", e); None }
+                    }
+                },
                 "marketdata_app" => {
-                    if let Some(key) = api_key {
+                    if let Some(key) = api_key { // api_key is Option<String>
                         if !key.is_empty() {
-                            Some(Arc::new(MarketDataAppProvider::new(&key)))
+                            match MarketDataAppProvider::new(key).await { // key is String here
+                                Ok(p) => {
+                                    let shared = Arc::new(p);
+                                    Some((shared.clone(), Some(shared))) // Assuming MarketDataAppProvider is also AssetProfiler
+                                },
+                                Err(e) => { warn!("Failed to init MarketDataAppProvider for {}: {}", setting.id, e); None }
+                            }
                         } else {
-                            warn!("MarketData.app provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
-                            None
+                            warn!("API key for {} is empty. Skipping.", setting.id); None
                         }
                     } else {
-                        warn!("MarketData.app provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
-                        None
+                        warn!("API key for {} not resolved/provided. Skipping.", setting.id); None
                     }
-                }
-                _ => {
-                    warn!("Unknown market data provider ID: {}. Skipping.", setting.id);
-                    None
-                }
-            };
-            
-            // Handle AssetProfilers similarly - assuming profilers might be same objects or different
-            // For now, let's assume providers that are MarketDataProvider are also AssetProfiler if they implement it.
-            // ManualProvider is special as it's often just for profiling cash or manual assets.
-            let profiler_arc: Option<Arc<dyn AssetProfiler + Send + Sync>> = match provider_id_str {
-                "yahoo" => provider_arc.clone().map(|p| p as Arc<dyn AssetProfiler + Send + Sync>), // if YahooProvider impls AssetProfiler
-                "marketdata_app" => provider_arc.clone().map(|p| p as Arc<dyn AssetProfiler + Send + Sync>), // if MarketDataAppProvider impls AssetProfiler
-                // ManualProvider might always be available for profiling, regardless of settings table, or added here if listed.
-                // If ManualProvider is not in settings, it can be added separately or by default.
-                _ => None, 
+                },
+                _ => { warn!("Unknown provider ID: {}. Skipping.", setting.id); None }
             };
 
-
-            if let Some(p_arc) = provider_arc {
-                 active_providers_with_priority.push((setting.priority, setting.id.clone(), p_arc, profiler_arc));
-                 info!("Successfully configured and activated provider: {} (ID: {}) with priority {}", setting.name, setting.id, setting.priority);
+            if let Some((data_provider_arc, asset_profiler_arc_opt)) = maybe_providers {
+                active_providers_with_priority.push((setting.priority, setting.id.clone(), data_provider_arc, asset_profiler_arc_opt));
+                info!("Successfully configured and activated provider: {} (ID: {}) with priority {}", setting.name, setting.id, setting.priority);
             }
         }
 
@@ -121,14 +117,19 @@ impl ProviderRegistry {
         // Add ManualProvider for profiling by default if not already added
         // This ensures cash assets and manual assets can always be profiled.
         if !asset_profilers_map.contains_key("manual") {
-            let manual_profiler = Arc::new(ManualProvider::new()) as Arc<dyn AssetProfiler + Send + Sync>;
-            asset_profilers_map.insert("manual".to_string(), manual_profiler);
-            // Decide its order; perhaps always last or a fixed low priority for profiling.
-            // For simplicity, if it's just for get_profiler("manual"), order might not matter as much.
-            if !ordered_profiler_ids_vec.contains(&"manual".to_string()){
-                 ordered_profiler_ids_vec.push("manual".to_string()); // Add to ordered list if used in iteration
+            match ManualProvider::new() {
+                Ok(provider) => {
+                    let manual_profiler_arc: Arc<dyn AssetProfiler + Send + Sync> = Arc::new(provider);
+                    asset_profilers_map.insert("manual".to_string(), manual_profiler_arc);
+                    if !ordered_profiler_ids_vec.contains(&"manual".to_string()){
+                         ordered_profiler_ids_vec.push("manual".to_string());
+                    }
+                    info!("Ensured ManualProvider is available for asset profiling.");
+                }
+                Err(e) => {
+                    warn!("Failed to initialize ManualProvider: {}. Manual profiling for cash/manual assets might be affected.", e);
+                }
             }
-            info!("Ensured ManualProvider is available for asset profiling.");
         }
 
 
@@ -248,7 +249,7 @@ impl ProviderRegistry {
     }
     
     // Search ticker usually goes to a specific capable provider, often the default one.
-    pub async fn search_ticker(&self, query: &str) -> Result<Vec<super::models::QuoteSummary>, MarketDataError> {
+    pub async fn search_ticker(&self, query: &str) -> Result<Vec<crate::market_data::market_data_model::QuoteSummary>, MarketDataError> {
         if let Some(default_provider_id) = self.ordered_data_provider_ids.first() {
              if let Some(p) = self.data_providers.get(default_provider_id) {
                 if let Some(profiler) = self.asset_profilers.get(default_provider_id) { // Assuming provider that can search also profiles
