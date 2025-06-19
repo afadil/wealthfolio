@@ -57,7 +57,12 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
         }
         "toggle_fullscreen" => {
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_fullscreen(true);
+                if let Ok(is_fullscreen) = window.is_fullscreen() {
+                    let _ = window.set_fullscreen(!is_fullscreen);
+                } else {
+                    // if getting fullscreen state fails just try toggling
+                    let _ = window.set_fullscreen(false);
+                }
             }
         }
         "check_for_update" => {
