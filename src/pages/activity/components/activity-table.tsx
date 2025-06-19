@@ -133,11 +133,11 @@ export const ActivityTable = ({
 
           return (
             <div className="w-3/3 flex items-center">
-              {ogSymbol.startsWith('$CASH-') ? (
-                badge
-              ) : (
-                <Link to={`/holdings/${ogSymbol}`}>{badge}</Link>
-              )}
+                {ogSymbol.startsWith('$CASH-') ? (
+                  badge
+                ) : (
+                  <Link to={`/holdings/${encodeURIComponent(ogSymbol)}`}>{badge}</Link>
+                )}
               <span className="ml-2 text-xs">{row.getValue('assetName')}</span>
             </div>
           );

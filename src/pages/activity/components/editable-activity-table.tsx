@@ -590,7 +590,7 @@ const EditableActivityTable = ({
           if (symbol.startsWith('$CASH')) symbol = symbol.split('-')[0];
           return (
             <div className="flex min-w-[120px] items-center">
-              <Link to={`/holdings/${symbol}`}>
+              <Link to={`/holdings/${encodeURIComponent(symbol)}`}>
                 <Badge className="flex min-w-[60px] cursor-pointer items-center justify-center rounded-sm">
                   {symbol || '-'}
                 </Badge>

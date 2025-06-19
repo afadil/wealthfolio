@@ -72,7 +72,7 @@ export function ExchangeRatesSettings() {
       id: 'history',
       enableHiding: false,
       cell: ({ row }) => (
-        <Link to={`/holdings/${row.original.id}`} className="flex items-center justify-center">
+        <Link to={`/holdings/${encodeURIComponent(row.original.id)}`} className="flex items-center justify-center">
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Icons.Clock className="h-4 w-4" />
             <span className="sr-only">View history</span>

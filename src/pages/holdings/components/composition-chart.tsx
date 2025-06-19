@@ -98,7 +98,7 @@ const CustomizedContent = (props: any) => {
       />
       {depth === 1 ? (
         <>
-          <Link to={`/holdings/${symbol}`}>
+          <Link to={`/holdings/${encodeURIComponent(symbol)}`}>
             <text
               x={x + width / 2}
               y={y + height / 2}
