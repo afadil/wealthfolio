@@ -281,7 +281,6 @@ export function calculatePerformanceMetrics(
   history: AccountValuation[] | null | undefined,
   isAllTime = false,
 ): { gainLossAmount: number; simpleReturn: number } {
-  console.log('Calculating performance metrics', { historyLength: history?.length, isAllTime });
   
   if (!history?.length) return { gainLossAmount: 0, simpleReturn: 0 };
 
@@ -292,24 +291,10 @@ export function calculatePerformanceMetrics(
   const mvGain = Number(last.totalValue) - Number(first.totalValue);
   const gain$ = mvGain - ncFlow; // profit / loss
 
-  console.log('Initial calculations', {
-    ncFlow,
-    mvGain,
-    gainDollars: gain$,
-    firstValuation: first,
-    lastValuation: last
-  });
-
   // ── all‑time ROI ────────────────────────────────────────────────
   if (isAllTime) {
     const totalNC = Number(last.netContribution);
     const gain = Number(last.totalValue) - totalNC;
-
-    console.log('All-time ROI calculation', {
-      totalNetContribution: totalNC,
-      gain,
-      simpleReturn: totalNC !== 0 ? gain / totalNC : 0
-    });
 
     return {
       gainLossAmount: gain,
@@ -326,28 +311,18 @@ export function calculatePerformanceMetrics(
     const cf = Number(curr.netContribution) - Number(prev.netContribution); // deposit(+)/withdraw(-)
     const mv0 = Number(prev.totalValue);
     if (mv0 === 0) {
-      console.log(`Skipping day ${i} due to zero portfolio value`, { prev, curr });
       continue; // skip day zero if portfolio just opened
     }
 
     const dailyReturn = (Number(curr.totalValue) - cf) / mv0;
     twr *= dailyReturn;
 
-    console.log(`Day ${i} TWR calculation`, {
-      cashFlow: cf,
-      previousValue: mv0,
-      currentValue: curr.totalValue,
-      dailyReturn,
-      cumulativeTWR: twr
-    });
   }
 
   const result = {
     gainLossAmount: gain$,
     simpleReturn: twr - 1, // e.g. 0.034 -> 3.4 %
   };
-
-  console.log('Final performance metrics', result);
 
   return result;
 }

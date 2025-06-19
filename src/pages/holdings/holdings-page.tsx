@@ -19,11 +19,9 @@ import { ClassesChart } from './components/classes-chart';
 import { HoldingsTable } from './components/holdings-table';
 import { PortfolioComposition } from './components/composition-chart';
 import { SectorsChart } from './components/sectors-chart';
-import { getHoldings } from '@/commands/portfolio';
-import { useQuery } from '@tanstack/react-query';
+import { useHoldings } from '@/hooks/use-holdings';
 import { Account, Holding, HoldingType, Instrument } from '@/lib/types';
 import { useSettingsContext } from '@/lib/settings-provider';
-import { QueryKeys } from '@/lib/query-keys';
 import { useLocation } from 'react-router-dom';
 import { CountryChart } from './components/country-chart';
 import { CashHoldingsWidget } from './components/cash-holdings-widget';
@@ -55,10 +53,7 @@ export const HoldingsPage = () => {
 
   const { settings } = useSettingsContext();
 
-  const { data: holdings, isLoading } = useQuery<Holding[], Error>({
-    queryKey: [QueryKeys.HOLDINGS, selectedAccount?.id || PORTFOLIO_ACCOUNT_ID],
-    queryFn: () => getHoldings(selectedAccount?.id || PORTFOLIO_ACCOUNT_ID),
-  });
+  const { holdings, isLoading } = useHoldings(selectedAccount?.id || PORTFOLIO_ACCOUNT_ID);
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState('');
