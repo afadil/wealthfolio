@@ -125,7 +125,7 @@ const getColumns = (
 
       const handleNavigate = () => {
         const navSymbol = holding.instrument?.symbol ?? holding.id;
-        navigate(`/holdings/${navSymbol}`, { state: { holding } });
+        navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
       return (
         <div className="flex items-center">
@@ -357,7 +357,7 @@ const getColumns = (
       const navigate = useNavigate();
       const handleNavigate = () => {
         const navSymbol = row.original.instrument?.symbol ?? row.original.id;
-        navigate(`/holdings/${navSymbol}`, { state: { holding: row.original } });
+        navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding: row.original } });
       };
 
       return (

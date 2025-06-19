@@ -54,7 +54,8 @@ interface AssetDetailData {
 }
 
 export const AssetProfilePage = () => {
-  const { symbol = '' } = useParams<{ symbol: string }>();
+  const { symbol: encodedSymbol = '' } = useParams<{ symbol: string }>();
+  const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = queryParams.get('tab') || 'overview';
