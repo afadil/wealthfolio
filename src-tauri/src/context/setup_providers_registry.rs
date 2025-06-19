@@ -1,60 +1,74 @@
 // src/provider/setup_registry.rs
-use std::{path::PathBuf, sync::Arc};
-
+use std::sync::Arc;
 use tauri::{AppHandle, Runtime};
-use tauri_plugin_stronghold::{Client, Store, Stronghold};
+use crate::context::KeyringApiKeyResolver;
+use wealthfolio_core::market_data::providers::api_key_resolver::ApiKeyResolver;
+use wealthfolio_core::market_data::providers::ProviderRegistry;
+// Import MarketDataProviderSetting if not already (it should be in scope via prelude or direct use)
+use wealthfolio_core::market_data::market_data_model::MarketDataProviderSetting;
+use log::{debug, warn, error};
 
-use crate::provider::{
-    MarketDataProvider, ProviderRegistry, YahooProvider, MarketDataAppProvider
-};
-
-/// Build the ProviderRegistry, pulling API keys from the Stronghold vault.
-///
-/// Called from `main` as:
-/// ```rust
-/// let registry = tauri::async_runtime::block_on(setup_registry(&handle))?;
-/// handle.manage(registry);
-/// ```
+/// Build the ProviderRegistry, providing configurations for default providers.
+/// API keys for these providers (if needed and specified in settings) will be
+/// resolved by the ApiKeyResolver passed to the ProviderRegistry.
 pub async fn build_provider_registry<R: Runtime>(
-    handle: &AppHandle<R>,
-    instance_id: &str,
+    _handle: &AppHandle<R>, // Evaluate if handle is needed at all
 ) -> anyhow::Result<ProviderRegistry> {
-    // ---------- open / create vault ----------
-    let vault_path: PathBuf = handle
-        .path()
-        .app_data_dir()?
-        .join("vault.hold");
+    debug!("Building ProviderRegistry with KeyringApiKeyResolver for default providers.");
+    let keyring_resolver = Arc::new(KeyringApiKeyResolver::new()); // ProviderRegistry expects Arc
 
-    let stronghold = if vault_path.exists() {
-        Stronghold::load(&vault_path, instance_id).await?
-    } else {
-        Stronghold::create(&vault_path, instance_id).await?
-    };
+    const MARKET_DATA_APP_DEFAULT_KEY_ENTRY_NAME: &str = "default_provider_marketdata_app_key";
 
-    // ---------- client + store ----------
-    let client_name = "wealthfolio";
-    let client: Client = stronghold
-        .load_client(client_name)
-        .await
-        .unwrap_or_else(|_| futures::executor::block_on(stronghold.create_client(client_name)).unwrap());
-    let store: Store = client.get_store();
+    let mut default_provider_settings = Vec::new();
 
-    // helper to read UTF‑8 secrets
-    async fn secret(store: &Store, key: &str) -> Option<String> {
-        store
-            .get(key)
-            .await
-            .ok()
-            .and_then(|bytes| String::from_utf8(bytes).ok())
+    // Setting for Yahoo (does not require an API key through this resolver path)
+    default_provider_settings.push(MarketDataProviderSetting {
+        id: "yahoo".to_string(), // Matches the ID used in DB seeding
+        name: "Yahoo Finance".to_string(),
+        api_key_vault_path: None, // Yahoo provider itself doesn't use API key via resolver
+        priority: 1,
+        enabled: true,
+        logo_filename: Some("yahoo-finance.png".to_string()),
+    });
+
+    // Attempt to set up MarketDataAppProvider
+    // The API key for MarketDataAppProvider, if set by user via UI, will be stored
+    // using an entry name like "market_data_provider_api_key_marketdata_app".
+    // The 'MARKET_DATA_APP_DEFAULT_KEY_ENTRY_NAME' is for a *potential* pre-seeded default key.
+    // If we want ProviderRegistry to load this specific default key,
+    // the api_key_vault_path for MarketDataAppProvider should be this constant.
+    default_provider_settings.push(MarketDataProviderSetting {
+        id: "marketdata_app".to_string(), // Matches the ID used in DB seeding
+        name: "MarketData.app".to_string(),
+        // This tells the ProviderRegistry to use the resolver for this entry
+        // if it needs to initialize MarketDataAppProvider with a key.
+        api_key_vault_path: Some(MARKET_DATA_APP_DEFAULT_KEY_ENTRY_NAME.to_string()),
+        priority: 2,
+        enabled: true, // Default to enabled, user can disable in settings
+        logo_filename: Some("marketdata-app.png".to_string()),
+    });
+
+    // Log the attempt to pre-load the key for user awareness if they need to set it
+    match keyring_resolver.resolve_api_key(MARKET_DATA_APP_DEFAULT_KEY_ENTRY_NAME).await {
+        Ok(Some(key)) if !key.is_empty() => {
+            debug!("A pre-configured API key for MarketData.app was found in keyring under '{}'. ProviderRegistry will use this if needed.", MARKET_DATA_APP_DEFAULT_KEY_ENTRY_NAME);
+        }
+        _ => {
+            warn!("No pre-configured API key for MarketData.app was found in keyring under '{}'. If this provider is used, its API key might need to be configured in settings.", MARKET_DATA_APP_DEFAULT_KEY_ENTRY_NAME);
+        }
     }
 
-    // ---------- providers ----------
-    let mut providers: Vec<Arc<dyn MarketDataProvider>> =
-        vec![Arc::new(YahooProvider::default())];
-
-    if let Some(market_data_app_key) = secret(&store, "MARKET_DATA_APP_KEY").await {
-        providers.push(Arc::new(MarketDataAppProvider::new(market_data_app_key)));
+    // ProviderRegistry::new now takes the resolver and settings.
+    // It will internally try to create providers based on these settings.
+    // If a setting has an api_key_vault_path, the resolver will be used.
+    match ProviderRegistry::new(keyring_resolver.clone(), default_provider_settings).await {
+        Ok(registry) => {
+            debug!("ProviderRegistry built successfully.");
+            Ok(registry)
+        }
+        Err(e) => {
+            error!("Failed to build ProviderRegistry: {}", e);
+            Err(anyhow::anyhow!("Failed to build ProviderRegistry: {}", e))
+        }
     }
-
-    Ok(ProviderRegistry::new(providers))
 }

@@ -9,13 +9,13 @@ mod menu;
 mod updater;
 
 use log::error;
-use std::path::PathBuf;
+// use std::path::PathBuf; // Removed as salt_path is removed
 use updater::check_for_update;
 
 use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
-use std::fs;
+// use std::fs; // Removed as app_local_data_dir logic is removed
 
 use tauri::async_runtime::spawn;
 
@@ -25,33 +25,13 @@ use tauri::Manager;
 use context::ServiceContext;
 use events::{emit_portfolio_trigger_update, PortfolioRequestPayload};
 
-use tauri_plugin_stronghold; // Added for stronghold plugin
-
 pub fn main() {
     dotenv().ok(); // Load environment variables from .env file if available
 
     // Generate context once to use for path resolution and building the app
     let tauri_context = tauri::generate_context!();
 
-    // Determine app_local_data_dir for stronghold salt file
-    let app_local_data_dir =
-        tauri::api::path::app_local_data_dir(&tauri_context.config()).expect(
-            "Failed to get app local data directory. Check bundle identifier in tauri.conf.json.",
-        );
-
-    // Ensure the app_local_data_dir exists
-    if !app_local_data_dir.exists() {
-        fs::create_dir_all(&app_local_data_dir)
-            .expect("Failed to create app local data directory.");
-    }
-
-    let salt_path = app_local_data_dir.join("salt.txt");
-
     let app = tauri::Builder::default()
-        .plugin(
-            tauri_plugin_stronghold::Builder::with_argon2(&salt_path)
-                .build(),
-        )
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
