@@ -192,6 +192,24 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
   };
 };
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+  // Handle pence (GBp) specially
+  if (currency === 'GBp' || currency === 'GBX') {
+    if (!displayCurrency) {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    }
+    
+    // For pence, format as "123.45p" or "1,234.56p"
+    const formattedNumber = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    
+    return `${formattedNumber}p`;
+  }
+  
   return new Intl.NumberFormat('en-US', {
     style: displayCurrency ? 'currency' : undefined,
     currency: currency,
@@ -263,8 +281,8 @@ export function calculatePerformanceMetrics(
   history: AccountValuation[] | null | undefined,
   isAllTime = false,
 ): { gainLossAmount: number; simpleReturn: number } {
+  
   if (!history?.length) return { gainLossAmount: 0, simpleReturn: 0 };
-
 
   const first = history[0];
   const last = history[history.length - 1];
@@ -292,13 +310,19 @@ export function calculatePerformanceMetrics(
 
     const cf = Number(curr.netContribution) - Number(prev.netContribution); // deposit(+)/withdraw(-)
     const mv0 = Number(prev.totalValue);
-    if (mv0 === 0) continue; // skip day zero if portfolio just opened
+    if (mv0 === 0) {
+      continue; // skip day zero if portfolio just opened
+    }
 
-    twr *= (Number(curr.totalValue) - cf) / mv0;
+    const dailyReturn = (Number(curr.totalValue) - cf) / mv0;
+    twr *= dailyReturn;
+
   }
 
-  return {
+  const result = {
     gainLossAmount: gain$,
-    simpleReturn: twr - 1, // e.g. 0.034 -> 3.4 %
+    simpleReturn: twr - 1, // e.g. 0.034 -> 3.4 %
   };
+
+  return result;
 }

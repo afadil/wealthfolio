@@ -1,11 +1,13 @@
 import NumberFlow from '@number-flow/react';
 import { useBalancePrivacy } from '@/context/privacy-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface BalanceProps {
   targetValue: number;
   currency: string;
   displayCurrency?: boolean;
   displayDecimal?: boolean;
+  isLoading?: boolean;
 }
 
 const Balance: React.FC<BalanceProps> = ({
@@ -13,9 +15,13 @@ const Balance: React.FC<BalanceProps> = ({
   currency = 'USD',
   displayCurrency = false,
   displayDecimal = true,
+  isLoading = false,
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
+  if (isLoading) {
+    return <Skeleton className="h-9 w-48" />;
+  }
 
   return (
     <h1 className="font-heading font-bold text-3xl tracking-tight">

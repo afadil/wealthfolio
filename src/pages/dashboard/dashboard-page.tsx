@@ -14,6 +14,8 @@ import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigg
 import { DateRange, TimePeriod } from '@/lib/types';
 import { subMonths } from 'date-fns';
 import { calculatePerformanceMetrics } from '@/lib/utils';
+import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
+import { useHoldings } from '@/hooks/use-holdings';
 
 
 function DashboardSkeleton() {
@@ -41,17 +43,20 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
-  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>('Last 3 months');
+  const [selectedIntervalDescription, setSelectedIntervalDescription] =
+    useState<string>('Last 3 months');
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
-  const {
-    valuationHistory,
-    isLoading: isValuationHistoryLoading,
-  } = useValuationHistory(dateRange);
+  const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+
+  const totalValue = useMemo(() => {
+    return holdings?.reduce((acc, holding) => acc + (holding.marketValue?.base || 0), 0) ?? 0;
+  }, [holdings]);
+
+  const { valuationHistory, isLoading: isValuationHistoryLoading } = useValuationHistory(dateRange);
 
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency || 'USD';
-
 
   // Calculate gainLossAmount and simpleReturn from valuationHistory
   const { gainLossAmount, simpleReturn } = useMemo(() => {
@@ -65,26 +70,28 @@ export default function DashboardPage() {
   }, [valuationHistory]);
 
   const chartData = useMemo(() => {
-    return valuationHistory?.map(item => ({
-      date: item.valuationDate,
-      totalValue: item.totalValue,
-      netContribution: item.netContribution,
-      currency: item.baseCurrency || baseCurrency,
-    })) || [];
+    return (
+      valuationHistory?.map((item) => ({
+        date: item.valuationDate,
+        totalValue: item.totalValue,
+        netContribution: item.netContribution,
+        currency: item.baseCurrency || baseCurrency,
+      })) || []
+    );
   }, [valuationHistory, baseCurrency]);
 
-  if (isValuationHistoryLoading && !valuationHistory) {
+  if ((isValuationHistoryLoading && !valuationHistory) || (isHoldingsLoading && !holdings)) {
     return <DashboardSkeleton />;
   }
 
   // Callback for IntervalSelector
   const handleIntervalSelect = (
-    code: TimePeriod, 
+    code: TimePeriod,
     description: string,
-    range: DateRange | undefined
+    range: DateRange | undefined,
   ) => {
     setSelectedIntervalDescription(description);
-    setDateRange(range); 
+    setDateRange(range);
     setIsAllTime(code === 'ALL');
   };
 
@@ -97,7 +104,8 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-3">
                 <Balance
-                  targetValue={currentValuation?.totalValue || 0}
+                  isLoading={isHoldingsLoading}
+                  targetValue={totalValue}
                   currency={baseCurrency}
                   displayCurrency={true}
                 />
