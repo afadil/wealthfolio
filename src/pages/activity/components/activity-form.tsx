@@ -16,7 +16,8 @@ import {
 import { Form } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { DataSource } from '@/lib/constants';
+import { DataSource, CASH_ACTIVITY_TYPES } from '@/lib/constants';
+import type { ActivityType } from '@/lib/constants';
 import type { ActivityDetails } from '@/lib/types';
 import { useActivityMutations } from '../hooks/use-activity-mutations';
 import { TradeForm } from './forms/trade-form';
@@ -25,11 +26,13 @@ import { IncomeForm } from './forms/income-form';
 import { OtherForm } from './forms/other-form';
 import { HoldingsForm } from './forms/holdings-form';
 import { newActivitySchema, type NewActivityFormValues } from './forms/schemas';
+import { calculateAccountsSimplePerformance } from '@/commands/portfolio';
 
 export interface AccountSelectOption {
   value: string;
   label: string;
   currency: string;
+  balance?: number;
 }
 
 interface ActivityFormProps {
@@ -83,13 +86,14 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     currency: activity?.currency || '',
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
     showCurrencySelect: false,
+    updateBalance: false,
   };
 
   const form = useForm<NewActivityFormValues>({
     resolver: zodResolver(newActivitySchema),
     defaultValues,
   });
-  
+
   // Reset form when dialog closes or activity changes
   useEffect(() => {
     if (!open) {
@@ -103,17 +107,49 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
+  // Type guard to narrow the ActivityType to one of the predefined cash activity literals.
+  const isCashActivityType = (type: ActivityType): type is (typeof CASH_ACTIVITY_TYPES)[number] => {
+    return (CASH_ACTIVITY_TYPES as readonly ActivityType[]).includes(type);
+  };
+
   async function onSubmit(data: NewActivityFormValues) {
     try {
-      const { showCurrencySelect, ...submissionData } = { ...data, isDraft: false };
+      const { showCurrencySelect, updateBalance, ...submissionData } = { ...data, isDraft: false };
       const { id, ...submitData } = submissionData;
 
-      // For cash activities and fees, set assetId to $CASH-accountCurrency and currency
-      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(submitData.activityType)) {
+      // For activities that affect cash balance, set assetId to $CASH-accountCurrency and ensure currency is set
+      if (isCashActivityType(submitData.activityType)) {
         const account = accounts.find((a) => a.value === submitData.accountId);
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
           submitData.currency = submitData.currency || account.currency;
+
+          // Handle UPDATE_BALANCE by converting it into DEPOSIT or WITHDRAWAL based on balance delta
+          if (updateBalance && 'amount' in submitData) {
+            const latestAccount = (
+              await calculateAccountsSimplePerformance([submitData.accountId])
+            )[0];
+            const currentBalance =
+              typeof latestAccount?.totalValue === 'number' ? latestAccount.totalValue : 0;
+
+            const newBalance = submitData.amount ?? 0;
+            const delta = newBalance - currentBalance;
+
+            if (delta === 0) {
+              return;
+            }
+
+            if (submitData.activityType === 'DEPOSIT' || submitData.activityType === 'WITHDRAWAL') {
+              submitData.activityType = delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+            } else if (
+              submitData.activityType === 'TRANSFER_IN' ||
+              submitData.activityType === 'TRANSFER_OUT'
+            ) {
+              submitData.activityType = delta > 0 ? 'TRANSFER_IN' : 'TRANSFER_OUT';
+            }
+
+            submitData.amount = Number(delta.toFixed(2));
+          }
         }
       }
 

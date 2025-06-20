@@ -20,11 +20,13 @@ import { DataSource } from '@/lib/constants';
 export interface ConfigurationCheckboxProps {
   showCurrencyOption?: boolean;
   shouldShowSymbolLookup?: boolean;
+  shouldShowUpdateBalance?: boolean;
 }
 
 export const ConfigurationCheckbox = ({
   showCurrencyOption = true,
   shouldShowSymbolLookup = true,
+  shouldShowUpdateBalance = false,
 }: ConfigurationCheckboxProps) => {
   const { control } = useFormContext();
 
@@ -75,6 +77,32 @@ export const ConfigurationCheckbox = ({
                   </label>
                   <Checkbox
                     id="use-different-currency-checkbox"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    className="h-4 w-4"
+                  />
+                </div>
+              </div>
+            </FormItem>
+          )}
+        />
+      )}
+      {shouldShowUpdateBalance && (
+        <FormField
+          control={control}
+          name="updateBalance"
+          render={({ field }) => (
+            <FormItem className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <label
+                    htmlFor="use-update-balance-checkbox"
+                    className="cursor-pointer text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Update Balance
+                  </label>
+                  <Checkbox
+                    id="use-update-balance-checkbox"
                     checked={field.value}
                     onCheckedChange={field.onChange}
                     className="h-4 w-4"
