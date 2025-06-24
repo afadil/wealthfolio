@@ -138,7 +138,7 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
         row: data.row,
         count: data.count,
         isValid: !invalidAccounts.includes(account),
-        mappedAccount: props.mapping.symbolMappings[account],
+        mappedAccount: props.mapping.accountMappings[account],
       })),
     };
   }, [props.data, props.getMappedValue, invalidAccounts, props.mapping.accountMappings]);
@@ -175,8 +175,6 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
           rowsNeedingMapping.add(row);
         }
     });
-
-    console.log
 
     // Convert to array and sort
     return Array.from(processedRows.values()).sort((a, b) => {
