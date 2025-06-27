@@ -122,9 +122,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 match sort.id.as_str() {
                     "date" => {
                         if sort.desc {
-                            query = query.order(activities::activity_date.desc());
+                            query = query.order((activities::activity_date.desc(), activities::created_at.asc()));
                         } else {
-                            query = query.order(activities::activity_date.asc());
+                            query = query.order((activities::activity_date.asc(), activities::created_at.asc()));
                         }
                     }
                     "activityType" => {
@@ -148,10 +148,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
                             query = query.order(accounts::name.asc());
                         }
                     }
-                    _ => query = query.order(activities::activity_date.desc()), // Default order
+                    _ => query = query.order((activities::activity_date.desc(), activities::created_at.asc())), // Default order
                 }
             } else {
-                query = query.order(activities::activity_date.desc()); // Default order
+                query = query.order((activities::activity_date.desc(), activities::created_at.asc())); // Default order
             }
 
             query
