@@ -47,6 +47,8 @@ Subscriptions, No Cloud.
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
 ![Screenshot](public/screenshot.png)
+Documentation for all Activity types, including the required form fields, is available in [docs/activity-types.md](docs/activity-types.md).
+
 
 ## Roadmap
 
