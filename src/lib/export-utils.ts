@@ -11,6 +11,7 @@ export function formatData(data: any, format: ExportedFileFormat): string {
 }
 
 function convertToCSV(data: any) {
+  if (!data || data.length === 0) return '';
   let headers = Object.keys(data[0]);
   // Check if 'assetID' is present and replace it with 'symbol'
   const assetIDIndex = headers.indexOf('assetID');
