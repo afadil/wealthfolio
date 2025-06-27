@@ -76,17 +76,19 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
 
   const addActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues) => {
-      await createQuoteFromActivity(data);
       const { ...rest } = data;
-      return createActivity(rest);
+      const activity = await createActivity(rest);
+      await createQuoteFromActivity(data);
+      return activity;
     },
     ...createMutationOptions('adding'),
   });
 
   const updateActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues & { id: string }) => {
+      const activity = await updateActivity(data);
       await createQuoteFromActivity(data);
-      return updateActivity(data);
+      return activity;
     },
     ...createMutationOptions('updating'),
   });
