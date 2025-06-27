@@ -11,7 +11,13 @@ export function formatData(data: any, format: ExportedFileFormat): string {
 }
 
 function convertToCSV(data: any) {
-  const array = [Object.keys(data[0])].concat(data);
+  let headers = Object.keys(data[0]);
+  // Check if 'assetID' is present and replace it with 'symbol'
+  const assetIDIndex = headers.indexOf('assetID');
+  if (assetIDIndex !== -1) {
+    headers[assetIDIndex] = 'symbol';
+  }
+  const array = [headers].concat(data);
   return array
     .map((row) => {
       return Object.values(row)
