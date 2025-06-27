@@ -138,6 +138,8 @@ pub fn main() {
             commands::market_data::delete_quote,
             commands::market_data::get_quote_history,
             commands::market_data::get_market_data_providers,
+            commands::secrets::set_api_key,
+            commands::secrets::get_api_key,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
