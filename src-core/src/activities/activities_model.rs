@@ -330,6 +330,7 @@ pub struct ImportMapping {
     pub field_mappings: String,
     pub activity_mappings: String,
     pub symbol_mappings: String,
+    pub account_mappings: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -342,6 +343,7 @@ pub struct ImportMappingData {
     pub field_mappings: std::collections::HashMap<String, String>,
     pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
     pub symbol_mappings: std::collections::HashMap<String, String>,
+    pub account_mappings: std::collections::HashMap<String, String>,
 }
 
 impl Default for ImportMappingData {
@@ -356,6 +358,8 @@ impl Default for ImportMappingData {
         field_mappings.insert("comment".to_string(), "comment".to_string());
         field_mappings.insert("currency".to_string(), "currency".to_string());
         field_mappings.insert("fee".to_string(), "fee".to_string());
+        field_mappings.insert("account".to_string(), "account".to_string());
+
 
         let mut activity_mappings = std::collections::HashMap::new();
         activity_mappings.insert("BUY".to_string(), vec!["BUY".to_string()]);
@@ -377,6 +381,7 @@ impl Default for ImportMappingData {
             field_mappings,
             activity_mappings,
             symbol_mappings: std::collections::HashMap::new(),
+            account_mappings: std::collections::HashMap::new(),
         }
     }
 }
@@ -388,6 +393,7 @@ impl ImportMapping {
             field_mappings: serde_json::from_str(&self.field_mappings)?,
             activity_mappings: serde_json::from_str(&self.activity_mappings)?,
             symbol_mappings: serde_json::from_str(&self.symbol_mappings)?,
+            account_mappings: serde_json::from_str(&self.account_mappings)?,
         })
     }
 
@@ -397,6 +403,7 @@ impl ImportMapping {
             field_mappings: serde_json::to_string(&data.field_mappings)?,
             activity_mappings: serde_json::to_string(&data.activity_mappings)?,
             symbol_mappings: serde_json::to_string(&data.symbol_mappings)?,
+            account_mappings: serde_json::to_string(&data.account_mappings)?,
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),
         })

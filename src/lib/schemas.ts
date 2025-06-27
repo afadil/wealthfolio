@@ -19,6 +19,7 @@ export const importMappingSchema = z.object({
   fieldMappings: z.record(z.string(), z.string()),
   activityMappings: z.record(z.string(), z.array(z.string())),
   symbolMappings: z.record(z.string(), z.string()),
+  accountMappings: z.record(z.string(), z.string()),
 });
 
 export const newAccountSchema = z.object({

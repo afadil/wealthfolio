@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ActivityImport, CsvRowData } from '@/lib/types';
+import { Account, ActivityImport, CsvRowData } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CSVFileViewer } from '../components/csv-file-viewer';
 import { ImportPreviewTable } from '../import-preview-table';
@@ -15,6 +15,7 @@ interface DataPreviewStepProps {
   data: CsvRowData[] | null;
   headers: string[];
   activities?: ActivityImport[];
+  accounts: Account[];
   onNext: (processedActivities: ActivityImport[]) => void;
   onBack: () => void;
   onError?: () => void;
@@ -23,6 +24,7 @@ interface DataPreviewStepProps {
 export const DataPreviewStep = ({
   headers,
   data,
+  accounts,
   activities = [],
   onNext,
   onBack,
@@ -223,7 +225,7 @@ export const DataPreviewStep = ({
             </div>
             <CardContent className="overflow-hidden p-0 pt-5">
               <TabsContent value="preview" className="m-0 overflow-x-auto">
-                <ImportPreviewTable activities={activities} />
+                <ImportPreviewTable activities={activities} accounts={accounts}/>
               </TabsContent>
               <TabsContent value="raw" className="m-0 overflow-x-auto">
                 <div className="space-y-2">

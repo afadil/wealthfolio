@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { CsvMappingEditor } from '../components/mapping-editor';
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData } from '@/lib/types';
+import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from '@/lib/types';
 import { useMemo } from 'react';
 import { validateTickerSymbol } from '../utils/validation-utils';
 import { useImportMapping } from '../hooks/use-import-mapping';
@@ -12,6 +12,7 @@ import { LucideIcon } from 'lucide-react';
 interface MappingStepProps {
   headers: string[];
   data: CsvRowData[];
+  accounts: Account[];
   accountId?: string;
   onNext: (mapping: ImportMappingData) => void;
   onBack: () => void;
@@ -20,16 +21,17 @@ interface MappingStepProps {
 export const MappingStep = ({
   headers,
   data,
+  accounts,
   accountId,
   onNext,
   onBack,
 }: MappingStepProps) => {
-  // Use the enhanced hook with accountId
   const {
     mapping,
     handleColumnMapping,
     handleActivityTypeMapping,
     handleSymbolMapping,
+    handleAccountIdMapping, 
     saveMapping,
     saveMappingMutation,
   } = useImportMapping({
@@ -40,6 +42,7 @@ export const MappingStep = ({
       fieldMappings: {},
       activityMappings: {},
       symbolMappings: {},
+      accountMappings: {}, 
     },
     onSaveSuccess: (savedMapping) => {
       onNext(savedMapping);
@@ -68,7 +71,7 @@ export const MappingStep = ({
     .length;
   const totalFields = Object.values(ImportFormat).length;
   
-
+  
   // For direct CsvRowData access
   const getMappedValue = (row: CsvRowData, field: ImportFormat): string => {
     const headerName = mapping.fieldMappings[field] || '';
@@ -86,6 +89,14 @@ export const MappingStep = ({
   const invalidSymbols = useMemo(() => {
     return distinctSymbols.filter((symbol) => !validateTickerSymbol(symbol));
   }, [distinctSymbols]);
+
+  // Account ID mappings
+  const distinctAccountIds = useMemo(() => {
+    if (!mapping.fieldMappings[ImportFormat.ACCOUNT]) return [];
+     return Array.from(
+      new Set(data.map((row) => getMappedValue(row, ImportFormat.ACCOUNT))),
+    ).filter(Boolean);
+  }, [data, mapping.fieldMappings]);
 
   // Activity type mappings
   const { distinctActivityTypes } = useMemo(() => {
@@ -122,6 +133,7 @@ export const MappingStep = ({
     };
   }, [data, mapping.activityMappings, mapping.fieldMappings]);
 
+
   function findAppTypeForCsvType(
     csvType: string,
     mappings: Partial<Record<ActivityType, string[]>>,
@@ -146,13 +158,27 @@ export const MappingStep = ({
     return distinctActivityTypes.filter((activity) => !activity.appType).length;
   }, [distinctActivityTypes]);
 
+  //  Count unmapped accounts
+  const accountsToMapCount = useMemo(() => {
+    if (!mapping.fieldMappings[ImportFormat.ACCOUNT]) return 0;
+    
+    const unmappedIds = new Set<string>();
+    data.forEach((row) => {
+      const accountId = getMappedValue(row, ImportFormat.ACCOUNT);
+      if (accountId && !mapping.accountMappings?.[accountId.trim()]) {
+        unmappedIds.add(accountId.trim());
+      }
+    });
+    return unmappedIds.size;
+  }, [data, mapping.fieldMappings, mapping.accountMappings, getMappedValue]);
+
   // Symbol mappings
   const symbolsToMapCount = useMemo(() => {
     const symbolsNeedingMapping = invalidSymbols.filter((symbol) => {
       // Check if any key in symbolMappings matches this symbol (case-insensitive)
       const normalizedSymbol = symbol.trim();
       return !Object.keys(mapping.symbolMappings).some(
-        (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol
+                (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol
       );
     }).length;
     return symbolsNeedingMapping;
@@ -160,16 +186,18 @@ export const MappingStep = ({
 
   // Check if all mappings are complete
   const allMappingsComplete =
-    requiredFieldsMapped && activitiesToMapCount === 0 && symbolsToMapCount === 0;
+    requiredFieldsMapped && 
+    activitiesToMapCount === 0 && 
+    symbolsToMapCount === 0 &&
+    (accountsToMapCount === 0 || !mapping.fieldMappings[ImportFormat.ACCOUNT]);
 
   const handleNextClick = () => {
-    // Save the mapping first, then onNext will be called via the onSaveSuccess callback
     saveMapping();
   };
   
   return (
     <div className="m-0 flex h-full flex-col p-0">
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
         {/* Fields mapping status */}
         <ImportAlert
           variant={requiredFieldsMapped ? 'success' : 'destructive'}
@@ -199,20 +227,38 @@ export const MappingStep = ({
           icon={Icons.Tag as LucideIcon}
           rightIcon={symbolsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
         />
-       
+        
+        {/* Account ID mapping status */}
+        {mapping.fieldMappings[ImportFormat.ACCOUNT] && (
+          <ImportAlert
+            variant={accountsToMapCount === 0 ? 'success' : 'destructive'}
+            size="sm"
+            title="Accounts"
+            description={
+              distinctAccountIds.length > 0 
+                ? `${distinctAccountIds.length - accountsToMapCount} of ${distinctAccountIds.length} mapped`
+                : "No unmapped account IDs found"
+            }
+            icon={Icons.Wallet as LucideIcon}
+            rightIcon={accountsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
+          />
+        )}
       </div>
 
       <CsvMappingEditor
         mapping={mapping}
         headers={headers}
         data={data}
+        accounts={accounts}
         handleColumnMapping={handleColumnMapping}
         handleActivityTypeMapping={handleActivityTypeMapping}
         handleSymbolMapping={handleSymbolMapping}
+        handleAccountIdMapping={handleAccountIdMapping}
         getMappedValue={getMappedValue}
         mappedFieldsCount={mappedFieldsCount}
         totalFields={totalFields}
         requiredFieldsMapped={requiredFieldsMapped}
+        distinctAccountIds={distinctAccountIds}
       />
 
       <div className="flex justify-between pt-4">

@@ -15,6 +15,9 @@ import { DataPreviewStep } from './steps/preview-step';
 import { ResultStep } from './steps/result-step';
 import { logger } from '@/adapters';
 import { useNavigate } from 'react-router-dom';
+import { getAccounts } from '@/commands/account';
+import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from '@tanstack/react-query';
 
 // Define the steps in the wizard
 const STEPS = [
@@ -32,6 +35,14 @@ const ActivityImportPage = () => {
   const [activities, setActivities] = useState<ActivityImport[]>([]);
   const [processedActivities, setProcessedActivities] = useState<ActivityImport[]>([]);
 
+
+  const { data: accountsData } = useQuery<Account[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: getAccounts,
+  });
+  const accounts = accountsData || [];
+
+  
   // 1. CSV Parsing Hook - Focus on parsing and structure validation
   const { 
     headers, 
@@ -129,6 +140,7 @@ const ActivityImportPage = () => {
           <MappingStep
             headers={headers}
             data={data}
+            accounts={accounts}
             accountId={selectedAccount?.id}
             onNext={handleMappingComplete}
             onBack={goToPreviousStep}
@@ -139,6 +151,7 @@ const ActivityImportPage = () => {
           <DataPreviewStep
             data={data}
             headers={headers}
+            accounts={accounts}
             activities={activities}
             onNext={handlePreviewComplete}
             onBack={goToPreviousStep}
@@ -148,6 +161,7 @@ const ActivityImportPage = () => {
         return (
           <ResultStep
             activities={processedActivities}
+            accounts={accounts}
             onBack={goToPreviousStep}
             onReset={resetImportProcess}
           />

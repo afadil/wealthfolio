@@ -46,6 +46,7 @@ export const ImportFormat = {
   AMOUNT: 'amount',
   CURRENCY: 'currency',
   FEE: 'fee',
+  ACCOUNT: 'account',
   COMMENT: 'comment',
 } as const;
 
@@ -60,6 +61,7 @@ export const importFormatSchema = z.enum([
   ImportFormat.AMOUNT,
   ImportFormat.CURRENCY,
   ImportFormat.FEE,
+  ImportFormat.ACCOUNT,
   ImportFormat.COMMENT,
 ]);
 
