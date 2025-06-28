@@ -7,6 +7,16 @@ import {
 } from '@/lib/types';
 import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 
+// Interface matching the backend struct
+export interface MarketDataProviderSetting {
+  id: string;
+  name: string;
+  apiKeyVaultPath: string | null;
+  priority: number;
+  enabled: boolean;
+  logoFilename: string | null;
+}
+
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   try {
     switch (getRunEnv()) {
@@ -144,6 +154,38 @@ export const getMarketDataProviders = async (): Promise<MarketDataProviderInfo[]
     }
   } catch (error) {
     logger.error('Error fetching market data providers.');
+    throw error;
+  }
+};
+
+export const getMarketDataProviderSettings = async (): Promise<MarketDataProviderSetting[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_market_data_providers_settings');
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error('Error fetching market data provider settings.');
+    throw error;
+  }
+};
+
+export const updateMarketDataProviderSettings = async (payload: {
+  providerId: string;
+  priority: number;
+  enabled: boolean;
+}): Promise<MarketDataProviderSetting> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('update_market_data_provider_settings', payload);
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error('Error updating market data provider settings.');
     throw error;
   }
 };

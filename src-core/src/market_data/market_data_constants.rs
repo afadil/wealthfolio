@@ -1,6 +1,7 @@
 /// Data source identifiers
 pub const DATA_SOURCE_YAHOO: &str = "YAHOO";
 pub const DATA_SOURCE_MANUAL: &str = "MANUAL";
+pub const DATA_SOURCE_MARKET_DATA_APP: &str = "MARKETDATA_APP";
 pub const DATA_SOURCE_CALCULATED: &str = "CALCULATED";
 
 /// Default values

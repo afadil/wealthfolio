@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL};
+use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP};
 
 #[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -129,6 +129,7 @@ pub struct QuoteRequest {
 #[serde(rename_all = "UPPERCASE")]
 pub enum DataSource {
     Yahoo,
+    MarketDataApp,
     Manual,
 }
 
@@ -136,6 +137,7 @@ impl DataSource {
     pub fn as_str(&self) -> &'static str {
         match self {
             DataSource::Yahoo => DATA_SOURCE_YAHOO,
+            DataSource::MarketDataApp => DATA_SOURCE_MARKET_DATA_APP,
             DataSource::Manual => DATA_SOURCE_MANUAL,
         }
     }
@@ -151,6 +153,7 @@ impl From<&str> for DataSource {
     fn from(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             DATA_SOURCE_YAHOO => DataSource::Yahoo,
+            DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
             _ => DataSource::Manual,
         }
     }
@@ -169,4 +172,30 @@ pub struct MarketDataProviderInfo {
     pub name: String,
     pub logo_filename: String,
     pub last_synced_date: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// --- Added for MarketDataProviderSetting ---
+
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, Selectable, Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::market_data_providers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct MarketDataProviderSetting {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub priority: i32,
+    pub enabled: bool,
+    pub logo_filename: Option<String>,
+    pub last_synced_at: Option<String>,
+    pub last_sync_status: Option<String>,
+    pub last_sync_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::market_data_providers)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct UpdateMarketDataProviderSetting {
+    pub priority: Option<i32>,
+    pub enabled: Option<bool>,
 }

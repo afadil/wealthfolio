@@ -22,4 +22,14 @@ impl SecretManager {
             Err(e) => Err(Error::from(e)),
         }
     }
+
+    /// Delete an API key for the given service.
+    pub fn delete_api_key(service: &str) -> Result<()> {
+        let entry = Entry::new(service, USERNAME).map_err(Error::from)?;
+        match entry.delete_password() {
+            Ok(_) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()), // If no entry, it's already "deleted"
+            Err(e) => Err(Error::from(e)),
+        }
+    }
 }

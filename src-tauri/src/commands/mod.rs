@@ -8,3 +8,5 @@ pub mod portfolio;
 pub mod settings;
 pub mod utilities;
 pub mod secrets;
+pub mod providers_settings;
+pub mod error;

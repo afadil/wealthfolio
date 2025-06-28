@@ -40,9 +40,9 @@ diesel::table! {
         field_mappings -> Text,
         activity_mappings -> Text,
         symbol_mappings -> Text,
-        account_mappings -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        account_mappings -> Text,
     }
 }
 
@@ -143,6 +143,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    market_data_providers (id) {
+        id -> Text,
+        name -> Text,
+        description -> Text,
+        priority -> Integer,
+        enabled -> Bool,
+        logo_filename -> Nullable<Text>,
+        last_synced_at -> Nullable<Text>,
+        last_sync_status -> Nullable<Text>,
+        last_sync_error -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     platforms (id) {
         id -> Text,
         name -> Nullable<Text>,
@@ -183,6 +197,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     goals,
     goals_allocation,
     holdings_snapshots,
+    market_data_providers,
     platforms,
     quotes,
 );
