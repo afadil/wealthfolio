@@ -14,7 +14,7 @@ function convertToCSV(data: any) {
   if (!data || data.length === 0) return '';
   let headers = Object.keys(data[0]);
   // Check if 'assetID' is present and replace it with 'symbol'
-  const assetIDIndex = headers.indexOf('assetID');
+  const assetIDIndex = headers.indexOf('assetId');
   if (assetIDIndex !== -1) {
     headers[assetIDIndex] = 'symbol';
   }
