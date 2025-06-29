@@ -100,13 +100,13 @@ const SettingsGoalsPage = () => {
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="Goal" />
-              <EmptyPlaceholder.Title>No goal added!</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Title>No goals added!</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any goal yet. Start adding your investment goals.
+                You don&apos;t have any goals yet. Start adding your investment goals.
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddGoal()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
-                Add an goal
+                Add a goal
               </Button>
             </EmptyPlaceholder>
           )}
