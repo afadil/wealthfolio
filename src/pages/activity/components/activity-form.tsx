@@ -105,18 +105,18 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   async function onSubmit(data: NewActivityFormValues) {
     try {
-      const { showCurrencySelect, ...submissionData } = { ...data, isDraft: false };
-      const { id, ...submitData } = submissionData;
+      const { showCurrencySelect, id, ...submitData } = { ...data, isDraft: false };
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(submitData.activityType)) {
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
+          submitData.currency = submitData.currency || account.currency;
         }
       }
-       if (account) {
-         submitData.currency = submitData.currency || account.currency;
-       }
+      if ('assetDataSource' in submitData && submitData.assetDataSource === DataSource.MANUAL && account) {
+        submitData.currency = submitData.currency || account.currency;
+      }
       if (id) {
         return await updateActivityMutation.mutateAsync({ id, ...submitData });
       }
