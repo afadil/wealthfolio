@@ -97,10 +97,9 @@ pub async fn create_activity(
     handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Creating activity...");
-    // Note: Account currency for FX check is now handled by get_symbols_to_sync using the result
     let result = state.activity_service().create_activity(activity).await?;
+    
     let handle = handle.clone();
-
     let symbols_for_payload = get_symbols_to_sync(
         &state,
         &result.account_id,

@@ -125,16 +125,17 @@ impl MarketDataProvider for MarketDataAppProvider {
     async fn get_historical_quotes_bulk(&self, symbols_with_currencies: &[(String, String)], start: SystemTime, end: SystemTime) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         const BATCH_SIZE: usize = 10;
         let mut all_quotes = Vec::new();
-        let mut errors = Vec::new();
+        let mut failed_symbols: Vec<(String, String)> = Vec::new();
+        let mut errors_for_logging: Vec<(String, String)> = Vec::new();
 
         for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
             let futures: Vec<_> = chunk.iter().map(|(symbol, currency)| {
                 let symbol_clone = symbol.clone();
                 let currency_clone = currency.clone();
                 async move {
-                    match self.get_historical_quotes(&symbol_clone, start, end, currency_clone).await {
-                        Ok(quotes) => Ok((symbol_clone, quotes)),
-                        Err(e) => Err((symbol_clone, e.to_string())),
+                    match self.get_historical_quotes(&symbol_clone, start, end, currency_clone.clone()).await {
+                        Ok(quotes) => Ok(quotes),
+                        Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
                     }
                 }
             }).collect();
@@ -143,17 +144,20 @@ impl MarketDataProvider for MarketDataAppProvider {
 
             for result in results {
                 match result {
-                    Ok((_, quotes)) => all_quotes.extend(quotes),
-                    Err((symbol, error)) => errors.push((symbol, error)),
+                    Ok(quotes) => all_quotes.extend(quotes),
+                    Err((symbol, currency, error)) => {
+                        failed_symbols.push((symbol.clone(), currency));
+                        errors_for_logging.push((symbol, error));
+                    }
                 }
             }
         }
 
-        if !errors.is_empty() {
-            log::warn!("Failed to fetch history for {} symbols: {:?}", errors.len(), errors);
+        if !errors_for_logging.is_empty() {
+            log::warn!("Failed to fetch history for {} symbols: {:?}", errors_for_logging.len(), errors_for_logging);
         }
 
         log::info!("NEW Fetched quotes for {}",  all_quotes.len());
-        Ok((all_quotes, errors))
+        Ok((all_quotes, failed_symbols))
     }
 }

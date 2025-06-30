@@ -13,4 +13,5 @@ CREATE TABLE market_data_providers (
 INSERT INTO market_data_providers (id, name, description, priority, enabled, logo_filename, last_synced_at, last_sync_status, last_sync_error)
 VALUES
     ('YAHOO', 'Yahoo Finance', 'Yahoo Finance is a leading financial data provider for many markets. It provides historical and real-time stock data.', 1, TRUE, 'yahoo-finance.png', NULL, NULL, NULL),
-    ('MARKETDATA_APP', 'MarketData.app', 'https://www.marketdata.app/ provides real-time and historical data for U.S. stocks, options, ETFs, mutual funds, and more.', 2, FALSE, 'marketdata-app.png', NULL, NULL, NULL);
+    ('MARKETDATA_APP', 'MarketData.app', 'https://www.marketdata.app/ provides real-time and historical data for U.S. stocks, options, ETFs, mutual funds, and more.', 2, FALSE, 'marketdata-app.png', NULL, NULL, NULL),
+    ('ALPHA_VANTAGE', 'Alpha Vantage', 'Alpha Vantage provides free APIs for real-time and historical data on stocks, forex, and cryptocurrencies.', 3, FALSE, 'alpha-vantage.png', NULL, NULL, NULL);

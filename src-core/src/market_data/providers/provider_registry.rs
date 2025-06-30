@@ -1,5 +1,6 @@
 use crate::market_data::market_data_constants::{
     DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_YAHOO,
+    DATA_SOURCE_ALPHA_VANTAGE
 };
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::{
@@ -7,10 +8,11 @@ use crate::market_data::market_data_model::{
 };
 use crate::market_data::providers::manual_provider::ManualProvider;
 use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketDataProvider};
-use crate::market_data::providers::market_data_app_provider::MarketDataAppProvider;
+use crate::market_data::providers::marketdata_app_provider::MarketDataAppProvider;
+use crate::market_data::providers::alpha_vantage_provider::AlphaVantageProvider;
 use crate::market_data::providers::yahoo_provider::YahooProvider;
 use crate::secrets::SecretManager;
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -44,7 +46,7 @@ impl ProviderRegistry {
 
             let provider_id_str = &setting.id;
 
-            let api_key = if provider_id_str == DATA_SOURCE_MARKET_DATA_APP {
+            let api_key = if provider_id_str == DATA_SOURCE_MARKET_DATA_APP || provider_id_str == DATA_SOURCE_ALPHA_VANTAGE {
                 match SecretManager::get_api_key(provider_id_str) {
                     Ok(key_opt) => key_opt,
                     Err(e) => {
@@ -81,6 +83,23 @@ impl ProviderRegistry {
                         }
                     } else {
                         warn!("MarketData.app provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
+                        (None, None)
+                    }
+                }
+                DATA_SOURCE_ALPHA_VANTAGE => {
+                    if let Some(key) = api_key {
+                        if !key.is_empty() {
+                            let p = Arc::new(AlphaVantageProvider::new(key));
+                            (
+                                Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                                Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                            )
+                        } else {
+                            warn!("AlphaVantage provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
+                            (None, None)
+                        }
+                    } else {
+                        warn!("AlphaVantage provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
                         (None, None)
                     }
                 }
@@ -147,43 +166,22 @@ impl ProviderRegistry {
         })
     }
 
-    pub fn get_provider(&self, id: &str) -> Option<&Arc<dyn MarketDataProvider + Send + Sync>> {
-        self.data_providers.get(id)
-    }
 
-    pub fn default_provider(&self) -> Option<&Arc<dyn MarketDataProvider + Send + Sync>> {
+
+    pub fn get_enabled_providers(&self) -> Vec<(&String, &Arc<dyn MarketDataProvider + Send + Sync>)> {
         self.ordered_data_provider_ids
-            .first()
-            .and_then(|id| self.data_providers.get(id))
+            .iter()
+            .filter_map(|id| self.data_providers.get(id).map(|p| (id, p)))
+            .collect()
     }
 
-    pub fn get_profiler(&self, id: &str) -> Option<&Arc<dyn AssetProfiler + Send + Sync>> {
-        self.asset_profilers.get(id)
-    }
+  
 
-    pub fn default_profiler(&self) -> Option<&Arc<dyn AssetProfiler + Send + Sync>> {
+    pub fn get_enabled_profilers(&self) -> Vec<(&String, &Arc<dyn AssetProfiler + Send + Sync>)> {
         self.ordered_profiler_ids
-            .first()
-            .and_then(|id| self.asset_profilers.get(id))
-    }
-
-    pub async fn latest_quote(
-        &self,
-        symbol: &str,
-        fallback_currency: String,
-    ) -> Result<ModelQuote, MarketDataError> {
-        for provider_id in &self.ordered_data_provider_ids {
-            if let Some(p) = self.data_providers.get(provider_id) {
-                match p.get_latest_quote(symbol, fallback_currency.clone()).await {
-                    Ok(q) => return Ok(q),
-                    Err(e) => warn!(
-                        "Provider '{}' failed to get latest quote for symbol '{}': {:?}. Trying next.",
-                        provider_id, symbol, e
-                    ),
-                }
-            }
-        }
-        Err(MarketDataError::NotFound(symbol.to_string()))
+            .iter()
+            .filter_map(|id| self.asset_profilers.get(id).map(|p| (id, p)))
+            .collect()
     }
 
     pub async fn historical_quotes(
@@ -193,22 +191,27 @@ impl ProviderRegistry {
         end: SystemTime,
         fallback_currency: String,
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
-        for provider_id in &self.ordered_data_provider_ids {
-            if let Some(p) = self.data_providers.get(provider_id) {
-                match p
-                    .get_historical_quotes(symbol, start, end, fallback_currency.clone())
-                    .await
-                {
-                    Ok(q_vec) if !q_vec.is_empty() => return Ok(q_vec),
-                    Ok(_) => info!(
-                        "Provider '{}' returned no historical quotes for symbol '{}'. Trying next.",
+        for (provider_id, p) in self.get_enabled_providers() {
+            match p
+                .get_historical_quotes(symbol, start, end, fallback_currency.clone())
+                .await
+            {
+                Ok(q_vec) if !q_vec.is_empty() => return Ok(q_vec),
+                Ok(_) => info!(
+                    "Provider '{}' returned no historical quotes for symbol '{}'. Trying next.",
+                    provider_id, symbol
+                ),
+                Err(MarketDataError::NoData) => {
+                    info!(
+                        "Provider '{}' reported no data for symbol '{}'. Stopping.",
                         provider_id, symbol
-                    ),
-                    Err(e) => warn!(
-                        "Provider '{}' failed to get historical quotes for symbol '{}': {:?}. Trying next.",
-                        provider_id, symbol, e
-                    ),
+                    );
+                    return Ok(vec![]);
                 }
+                Err(e) => warn!(
+                    "Provider '{}' failed to get historical quotes for symbol '{}': {:?}. Trying next.",
+                    provider_id, symbol, e
+                ),
             }
         }
         Err(MarketDataError::NotFound(symbol.to_string()))
@@ -222,35 +225,67 @@ impl ProviderRegistry {
     ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         if self.ordered_data_provider_ids.is_empty() {
             warn!("No data providers available for historical_quotes_bulk.");
-            return Err(MarketDataError::ProviderExhausted(
-                "No providers available".to_string(),
-            ));
+            return Ok((vec![], symbols_with_currencies.to_vec()));
         }
-        if let Some(default_provider_id) = self.ordered_data_provider_ids.first() {
-            if let Some(p) = self.data_providers.get(default_provider_id) {
-                return p
-                    .get_historical_quotes_bulk(symbols_with_currencies, start, end)
-                    .await;
+
+        let mut all_quotes = Vec::new();
+        let mut remaining_symbols = symbols_with_currencies.to_vec();
+
+        for (provider_id, provider) in self.get_enabled_providers() {
+            if remaining_symbols.is_empty() {
+                break;
+            }
+
+            info!(
+                "Using provider '{}' to fetch bulk historical quotes for {} symbols.",
+                provider_id,
+                remaining_symbols.len()
+            );
+            match provider
+                .get_historical_quotes_bulk(&remaining_symbols, start, end)
+                .await
+            {
+                Ok((quotes, failed)) => {
+                    all_quotes.extend(quotes);
+                    if !failed.is_empty() {
+                        warn!(
+                            "Provider '{}' failed to fetch data for {} symbols. Retrying with next provider.",
+                            provider_id,
+                            failed.len()
+                        );
+                    }
+                    remaining_symbols = failed;
+                }
+                Err(e) => {
+                    warn!(
+                        "Provider '{}' returned an error for bulk fetch: {:?}. Trying next provider.",
+                        provider_id, e
+                    );
+                }
             }
         }
-        Err(MarketDataError::ProviderExhausted(
-            "No providers available".to_string(),
-        ))
+
+        if !remaining_symbols.is_empty() {
+            warn!(
+                "After trying all providers, failed to fetch data for {} symbols.",
+                remaining_symbols.len()
+            );
+        }
+
+        Ok((all_quotes, remaining_symbols))
     }
 
     pub async fn get_asset_profile(
         &self,
         symbol: &str,
     ) -> Result<super::models::AssetProfile, MarketDataError> {
-        for profiler_id in &self.ordered_profiler_ids {
-            if let Some(profiler) = self.asset_profilers.get(profiler_id) {
-                match profiler.get_asset_profile(symbol).await {
-                    Ok(profile) => return Ok(profile),
-                    Err(e) => warn!(
-                        "Profiler '{}' failed to get asset profile for symbol '{}': {:?}. Trying next.",
-                        profiler_id, symbol, e
-                    ),
-                }
+        for (profiler_id, profiler) in self.get_enabled_profilers() {
+            match profiler.get_asset_profile(symbol).await {
+                Ok(profile) => return Ok(profile),
+                Err(e) => warn!(
+                    "Profiler '{}' failed to get asset profile for symbol '{}': {:?}. Trying next.",
+                    profiler_id, symbol, e
+                ),
             }
         }
         if symbol.starts_with("$CASH") {
@@ -265,11 +300,26 @@ impl ProviderRegistry {
         &self,
         query: &str,
     ) -> Result<Vec<QuoteSummary>, MarketDataError> {
-        if let Some(default_provider_id) = self.ordered_data_provider_ids.first() {
-            if let Some(profiler) = self.asset_profilers.get(default_provider_id) {
-                return profiler.search_ticker(query).await;
+        for (profiler_id, profiler) in self.get_enabled_profilers() {
+            match profiler.search_ticker(query).await {
+                Ok(results) if !results.is_empty() => {
+                    return Ok(results);
+                }
+                Ok(_) => {
+                    info!(
+                        "Profiler '{}' found no results for query '{}'. Trying next.",
+                        profiler_id, query
+                    );
+                }
+                Err(e) => {
+                    debug!(
+                        "Profiler '{}' failed to search for query '{}': {:?}. Trying next.",
+                        profiler_id, query, e
+                    );
+                }
             }
         }
+
         Err(MarketDataError::ProviderError(
             "Search ticker is not supported by any active provider".to_string(),
         ))

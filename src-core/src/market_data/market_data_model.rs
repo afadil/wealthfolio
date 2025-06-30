@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP};
+use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE};
 
 #[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -130,6 +130,7 @@ pub struct QuoteRequest {
 pub enum DataSource {
     Yahoo,
     MarketDataApp,
+    AlphaVantage,
     Manual,
 }
 
@@ -138,6 +139,7 @@ impl DataSource {
         match self {
             DataSource::Yahoo => DATA_SOURCE_YAHOO,
             DataSource::MarketDataApp => DATA_SOURCE_MARKET_DATA_APP,
+            DataSource::AlphaVantage => DATA_SOURCE_ALPHA_VANTAGE,
             DataSource::Manual => DATA_SOURCE_MANUAL,
         }
     }
@@ -154,6 +156,7 @@ impl From<&str> for DataSource {
         match s.to_uppercase().as_str() {
             DATA_SOURCE_YAHOO => DataSource::Yahoo,
             DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
+            DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
             _ => DataSource::Manual,
         }
     }
