@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import pkg from '../../../package.json';
 
 import { cn } from '@/lib/utils';
 
@@ -28,7 +29,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
   return (
     <div
       className={cn({
-        'light:bg-secondary/50 h-screen border-r pt-12 transition-[width] duration-300 ease-in-out md:flex':
+        'light:bg-secondary/50 h-screen overflow-x-hidden border-r pt-12 transition-[width] duration-300 ease-in-out md:flex':
           true,
         'md:w-sidebar': !collapsed,
         'md:w-sidebar-collapsed': collapsed,
@@ -37,7 +38,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     >
       <div className="z-20 w-full rounded-xl md:flex">
         <div className="flex w-full flex-col">
-          <div className="flex w-full flex-1 flex-col overflow-y-auto">
+          <div className="flex w-full flex-1 flex-col overflow-y-auto overflow-x-hidden">
             <div data-tauri-drag-region="true" className="flex-1">
               <nav
                 data-tauri-drag-region="true"
@@ -78,7 +79,8 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
             <div className="flex flex-shrink-0 flex-col p-2">
               {navigation?.secondary?.map((item) => NavItem({ item }))}
               <Separator className="mt-0" />
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between px-2">
+                {!collapsed && <p className="text-xs text-muted-foreground cursor-default">v{pkg.version}</p>}
                 <Button
                   title="Toggle Sidebar"
                   variant="ghost"
