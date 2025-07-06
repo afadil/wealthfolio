@@ -115,7 +115,6 @@ impl MarketDataProvider for MarketDataAppProvider {
                     }
                 })
                 .collect();
-            log::info!("NEW Fetched quotes for {}",  symbol);
             Ok(quotes)
         } else {
             Err(MarketDataError::ProviderError("No data found".to_string()))
@@ -157,7 +156,6 @@ impl MarketDataProvider for MarketDataAppProvider {
             log::warn!("Failed to fetch history for {} symbols: {:?}", errors_for_logging.len(), errors_for_logging);
         }
 
-        log::info!("NEW Fetched quotes for {}",  all_quotes.len());
         Ok((all_quotes, failed_symbols))
     }
 }

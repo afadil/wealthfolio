@@ -187,6 +187,7 @@ pub struct MarketDataProviderSetting {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub url: Option<String>,
     pub priority: i32,
     pub enabled: bool,
     pub logo_filename: Option<String>,

@@ -11,10 +11,14 @@ import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 export interface MarketDataProviderSetting {
   id: string;
   name: string;
-  apiKeyVaultPath: string | null;
+  description: string;
+  url: string | null;
   priority: number;
   enabled: boolean;
   logoFilename: string | null;
+  lastSyncedAt: string | null;
+  lastSyncStatus: string | null;
+  lastSyncError: string | null;
 }
 
 export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {

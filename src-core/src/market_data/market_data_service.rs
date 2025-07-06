@@ -4,6 +4,7 @@ use log::{debug, error};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::sync::RwLock;
 
 use super::market_data_constants::*;
 use super::market_data_model::{
@@ -21,7 +22,7 @@ use crate::utils::time_utils;
 const QUOTE_LOOKBACK_DAYS: i64 = 7;
 
 pub struct MarketDataService {
-    provider_registry: Arc<ProviderRegistry>,
+    provider_registry: Arc<RwLock<ProviderRegistry>>,
     repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
     asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
 }
@@ -30,6 +31,8 @@ pub struct MarketDataService {
 impl MarketDataServiceTrait for MarketDataService {
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
         self.provider_registry
+            .read()
+            .await
             .search_ticker(query)
             .await
             .map_err(|e| e.into())
@@ -71,6 +74,8 @@ impl MarketDataServiceTrait for MarketDataService {
 
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile> {
         self.provider_registry
+            .read()
+            .await
             .get_asset_profile(symbol)
             .await
             .map_err(|e| e.into())
@@ -112,6 +117,8 @@ impl MarketDataServiceTrait for MarketDataService {
             .into();
 
         self.provider_registry
+            .read()
+            .await
             .historical_quotes(symbol, start_time, end_time, "USD".to_string())
             .await
             .map_err(|e| e.into())
@@ -278,9 +285,15 @@ impl MarketDataServiceTrait for MarketDataService {
             priority: Some(priority),
             enabled: Some(enabled),
         };
-        self.repository
+        let updated_setting = self.repository
             .update_provider_settings(provider_id, changes)
-            .await
+            .await?;
+        
+        // Refresh the provider registry with the updated settings
+        debug!("Refreshing provider registry after settings update");
+        self.refresh_provider_registry().await?;
+        
+        Ok(updated_setting)
     }
 }
 
@@ -290,13 +303,26 @@ impl MarketDataService {
         asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
     ) -> Result<Self> {
         let provider_settings = repository.get_all_providers()?;
-        let provider_registry = Arc::new(ProviderRegistry::new(provider_settings).await?);
+        let provider_registry = Arc::new(RwLock::new(ProviderRegistry::new(provider_settings).await?));
 
         Ok(Self {
             provider_registry,
             repository,
             asset_repository,
         })
+    }
+
+    /// Refreshes the provider registry with the latest settings from the database
+    async fn refresh_provider_registry(&self) -> Result<()> {
+        debug!("Refreshing provider registry with latest settings");
+        let provider_settings = self.repository.get_all_providers()?;
+        let new_registry = ProviderRegistry::new(provider_settings).await?;
+        
+        // Replace the registry with the new one
+        *self.provider_registry.write().await = new_registry;
+        
+        debug!("Provider registry refreshed successfully");
+        Ok(())
     }
 
     fn fill_missing_quotes(
@@ -403,6 +429,8 @@ impl MarketDataService {
 
             match self
                 .provider_registry
+                .read()
+                .await
                 .historical_quotes_bulk(&symbols_with_currencies, start_date_time, end_date)
                 .await
             {

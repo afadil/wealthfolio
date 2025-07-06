@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "debug": "RUST_LOG=debug pnpm tauri dev",
     "tsc": "tsc -b",
     "build": "tsc && vite build",
     "preview": "vite preview",

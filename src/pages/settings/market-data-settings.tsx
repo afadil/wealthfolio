@@ -135,7 +135,19 @@ function ProviderSettings({
                 )}
               </div>
               <CardDescription className="mt-1 text-xs">
-                Configure {provider.name} settings.
+                {provider.description}
+                {provider.url && (
+                  <div className="mt-1">
+                    <a
+                      href={provider.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {provider.url}
+                    </a>
+                  </div>
+                )}
               </CardDescription>
             </div>
           </div>

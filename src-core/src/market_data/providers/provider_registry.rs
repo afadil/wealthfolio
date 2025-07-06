@@ -151,7 +151,6 @@ impl ProviderRegistry {
             if !ordered_profiler_ids_vec.contains(&DATA_SOURCE_MANUAL.to_string()) {
                 ordered_profiler_ids_vec.push(DATA_SOURCE_MANUAL.to_string());
             }
-            info!("Ensured ManualProvider is available for asset profiling.");
         }
 
         if data_providers_map.is_empty() {
@@ -267,8 +266,8 @@ impl ProviderRegistry {
 
         if !remaining_symbols.is_empty() {
             warn!(
-                "After trying all providers, failed to fetch data for {} symbols.",
-                remaining_symbols.len()
+                "After trying all providers, failed to fetch data for {:?} symbols.",
+                remaining_symbols
             );
         }
 

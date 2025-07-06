@@ -147,6 +147,7 @@ diesel::table! {
         id -> Text,
         name -> Text,
         description -> Text,
+        url -> Nullable<Text>,
         priority -> Integer,
         enabled -> Bool,
         logo_filename -> Nullable<Text>,
