@@ -26,6 +26,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { getApiKey } from '@/commands/secrets';
 import { QueryKeys } from '@/lib/query-keys';
+import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
+import { ActionConfirm } from '@/components/action-confirm';
 
 const useApiKeyStatus = (providerId: string) => {
   const queryClient = useQueryClient();
@@ -243,6 +245,8 @@ export default function MarketDataSettingsPage() {
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
   const { mutate: setApiKey } = useSetApiKey();
   const { mutate: deleteApiKey } = useDeleteApiKey();
+  const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
+  const { mutate: recalculatePortfolio, isPending: isRecalculating } = useRecalculatePortfolioMutation();
 
   const [priorityInputs, setPriorityInputs] = useState<{ [providerId: string]: number }>({});
 
@@ -288,10 +292,38 @@ export default function MarketDataSettingsPage() {
 
   return (
     <div className="space-y-6 text-foreground">
-      <SettingsHeader
-        heading="Market Data Providers"
-        text="Manage settings for your market data providers."
-      />
+      <SettingsHeader heading="Market Data" text="Manage settings for your market data providers.">
+        <div className="flex gap-2">
+          <ActionConfirm
+            handleConfirm={() => recalculatePortfolio()}
+            isPending={isRecalculating}
+            confirmTitle="Are you sure?"
+            confirmMessage="This will refetch all market data history and recalculate the portfolio."
+            confirmButtonText="Refetch"
+            pendingText="Refetching..."
+            cancelButtonText="Cancel"
+            confirmButtonVariant="destructive"
+            button={
+              <Button variant="outline" size="sm" disabled={isRecalculating}>
+                {isRecalculating ? (
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.Clock className="mr-2 h-4 w-4" />
+                )}
+                Refetch all
+              </Button>
+            }
+          />
+          <Button size="sm" disabled={isUpdating} onClick={() => updatePortfolio()}>
+            {isUpdating ? (
+              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Refresh className="mr-2 h-4 w-4" />
+            )}
+            Update
+          </Button>
+        </div>
+      </SettingsHeader>
       <Separator />
       <div>
         {providers?.length === 0 ? (
