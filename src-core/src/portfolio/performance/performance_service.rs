@@ -340,7 +340,7 @@ impl PerformanceService {
         let effective_end_date =
             end_date_opt.unwrap_or_else(|| chrono::Local::now().naive_local().date());
         let effective_start_date =
-            start_date_opt.unwrap_or_else(|| effective_end_date - chrono::Duration::days(365));
+            start_date_opt.unwrap_or_else(|| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
 
         if effective_start_date > effective_end_date {
             return Err(errors::Error::Validation(ValidationError::InvalidInput(
