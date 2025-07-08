@@ -4,7 +4,6 @@ use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
-        .item(&PredefinedMenuItem::about(app, None, None)?)
         .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
         .separator()
         .item(&PredefinedMenuItem::hide(app, None).unwrap())
@@ -34,7 +33,7 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
         // Add the new menu item for checking updates
         .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
         .separator()
-        .item(&PredefinedMenuItem::about(app, None, None)?)
+        .item(&MenuItemBuilder::with_id("show_about_dialog", "About Wealthfolio").build(app)?)
         .build()?;
 
     let menu = MenuBuilder::new(app)
@@ -71,6 +70,16 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
             tauri::async_runtime::spawn(async move {
                 crate::updater::check_for_update(app_handle, &instance_id, true).await;
             });
+        }
+        "show_about_dialog" => {
+            let package_info = app.package_info();
+            let app_name = &package_info.name;
+            let app_version = &package_info.version.to_string();
+            let message = format!("{} version {}", app_name, app_version);
+            app.dialog()
+                .message(message)
+                .title(&format!("About {}", app_name))
+                .show(|_| {});
         }
         _ => {}
     }
