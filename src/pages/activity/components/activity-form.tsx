@@ -57,15 +57,17 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
 export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
 
-  const isValidActivityType = (type: string | undefined): type is NewActivityFormValues['activityType'] => {
+  const isValidActivityType = (
+    type: string | undefined,
+  ): type is NewActivityFormValues['activityType'] => {
     return type ? Object.keys(ACTIVITY_TYPE_TO_TAB).includes(type) : false;
   };
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
     accountId: activity?.accountId || '',
     activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
-    amount: activity?.amount ,
-    quantity: activity?.quantity ,
+    amount: activity?.amount,
+    quantity: activity?.quantity,
     unitPrice: activity?.unitPrice,
     fee: activity?.fee || 0,
     isDraft: activity?.isDraft || false,
@@ -78,6 +80,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
       return date;
     })(),
+
     currency: activity?.currency || '',
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
     showCurrencySelect: false,
@@ -87,7 +90,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     resolver: zodResolver(newActivitySchema),
     defaultValues,
   });
-  
+
   // Reset form when dialog closes or activity changes
   useEffect(() => {
     if (!open) {
@@ -107,14 +110,18 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const { id, ...submitData } = submissionData;
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
-      if (['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(submitData.activityType)) {
+      if (
+        ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
+          submitData.activityType,
+        )
+      ) {
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
         }
       }
-       if (account) {
-         submitData.currency = submitData.currency || account.currency;
-       }
+      if (account) {
+        submitData.currency = submitData.currency || account.currency;
+      }
       if (id) {
         return await updateActivityMutation.mutateAsync({ id, ...submitData });
       }
@@ -126,11 +133,13 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     }
   }
 
-  const defaultTab = activity ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'holdings' : 'holdings';
+  const defaultTab = activity
+    ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'holdings'
+    : 'holdings';
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="space-y-8 sm:max-w-[625px]">
+      <SheetContent className="space-y-8 overflow-y-auto sm:max-w-[625px]">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <SheetTitle>{activity?.id ? 'Update Activity' : 'Add Activity'}</SheetTitle>
