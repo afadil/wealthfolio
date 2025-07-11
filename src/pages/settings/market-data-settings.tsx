@@ -255,8 +255,6 @@ function ProviderSettings({
 export default function MarketDataSettingsPage() {
   const { data: providers, isLoading, error } = useMarketDataProviderSettings();
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
-  const { mutate: setApiKey } = useSetApiKey();
-  const { mutate: deleteApiKey } = useDeleteApiKey();
   const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
   const { mutate: recalculatePortfolio, isPending: isRecalculating } = useRecalculatePortfolioMutation();
 
