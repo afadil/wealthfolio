@@ -80,6 +80,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
       return date;
     })(),
+
     currency: activity?.currency || '',
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
     showCurrencySelect: false,
@@ -115,9 +116,9 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       ) {
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
-          submitData.currency = submitData.currency || account.currency;
         }
       }
+
       if ('assetDataSource' in submitData && submitData.assetDataSource === DataSource.MANUAL && account) {
         submitData.currency = submitData.currency || account.currency;
       }
