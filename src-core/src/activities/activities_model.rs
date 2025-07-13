@@ -330,9 +330,9 @@ pub struct ImportMapping {
     pub field_mappings: String,
     pub activity_mappings: String,
     pub symbol_mappings: String,
-    pub account_mappings: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub account_mappings: String,
 }
 
 /// Model for activity import mapping data with structured mappings

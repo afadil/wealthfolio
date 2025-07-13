@@ -185,6 +185,12 @@ wealthfolio/
 └── vite.config.ts       # Vite build tool configuration
 ```
 
+### API Keys
+
+API credentials are stored using the operating system keyring through the
+`keyring` crate. Use the `set_api_key` and `get_api_key` commands to manage
+keys for external services without writing them to disk.
+
 ## Contributing
 
 Contributions are welcome! Please follow these steps:

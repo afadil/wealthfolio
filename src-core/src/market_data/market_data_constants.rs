@@ -1,7 +1,9 @@
 /// Data source identifiers
 pub const DATA_SOURCE_YAHOO: &str = "YAHOO";
 pub const DATA_SOURCE_MANUAL: &str = "MANUAL";
+pub const DATA_SOURCE_MARKET_DATA_APP: &str = "MARKETDATA_APP";
 pub const DATA_SOURCE_CALCULATED: &str = "CALCULATED";
+pub const DATA_SOURCE_ALPHA_VANTAGE: &str = "ALPHA_VANTAGE";
 
 /// Default values
 pub const DEFAULT_QUOTE_BATCH_SIZE: usize = 1000;

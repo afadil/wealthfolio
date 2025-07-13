@@ -112,7 +112,7 @@ impl YahooProvider {
             }
             Err(_) => {
                 // If the primary method fails, try the backup method
-                self.get_latest_quote_backup(symbol).await
+                self.get_latest_quote_backup(symbol, fallback_currency).await
             }
         }
     }
@@ -154,7 +154,7 @@ impl YahooProvider {
                     DateTime::<Utc>::from(start).format("%Y-%m-%d"), 
                     DateTime::<Utc>::from(end).format("%Y-%m-%d")
                 );
-                Ok(vec![])
+                Err(MarketDataError::NoData)
             }
             Err(e) => { // e is any other yahoo::YahooError
                 Err(MarketDataError::from(e))
@@ -162,7 +162,7 @@ impl YahooProvider {
         }
     }
 
-    async fn get_latest_quote_backup(&self, symbol: &str) -> Result<ModelQuote, yahoo::YahooError> {
+    async fn get_latest_quote_backup(&self, symbol: &str, fallback_currency: String) -> Result<ModelQuote, yahoo::YahooError> {
         let asset_profile = self.fetch_asset_profile(symbol).await?;
 
         let price = asset_profile
@@ -228,7 +228,7 @@ impl YahooProvider {
                     .unwrap_or(0.0),
             )
             .unwrap_or_default(),
-            currency: price.currency.clone().unwrap_or_else(|| "USD".to_string()),
+            currency: price.currency.clone().unwrap_or(fallback_currency),
         })
     }
 
@@ -595,10 +595,11 @@ impl YahooProvider {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        const BATCH_SIZE: usize = 2; 
+        const BATCH_SIZE: usize = 2;
 
         let mut all_quotes = Vec::new();
-        let mut errors: Vec<(String, String)> = Vec::new();
+        let mut failed_symbols: Vec<(String, String)> = Vec::new();
+        let mut errors_for_logging: Vec<(String, String)> = Vec::new();
 
         for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
             let futures: Vec<_> = chunk
@@ -616,8 +617,8 @@ impl YahooProvider {
                             )
                             .await
                         {
-                            Ok(quotes) => Ok((symbol_clone, quotes)),
-                            Err(e) => Err((symbol_clone, e.to_string())),
+                            Ok(quotes) => Ok(quotes),
+                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
                         }
                     }
                 })
@@ -627,22 +628,25 @@ impl YahooProvider {
 
             for result in results {
                 match result {
-                    Ok((_, quotes)) => all_quotes.extend(quotes),
-                    Err((symbol, error)) => errors.push((symbol, error)),
+                    Ok(quotes) => all_quotes.extend(quotes),
+                    Err((symbol, currency, error)) => {
+                        failed_symbols.push((symbol.clone(), currency));
+                        errors_for_logging.push((symbol, error));
+                    }
                 }
             }
         }
 
         // Log errors but don't fail the entire operation
-        if !errors.is_empty() {
+        if !errors_for_logging.is_empty() {
             log::warn!(
                 "Failed to fetch history for {} symbols: {:?}",
-                errors.len(),
-                errors
+                errors_for_logging.len(),
+                errors_for_logging
             );
         }
 
-        Ok((all_quotes, errors))
+        Ok((all_quotes, failed_symbols))
     }
 }
 
@@ -653,14 +657,22 @@ impl AssetProfiler for YahooProvider {
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
-}
 
-#[async_trait::async_trait]
-impl MarketDataProvider for YahooProvider {
     async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
         self.search_ticker(query)
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))
+    }
+}
+
+#[async_trait::async_trait]
+impl MarketDataProvider for YahooProvider {
+    fn name(&self) -> &'static str {
+        "YAHOO"
+    }
+
+    fn priority(&self) -> u8 {
+        1
     }
 
     async fn get_latest_quote(
@@ -682,7 +694,6 @@ impl MarketDataProvider for YahooProvider {
     ) -> Result<Vec<ModelQuote>, MarketDataError> {
         self.get_historical_quotes(symbol, start, end, fallback_currency)
             .await
-            .map_err(|e| MarketDataError::ProviderError(e.to_string()))
     }
 
     async fn get_historical_quotes_bulk(

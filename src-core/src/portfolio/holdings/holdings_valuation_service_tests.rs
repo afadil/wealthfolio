@@ -109,6 +109,8 @@ mod tests {
         fn get_historical_quotes_for_symbols_in_range(&self, _symbols: &HashSet<String>, _start_date: NaiveDate, _end_date: NaiveDate) -> Result<Vec<Quote>> { unimplemented!() }
         async fn get_daily_quotes(&self, _asset_ids: &HashSet<String>, _start_date: NaiveDate, _end_date: NaiveDate) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>> { unimplemented!() }
         async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> { unimplemented!() }
+        async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>> { unimplemented!() }
+        async fn update_market_data_provider_settings(&self, _provider_id: String, _priority: i32, _enabled: bool) -> Result<MarketDataProviderSetting> { unimplemented!() }
 
         fn get_latest_quotes_pair_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, LatestQuotePair>> {
             if self.should_fail.lock().unwrap().clone() {

@@ -3,6 +3,7 @@ use chrono::{NaiveDate, NaiveDateTime};
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
+use crate::market_data::market_data_model::{MarketDataProviderSetting, UpdateMarketDataProviderSetting};
 use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo};
 use super::providers::models::AssetProfile;
 
@@ -46,6 +47,14 @@ pub trait MarketDataServiceTrait: Send + Sync {
         end_date: NaiveDate,
     ) -> Result<HashMap<NaiveDate, HashMap<String, Quote>>>;
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>>;
+    async fn get_market_data_providers_settings(&self) -> Result<Vec<MarketDataProviderSetting>>;
+    async fn update_market_data_provider_settings(
+        &self,
+        provider_id: String,
+        priority: i32,
+        enabled: bool,
+    ) -> Result<MarketDataProviderSetting>;
+
 }
 
 #[async_trait]
@@ -82,4 +91,11 @@ pub trait MarketDataRepositoryTrait {
         source: &str,
     ) -> Result<Vec<Quote>>;
     fn get_latest_sync_dates_by_source(&self) -> Result<HashMap<String, Option<NaiveDateTime>>>;
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>>;
+    fn get_provider_by_id(&self, provider_id: &str) -> Result<MarketDataProviderSetting>;
+    async fn update_provider_settings(
+        &self,
+        provider_id: String,
+        changes: UpdateMarketDataProviderSetting,
+    ) -> Result<MarketDataProviderSetting>;
 }

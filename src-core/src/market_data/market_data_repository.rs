@@ -7,11 +7,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::market_data_errors::MarketDataError;
-use super::market_data_model::Quote;
+use super::market_data_model::{
+    LatestQuotePair, MarketDataProviderSetting, Quote, QuoteDb, UpdateMarketDataProviderSetting,
+};
 use super::market_data_traits::MarketDataRepositoryTrait;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::Result;
-use crate::market_data::market_data_model::{LatestQuotePair, QuoteDb};
 use crate::schema::quotes::dsl::{quotes, symbol, timestamp};
 use diesel::sql_query;
 use diesel::sql_types::Text;
@@ -20,6 +21,7 @@ use diesel::sqlite::Sqlite;
 // Import for daily_account_valuation table
 use super::market_data_constants::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
 use crate::schema::daily_account_valuation::dsl as dav_dsl;
+use crate::schema::market_data_providers::dsl as market_data_providers_dsl;
 
 pub struct MarketDataRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -362,5 +364,43 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         sync_dates_map.insert(DATA_SOURCE_MANUAL.to_string(), latest_sync_naive_datetime);
 
         Ok(sync_dates_map)
+    }
+
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
+        let mut conn = get_connection(&self.pool)?;
+        market_data_providers_dsl::market_data_providers
+            .order(market_data_providers_dsl::priority.desc())
+            .select(MarketDataProviderSetting::as_select())
+            .load::<MarketDataProviderSetting>(&mut conn)
+            .map_err(|e| MarketDataError::DatabaseError(e).into())
+    }
+
+    fn get_provider_by_id(&self, provider_id_input: &str) -> Result<MarketDataProviderSetting> {
+        let mut conn = get_connection(&self.pool)?;
+        market_data_providers_dsl::market_data_providers
+            .find(provider_id_input)
+            .select(MarketDataProviderSetting::as_select())
+            .first::<MarketDataProviderSetting>(&mut conn)
+            .map_err(|e| MarketDataError::DatabaseError(e).into())
+    }
+
+    async fn update_provider_settings(
+        &self,
+        provider_id_input: String,
+        changes: UpdateMarketDataProviderSetting,
+    ) -> Result<MarketDataProviderSetting> {
+        self.writer
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<MarketDataProviderSetting> {
+                    diesel::update(
+                        market_data_providers_dsl::market_data_providers
+                            .find(&provider_id_input),
+                    )
+                    .set(&changes)
+                    .get_result(conn)
+                    .map_err(|e| MarketDataError::DatabaseError(e).into())
+                },
+            )
+            .await
     }
 }

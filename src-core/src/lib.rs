@@ -12,6 +12,7 @@ pub mod market_data;
 pub mod portfolio;
 pub mod schema;
 pub mod settings;
+pub mod secrets;
 pub mod utils;
 pub use portfolio::*;
 pub use assets::*;
