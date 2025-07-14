@@ -32,34 +32,6 @@ fn get_symbols_to_sync(
     Ok(symbols)
 }
 
-// Helper function to generate symbols for imported activities (batch)
-fn get_all_symbols_to_sync(
-    state: &State<'_, Arc<ServiceContext>>,
-    account_id: &str,
-    activities: &[ActivityImport], // Use slice
-) -> Result<Vec<String>, String> {
-    let account = state
-        .account_service()
-        .get_account(account_id)
-        .map_err(|e| format!("Failed to get account {}: {}", account_id, e))?;
-    let account_currency = account.currency;
-
-    let mut all_symbols: HashSet<String> = HashSet::new();
-
-    for activity_import in activities {
-        // Add asset symbol
-        if !activity_import.symbol.is_empty() {
-            all_symbols.insert(activity_import.symbol.clone());
-        }
-
-        // Add FX symbol if currencies differ
-        if !activity_import.currency.is_empty() && activity_import.currency != account_currency {
-            let fx_symbol = format!("{}{}=X", account_currency, activity_import.currency);
-            all_symbols.insert(fx_symbol);
-        }
-    }
-    Ok(all_symbols.into_iter().collect())
-}
 
 #[tauri::command]
 pub async fn get_activities(
@@ -211,26 +183,39 @@ pub async fn check_activities_import(
 
 #[tauri::command]
 pub async fn import_activities(
-    account_id: String,
     activities: Vec<ActivityImport>,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
 ) -> Result<Vec<ActivityImport>, String> {
-    debug!("Importing activities for account: {}", account_id);
+    debug!("Importing activities...");
 
-    // Generate symbols (including FX) using the new helper function
-    let symbols_for_payload = get_all_symbols_to_sync(&state, &account_id, &activities)?;
+    let mut all_symbols = std::collections::HashSet::new();
+    let mut all_account_ids = std::collections::HashSet::new();
+
+    for activity in &activities {
+        if let Some(account_id) = &activity.account_id {
+            all_account_ids.insert(account_id.clone());
+            let account = state.account_service().get_account(account_id).map_err(|e| e.to_string())?;
+            if !activity.currency.is_empty() && activity.currency != account.currency {
+                let fx_symbol = format!("{}{}=X", account.currency, activity.currency);
+                all_symbols.insert(fx_symbol);
+            }
+        }
+        if !activity.symbol.is_empty() {
+            all_symbols.insert(activity.symbol.clone());
+        }
+    }
 
     let result = state
         .activity_service()
-        .import_activities(account_id.clone(), activities) // activities is moved here
+        .import_activities(activities)
         .await?;
     let handle = handle.clone();
 
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id])) // account_id is still available
+        .account_ids(Some(all_account_ids.into_iter().collect()))
         .refetch_all_market_data(true)
-        .symbols(Some(symbols_for_payload))
+        .symbols(Some(all_symbols.into_iter().collect()))
         .build();
     emit_portfolio_trigger_recalculate(&handle, payload);
 

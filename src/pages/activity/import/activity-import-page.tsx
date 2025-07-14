@@ -93,14 +93,14 @@ const ActivityImportPage = () => {
 
   // Handle mapping completion from MappingStep
   const handleMappingComplete = async (mapping: ImportMappingData) => {
-    if (!selectedAccount?.id || !data || data.length < 2) {
-      logger.error('Missing account ID or CSV data');
+    if (!data || data.length < 2) {
+      logger.error('Missing CSV data');
       return;
     }
 
     try {
       // Validate data and store results
-      const results = validateActivityImport(data, mapping, selectedAccount.id, selectedAccount.currency);
+      const results = validateActivityImport(data, mapping, selectedAccount?.id, selectedAccount?.currency);
 
       // Update state with validated activities
       setActivities(results.activities);

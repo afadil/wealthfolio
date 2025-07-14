@@ -180,8 +180,16 @@ impl ActivityServiceTrait for ActivityService {
 
         for mut activity in activities {
             activity.id = Some(Uuid::new_v4().to_string());
-            activity.account_name = Some(account.name.clone());
-            activity.account_id = Some(account_id.clone());
+
+            // If the activity doesn't have an account_id, use the one passed in
+            if activity.account_id.is_none() {
+                activity.account_id = Some(account_id.clone());
+                activity.account_name = Some(account.name.clone());
+            } else {
+                // If it does, fetch the account and set the name
+                let activity_account = self.account_service.get_account(activity.account_id.as_ref().unwrap())?;
+                activity.account_name = Some(activity_account.name.clone());
+            }
 
             // Determine context currency for potential asset creation during check
             let asset_context_currency = if !activity.currency.is_empty() {
@@ -244,14 +252,23 @@ impl ActivityServiceTrait for ActivityService {
     /// Imports activities after validation
     async fn import_activities(
         &self,
-        account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>> {
-        let validated_activities = self
-            .check_activities_import(account_id.clone(), activities)
-            .await?;
+        let mut all_validated_activities = Vec::new();
 
-        let has_errors = validated_activities.iter().any(|activity| {
+        // Group activities by account_id
+        let mut activities_by_account: std::collections::HashMap<String, Vec<ActivityImport>> = std::collections::HashMap::new();
+        for activity in activities {
+            let account_id = activity.account_id.clone().ok_or_else(|| ActivityError::InvalidData("Missing account ID in activity".to_string()))?;
+            activities_by_account.entry(account_id).or_default().push(activity);
+        }
+
+        for (account_id, account_activities) in activities_by_account {
+            let validated_activities = self.check_activities_import(account_id, account_activities).await?;
+            all_validated_activities.extend(validated_activities);
+        }
+
+        let has_errors = all_validated_activities.iter().any(|activity| {
             !activity.is_valid
                 || activity
                     .errors
@@ -260,10 +277,10 @@ impl ActivityServiceTrait for ActivityService {
         });
 
         if has_errors {
-            return Ok(validated_activities);
+            return Ok(all_validated_activities);
         }
 
-        let new_activities: Vec<NewActivity> = validated_activities
+        let new_activities: Vec<NewActivity> = all_validated_activities
             .iter()
             .map(|activity| NewActivity {
                 id: activity.id.clone(),
@@ -284,7 +301,7 @@ impl ActivityServiceTrait for ActivityService {
         let count = self.activity_repository.create_activities(new_activities).await?;
         debug!("Successfully imported {} activities", count);
 
-        Ok(validated_activities)
+        Ok(all_validated_activities)
     }
 
     /// Gets the first activity date for given account IDs

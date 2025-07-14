@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { logger } from '@/adapters';
-import { importActivities } from '@/commands/activity-import';
+import { importActivities } from '@/commands/activity';
 import { toast } from '@/components/ui/use-toast';
+import type { ActivityImport } from '@/lib/types';
 
 export function useActivityImportMutations({
   onSuccess,
@@ -12,7 +13,7 @@ export function useActivityImportMutations({
 } = {}) {
 
   const confirmImportMutation = useMutation({
-    mutationFn: importActivities,
+    mutationFn: (activities: ActivityImport[]) => importActivities(activities),
     onSuccess: async (result: any) => {
       // Call the provided onSuccess callback if it exists
       if (onSuccess) {
