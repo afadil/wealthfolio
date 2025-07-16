@@ -41,7 +41,8 @@ const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
 const AccountPage = () => {
   const { id = '' } = useParams<{ id: string }>();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
-  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>(INITIAL_INTERVAL_CODE);
+  const [selectedIntervalCode, setSelectedIntervalCode] =
+    useState<TimePeriod>(INITIAL_INTERVAL_CODE);
 
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
@@ -67,9 +68,10 @@ const AccountPage = () => {
   );
 
   // Calculate gainLossAmount and simpleReturn from valuationHistory
-  const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } = useMemo(() => {
-    return calculatePerformanceMetrics(valuationHistory, false);
-  }, [valuationHistory, id]);
+  const { gainLossAmount: frontendGainLossAmount, simpleReturn: frontendSimpleReturn } =
+    useMemo(() => {
+      return calculatePerformanceMetrics(valuationHistory, false);
+    }, [valuationHistory, id]);
 
   const chartData: HistoryChartData[] = useMemo(() => {
     if (!valuationHistory) return [];
@@ -90,7 +92,7 @@ const AccountPage = () => {
   const handleIntervalSelect = (
     code: TimePeriod,
     _description: string,
-    range: DateRange | undefined
+    range: DateRange | undefined,
   ) => {
     setSelectedIntervalCode(code);
     setDateRange(range);

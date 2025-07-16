@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -7,6 +7,65 @@ import { AccountValuation, PerformanceMetrics } from '@/lib/types';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { PerformanceGrid } from '@/pages/account/performance-grid';
 import { formatDate } from '@/lib/utils';
+import { MoneyInput } from '@/components/ui/money-input';
+import { Button } from '@/components/ui/button';
+import { Icons } from '@/components/icons';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useBalanceUpdate } from './use-balance-update';
+
+interface EditableBalanceProps {
+  account: AccountValuation;
+  initialBalance: number;
+  currency: string;
+}
+
+const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalance, currency }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [balance, setBalance] = useState(initialBalance);
+  const { updateBalance, isPending } = useBalanceUpdate(account);
+
+  const handleSave = () => {
+    updateBalance(balance);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2">
+        <MoneyInput value={balance} onChange={(e) => setBalance(Number(e.target.value))} />
+        <Button size="sm" onClick={handleSave} disabled={isPending}>
+          {isPending ? (
+            <Icons.Spinner className="h-4 w-4 animate-spin" />
+          ) : (
+            <Icons.Check className="h-4 w-4" />
+          )}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+          <Icons.Close className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="flex items-center gap-2 text-lg font-extrabold cursor-pointer"
+            onClick={() => setIsEditing(true)}
+          >
+            <PrivacyAmount value={initialBalance} currency={currency} />
+            <Icons.Pencil className="h-4 w-4 cursor-pointer text-muted-foreground" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Click to update the cash balance</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 interface AccountMetricsProps {
   valuation?: AccountValuation | null;
@@ -28,7 +87,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
           <Skeleton className="h-6 w-32" />
           <Skeleton className="h-7 w-24" />
         </CardHeader>
-        <CardContent className='space-y-6'>
+        <CardContent className="space-y-6">
           <Separator className="mb-4" />
           <div className="space-y-4 text-sm">
             <div className="flex justify-between">
@@ -53,7 +112,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
       </Card>
     );
 
-  const displayCurrency = valuation?.accountCurrency || 'USD';
+  const displayCurrency = valuation?.accountCurrency || valuation.baseCurrency;
 
   const rows = [
     {
@@ -79,11 +138,15 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-bold">Cash Balance</CardTitle>
-        <div className="text-lg font-extrabold">
-          <PrivacyAmount value={valuation?.cashBalance || 0} currency={displayCurrency} />
-        </div>
+        {valuation && (
+          <EditableBalance
+            account={valuation}
+            initialBalance={valuation?.cashBalance || 0}
+            currency={displayCurrency}
+          />
+        )}
       </CardHeader>
-      <CardContent className='space-y-6'>
+      <CardContent className="space-y-6">
         <Separator className="mb-4" />
         <div className="space-y-4 text-sm">
           {rows.map(({ label, value }, idx) => (
@@ -97,7 +160,9 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
         <PerformanceGrid performance={performance} isLoading={isLoading} />
       </CardContent>
       <CardFooter className="flex justify-end pb-0">
-        <p className="p-0 m-0 text-xs text-muted-foreground">from {formattedStartDate} to {formattedEndDate}</p>
+        <p className="m-0 p-0 text-xs text-muted-foreground">
+          from {formattedStartDate} to {formattedEndDate}
+        </p>
       </CardFooter>
     </Card>
   );
