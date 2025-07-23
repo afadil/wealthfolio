@@ -27,7 +27,6 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
     const currentBalance = account.cashBalance || 0;
     const difference = newBalance - currentBalance;
 
-    console.log('difference', difference);
     if (difference === 0) return;
 
     const activityType = difference > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
@@ -44,7 +43,6 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
       comment: 'Balance updated manually',
     };
 
-    console.log('newActivity', newActivity);
     mutation.mutate(newActivity);
   };
 
