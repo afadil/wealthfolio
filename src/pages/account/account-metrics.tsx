@@ -120,7 +120,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
       </Card>
     );
 
-  const displayCurrency = valuation?.accountCurrency || valuation.baseCurrency;
+  const displayCurrency = valuation?.accountCurrency || valuation?.baseCurrency;
 
   const rows = [
     {
