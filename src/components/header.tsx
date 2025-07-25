@@ -2,7 +2,6 @@ import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 
 interface ApplicationHeaderProps {
   heading: string;
@@ -24,7 +23,6 @@ export function ApplicationHeader({
   backUrl,
 }: ApplicationHeaderProps) {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   return (
     <div className={cn('flex w-full items-center justify-between', className)}>
       <div className="flex items-center gap-2">
@@ -51,7 +49,7 @@ export function ApplicationHeader({
             </>
           )}
 
-          <h1 className="font-heading text-xl font-bold tracking-tight">{t(heading)}</h1>
+          <h1 className="font-heading text-xl font-bold tracking-tight">{heading}</h1>
           {text && <p className="ml-4 text-lg font-light text-muted-foreground">{text}</p>}
         </div>
       </div>
