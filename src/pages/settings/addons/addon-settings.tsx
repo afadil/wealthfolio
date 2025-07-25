@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DeleteConfirm } from '@/components/delete-confirm';
 import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
 import { triggerAllDisableCallbacks } from '@/addon/runtimeContext';
-import { reloadAllAddons, analyzeAddonFromCode } from '@/addon/pluginLoader';
+import { reloadAllAddons } from '@/addon/pluginLoader';
 import {
   installAddonZip,
   listInstalledAddons,
@@ -23,6 +23,7 @@ import {
   extractAddonZip,
 } from '@/commands/addon';
 import type { InstalledAddon } from '@/adapters/tauri';
+import type { Permission, RiskLevel } from '@wealthfolio/addon-sdk';
 
 export default function AddonSettingsPage() {
   const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([]);
@@ -34,8 +35,8 @@ export default function AddonSettingsPage() {
   const [permissionDialog, setPermissionDialog] = useState<{
     open: boolean;
     manifest?: any;
-    detectedCategories?: any[];
-    riskLevel?: 'low' | 'medium' | 'high';
+    permissions?: Permission[];
+    riskLevel?: RiskLevel;
     fileData?: Uint8Array;
     onApprove?: () => void;
   }>({
@@ -46,9 +47,8 @@ export default function AddonSettingsPage() {
   const [viewPermissionDialog, setViewPermissionDialog] = useState<{
     open: boolean;
     addon?: InstalledAddon;
-    detectedCategories?: any[];
-    declaredPermissions?: any[];
-    riskLevel?: 'low' | 'medium' | 'high';
+    permissions?: Permission[];
+    riskLevel?: RiskLevel;
   }>({
     open: false,
   });
@@ -111,20 +111,16 @@ export default function AddonSettingsPage() {
       // First, extract and analyze the addon to check permissions
       const extractedAddon = await extractAddonZip(fileData);
 
-      // Find the main file and analyze permissions
-      const mainFile = extractedAddon.files.find((f) => f.is_main);
-      if (!mainFile) {
-        throw new Error('No main addon file found');
-      }
-
-      const permissionAnalysis = analyzeAddonFromCode(mainFile.content);
+      // Calculate risk level based on permissions
+      const permissions = extractedAddon.metadata.permissions || [];
+      const riskLevel = calculateRiskLevel(permissions);
 
       // Show permission dialog
       setPermissionDialog({
         open: true,
         manifest: extractedAddon.metadata,
-        detectedCategories: permissionAnalysis.categories,
-        riskLevel: permissionAnalysis.riskLevel,
+        permissions,
+        riskLevel,
         fileData,
         onApprove: async () => {
           setPermissionDialog({ open: false });
@@ -143,6 +139,19 @@ export default function AddonSettingsPage() {
       // Still allow installation but with warning
       await performAddonInstallation(fileData);
     }
+  };
+
+  // Helper function to calculate risk level from permissions
+  const calculateRiskLevel = (permissions: Permission[]): RiskLevel => {
+    const hasHighRiskCategories = permissions.some(perm => 
+      ['accounts', 'activities', 'settings'].includes(perm.category)
+    );
+    const hasMediumRiskCategories = permissions.some(perm => 
+      ['portfolio', 'files', 'financial-planning'].includes(perm.category)
+    );
+    
+    return hasHighRiskCategories ? 'high' : 
+           hasMediumRiskCategories ? 'medium' : 'low';
   };
 
   const performAddonInstallation = async (fileData: Uint8Array) => {
@@ -234,34 +243,16 @@ export default function AddonSettingsPage() {
 
   const handleViewPermissions = async (addon: InstalledAddon) => {
     try {
-      // Use the stored permissions from the addon metadata instead of analyzing code
-      // This gives us access to the merged permissions with isDeclared/isDetected flags
+      // Use the stored permissions from the addon metadata
       const storedPermissions = addon.metadata.permissions || [];
       
-      // Convert stored permissions to the expected format for display
-      const declaredPermissions = storedPermissions.map(perm => ({
-        category: perm.category,
-        functions: perm.functions,
-        purpose: perm.purpose,
-        isDeclared: perm.is_declared,
-        isDetected: perm.is_detected,
-      }));
-
       // Calculate risk level based on stored permissions
-      const hasHighRiskCategories = storedPermissions.some(perm => 
-        ['accounts', 'activities', 'settings'].includes(perm.category)
-      );
-      const hasMediumRiskCategories = storedPermissions.some(perm => 
-        ['portfolio', 'files', 'financial-planning'].includes(perm.category)
-      );
-      
-      const riskLevel = hasHighRiskCategories ? 'high' : 
-                       hasMediumRiskCategories ? 'medium' : 'low';
+      const riskLevel = calculateRiskLevel(storedPermissions);
 
       setViewPermissionDialog({
         open: true,
         addon,
-        declaredPermissions,
+        permissions: storedPermissions,
         riskLevel,
       });
     } catch (error) {
@@ -485,7 +476,7 @@ export default function AddonSettingsPage() {
         open={permissionDialog.open}
         onOpenChange={(open) => setPermissionDialog({ ...permissionDialog, open })}
         manifest={permissionDialog.manifest}
-        detectedCategories={permissionDialog.detectedCategories || []}
+        declaredPermissions={permissionDialog.permissions || []}
         riskLevel={permissionDialog.riskLevel || 'low'}
         onApprove={() => {
           if (permissionDialog.onApprove) {
@@ -507,8 +498,7 @@ export default function AddonSettingsPage() {
           open={viewPermissionDialog.open}
           onOpenChange={(open) => setViewPermissionDialog({ ...viewPermissionDialog, open })}
           manifest={viewPermissionDialog.addon.metadata}
-          detectedCategories={[]}
-          declaredPermissions={viewPermissionDialog.declaredPermissions || []}
+          declaredPermissions={viewPermissionDialog.permissions || []}
           riskLevel={viewPermissionDialog.riskLevel || 'low'}
           onApprove={() => {
             setViewPermissionDialog({ open: false });

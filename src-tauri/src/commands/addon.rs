@@ -5,48 +5,98 @@ use tauri::AppHandle;
 use tauri::Manager;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AddonFile {
     pub name: String,
     pub content: String,
     pub is_main: bool,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
-pub struct AddonPermission {
-    pub category: String,
-    pub functions: Vec<String>,
-    pub purpose: String,
-    /// Whether this permission was declared by the developer in manifest
-    pub is_declared: Option<bool>,
-    /// Whether this permission was detected by static analysis during installation
-    pub is_detected: Option<bool>,
-    /// ISO timestamp when this permission was detected (if is_detected is true)
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionPermission {
+    /// Function name
+    pub name: String,
+    /// Whether this function was declared by the developer in manifest
+    pub is_declared: bool,
+    /// Whether this function was detected by static analysis during installation
+    pub is_detected: bool,
+    /// ISO timestamp when this function was detected (if is_detected is true)
     pub detected_at: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
-pub struct AddonMetadata {
+#[serde(rename_all = "camelCase")]
+pub struct AddonPermission {
+    pub category: String,
+    pub functions: Vec<FunctionPermission>,
+    pub purpose: String,
+}
+
+/// Base addon manifest structure matching the SDK
+/// This represents what developers write in their manifest.json
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonManifest {
     pub id: String,
     pub name: String,
     pub version: String,
     pub description: Option<String>,
     pub author: Option<String>,
-    pub main: String,
     #[serde(rename = "sdkVersion")]
     pub sdk_version: Option<String>,
+    pub main: Option<String>,
+    pub enabled: Option<bool>,
     pub permissions: Option<Vec<AddonPermission>>,
-    // Runtime fields added when saving
-    pub enabled: bool,
+    pub homepage: Option<String>,
+    pub repository: Option<String>,
+    pub license: Option<String>,
+    #[serde(rename = "minWealthfolioVersion")]
+    pub min_wealthfolio_version: Option<String>,
+    pub keywords: Option<Vec<String>>,
+    pub icon: Option<String>,
+}
+
+/// Extended addon metadata with runtime and installation information
+/// This matches the SDK's AddonMetadata interface
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AddonMetadata {
+    // Base manifest fields
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub description: Option<String>,
+    pub author: Option<String>,
+    #[serde(rename = "sdkVersion")]
+    pub sdk_version: Option<String>,
+    pub main: String, // Required after installation
+    pub homepage: Option<String>,
+    pub repository: Option<String>,
+    pub license: Option<String>,
+    #[serde(rename = "minWealthfolioVersion")]
+    pub min_wealthfolio_version: Option<String>,
+    pub keywords: Option<Vec<String>>,
+    pub icon: Option<String>,
+    
+    // Runtime fields
+    pub enabled: bool, // Required after installation
     pub installed_at: String,
+    pub updated_at: Option<String>,
+    pub source: Option<String>, // 'local' | 'store' | 'sideload'
+    pub size: Option<u64>,
+    pub permissions: Option<Vec<AddonPermission>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExtractedAddon {
     pub metadata: AddonMetadata,
     pub files: Vec<AddonFile>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InstalledAddon {
     pub metadata: AddonMetadata,
     pub file_path: String,
@@ -117,13 +167,21 @@ fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermission> {
             .map(|(_, _, purpose)| purpose.to_string())
             .unwrap_or_else(|| format!("Access to {} functions", category));
 
+        // Create FunctionPermission objects for detected functions
+        let function_permissions: Vec<FunctionPermission> = unique_functions
+            .into_iter()
+            .map(|func_name| FunctionPermission {
+                name: func_name,
+                is_declared: false,
+                is_detected: true,
+                detected_at: Some(current_time.clone()),
+            })
+            .collect();
+
         detected_permissions.push(AddonPermission {
             category,
-            functions: unique_functions,
+            functions: function_permissions,
             purpose,
-            is_declared: Some(false),
-            is_detected: Some(true),
-            detected_at: Some(current_time.clone()),
         });
     }
 
@@ -186,29 +244,28 @@ pub async fn install_addon_zip(
                 category: perm.category.clone(),
                 functions: perm.functions.clone(),
                 purpose: perm.purpose.clone(),
-                is_declared: Some(true),
-                is_detected: Some(false), // Will be updated if also detected
-                detected_at: None,
             });
         }
     }
     
-    // Then, add detected permissions and mark matches
+    // Then, add detected permissions and merge with declared ones
     for detected_perm in detected_permissions {
         // Check if this category already exists in declared permissions
         if let Some(existing) = merged_permissions.iter_mut().find(|p| p.category == detected_perm.category) {
-            // Mark as both declared and detected
-            existing.is_detected = Some(true);
-            existing.detected_at = detected_perm.detected_at.clone();
-            
-            // Merge functions (detected functions not in declared)
-            for func in &detected_perm.functions {
-                if !existing.functions.contains(func) {
-                    existing.functions.push(func.clone());
+            // Merge detected functions with declared functions
+            for detected_func in &detected_perm.functions {
+                // Check if this function already exists in declared functions
+                if let Some(existing_func) = existing.functions.iter_mut().find(|f| f.name == detected_func.name) {
+                    // Mark existing declared function as also detected
+                    existing_func.is_detected = true;
+                    existing_func.detected_at = detected_func.detected_at.clone();
+                } else {
+                    // Add new detected function
+                    existing.functions.push(detected_func.clone());
                 }
             }
         } else {
-            // Add as detected-only permission
+            // Add as detected-only permission category
             merged_permissions.push(detected_perm);
         }
     }
@@ -486,34 +543,40 @@ pub async fn redetect_addon_permissions(
     // First, preserve declared permissions
     if let Some(existing_perms) = &metadata.permissions {
         for perm in existing_perms {
-            if perm.is_declared.unwrap_or(false) {
+            // Only preserve functions that were declared
+            let declared_functions: Vec<FunctionPermission> = perm.functions
+                .iter()
+                .filter(|f| f.is_declared)
+                .cloned()
+                .collect();
+            
+            if !declared_functions.is_empty() {
                 merged_permissions.push(AddonPermission {
                     category: perm.category.clone(),
-                    functions: perm.functions.clone(),
+                    functions: declared_functions,
                     purpose: perm.purpose.clone(),
-                    is_declared: Some(true),
-                    is_detected: Some(false), // Will be updated if also detected
-                    detected_at: None,
                 });
             }
         }
     }
     
-    // Then, add detected permissions and mark matches
+    // Then, add detected permissions and merge with declared ones
     for detected_perm in detected_permissions {
         if let Some(existing) = merged_permissions.iter_mut().find(|p| p.category == detected_perm.category) {
-            // Mark as both declared and detected
-            existing.is_detected = Some(true);
-            existing.detected_at = detected_perm.detected_at.clone();
-            
-            // Merge functions
-            for func in &detected_perm.functions {
-                if !existing.functions.contains(func) {
-                    existing.functions.push(func.clone());
+            // Merge detected functions with declared functions
+            for detected_func in &detected_perm.functions {
+                // Check if this function already exists in declared functions
+                if let Some(existing_func) = existing.functions.iter_mut().find(|f| f.name == detected_func.name) {
+                    // Mark existing declared function as also detected
+                    existing_func.is_detected = true;
+                    existing_func.detected_at = detected_func.detected_at.clone();
+                } else {
+                    // Add new detected function
+                    existing.functions.push(detected_func.clone());
                 }
             }
         } else {
-            // Add as detected-only permission
+            // Add as detected-only permission category
             merged_permissions.push(detected_perm);
         }
     }
@@ -652,6 +715,40 @@ fn parse_manifest_json_metadata(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    let homepage = manifest_json
+        .get("homepage")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let repository = manifest_json
+        .get("repository")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let license = manifest_json
+        .get("license")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let min_wealthfolio_version = manifest_json
+        .get("minWealthfolioVersion")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let keywords = manifest_json
+        .get("keywords")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect::<Vec<String>>()
+        });
+
+    let icon = manifest_json
+        .get("icon")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
     // Parse permissions if they exist
     let permissions = manifest_json
         .get("permissions")
@@ -660,20 +757,28 @@ fn parse_manifest_json_metadata(
             arr.iter()
                 .filter_map(|perm| {
                     let category = perm.get("category")?.as_str()?.to_string();
-                    let functions = perm.get("functions")?
+                    let function_names = perm.get("functions")?
                         .as_array()?
                         .iter()
                         .filter_map(|f| f.as_str().map(|s| s.to_string()))
                         .collect::<Vec<String>>();
                     let purpose = perm.get("purpose")?.as_str()?.to_string();
                     
+                    // Convert function names to FunctionPermission objects
+                    let functions: Vec<FunctionPermission> = function_names
+                        .into_iter()
+                        .map(|name| FunctionPermission {
+                            name,
+                            is_declared: true,
+                            is_detected: false,
+                            detected_at: None,
+                        })
+                        .collect();
+                    
                     Some(AddonPermission {
                         category,
                         functions,
                         purpose,
-                        is_declared: Some(true), // These are declared in manifest
-                        is_detected: Some(false), // Will be updated during installation
-                        detected_at: None,
                     })
                 })
                 .collect::<Vec<AddonPermission>>()
@@ -685,11 +790,20 @@ fn parse_manifest_json_metadata(
         version,
         description,
         author,
-        main,
         sdk_version,
-        permissions,
+        main,
+        homepage,
+        repository,
+        license,
+        min_wealthfolio_version,
+        keywords,
+        icon,
         enabled: true, // Default for new addons
         installed_at: chrono::Utc::now().to_rfc3339(),
+        updated_at: None,
+        source: Some("local".to_string()),
+        size: None,
+        permissions,
     })
 }
 
@@ -733,4 +847,44 @@ fn read_addon_files_recursive(
     }
 
     Ok(())
+}
+
+/// Helper functions for working with function-level permissions
+
+/// Get all declared functions from a permission
+#[allow(dead_code)]
+pub fn get_declared_functions(permission: &AddonPermission) -> Vec<String> {
+    permission.functions
+        .iter()
+        .filter(|func| func.is_declared)
+        .map(|func| func.name.clone())
+        .collect()
+}
+
+/// Get all detected functions from a permission
+#[allow(dead_code)]
+pub fn get_detected_functions(permission: &AddonPermission) -> Vec<String> {
+    permission.functions
+        .iter()
+        .filter(|func| func.is_detected)
+        .map(|func| func.name.clone())
+        .collect()
+}
+
+/// Get functions that were detected but not declared (potential security concern)
+#[allow(dead_code)]
+pub fn get_undeclared_detected_functions(permission: &AddonPermission) -> Vec<String> {
+    permission.functions
+        .iter()
+        .filter(|func| func.is_detected && !func.is_declared)
+        .map(|func| func.name.clone())
+        .collect()
+}
+
+/// Check if a permission has any undeclared detected functions
+#[allow(dead_code)]
+pub fn has_undeclared_detected_functions(permission: &AddonPermission) -> bool {
+    permission.functions
+        .iter()
+        .any(|func| func.is_detected && !func.is_declared)
 } 

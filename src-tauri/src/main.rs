@@ -138,6 +138,11 @@ pub fn main() {
             commands::market_data::delete_quote,
             commands::market_data::get_quote_history,
             commands::market_data::get_market_data_providers,
+            commands::secrets::set_api_key,
+            commands::secrets::get_api_key,
+            commands::secrets::delete_api_key,
+            commands::providers_settings::get_market_data_providers_settings,
+            commands::providers_settings::update_market_data_provider_settings,
             commands::addon::extract_addon_zip,
             commands::addon::install_addon_zip,
             commands::addon::list_installed_addons,
@@ -146,11 +151,6 @@ pub fn main() {
             commands::addon::load_addon_for_runtime,
             commands::addon::get_enabled_addons_on_startup,
             commands::addon::redetect_addon_permissions,
-            commands::secrets::set_api_key,
-            commands::secrets::get_api_key,
-            commands::secrets::delete_api_key,
-            commands::providers_settings::get_market_data_providers_settings,
-            commands::providers_settings::update_market_data_provider_settings,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

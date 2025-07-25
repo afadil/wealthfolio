@@ -37,7 +37,7 @@ export type {
   RiskLevel,
   Permission,
   PermissionCategory,
-  DataAccessDeclaration,
+  FunctionPermission,
 } from './permissions';
 
 export {
@@ -51,8 +51,6 @@ export {
 // Utilities
 export {
   validateManifest,
-  createManifestTemplate,
-  analyzeCodePermissions,
   isCompatibleVersion,
   formatAddonSize,
   generateAddonId,

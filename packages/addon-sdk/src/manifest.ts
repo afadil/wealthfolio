@@ -5,7 +5,8 @@
 import type { Permission } from './permissions';
 
 /**
- * Addon manifest structure for ZIP packages
+ * Base addon manifest structure for addon packages
+ * This is what developers write in their manifest.json
  */
 export interface AddonManifest {
   /** Unique addon identifier (lowercase, no spaces, hyphens allowed) */
@@ -41,21 +42,24 @@ export interface AddonManifest {
 }
 
 /**
- * Addon metadata with runtime information
+ * Extended addon metadata with runtime and installation information
+ * This is what the system uses internally after installation
  */
 export interface AddonMetadata extends AddonManifest {
-  /** Installation timestamp */
-  installedAt?: string;
+  /** Main entry point file (required after installation) */
+  main: string;
+  /** Whether the addon is currently enabled (runtime field) */
+  enabled: boolean;
+  /** Installation timestamp in ISO format */
+  installedAt: string;
   /** Last update timestamp */
   updatedAt?: string;
   /** Installation source */
   source?: 'local' | 'store' | 'sideload';
   /** File size in bytes */
   size?: number;
-  /** Whether the addon is currently enabled (runtime field) */
-  enabled: boolean;
-  /** Installation timestamp in ISO format (runtime field) */
-  installed_at: string;
+  /** Permissions with enhanced tracking (runtime field) */
+  permissions?: Permission[];
 }
 
 /**

@@ -10,22 +10,22 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
 import { Separator } from '@/components/ui/separator';
-import type { AddonManifest, PermissionCategory } from '@wealthfolio/addon-sdk';
-import { PermissionCategoriesDisplay, type Permission } from './permission-categories-display';
+import type { AddonManifest, PermissionCategory, Permission, RiskLevel } from '@wealthfolio/addon-sdk';
+import { PermissionCategoriesDisplay } from './permission-categories-display';
 
 interface PermissionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   manifest?: AddonManifest;
-  detectedCategories: PermissionCategory[];
-  declaredPermissions?: any[];
-  riskLevel: 'low' | 'medium' | 'high';
+  detectedCategories?: PermissionCategory[];
+  declaredPermissions?: Permission[];
+  riskLevel: RiskLevel;
   onApprove: () => void;
   onDeny: () => void;
   isViewOnly?: boolean;
 }
 
-const getRiskLevelColor = (riskLevel: 'low' | 'medium' | 'high') => {
+const getRiskLevelColor = (riskLevel: RiskLevel) => {
   switch (riskLevel) {
     case 'low':
       return 'text-green-600 bg-green-50 border-green-200';
@@ -36,7 +36,7 @@ const getRiskLevelColor = (riskLevel: 'low' | 'medium' | 'high') => {
   }
 };
 
-const getRiskLevelIcon = (riskLevel: 'low' | 'medium' | 'high') => {
+const getRiskLevelIcon = (riskLevel: RiskLevel) => {
   switch (riskLevel) {
     case 'low':
       return <Icons.Check className="h-4 w-4" />;
@@ -51,7 +51,6 @@ export function PermissionDialog({
   open,
   onOpenChange,
   manifest,
-  detectedCategories,
   declaredPermissions = [],
   riskLevel,
   onApprove,
@@ -63,56 +62,9 @@ export function PermissionDialog({
     return null;
   }
 
-  // Merge declared and detected permissions into a single list
-  const mergedPermissions: Permission[] = [];
-  const processedCategories = new Set<string>();
-
-  // First, process detected categories
-  detectedCategories.forEach((category) => {
-    mergedPermissions.push({
-      category: category.id,
-      name: category.name,
-      description: category.description,
-      riskLevel: category.riskLevel,
-      functions: [], // Detected categories don't have function details in this context
-      purpose: category.description,
-      isDeclared: false,
-      isDetected: true,
-    });
-    processedCategories.add(category.id);
-  });
-
-  // Then, process declared permissions and merge with detected
-  const permissionsToProcess = isViewOnly ? declaredPermissions : manifest.permissions;
-  if (permissionsToProcess) {
-    permissionsToProcess.forEach((permission: any) => {
-      const existingIndex = mergedPermissions.findIndex(p => p.category === permission.category);
-      
-      if (existingIndex >= 0) {
-        // Update existing entry to mark as both declared and detected
-        mergedPermissions[existingIndex] = {
-          ...mergedPermissions[existingIndex],
-          functions: permission.functions,
-          purpose: permission.purpose,
-          isDeclared: permission.isDeclared !== undefined ? permission.isDeclared : true,
-          isDetected: permission.isDetected !== undefined ? permission.isDetected : true,
-        };
-      } else {
-        // Add new entry for declared-only permission
-        mergedPermissions.push({
-          category: permission.category,
-          name: permission.category.charAt(0).toUpperCase() + permission.category.slice(1),
-          description: permission.purpose,
-          riskLevel: 'medium', // Default risk level for declared permissions
-          functions: permission.functions,
-          purpose: permission.purpose,
-          isDeclared: permission.isDeclared !== undefined ? permission.isDeclared : true,
-          isDetected: permission.isDetected !== undefined ? permission.isDetected : false,
-        });
-      }
-      processedCategories.add(permission.category);
-    });
-  }
+  // For installation (not view-only), use manifest permissions
+  // For view-only, use declared permissions passed in
+  const permissionsToDisplay = isViewOnly ? declaredPermissions : (manifest.permissions || []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,7 +122,7 @@ export function PermissionDialog({
 
           {/* Data Access Permissions using shared component */}
           <PermissionCategoriesDisplay
-            permissions={mergedPermissions}
+            permissions={permissionsToDisplay}
             variant="default"
           />
 

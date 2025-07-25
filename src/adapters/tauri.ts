@@ -7,19 +7,23 @@ import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
 
 export type { EventCallback, UnlistenFn };
 
-import type { AddonManifest as BaseAddonManifest } from '@wealthfolio/addon-sdk';
+import type { 
+  AddonMetadata,
+  AddonManifest,
+  AddonInstallResult,
+  AddonValidationResult,
+  AddonFile as BaseAddonFile,
+  FunctionPermission,
+  Permission
+} from '@wealthfolio/addon-sdk';
 
-export interface AddonFile {
-  name: string;
-  content: string;
-  is_main: boolean;
+// Tauri-specific types with camelCase serialization to match Rust
+export interface AddonFile extends Omit<BaseAddonFile, 'is_main'> {
+  isMain: boolean;
 }
 
-export interface AddonMetadata extends BaseAddonManifest {
-  main: string;
-  enabled: boolean;
-  installed_at: string;
-}
+// Re-export SDK types directly
+export type { AddonManifest, AddonMetadata, AddonInstallResult, AddonValidationResult, FunctionPermission, Permission };
 
 export interface ExtractedAddon {
   metadata: AddonMetadata;
@@ -28,8 +32,10 @@ export interface ExtractedAddon {
 
 export interface InstalledAddon {
   metadata: AddonMetadata;
-  file_path: string;
-  is_zip_addon: boolean;
+  /** File path where the addon is stored (Tauri-specific) */
+  filePath: string;
+  /** Whether this is a ZIP-based addon (Tauri-specific) */
+  isZipAddon: boolean;
 }
 
 export const invokeTauri = async <T>(command: string, payload?: Record<string, unknown>) => {

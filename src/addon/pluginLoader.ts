@@ -1,26 +1,12 @@
-import { readDir, readTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
 import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
-// import realCtx, { getDynamicNavItems, getDynamicRoutes } from './runtimeContextBase';
 import { realCtx, getDynamicNavItems, getDynamicRoutes } from '@/addon/runtimeContext';
-import { logger } from '@/adapters/tauri';
-import { 
-  validateManifestPermissions,
-  analyzeAddonPermissions
-} from '@/addon/permissions';
+import { logger } from '@/adapters';
+import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
 
 interface AddonFile {
   path: string;
   manifestPath: string;
-  manifest: AddonManifest & {
-    permissions?: Array<{
-      category: string;
-      functions: string[];
-      purpose: string;
-      is_declared?: boolean;
-      is_detected?: boolean;
-      detected_at?: string;
-    }>;
-  };
+  manifest: AddonManifest;
 }
 
 // Store loaded addons for cleanup
@@ -28,93 +14,21 @@ const loadedAddons = new Map<string, { disable?: () => void }>();
 const loadedAddonIds = new Set<string>(); // Prevent re-loading already processed addons
 
 /**
- * Discovers all available addons in the AppData/addons directory
+ * Discovers all available addons using Tauri commands
  */
 async function discoverAddons(): Promise<AddonFile[]> {
   try {
-    const addonDirs = await readDir('addons', { baseDir: BaseDirectory.AppData });
-    
+    const installedAddons = await listInstalledAddons();
     const addonFiles: AddonFile[] = [];
 
-    for (const dir of addonDirs as any[]) {
-      
-      // Skip non-directories (like .DS_Store)
-      if (!dir.isDirectory || !dir.name) {
-        continue;
-      }
-
-      try {
-        // Read the contents of this addon directory
-        const addonDirContents = await readDir(`addons/${dir.name}`, { baseDir: BaseDirectory.AppData });
-
-        // Look for manifest.json first
-        const manifestJson = addonDirContents.find((file: any) => file.name === 'manifest.json');
-
-        if (manifestJson) {
-          try {
-            // Read manifest.json using Tauri file system API
-            const manifestPath = `addons/${dir.name}/manifest.json`;
-            
-            // Read and parse manifest using readTextFile
-            const manifestContent = await readTextFile(manifestPath, { baseDir: BaseDirectory.AppData });
-            
-            const manifest: AddonManifest = JSON.parse(manifestContent);
-
-            // Get the main file path from manifest (default to 'addon.js')
-            const mainFile = manifest.main || 'addon.js';
-            
-            // Find the actual addon file based on the main field
-            const addonJs = addonDirContents.find((file: any) => {
-              // Support both relative path and just filename
-              return file.name === mainFile;
-            });
-
-            // If not found directly, check if it's in a subdirectory (like dist/)
-            if (!addonJs && mainFile.includes('/')) {
-              const [subDir, fileName] = mainFile.split('/');
-              
-              // Check if subdirectory exists
-              const subDirectory = addonDirContents.find((item: any) => item.name === subDir && item.isDirectory);
-              if (subDirectory) {
-                try {
-                  const subDirContents = await readDir(`addons/${dir.name}/${subDir}`, { baseDir: BaseDirectory.AppData });
-                  
-                  const addonJsInSubDir = subDirContents.find((file: any) => file.name === fileName);
-                  if (addonJsInSubDir) {
-                    // Construct the full path for the addon file in subdirectory
-                    const addonPath = `addons/${dir.name}/${subDir}/${fileName}`;
-                    addonFiles.push({
-                      path: addonPath,
-                      manifestPath: manifestPath,
-                      manifest
-                    });
-                    continue;
-                  }
-                } catch (subDirError) {
-                  logger.error(`Failed to read subdirectory ${subDir}: ${String(subDirError)}`);
-                }
-              }
-            }
-
-            if (addonJs) {
-              // Construct the full path for the addon file
-              const addonPath = `addons/${dir.name}/${addonJs.name}`;
-              addonFiles.push({
-                path: addonPath,
-                manifestPath: manifestPath,
-                manifest
-              });
-            } else {
-              logger.warn(`Main file '${mainFile}' not found for addon ${manifest.id}`);
-            }
-          } catch (error) {
-            logger.error(`Failed to read manifest for addon in ${dir.name}: ${String(error)}`);
-          }
-        } else {
-        }
-      } catch (dirError) {
-        logger.error(`Failed to read directory contents for ${dir.name}: ${String(dirError)}`);
-      }
+    for (const addon of installedAddons) {
+      // Create AddonFile structure from InstalledAddon
+      // Note: filePath from Tauri represents the addon directory, not the specific file
+      addonFiles.push({
+        path: `${addon.filePath}/${addon.metadata.main}`, // Construct the main file path
+        manifestPath: `${addon.filePath}/manifest.json`, // Construct manifest path
+        manifest: addon.metadata
+      });
     }
 
     return addonFiles;
@@ -137,7 +51,7 @@ function validateAddonCompatibility(manifest: AddonManifest): boolean {
 }
 
 /**
- * Loads a single addon from its file path using Blob URLs
+ * Loads a single addon using Tauri commands
  */
 async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<boolean> {
   let blobUrl: string | null = null;
@@ -155,46 +69,27 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
       return false;
     }
 
-    // Read the addon's JavaScript file content
-    // addonFile.path is relative to AppData, e.g., "addons/addon-id/dist/addon.js"
-    const addonCode = await readTextFile(addonFile.path, { baseDir: BaseDirectory.AppData });
-
-    // Get permissions from cached data in manifest (fast) or analyze code (fallback)
-    let permissionAnalysis;
+    // Load addon using Tauri command instead of direct file access
+    const extractedAddon = await loadAddonForRuntime(addonFile.manifest.id);
     
-    // Check if manifest has detected permissions (from new installation system)
-    const detectedPermissions = addonFile.manifest.permissions?.filter(p => p.is_detected);
-    if (detectedPermissions && detectedPermissions.length > 0) {
-      // Use cached permissions (fast path)
-      const allDetectedFunctions = detectedPermissions.flatMap(p => p.functions);
-      const detectedCategories = [...new Set(detectedPermissions.map(p => p.category))];
-      
-      permissionAnalysis = {
-        detectedFunctions: allDetectedFunctions,
-        categories: [], // Simplified for logging
-        riskLevel: 'medium' as const // Simplified for logging
-      };
-      
-      logger.info(`Using cached permissions for addon ${addonFile.manifest.id}: functions=[${allDetectedFunctions.join(',')}], categories=[${detectedCategories.join(',')}]`);
-    } else {
-      // Fallback to runtime analysis (for legacy addons without cached permissions)
-      logger.warn(`No cached permissions found for addon ${addonFile.manifest.id}, performing runtime analysis...`);
-      permissionAnalysis = analyzeAddonPermissions(addonCode);
-      logger.info(`Runtime permission analysis for addon ${addonFile.manifest.id}: riskLevel=${permissionAnalysis.riskLevel}, categories=[${permissionAnalysis.categories.map(c => c.name).join(',')}], functions=[${permissionAnalysis.detectedFunctions.join(',')}]`);
-    }
-    
-    // Validate manifest permissions if they exist
-    if (addonFile.manifest.permissions) {
-      const validation = validateManifestPermissions(
-        addonFile.manifest,
-        permissionAnalysis.detectedFunctions
-      );
-      
-      if (!validation.isValid) {
-        logger.warn(`Addon ${addonFile.manifest.id} has permission mismatches: missing=${validation.missingPermissions.join(',')}, extra=${validation.extraPermissions.join(',')}`);
-      }
+    // Find the main file from the extracted addon files
+    const mainFile = extractedAddon.files.find(file => file.isMain);
+    if (!mainFile) {
+      logger.error(`Main file not found for addon ${addonFile.manifest.id}. Available files: ${extractedAddon.files.map(f => f.name).join(', ')}`);
+      return false;
     }
 
+    const addonCode = mainFile.content;
+
+    // Extract permission data directly from manifest (already processed by Rust backend)
+    const permissions = extractedAddon.metadata.permissions || [];
+    const detectedFunctions = permissions.flatMap(p => 
+      p.functions.filter((f: any) => f.isDetected).map((f: any) => f.name)
+    );
+    const detectedCategories = [...new Set(permissions.map(p => p.category))];
+    
+    logger.info(`Permissions for addon ${extractedAddon.metadata.id}: functions=[${detectedFunctions.join(',')}], categories=[${detectedCategories.join(',')}]`);
+    
     // Create a Blob and an object URL
     const blob = new Blob([addonCode], { type: 'text/javascript' });
     blobUrl = URL.createObjectURL(blob);
@@ -225,17 +120,17 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
       null;
 
     if (!enableFunction) {
-      logger.error(`❌ Addon ${addonFile.manifest.id} does not export a valid enable function. Available exports: ${Object.keys(mod).join(', ')}`);
+      logger.error(`❌ Addon ${extractedAddon.metadata.id} does not export a valid enable function. Available exports: ${Object.keys(mod).join(', ')}`);
       return false;
     }
 
     const result = await enableFunction(context);
     
     // Store addon reference for potential cleanup
-    loadedAddons.set(addonFile.manifest.id, {
+    loadedAddons.set(extractedAddon.metadata.id, {
       disable: typeof result?.disable === 'function' ? result.disable : undefined
     });
-    loadedAddonIds.add(addonFile.manifest.id); // Add to set after successful load and enablement
+    loadedAddonIds.add(extractedAddon.metadata.id); // Add to set after successful load and enablement
 
     return true;
   } catch (error) {
@@ -335,9 +230,6 @@ export function debugAddonState(): void {
 }
 
 /**
- * Analyze addon permissions from code (exported for UI use - for preview only)
- * This should only be used for addon preview before installation
+ * Note: Addon permission analysis and file discovery is now handled by Tauri commands.
+ * The addon loading process uses the Rust backend for secure file access and permission validation.
  */
-export function analyzeAddonFromCode(addonCode: string) {
-  return analyzeAddonPermissions(addonCode);
-}

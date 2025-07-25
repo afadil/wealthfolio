@@ -3,8 +3,6 @@
  */
 
 import type { AddonManifest, AddonValidationResult } from './manifest';
-import type { PermissionCategory, RiskLevel } from './permissions';
-import { PERMISSION_CATEGORIES } from './permissions';
 
 /**
  * Validates an addon manifest
@@ -65,78 +63,7 @@ export function validateManifest(manifest: AddonManifest): AddonValidationResult
   };
 }
 
-/**
- * Creates a basic addon manifest template
- */
-export function createManifestTemplate(options: {
-  id: string;
-  name: string;
-  author?: string;
-  description?: string;
-}): AddonManifest {
-  return {
-    id: options.id,
-    name: options.name,
-    version: '1.0.0',
-    description: options.description || `${options.name} addon for Wealthfolio`,
-    author: options.author || 'Unknown Author',
-    main: 'dist/addon.js',
-    sdkVersion: '1.1.0',
-    enabled: true,
-    permissions: [],
-    dataAccess: []
-  };
-}
 
-/**
- * Analyzes code to detect API usage and suggest permissions
- */
-export function analyzeCodePermissions(code: string): {
-  detectedFunctions: string[];
-  suggestedCategories: PermissionCategory[];
-  riskLevel: RiskLevel;
-} {
-  const detectedFunctions: string[] = [];
-  
-  // Search for API function calls in the code
-  PERMISSION_CATEGORIES.forEach(category => {
-    category.functions.forEach(func => {
-      // Look for various patterns of function calls
-      const patterns = [
-        new RegExp(`\\.${func}\\s*\\(`, 'g'), // object.function()
-        new RegExp(`\\b${func}\\s*\\(`, 'g'),  // function()
-        new RegExp(`["']${func}["']`, 'g'),    // "function" as string
-      ];
-      
-      patterns.forEach(pattern => {
-        if (pattern.test(code)) {
-          if (!detectedFunctions.includes(func)) {
-            detectedFunctions.push(func);
-          }
-        }
-      });
-    });
-  });
-  
-  // Find categories that have detected functions
-  const suggestedCategories = PERMISSION_CATEGORIES.filter(category =>
-    category.functions.some(func => detectedFunctions.includes(func))
-  );
-  
-  // Determine overall risk level
-  let riskLevel: RiskLevel = 'low';
-  if (suggestedCategories.some(cat => cat.riskLevel === 'high')) {
-    riskLevel = 'high';
-  } else if (suggestedCategories.some(cat => cat.riskLevel === 'medium')) {
-    riskLevel = 'medium';
-  }
-  
-  return {
-    detectedFunctions,
-    suggestedCategories,
-    riskLevel
-  };
-}
 
 /**
  * Checks if an addon version is compatible with the current SDK

@@ -8,21 +8,29 @@
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 /**
+ * Function permission details with declaration and detection tracking
+ */
+export interface FunctionPermission {
+  /** Function name */
+  name: string;
+  /** Whether this function was declared by the developer in manifest */
+  isDeclared: boolean;
+  /** Whether this function was detected by static analysis during installation */
+  isDetected: boolean;
+  /** ISO timestamp when this function was detected (if isDetected is true) */
+  detectedAt?: string;
+}
+
+/**
  * Permission requirement for specific addon functionality
  */
 export interface Permission {
   /** Permission category identifier */
   category: string;
-  /** List of API functions this permission grants access to */
-  functions: string[];
+  /** List of API functions this permission grants access to with their declaration/detection status */
+  functions: FunctionPermission[];
   /** Human-readable explanation of why this permission is needed */
   purpose: string;
-  /** Whether this permission was declared by the developer in manifest */
-  is_declared?: boolean;
-  /** Whether this permission was detected by static analysis during installation */
-  is_detected?: boolean;
-  /** ISO timestamp when this permission was detected (if is_detected is true) */
-  detected_at?: string;
 }
 
 /**
@@ -153,6 +161,23 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
  */
 
 /**
+ * Create a FunctionPermission object
+ */
+export function createFunctionPermission(
+  name: string,
+  isDeclared: boolean = false,
+  isDetected: boolean = false,
+  detectedAt?: string
+): FunctionPermission {
+  return {
+    name,
+    isDeclared,
+    isDetected,
+    detectedAt: isDetected ? (detectedAt || new Date().toISOString()) : undefined
+  };
+}
+
+/**
  * Get permission category by ID
  */
 export function getPermissionCategory(id: string): PermissionCategory | undefined {
@@ -182,4 +207,84 @@ export function getFunctionRiskLevel(functionName: string): RiskLevel | undefine
 export function isPermissionRequired(functionName: string, categoryId: string): boolean {
   const category = getPermissionCategory(categoryId);
   return category ? category.functions.includes(functionName) : false;
+}
+
+/**
+ * Get all declared functions from a permission
+ */
+export function getDeclaredFunctions(permission: Permission): string[] {
+  return permission.functions
+    .filter(func => func.isDeclared)
+    .map(func => func.name);
+}
+
+/**
+ * Get all detected functions from a permission
+ */
+export function getDetectedFunctions(permission: Permission): string[] {
+  return permission.functions
+    .filter(func => func.isDetected)
+    .map(func => func.name);
+}
+
+/**
+ * Get functions that were detected but not declared (potential security concern)
+ */
+export function getUndeclaredDetectedFunctions(permission: Permission): string[] {
+  return permission.functions
+    .filter(func => func.isDetected && !func.isDeclared)
+    .map(func => func.name);
+}
+
+/**
+ * Check if a permission has any undeclared detected functions
+ */
+export function hasUndeclaredDetectedFunctions(permission: Permission): boolean {
+  return permission.functions.some(func => func.isDetected && !func.isDeclared);
+}
+
+/**
+ * Add a detected function to a permission
+ */
+export function addDetectedFunction(
+  permission: Permission, 
+  functionName: string, 
+  detectedAt?: string
+): Permission {
+  const existingFunc = permission.functions.find(f => f.name === functionName);
+  
+  if (existingFunc) {
+    // Update existing function to mark as detected
+    existingFunc.isDetected = true;
+    existingFunc.detectedAt = detectedAt || new Date().toISOString();
+  } else {
+    // Add new detected function
+    permission.functions.push(createFunctionPermission(
+      functionName, 
+      false, 
+      true, 
+      detectedAt
+    ));
+  }
+  
+  return permission;
+}
+
+/**
+ * Mark a function as declared in a permission
+ */
+export function markFunctionAsDeclared(
+  permission: Permission, 
+  functionName: string
+): Permission {
+  const existingFunc = permission.functions.find(f => f.name === functionName);
+  
+  if (existingFunc) {
+    existingFunc.isDeclared = true;
+  } else {
+    // Add new declared function
+    permission.functions.push(createFunctionPermission(functionName, true, false));
+  }
+  
+  return permission;
 }

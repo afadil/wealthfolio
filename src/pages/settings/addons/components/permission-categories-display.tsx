@@ -1,20 +1,33 @@
 import { Badge } from '@/components/ui/badge';
+import type { Permission, FunctionPermission } from '@/adapters/tauri';
+import { getPermissionCategory } from '@wealthfolio/addon-sdk';
 
-export interface Permission {
+interface PermissionForDisplay {
   category: string;
   name: string;
   description: string;
   riskLevel: string;
-  functions: string[];
+  functions: FunctionPermission[];
   purpose: string;
-  isDeclared: boolean;
-  isDetected: boolean;
 }
 
 interface PermissionCategoriesDisplayProps {
   permissions: Permission[];
   variant?: 'default' | 'compact';
 }
+
+// Helper to convert SDK Permission to display format
+const convertToDisplayPermission = (permission: Permission): PermissionForDisplay => {
+  const category = getPermissionCategory(permission.category);
+  return {
+    category: permission.category,
+    name: category?.name || permission.category.charAt(0).toUpperCase() + permission.category.slice(1),
+    description: category?.description || permission.purpose,
+    riskLevel: category?.riskLevel || 'medium',
+    functions: permission.functions,
+    purpose: permission.purpose,
+  };
+};
 
 const getRiskBadgeColor = (riskLevel: string) => {
   switch (riskLevel) {
@@ -29,15 +42,26 @@ const getRiskBadgeColor = (riskLevel: string) => {
   }
 };
 
-const getPermissionBadgeVariant = (isDeclared: boolean, isDetected: boolean) => {
-  if (isDeclared && isDetected) {
-    return 'info'; // Declared and detected
-  } else if (isDeclared && !isDetected) {
+const getFunctionBadgeVariant = (func: FunctionPermission) => {
+  if (func.isDeclared && func.isDetected) {
+    return 'default'; // Declared and detected
+  } else if (func.isDeclared && !func.isDetected) {
     return 'outline'; // Declared but not detected
-  } else if (!isDeclared && isDetected) {
-    return 'warning'; // Detected but not declared
+  } else if (!func.isDeclared && func.isDetected) {
+    return 'destructive'; // Detected but not declared (security concern)
   }
   return 'outline'; // Fallback
+};
+
+const getFunctionBadgeLabel = (func: FunctionPermission) => {
+  if (func.isDeclared && func.isDetected) {
+    return 'Declared & Detected';
+  } else if (func.isDeclared && !func.isDetected) {
+    return 'Declared Only';
+  } else if (!func.isDeclared && func.isDetected) {
+    return 'Detected Only';
+  }
+  return 'Unknown';
 };
 
 export function PermissionCategoriesDisplay({
@@ -55,6 +79,9 @@ export function PermissionCategoriesDisplay({
       </div>
     );
   }
+
+  // Convert SDK permissions to display format
+  const displayPermissions = permissions.map(convertToDisplayPermission);
   
   return (
     <div className="space-y-4">
@@ -63,7 +90,7 @@ export function PermissionCategoriesDisplay({
           Data Access Permissions
         </h4>
         <div className="space-y-2">
-          {permissions.map((permission) => (
+          {displayPermissions.map((permission) => (
             <div
               key={permission.category}
               className={`flex items-start gap-3 p-3 bg-muted/30 rounded-lg ${
@@ -81,28 +108,31 @@ export function PermissionCategoriesDisplay({
                   >
                     {permission.riskLevel}
                   </Badge>
-                  <Badge
-                    variant={getPermissionBadgeVariant(permission.isDeclared, permission.isDetected)}
-                  >
-                    {permission.isDeclared && permission.isDetected && 'Declared & Detected'}
-                    {permission.isDeclared && !permission.isDetected && 'Declared Only'}
-                    {!permission.isDeclared && permission.isDetected && 'Detected Only'}
-                  </Badge>
                 </div>
                 <p className={`text-muted-foreground ${isCompact ? 'text-xs' : 'text-xs'}`}>
                   {permission.description}
                 </p>
                 {permission.functions.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {permission.functions.map((func: string) => (
-                      <Badge 
-                        key={func} 
-                        variant="secondary" 
-                        className={isCompact ? 'text-xs' : 'text-xs'}
-                      >
-                        {func}
-                      </Badge>
-                    ))}
+                  <div className="space-y-2 mt-2">
+                    <p className="text-xs text-muted-foreground font-medium">Functions:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {permission.functions.map((func: FunctionPermission) => (
+                        <div key={func.name} className="flex items-center gap-1">
+                          <Badge 
+                            variant="secondary" 
+                            className={isCompact ? 'text-xs' : 'text-xs'}
+                          >
+                            {func.name}
+                          </Badge>
+                          <Badge
+                            variant={getFunctionBadgeVariant(func)}
+                            className="text-xs"
+                          >
+                            {getFunctionBadgeLabel(func)}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
