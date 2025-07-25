@@ -1,30 +1,87 @@
-export interface SidebarItemHandle {
-  remove(): void;
-}
+/**
+ * @wealthfolio/addon-sdk
+ * 
+ * TypeScript SDK for building Wealthfolio addons with enhanced functionality,
+ * type safety, and comprehensive permission management.
+ * 
+ * @version 1.1.0
+ * @author Wealthfolio Team
+ * @license MIT
+ */
 
-export interface AddonContext {
-  sidebar: {
-    addItem(cfg: {
-      id: string;
-      label: string;
-      icon?: string;
-      route?: string;
-      order?: number;
-      onClick?: () => void;
-    }): SidebarItemHandle;
-  };
-  router: {
-    add(r: {
-      path: string;
-      component: React.LazyExoticComponent<React.ComponentType<any>>;
-    }): void;
-  };
-  onDisable(cb: () => void): void;
-}
+// Core types
+export type {
+  AddonContext,
+  AddonEnableFunction,
+  SidebarItemHandle,
+  SidebarItemConfig,
+  RouteConfig,
+  SidebarManager,
+  RouterManager,
+} from './types';
 
+// Manifest and metadata types
+export type {
+  AddonManifest,
+  AddonMetadata,
+  AddonFile,
+  ExtractedAddon,
+  InstalledAddon,
+  AddonInstallResult,
+  AddonValidationResult,
+  AddonStoreListing,
+} from './manifest';
+
+// Permission system
+export type {
+  RiskLevel,
+  Permission,
+  PermissionCategory,
+  DataAccessDeclaration,
+} from './permissions';
+
+export {
+  PERMISSION_CATEGORIES,
+  getPermissionCategory,
+  getPermissionCategoriesByRisk,
+  getFunctionRiskLevel,
+  isPermissionRequired,
+} from './permissions';
+
+// Utilities
+export {
+  validateManifest,
+  createManifestTemplate,
+  analyzeCodePermissions,
+  isCompatibleVersion,
+  formatAddonSize,
+  generateAddonId,
+  isAddonManifest,
+} from './utils';
+
+import type { AddonContext } from './types';
+
+// Global context access
 declare global {
   var __WF_CTX__: AddonContext;
 }
 
-const ctx = (globalThis as any).__WF_CTX__ as AddonContext;
+/**
+ * Get the current addon context
+ * This provides access to Wealthfolio's APIs for your addon
+ */
+export function getAddonContext(): AddonContext {
+  if (typeof globalThis !== 'undefined' && globalThis.__WF_CTX__) {
+    return globalThis.__WF_CTX__;
+  }
+  
+  throw new Error(
+    'Addon context not available. Make sure your addon is loaded within Wealthfolio.'
+  );
+}
+
+/**
+ * Default export for backward compatibility
+ */
+const ctx = typeof globalThis !== 'undefined' ? globalThis.__WF_CTX__ : undefined;
 export default ctx; 

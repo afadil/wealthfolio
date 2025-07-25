@@ -10,27 +10,49 @@ import { Label } from '@/components/ui/label';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { EmptyPlaceholder } from '@/components/empty-placeholder';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DeleteConfirm } from '@/components/delete-confirm';
+import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
 import { triggerAllDisableCallbacks } from '@/addon/runtimeContext';
-import { reloadAllAddons } from '@/addon/pluginLoader';
+import { reloadAllAddons, analyzeAddonFromCode } from '@/addon/pluginLoader';
 import {
   installAddonZip,
   listInstalledAddons,
   toggleAddon,
   uninstallAddon,
-  type InstalledAddon,
-} from '@/adapters/tauri';
+  extractAddonZip,
+} from '@/commands/addon';
+import type { InstalledAddon } from '@/adapters/tauri';
 
 export default function AddonSettingsPage() {
   const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAddons, setIsLoadingAddons] = useState(true);
   const [togglingAddonId, setTogglingAddonId] = useState<string | null>(null);
+
+  // Permission dialog state
+  const [permissionDialog, setPermissionDialog] = useState<{
+    open: boolean;
+    manifest?: any;
+    detectedCategories?: any[];
+    riskLevel?: 'low' | 'medium' | 'high';
+    fileData?: Uint8Array;
+    onApprove?: () => void;
+  }>({
+    open: false,
+  });
+
+  // View permissions dialog state
+  const [viewPermissionDialog, setViewPermissionDialog] = useState<{
+    open: boolean;
+    addon?: InstalledAddon;
+    detectedCategories?: any[];
+    declaredPermissions?: any[];
+    riskLevel?: 'low' | 'medium' | 'high';
+  }>({
+    open: false,
+  });
+
   const { toast } = useToast();
 
   // Load installed addons on component mount
@@ -58,12 +80,10 @@ export default function AddonSettingsPage() {
   const handleLoadAddon = async () => {
     try {
       setIsLoading(true);
-      
+
       // Open file dialog for ZIP files only
       const filePath = await open({
-        filters: [
-          { name: 'Addon Packages', extensions: ['zip'] },
-        ],
+        filters: [{ name: 'Addon Packages', extensions: ['zip'] }],
         multiple: false,
       });
 
@@ -74,7 +94,6 @@ export default function AddonSettingsPage() {
       // Read the ZIP file
       const fileData = await readFile(filePath);
       await handleInstallZipAddon(filePath, fileData);
-
     } catch (error) {
       console.error('Error loading addon:', error);
       toast({
@@ -89,20 +108,58 @@ export default function AddonSettingsPage() {
 
   const handleInstallZipAddon = async (_filePath: string, fileData: Uint8Array) => {
     try {
+      // First, extract and analyze the addon to check permissions
+      const extractedAddon = await extractAddonZip(fileData);
+
+      // Find the main file and analyze permissions
+      const mainFile = extractedAddon.files.find((f) => f.is_main);
+      if (!mainFile) {
+        throw new Error('No main addon file found');
+      }
+
+      const permissionAnalysis = analyzeAddonFromCode(mainFile.content);
+
+      // Show permission dialog
+      setPermissionDialog({
+        open: true,
+        manifest: extractedAddon.metadata,
+        detectedCategories: permissionAnalysis.categories,
+        riskLevel: permissionAnalysis.riskLevel,
+        fileData,
+        onApprove: async () => {
+          setPermissionDialog({ open: false });
+          await performAddonInstallation(fileData);
+        },
+      });
+    } catch (error) {
+      console.error('Error analyzing addon permissions:', error);
+      // If permission analysis fails, show warning and allow user to proceed
+      toast({
+        title: 'Permission analysis failed',
+        description: 'Could not analyze addon permissions. Install at your own risk.',
+        variant: 'destructive',
+      });
+
+      // Still allow installation but with warning
+      await performAddonInstallation(fileData);
+    }
+  };
+
+  const performAddonInstallation = async (fileData: Uint8Array) => {
+    try {
       // Install the ZIP addon persistently
       const metadata = await installAddonZip(fileData, true);
-      
+
       // Refresh the addon list
       await loadInstalledAddons();
-      
+
       // Reload all addons to load the newly installed addon immediately
       await reloadAllAddons();
-      
+
       toast({
         title: 'Addon installed successfully',
         description: `${metadata.name} has been installed and is now active.`,
       });
-      
     } catch (error) {
       console.error('Error installing ZIP addon:', error);
       throw error;
@@ -114,11 +171,11 @@ export default function AddonSettingsPage() {
       setTogglingAddonId(addonId);
       const newEnabled = !currentEnabled;
       await toggleAddon(addonId, newEnabled);
-      
+
       // Refresh the addon list
       await loadInstalledAddons();
-      
-      const addon = installedAddons.find(a => a.metadata.id === addonId);
+
+      const addon = installedAddons.find((a) => a.metadata.id === addonId);
       if (addon) {
         toast({
           title: `Addon ${newEnabled ? 'enabled' : 'disabled'}`,
@@ -147,14 +204,14 @@ export default function AddonSettingsPage() {
 
   const handleUninstallAddon = async (addonId: string) => {
     try {
-      const addon = installedAddons.find(a => a.metadata.id === addonId);
+      const addon = installedAddons.find((a) => a.metadata.id === addonId);
       if (!addon) return;
 
       await uninstallAddon(addonId);
-      
+
       // Refresh the addon list
       await loadInstalledAddons();
-      
+
       toast({
         title: 'Addon uninstalled',
         description: `${addon.metadata.name} has been completely removed.`,
@@ -175,6 +232,48 @@ export default function AddonSettingsPage() {
     }
   };
 
+  const handleViewPermissions = async (addon: InstalledAddon) => {
+    try {
+      // Use the stored permissions from the addon metadata instead of analyzing code
+      // This gives us access to the merged permissions with isDeclared/isDetected flags
+      const storedPermissions = addon.metadata.permissions || [];
+      
+      // Convert stored permissions to the expected format for display
+      const declaredPermissions = storedPermissions.map(perm => ({
+        category: perm.category,
+        functions: perm.functions,
+        purpose: perm.purpose,
+        isDeclared: perm.is_declared,
+        isDetected: perm.is_detected,
+      }));
+
+      // Calculate risk level based on stored permissions
+      const hasHighRiskCategories = storedPermissions.some(perm => 
+        ['accounts', 'activities', 'settings'].includes(perm.category)
+      );
+      const hasMediumRiskCategories = storedPermissions.some(perm => 
+        ['portfolio', 'files', 'financial-planning'].includes(perm.category)
+      );
+      
+      const riskLevel = hasHighRiskCategories ? 'high' : 
+                       hasMediumRiskCategories ? 'medium' : 'low';
+
+      setViewPermissionDialog({
+        open: true,
+        addon,
+        declaredPermissions,
+        riskLevel,
+      });
+    } catch (error) {
+      console.error('Error loading addon permissions:', error);
+      toast({
+        title: 'Error loading permissions',
+        description: 'Could not load addon permissions.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -182,7 +281,7 @@ export default function AddonSettingsPage() {
           heading="Addon Manager"
           text="Install and manage ZIP addon packages to extend Wealthfolio's functionality."
         />
-        
+
         <div className="flex items-center gap-3">
           <Popover>
             <PopoverTrigger asChild>
@@ -195,21 +294,24 @@ export default function AddonSettingsPage() {
                 <div className="space-y-2">
                   <h4 className="font-medium">🔌 Addons & Extensions</h4>
                   <p className="text-sm text-muted-foreground">
-                    Addons let you extend Wealthfolio with new features, custom analytics, and additional functionality to enhance your financial management experience.
+                    Addons let you extend Wealthfolio with new features, custom analytics, and
+                    additional functionality to enhance your financial management experience.
                   </p>
                 </div>
-                <div className="pt-2 border-t">
+                <div className="border-t pt-2">
                   <div className="flex items-start gap-2">
-                    <Icons.AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                    <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-medium text-amber-600">Security Notice:</span> Only install addons from trusted sources. Addons have access to your application data.
+                      <span className="font-medium text-amber-600">Security Notice:</span> Only
+                      install addons from trusted sources. Addons have access to your application
+                      data.
                     </p>
                   </div>
                 </div>
               </div>
             </PopoverContent>
           </Popover>
-          
+
           <Button onClick={handleLoadAddon} disabled={isLoading}>
             {isLoading ? (
               <>
@@ -225,7 +327,7 @@ export default function AddonSettingsPage() {
           </Button>
         </div>
       </div>
-      
+
       <Separator />
 
       <div className="space-y-4">
@@ -236,12 +338,12 @@ export default function AddonSettingsPage() {
               {installedAddons.length} addon{installedAddons.length !== 1 ? 's' : ''} installed
             </p>
           </div>
-          
+
           <a
             href="https://wealthfolio.app/addons"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Browse Plugin Store
             <Icons.Globe className="h-3 w-3" />
@@ -258,18 +360,15 @@ export default function AddonSettingsPage() {
             <EmptyPlaceholder.Icon name="FileText" />
             <EmptyPlaceholder.Title>No addons installed</EmptyPlaceholder.Title>
             <EmptyPlaceholder.Description>
-              Get started by installing your first addon package to extend Wealthfolio's functionality.
+              Get started by installing your first addon package to extend Wealthfolio's
+              functionality.
             </EmptyPlaceholder.Description>
             <div className="flex items-center gap-3">
               <Button onClick={handleLoadAddon} disabled={isLoading}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
                 Install Your First Addon
               </Button>
-              <a
-                href="https://wealthfolio.app/addons"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href="https://wealthfolio.app/addons" target="_blank" rel="noopener noreferrer">
                 <Button variant="outline">
                   Browse Store
                   <Icons.Globe className="ml-2 h-4 w-4" />
@@ -282,25 +381,25 @@ export default function AddonSettingsPage() {
             {installedAddons.map((addon) => (
               <div
                 key={addon.metadata.id}
-                className="group rounded-lg border bg-card p-6 hover:bg-accent/30 transition-all duration-200 hover:shadow-md"
+                className="group rounded-lg border bg-card p-6 transition-all duration-200 hover:bg-accent/30 hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0 space-y-3">
+                  <div className="min-w-0 flex-1 space-y-3">
                     {/* Header section with name and version */}
                     <div className="flex items-center gap-3">
-                      <h4 className="font-semibold text-lg truncate">{addon.metadata.name}</h4>
+                      <h4 className="truncate text-lg font-semibold">{addon.metadata.name}</h4>
                       <Badge variant="outline" className="shrink-0 text-xs">
                         v{addon.metadata.version}
                       </Badge>
                     </div>
-                    
+
                     {/* Description */}
                     {addon.metadata.description && (
-                      <p className="text-sm text-muted-foreground leading-relaxed">
+                      <p className="text-sm leading-relaxed text-muted-foreground">
                         {addon.metadata.description}
                       </p>
                     )}
-                    
+
                     {/* Author info */}
                     {addon.metadata.author && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -309,40 +408,31 @@ export default function AddonSettingsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Controls section */}
-                  <div className="flex items-center gap-4 ml-6">
-                    {/* Enable/Disable Switch */}
-                    <div className="flex items-center gap-3">
-                      <Label 
-                        htmlFor={`addon-${addon.metadata.id}`} 
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        {togglingAddonId === addon.metadata.id
-                          ? 'Loading...'
-                          : addon.metadata.enabled 
-                            ? 'Enabled' 
-                            : 'Disabled'}
-                      </Label>
-                      <Switch
-                        id={`addon-${addon.metadata.id}`}
-                        checked={addon.metadata.enabled}
-                        onCheckedChange={(checked) => 
-                          handleToggleAddon(addon.metadata.id, !checked)
-                        }
-                        className="data-[state=checked]:bg-green-600"
-                        disabled={togglingAddonId === addon.metadata.id}
-                      />
-                    </div>
-                    
+                  <div className="ml-6 flex items-center gap-2">
+                    {/* Permissions button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewPermissions(addon)}
+                      className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                    >
+                      <Icons.Settings className="h-4 w-4" />
+                      <span className="sr-only">View permissions</span>
+                    </Button>
+
                     {/* Delete button with confirmation */}
                     <DeleteConfirm
                       deleteConfirmTitle="Remove Addon"
                       deleteConfirmMessage={
                         <div className="space-y-2">
-                          <p>Are you sure you want to remove <strong>{addon.metadata.name}</strong>?</p>
+                          <p>
+                            Are you sure you want to remove <strong>{addon.metadata.name}</strong>?
+                          </p>
                           <p className="text-sm text-muted-foreground">
-                            This action cannot be undone. The addon will be completely removed from your system.
+                            This action cannot be undone. The addon will be completely removed from
+                            your system.
                           </p>
                         </div>
                       }
@@ -350,15 +440,38 @@ export default function AddonSettingsPage() {
                       isPending={false}
                       button={
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                         >
                           <Icons.Trash className="h-4 w-4" />
                           <span className="sr-only">Remove addon</span>
                         </Button>
                       }
                     />
+
+                    {/* Enable/Disable Switch */}
+                    <div className="mr-2 flex items-center gap-3">
+                      <Label
+                        htmlFor={`addon-${addon.metadata.id}`}
+                        className="cursor-pointer text-sm font-medium"
+                      >
+                        {togglingAddonId === addon.metadata.id
+                          ? 'Loading...'
+                          : addon.metadata.enabled
+                            ? 'Enabled'
+                            : 'Disabled'}
+                      </Label>
+                      <Switch
+                        id={`addon-${addon.metadata.id}`}
+                        checked={addon.metadata.enabled}
+                        onCheckedChange={(checked) =>
+                          handleToggleAddon(addon.metadata.id, !checked)
+                        }
+                        className="data-[state=checked]:bg-green-600"
+                        disabled={togglingAddonId === addon.metadata.id}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -366,6 +479,46 @@ export default function AddonSettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Permission Dialog */}
+      <PermissionDialog
+        open={permissionDialog.open}
+        onOpenChange={(open) => setPermissionDialog({ ...permissionDialog, open })}
+        manifest={permissionDialog.manifest}
+        detectedCategories={permissionDialog.detectedCategories || []}
+        riskLevel={permissionDialog.riskLevel || 'low'}
+        onApprove={() => {
+          if (permissionDialog.onApprove) {
+            permissionDialog.onApprove();
+          }
+        }}
+        onDeny={() => {
+          setPermissionDialog({ open: false });
+          toast({
+            title: 'Installation cancelled',
+            description: 'Addon installation was cancelled by user.',
+          });
+        }}
+      />
+
+      {/* View Permissions Dialog */}
+      {viewPermissionDialog.addon && (
+        <PermissionDialog
+          open={viewPermissionDialog.open}
+          onOpenChange={(open) => setViewPermissionDialog({ ...viewPermissionDialog, open })}
+          manifest={viewPermissionDialog.addon.metadata}
+          detectedCategories={[]}
+          declaredPermissions={viewPermissionDialog.declaredPermissions || []}
+          riskLevel={viewPermissionDialog.riskLevel || 'low'}
+          onApprove={() => {
+            setViewPermissionDialog({ open: false });
+          }}
+          onDeny={() => {
+            setViewPermissionDialog({ open: false });
+          }}
+          isViewOnly={true}
+        />
+      )}
     </div>
   );
-} 
+}

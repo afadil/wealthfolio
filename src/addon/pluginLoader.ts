@@ -1,24 +1,26 @@
 import { readDir, readTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
 // import realCtx, { getDynamicNavItems, getDynamicRoutes } from './runtimeContextBase';
 import { realCtx, getDynamicNavItems, getDynamicRoutes } from '@/addon/runtimeContext';
 import { logger } from '@/adapters/tauri';
-
-interface AddonManifest {
-  id: string;
-  name: string;
-  version: string;
-  description?: string;
-  author?: string;
-  sdkVersion?: string;
-  main?: string;
-  enabled?: boolean;
-}
+import { 
+  validateManifestPermissions,
+  analyzeAddonPermissions
+} from '@/addon/permissions';
 
 interface AddonFile {
   path: string;
   manifestPath: string;
-  manifest: AddonManifest;
+  manifest: AddonManifest & {
+    permissions?: Array<{
+      category: string;
+      functions: string[];
+      purpose: string;
+      is_declared?: boolean;
+      is_detected?: boolean;
+      detected_at?: string;
+    }>;
+  };
 }
 
 // Store loaded addons for cleanup
@@ -157,6 +159,42 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
     // addonFile.path is relative to AppData, e.g., "addons/addon-id/dist/addon.js"
     const addonCode = await readTextFile(addonFile.path, { baseDir: BaseDirectory.AppData });
 
+    // Get permissions from cached data in manifest (fast) or analyze code (fallback)
+    let permissionAnalysis;
+    
+    // Check if manifest has detected permissions (from new installation system)
+    const detectedPermissions = addonFile.manifest.permissions?.filter(p => p.is_detected);
+    if (detectedPermissions && detectedPermissions.length > 0) {
+      // Use cached permissions (fast path)
+      const allDetectedFunctions = detectedPermissions.flatMap(p => p.functions);
+      const detectedCategories = [...new Set(detectedPermissions.map(p => p.category))];
+      
+      permissionAnalysis = {
+        detectedFunctions: allDetectedFunctions,
+        categories: [], // Simplified for logging
+        riskLevel: 'medium' as const // Simplified for logging
+      };
+      
+      logger.info(`Using cached permissions for addon ${addonFile.manifest.id}: functions=[${allDetectedFunctions.join(',')}], categories=[${detectedCategories.join(',')}]`);
+    } else {
+      // Fallback to runtime analysis (for legacy addons without cached permissions)
+      logger.warn(`No cached permissions found for addon ${addonFile.manifest.id}, performing runtime analysis...`);
+      permissionAnalysis = analyzeAddonPermissions(addonCode);
+      logger.info(`Runtime permission analysis for addon ${addonFile.manifest.id}: riskLevel=${permissionAnalysis.riskLevel}, categories=[${permissionAnalysis.categories.map(c => c.name).join(',')}], functions=[${permissionAnalysis.detectedFunctions.join(',')}]`);
+    }
+    
+    // Validate manifest permissions if they exist
+    if (addonFile.manifest.permissions) {
+      const validation = validateManifestPermissions(
+        addonFile.manifest,
+        permissionAnalysis.detectedFunctions
+      );
+      
+      if (!validation.isValid) {
+        logger.warn(`Addon ${addonFile.manifest.id} has permission mismatches: missing=${validation.missingPermissions.join(',')}, extra=${validation.extraPermissions.join(',')}`);
+      }
+    }
+
     // Create a Blob and an object URL
     const blob = new Blob([addonCode], { type: 'text/javascript' });
     blobUrl = URL.createObjectURL(blob);
@@ -294,4 +332,12 @@ export function debugAddonState(): void {
   logger.info(`- Dynamic nav items: ${JSON.stringify(getDynamicNavItems())}`);
   logger.info(`- Dynamic routes: ${JSON.stringify(getDynamicRoutes())}`);
   logger.info(`- Loaded addons: ${JSON.stringify(getLoadedAddons())}`);
+}
+
+/**
+ * Analyze addon permissions from code (exported for UI use - for preview only)
+ * This should only be used for addon preview before installation
+ */
+export function analyzeAddonFromCode(addonCode: string) {
+  return analyzeAddonPermissions(addonCode);
 }

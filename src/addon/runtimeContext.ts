@@ -15,7 +15,6 @@ import type {
   DepositsCalculation,
   Goal,
   GoalAllocation,
-  AssetData,
   QuoteSummary,
   Asset,
   Quote,
@@ -59,7 +58,7 @@ import {
 import {
   searchTicker,
   syncHistoryQuotes,
-  getAssetData,
+  getAssetProfile,
   updateAssetProfile,
   updateAssetDataSource,
   updateQuote,
@@ -197,7 +196,7 @@ export interface HostAPI {
   // Market data
   searchTicker(query: string): Promise<QuoteSummary[]>;
   syncHistoryQuotes(): Promise<void>;
-  getAssetData(assetId: string): Promise<AssetData>;
+  getAssetProfile(assetId: string): Promise<Asset>;
   updateAssetProfile(payload: UpdateAssetProfile): Promise<Asset>;
   updateAssetDataSource(symbol: string, dataSource: string): Promise<Asset>;
   updateQuote(symbol: string, quote: Quote): Promise<void>;
@@ -286,22 +285,21 @@ export const realCtx: Base & { api: HostAPI } = {
         remove: () => {
           dynamicNavItems.delete(cfg.id);
           notifyNavigationUpdate();
-        }
+        },
       };
-    }
+    },
   },
   router: {
     add: (r: {
       path: string;
       component: React.LazyExoticComponent<React.ComponentType<any>>;
     }): void => {
-
       // Store the route component
       dynamicRoutes.set(r.path, r.component);
 
       // Notify listeners that routes have changed
       notifyNavigationUpdate();
-    }
+    },
   },
   onDisable: (cb: () => void): void => {
     disableCallbacks.add(cb);
@@ -336,7 +334,7 @@ export const realCtx: Base & { api: HostAPI } = {
     // Market data
     searchTicker,
     syncHistoryQuotes,
-    getAssetData,
+    getAssetProfile,
     updateAssetProfile,
     updateAssetDataSource,
     updateQuote,

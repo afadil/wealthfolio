@@ -7,20 +7,16 @@ import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
 
 export type { EventCallback, UnlistenFn };
 
+import type { AddonManifest as BaseAddonManifest } from '@wealthfolio/addon-sdk';
+
 export interface AddonFile {
   name: string;
   content: string;
   is_main: boolean;
 }
 
-export interface AddonMetadata {
-  id: string;
-  name: string;
-  version: string;
-  description?: string;
-  author?: string;
+export interface AddonMetadata extends BaseAddonManifest {
   main: string;
-  sdkVersion?: string;
   enabled: boolean;
   installed_at: string;
 }

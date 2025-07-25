@@ -12,6 +12,19 @@ pub struct AddonFile {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct AddonPermission {
+    pub category: String,
+    pub functions: Vec<String>,
+    pub purpose: String,
+    /// Whether this permission was declared by the developer in manifest
+    pub is_declared: Option<bool>,
+    /// Whether this permission was detected by static analysis during installation
+    pub is_detected: Option<bool>,
+    /// ISO timestamp when this permission was detected (if is_detected is true)
+    pub detected_at: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct AddonMetadata {
     pub id: String,
     pub name: String,
@@ -21,6 +34,7 @@ pub struct AddonMetadata {
     pub main: String,
     #[serde(rename = "sdkVersion")]
     pub sdk_version: Option<String>,
+    pub permissions: Option<Vec<AddonPermission>>,
     // Runtime fields added when saving
     pub enabled: bool,
     pub installed_at: String,
@@ -47,6 +61,73 @@ fn ensure_addons_directory(app_data_dir: &str) -> Result<PathBuf, String> {
             .map_err(|e| format!("Failed to create addons directory: {}", e))?;
     }
     Ok(addons_dir)
+}
+
+/// Simple permission detection based on common API function patterns
+/// Returns detected permissions that can be merged with declared ones
+fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermission> {
+    // Define known permission categories and their associated functions
+    let permission_patterns = vec![
+        ("portfolio", vec!["getHoldings", "getPortfolio", "getPerformance", "getAccountSummary"], "Portfolio data access"),
+        ("account", vec!["getAccounts", "createAccount", "updateAccount", "deleteAccount"], "Account management"),
+        ("activity", vec!["getActivities", "addActivity", "updateActivity", "deleteActivity"], "Activity management"),
+        ("market-data", vec!["getMarketData", "getQuote", "getHistoricalData", "searchSymbols"], "Market data access"),
+        ("goals", vec!["getGoals", "createGoal", "updateGoal", "deleteGoal"], "Goals management"),
+        ("settings", vec!["getSettings", "updateSettings", "getPreferences"], "Settings access"),
+        ("import-export", vec!["importData", "exportData", "uploadFile", "downloadFile"], "Data import/export"),
+        ("ui", vec!["showNotification", "openModal", "updateTheme", "navigate"], "User interface"),
+    ];
+
+    let mut detected_permissions: Vec<AddonPermission> = Vec::new();
+    let current_time = chrono::Utc::now().to_rfc3339();
+
+    // Group detected functions by category
+    let mut category_functions: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+
+    // Analyze all addon files for function usage
+    for file in addon_files {
+        for (category, functions, _purpose) in &permission_patterns {
+            for function in functions {
+                // Simple pattern matching for function calls
+                if file.content.contains(&format!("{}(", function)) ||
+                   file.content.contains(&format!(".{}(", function)) ||
+                   file.content.contains(&format!("'{}'", function)) ||
+                   file.content.contains(&format!("\"{}\"", function)) {
+                    
+                    category_functions
+                        .entry(category.to_string())
+                        .or_insert_with(Vec::new)
+                        .push(function.to_string());
+                }
+            }
+        }
+    }
+
+    // Create permission objects for each category with detected functions
+    for (category, functions) in category_functions {
+        // Remove duplicates
+        let mut unique_functions = functions;
+        unique_functions.sort();
+        unique_functions.dedup();
+
+        // Find the purpose for this category
+        let purpose = permission_patterns
+            .iter()
+            .find(|(cat, _, _)| cat == &category)
+            .map(|(_, _, purpose)| purpose.to_string())
+            .unwrap_or_else(|| format!("Access to {} functions", category));
+
+        detected_permissions.push(AddonPermission {
+            category,
+            functions: unique_functions,
+            purpose,
+            is_declared: Some(false),
+            is_detected: Some(true),
+            detected_at: Some(current_time.clone()),
+        });
+    }
+
+    detected_permissions
 }
 
 /// Get addon directory path for a specific addon
@@ -92,10 +173,51 @@ pub async fn install_addon_zip(
             .map_err(|e| format!("Failed to write addon file {}: {}", file.name, e))?;
     }
 
-    // Save manifest with runtime fields
+    // Perform permission detection on the extracted files
+    let detected_permissions = detect_addon_permissions(&extracted.files);
+
+    // Merge declared and detected permissions
+    let mut merged_permissions = Vec::new();
+    
+    // First, add all declared permissions and mark them as declared
+    if let Some(declared_perms) = &extracted.metadata.permissions {
+        for perm in declared_perms {
+            merged_permissions.push(AddonPermission {
+                category: perm.category.clone(),
+                functions: perm.functions.clone(),
+                purpose: perm.purpose.clone(),
+                is_declared: Some(true),
+                is_detected: Some(false), // Will be updated if also detected
+                detected_at: None,
+            });
+        }
+    }
+    
+    // Then, add detected permissions and mark matches
+    for detected_perm in detected_permissions {
+        // Check if this category already exists in declared permissions
+        if let Some(existing) = merged_permissions.iter_mut().find(|p| p.category == detected_perm.category) {
+            // Mark as both declared and detected
+            existing.is_detected = Some(true);
+            existing.detected_at = detected_perm.detected_at.clone();
+            
+            // Merge functions (detected functions not in declared)
+            for func in &detected_perm.functions {
+                if !existing.functions.contains(func) {
+                    existing.functions.push(func.clone());
+                }
+            }
+        } else {
+            // Add as detected-only permission
+            merged_permissions.push(detected_perm);
+        }
+    }
+
+    // Save manifest with runtime fields and merged permissions
     let mut metadata = extracted.metadata.clone();
     metadata.enabled = enable_after_install.unwrap_or(true);
     metadata.installed_at = chrono::Utc::now().to_rfc3339();
+    metadata.permissions = Some(merged_permissions);
     
     let manifest_path = addon_dir.join("manifest.json");
     let manifest_json = serde_json::to_string_pretty(&metadata)
@@ -325,6 +447,89 @@ pub async fn extract_addon_zip(
     extract_addon_zip_internal(zip_data)
 }
 
+#[tauri::command]
+pub async fn redetect_addon_permissions(
+    app_handle: AppHandle,
+    addon_id: String,
+) -> Result<Vec<AddonPermission>, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .to_str()
+        .ok_or("Failed to convert app data dir path to string")?
+        .to_string();
+
+    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
+    let manifest_path = addon_dir.join("manifest.json");
+    
+    if !manifest_path.exists() {
+        return Err("Addon not found".to_string());
+    }
+
+    // Read current manifest
+    let manifest_content = fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read manifest file: {}", e))?;
+    let mut metadata: AddonMetadata = serde_json::from_str(&manifest_content)
+        .map_err(|e| format!("Failed to parse manifest: {}", e))?;
+
+    // Load addon files for permission detection
+    let mut files = Vec::new();
+    read_addon_files_recursive(&addon_dir, &addon_dir, &mut files)?;
+    
+    // Re-detect permissions
+    let detected_permissions = detect_addon_permissions(&files);
+    
+    // Merge with existing declared permissions
+    let mut merged_permissions = Vec::new();
+    
+    // First, preserve declared permissions
+    if let Some(existing_perms) = &metadata.permissions {
+        for perm in existing_perms {
+            if perm.is_declared.unwrap_or(false) {
+                merged_permissions.push(AddonPermission {
+                    category: perm.category.clone(),
+                    functions: perm.functions.clone(),
+                    purpose: perm.purpose.clone(),
+                    is_declared: Some(true),
+                    is_detected: Some(false), // Will be updated if also detected
+                    detected_at: None,
+                });
+            }
+        }
+    }
+    
+    // Then, add detected permissions and mark matches
+    for detected_perm in detected_permissions {
+        if let Some(existing) = merged_permissions.iter_mut().find(|p| p.category == detected_perm.category) {
+            // Mark as both declared and detected
+            existing.is_detected = Some(true);
+            existing.detected_at = detected_perm.detected_at.clone();
+            
+            // Merge functions
+            for func in &detected_perm.functions {
+                if !existing.functions.contains(func) {
+                    existing.functions.push(func.clone());
+                }
+            }
+        } else {
+            // Add as detected-only permission
+            merged_permissions.push(detected_perm);
+        }
+    }
+    
+    // Update manifest with new permissions
+    metadata.permissions = Some(merged_permissions.clone());
+    
+    // Write back manifest
+    let manifest_json = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
+    fs::write(&manifest_path, manifest_json)
+        .map_err(|e| format!("Failed to write manifest: {}", e))?;
+
+    Ok(merged_permissions)
+}
+
 fn extract_addon_zip_internal(zip_data: Vec<u8>) -> Result<ExtractedAddon, String> {
     use zip::ZipArchive;
     use std::io::Cursor;
@@ -447,6 +652,33 @@ fn parse_manifest_json_metadata(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    // Parse permissions if they exist
+    let permissions = manifest_json
+        .get("permissions")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|perm| {
+                    let category = perm.get("category")?.as_str()?.to_string();
+                    let functions = perm.get("functions")?
+                        .as_array()?
+                        .iter()
+                        .filter_map(|f| f.as_str().map(|s| s.to_string()))
+                        .collect::<Vec<String>>();
+                    let purpose = perm.get("purpose")?.as_str()?.to_string();
+                    
+                    Some(AddonPermission {
+                        category,
+                        functions,
+                        purpose,
+                        is_declared: Some(true), // These are declared in manifest
+                        is_detected: Some(false), // Will be updated during installation
+                        detected_at: None,
+                    })
+                })
+                .collect::<Vec<AddonPermission>>()
+        });
+
     Ok(AddonMetadata {
         id,
         name,
@@ -455,6 +687,7 @@ fn parse_manifest_json_metadata(
         author,
         main,
         sdk_version,
+        permissions,
         enabled: true, // Default for new addons
         installed_at: chrono::Utc::now().to_rfc3339(),
     })

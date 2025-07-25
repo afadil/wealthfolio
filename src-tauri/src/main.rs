@@ -145,6 +145,7 @@ pub fn main() {
             commands::addon::uninstall_addon,
             commands::addon::load_addon_for_runtime,
             commands::addon::get_enabled_addons_on_startup,
+            commands::addon::redetect_addon_permissions,
             commands::secrets::set_api_key,
             commands::secrets::get_api_key,
             commands::secrets::delete_api_key,
