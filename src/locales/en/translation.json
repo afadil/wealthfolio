@@ -1,0 +1,55 @@
+{
+    "common": {
+      "settings": "Settings",
+      "general": "General",
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "edit": "Edit",
+      "add": "Add",
+      "back": "Back",
+      "success": "Success",
+      "error": "Error"
+    },
+    "settings": {
+      "General": "General",
+      "general": {
+        "title": "General",
+        "description": "Manage the general application settings and preferences",
+        "language": "Language",
+        "language_description": "Choose your preferred language",
+        "language_selection": "Select Language",
+        "baseCurrency": "Base Currency",
+        "baseCurrency_description": "Choose your base currency"
+      },
+      "Accounts": "Accounts",
+      "Limits": "Limits",
+      "Goals": "Goals",
+      "Appearance": "Appearance",
+      "Data Export": "Data Export",
+      "Contribution Limits": "Contribution Limits",
+      "Manage your investment and saving accounts.": "Manage your investment and saving accounts.",
+      "Manage your contribution limits.": "Manage your contribution limits.",
+      "Manage your investment and saving goals.": "Manage your investment and saving goals.",
+      "Customize the appearance of the application.": "Customize the appearance of the application.",
+      "Export all your financial data with flexible export options.": "Export all your financial data with flexible export options.",
+      "Choose Your Preferred Format": "Choose Your Preferred Format"
+    },
+    "dashboard": {
+      "Dashboard": "Dashboard",
+      "portfolio": "Portfolio",
+      "holdings": "Holdings",
+      "activities": "Activities",
+      "performance": "Performance"
+    },
+    "Dashboard": "Dashboard",
+    "Holdings": "Holdings",
+    "Performance": "Performance",
+    "Income": "Income",
+    "Activities": "Activities",
+    "Settings": "Settings",
+    "Investment Income": "Investment Income",
+    "Portfolio Performance": "Portfolio Performance",
+    "No income data available": "No income data available",
+    "Add account": "Add account"
+  }
