@@ -23,13 +23,18 @@ export type {
 // Manifest and metadata types
 export type {
   AddonManifest,
-  AddonMetadata,
+  DevelopmentManifest,
+  InstalledManifest,
   AddonFile,
   ExtractedAddon,
   InstalledAddon,
   AddonInstallResult,
   AddonValidationResult,
   AddonStoreListing,
+} from './manifest';
+
+export {
+  isInstalledManifest,
 } from './manifest';
 
 // Permission system

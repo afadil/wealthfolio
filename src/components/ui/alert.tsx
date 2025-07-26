@@ -13,13 +13,13 @@ const alertVariants = cva(
           'border-destructive/50 text-destructive bg-destructive/20 dark:border-destructive [&>svg]:text-destructive',
 
         error:
-          'border-destructive/50 text-destructive bg-destructive/20 dark:border-destructive [&>svg]:text-destructive',
+          'border-red-100/40 bg-red-100/30 text-red-500 [&>svg]:text-red-600 dark:border-red-100/20 dark:bg-red-100/20 dark:text-red-300 dark:[&>svg]:text-red-300',
 
         success:
-          'success group border-success bg-success text-success-foreground ',
+          'border-green-100/40 bg-green-100/30 text-green-500 [&>svg]:text-green-600 dark:border-green-100/20 dark:bg-green-100/20 dark:text-green-200 dark:[&>svg]:text-green-300',
 
         warning:
-          'border-orange-500 bg-orange-100 text-orange-800 dark:border-orange-500 dark:bg-orange-800/50 [&>svg]:text-orange-200 dark:text-orange-100',
+          'border-orange-100/40 bg-orange-100/30 text-orange-500 [&>svg]:text-orange-600 dark:border-orange-100/20 dark:bg-orange-100/20 dark:text-orange-200 dark:[&>svg]:text-orange-300',
       },
     },
     defaultVariants: {

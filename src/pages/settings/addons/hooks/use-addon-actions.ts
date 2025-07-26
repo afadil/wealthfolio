@@ -1,0 +1,276 @@
+import { useState, useCallback } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { open } from '@tauri-apps/plugin-dialog';
+import { readFile } from '@tauri-apps/plugin-fs';
+import { triggerAllDisableCallbacks } from '@/addon/runtimeContext';
+import { reloadAllAddons } from '@/addon/pluginLoader';
+import {
+  installAddonZip,
+  listInstalledAddons,
+  toggleAddon,
+  uninstallAddon,
+  extractAddonZip,
+} from '@/commands/addon';
+import type { InstalledAddon, Permission } from '@/adapters/tauri';
+import type { RiskLevel } from '@wealthfolio/addon-sdk';
+
+interface PermissionDialogState {
+  open: boolean;
+  manifest?: any;
+  permissions?: Permission[];
+  riskLevel?: RiskLevel;
+  fileData?: Uint8Array;
+  onApprove?: () => void;
+}
+
+interface ViewPermissionDialogState {
+  open: boolean;
+  addon?: InstalledAddon;
+  permissions?: Permission[];
+  riskLevel?: RiskLevel;
+}
+
+export function useAddonActions() {
+  const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAddons, setIsLoadingAddons] = useState(true);
+  const [togglingAddonId, setTogglingAddonId] = useState<string | null>(null);
+
+  // Permission dialog state
+  const [permissionDialog, setPermissionDialog] = useState<PermissionDialogState>({
+    open: false,
+  });
+
+  // View permissions dialog state
+  const [viewPermissionDialog, setViewPermissionDialog] = useState<ViewPermissionDialogState>({
+    open: false,
+  });
+
+  const { toast } = useToast();
+
+  const loadInstalledAddons = useCallback(async () => {
+    try {
+      setIsLoadingAddons(true);
+      const addons = await listInstalledAddons();
+      setInstalledAddons(addons);
+    } catch (error) {
+      console.error('Error loading installed addons:', error);
+      toast({
+        title: 'Error loading addons',
+        description: error instanceof Error ? error.message : 'Failed to load installed addons',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingAddons(false);
+    }
+  }, [toast]);
+
+  // Helper function to calculate risk level from permissions
+  const calculateRiskLevel = (permissions: Permission[]): RiskLevel => {
+    const hasHighRiskCategories = permissions.some(perm => 
+      ['accounts', 'activities', 'settings'].includes(perm.category)
+    );
+    const hasMediumRiskCategories = permissions.some(perm => 
+      ['portfolio', 'files', 'financial-planning'].includes(perm.category)
+    );
+    
+    return hasHighRiskCategories ? 'high' : 
+           hasMediumRiskCategories ? 'medium' : 'low';
+  };
+
+  const handleLoadAddon = async () => {
+    try {
+      setIsLoading(true);
+
+      // Open file dialog for ZIP files only
+      const filePath = await open({
+        filters: [{ name: 'Addon Packages', extensions: ['zip'] }],
+        multiple: false,
+      });
+
+      if (!filePath || Array.isArray(filePath)) {
+        return;
+      }
+
+      // Read the ZIP file
+      const fileData = await readFile(filePath);
+      await handleInstallZipAddon(filePath, fileData);
+    } catch (error) {
+      console.error('Error loading addon:', error);
+      toast({
+        title: 'Error loading addon',
+        description: error instanceof Error ? error.message : 'Failed to load addon',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInstallZipAddon = async (_filePath: string, fileData: Uint8Array) => {
+    try {
+      // First, extract and analyze the addon to check permissions
+      const extractedAddon = await extractAddonZip(fileData);
+
+      // Calculate risk level based on permissions
+      const permissions = extractedAddon.metadata.permissions || [];
+      const riskLevel = calculateRiskLevel(permissions);
+
+      // Show permission dialog
+      setPermissionDialog({
+        open: true,
+        manifest: extractedAddon.metadata,
+        permissions,
+        riskLevel,
+        fileData,
+        onApprove: async () => {
+          setPermissionDialog({ open: false });
+          await performAddonInstallation(fileData);
+        },
+      });
+    } catch (error) {
+      console.error('Error analyzing addon permissions:', error);
+      // If permission analysis fails, show warning and allow user to proceed
+      toast({
+        title: 'Permission analysis failed',
+        description: 'Could not analyze addon permissions. Install at your own risk.',
+        variant: 'destructive',
+      });
+
+      // Still allow installation but with warning
+      await performAddonInstallation(fileData);
+    }
+  };
+
+  const performAddonInstallation = async (fileData: Uint8Array) => {
+    try {
+      // Install the ZIP addon persistently
+      const metadata = await installAddonZip(fileData, true);
+
+      // Refresh the addon list
+      await loadInstalledAddons();
+
+      // Reload all addons to load the newly installed addon immediately
+      await reloadAllAddons();
+
+      toast({
+        title: 'Addon installed successfully',
+        description: `${metadata.name} has been installed and is now active.`,
+      });
+    } catch (error) {
+      console.error('Error installing ZIP addon:', error);
+      throw error;
+    }
+  };
+
+  const handleToggleAddon = async (addonId: string, currentEnabled: boolean) => {
+    try {
+      setTogglingAddonId(addonId);
+      const newEnabled = !currentEnabled;
+      await toggleAddon(addonId, newEnabled);
+
+      // Refresh the addon list
+      await loadInstalledAddons();
+
+      const addon = installedAddons.find((a) => a.metadata.id === addonId);
+      if (addon) {
+        toast({
+          title: `Addon ${newEnabled ? 'enabled' : 'disabled'}`,
+          description: `${addon.metadata.name} has been ${newEnabled ? 'enabled' : 'disabled'}.`,
+        });
+      }
+
+      // Reload all addons to apply the changes immediately
+      await reloadAllAddons();
+
+      // If disabling, trigger cleanup callbacks (this is now redundant since reloadAllAddons handles it)
+      if (!newEnabled) {
+        triggerAllDisableCallbacks();
+      }
+    } catch (error) {
+      console.error('Error toggling addon:', error);
+      toast({
+        title: 'Error toggling addon',
+        description: error instanceof Error ? error.message : 'Failed to toggle addon',
+        variant: 'destructive',
+      });
+    } finally {
+      setTogglingAddonId(null);
+    }
+  };
+
+  const handleUninstallAddon = async (addonId: string) => {
+    try {
+      const addon = installedAddons.find((a) => a.metadata.id === addonId);
+      if (!addon) return;
+
+      await uninstallAddon(addonId);
+
+      // Refresh the addon list
+      await loadInstalledAddons();
+
+      toast({
+        title: 'Addon uninstalled',
+        description: `${addon.metadata.name} has been completely removed.`,
+      });
+
+      // Reload all addons to remove the uninstalled addon from runtime
+      await reloadAllAddons();
+
+      // Trigger disable callbacks for cleanup (this is now redundant since reloadAllAddons handles it)
+      triggerAllDisableCallbacks();
+    } catch (error) {
+      console.error('Error uninstalling addon:', error);
+      toast({
+        title: 'Error uninstalling addon',
+        description: error instanceof Error ? error.message : 'Failed to uninstall addon',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleViewPermissions = async (addon: InstalledAddon) => {
+    try {
+      // Use the stored permissions from the addon metadata
+      const storedPermissions = addon.metadata.permissions || [];
+      
+      // Calculate risk level based on stored permissions
+      const riskLevel = calculateRiskLevel(storedPermissions);
+
+      setViewPermissionDialog({
+        open: true,
+        addon,
+        permissions: storedPermissions,
+        riskLevel,
+      });
+    } catch (error) {
+      console.error('Error loading addon permissions:', error);
+      toast({
+        title: 'Error loading permissions',
+        description: 'Could not load addon permissions.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return {
+    // State
+    installedAddons,
+    isLoading,
+    isLoadingAddons,
+    togglingAddonId,
+    permissionDialog,
+    viewPermissionDialog,
+    
+    // Actions
+    loadInstalledAddons,
+    handleLoadAddon,
+    handleToggleAddon,
+    handleUninstallAddon,
+    handleViewPermissions,
+    
+    // Dialog setters
+    setPermissionDialog,
+    setViewPermissionDialog,
+  };
+}

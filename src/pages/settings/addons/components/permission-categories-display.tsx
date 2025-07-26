@@ -45,23 +45,10 @@ const getRiskBadgeColor = (riskLevel: string) => {
 const getFunctionBadgeVariant = (func: FunctionPermission) => {
   if (func.isDeclared && func.isDetected) {
     return 'default'; // Declared and detected
-  } else if (func.isDeclared && !func.isDetected) {
-    return 'outline'; // Declared but not detected
   } else if (!func.isDeclared && func.isDetected) {
     return 'destructive'; // Detected but not declared (security concern)
   }
-  return 'outline'; // Fallback
-};
-
-const getFunctionBadgeLabel = (func: FunctionPermission) => {
-  if (func.isDeclared && func.isDetected) {
-    return 'Declared & Detected';
-  } else if (func.isDeclared && !func.isDetected) {
-    return 'Declared Only';
-  } else if (!func.isDeclared && func.isDetected) {
-    return 'Detected Only';
-  }
-  return 'Unknown';
+  return 'outline'; // Fallback (declared but not detected)
 };
 
 export function PermissionCategoriesDisplay({
@@ -87,9 +74,9 @@ export function PermissionCategoriesDisplay({
     <div className="space-y-4">
       <div className="space-y-3">
         <h4 className={`font-medium ${isCompact ? 'text-sm' : ''}`}>
-          Data Access Permissions
+          Permissions
         </h4>
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
           {displayPermissions.map((permission) => (
             <div
               key={permission.category}
@@ -117,20 +104,13 @@ export function PermissionCategoriesDisplay({
                     <p className="text-xs text-muted-foreground font-medium">Functions:</p>
                     <div className="flex flex-wrap gap-1">
                       {permission.functions.map((func: FunctionPermission) => (
-                        <div key={func.name} className="flex items-center gap-1">
-                          <Badge 
-                            variant="secondary" 
-                            className={isCompact ? 'text-xs' : 'text-xs'}
-                          >
-                            {func.name}
-                          </Badge>
-                          <Badge
-                            variant={getFunctionBadgeVariant(func)}
-                            className="text-xs"
-                          >
-                            {getFunctionBadgeLabel(func)}
-                          </Badge>
-                        </div>
+                        <Badge 
+                          key={func.name}
+                          variant={getFunctionBadgeVariant(func)}
+                          className={isCompact ? 'text-xs' : 'text-xs'}
+                        >
+                          {func.name}
+                        </Badge>
                       ))}
                     </div>
                   </div>

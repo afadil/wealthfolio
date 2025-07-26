@@ -1,5 +1,6 @@
 import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
-import type { InstalledAddon, ExtractedAddon, AddonMetadata } from '@/adapters/tauri';
+import type { InstalledAddon, ExtractedAddon } from '@/adapters/tauri';
+import type { AddonManifest } from '@wealthfolio/addon-sdk';
 
 export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
   try {
@@ -46,7 +47,7 @@ export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAdd
 export const installAddonZip = async (
   zipData: Uint8Array, 
   enableAfterInstall?: boolean
-): Promise<AddonMetadata> => {
+): Promise<AddonManifest> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

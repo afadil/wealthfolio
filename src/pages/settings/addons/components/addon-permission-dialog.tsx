@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
-import { Separator } from '@/components/ui/separator';
+import { AlertFeedback } from '@/components/alert-feedback';
 import type { AddonManifest, PermissionCategory, Permission, RiskLevel } from '@wealthfolio/addon-sdk';
 import { PermissionCategoriesDisplay } from './permission-categories-display';
 
@@ -25,25 +25,14 @@ interface PermissionDialogProps {
   isViewOnly?: boolean;
 }
 
-const getRiskLevelColor = (riskLevel: RiskLevel) => {
+const getRiskLevelVariant = (riskLevel: RiskLevel): 'success' | 'warning' | 'error' => {
   switch (riskLevel) {
     case 'low':
-      return 'text-green-600 bg-green-50 border-green-200';
+      return 'success';
     case 'medium':
-      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      return 'warning';
     case 'high':
-      return 'text-red-600 bg-red-50 border-red-200';
-  }
-};
-
-const getRiskLevelIcon = (riskLevel: RiskLevel) => {
-  switch (riskLevel) {
-    case 'low':
-      return <Icons.Check className="h-4 w-4" />;
-    case 'medium':
-      return <Icons.AlertTriangle className="h-4 w-4" />;
-    case 'high':
-      return <Icons.AlertTriangle className="h-4 w-4" />;
+      return 'error';
   }
 };
 
@@ -62,69 +51,66 @@ export function PermissionDialog({
     return null;
   }
 
+  console.log('Rendering PermissionDialog with manifest:', manifest);
+
   // For installation (not view-only), use manifest permissions
   // For view-only, use declared permissions passed in
   const permissionsToDisplay = isViewOnly ? declaredPermissions : (manifest.permissions || []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-3">
             <Icons.Settings className="h-5 w-5" />
-            {isViewOnly ? 'Addon Permissions' : 'Addon Permission Request'}
-          </DialogTitle>
-          <DialogDescription>
-            {isViewOnly 
-              ? 'View the permissions and data access for this installed addon.'
-              : 'Review the permissions requested by this addon before installation.'
-            }
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Addon Info */}
-          <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-semibold">{manifest.name}</h3>
+              <span>{manifest.name}</span>
               <Badge variant="outline">v{manifest.version}</Badge>
+               {manifest.author && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Icons.Users className="h-3 w-3" />
+                <span>By {manifest.author}</span>
+              </Badge>
+            )}
             </div>
-            
-            {manifest.description && (
+          </DialogTitle>
+          <DialogDescription className="space-y-2">
+            <div className="text-sm text-muted-foreground">
+              {manifest.description && (
               <p className="text-sm text-muted-foreground">
                 {manifest.description}
               </p>
             )}
-            
-            {manifest.author && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Icons.Users className="h-4 w-4" />
-                <span>By {manifest.author}</span>
-              </div>
-            )}
           </div>
+            <div>
+              {isViewOnly 
+                ? 'View the permissions and data access for this installed addon.'
+                : 'Review the permissions requested by this addon before installation.'
+              }
+            </div>
+            
+        </DialogDescription>
+      </DialogHeader>
 
-          <Separator />
-
+        <div className="flex-1 overflow-hidden space-y-6">
           {/* Risk Level */}
           <div className="space-y-3">
-            <h4 className="font-medium">Risk Assessment</h4>
-            <div className={`flex items-center gap-2 p-3 rounded-lg border ${getRiskLevelColor(riskLevel)}`}>
-              {getRiskLevelIcon(riskLevel)}
-              <span className="font-medium capitalize">{riskLevel} Risk</span>
-              <span className="text-sm">
-                {riskLevel === 'low' && 'This addon has minimal access to sensitive data.'}
-                {riskLevel === 'medium' && 'This addon has moderate access to your financial data.'}
-                {riskLevel === 'high' && 'This addon has extensive access to sensitive financial data.'}
-              </span>
-            </div>
+            <AlertFeedback
+              variant={getRiskLevelVariant(riskLevel)}
+            >
+              {riskLevel === 'low' && 'This addon has minimal access to sensitive data.'}
+              {riskLevel === 'medium' && 'This addon has moderate access to your financial data.'}
+              {riskLevel === 'high' && 'This addon has extensive access to sensitive financial data.'}
+            </AlertFeedback>
           </div>
 
-          {/* Data Access Permissions using shared component */}
-          <PermissionCategoriesDisplay
-            permissions={permissionsToDisplay}
-            variant="default"
-          />
+          {/* Data Access Permissions using shared component - Make scrollable */}
+          <div className="flex-1 overflow-auto">
+            <PermissionCategoriesDisplay
+              permissions={permissionsToDisplay}
+              variant="default"
+            />
+          </div>
 
           {/* Warning for high-risk addons */}
           {riskLevel === 'high' && (

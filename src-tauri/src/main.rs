@@ -8,6 +8,9 @@ mod listeners;
 mod menu;
 mod updater;
 
+#[cfg(test)]
+mod tests;
+
 use log::error;
 use updater::check_for_update;
 

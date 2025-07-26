@@ -5,10 +5,11 @@
 import type { Permission } from './permissions';
 
 /**
- * Base addon manifest structure for addon packages
- * This is what developers write in their manifest.json
+ * Unified addon manifest structure that handles both development and runtime scenarios
+ * This represents both what developers write in their manifest.json and installed addon metadata
  */
 export interface AddonManifest {
+  // Core manifest fields (always present)
   /** Unique addon identifier (lowercase, no spaces, hyphens allowed) */
   id: string;
   /** Human-readable addon name */
@@ -39,28 +40,34 @@ export interface AddonManifest {
   keywords?: string[];
   /** Addon icon (base64 or relative path) */
   icon?: string;
-}
-
-/**
- * Extended addon metadata with runtime and installation information
- * This is what the system uses internally after installation
- */
-export interface AddonMetadata extends AddonManifest {
-  /** Main entry point file (required after installation) */
-  main: string;
-  /** Whether the addon is currently enabled (runtime field) */
-  enabled: boolean;
+  
+  // Runtime fields (only present after installation)
   /** Installation timestamp in ISO format */
-  installedAt: string;
+  installedAt?: string;
   /** Last update timestamp */
   updatedAt?: string;
   /** Installation source */
   source?: 'local' | 'store' | 'sideload';
   /** File size in bytes */
   size?: number;
-  /** Permissions with enhanced tracking (runtime field) */
-  permissions?: Permission[];
 }
+
+/**
+ * Type guard to check if a manifest has been installed (has runtime fields)
+ */
+export function isInstalledManifest(manifest: AddonManifest): manifest is Required<Pick<AddonManifest, 'main' | 'enabled' | 'installedAt'>> & AddonManifest {
+  return !!(manifest.installedAt && manifest.main !== undefined && manifest.enabled !== undefined);
+}
+
+/**
+ * Helper type for development manifests (without runtime fields)
+ */
+export type DevelopmentManifest = Omit<AddonManifest, 'installedAt' | 'updatedAt' | 'source' | 'size'>;
+
+/**
+ * Helper type for installed manifests (with runtime fields)
+ */
+export type InstalledManifest = Required<Pick<AddonManifest, 'main' | 'enabled' | 'installedAt'>> & AddonManifest;
 
 /**
  * Addon file information
@@ -81,7 +88,7 @@ export interface AddonFile {
  */
 export interface ExtractedAddon {
   /** Addon metadata from manifest */
-  metadata: AddonMetadata;
+  metadata: AddonManifest;
   /** List of files in the addon package */
   files: AddonFile[];
 }
@@ -91,7 +98,7 @@ export interface ExtractedAddon {
  */
 export interface InstalledAddon {
   /** Addon metadata */
-  metadata: AddonMetadata;
+  metadata: AddonManifest;
   /** Installation path */
   path?: string;
   /** Whether the addon is currently active */
@@ -107,7 +114,7 @@ export interface AddonInstallResult {
   /** Error message if installation failed */
   error?: string;
   /** Installed addon metadata */
-  addon?: AddonMetadata;
+  addon?: AddonManifest;
 }
 
 /**
@@ -127,7 +134,7 @@ export interface AddonValidationResult {
  */
 export interface AddonStoreListing {
   /** Addon metadata */
-  metadata: AddonMetadata;
+  metadata: AddonManifest;
   /** Download URL */
   downloadUrl: string;
   /** Number of downloads */

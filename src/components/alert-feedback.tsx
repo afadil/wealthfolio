@@ -30,7 +30,7 @@ export function AlertFeedback({
   return (
     <Alert variant={variant} className={className} {...props}>
       {alertIcon}
-      <AlertTitle>{title}</AlertTitle>
+      {title && <AlertTitle>{title}</AlertTitle>}
       <AlertDescription>{children}</AlertDescription>
     </Alert>
   );
