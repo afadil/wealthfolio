@@ -225,6 +225,25 @@ async function loadInstalledAddons(): Promise<void> {
 }
 
 /**
+ * Unloads a specific addon by ID
+ */
+export function unloadAddon(addonId: string): void {
+  const addon = loadedAddons.get(addonId);
+  if (addon) {
+    try {
+      if (addon.disable) {
+        addon.disable();
+      }
+      loadedAddons.delete(addonId);
+      loadedAddonIds.delete(addonId);
+      logger.info(`🗑️ Unloaded addon: ${addonId}`);
+    } catch (error) {
+      logger.error(`Error unloading addon ${addonId}: ${String(error)}`);
+    }
+  }
+}
+
+/**
  * Unloads all addons and cleans up resources
  */
 export function unloadAllAddons(): void {

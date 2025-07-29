@@ -257,7 +257,7 @@ class AddonDevManager {
           if (status.lastModified && devServer.lastUpdated) {
             const lastModified = new Date(status.lastModified);
             if (lastModified > devServer.lastUpdated) {
-              logger.info(`🔄 Detected changes in ${devServer.name}, reloading...`);
+              logger.info(`🔄 Detected changes in ${devServer.name}, auto-reloading...`);
               await this.reloadAddon(addonId);
             }
           }
@@ -272,18 +272,44 @@ class AddonDevManager {
    * Reload a specific addon
    */
   private async reloadAddon(addonId: string): Promise<void> {
-    // Clean up existing instance
-    const devAddons = (globalThis as any).__DEV_ADDONS__;
-    if (devAddons && devAddons.has(addonId)) {
-      const instance = devAddons.get(addonId);
-      if (instance.disable) {
-        instance.disable();
+    try {
+      // Clean up existing instance
+      const devAddons = (globalThis as any).__DEV_ADDONS__;
+      if (devAddons && devAddons.has(addonId)) {
+        const instance = devAddons.get(addonId);
+        if (instance.disable) {
+          logger.info(`🧹 Cleaning up old instance of ${addonId}`);
+          instance.disable();
+        }
+        devAddons.delete(addonId);
       }
-      devAddons.delete(addonId);
-    }
 
-    // Reload from dev server
-    await this.loadAddonFromDevServer(addonId);
+      // Also clean up from the main addon loader
+      const { unloadAddon } = await import('./pluginLoader');
+      if (unloadAddon) {
+        unloadAddon(addonId);
+      }
+
+      // Small delay to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Reload from dev server
+      const success = await this.loadAddonFromDevServer(addonId);
+      
+      if (success) {
+        logger.info(`✅ Successfully hot-reloaded ${addonId}`);
+        
+        // Trigger navigation update to refresh the UI
+        const { triggerNavigationUpdate } = await import('./runtimeContext');
+        if (triggerNavigationUpdate) {
+          triggerNavigationUpdate();
+        }
+      } else {
+        logger.error(`❌ Failed to reload ${addonId}`);
+      }
+    } catch (error) {
+      logger.error(`❌ Error during hot reload of ${addonId}: ${error}`);
+    }
   }
 
   /**
@@ -362,19 +388,58 @@ class AddonDevManager {
       autoReload: this.config.autoReload,
     };
   }
+
+  /**
+   * Toggle development mode on/off
+   */
+  toggleDevMode(): boolean {
+    if (this.config.enabled) {
+      this.disableDevMode();
+    } else {
+      this.enableDevMode();
+    }
+    return this.config.enabled;
+  }
+
+  /**
+   * Check if development mode is enabled
+   */
+  isEnabled(): boolean {
+    return this.config.enabled;
+  }
+
+  /**
+   * Force disable development mode (for manual control)
+   */
+  forceDisable(): void {
+    if (this.config.enabled) {
+      logger.info('🔧 Force disabling addon development mode...');
+      this.disableDevMode();
+    }
+  }
+
+  /**
+   * Force enable development mode (for manual control)
+   */
+  forceEnable(): void {
+    if (!this.config.enabled && import.meta.env.DEV) {
+      logger.info('🔧 Force enabling addon development mode...');
+      this.enableDevMode();
+    }
+  }
 }
 
 // Global instance
 export const addonDevManager = new AddonDevManager();
 
-// Initialize in development mode
+// Initialize in development mode only
 if (import.meta.env.DEV) {
   addonDevManager.enableDevMode();
+  
+  // Make available globally for debugging (dev only)
+  (globalThis as any).__ADDON_DEV__ = addonDevManager;
+
+  // Add global helper functions (dev only)
+  (globalThis as any).discoverAddons = () => addonDevManager.discoverAndRegister();
+  (globalThis as any).reloadAddons = () => reloadAllAddons();
 }
-
-// Make available globally for debugging
-(globalThis as any).__ADDON_DEV__ = addonDevManager;
-
-// Add global helper functions
-(globalThis as any).discoverAddons = () => addonDevManager.discoverAndRegister();
-(globalThis as any).reloadAddons = () => reloadAllAddons();

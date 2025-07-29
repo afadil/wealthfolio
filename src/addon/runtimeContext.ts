@@ -151,6 +151,11 @@ export function subscribeToNavigationUpdates(callback: () => void) {
   return () => navigationUpdateListeners.delete(callback);
 }
 
+// Public API for triggering navigation updates
+export function triggerNavigationUpdate() {
+  notifyNavigationUpdate();
+}
+
 // Public API for triggering all disable callbacks
 export function triggerAllDisableCallbacks() {
   disableCallbacks.forEach(cb => {
