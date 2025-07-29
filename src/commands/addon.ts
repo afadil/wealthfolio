@@ -1,6 +1,6 @@
 import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 import type { InstalledAddon, ExtractedAddon } from '@/adapters/tauri';
-import type { AddonManifest } from '@wealthfolio/addon-sdk';
+import type { AddonManifest, AddonUpdateCheckResult } from '@wealthfolio/addon-sdk';
 
 export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
   try {
@@ -102,6 +102,48 @@ export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => 
     }
   } catch (error) {
     logger.error('Error getting enabled addons on startup.');
+    throw error;
+  }
+};
+
+export const checkAddonUpdate = async (addonId: string): Promise<AddonUpdateCheckResult> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('check_addon_update', { addonId });
+      default:
+        throw new Error('Addon update checking is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error checking addon update.');
+    throw error;
+  }
+};
+
+export const checkAllAddonUpdates = async (): Promise<AddonUpdateCheckResult[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('check_all_addon_updates');
+      default:
+        throw new Error('Addon update checking is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error checking all addon updates.');
+    throw error;
+  }
+};
+
+export const updateAddonFromStore = async (addonId: string, downloadUrl: string): Promise<AddonManifest> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('update_addon_from_store', { addonId, downloadUrl });
+      default:
+        throw new Error('Addon updating is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error updating addon from store.');
     throw error;
   }
 };

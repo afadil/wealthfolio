@@ -1,4 +1,5 @@
-use crate::commands::addon::*;
+use crate::addons::models::*;
+use crate::addons::service::*;
 
 #[test]
 fn test_detect_addon_permissions_hello_world() {
@@ -412,4 +413,102 @@ fn test_function_permission_serialization() {
     assert_eq!(deserialized.is_declared, true);
     assert_eq!(deserialized.is_detected, true);
     assert_eq!(deserialized.detected_at, Some("2023-01-01T00:00:00Z".to_string()));
+}
+
+#[test]
+fn test_parse_manifest_json_metadata_service() {
+    // Test the service function parse_manifest_json_metadata
+    let manifest_json = r#"
+    {
+        "id": "test-addon",
+        "name": "Test Addon",
+        "version": "1.0.0",
+        "description": "A test addon for testing",
+        "author": "Test Author",
+        "main": "addon.js",
+        "permissions": [
+            {
+                "category": "ui",
+                "purpose": "User interface access",
+                "functions": ["showNotification", "openModal"]
+            }
+        ]
+    }
+    "#;
+
+    let result = parse_manifest_json_metadata(manifest_json);
+    assert!(result.is_ok(), "Failed to parse valid manifest JSON");
+    
+    let manifest = result.unwrap();
+    assert_eq!(manifest.id, "test-addon");
+    assert_eq!(manifest.name, "Test Addon");
+    assert_eq!(manifest.version, "1.0.0");
+    assert_eq!(manifest.description, Some("A test addon for testing".to_string()));
+    assert_eq!(manifest.author, Some("Test Author".to_string()));
+    assert_eq!(manifest.main, Some("addon.js".to_string()));
+    
+    // Check permissions were parsed correctly
+    assert!(manifest.permissions.is_some());
+    let permissions = manifest.permissions.unwrap();
+    assert_eq!(permissions.len(), 1);
+    assert_eq!(permissions[0].category, "ui");
+    assert_eq!(permissions[0].purpose, "User interface access");
+    assert_eq!(permissions[0].functions.len(), 2);
+    assert_eq!(permissions[0].functions[0].name, "showNotification");
+    assert_eq!(permissions[0].functions[0].is_declared, true);
+    assert_eq!(permissions[0].functions[0].is_detected, false);
+}
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_ensure_addons_directory_service() {
+        // Test the service function ensure_addons_directory
+        let temp_dir = env::temp_dir().join("wealthfolio_test_addons");
+        let app_data_path = temp_dir.to_str().unwrap();
+        
+        // Clean up any existing test directory
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+        
+        let result = ensure_addons_directory(app_data_path);
+        assert!(result.is_ok(), "Failed to ensure addons directory");
+        
+        let addons_dir = result.unwrap();
+        assert!(addons_dir.exists(), "Addons directory should exist");
+        assert!(addons_dir.is_dir(), "Addons path should be a directory");
+        assert_eq!(addons_dir.file_name().unwrap(), "addons");
+        
+        // Clean up
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_get_addon_path_service() {
+        // Test the service function get_addon_path
+        let temp_dir = env::temp_dir().join("wealthfolio_test_addon_path");
+        let app_data_path = temp_dir.to_str().unwrap();
+        
+        // Clean up any existing test directory
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+        
+        let result = get_addon_path(app_data_path, "test-addon");
+        assert!(result.is_ok(), "Failed to get addon path");
+        
+        let addon_path = result.unwrap();
+        assert_eq!(addon_path.file_name().unwrap(), "test-addon");
+        
+        // Verify the parent directory is the addons directory
+        let parent = addon_path.parent().unwrap();
+        assert_eq!(parent.file_name().unwrap(), "addons");
+        
+        // Clean up
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
 }

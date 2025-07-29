@@ -130,6 +130,44 @@ export interface AddonValidationResult {
 }
 
 /**
+ * Addon update information
+ */
+export interface AddonUpdateInfo {
+  /** Current installed version */
+  currentVersion: string;
+  /** Latest available version */
+  latestVersion: string;
+  /** Whether an update is available */
+  updateAvailable: boolean;
+  /** Download URL for the update */
+  downloadUrl?: string;
+  /** Release notes for the latest version */
+  releaseNotes?: string;
+  /** Release date of the latest version */
+  releaseDate?: string;
+  /** Changelog URL */
+  changelogUrl?: string;
+  /** Whether this is a critical security update */
+  isCritical?: boolean;
+  /** Breaking changes in this update */
+  hasBreakingChanges?: boolean;
+  /** Minimum Wealthfolio version required for this update */
+  minWealthfolioVersion?: string;
+}
+
+/**
+ * Addon update check result
+ */
+export interface AddonUpdateCheckResult {
+  /** Addon ID */
+  addonId: string;
+  /** Update information */
+  updateInfo: AddonUpdateInfo;
+  /** Any errors during update check */
+  error?: string;
+}
+
+/**
  * Addon store listing
  */
 export interface AddonStoreListing {
@@ -149,4 +187,8 @@ export interface AddonStoreListing {
   lastUpdated?: string;
   /** Screenshots or images */
   images?: string[];
+  /** Release notes for the latest version */
+  releaseNotes?: string;
+  /** Changelog URL */
+  changelogUrl?: string;
 }

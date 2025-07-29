@@ -13,7 +13,9 @@ import type {
   AddonValidationResult,
   AddonFile as BaseAddonFile,
   FunctionPermission,
-  Permission
+  Permission,
+  AddonUpdateInfo,
+  AddonUpdateCheckResult
 } from '@wealthfolio/addon-sdk';
 
 // Tauri-specific types with camelCase serialization to match Rust
@@ -22,7 +24,15 @@ export interface AddonFile extends Omit<BaseAddonFile, 'is_main'> {
 }
 
 // Re-export SDK types directly
-export type { AddonManifest, AddonInstallResult, AddonValidationResult, FunctionPermission, Permission };
+export type { 
+  AddonManifest, 
+  AddonInstallResult, 
+  AddonValidationResult, 
+  FunctionPermission, 
+  Permission,
+  AddonUpdateInfo,
+  AddonUpdateCheckResult 
+};
 
 export interface ExtractedAddon {
   metadata: AddonManifest;

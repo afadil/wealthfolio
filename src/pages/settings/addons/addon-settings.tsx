@@ -11,7 +11,9 @@ import { EmptyPlaceholder } from '@/components/empty-placeholder';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DeleteConfirm } from '@/components/delete-confirm';
 import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
+import { AddonUpdateCard } from '@/pages/settings/addons/components/addon-update-card';
 import { useAddonActions } from './hooks/use-addon-actions';
+import { useAddonUpdates } from './hooks/use-addon-updates';
 
 export default function AddonSettingsPage() {
   const {
@@ -30,12 +32,37 @@ export default function AddonSettingsPage() {
     setViewPermissionDialog,
   } = useAddonActions();
 
+  const {
+    isCheckingUpdates,
+    lastUpdateCheck,
+    checkAllUpdates,
+    getUpdateResult,
+    hasUpdates,
+    getUpdateCount,
+    getCriticalUpdateCount,
+    clearUpdateResult,
+  } = useAddonUpdates();
+
   const { toast } = useToast();
 
   // Load installed addons on component mount
   useEffect(() => {
     loadInstalledAddons();
   }, [loadInstalledAddons]);
+
+  const handleCheckUpdates = async () => {
+    try {
+      await checkAllUpdates();
+    } catch (error) {
+      // Error handling is done in the hook
+    }
+  };
+
+  const handleUpdateComplete = async (addonId: string) => {
+    // Refresh addon list and clear update result
+    await loadInstalledAddons();
+    clearUpdateResult(addonId);
+  };
 
   return (
     <div className="space-y-6">
@@ -75,6 +102,29 @@ export default function AddonSettingsPage() {
             </PopoverContent>
           </Popover>
 
+          <Button 
+            variant="outline" 
+            onClick={handleCheckUpdates} 
+            disabled={isCheckingUpdates || installedAddons.length === 0}
+          >
+            {isCheckingUpdates ? (
+              <>
+                <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                Checking...
+              </>
+            ) : (
+              <>
+                <Icons.Refresh className="mr-2 h-4 w-4" />
+                Check Updates
+                {hasUpdates() && (
+                  <Badge variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'} className="ml-2">
+                    {getUpdateCount()}
+                  </Badge>
+                )}
+              </>
+            )}
+          </Button>
+
           <Button onClick={handleLoadAddon} disabled={isLoading}>
             {isLoading ? (
               <>
@@ -97,9 +147,23 @@ export default function AddonSettingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium">Installed Addons</h3>
-            <p className="text-sm text-muted-foreground">
-              {installedAddons.length} addon{installedAddons.length !== 1 ? 's' : ''} installed
-            </p>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>
+                {installedAddons.length} addon{installedAddons.length !== 1 ? 's' : ''} installed
+              </span>
+              {lastUpdateCheck && (
+                <span className="flex items-center gap-1">
+                  <Icons.Clock className="h-3 w-3" />
+                  Last checked: {lastUpdateCheck.toLocaleDateString()} at {lastUpdateCheck.toLocaleTimeString()}
+                </span>
+              )}
+              {hasUpdates() && (
+                <Badge variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'} className="text-xs">
+                  {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
+                  {getCriticalUpdateCount() > 0 && ` (${getCriticalUpdateCount()} critical)`}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <a
@@ -237,6 +301,22 @@ export default function AddonSettingsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Update Card - Show if update is available */}
+                {(() => {
+                  const updateResult = getUpdateResult(addon.metadata.id);
+                  return updateResult?.updateInfo.updateAvailable ? (
+                    <div className="mt-3">
+                      <AddonUpdateCard
+                        addonId={addon.metadata.id}
+                        addonName={addon.metadata.name}
+                        updateInfo={updateResult.updateInfo}
+                        onUpdateComplete={() => handleUpdateComplete(addon.metadata.id)}
+                        disabled={togglingAddonId === addon.metadata.id}
+                      />
+                    </div>
+                  ) : null;
+                })()}
               </div>
             ))}
           </div>

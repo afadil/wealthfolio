@@ -31,6 +31,8 @@ export type {
   AddonInstallResult,
   AddonValidationResult,
   AddonStoreListing,
+  AddonUpdateInfo,
+  AddonUpdateCheckResult,
 } from './manifest';
 
 export {

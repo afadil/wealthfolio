@@ -6291,6 +6291,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "log",
+ "reqwest",
  "serde",
  "serde_json",
  "tauri",
@@ -6301,6 +6302,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tokio",
  "wealthfolio_core",
  "zip 2.4.2",
 ]

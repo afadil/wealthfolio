@@ -11,14 +11,22 @@ A minimal addon that demonstrates:
 - Simple React component
 - Cleanup on disable
 
-### 2. Portfolio Analytics (`portfolio-analytics/`)
+### 2. Investment Target Tracker (`investment-target-tracker/`)
+An interactive addon featuring:
+- Calendar-style progress visualization
+- Portfolio data integration using hooks
+- Custom React components
+- Interactive UI elements
+- Real-time holdings data access
+
+### 3. Portfolio Analytics (`portfolio-analytics/`)
 An intermediate addon showing:
 - Data access APIs
 - Custom hooks
 - Complex UI components
 - Permission declarations
 
-### 3. Advanced Dashboard (`advanced-dashboard/`)
+### 4. Advanced Dashboard (`advanced-dashboard/`)
 A comprehensive addon featuring:
 - Multiple routes and components
 - Real-time data updates

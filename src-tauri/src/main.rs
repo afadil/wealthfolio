@@ -2,14 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod addons;
 mod context;
 mod events;
 mod listeners;
 mod menu;
 mod updater;
 
-#[cfg(test)]
-mod tests;
+
 
 use log::error;
 use updater::check_for_update;
@@ -154,6 +154,9 @@ pub fn main() {
             commands::addon::load_addon_for_runtime,
             commands::addon::get_enabled_addons_on_startup,
             commands::addon::redetect_addon_permissions,
+            commands::addon::check_addon_update,
+            commands::addon::check_all_addon_updates,
+            commands::addon::update_addon_from_store,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
