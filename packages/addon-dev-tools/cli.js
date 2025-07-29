@@ -77,7 +77,7 @@ const addonTemplate = {
     "scripts": {
       "build": "vite build",
       "dev": "vite build --watch",
-      "dev:server": "node ../../../addon-sdk/dev-server.js .",
+      "dev:server": "node ../../addon-dev-tools/dev-server.js .",
       "clean": "rm -rf dist *.zip",
       "package": "zip -r {{packageName}}.zip manifest.json dist/ README.md",
       "bundle": "npm run clean && npm run build && npm run package"

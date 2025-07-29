@@ -16,7 +16,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "clean": "rm -rf dist hello-world-addon.zip",
+    "dev:server": "node ../../../addon-dev-tools/dev-server.js .",
+    "clean": "rm -rf dist investment-target-tracker-addon.zip",
     "package": "zip -r $npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
     "bundle": "pnpm clean && pnpm build && pnpm package",
     "lint": "tsc --noEmit",

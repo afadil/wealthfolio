@@ -11,7 +11,7 @@ This guide explains how to develop Wealthfolio addons with hot reload functional
 cd /path/to/your/addons
 
 # Create a new addon
-npx @wealthfolio/addon-sdk create my-awesome-addon
+npx @wealthfolio/addon-dev-tools create my-awesome-addon
 
 # Navigate to the addon directory
 cd my-awesome-addon

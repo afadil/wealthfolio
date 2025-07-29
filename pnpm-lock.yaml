@@ -244,7 +244,7 @@ importers:
         specifier: ^3.1.3
         version: 3.1.3(@types/node@22.14.0)(jiti@1.21.7)(jsdom@26.0.0)(yaml@2.7.1)
 
-  packages/addon-sdk:
+  packages/addon-dev-tools:
     dependencies:
       chokidar:
         specifier: ^3.5.0
@@ -258,6 +258,9 @@ importers:
       express:
         specifier: ^4.18.0
         version: 4.21.2
+
+  packages/addon-sdk:
+    dependencies:
       react:
         specifier: ^18.0.0
         version: 18.3.1
