@@ -48,11 +48,19 @@
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "dev-server": "node dev-server.js",
+    "addon": "node cli.js",
     "prepack": "npm run build"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "commander": "^9.0.0",
+    "express": "^4.18.0",
+    "cors": "^2.8.0",
+    "chokidar": "^3.5.0"
   },
   "peerDependencies": {
     "react": "^18.0.0"

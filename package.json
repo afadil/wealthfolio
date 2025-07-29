@@ -14,7 +14,9 @@
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "publish:sdk": "cd packages/addon-sdk && npm publish --access public"
+    "publish:sdk": "cd packages/addon-sdk && npm publish --access public",
+    "addon:create": "cd packages/addon-sdk && node cli.js create",
+    "addon:dev": "cd packages/addon-sdk && node dev-server.js"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.6",

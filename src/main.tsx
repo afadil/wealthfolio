@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 import "./addon/runtimeContext"; 
+import "./addon/devMode"; // Initialize development mode
 import { loadAllAddons, debugAddonState } from "./addon/pluginLoader";
 
 // Expose React and ReactDOM globally for addons

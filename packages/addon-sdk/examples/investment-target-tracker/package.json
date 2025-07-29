@@ -19,6 +19,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
+    "dev:server": "node ../../dev-server.js .",
     "clean": "rm -rf dist investment-target-tracker-addon.zip",
     "package": "zip -r $npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
     "bundle": "pnpm clean && pnpm build && pnpm package",

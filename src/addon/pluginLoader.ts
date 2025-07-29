@@ -2,6 +2,7 @@ import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
 import { realCtx, getDynamicNavItems, getDynamicRoutes } from '@/addon/runtimeContext';
 import { logger } from '@/adapters';
 import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
+import { addonDevManager } from './devMode';
 
 interface AddonFile {
   path: string;
@@ -145,44 +146,82 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
 }
 
 /**
- * Loads all discovered addons
+ * Loads all discovered addons with development mode support
  */
 export async function loadAllAddons(): Promise<void> {
   
   try {
-    const addonFiles = await discoverAddons();
-
-    if (addonFiles.length === 0) {
-      logger.info('⚠️  No addons found to load - check AppData/addons directory');
-      return;
-    }
-
-    // Filter only enabled addons
-    const enabledAddonFiles = addonFiles.filter(addonFile => addonFile.manifest.enabled !== false);
-
-    if (enabledAddonFiles.length === 0) {
-      logger.info('📦 No enabled addons found to load');
-      return;
-    }
-
-    let loadedCount = 0;
-    const loadPromises = enabledAddonFiles.map(async (addonFile) => {
-      const success = await loadAddon(addonFile, realCtx);
-      if (success) {
-        loadedCount++;
+    // Check if we're in development mode and have dev servers
+    if (import.meta.env.DEV) {
+      logger.info('🔧 Development mode detected, checking for dev servers...');
+      
+      // Force discovery of dev servers
+      await addonDevManager.enableDevMode();
+      
+      const devStatus = addonDevManager.getStatus();
+      if (devStatus.enabled && devStatus.servers.length > 0) {
+        logger.info(`� Found ${devStatus.servers.length} development server(s), loading addons...`);
+        
+        let devLoadedCount = 0;
+        for (const server of devStatus.servers) {
+          const success = await addonDevManager.loadAddonFromDevServer(server.id);
+          if (success) {
+            devLoadedCount++;
+          }
+        }
+        
+        logger.info(`✅ Loaded ${devLoadedCount} addon(s) from development servers`);
+        
+        // Also load installed addons that aren't in dev mode
+        await loadInstalledAddons();
+        return;
       } else {
+        logger.info('🔍 No development servers found, falling back to installed addons');
       }
-    });
-
-    // Load all enabled addons concurrently
-    await Promise.all(loadPromises);
+    }
     
-    logger.info(`🎉 Successfully loaded ${loadedCount} out of ${enabledAddonFiles.length} enabled addons`);
+    // Standard production loading
+    await loadInstalledAddons();
     
-    // Debug: Show current navigation state
   } catch (error) {
     logger.error(`❌ Failed to load addons: ${String(error)}`);
   }
+}
+
+/**
+ * Load installed addons (production mode)
+ */
+async function loadInstalledAddons(): Promise<void> {
+  const addonFiles = await discoverAddons();
+
+  if (addonFiles.length === 0) {
+    logger.info('⚠️  No addons found to load - check AppData/addons directory');
+    return;
+  }
+
+  // Filter only enabled addons
+  const enabledAddonFiles = addonFiles.filter(addonFile => addonFile.manifest.enabled !== false);
+
+  if (enabledAddonFiles.length === 0) {
+    logger.info('📦 No enabled addons found to load');
+    return;
+  }
+
+  let loadedCount = 0;
+  const loadPromises = enabledAddonFiles.map(async (addonFile) => {
+    const success = await loadAddon(addonFile, realCtx);
+    if (success) {
+      loadedCount++;
+    } else {
+    }
+  });
+
+  // Load all enabled addons concurrently
+  await Promise.all(loadPromises);
+  
+  logger.info(`🎉 Successfully loaded ${loadedCount} out of ${enabledAddonFiles.length} enabled addons`);
+  
+  // Debug: Show current navigation state
 }
 
 /**
