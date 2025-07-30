@@ -1,32 +1,8 @@
-import type { AddonContext as Base, SidebarItemHandle } from '@wealthfolio/addon-sdk';
-import type { EventCallback, UnlistenFn } from '@/adapters';
-import type {
-  Holding,
-  Activity,
-  Account,
-  ActivityDetails,
-  ActivityCreate,
-  ActivityUpdate,
-  ActivityImport,
-  ActivitySearchResponse,
-  ExchangeRate,
-  ContributionLimit,
-  NewContributionLimit,
-  DepositsCalculation,
-  Goal,
-  GoalAllocation,
-  QuoteSummary,
-  Asset,
-  Quote,
-  UpdateAssetProfile,
-  MarketDataProviderInfo,
-  IncomeSummary,
-  AccountValuation,
-  PerformanceMetrics,
-  SimplePerformanceMetrics,
-  Settings,
-  ImportMappingData,
-} from '@/lib/types';
+import type { 
+  AddonContext, 
+  SidebarItemHandle,
+} from '@wealthfolio/addon-sdk';
+import { createSDKHostAPIBridge } from './type-bridge';
 import React from 'react';
 
 
@@ -171,96 +147,7 @@ export function triggerAllDisableCallbacks() {
   notifyNavigationUpdate();
 }
 
-export interface HostAPI {
-  // Core data access
-  holdings(accountId: string): Promise<Holding[]>;
-  activities(accountId?: string): Promise<ActivityDetails[]>;
-  accounts(): Promise<Account[]>;
-
-  // Exchange rates
-  getExchangeRates(): Promise<ExchangeRate[]>;
-  updateExchangeRate(updatedRate: ExchangeRate): Promise<ExchangeRate>;
-  addExchangeRate(newRate: Omit<ExchangeRate, 'id'>): Promise<ExchangeRate>;
-  deleteExchangeRate(rateId: string): Promise<void>;
-
-  // Contribution limits
-  getContributionLimit(): Promise<ContributionLimit[]>;
-  createContributionLimit(newLimit: NewContributionLimit): Promise<ContributionLimit>;
-  updateContributionLimit(id: string, updatedLimit: NewContributionLimit): Promise<ContributionLimit>;
-  deleteContributionLimit(id: string): Promise<void>;
-  calculateDepositsForLimit(limitId: string): Promise<DepositsCalculation>;
-
-  // Goals
-  getGoals(): Promise<Goal[]>;
-  createGoal(goal: any): Promise<Goal>;
-  updateGoal(goal: Goal): Promise<Goal>;
-  deleteGoal(goalId: string): Promise<void>;
-  updateGoalsAllocations(allocations: GoalAllocation[]): Promise<void>;
-  getGoalsAllocation(): Promise<GoalAllocation[]>;
-
-  // Market data
-  searchTicker(query: string): Promise<QuoteSummary[]>;
-  syncHistoryQuotes(): Promise<void>;
-  getAssetProfile(assetId: string): Promise<Asset>;
-  updateAssetProfile(payload: UpdateAssetProfile): Promise<Asset>;
-  updateAssetDataSource(symbol: string, dataSource: string): Promise<Asset>;
-  updateQuote(symbol: string, quote: Quote): Promise<void>;
-  syncMarketData(symbols: string[], refetchAll: boolean): Promise<void>;
-  deleteQuote(id: string): Promise<void>;
-  getQuoteHistory(symbol: string): Promise<Quote[]>;
-  getMarketDataProviders(): Promise<MarketDataProviderInfo[]>;
-
-  // Portfolio
-  updatePortfolio(): Promise<void>;
-  recalculatePortfolio(): Promise<void>;
-  getIncomeSummary(): Promise<IncomeSummary[]>;
-  getHistoricalValuations(accountId?: string, startDate?: string, endDate?: string): Promise<AccountValuation[]>;
-  calculatePerformanceHistory(itemType: 'account' | 'symbol', itemId: string, startDate: string, endDate: string): Promise<PerformanceMetrics>;
-  calculatePerformanceSummary(args: { itemType: 'account' | 'symbol'; itemId: string; startDate?: string | null; endDate?: string | null; }): Promise<PerformanceMetrics>;
-  calculateAccountsSimplePerformance(accountIds: string[]): Promise<SimplePerformanceMetrics[]>;
-  getHolding(accountId: string, assetId: string): Promise<Holding | null>;
-
-  // Settings
-  getSettings(): Promise<Settings>;
-  updateSettings(settingsUpdate: Settings): Promise<Settings>;
-  backupDatabase(): Promise<{ filename: string; data: Uint8Array }>;
-
-  // Account management
-  createAccount(account: any): Promise<Account>;
-  updateAccount(account: any): Promise<Account>;
-  deleteAccount(accountId: string): Promise<void>;
-
-  // Activity management
-  searchActivities(page: number, pageSize: number, filters: any, searchKeyword: string, sort: any): Promise<ActivitySearchResponse>;
-  createActivity(activity: ActivityCreate): Promise<Activity>;
-  updateActivity(activity: ActivityUpdate): Promise<Activity>;
-  saveActivities(activities: ActivityUpdate[]): Promise<Activity[]>;
-  deleteActivity(activityId: string): Promise<Activity>;
-
-  // File operations
-  openCsvFileDialog(): Promise<null | string | string[]>;
-  openFileSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>;
-
-  // Event listeners - Import
-  listenImportFileDropHover<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-  listenImportFileDrop<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-  listenImportFileDropCancelled<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-
-  // Event listeners - Portfolio
-  listenPortfolioUpdateStart<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-  listenPortfolioUpdateComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-  listenPortfolioUpdateError<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-  listenMarketSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-  listenMarketSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
-
-  // Activity import
-  importActivities(params: { activities: ActivityImport[] }): Promise<ActivityImport[]>;
-  checkActivitiesImport(params: { account_id: string; activities: ActivityImport[] }): Promise<ActivityImport[]>;
-  getAccountImportMapping(accountId: string): Promise<ImportMappingData>;
-  saveAccountImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>;
-}
-
-export const realCtx: Base & { api: HostAPI } = {
+export const realCtx: AddonContext = {
   sidebar: {
     addItem: (cfg: {
       id: string;
@@ -309,11 +196,11 @@ export const realCtx: Base & { api: HostAPI } = {
   onDisable: (cb: () => void): void => {
     disableCallbacks.add(cb);
   },
-  api: {
+  api: createSDKHostAPIBridge({
     // Core data access
-    holdings: getHoldings,
-    activities: getActivities,
-    accounts: getAccounts,
+    getHoldings: getHoldings,
+    getActivities: getActivities,
+    getAccounts: getAccounts,
 
     // Exchange rates
     getExchangeRates,
@@ -396,7 +283,7 @@ export const realCtx: Base & { api: HostAPI } = {
     checkActivitiesImport,
     getAccountImportMapping,
     saveAccountImportMapping,
-  },
+  }),
 };
 
 globalThis.__WF_CTX__ = realCtx; 

@@ -32,6 +32,7 @@ export * from './components/ui/calendar';
 export * from './components/ui/command';
 export * from './components/ui/collapsible';
 export * from './components/ui/currency-input';
+export * from './components/ui/icons';
 
 // Export utilities
 export * from './lib/utils';

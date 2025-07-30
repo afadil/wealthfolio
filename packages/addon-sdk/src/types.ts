@@ -1,4 +1,5 @@
 import React from 'react';
+import type { HostAPI } from './host-api';
 
 /**
  * Core types for addon development
@@ -64,6 +65,16 @@ export interface RouterManager {
 }
 
 /**
+ * Event callback type for Tauri events
+ */
+export type EventCallback<T> = (event: { payload: T }) => void;
+
+/**
+ * Unlisten function type for event listeners
+ */
+export type UnlistenFn = () => void;
+
+/**
  * Main addon context interface providing access to Wealthfolio APIs
  */
 export interface AddonContext {
@@ -73,6 +84,8 @@ export interface AddonContext {
   router: RouterManager;
   /** Register a callback for addon cleanup */
   onDisable(callback: () => void): void;
+  /** Access to host application APIs */
+  api: HostAPI;
 }
 
 /**

@@ -4,7 +4,7 @@
  * TypeScript SDK for building Wealthfolio addons with enhanced functionality,
  * type safety, and comprehensive permission management.
  * 
- * @version 1.1.0
+ * @version 1.2.0
  * @author Wealthfolio Team
  * @license MIT
  */
@@ -18,7 +18,15 @@ export type {
   RouteConfig,
   SidebarManager,
   RouterManager,
+  EventCallback,
+  UnlistenFn,
 } from './types';
+
+// Host API interface
+export type { HostAPI } from './host-api';
+
+// Comprehensive data types
+export type * from './data-types';
 
 // Manifest and metadata types
 export type {

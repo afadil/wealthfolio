@@ -1,21 +1,21 @@
 {
   "name": "@wealthfolio/addon-sdk",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "TypeScript SDK for building Wealthfolio addons with enhanced functionality and type safety",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
     },
     "./types": {
-      "import": "./dist/types.js",
-      "types": "./dist/types.d.ts"
+      "import": "./dist/types.mjs",
+      "types": "./dist/types.d.mts"
     },
     "./permissions": {
-      "import": "./dist/permissions.js",
-      "types": "./dist/permissions.d.ts"
+      "import": "./dist/permissions.mjs",
+      "types": "./dist/permissions.d.mts"
     }
   },
   "files": [
