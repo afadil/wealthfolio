@@ -5,9 +5,9 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 
-import { worldCurrencies } from '@/lib/currencies';
+import { worldCurrencies } from '@wealthfolio/ui';
 import { ExchangeRate } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import {
   DialogDescription,
   DialogFooter,

@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { GoalOperations } from './goal-operations';
 import type { Goal } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { formatAmount } from '@/lib/utils';
 
 export interface GoalItemProps {

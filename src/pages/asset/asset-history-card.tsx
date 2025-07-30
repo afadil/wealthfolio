@@ -6,7 +6,7 @@ import HistoryChart from '@/components/history-chart-symbol';
 import IntervalSelector from '@/components/interval-selector';
 import { Quote, TimePeriod, DateRange } from '@/lib/types';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/badge';
 import { useSyncMarketDataMutation } from '@/hooks/use-sync-market-data';
 import { Button } from '@/components/ui/button';

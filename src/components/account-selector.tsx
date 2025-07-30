@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown, CreditCard, Briefcase, DollarSign, Bitcoin, Plus, Wallet } from 'lucide-react';
+import { Icons } from '@/components/ui/icons';
 import {
   Command,
   CommandEmpty,
@@ -24,10 +24,10 @@ type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
 
 // Map account types to icons for visual distinction
 const accountTypeIcons: Record<string, any> = {
-  SECURITIES: Briefcase,
-  CASH: DollarSign,
-  CRYPTOCURRENCY: Bitcoin,
-  [PORTFOLIO_ACCOUNT_ID]: Wallet,
+  SECURITIES: Icons.Briefcase,
+  CASH: Icons.DollarSign,
+  CRYPTOCURRENCY: Icons.Bitcoin,
+  [PORTFOLIO_ACCOUNT_ID]: Icons.Wallet,
 };
 
 interface AccountSelectorProps {
@@ -217,7 +217,7 @@ export function AccountSelector({
                     <motion.div variants={iconVariants} initial="initial" animate="animate">
                       {(() => {
                         const IconComponent =
-                          accountTypeIcons[selectedAccount.accountType] || CreditCard;
+                          accountTypeIcons[selectedAccount.accountType] || Icons.CreditCard;
                         return (
                           <IconComponent className="h-4 w-4 text-green-600 dark:text-green-400" />
                         );
@@ -234,7 +234,7 @@ export function AccountSelector({
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-muted shadow-sm"
                   >
                     <motion.div variants={iconVariants} initial="initial" animate="animate">
-                      <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                      <Icons.ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
                     </motion.div>
                   </motion.div>
                 )}
@@ -289,7 +289,7 @@ export function AccountSelector({
                 <>
                   {(() => {
                     const IconComponent =
-                      accountTypeIcons[selectedAccount.accountType] || CreditCard;
+                      accountTypeIcons[selectedAccount.accountType] || Icons.CreditCard;
                     return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
                   })()}
                   <span>{selectedAccount.name}</span>
@@ -298,7 +298,7 @@ export function AccountSelector({
                 <span className="text-muted-foreground">Select an account</span>
               )}
             </div>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         );
       
@@ -311,7 +311,7 @@ export function AccountSelector({
             className="flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium hover:bg-muted/80"
             size="sm"
           >
-            <Plus className="h-4 w-4" />
+            <Icons.Plus className="h-4 w-4" />
             {buttonText}
           </Button>
         );
@@ -352,7 +352,7 @@ export function AccountSelector({
                 {sortedGroups.map(([type, typeAccounts]) => (
                   <CommandGroup key={type} heading={type}>
                     {typeAccounts.map((account) => {
-                      const IconComponent = accountTypeIcons[account.accountType] || CreditCard;
+                      const IconComponent = accountTypeIcons[account.accountType] || Icons.CreditCard;
                       return (
                         <CommandItem
                           key={account.id}
@@ -367,7 +367,7 @@ export function AccountSelector({
                             <IconComponent className="mr-2 h-4 w-4" />
                             <span>{account.name} ({account.currency})</span>
                           </div>
-                          <Check
+                          <Icons.Check
                             className={cn(
                               'ml-auto h-4 w-4',
                               selectedAccount?.id === account.id ? 'opacity-100' : 'opacity-0',

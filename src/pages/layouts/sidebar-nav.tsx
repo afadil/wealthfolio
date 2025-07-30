@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 

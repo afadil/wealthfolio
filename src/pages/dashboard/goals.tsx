@@ -6,7 +6,7 @@ import { Goal, GoalAllocation } from '@/lib/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useQuery } from '@tanstack/react-query';
 import { formatPercent } from '@/lib/utils';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { AmountDisplay } from '@/components/amount-display';
 import { useLatestValuations } from '@/hooks/use-latest-valuations';

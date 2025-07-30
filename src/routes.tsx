@@ -22,7 +22,7 @@ import ContributionLimitPage from './pages/settings/contribution-limits/contribu
 import PerformancePage from '@/pages/performance/performance-page';
 import MarketDataSettingsPage from './pages/settings/market-data-settings';
 import AddonSettingsPage from './pages/settings/addons/addon-settings';
-import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addon/runtimeContext';
+import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 
 export function AppRoutes() {
   useGlobalEventListener();

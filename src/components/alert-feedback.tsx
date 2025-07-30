@@ -1,5 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 interface ApplicationShellProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;

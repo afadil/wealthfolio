@@ -7,8 +7,8 @@ import { CSVFileViewer } from '../components/csv-file-viewer';
 import { ImportPreviewTable } from '../import-preview-table';
 import { ImportAlert } from '../components/import-alert';
 import { useActivityImportMutations } from '../hooks/use-activity-import-mutations';
-import { Icons } from '@/components/icons';
-import { ImportProgressIndicator } from '../components/progress-indicator';
+import { Icons } from '@/components/ui/icons';
+import { ProgressIndicator } from '@/components/ui/progress-indicator';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface DataPreviewStepProps {
@@ -31,7 +31,9 @@ export const DataPreviewStep = ({
   onError,
 }: DataPreviewStepProps) => {
   const [importError, setImportError] = useState<string | null>(null);
-  const [confirmationState, setConfirmationState] = useState<'initial' | 'confirm' | 'processing'>('initial');
+  const [confirmationState, setConfirmationState] = useState<'initial' | 'confirm' | 'processing'>(
+    'initial',
+  );
 
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: (processedActivities) => {
@@ -154,7 +156,7 @@ export const DataPreviewStep = ({
     }
 
     setConfirmationState('processing');
-    
+
     // Ensure we have a single transaction for data integrity
     confirmImportMutation.mutate({
       activities: validActivities,
@@ -172,7 +174,6 @@ export const DataPreviewStep = ({
     tap: { scale: 0.99 },
   };
 
-
   // Pulse animation variants
   const pulseVariants = {
     pulse: {
@@ -180,8 +181,8 @@ export const DataPreviewStep = ({
       transition: {
         duration: 2,
         repeat: Infinity,
-        repeatType: "loop" as const,
-        ease: "easeInOut",
+        repeatType: 'loop' as const,
+        ease: 'easeInOut',
       },
     },
   };
@@ -225,15 +226,11 @@ export const DataPreviewStep = ({
             </div>
             <CardContent className="overflow-hidden p-0 pt-5">
               <TabsContent value="preview" className="m-0 overflow-x-auto">
-                <ImportPreviewTable activities={activities} accounts={accounts}/>
+                <ImportPreviewTable activities={activities} accounts={accounts} />
               </TabsContent>
               <TabsContent value="raw" className="m-0 overflow-x-auto">
                 <div className="space-y-2">
-                  <CSVFileViewer
-                    data={csvLines}
-                    className="w-full"
-                    maxHeight="40vh"
-                  />
+                  <CSVFileViewer data={csvLines} className="w-full" maxHeight="40vh" />
                 </div>
               </TabsContent>
             </CardContent>
@@ -241,14 +238,20 @@ export const DataPreviewStep = ({
         </Card>
 
         {/* Dialog for import progress */}
-        <ImportProgressIndicator isLoading={isProcessing} open={isProcessing} />
+        <ProgressIndicator
+          title="Import Progress"
+          description="Please wait while the application processes your data."
+          message="Processing Import..."
+          isLoading={isProcessing}
+          open={isProcessing}
+        />
       </div>
 
       <div className="flex justify-between pt-4">
         <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
-          <Button 
-            variant="outline" 
-            onClick={confirmationState === 'confirm' ? handleCancelConfirmation : onBack} 
+          <Button
+            variant="outline"
+            onClick={confirmationState === 'confirm' ? handleCancelConfirmation : onBack}
             disabled={isProcessing}
           >
             {confirmationState === 'confirm' ? (
@@ -267,10 +270,10 @@ export const DataPreviewStep = ({
 
         <AnimatePresence mode="wait">
           {confirmationState === 'initial' ? (
-            <motion.div 
-              key="initial" 
-              whileHover="hover" 
-              whileTap="tap" 
+            <motion.div
+              key="initial"
+              whileHover="hover"
+              whileTap="tap"
               variants={buttonVariants}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -301,13 +304,10 @@ export const DataPreviewStep = ({
               }}
               onMouseEnter={() => {}}
             >
-              <motion.div
-                variants={pulseVariants}
-                animate="pulse"
-              >
+              <motion.div variants={pulseVariants} animate="pulse">
                 <Button
                   onClick={handleConfirmClick}
-                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold shadow-md"
+                  className="w-full bg-yellow-600 font-bold text-white shadow-md hover:bg-yellow-700"
                 >
                   <Icons.AlertTriangle className="mr-2 h-4 w-4" />
                   Confirm importing {validActivitiesCount} activities
@@ -321,10 +321,7 @@ export const DataPreviewStep = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <Button
-                disabled
-                className="bg-primary font-medium shadow-md"
-              >
+              <Button disabled className="bg-primary font-medium shadow-md">
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                 Importing Activities...
               </Button>

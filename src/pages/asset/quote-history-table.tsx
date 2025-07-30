@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Quote } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import DatePickerInput from '@/components/ui/date-picker-input';
 import {
   Select,

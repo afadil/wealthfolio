@@ -12,7 +12,7 @@ import { InputTags } from '@/components/ui/tag-input';
 import { Button } from '@/components/ui/button';
 import { useAssetProfileMutations } from './use-asset-profile-mutations';
 import { useQuoteMutations } from './use-quote-mutations';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { getHolding } from '@/commands/portfolio';
 import { QueryKeys } from '@/lib/query-keys';

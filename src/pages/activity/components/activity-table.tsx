@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Link } from 'react-router-dom';
 import { QueryKeys } from '@/lib/query-keys';
 import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';

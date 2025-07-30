@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 import {
   DialogDescription,

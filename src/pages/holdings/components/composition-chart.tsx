@@ -6,10 +6,9 @@ import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LayoutDashboard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 type ReturnType = 'daily' | 'total';
 
@@ -247,7 +246,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
-            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+            <Icons.LayoutDashboard className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
               Holding Composition
             </CardTitle>
@@ -269,7 +268,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
-            <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+            <Icons.LayoutDashboard className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
           </div>
         </CardHeader>

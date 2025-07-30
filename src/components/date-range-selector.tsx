@@ -4,7 +4,7 @@ import { DateRange as DayPickerDateRange } from 'react-day-picker';
 import { DateRange as CustomDateRange } from '@/lib/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 const ranges = [

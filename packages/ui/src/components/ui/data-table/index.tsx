@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-table';
 import * as React from 'react';
 
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import {
   Table,
   TableBody,

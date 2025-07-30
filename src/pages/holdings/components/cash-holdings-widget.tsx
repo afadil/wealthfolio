@@ -1,5 +1,5 @@
 import { Holding } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { AmountDisplay } from '@/components/amount-display';
 import { cn } from '@/lib/utils';
 import { useBalancePrivacy } from '@/context/privacy-context';

@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@wealthfolio/addon-sdk": "workspace:*",
+    "@wealthfolio/ui": "workspace:*",
     "react": "^18.2.0"
   },
   "devDependencies": {

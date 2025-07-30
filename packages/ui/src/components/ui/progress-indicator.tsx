@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { cn } from "@/lib/utils";
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 // Custom DialogContent without close button
 const DialogContentWithoutClose = React.forwardRef<
@@ -32,15 +32,21 @@ const DialogContentWithoutClose = React.forwardRef<
 ));
 DialogContentWithoutClose.displayName = "DialogContentWithoutClose";
 
-export interface ImportProgressIndicatorProps {
+export interface ProgressIndicatorProps {
   isLoading?: boolean;
   open?: boolean;
+  title?: string;
+  description?: string;
+  message?: string;
 }
 
-export function ImportProgressIndicator({
+export function ProgressIndicator({
   isLoading = true,
   open,
-}: ImportProgressIndicatorProps) {
+  title = "Processing",
+  description = "Please wait while we process your request. This may take a few moments.",
+  message = "Processing...",
+}: ProgressIndicatorProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
 
   // Track elapsed time during import
@@ -90,7 +96,7 @@ export function ImportProgressIndicator({
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            Processing import... {formatTime(elapsedTime)}
+            {message} {formatTime(elapsedTime)}
           </motion.h3>
         </div>
 
@@ -123,9 +129,9 @@ export function ImportProgressIndicator({
         <DialogContentWithoutClose 
           className="sm:max-w-md p-0 border-none bg-transparent shadow-none"
         >
-          <DialogTitle className="sr-only">Import Progress</DialogTitle>
+          <DialogTitle className="sr-only">{title}</DialogTitle>
           <DialogDescription className="sr-only">
-            Shows the progress of importing your data. Currently processing with an animated progress bar.
+            {description}
           </DialogDescription>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}

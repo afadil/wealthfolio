@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { AlertFeedback } from '@/components/alert-feedback';
 import type { AddonManifest, PermissionCategory, Permission, RiskLevel } from '@wealthfolio/addon-sdk';
 import { PermissionCategoriesDisplay } from './permission-categories-display';

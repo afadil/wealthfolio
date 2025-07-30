@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Loader2, Trash, AlertCircle, CheckCircle } from 'lucide-react';
+import { Icons } from "@/components/ui/icons"
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface FileDropzoneProps {
@@ -152,7 +152,7 @@ export const FileDropzone = ({
               onClick={handleRemoveFile}
               className="flex items-center gap-1.5 px-3"
             >
-              <Trash className="h-4 w-4" />
+              <Icons.Trash className="h-4 w-4" />
               <span>Remove File</span>
             </Button>
           </div>
@@ -171,7 +171,7 @@ export const FileDropzone = ({
               className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 shadow-sm dark:bg-blue-900/20"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
+                <Icons.Spinner className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
               </motion.div>
             </motion.div>
           ) : file && (!isValid || error) ? (
@@ -184,7 +184,7 @@ export const FileDropzone = ({
               className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 shadow-sm dark:bg-red-900/20"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
-                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <Icons.AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </motion.div>
             </motion.div>
           ) : file ? (
@@ -198,9 +198,9 @@ export const FileDropzone = ({
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
                 {isValid ? (
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <Icons.CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                 ) : (
-                  <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <Icons.FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
                 )}
               </motion.div>
             </motion.div>
@@ -214,7 +214,7 @@ export const FileDropzone = ({
               className="flex h-10 w-10 items-center justify-center rounded-full bg-muted shadow-sm"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
-                <Upload className="h-5 w-5 text-muted-foreground" />
+                <Icons.Import className="h-5 w-5 text-muted-foreground" />
               </motion.div>
             </motion.div>
           )}

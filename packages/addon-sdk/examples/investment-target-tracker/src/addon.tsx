@@ -1,7 +1,7 @@
 import { type AddonContext } from '@wealthfolio/addon-sdk';
+import { Card, CardContent } from '@wealthfolio/ui';
 import React, { useState, useEffect, useMemo } from 'react';
 import { TargetIcon } from './icons';
-import { Card, CardContent } from './components/card';
 
 // Types for goals
 interface Goal {

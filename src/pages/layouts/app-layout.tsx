@@ -1,10 +1,10 @@
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Toaster } from '@/components/ui/toaster';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { type NavigationProps, SidebarNav } from './sidebar-nav';
 import { useSettings } from '@/hooks/use-settings';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { getDynamicNavItems, subscribeToNavigationUpdates } from '@/addon/runtimeContext';
+import { getDynamicNavItems, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 import { useState, useEffect } from 'react';
 
 const staticNavigation: NavigationProps = {

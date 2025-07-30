@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SettingsHeader } from '../header';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';

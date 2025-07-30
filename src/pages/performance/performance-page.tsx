@@ -3,7 +3,7 @@ import { subMonths } from 'date-fns';
 import { PerformanceChart } from '@/components/performance-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, BarChart } from 'lucide-react';
+import { Icons } from '@/components/ui/icons';
 import { DateRangeSelector } from '@/components/date-range-selector';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@/components/shell';
@@ -68,7 +68,7 @@ function PerformanceContent({
       {!chartData?.length && !isLoading && !hasErrors && (
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
-          icon={<BarChart className="h-10 w-10" />}
+          icon={<Icons.BarChart className="h-10 w-10" />}
           title="No performance data"
           description="Select accounts to compare their performance over time."
         />
@@ -162,7 +162,7 @@ const SelectedItemBadge = ({
           onClick={onDelete}
           aria-label={`Remove ${item.name}`}
         >
-          <X size={18} />
+          <Icons.Close size={18} />
         </button>
       </Badge>
     </div>

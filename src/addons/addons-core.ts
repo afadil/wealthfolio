@@ -1,8 +1,7 @@
 import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
-import { realCtx, getDynamicNavItems, getDynamicRoutes } from '@/addon/runtimeContext';
+import { realCtx, getDynamicNavItems, getDynamicRoutes } from '@/addons/addons-runtime-context';
 import { logger } from '@/adapters';
 import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
-import { addonDevManager } from './devMode';
 
 interface AddonFile {
   path: string;
@@ -146,52 +145,9 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
 }
 
 /**
- * Loads all discovered addons with development mode support
- */
-export async function loadAllAddons(): Promise<void> {
-  
-  try {
-    // Check if we're in development mode and have dev servers
-    if (import.meta.env.DEV) {
-      logger.info('🔧 Development mode detected, checking for dev servers...');
-      
-      // Force discovery of dev servers
-      await addonDevManager.enableDevMode();
-      
-      const devStatus = addonDevManager.getStatus();
-      if (devStatus.enabled && devStatus.servers.length > 0) {
-        logger.info(`� Found ${devStatus.servers.length} development server(s), loading addons...`);
-        
-        let devLoadedCount = 0;
-        for (const server of devStatus.servers) {
-          const success = await addonDevManager.loadAddonFromDevServer(server.id);
-          if (success) {
-            devLoadedCount++;
-          }
-        }
-        
-        logger.info(`✅ Loaded ${devLoadedCount} addon(s) from development servers`);
-        
-        // Also load installed addons that aren't in dev mode
-        await loadInstalledAddons();
-        return;
-      } else {
-        logger.info('🔍 No development servers found, falling back to installed addons');
-      }
-    }
-    
-    // Standard production loading
-    await loadInstalledAddons();
-    
-  } catch (error) {
-    logger.error(`❌ Failed to load addons: ${String(error)}`);
-  }
-}
-
-/**
  * Load installed addons (production mode)
  */
-async function loadInstalledAddons(): Promise<void> {
+export async function loadInstalledAddons(): Promise<void> {
   const addonFiles = await discoverAddons();
 
   if (addonFiles.length === 0) {
@@ -270,14 +226,6 @@ export function getLoadedAddons(): string[] {
 }
 
 /**
- * Reloads all addons (useful for development)
- */
-export async function reloadAllAddons(): Promise<void> {
-  unloadAllAddons();
-  await loadAllAddons();
-}
-
-/**
  * Debug function to check current addon state
  */
 export function debugAddonState(): void {
@@ -288,6 +236,13 @@ export function debugAddonState(): void {
 }
 
 /**
- * Note: Addon permission analysis and file discovery is now handled by Tauri commands.
- * The addon loading process uses the Rust backend for secure file access and permission validation.
+ * Reloads all addons (useful for development and settings)
+ * This function dynamically imports the full plugin loader to avoid circular dependencies
  */
+export async function reloadAllAddons(): Promise<void> {
+  unloadAllAddons();
+  
+  // Dynamically import the full plugin loader to avoid importing dev mode
+  const { loadAllAddons } = await import('./addons-loader');
+  await loadAllAddons();
+}

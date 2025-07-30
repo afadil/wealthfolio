@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
-import { triggerAllDisableCallbacks } from '@/addon/runtimeContext';
-import { reloadAllAddons } from '@/addon/pluginLoader';
+import { triggerAllDisableCallbacks } from '@/addons/addons-runtime-context';
+import { reloadAllAddons } from '@/addons/addons-core';
 import {
   installAddonZip,
   listInstalledAddons,

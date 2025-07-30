@@ -9,7 +9,7 @@ import { PerformanceGrid } from '@/pages/account/performance-grid';
 import { formatDate } from '@/lib/utils';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBalanceUpdate } from './use-balance-update';
 

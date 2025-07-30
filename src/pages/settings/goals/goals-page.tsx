@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { GoalItem } from './components/goal-item';
 import { GoalEditModal } from './components/goal-edit-modal';
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import type { Goal, GoalAllocation } from '@/lib/types';
 import { SettingsHeader } from '../header';
 import { getGoals, getGoalsAllocation } from '@/commands/goal';

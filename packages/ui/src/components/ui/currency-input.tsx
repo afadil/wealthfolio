@@ -1,7 +1,7 @@
 import { forwardRef, useState } from 'react';
-import type { ButtonProps } from '@/components/ui/button';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { ChevronsUpDown, Check } from 'lucide-react';
+import type { ButtonProps } from './button';
+import { Button } from './button';
 import {
   Command,
   CommandEmpty,
@@ -9,11 +9,11 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
-import { worldCurrencies } from '@/lib/currencies';
+} from './command';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { ScrollArea } from './scroll-area';
+import { cn } from '../../lib/utils';
+import { worldCurrencies } from '../../lib/currencies';
 
 interface CurrencyInputCustomProps {
   value?: string;
@@ -41,7 +41,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             {value
               ? worldCurrencies.find((currency) => currency.value === value)?.label
               : 'Select account currency'}
-            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-full p-0">
@@ -61,7 +61,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                       }}
                     >
                       {currency.label}
-                      <Icons.Check
+                      <Check
                         className={cn(
                           'ml-auto h-4 w-4',
                           currency.value === value ? 'opacity-100' : 'opacity-0',

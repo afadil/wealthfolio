@@ -1,6 +1,6 @@
 import { logger } from '@/adapters';
-import { reloadAllAddons } from './pluginLoader';
-import { realCtx } from './runtimeContext';
+import { reloadAllAddons } from '@/addons/addons-core';
+import { realCtx } from './addons-runtime-context';
 
 interface DevModeConfig {
   enabled: boolean;
@@ -32,10 +32,8 @@ class AddonDevManager {
       autoReload: true,
     };
     
-    // Auto-discover development servers on startup
-    if (this.config.enabled) {
-      this.discoverDevServers();
-    }
+    // Note: Auto-discovery is now done lazily when enableDevMode() is called
+    // This prevents side effects during module import
   }
 
   /**
@@ -285,7 +283,7 @@ class AddonDevManager {
       }
 
       // Also clean up from the main addon loader
-      const { unloadAddon } = await import('./pluginLoader');
+      const { unloadAddon } = await import('./addons-core');
       if (unloadAddon) {
         unloadAddon(addonId);
       }
@@ -300,7 +298,7 @@ class AddonDevManager {
         logger.info(`✅ Successfully hot-reloaded ${addonId}`);
         
         // Trigger navigation update to refresh the UI
-        const { triggerNavigationUpdate } = await import('./runtimeContext');
+        const { triggerNavigationUpdate } = await import('./addons-runtime-context');
         if (triggerNavigationUpdate) {
           triggerNavigationUpdate();
         }
@@ -432,10 +430,11 @@ class AddonDevManager {
 // Global instance
 export const addonDevManager = new AddonDevManager();
 
-// Initialize in development mode only
+// Note: Development mode initialization is now done explicitly in main.tsx
+// to avoid side effects during module imports
+
+// Make debugging tools available globally in development mode
 if (import.meta.env.DEV) {
-  addonDevManager.enableDevMode();
-  
   // Make available globally for debugging (dev only)
   (globalThis as any).__ADDON_DEV__ = addonDevManager;
 

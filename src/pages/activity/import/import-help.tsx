@@ -1,4 +1,4 @@
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';

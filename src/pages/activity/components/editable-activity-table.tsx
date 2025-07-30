@@ -65,7 +65,7 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { QuantityInput } from '@/components/ui/quantity-input';
 import { DeleteConfirm } from '@/components/delete-confirm';
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 // New imports for data table enhancements

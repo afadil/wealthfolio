@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { EmptyPlaceholder } from '@/components/empty-placeholder';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import type { ContributionLimit } from '@/lib/types';
 import { SettingsHeader } from '../header';
 import { getContributionLimit } from '@/commands/contribution-limits';

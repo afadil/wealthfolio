@@ -4,7 +4,7 @@ import * as z from 'zod';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Card, CardContent } from '@/components/ui/card';
 
 import {

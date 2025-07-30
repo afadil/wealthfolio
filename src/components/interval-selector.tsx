@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { TimePeriod, DateRange } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { subWeeks, subMonths, subYears, startOfYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 

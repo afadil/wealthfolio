@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PrivacyAmount } from '@/components/privacy-amount';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import {
   Tooltip,
   TooltipContent,

@@ -7,6 +7,8 @@ import {
   ArrowRight,
   ArrowRightLeft,
   ArrowUp,
+  Bitcoin,
+  Briefcase,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -72,6 +74,7 @@ import {
   Save,
   Copy,
   Grid3x3,
+  LayoutDashboard,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -86,6 +89,7 @@ export const Icons = {
   CheckCircle: CheckCircle2,
   Clock: Clock,
   ListChecks: ListChecks,
+  LayoutDashboard: LayoutDashboard,
   HandCoins: HandCoins,
   Home: Home,
   Copy: Copy,
@@ -95,6 +99,9 @@ export const Icons = {
   ArrowDown: ArrowDown,
   ArrowUp: ArrowUp,
   Billing: CreditCard,
+  CreditCard: CreditCard,
+  Bitcoin: Bitcoin,
+  Briefcase: Briefcase,
   Search: Search,
   Save: Save,
   Group: Group,

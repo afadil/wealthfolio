@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import type { Table } from '@tanstack/react-table';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { useState, KeyboardEvent } from 'react';
 
 interface DataTablePaginationProps<TData> {

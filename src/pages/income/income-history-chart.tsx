@@ -16,7 +16,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { formatAmount } from '@/lib/utils';
 

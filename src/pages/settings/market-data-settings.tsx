@@ -3,13 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SettingsHeader } from './header';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { EyeIcon, EyeOffIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   useMarketDataProviderSettings,
   useUpdateMarketDataProviderSettings,
@@ -178,9 +177,9 @@ function ProviderSettings({
             </span>
             {provider.enabled &&
               (isOpen ? (
-                <ChevronUp className="h-4 w-4" />
+                <Icons.ChevronUp className="h-4 w-4" />
               ) : (
-                <ChevronDown className="h-4 w-4" />
+                <Icons.ChevronDown className="h-4 w-4" />
               ))}
           </Button>
         </CollapsibleTrigger>
@@ -205,9 +204,9 @@ function ProviderSettings({
                     aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
                   >
                     {showApiKey ? (
-                      <EyeOffIcon className="h-4 w-4" />
+                      <Icons.EyeOff className="h-4 w-4" />
                     ) : (
-                      <EyeIcon className="h-4 w-4" />
+                      <Icons.Eye className="h-4 w-4" />
                     )}
                   </Button>
                   <Button onClick={handleSaveApiKey} size="sm">

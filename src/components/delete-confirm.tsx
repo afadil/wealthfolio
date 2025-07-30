@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Button } from "./ui/button";
-import { Icons } from "./icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
 
 interface DeleteConfirmProps {
   deleteConfirmMessage: string | ReactNode;

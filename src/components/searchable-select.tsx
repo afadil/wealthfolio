@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check } from "lucide-react";
+import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +76,7 @@ export function SearchableSelect({
                 }}
               >
                 {option.label}
-                <Check
+                <Icons.Check
                   className={cn(
                     'ml-auto h-4 w-4',
                     value === option.value ? 'opacity-100' : 'opacity-0',
