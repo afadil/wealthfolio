@@ -326,3 +326,21 @@ export function calculatePerformanceMetrics(
 
   return result;
 }
+
+/**
+ * Truncates a string to fit within a given pixel width, appending an ellipsis ("...") if necessary.
+ * The calculation estimates the number of characters that can fit based on the provided font size.
+ *
+ * @param text - The string to truncate.
+ * @param maxWidth - The maximum allowed width in pixels for the text.
+ * @param fontSize - The font size in pixels used to estimate character width.
+ * @returns The truncated string, with "..." appended if truncation occurs.
+ */
+export function truncateTextToWidth(text: string, maxWidth: number, fontSize: number) {
+  const avgCharWidth = fontSize * 0.6;
+  const maxChars = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  if (!text) return '';
+  if (text.length <= maxChars) return text;
+  if (maxChars <= 3) return text.slice(0, maxChars);
+  return text.slice(0, maxChars - 3) + '...';
+}

@@ -1,6 +1,6 @@
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Holding } from '@/lib/types';
-import { cn, formatPercent, formatAmount } from '@/lib/utils';
+import { cn, formatPercent, formatAmount, truncateTextToWidth } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
@@ -39,6 +39,38 @@ const ReturnTypeSelector: React.FC<{
   </div>
 );
 
+type LabelType = 'name' | 'symbol';
+
+const LabelTypeSelector: React.FC<{
+  selectedType: LabelType;
+  onTypeSelect: (type: LabelType) => void;
+}> = ({ selectedType, onTypeSelect }) => (
+  <div className="flex items-center gap-1">
+    <button
+      className={cn(
+        "w-6 h-6 flex items-center justify-center rounded-full border transition",
+        selectedType === 'name' ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground"
+      )}
+      onClick={() => onTypeSelect('name')}
+      type="button"
+      aria-label="Show Name"
+    >
+      <Icons.Tag className="h-3 w-3" />
+    </button>
+    <button
+      className={cn(
+        "w-6 h-6 flex items-center justify-center rounded-full border transition",
+        selectedType === 'symbol' ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground"
+      )}
+      onClick={() => onTypeSelect('symbol')}
+      type="button"
+      aria-label="Show Symbol"
+    >
+      <Icons.Hash className="h-3 w-3" />
+    </button>
+  </div>
+);
+
 interface ColorScale {
   opacity: number;
   className: string;
@@ -73,10 +105,12 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
 }
 
 const CustomizedContent = (props: any) => {
-  const { depth, x, y, width, height, symbol, gain, maxGain, minGain } = props;
+  const { depth, x, y, width, height, symbol, gain, maxGain, minGain, name, labelType } = props;
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
   const colorScale = getColorScale(gain, maxGain, minGain);
+  const displayLabel = labelType === 'name' ? name || symbol : symbol;
+  const displayName = truncateTextToWidth(displayLabel, width - 10, fontSize + 1);
 
   return (
     <g style={{ cursor: 'pointer' }}>
@@ -109,7 +143,7 @@ const CustomizedContent = (props: any) => {
                 fontSize: fontSize + 1,
               }}
             >
-              {symbol}
+              {displayName}
             </text>
           </Link>
 
@@ -194,6 +228,7 @@ const CompositionTooltip = ({ active, payload, settings }: any) => {
 
 export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositionProps) {
   const [returnType, setReturnType] = useState<ReturnType>('daily');
+  const [labelType, setLabelType] = useState<LabelType>('name');
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
     let maxGain = -Infinity;
@@ -291,6 +326,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
             Holding Composition
           </CardTitle>
+          <LabelTypeSelector selectedType={labelType} onTypeSelect={setLabelType} />
         </div>
         <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />
       </CardHeader>
@@ -302,7 +338,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             data={data}
             dataKey="marketValueConverted"
             animationDuration={100}
-            content={<CustomizedContent theme={settings?.theme || 'light'} />}
+            content={(props) => <CustomizedContent {...props} labelType={labelType} theme={settings?.theme || 'light'} />}
           >
             <Tooltip content={<CompositionTooltip settings={settings} />} />
           </Treemap>
