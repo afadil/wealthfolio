@@ -177,6 +177,8 @@ impl HoldingsCalculator {
             ActivityType::RemoveHolding => self.handle_remove_holding(activity, state, account_currency, fee_acct),
             ActivityType::TransferIn => self.handle_transfer_in(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::TransferOut => self.handle_transfer_out(activity, state, account_currency, amount_acct, fee_acct),
+            ActivityType::LoanTaken => self.handle_loan_taken(activity, state, account_currency, amount_acct, fee_acct),
+            ActivityType::LoanRepaid => self.handle_loan_repaid(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::Split => Ok(()), 
          }
     }
@@ -767,6 +769,44 @@ impl HoldingsCalculator {
                     .or_insert(Decimal::ZERO) -= fee_acct;
             }
         }
+        Ok(())
+    }
+
+    fn handle_loan_taken(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        amount_acct: Decimal, // Already converted using activity date
+        fee_acct: Decimal,    // Already converted using activity date
+    ) -> Result<()> {
+        // Loan taken: increases cash but does NOT affect net_contribution
+        // (because it's not the user's own money)
+        let net_amount_acct = amount_acct - fee_acct;
+        *state
+            .cash_balances
+            .entry(account_currency.to_string())
+            .or_insert(Decimal::ZERO) += net_amount_acct;
+        // Note: net_contribution is NOT modified for loans
+        Ok(())
+    }
+
+    fn handle_loan_repaid(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        amount_acct: Decimal, // Already converted using activity date
+        fee_acct: Decimal,    // Already converted using activity date
+    ) -> Result<()> {
+        // Loan repaid: decreases cash but does NOT affect net_contribution
+        // (because it's not reducing the user's own investment)
+        let net_amount_acct = amount_acct + fee_acct;
+        *state
+            .cash_balances
+            .entry(account_currency.to_string())
+            .or_insert(Decimal::ZERO) -= net_amount_acct;
+        // Note: net_contribution is NOT modified for loans
         Ok(())
     }
 
