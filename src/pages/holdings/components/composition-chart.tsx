@@ -1,7 +1,7 @@
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Holding } from '@/lib/types';
 import { cn, formatPercent, formatAmount, truncateTextToWidth } from '@/lib/utils';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { LayoutDashboard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Icons } from '@/components/icons';
+import { usePersistentState } from '@/hooks/use-persistent-state';
 
 type ReturnType = 'daily' | 'total';
 
@@ -227,8 +228,14 @@ const CompositionTooltip = ({ active, payload, settings }: any) => {
 };
 
 export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositionProps) {
-  const [returnType, setReturnType] = useState<ReturnType>('daily');
-  const [labelType, setLabelType] = useState<LabelType>('name');
+  const [returnType, setReturnType] = usePersistentState<ReturnType>(
+    'composition-chart:returnType',
+    'daily' as ReturnType
+  );
+  const [labelType, setLabelType] = usePersistentState<LabelType>(
+    'composition-chart:labelType',
+    'name' as LabelType
+  )
   const { settings } = useSettingsContext();
   const data = useMemo(() => {
     let maxGain = -Infinity;
