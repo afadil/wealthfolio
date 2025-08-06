@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
-import { Account, ContributionLimit, DepositsCalculation } from '@/lib/types';
+import { Account, ContributionLimit, LimitsCalculation } from '@/lib/types';
 import { useContributionLimitMutations } from '../use-contribution-limit-mutations';
 import { formatAmount } from '@/lib/utils';
 
 interface AccountSelectionProps {
   limit: ContributionLimit;
   accounts: Account[];
-  deposits: DepositsCalculation | undefined;
+  deposits: LimitsCalculation | undefined;
   isLoading: boolean;
 }
 

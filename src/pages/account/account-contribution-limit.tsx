@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { calculateDepositsForLimit, getContributionLimit } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
-import { ContributionLimit, DepositsCalculation } from '@/lib/types';
+import { ContributionLimit, LimitsCalculation } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +23,7 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
     (limit) => limit.accountIds?.includes(accountId) && limit.contributionYear === currentYear,
   );
 
-  const { data: deposits, isLoading: isDepositsLoading } = useQuery<DepositsCalculation, Error>({
+  const { data: deposits, isLoading: isDepositsLoading } = useQuery<LimitsCalculation, Error>({
     queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountId, currentYear],
     queryFn: () => calculateDepositsForLimit(limitForAccount?.id || ''),
     enabled: !isLimitsLoading,

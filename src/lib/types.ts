@@ -455,16 +455,16 @@ export interface ContributionLimit {
 
 export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
 
-export interface AccountDeposit {
+export interface AccountLimit {
   amount: number;
   currency: string;
   convertedAmount: number;
 }
 
-export interface DepositsCalculation {
+export interface LimitsCalculation {
   total: number;
   baseCurrency: string;
-  byAccount: Record<string, AccountDeposit>;
+  byAccount: Record<string, AccountLimit>;
 }
 
 export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;

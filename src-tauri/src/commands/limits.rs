@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use log::debug;
 use tauri::State;
-use wealthfolio_core::limits::{ContributionLimit, DepositsCalculation, NewContributionLimit};
+use wealthfolio_core::limits::{ContributionLimit, LimitsCalculation, NewContributionLimit};
 
 #[tauri::command]
 pub async fn get_contribution_limits(
@@ -57,14 +57,14 @@ pub async fn delete_contribution_limit(
 }
 
 #[tauri::command]
-pub async fn calculate_deposits_for_contribution_limit(
+pub async fn calculate_deposits_withdrawals_for_contribution_limit(
     limit_id: String,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<DepositsCalculation, String> {
-    debug!("Calculating deposits for contribution limit...");
+) -> Result<LimitsCalculation, String> {
+    debug!("Calculating deposits and withdrawals for contribution limit...");
     let base_currency = state.base_currency.read().unwrap();
     state
         .limits_service()
-        .calculate_deposits_for_contribution_limit(&limit_id, &base_currency)
-        .map_err(|e| format!("Failed to calculate deposits for contribution limit: {}", e))
+        .calculate_deposits_withdrawals_for_contribution_limit(&limit_id, &base_currency)
+        .map_err(|e| format!("Failed to calculate deposits and withdrawals for contribution limit: {}", e))
 }

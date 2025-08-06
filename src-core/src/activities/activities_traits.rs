@@ -21,6 +21,12 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
     ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>>;
+    fn get_withdrawal_activities(
+        &self,
+        account_ids: &[String],
+        start_date: NaiveDateTime,
+        end_date: NaiveDateTime,
+    ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>>;
     fn search_activities(
         &self,
         page: i64,
