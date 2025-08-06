@@ -136,16 +136,40 @@ Enhance the dashboard to show 4 different portfolio metrics with clear separatio
    - [✅] **All loan tracking data flows correctly through the system**
    - [✅] **Build validates successfully and loan tracking operational!**
 
-### Phase 2: Frontend Data Integration
-1. [ ] Update TypeScript types for new data structure
-2. [ ] Modify data fetching hooks
-3. [ ] Update portfolio context/state management
+### Phase 2: Frontend Data Integration ✅ COMPLETE & FULLY OPERATIONAL
+1. [✅] **Update TypeScript types for new data structure**
+   - [✅] Added `outstandingLoans: number` to AccountValuation interface
+   - [✅] Added `portfolioEquity: number` to AccountValuation interface
+   - [✅] Updated test files with new fields and default values
+   - [✅] **TypeScript compilation passes successfully**
+2. [✅] **Modify data fetching hooks** 
+   - [✅] Verified existing hooks `useLatestValuations` and `useValuationHistory` automatically work with updated interface
+   - [✅] Backend APIs already serve all 4 metrics via updated AccountValuation struct
+3. [✅] **Update portfolio context/state management**
+   - [✅] Confirmed no specific portfolio context exists - data flows through TanStack Query hooks
+   - [✅] Dashboard components consume data directly from hooks, no state management changes needed
+   - [✅] **Frontend infrastructure ready for Phase 3 UI updates**
 
-### Phase 3: UI Implementation
-1. [ ] Enhance chart component to handle 4 series
-2. [ ] Implement show/hide toggle functionality
-3. [ ] Add proper styling and colors
-4. [ ] Update tooltips and legends
+### Phase 3: UI Implementation ✅ COMPLETE & FULLY OPERATIONAL  
+1. [✅] **Enhance chart component to handle 4 series**
+   - [✅] Updated HistoryChartData interface with optional portfolioEquity and outstandingLoans fields
+   - [✅] Added conditional rendering logic for 4-metric vs fallback systems
+   - [✅] Implemented backward compatibility for account pages without loan data
+2. [✅] **Implement show/hide toggle functionality**
+   - [✅] Default view: Portfolio Equity (primary) + Outstanding Loans (secondary, negative)
+   - [✅] Hover view: Total Value + Net Deposit (revealed on mouse hover)
+   - [✅] Fallback mode: Total Value (primary) + Net Deposit on hover (for account pages)
+3. [✅] **Add proper styling and colors**  
+   - [✅] Portfolio Equity: Green success color, solid line with gradient fill, rendered on top
+   - [✅] Outstanding Loans: Red destructive color, solid line with red background, negative values
+   - [✅] Total Value: Orange color, solid line with orange background, hover-only visibility
+   - [✅] Net Deposit: Grey color, dotted line (only dotted line), hover-only visibility
+   - [✅] **Final styling refinements applied for optimal visual hierarchy**
+4. [✅] **Update tooltips and legends**
+   - [✅] Enhanced tooltip shows all 4 metrics with color-coded indicators
+   - [✅] Dynamic tooltip adapts to available data (4-metric vs fallback)
+   - [✅] Outstanding Loans displayed correctly as negative values
+   - [✅] Maintained privacy mode and formatting consistency
 
 ### Phase 4: Performance & Dependencies
 1. [ ] Review and update performance calculations

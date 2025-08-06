@@ -75,6 +75,8 @@ export default function DashboardPage() {
         date: item.valuationDate,
         totalValue: item.totalValue,
         netContribution: item.netContribution,
+        portfolioEquity: item.portfolioEquity,
+        outstandingLoans: -item.outstandingLoans, // Show as negative for chart visualization
         currency: item.baseCurrency || baseCurrency,
       })) || []
     );
