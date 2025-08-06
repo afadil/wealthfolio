@@ -240,6 +240,14 @@ mod tests {
         ) -> AppResult<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
             unimplemented!()
         }
+        fn get_withdrawal_activities(
+            &self,
+            _account_ids: &[String],
+            _start_date: NaiveDateTime,
+            _end_date: NaiveDateTime,
+        ) -> AppResult<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+            unimplemented!()
+        }
         fn search_activities(
             &self,
             _page: i64,
@@ -336,6 +344,14 @@ mod tests {
             unimplemented!()
         }
         fn get_deposit_activities(
+            &self,
+            _ids: &[String],
+            _s: NaiveDateTime,
+            _e: NaiveDateTime,
+        ) -> AppResult<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+            unimplemented!()
+        }
+        fn get_withdrawal_activities(
             &self,
             _ids: &[String],
             _s: NaiveDateTime,

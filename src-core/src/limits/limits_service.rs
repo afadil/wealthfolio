@@ -1,3 +1,4 @@
+use log::debug;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -9,7 +10,7 @@ use crate::errors::{Error, Result, ValidationError};
 use crate::fx::fx_traits::FxServiceTrait;
 
 use super::limits_model::{
-    AccountDeposit, ContributionLimit, DepositsCalculation, NewContributionLimit,
+    AccountLimit, ContributionLimit, LimitsCalculation, NewContributionLimit,
 };
 use super::limits_traits::{ContributionLimitRepositoryTrait, ContributionLimitServiceTrait};
 use async_trait::async_trait;
@@ -39,9 +40,9 @@ impl ContributionLimitService {
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
         base_currency: &str,
-    ) -> Result<DepositsCalculation> {
+    ) -> Result<LimitsCalculation> {
         if account_ids.is_empty() {
-            return Ok(DepositsCalculation {
+            return Ok(LimitsCalculation {
                 total: Decimal::ZERO,
                 base_currency: base_currency.to_string(),
                 by_account: HashMap::new(),
@@ -52,8 +53,14 @@ impl ContributionLimitService {
             self.activity_repository
                 .get_deposit_activities(account_ids, start_date, end_date)?;
 
-        let mut total_deposits = Decimal::ZERO;
-        let mut deposits_by_account: HashMap<String, AccountDeposit> = HashMap::new();
+        let withdrawal_activities = self.activity_repository.get_withdrawal_activities(
+            account_ids,
+            start_date,
+            end_date,
+        )?;
+
+        let mut totals = Decimal::ZERO;
+        let mut limits_by_account: HashMap<String, AccountLimit> = HashMap::new();
 
         for (account_id, _quantity, _unit_price, currency, amount_opt) in deposit_activities {
             let amount = amount_opt.ok_or_else(|| {
@@ -66,24 +73,51 @@ impl ContributionLimitService {
                 self.fx_service
                     .convert_currency(amount, &currency, base_currency)?;
 
-            total_deposits += &converted_amount;
-            let account_deposit = deposits_by_account
-                .entry(account_id.clone())
-                .or_insert_with(|| AccountDeposit {
-                    amount: Decimal::ZERO,
-                    currency: currency.clone(),
-                    converted_amount: Decimal::ZERO,
-                });
+            totals += &converted_amount;
+            let account_deposit =
+                limits_by_account
+                    .entry(account_id.clone())
+                    .or_insert_with(|| AccountLimit {
+                        amount: Decimal::ZERO,
+                        currency: currency.clone(),
+                        converted_amount: Decimal::ZERO,
+                    });
 
             account_deposit.amount += amount;
             account_deposit.converted_amount += &converted_amount;
             account_deposit.currency = currency;
         }
 
-        Ok(DepositsCalculation {
-            total: total_deposits,
+        for (account_id, _quantity, _unit_price, currency, amount_opt) in withdrawal_activities {
+            let amount = amount_opt.ok_or_else(|| {
+                Error::Validation(ValidationError::MissingField(
+                    "Amount is missing in WITHDRAWAL activity".to_string(),
+                ))
+            })?;
+
+            let converted_amount =
+                self.fx_service
+                    .convert_currency(amount, &currency, base_currency)?;
+
+            totals -= &converted_amount;
+            let account_withdrawal =
+                limits_by_account
+                    .entry(account_id.clone())
+                    .or_insert_with(|| AccountLimit {
+                        amount: Decimal::ZERO,
+                        currency: currency.clone(),
+                        converted_amount: Decimal::ZERO,
+                    });
+
+            account_withdrawal.amount -= amount;
+            account_withdrawal.converted_amount -= &converted_amount;
+            account_withdrawal.currency = currency;
+        }
+
+        Ok(LimitsCalculation {
+            total: totals,
             base_currency: base_currency.to_string(),
-            by_account: deposits_by_account,
+            by_account: limits_by_account,
         })
     }
 }
@@ -98,7 +132,9 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
         &self,
         new_limit: NewContributionLimit,
     ) -> Result<ContributionLimit> {
-        self.limit_repository.create_contribution_limit(new_limit).await
+        self.limit_repository
+            .create_contribution_limit(new_limit)
+            .await
     }
 
     async fn update_contribution_limit(
@@ -115,11 +151,11 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
         self.limit_repository.delete_contribution_limit(id).await
     }
 
-    fn calculate_deposits_for_contribution_limit(
+    fn calculate_deposits_withdrawals_for_contribution_limit(
         &self,
         limit_id: &str,
         base_currency: &str,
-    ) -> Result<DepositsCalculation> {
+    ) -> Result<LimitsCalculation> {
         let limit = self.limit_repository.get_contribution_limit(limit_id)?;
 
         let account_ids = match limit.account_ids {
@@ -128,7 +164,7 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
                 .map(|s| s.trim().to_string())
                 .collect::<Vec<String>>(),
             _ => {
-                return Ok(DepositsCalculation {
+                return Ok(LimitsCalculation {
                     total: Decimal::ZERO,
                     base_currency: base_currency.to_string(),
                     by_account: HashMap::new(),
@@ -145,13 +181,19 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
         } else {
             let year = limit.contribution_year;
             let start = NaiveDateTime::new(
-                chrono::NaiveDate::from_ymd_opt(year, 1, 1)
-                    .ok_or_else(|| Error::Validation(ValidationError::InvalidInput("Invalid start date".to_string())))?,
+                chrono::NaiveDate::from_ymd_opt(year, 1, 1).ok_or_else(|| {
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Invalid start date".to_string(),
+                    ))
+                })?,
                 chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
             );
             let end = NaiveDateTime::new(
-                chrono::NaiveDate::from_ymd_opt(year, 12, 31)
-                    .ok_or_else(|| Error::Validation(ValidationError::InvalidInput("Invalid start date".to_string())))?,
+                chrono::NaiveDate::from_ymd_opt(year, 12, 31).ok_or_else(|| {
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Invalid start date".to_string(),
+                    ))
+                })?,
                 chrono::NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
             );
             self.calculate_deposits_by_period(&account_ids, start, end, base_currency)

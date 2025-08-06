@@ -419,6 +419,53 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(converted_results)
     }
 
+    /// Retrieves withdrawal activities for specified accounts within a year as raw data
+    fn get_withdrawal_activities(
+        &self,
+        account_ids: &[String],
+        start_date: NaiveDateTime,
+        end_date: NaiveDateTime,
+    ) -> Result<Vec<(String, Decimal, Decimal, String, Option<Decimal>)>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Use a proper join with explicit ON condition
+        let results = activities::table
+            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
+            .filter(accounts::id.eq_any(account_ids))
+            .filter(accounts::is_active.eq(true))
+            .filter(activities::activity_type.eq("WITHDRAWAL"))
+            .filter(activities::activity_date.between(
+                Utc.from_utc_datetime(&start_date).to_rfc3339(),
+                Utc.from_utc_datetime(&end_date).to_rfc3339(),
+            ))
+            .select((
+                activities::account_id,
+                activities::quantity,
+                activities::unit_price,
+                activities::currency,
+                activities::amount,
+            ))
+            .load::<(String, String, String, String, Option<String>)>(&mut conn)
+            .map_err(ActivityError::from)?;
+
+        // Convert string values to Decimal
+        let converted_results = results
+            .into_iter()
+            .map(|(account_id, quantity, unit_price, currency, amount)| {
+                Ok((
+                    account_id,
+                    Decimal::from_str(&quantity)?,
+                    Decimal::from_str(&unit_price)?,
+                    currency,
+                    amount.map(|a| Decimal::from_str(&a)).transpose()?,
+                ))
+            })
+            .collect::<std::result::Result<Vec<_>, rust_decimal::Error>>()
+            .map_err(|e| ActivityError::DatabaseError(e.to_string()))?;
+
+        Ok(converted_results)
+    }
+
     fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
         let mut conn = get_connection(&self.pool)?;
 

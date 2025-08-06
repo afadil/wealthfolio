@@ -1,4 +1,4 @@
-use super::limits_model::{ ContributionLimit, DepositsCalculation, NewContributionLimit};
+use super::limits_model::{ ContributionLimit, LimitsCalculation, NewContributionLimit};
 use crate::errors::Result; 
 use async_trait::async_trait;
 
@@ -27,10 +27,10 @@ pub trait ContributionLimitServiceTrait: Send + Sync {
         updated_limit: NewContributionLimit,
     ) -> Result<ContributionLimit>;
     async fn delete_contribution_limit(&self, id: &str) -> Result<()>;
-    fn calculate_deposits_for_contribution_limit(
+    fn calculate_deposits_withdrawals_for_contribution_limit(
         &self,
         limit_id: &str,
         base_currency: &str,
-    ) -> Result<DepositsCalculation>;
+    ) -> Result<LimitsCalculation>;
     // Note: calculate_deposits_by_period might be better as a private helper or part of the trait if needed elsewhere
 } 

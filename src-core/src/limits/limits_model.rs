@@ -34,7 +34,7 @@ pub struct NewContributionLimit {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountDeposit {
+pub struct AccountLimit {
     pub amount: Decimal,
     pub currency: String,
     pub converted_amount: Decimal,
@@ -42,8 +42,8 @@ pub struct AccountDeposit {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct DepositsCalculation {
+pub struct LimitsCalculation {
     pub total: Decimal,
     pub base_currency: String,
-    pub by_account: HashMap<String, AccountDeposit>,
+    pub by_account: HashMap<String, AccountLimit>,
 }

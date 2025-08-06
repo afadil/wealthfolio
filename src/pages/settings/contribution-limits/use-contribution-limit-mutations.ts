@@ -7,20 +7,20 @@ import {
 } from '@/commands/contribution-limits';
 import { QueryKeys } from '@/lib/query-keys';
 import { toast } from '@/components/ui/use-toast';
-import { ContributionLimit, NewContributionLimit, DepositsCalculation } from '@/lib/types';
+import { ContributionLimit, NewContributionLimit, LimitsCalculation } from '@/lib/types';
 import { logger } from '@/adapters';
 
 export const useContributionLimitProgress = (limitId: string) => {
-  return useQuery<DepositsCalculation>({
+  return useQuery<LimitsCalculation>({
     queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, limitId],
     queryFn: async () => {
       try {
         return await calculateDepositsForLimit(limitId);
       } catch (e) {
-        logger.error(`Error calculating deposits for limit: ${e}`);
+        logger.error(`Error calculating deposits and withdrawals for limit: ${e}`);
         toast({
-          title: 'Error calculating deposits',
-          description: 'There was a problem calculating the deposits for this limit.',
+          title: 'Error calculating deposits and withdrawals',
+          description: 'There was a problem calculating the deposits and withdrawals for this limit.',
           variant: 'destructive',
         });
         throw e;
