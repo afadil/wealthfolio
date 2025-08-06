@@ -36,6 +36,10 @@ pub struct AccountStateSnapshot {
     pub net_contribution: Decimal, // Cumulative net deposits in account currency
     #[serde(default)]
     pub net_contribution_base: Decimal, // portfolio base currency
+    #[serde(default)]
+    pub outstanding_loans: Decimal, // Cumulative loan balance in account currency
+    #[serde(default)]
+    pub outstanding_loans_base: Decimal, // Cumulative loan balance in base currency
 
     pub calculated_at: NaiveDateTime, // When this snapshot was generated
 }
@@ -52,6 +56,8 @@ impl Default for AccountStateSnapshot {
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
             net_contribution_base: Decimal::ZERO,
+            outstanding_loans: Decimal::ZERO,
+            outstanding_loans_base: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
         }
     }
@@ -85,11 +91,13 @@ pub struct AccountStateSnapshotDB {
     #[diesel(sql_type = Text)]
     pub net_contribution: String,
     #[diesel(sql_type = Text)]
+    pub outstanding_loans: String,
+    #[diesel(sql_type = Text)]
+    pub outstanding_loans_base: String,
+    #[diesel(sql_type = Text)]
     pub calculated_at: String,
     #[diesel(sql_type = Text)]
     pub net_contribution_base: String,
-
-
 }
 
 // --- Conversions ---
@@ -108,6 +116,8 @@ impl From<AccountStateSnapshotDB> for AccountStateSnapshot {
             cost_basis: Decimal::from_str(&db.cost_basis).unwrap_or_default(),
             net_contribution: Decimal::from_str(&db.net_contribution).unwrap_or_default(),
             net_contribution_base: Decimal::from_str(&db.net_contribution_base).unwrap_or_default(),
+            outstanding_loans: Decimal::from_str(&db.outstanding_loans).unwrap_or_default(),
+            outstanding_loans_base: Decimal::from_str(&db.outstanding_loans_base).unwrap_or_default(),
             calculated_at: NaiveDateTime::parse_from_str(
                 &db.calculated_at,
                 "%Y-%m-%dT%H:%M:%S%.fZ",
@@ -143,6 +153,14 @@ impl From<AccountStateSnapshot> for AccountStateSnapshotDB {
                 .to_string(),
             net_contribution_base: domain
                 .net_contribution_base
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            outstanding_loans: domain
+                .outstanding_loans
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            outstanding_loans_base: domain
+                .outstanding_loans_base
                 .round_dp(DECIMAL_PRECISION)
                 .to_string(),
             calculated_at: domain
