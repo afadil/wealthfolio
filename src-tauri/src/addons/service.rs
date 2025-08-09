@@ -27,16 +27,120 @@ pub fn get_addon_path(app_data_dir: &str, addon_id: &str) -> Result<PathBuf, Str
 /// Returns detected permissions that can be merged with declared ones
 pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermission> {
     // Define known permission categories and their associated functions
-    // Prioritize full dotted function names over short names
+    // Use SDK category ids and current Host API function names
     let permission_patterns = vec![
-        ("portfolio", vec!["getHoldings", "getPortfolio", "getPerformance", "getAccountSummary", "holdings", "getHolding", "getHistoricalValuations", "calculatePerformanceHistory", "calculatePerformanceSummary"], "Portfolio data access"),
-        ("account", vec!["getAccounts", "createAccount", "updateAccount", "deleteAccount"], "Account management"),
-        ("activity", vec!["getActivities", "addActivity", "updateActivity", "deleteActivity"], "Activity management"),
-        ("market-data", vec!["getMarketData", "getQuote", "getHistoricalData", "searchSymbols", "searchTicker", "getAssetProfile", "getQuoteHistory"], "Market data access"),
-        ("goals", vec!["getGoals", "createGoal", "updateGoal", "deleteGoal"], "Goals management"),
-        ("settings", vec!["getSettings", "updateSettings", "getPreferences"], "Settings access"),
-        ("import-export", vec!["importData", "exportData", "uploadFile", "downloadFile"], "Data import/export"),
-        ("ui", vec!["showNotification", "openModal", "updateTheme", "navigate", "onDisable", "sidebar.addItem", "router.add"], "User interface and navigation"),
+        (
+            "portfolio",
+            vec![
+                "getHoldings",
+                "getHolding",
+                "update",
+                "recalculate",
+                "getIncomeSummary",
+                "getHistoricalValuations",
+                "getLatestValuations",
+            ],
+            "Access to portfolio holdings, valuations, and performance",
+        ),
+        (
+            "activities",
+            vec![
+                "getAll",
+                "search",
+                "create",
+                "update",
+                "saveMany",
+                "import",
+                "checkImport",
+                "getImportMapping",
+                "saveImportMapping",
+            ],
+            "Access to transaction history and activity management",
+        ),
+        (
+            "accounts",
+            vec!["getAll", "create"],
+            "Access to account information and management",
+        ),
+        (
+            "market-data",
+            vec![
+                "searchTicker",
+                "syncHistory",
+                "sync",
+                "getProviders",
+                "getProfile",
+                "updateProfile",
+                "updateDataSource",
+            ],
+            "Access to quotes and market data",
+        ),
+        (
+            "quotes",
+            vec![
+                "update",
+                "getHistory",
+            ],
+            "Access to quote management",
+        ),
+        (
+            "performance",
+            vec![
+                "calculateHistory",
+                "calculateSummary",
+                "calculateAccountsSimple",
+            ],
+            "Access to performance calculations",
+        ),
+        (
+            "financial-planning",
+            vec![
+                "getAll",
+                "create",
+                "update",
+                "updateAllocations",
+                "getAllocations",
+                "calculateDeposits",
+            ],
+            "Access to goals and contribution limits",
+        ),
+        (
+            "currency",
+            vec!["getAll", "update", "add"],
+            "Access to exchange rates and currency data",
+        ),
+        (
+            "settings",
+            vec!["get", "update", "backupDatabase"],
+            "Access to application settings",
+        ),
+        (
+            "files",
+            vec!["openCsvDialog", "openSaveDialog"],
+            "Access to file dialogs",
+        ),
+        (
+            "events",
+            vec![
+                // Import events
+                "onDropHover",
+                "onDrop",
+                "onDropCancelled",
+                // Portfolio events
+                "onUpdateStart",
+                "onUpdateComplete",
+                "onUpdateError",
+                // Market events
+                "onSyncStart",
+                "onSyncComplete",
+            ],
+            "Access to application events",
+        ),
+        (
+            "ui",
+            vec!["sidebar.addItem", "router.add"],
+            "User interface and navigation",
+        ),
     ];
 
     let mut detected_permissions: Vec<AddonPermission> = Vec::new();
@@ -79,23 +183,96 @@ pub fn detect_addon_permissions(addon_files: &[AddonFile]) -> Vec<AddonPermissio
                 
                 // For simple function names or if dotted pattern wasn't found
                 if !function_detected {
-                    let simple_patterns = vec![
-                        format!("{}(", function),              // getHoldings(
-                        format!(".{}(", function),             // .getHoldings(
-                        format!("ctx.{}(", function),          // ctx.onDisable(
-                        // Remove the string literal patterns that cause false positives
-                        // format!("'{}'", function),
-                        // format!("\"{}\"", function),
+                    // Create API-specific patterns to prevent false positives
+                    let api_category = if category == &"currency" {
+                        "exchangeRates"
+                    } else if category == &"financial-planning" {
+                        // Handle both goals and contributionLimits APIs
+                        if *function == "calculateDeposits" {
+                            "contributionLimits"
+                        } else {
+                            "goals" // Default to goals for getAll, create, update, etc.
+                        }
+                    } else if category == &"market-data" {
+                        // Handle both market and assets APIs
+                        if *function == "getProfile" || *function == "updateProfile" || *function == "updateDataSource" {
+                            "assets"
+                        } else {
+                            "market" // Default to market for searchTicker, sync, etc.
+                        }
+                    } else {
+                        category // Use category as-is for portfolio, activities, accounts, etc.
+                    };
+                    
+                    let api_patterns = vec![
+                        format!("api.{}.{}(", api_category, function),        // api.portfolio.getHoldings(
+                        format!(".api.{}.{}(", api_category, function),       // ctx.api.portfolio.getHoldings(
+                        format!("ctx.api.{}.{}(", api_category, function),    // ctx.api.portfolio.getHoldings(
                     ];
                     
-                    for pattern in &simple_patterns {
+                    // Handle events category with nested API structure
+                    let events_patterns = if *category == "events" {
+                        vec![
+                            format!("ctx.api.events.import.{}(", function),    // ctx.api.events.import.onDrop(
+                            format!("ctx.api.events.portfolio.{}(", function), // ctx.api.events.portfolio.onUpdateStart(
+                            format!("ctx.api.events.market.{}(", function),    // ctx.api.events.market.onSyncStart(
+                            format!("api.events.import.{}(", function),        // api.events.import.onDrop(
+                            format!("api.events.portfolio.{}(", function),     // api.events.portfolio.onUpdateStart(
+                            format!("api.events.market.{}(", function),        // api.events.market.onSyncStart(
+                        ]
+                    } else {
+                        vec![]
+                    };
+                    
+                    // Special patterns for non-API functions
+                    let simple_patterns = if *category == "ui" {
+                        vec![
+                            format!("ctx.{}(", function),          // ctx.onDisable(
+                        ]
+                    } else {
+                        vec![] // No simple patterns for API functions to prevent false positives
+                    };
+                    
+                    // First try API-specific patterns
+                    let mut pattern_found = false;
+                    for pattern in &api_patterns {
                         if file.content.contains(pattern) {
-                            log::debug!("Found simple pattern '{}' in file '{}' for function '{}'", pattern, file.name, function);
+                            log::debug!("Found API pattern '{}' in file '{}' for function '{}'", pattern, file.name, function);
                             category_functions
                                 .entry(category.to_string())
                                 .or_insert_with(Vec::new)
                                 .push(function.to_string());
-                            break; // Only add once per function per file
+                            pattern_found = true;
+                            break;
+                        }
+                    }
+                    
+                    // If no API pattern found, try events patterns
+                    if !pattern_found {
+                        for pattern in &events_patterns {
+                            if file.content.contains(pattern) {
+                                log::debug!("Found events pattern '{}' in file '{}' for function '{}'", pattern, file.name, function);
+                                category_functions
+                                    .entry(category.to_string())
+                                    .or_insert_with(Vec::new)
+                                    .push(function.to_string());
+                                pattern_found = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // If no API or events pattern found, try simple patterns (for special cases like onDisable)
+                    if !pattern_found {
+                        for pattern in &simple_patterns {
+                            if file.content.contains(pattern) {
+                                log::debug!("Found simple pattern '{}' in file '{}' for function '{}'", pattern, file.name, function);
+                                category_functions
+                                    .entry(category.to_string())
+                                    .or_insert_with(Vec::new)
+                                    .push(function.to_string());
+                                break; // Only add once per function per file
+                            }
                         }
                     }
                 }

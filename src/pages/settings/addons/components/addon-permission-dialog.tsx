@@ -82,7 +82,7 @@ export function PermissionDialog({
               </p>
             )}
           </div>
-            <div>
+            <div className="font-light">
               {isViewOnly 
                 ? 'View the permissions and data access for this installed addon.'
                 : 'Review the permissions requested by this addon before installation.'

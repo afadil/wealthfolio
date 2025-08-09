@@ -11,6 +11,9 @@ const fs = require('fs');
 const path = require('path');
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
+const readline = require('node:readline/promises');
+const { stdin, stdout } = require('node:process');
+const { AddonScaffold } = require('./scaffold');
 
 const execAsync = promisify(exec);
 
@@ -46,173 +49,58 @@ function warn(message) {
   log(`⚠️  ${message}`, colors.yellow);
 }
 
-// Template for new addon
-const addonTemplate = {
-  manifest: {
-    "id": "{{addonId}}",
-    "name": "{{addonName}}",
-    "version": "1.0.0",
-    "description": "{{description}}",
-    "author": "{{author}}",
-    "main": "dist/addon.js",
-    "sdkVersion": "1.0.0",
-    "enabled": true,
-    "permissions": [
-      {
-        "category": "ui",
-        "functions": ["sidebar.addItem"],
-        "purpose": "Add navigation items to the sidebar"
-      }
-    ],
-    "keywords": ["wealthfolio", "addon"],
-    "license": "MIT"
-  },
-  
-  packageJson: {
-    "name": "{{packageName}}",
-    "version": "1.0.0",
-    "description": "{{description}}",
-    "type": "module",
-    "main": "dist/addon.js",
-    "scripts": {
-      "build": "vite build",
-      "dev": "vite build --watch",
-      "dev:server": "node ../../addon-dev-tools/dev-server.js .",
-      "clean": "rm -rf dist *.zip",
-      "package": "zip -r {{packageName}}.zip manifest.json dist/ README.md",
-      "bundle": "npm run clean && npm run build && npm run package"
-    },
-    "dependencies": {
-      "@wealthfolio/addon-sdk": "workspace:*",
-      "react": "^18.2.0"
-    },
-    "devDependencies": {
-      "@types/node": "^20.0.0",
-      "@types/react": "^18.2.0",
-      "rollup-plugin-external-globals": "^0.13.0",
-      "typescript": "^5.0.0",
-      "vite": "^5.0.0"
-    }
-  },
-
-  viteConfig: `import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import externalGlobals from 'rollup-plugin-external-globals';
-
-export default defineConfig({
-  plugins: [react()],
-  define: {
-    'process.env.NODE_ENV': JSON.stringify('production'),
-  },
-  build: {
-    lib: {
-      entry: 'src/addon.tsx',
-      fileName: () => 'addon.js',
-      formats: ['es'],
-    },
-    rollupOptions: {
-      external: ['react', 'react-dom'],
-      plugins: [
-        externalGlobals({
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        })
-      ],
-      output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM',
-        },
-      },
-    },
-    outDir: 'dist',
-    minify: false,
-    sourcemap: true,
-  },
-});`,
-
-  addonCode: `import React from 'react';
-import { getAddonContext } from '@wealthfolio/addon-sdk';
-
-function {{componentName}}() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">{{addonName}}</h1>
-      <p className="text-gray-600">
-        Welcome to your new Wealthfolio addon! Start building amazing features.
-      </p>
-    </div>
-  );
-}
-
-export default function enable(ctx) {
-  console.log('{{addonName}} addon enabled');
-  
-  // Add a sidebar item
-  const sidebarItem = ctx.sidebar.addItem({
-    id: '{{addonId}}-nav',
-    label: '{{addonName}}',
-    route: '/addons/{{addonId}}',
-    order: 100
-  });
-
-  // Add a route
-  ctx.router.add({
-    path: '/addons/{{addonId}}',
-    component: React.lazy(() => Promise.resolve({ default: {{componentName}} }))
-  });
-
-  // Return cleanup function
-  return {
-    disable() {
-      console.log('{{addonName}} addon disabled');
-      sidebarItem.remove();
-    }
-  };
-}`,
-
-  readme: `# {{addonName}}
-
-{{description}}
-
-## Development
-
-\`\`\`bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev:server
-
-# Build for production
-npm run build
-
-# Package addon
-npm run bundle
-\`\`\`
-
-## Features
-
-- Add your features here
-
-## License
-
-MIT
-`
-};
+// Initialize scaffold service
+const scaffold = new AddonScaffold();
 
 // Command: create
 async function createAddon(name, options) {
   try {
     info(`Creating new addon: ${name}`);
     
-    const addonId = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    const addonName = name;
-    const packageName = `wealthfolio-${addonId}-addon`;
-    const componentName = name.replace(/[^a-zA-Z0-9]/g, '');
-    const description = options.description || `A Wealthfolio addon for ${name}`;
-    const author = options.author || 'Anonymous';
+    // Prepare configuration
+    const config = {
+      name,
+      description: options.description,
+      author: options.author
+    };
+
+    // Validate configuration
+    const validationErrors = scaffold.validateConfig(config);
+    if (validationErrors.length > 0) {
+      error('Configuration errors:');
+      validationErrors.forEach(err => error(`  - ${err}`));
+      return;
+    }
+
+    // Interactive prompts for missing information
+    const interactive = process.stdin.isTTY && process.stdout.isTTY;
+    if (interactive && (!config.description || !config.author)) {
+      const rl = readline.createInterface({ input: stdin, output: stdout });
+      try {
+        if (!config.description) {
+          const defaultDesc = `A Wealthfolio addon for ${name}`;
+          const answer = (await rl.question(`Description [${defaultDesc}]: `)).trim();
+          config.description = answer.length > 0 ? answer : defaultDesc;
+        }
+        if (!config.author) {
+          const defaultAuthor = 'Anonymous';
+          const answer = (await rl.question(`Author [${defaultAuthor}]: `)).trim();
+          config.author = answer.length > 0 ? answer : defaultAuthor;
+        }
+      } finally {
+        rl.close();
+      }
+    }
+
+    // Set defaults for non-interactive mode
+    if (!config.description) {
+      config.description = `A Wealthfolio addon for ${name}`;
+    }
+    if (!config.author) {
+      config.author = 'Anonymous';
+    }
     
+    const addonId = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
     const addonDir = path.resolve(process.cwd(), addonId);
     
     // Check if directory already exists
@@ -221,56 +109,13 @@ async function createAddon(name, options) {
       return;
     }
     
-    // Create directory structure
-    fs.mkdirSync(addonDir);
-    fs.mkdirSync(path.join(addonDir, 'src'));
-    
-    // Replace template variables
-    const replacements = {
-      '{{addonId}}': addonId,
-      '{{addonName}}': addonName,
-      '{{packageName}}': packageName,
-      '{{componentName}}': componentName,
-      '{{description}}': description,
-      '{{author}}': author
-    };
-    
-    function replaceVariables(content) {
-      let result = content;
-      for (const [key, value] of Object.entries(replacements)) {
-        result = result.replace(new RegExp(key, 'g'), value);
-      }
-      return result;
-    }
-    
-    // Write files
-    fs.writeFileSync(
-      path.join(addonDir, 'manifest.json'),
-      JSON.stringify(addonTemplate.manifest, null, 2).replace(/{{[^}]+}}/g, match => replacements[match] || match)
-    );
-    
-    fs.writeFileSync(
-      path.join(addonDir, 'package.json'),
-      JSON.stringify(addonTemplate.packageJson, null, 2).replace(/{{[^}]+}}/g, match => replacements[match] || match)
-    );
-    
-    fs.writeFileSync(
-      path.join(addonDir, 'vite.config.ts'),
-      addonTemplate.viteConfig
-    );
-    
-    fs.writeFileSync(
-      path.join(addonDir, 'src', 'addon.tsx'),
-      replaceVariables(addonTemplate.addonCode)
-    );
-    
-    fs.writeFileSync(
-      path.join(addonDir, 'README.md'),
-      replaceVariables(addonTemplate.readme)
-    );
+    // Create addon using scaffold service
+    const result = await scaffold.createAddon(config, addonDir);
     
     success(`Addon ${name} created successfully!`);
-    info(`Directory: ${addonDir}`);
+    info(`Directory: ${result.addonDir}`);
+    info(`Addon ID: ${result.addonId}`);
+    info(`Package name: ${result.packageName}`);
     info(`Next steps:`);
     info(`  1. cd ${addonId}`);
     info(`  2. npm install`);
@@ -425,7 +270,7 @@ async function installAddon(zipPath) {
 
 // CLI Setup
 program
-  .name('wf-addon')
+  .name('wealthfolio')
   .description('Wealthfolio Addon Development CLI')
   .version('1.0.0');
 

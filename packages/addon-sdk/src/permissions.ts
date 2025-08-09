@@ -59,9 +59,10 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Portfolio Data',
     description: 'Access to holdings, portfolio performance, and account valuations',
     functions: [
-      'holdings', 'getHolding', 'updatePortfolio', 'recalculatePortfolio',
-      'getHistoricalValuations', 'calculatePerformanceHistory', 
-      'calculatePerformanceSummary', 'calculateAccountsSimplePerformance'
+      'getHoldings', 'getHolding', 'updatePortfolio', 'recalculatePortfolio',
+      'getIncomeSummary', 'getHistoricalValuations', 'getLatestValuations',
+      'calculatePerformanceHistory', 'calculatePerformanceSummary',
+      'calculateAccountsSimplePerformance'
     ],
     riskLevel: 'medium'
   },
@@ -70,8 +71,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Transaction History',
     description: 'Access to transaction records and activity management',
     functions: [
-      'activities', 'searchActivities', 'createActivity', 'updateActivity',
-      'saveActivities', 'deleteActivity', 'importActivities', 'checkActivitiesImport'
+      'getActivities', 'searchActivities', 'createActivity', 'updateActivity',
+      'saveActivities', 'importActivities', 'checkActivitiesImport',
+      'getAccountImportMapping', 'saveAccountImportMapping'
     ],
     riskLevel: 'high'
   },
@@ -80,8 +82,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Account Management',
     description: 'Access to account information and settings',
     functions: [
-      'accounts', 'createAccount', 'updateAccount', 'deleteAccount',
-      'getAccountImportMapping', 'saveAccountImportMapping'
+      'getAccounts', 'createAccount', 'updateAccount'
     ],
     riskLevel: 'high'
   },
@@ -91,7 +92,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     description: 'Access to market prices, quotes, and financial data',
     functions: [
       'searchTicker', 'syncHistoryQuotes', 'getAssetProfile', 'updateAssetProfile',
-      'updateAssetDataSource', 'updateQuote', 'syncMarketData', 'deleteQuote',
+      'updateAssetDataSource', 'updateQuote', 'syncMarketData',
       'getQuoteHistory', 'getMarketDataProviders'
     ],
     riskLevel: 'low'
@@ -101,9 +102,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Financial Planning',
     description: 'Access to goals, contribution limits, and planning tools',
     functions: [
-      'getGoals', 'createGoal', 'updateGoal', 'deleteGoal', 'updateGoalsAllocations',
+      'getGoals', 'createGoal', 'updateGoal', 'updateGoalsAllocations',
       'getGoalsAllocation', 'getContributionLimit', 'createContributionLimit',
-      'updateContributionLimit', 'deleteContributionLimit', 'calculateDepositsForLimit'
+      'updateContributionLimit', 'calculateDepositsForLimit'
     ],
     riskLevel: 'medium'
   },
@@ -112,7 +113,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Exchange Rates',
     description: 'Access to currency exchange rates and conversion data',
     functions: [
-      'getExchangeRates', 'updateExchangeRate', 'addExchangeRate', 'deleteExchangeRate'
+      'getExchangeRates', 'updateExchangeRate', 'addExchangeRate'
     ],
     riskLevel: 'low'
   },
@@ -139,9 +140,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Event Listeners',
     description: 'Access to application events and notifications',
     functions: [
-      'listenImportFileDropHover', 'listenImportFileDrop', 'listenImportFileDropCancelled',
-      'listenPortfolioUpdateStart', 'listenPortfolioUpdateComplete', 'listenPortfolioUpdateError',
-      'listenMarketSyncStart', 'listenMarketSyncComplete'
+      'onDropHover', 'onDrop', 'onDropCancelled',
+      'onUpdateStart', 'onUpdateComplete', 'onUpdateError',
+      'onSyncStart', 'onSyncComplete'
     ],
     riskLevel: 'low'
   },

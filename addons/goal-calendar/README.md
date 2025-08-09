@@ -1,4 +1,4 @@
-# Investment Target Tracker Addon
+# Goal Calendar Addon
 
 A Wealthfolio addon that helps you visualize your investment progress towards target amounts using a calendar-style representation.
 
@@ -54,7 +54,7 @@ pnpm bundle
 ## API Usage
 
 This addon demonstrates how to:
-- Use the `ctx.api.holdings()` function to access portfolio data
+- Use the `ctx.api.portfolio.getHoldings` and `ctx.api.goals.getAll` functions to access portfolio and goals data
 - Create custom React hooks within addons
 - Build interactive UI components
 - Handle loading and error states
@@ -75,14 +75,14 @@ This addon demonstrates how to:
 The addon displays a calendar grid similar to GitHub's contribution calendar, but for investment milestones:
 
 ```
-🟢🟢🟢🔵⚪⚪⚪
-🟢🟢🟢⚪⚪⚪⚪
+⚫⚫⚫⚫⚫⚫⚫
+⚫⚫🟢⚪⚪⚪⚪
 ⚪⚪⚪⚪⚪⚪⚪
 ```
 
 Where:
-- 🟢 = Completed milestone
-- 🔵 = Partially completed current milestone  
+- ⚫ = Completed milestone
+- 🟢 = Partially completed current milestone  
 - ⚪ = Future milestone
 
 ## License

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 
 /**
  * Addon Development Server
@@ -23,10 +24,12 @@ class AddonDevServer {
     this.app = express();
     this.lastModified = new Date();
     this.buildInProgress = false;
+    this.viteWatcher = null;
     
     this.setupMiddleware();
     this.setupRoutes();
     this.setupFileWatcher();
+    this.startViteWatcher();
   }
 
   setupMiddleware() {
@@ -72,17 +75,24 @@ class AddonDevServer {
     });
 
     // Serve addon code
-    this.app.get('/addon.js', (req, res) => {
+    this.app.get('/addon.js', async (req, res) => {
       try {
         const addonFile = path.resolve(this.config.addonPath, 'dist/addon.js');
-        if (fs.existsSync(addonFile)) {
+        console.log(`📦 Serving addon.js from: ${addonFile}`);
+        
+        // Wait for file to exist (with timeout)
+        const fileExists = await this.waitForFile(addonFile, 3000);
+        
+        if (fileExists) {
           const code = fs.readFileSync(addonFile, 'utf-8');
           res.type('application/javascript').send(code);
         } else {
-          res.status(404).json({ error: 'Addon file not found. Run build first.' });
+          console.error(`❌ Addon file not found at: ${addonFile}`);
+          res.status(404).json({ error: 'Addon file not found. Run build first.', path: addonFile });
         }
       } catch (error) {
-        res.status(500).json({ error: 'Failed to read addon file' });
+        console.error(`❌ Error serving addon.js:`, error);
+        res.status(500).json({ error: 'Failed to read addon file', details: error.message });
       }
     });
 
@@ -116,6 +126,32 @@ class AddonDevServer {
         manifest: this.getManifestInfo()
       });
     });
+
+    // Debug endpoint for troubleshooting
+    this.app.get('/debug', (req, res) => {
+      const addonFile = path.resolve(this.config.addonPath, 'dist/addon.js');
+      res.json({
+        lastModified: this.lastModified.toISOString(),
+        buildInProgress: this.buildInProgress,
+        files: this.getFileList(),
+        watchPaths: this.config.watchPaths,
+        viteWatcherRunning: this.viteWatcher !== null,
+        addonFile: {
+          path: addonFile,
+          exists: fs.existsSync(addonFile),
+          size: fs.existsSync(addonFile) ? fs.statSync(addonFile).size : 0
+        },
+        config: {
+          port: this.config.port,
+          buildCommand: this.config.buildCommand
+        }
+      });
+    });
+
+    // Simple ping endpoint
+    this.app.get('/ping', (req, res) => {
+      res.json({ message: 'pong', timestamp: new Date().toISOString() });
+    });
   }
 
   setupFileWatcher() {
@@ -127,12 +163,9 @@ class AddonDevServer {
 
     watcher.on('change', (filePath) => {
       console.log(`📝 File changed: ${filePath}`);
+      // Don't trigger manual build since Vite is already watching
+      // Just update the timestamp for status endpoint
       this.lastModified = new Date();
-      
-      // Trigger rebuild if configured
-      if (this.config.buildCommand && !this.buildInProgress) {
-        this.triggerBuild();
-      }
     });
 
     watcher.on('add', (filePath) => {
@@ -192,16 +225,106 @@ class AddonDevServer {
     }
   }
 
+  /**
+   * Wait for a file to exist with timeout
+   */
+  async waitForFile(filePath, timeout = 3000) {
+    const startTime = Date.now();
+    const checkInterval = 100;
+    
+    while (Date.now() - startTime < timeout) {
+      if (fs.existsSync(filePath)) {
+        // Additional check to ensure file is fully written
+        try {
+          const stats = fs.statSync(filePath);
+          if (stats.size > 0) {
+            return true;
+          }
+        } catch (err) {
+          // File might be in the process of being written
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+    }
+    
+    return false;
+  }
+
+  startViteWatcher() {
+    if (!this.config.buildCommand) return;
+    
+    console.log('🔨 Starting Vite in watch mode...');
+    
+    // Start vite build in watch mode
+    const { spawn } = require('child_process');
+    this.viteWatcher = spawn('npm', ['run', 'dev'], {
+      cwd: this.config.addonPath,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    this.viteWatcher.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log(`Vite output: ${output.trim()}`);
+      
+      if (output.includes('build started')) {
+        this.buildInProgress = true;
+      }
+      
+      if (output.includes('built in')) {
+        console.log(`✅ Vite rebuild completed`);
+        this.lastModified = new Date();
+        this.buildInProgress = false;
+      }
+      
+      if (output.includes('watching for file changes')) {
+        console.log(`✅ Vite watcher ready`);
+        this.buildInProgress = false;
+      }
+    });
+    
+    this.viteWatcher.stderr.on('data', (data) => {
+      console.error(`Vite error: ${data}`);
+    });
+    
+    this.viteWatcher.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`Vite watcher exited with code ${code}`);
+      }
+    });
+  }
+
   start() {
     this.app.listen(this.config.port, () => {
       console.log(`🚀 Addon dev server running on http://localhost:${this.config.port}`);
       console.log(`📁 Serving from: ${this.config.addonPath}`);
       console.log(`📋 Manifest: ${this.config.manifestPath}`);
+      console.log(`👀 Watching files: ${this.config.watchPaths.join(', ')}`);
       
       if (this.config.buildCommand) {
         console.log(`🔨 Build command: ${this.config.buildCommand}`);
       }
     });
+
+    // Handle graceful shutdown
+    process.on('SIGINT', () => {
+      this.stop();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', () => {
+      this.stop();
+      process.exit(0);
+    });
+  }
+
+  stop() {
+    console.log('🛑 Shutting down dev server...');
+    
+    if (this.viteWatcher) {
+      this.viteWatcher.kill('SIGTERM');
+      this.viteWatcher = null;
+    }
   }
 }
 
@@ -215,7 +338,7 @@ function main() {
     port,
     addonPath: path.resolve(addonPath),
     manifestPath: path.resolve(addonPath, 'manifest.json'),
-    buildCommand: 'npm run dev',
+    buildCommand: 'npm run build',
     watchPaths: [
       path.resolve(addonPath, 'src'),
       path.resolve(addonPath, 'manifest.json')

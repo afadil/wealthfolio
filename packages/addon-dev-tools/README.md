@@ -12,28 +12,28 @@ npm install -g @wealthfolio/addon-dev-tools
 
 ### Create New Addon
 ```bash
-wf-addon create my-awesome-addon
+wealthfolio create my-awesome-addon
 ```
 
 ### Start Development Server
 ```bash
 # In your addon directory
-wf-addon dev
+wealthfolio dev
 ```
 
 ### Build Addon
 ```bash
-wf-addon build
+wealthfolio build
 ```
 
 ### Package for Distribution
 ```bash
-wf-addon package
+wealthfolio package
 ```
 
 ### Test Setup
 ```bash
-wf-addon test
+wealthfolio test
 ```
 
 ## Development Server
@@ -60,7 +60,7 @@ Add to your addon's `package.json`:
 ```json
 {
   "scripts": {
-    "dev:server": "wf-addon dev"
+    "dev:server": "wealthfolio dev"
   },
   "devDependencies": {
     "@wealthfolio/addon-dev-tools": "^1.0.0"

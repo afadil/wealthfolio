@@ -14,20 +14,17 @@ import {
   getExchangeRates,
   updateExchangeRate,
   addExchangeRate,
-  deleteExchangeRate,
 } from '@/commands/exchange-rates';
 import {
   getContributionLimit,
   createContributionLimit,
   updateContributionLimit,
-  deleteContributionLimit,
   calculateDepositsForLimit,
 } from '@/commands/contribution-limits';
 import {
   getGoals,
   createGoal,
   updateGoal,
-  deleteGoal,
   updateGoalsAllocations,
   getGoalsAllocation,
 } from '@/commands/goal';
@@ -39,7 +36,6 @@ import {
   updateAssetDataSource,
   updateQuote,
   syncMarketData,
-  deleteQuote,
   getQuoteHistory,
   getMarketDataProviders,
 } from '@/commands/market-data';
@@ -48,6 +44,7 @@ import {
   recalculatePortfolio,
   getIncomeSummary,
   getHistoricalValuations,
+  getLatestValuations,
   calculatePerformanceHistory,
   calculatePerformanceSummary,
   calculateAccountsSimplePerformance,
@@ -61,14 +58,12 @@ import {
 import {
   createAccount,
   updateAccount,
-  deleteAccount,
 } from '@/commands/account';
 import {
   searchActivities,
   createActivity,
   updateActivity,
   saveActivities,
-  deleteActivity,
 } from '@/commands/activity';
 import {
   openCsvFileDialog,
@@ -206,20 +201,17 @@ export const realCtx: AddonContext = {
     getExchangeRates,
     updateExchangeRate,
     addExchangeRate,
-    deleteExchangeRate,
 
     // Contribution limits
     getContributionLimit,
     createContributionLimit,
     updateContributionLimit,
-    deleteContributionLimit,
     calculateDepositsForLimit,
 
     // Goals
     getGoals,
     createGoal,
     updateGoal,
-    deleteGoal,
     updateGoalsAllocations,
     getGoalsAllocation,
 
@@ -231,7 +223,6 @@ export const realCtx: AddonContext = {
     updateAssetDataSource,
     updateQuote,
     syncMarketData,
-    deleteQuote,
     getQuoteHistory,
     getMarketDataProviders,
 
@@ -240,6 +231,7 @@ export const realCtx: AddonContext = {
     recalculatePortfolio,
     getIncomeSummary,
     getHistoricalValuations,
+    getLatestValuations,
     calculatePerformanceHistory,
     calculatePerformanceSummary,
     calculateAccountsSimplePerformance,
@@ -253,14 +245,12 @@ export const realCtx: AddonContext = {
     // Account management
     createAccount,
     updateAccount,
-    deleteAccount,
 
     // Activity management
     searchActivities,
     createActivity,
     updateActivity,
     saveActivities,
-    deleteActivity,
 
     // File operations
     openCsvFileDialog,

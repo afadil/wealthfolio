@@ -49,19 +49,6 @@ export interface AccountsAPI {
    */
   create(account: any): Promise<Account>;
 
-  /**
-   * Update an existing account
-   * @param account Updated account data
-   * @returns Promise resolving to updated account
-   */
-  update(account: any): Promise<Account>;
-
-  /**
-   * Delete an account
-   * @param accountId Account identifier
-   * @returns Promise that resolves when deletion is complete
-   */
-  delete(accountId: string): Promise<void>;
 }
 
 /**
@@ -109,6 +96,13 @@ export interface PortfolioAPI {
    * @returns Promise resolving to array of account valuations
    */
   getHistoricalValuations(accountId?: string, startDate?: string, endDate?: string): Promise<AccountValuation[]>;
+
+  /**
+   * Get latest valuations for a set of accounts
+   * @param accountIds Array of account identifiers
+   * @returns Promise resolving to array of latest account valuations
+   */
+  getLatestValuations(accountIds: string[]): Promise<AccountValuation[]>;
 }
 
 /**
@@ -154,12 +148,6 @@ export interface ActivitiesAPI {
    */
   saveMany(activities: ActivityUpdate[]): Promise<Activity[]>;
 
-  /**
-   * Delete an activity
-   * @param activityId Activity identifier
-   * @returns Promise resolving to deleted activity
-   */
-  delete(activityId: string): Promise<Activity>;
 
   /**
    * Import activities from parsed data
@@ -262,12 +250,6 @@ export interface QuotesAPI {
    */
   update(symbol: string, quote: Quote): Promise<void>;
 
-  /**
-   * Delete a quote
-   * @param id Quote identifier
-   * @returns Promise that resolves when deletion is complete
-   */
-  delete(id: string): Promise<void>;
 
   /**
    * Get quote history for a symbol
@@ -335,12 +317,6 @@ export interface ExchangeRatesAPI {
    */
   add(newRate: Omit<ExchangeRate, 'id'>): Promise<ExchangeRate>;
 
-  /**
-   * Delete an exchange rate
-   * @param rateId Exchange rate identifier
-   * @returns Promise that resolves when deletion is complete
-   */
-  delete(rateId: string): Promise<void>;
 }
 
 /**
@@ -368,12 +344,6 @@ export interface ContributionLimitsAPI {
    */
   update(id: string, updatedLimit: NewContributionLimit): Promise<ContributionLimit>;
 
-  /**
-   * Delete a contribution limit
-   * @param id Contribution limit identifier
-   * @returns Promise that resolves when deletion is complete
-   */
-  delete(id: string): Promise<void>;
 
   /**
    * Calculate deposits for a specific contribution limit
@@ -407,12 +377,6 @@ export interface GoalsAPI {
    */
   update(goal: Goal): Promise<Goal>;
 
-  /**
-   * Delete a goal
-   * @param goalId Goal identifier
-   * @returns Promise that resolves when deletion is complete
-   */
-  delete(goalId: string): Promise<void>;
 
   /**
    * Update goal allocations

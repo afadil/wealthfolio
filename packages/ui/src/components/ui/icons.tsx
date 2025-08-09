@@ -9,6 +9,7 @@ import {
   ArrowUp,
   Bitcoin,
   Briefcase,
+  Blocks,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -82,6 +83,7 @@ export type Icon = LucideIcon;
 export const Icons = {
   AlertCircle: AlertCircle,
   AlertTriangle: AlertTriangle,
+  Blocks: Blocks,
   Grid3x3: Grid3x3,
   Rows3: Rows3,
   Calendar: CalendarDays,

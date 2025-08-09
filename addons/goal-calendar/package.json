@@ -1,10 +1,10 @@
 {
-  "name": "wealthfolio-investment-target-tracker-addon",
+  "name": "wealthfolio-goal-calendar-addon",
   "version": "1.0.0",
   "description": "An addon for tracking investment progress towards target amounts with calendar visualization",
   "type": "module",
   "main": "dist/addon.js",
-  "author": "Wealthfolio Team",
+  "author": "Wealthfolio",
   "license": "MIT",
   "homepage": "https://github.com/afadil/wealthfolio",
   "keywords": [
@@ -19,7 +19,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "dev:server": "node ../../packages/addon-dev-tools/dev-server.js .",
+    "dev:server": "wealthfolio dev",
     "clean": "rm -rf dist investment-target-tracker-addon.zip",
     "package": "zip -r $npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
     "bundle": "pnpm clean && pnpm build && pnpm package",
@@ -29,9 +29,11 @@
   "dependencies": {
     "@wealthfolio/addon-sdk": "workspace:*",
     "@wealthfolio/ui": "workspace:*",
+    "@tanstack/react-query": "^5.62.7",
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@wealthfolio/addon-dev-tools": "workspace:*",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "rollup-plugin-external-globals": "^0.13.0",

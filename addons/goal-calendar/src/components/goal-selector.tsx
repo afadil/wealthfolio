@@ -33,13 +33,13 @@ function GoalSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between"
+          className="w-full sm:w-[200px] justify-between"
         >
           {selectedGoal ? selectedGoal.title : "Select a goal..."}
           <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-full sm:w-[200px] p-0">
         <Command>
           <CommandInput placeholder="Search goals..." />
           <CommandList>

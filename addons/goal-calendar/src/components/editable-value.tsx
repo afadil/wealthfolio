@@ -82,9 +82,9 @@ function EditableValue({
     <Button 
       variant="ghost"
       onClick={() => setIsEditing(true)}
-      className="h-auto p-2 justify-start"
+      className="h-auto p-2 justify-start py-0 font-normal text-xs"
     >
-      <span className="text-lg">
+      <span>
         {displayValue}
       </span>
       <Icons.Pencil className="ml-2 h-3 w-3 opacity-50" />

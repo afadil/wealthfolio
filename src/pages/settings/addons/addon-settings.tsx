@@ -69,7 +69,7 @@ export default function AddonSettingsPage() {
       <div className="flex items-center justify-between">
         <SettingsHeader
           heading="Addon Manager"
-          text="Install and manage ZIP addon packages to extend Wealthfolio's functionality."
+          text="Install and manage addons to extend Wealthfolio's functionality."
         />
 
         <div className="flex items-center gap-3">

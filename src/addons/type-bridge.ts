@@ -47,20 +47,17 @@ export interface InternalHostAPI {
   getExchangeRates(): Promise<ExchangeRate[]>;
   updateExchangeRate(updatedRate: ExchangeRate): Promise<ExchangeRate>;
   addExchangeRate(newRate: Omit<ExchangeRate, 'id'>): Promise<ExchangeRate>;
-  deleteExchangeRate(rateId: string): Promise<void>;
 
   // Contribution limits
   getContributionLimit(): Promise<ContributionLimit[]>;
   createContributionLimit(newLimit: NewContributionLimit): Promise<ContributionLimit>;
   updateContributionLimit(id: string, updatedLimit: NewContributionLimit): Promise<ContributionLimit>;
-  deleteContributionLimit(id: string): Promise<void>;
   calculateDepositsForLimit(limitId: string): Promise<DepositsCalculation>;
 
   // Goals
   getGoals(): Promise<Goal[]>;
   createGoal(goal: any): Promise<Goal>;
   updateGoal(goal: Goal): Promise<Goal>;
-  deleteGoal(goalId: string): Promise<void>;
   updateGoalsAllocations(allocations: GoalAllocation[]): Promise<void>;
   getGoalsAllocation(): Promise<GoalAllocation[]>;
 
@@ -72,7 +69,6 @@ export interface InternalHostAPI {
   updateAssetDataSource(symbol: string, dataSource: string): Promise<Asset>;
   updateQuote(symbol: string, quote: Quote): Promise<void>;
   syncMarketData(symbols: string[], refetchAll: boolean): Promise<void>;
-  deleteQuote(id: string): Promise<void>;
   getQuoteHistory(symbol: string): Promise<Quote[]>;
   getMarketDataProviders(): Promise<MarketDataProviderInfo[]>;
 
@@ -81,6 +77,7 @@ export interface InternalHostAPI {
   recalculatePortfolio(): Promise<void>;
   getIncomeSummary(): Promise<IncomeSummary[]>;
   getHistoricalValuations(accountId?: string, startDate?: string, endDate?: string): Promise<AccountValuation[]>;
+  getLatestValuations(accountIds: string[]): Promise<AccountValuation[]>;
   calculatePerformanceHistory(itemType: 'account' | 'symbol', itemId: string, startDate: string, endDate: string): Promise<PerformanceMetrics>;
   calculatePerformanceSummary(args: { itemType: 'account' | 'symbol'; itemId: string; startDate?: string | null; endDate?: string | null; }): Promise<PerformanceMetrics>;
   calculateAccountsSimplePerformance(accountIds: string[]): Promise<SimplePerformanceMetrics[]>;
@@ -94,14 +91,12 @@ export interface InternalHostAPI {
   // Account management
   createAccount(account: any): Promise<Account>;
   updateAccount(account: any): Promise<Account>;
-  deleteAccount(accountId: string): Promise<void>;
 
   // Activity management
   searchActivities(page: number, pageSize: number, filters: any, searchKeyword: string, sort: any): Promise<ActivitySearchResponse>;
   createActivity(activity: ActivityCreate): Promise<Activity>;
   updateActivity(activity: ActivityUpdate): Promise<Activity>;
   saveActivities(activities: ActivityUpdate[]): Promise<Activity[]>;
-  deleteActivity(activityId: string): Promise<Activity>;
 
   // File operations
   openCsvFileDialog(): Promise<null | string | string[]>;
@@ -136,7 +131,6 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
       getAll: internalAPI.getAccounts,
       create: internalAPI.createAccount,
       update: internalAPI.updateAccount,
-      delete: internalAPI.deleteAccount,
     },
     portfolio: {
       getHoldings: internalAPI.getHoldings,
@@ -145,6 +139,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
       recalculate: internalAPI.recalculatePortfolio,
       getIncomeSummary: internalAPI.getIncomeSummary,
       getHistoricalValuations: internalAPI.getHistoricalValuations,
+      getLatestValuations: internalAPI.getLatestValuations,
     },
     activities: {
       getAll: internalAPI.getActivities,
@@ -152,7 +147,6 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
       create: internalAPI.createActivity,
       update: internalAPI.updateActivity,
       saveMany: internalAPI.saveActivities,
-      delete: internalAPI.deleteActivity,
       import: (activities: ActivityImport[]) => internalAPI.importActivities({ activities }),
       checkImport: (accountId: string, activities: ActivityImport[]) => internalAPI.checkActivitiesImport({ account_id: accountId, activities }),
       getImportMapping: internalAPI.getAccountImportMapping,
@@ -171,7 +165,6 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
     },
     quotes: {
       update: internalAPI.updateQuote,
-      delete: internalAPI.deleteQuote,
       getHistory: internalAPI.getQuoteHistory,
     },
     performance: {
@@ -183,20 +176,17 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
       getAll: internalAPI.getExchangeRates,
       update: internalAPI.updateExchangeRate,
       add: internalAPI.addExchangeRate,
-      delete: internalAPI.deleteExchangeRate,
     },
     contributionLimits: {
       getAll: internalAPI.getContributionLimit,
       create: internalAPI.createContributionLimit,
       update: internalAPI.updateContributionLimit,
-      delete: internalAPI.deleteContributionLimit,
       calculateDeposits: internalAPI.calculateDepositsForLimit,
     },
     goals: {
       getAll: internalAPI.getGoals,
       create: internalAPI.createGoal,
       update: internalAPI.updateGoal,
-      delete: internalAPI.deleteGoal,
       updateAllocations: internalAPI.updateGoalsAllocations,
       getAllocations: internalAPI.getGoalsAllocation,
     },
