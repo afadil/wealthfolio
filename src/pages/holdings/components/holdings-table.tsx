@@ -5,14 +5,14 @@ import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { safeDivide } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
-import { GainPercent } from '@/components/gain-percent';
+import { GainPercent } from '@wealthfolio/ui';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
 import { useNavigate } from 'react-router-dom';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { AmountDisplay } from '@/components/amount-display';
-import { QuantityDisplay } from '@/components/quantity-display';
+import { AmountDisplay } from '@wealthfolio/ui';
+import { QuantityDisplay } from '@wealthfolio/ui';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 

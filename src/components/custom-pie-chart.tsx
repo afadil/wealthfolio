@@ -1,10 +1,10 @@
 import type React from 'react';
 import { PieChart, Pie, Cell, Sector } from 'recharts';
 import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
-import { AmountDisplay } from '@/components/amount-display';
+import { AmountDisplay } from '@wealthfolio/ui';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { formatPercent } from '@/lib/utils';
+import { formatPercent } from '@wealthfolio/ui';
 
 const COLORS = [
   'hsl(var(--chart-1))',

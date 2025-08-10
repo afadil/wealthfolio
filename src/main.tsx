@@ -4,13 +4,17 @@ import * as ReactDOMLegacy from "react-dom";
 import App from "./App";
 import "./styles.css";
 import "./addons/addons-runtime-context"; 
-import "./addons/addons-dev-mode"; // Initialize development mode
 import { loadAllAddons, debugAddonState } from "./addons/addons-loader";
 
+// Initialize development mode only in development
+if (import.meta.env.DEV) {
+  import("./addons/addons-dev-mode");
+}
+
 // Expose React and ReactDOM globally for addons
-// Include both modern ReactDOM (from react-dom/client) and legacy ReactDOM methods
+// ReactDOM/client only has createRoot/hydrateRoot, but addons need createPortal from react-dom
 (window as any).React = React;
-(window as any).ReactDOM = { ...ReactDOM, ...ReactDOMLegacy };
+(window as any).ReactDOM = ReactDOMLegacy;
 
 // Make debug function available globally for debugging
 (globalThis as any).debugAddons = debugAddonState;

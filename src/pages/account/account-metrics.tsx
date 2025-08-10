@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountValuation, PerformanceMetrics } from '@/lib/types';
-import { PrivacyAmount } from '@/components/privacy-amount';
+import { PrivacyAmount } from '@wealthfolio/ui';
 import { PerformanceGrid } from '@/pages/account/performance-grid';
 import { formatDate } from '@/lib/utils';
 import { MoneyInput } from '@/components/ui/money-input';

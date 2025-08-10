@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@/components/shell';
+import { ApplicationShell } from '@wealthfolio/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   PieChart,
@@ -19,12 +19,12 @@ import type { IncomeSummary } from '@/lib/types';
 import { QueryKeys } from '@/lib/query-keys';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { GainPercent } from '@/components/gain-percent';
+import { GainPercent } from '@wealthfolio/ui';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Badge } from '@/components/ui/badge';
-import { PrivacyAmount } from '@/components/privacy-amount';
+import { PrivacyAmount } from '@wealthfolio/ui';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { AmountDisplay } from '@/components/amount-display';
+import { AmountDisplay } from '@wealthfolio/ui';
 import { IncomeHistoryChart } from './income-history-chart';
 
 const periods: { code: 'TOTAL' | 'YTD' | 'LAST_YEAR'; label: string }[] = [

@@ -1,6 +1,7 @@
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Holding } from '@/lib/types';
-import { cn, formatPercent, formatAmount } from '@/lib/utils';
+import { formatPercent, formatAmount } from '@wealthfolio/ui';
+import { cn } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';

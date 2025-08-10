@@ -1,7 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import { logger } from '@/adapters';
+import { Button } from '../ui/button';
+import { Icons } from '../ui/icons';
 
 interface Props {
   children: ReactNode;
@@ -23,7 +22,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logger.error(`Error Boundary Caught Error:
+    console.error(`Error Boundary Caught Error:
       Message: ${error.message}
       Stack: ${error.stack}
       Component Stack: ${errorInfo.componentStack}

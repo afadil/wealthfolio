@@ -1,4 +1,5 @@
 import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
+import { ReactVersion } from '@wealthfolio/addon-sdk';
 import { createAddonContext, getDynamicNavItems, getDynamicRoutes } from '@/addons/addons-runtime-context';
 import { logger } from '@/adapters';
 import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
@@ -53,7 +54,7 @@ function validateAddonCompatibility(manifest: AddonManifest): boolean {
 /**
  * Loads a single addon using Tauri commands
  */
-async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<boolean> {
+async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<boolean> {
   let blobUrl: string | null = null;
   try {
     // Check if this addon ID has already been loaded in the current session
@@ -90,24 +91,18 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
     
     logger.info(`Permissions for addon ${extractedAddon.metadata.id}: functions=[${detectedFunctions.join(',')}], categories=[${detectedCategories.join(',')}]`);
     
+    // Runtime guards: Verify React singletons are available before addon execution
+    if ((globalThis as any).React?.version && (globalThis as any).React.version !== ReactVersion) {
+      console.warn(`⚠️ React version mismatch: host=${(globalThis as any).React.version} sdk=${ReactVersion}`);
+    }
+
+    if (typeof (globalThis as any).ReactDOM?.createPortal !== 'function') {
+      throw new Error('Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.');
+    }
+
     // Create a Blob and an object URL
     const blob = new Blob([addonCode], { type: 'text/javascript' });
     blobUrl = URL.createObjectURL(blob);
-    
-    // Ensure React and ReactDOM are available globally before loading addon
-    if (typeof (globalThis as any).React === 'undefined') {
-      const React = await import('react');
-      (globalThis as any).React = React.default || React;
-      (window as any).React = React.default || React;
-    }
-    
-    if (typeof (globalThis as any).ReactDOM === 'undefined') {
-      const ReactDOM = await import('react-dom/client');
-      // Also import the legacy ReactDOM for createPortal
-      const ReactDOMLegacy = await import('react-dom');
-      (globalThis as any).ReactDOM = { ...ReactDOM, ...ReactDOMLegacy };
-      (window as any).ReactDOM = { ...ReactDOM, ...ReactDOMLegacy };
-    }
 
     // Dynamic import using the Blob URL
     // The /* @vite-ignore */ comment might not be strictly necessary for blob URLs 

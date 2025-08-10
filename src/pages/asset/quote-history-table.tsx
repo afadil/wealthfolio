@@ -24,7 +24,8 @@ import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/compone
 import { MoneyInput } from '@/components/ui/money-input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { formatAmount, formatQuantity } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatQuantity } from '@/lib/utils';
 import {
   useReactTable,
   getCoreRowModel,

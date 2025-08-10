@@ -3,7 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { type NavigationProps, SidebarNav } from './sidebar-nav';
 import { useSettings } from '@/hooks/use-settings';
-import { ErrorBoundary } from '@/components/error-boundary';
+import { ErrorBoundary } from '@wealthfolio/ui';
 import { getDynamicNavItems, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 import { useState, useEffect } from 'react';
 

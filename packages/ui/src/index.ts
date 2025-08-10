@@ -33,9 +33,20 @@ export * from './components/ui/command';
 export * from './components/ui/collapsible';
 export * from './components/ui/currency-input';
 export * from './components/ui/icons';
+export * from './components/ui/shell';
+export * from './components/ui/tailwind-indicator';
 
 // Export utilities
 export * from './lib/utils';
 
 // Export currencies data
 export * from './lib/currencies';
+
+// Export hooks
+export * from './hooks';
+
+// Export financial components
+export * from './components/financial';
+
+// Export common components
+export * from './components/common';

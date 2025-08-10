@@ -1,6 +1,5 @@
 import { logger } from '@/adapters';
 import { loadInstalledAddons, unloadAllAddons } from '@/addons/addons-core';
-import { addonDevManager } from './addons-dev-mode';
 
 /**
  * Loads all discovered addons with development mode support
@@ -11,6 +10,9 @@ export async function loadAllAddons(): Promise<void> {
     // Check if we're in development mode and have dev servers
     if (import.meta.env.DEV) {
       logger.info('🔧 Development mode detected, checking for dev servers...');
+      
+      // Dynamic import for development mode
+      const { addonDevManager } = await import('./addons-dev-mode');
       
       // Force discovery of dev servers
       await addonDevManager.enableDevMode();

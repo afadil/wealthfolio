@@ -4,7 +4,7 @@ import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipCont
 import { formatDate } from '@/lib/utils';
 import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { AmountDisplay } from './amount-display';
+import { AmountDisplay } from '@wealthfolio/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type CustomTooltipProps = TooltipProps<ValueType, NameType> & {

@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AmountDisplay } from '@/components/amount-display';
+import { AmountDisplay } from '@wealthfolio/ui';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { formatPercent } from '@/lib/utils';
+import { formatPercent } from '@wealthfolio/ui';
 import type { Holding } from '@/lib/types';
 
 // Using theme chart colors

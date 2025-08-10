@@ -72,6 +72,16 @@ export {
   isAddonManifest,
 } from './utils';
 
+// -----------------------------------------------------------------------------
+// Framework version contract
+// -----------------------------------------------------------------------------
+
+/**
+ * React version guaranteed by the host application. Addons may assert against
+ * this at runtime if they rely on a particular React feature set.
+ */
+export const ReactVersion = '18.3.1';
+
 /**
  * Addons receive their context as a parameter to the enable() function.
  * Each addon gets its own isolated context with scoped secret storage.
@@ -83,3 +93,6 @@ export {
  *   // Use ctx.router.add() to register routes
  * }
  */ 
+
+export const React = (window as any).React as typeof import('react');
+export const ReactDOM = (window as any).ReactDOM as typeof import('react-dom'); 

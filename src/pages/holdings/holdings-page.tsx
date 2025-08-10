@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@/components/shell';
+import { ApplicationShell } from '@wealthfolio/ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Sheet,
@@ -12,7 +12,7 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { AmountDisplay } from '@/components/amount-display';
+import { AmountDisplay } from '@wealthfolio/ui';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { ClassesChart } from './components/classes-chart';

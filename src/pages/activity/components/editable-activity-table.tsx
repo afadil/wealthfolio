@@ -54,7 +54,8 @@ import {
   NewActivityFormValues,
 } from './forms/schemas';
 import { ZodType, ZodTypeDef } from 'zod';
-import { formatDateTime, formatAmount, cn } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatDateTime, cn } from '@/lib/utils';
 
 import DatePickerInput from '@/components/ui/date-picker-input';
 import { SearchableSelect } from '@/components/searchable-select';
@@ -63,7 +64,7 @@ import { AccountSelector } from '@/components/account-selector';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { MoneyInput } from '@/components/ui/money-input';
 import { QuantityInput } from '@/components/ui/quantity-input';
-import { DeleteConfirm } from '@/components/delete-confirm';
+import { DeleteConfirm } from '@wealthfolio/ui';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';

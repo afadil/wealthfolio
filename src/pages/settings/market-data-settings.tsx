@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { getSecret } from '@/commands/secrets';
 import { QueryKeys } from '@/lib/query-keys';
 import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
-import { ActionConfirm } from '@/components/action-confirm';
+import { ActionConfirm } from '@wealthfolio/ui';
 
 const useApiKeyStatus = (providerId: string) => {
   const queryClient = useQueryClient();

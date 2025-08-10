@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GoalOperations } from './goal-operations';
 import type { Goal } from '@/lib/types';
 import { Icons } from '@/components/ui/icons';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
 
 export interface GoalItemProps {
   goal: Goal;

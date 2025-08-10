@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button, type ButtonProps } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Button, type ButtonProps } from '../ui/button';
+import { Icons } from '../ui/icons';
 
 interface ActionConfirmProps {
   confirmMessage: string | ReactNode;
@@ -83,4 +83,4 @@ export const ActionConfirm = ({
       </PopoverContent>
     </Popover>
   );
-}; 
+};

@@ -1,30 +1,15 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext } from 'react';
+import { useBalancePrivacy as useBalancePrivacyHook, type BalancePrivacyHook } from '@wealthfolio/ui';
 
-interface PrivacyContextType {
-  isBalanceHidden: boolean;
-  toggleBalanceVisibility: () => void;
-}
+type PrivacyContextType = BalancePrivacyHook;
 
 const PrivacyContext = createContext<PrivacyContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'privacy-settings';
-
 export function PrivacyProvider({ children }: { children: React.ReactNode }) {
-  const [isBalanceHidden, setIsBalanceHidden] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : false;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(isBalanceHidden));
-  }, [isBalanceHidden]);
-
-  function toggleBalanceVisibility() {
-    setIsBalanceHidden((prev: boolean) => !prev);
-  }
+  const balancePrivacy = useBalancePrivacyHook();
 
   return (
-    <PrivacyContext.Provider value={{ isBalanceHidden, toggleBalanceVisibility }}>
+    <PrivacyContext.Provider value={balancePrivacy}>
       {children}
     </PrivacyContext.Provider>
   );

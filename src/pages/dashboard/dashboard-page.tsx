@@ -1,5 +1,5 @@
-import { GainAmount } from '@/components/gain-amount';
-import { GainPercent } from '@/components/gain-percent';
+import { GainAmount } from '@wealthfolio/ui';
+import { GainPercent } from '@wealthfolio/ui';
 import { HistoryChart } from '@/components/history-chart';
 import IntervalSelector from '@/components/interval-selector';
 import Balance from './balance';

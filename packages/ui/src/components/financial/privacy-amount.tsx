@@ -1,6 +1,5 @@
-import { useBalancePrivacy } from '@/context/privacy-context';
-import { cn } from '@/lib/utils';
-import { formatAmount } from '@/lib/utils';
+import { cn, formatAmount } from '../../lib/utils';
+import { useBalancePrivacy } from '../../hooks/use-balance-privacy';
 
 interface PrivacyAmountProps extends React.HTMLAttributes<HTMLSpanElement> {
   value: number;

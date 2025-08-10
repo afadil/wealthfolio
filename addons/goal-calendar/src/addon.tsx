@@ -3,7 +3,8 @@ import { Icons } from '@wealthfolio/ui';
 import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InvestmentCalendar, GoalSelector, HelpPopover } from './components';
-import { useGoals, useInvestmentMetrics } from './hooks';
+import { useGoalProgress } from './hooks';
+import { useBalancePrivacy } from '@wealthfolio/ui';
 
 // Create a query client instance
 const queryClient = new QueryClient({
@@ -23,28 +24,23 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   const [stepSize, setStepSize] = useState(10000);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   
-  // Load goals using React Query
-  const { data: goals = [], isLoading: isLoadingGoals, error: goalsError } = useGoals({ ctx });
+  // Load goals and their progress using proper allocation calculation
+  const { goals, goalsProgress, isLoading, error } = useGoalProgress({ ctx });
   
-  // Use the PORTFOLIO_ACCOUNT_ID constant
-  const PORTFOLIO_ACCOUNT_ID = 'TOTAL';
-  
-  // Get investment metrics using React Query
-  const {
-    currentAmount,
-    progressPercent,
-    totalSteps,
-    completedSteps,
-    remainingAmount,
-    isTargetReached,
-    isLoading,
-    error
-  } = useInvestmentMetrics({
-    accountId: PORTFOLIO_ACCOUNT_ID,
-    ctx,
-    targetAmount,
-    stepSize
-  });
+  // Get balance privacy state
+  const { isBalanceHidden } = useBalancePrivacy();
+
+  // Calculate metrics for the selected goal
+  const selectedGoalProgress = selectedGoal 
+    ? goalsProgress?.find(progress => progress.name === selectedGoal.title)
+    : null;
+
+  const currentAmount = selectedGoalProgress?.currentValue || 0;
+  const progressPercent = selectedGoalProgress?.progress ? selectedGoalProgress.progress * 100 : 0;
+  const totalSteps = Math.ceil(targetAmount / stepSize);
+  const completedSteps = Math.floor(currentAmount / stepSize);
+  const remainingAmount = Math.max(0, targetAmount - currentAmount);
+  const isTargetReached = currentAmount >= targetAmount;
 
   // Update target amount when a goal is selected
   useEffect(() => {
@@ -55,12 +51,12 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
 
   // Set first goal as default when goals are loaded
   useEffect(() => {
-    if (goals.length > 0 && !selectedGoal) {
+    if (goals && goals.length > 0 && !selectedGoal) {
       setSelectedGoal(goals[0]);
     }
   }, [goals, selectedGoal]);
   
-  if (isLoading || isLoadingGoals) {
+  if (isLoading) {
     return (
       <div className="p-6 min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -73,7 +69,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
     );
   }
 
-  if (error || goalsError) {
+  if (error) {
     return (
       <div className="p-6 min-h-screen flex items-center justify-center bg-background">
         <div className="p-6 text-center bg-red-50 dark:bg-red-950 text-destructive rounded-xl border border-red-200 dark:border-red-800 max-w-md">
@@ -81,7 +77,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
             Error Loading Data
           </h3>
           <p className="text-sm">
-            {error?.message || goalsError?.message}
+            {error?.message}
           </p>
         </div>
       </div>
@@ -133,6 +129,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
             selectedGoal={selectedGoal}
             onTargetAmountChange={setTargetAmount}
             onStepSizeChange={setStepSize}
+            isBalanceHidden={isBalanceHidden}
           />
         </div>
       </div>

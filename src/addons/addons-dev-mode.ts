@@ -192,19 +192,9 @@ class AddonDevManager {
     addonId: string
   ): Promise<void> {
     try {
-      // Ensure React and ReactDOM are available globally before loading addon
-      if (typeof (globalThis as any).React === 'undefined') {
-        const React = await import('react');
-        (globalThis as any).React = React.default || React;
-        (window as any).React = React.default || React;
-      }
-      
-      if (typeof (globalThis as any).ReactDOM === 'undefined') {
-        const ReactDOM = await import('react-dom/client');
-        // Also import the legacy ReactDOM for createPortal
-        const ReactDOMLegacy = await import('react-dom');
-        (globalThis as any).ReactDOM = { ...ReactDOM, ...ReactDOMLegacy };
-        (window as any).ReactDOM = { ...ReactDOM, ...ReactDOMLegacy };
+      // Runtime guard: Verify React singletons are available
+      if (typeof (globalThis as any).ReactDOM?.createPortal !== 'function') {
+        throw new Error('Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.');
       }
 
       // Create a blob URL for the addon code

@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { EmptyPlaceholder } from '@/components/empty-placeholder';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DeleteConfirm } from '@/components/delete-confirm';
+import { DeleteConfirm } from '@wealthfolio/ui';
 import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
 import { AddonUpdateCard } from '@/pages/settings/addons/components/addon-update-card';
 import { useAddonActions } from './hooks/use-addon-actions';

@@ -234,14 +234,6 @@ export function formatPercent(value: number | null | undefined) {
     return `${value}%`; // Keep original fallback but it might still be incorrect
   }
 }
-export function formatStockQuantity(quantity: string | number) {
-  const numQuantity = parseFloat(String(quantity));
-  if (Number.isInteger(numQuantity)) {
-    return numQuantity.toString();
-  } else {
-    return numQuantity.toFixed(6);
-  }
-}
 
 export function toPascalCase(input: string) {
   return input

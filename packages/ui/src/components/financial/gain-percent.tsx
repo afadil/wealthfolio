@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { cn, formatPercent } from '@/lib/utils';
+import { cn, formatPercent } from '../../lib/utils';
 
 type GainPercentVariant = 'text' | 'badge';
 

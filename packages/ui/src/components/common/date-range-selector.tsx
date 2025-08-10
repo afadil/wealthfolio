@@ -1,11 +1,16 @@
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import { startOfYear, subDays, subMonths, subYears, isSameDay } from 'date-fns';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
-import { DateRange as CustomDateRange } from '@/lib/types';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Icons } from '@/components/ui/icons';
-import { cn } from '@/lib/utils';
+import { Calendar } from '../ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Icons } from '../ui/icons';
+import { cn } from '../../lib/utils';
+
+// Define a generic DateRange type for this component
+export interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
 
 const ranges = [
   {
@@ -56,8 +61,8 @@ const ranges = [
 ];
 
 interface DateRangeSelectorProps {
-  value: CustomDateRange | undefined;
-  onChange: (range: CustomDateRange | undefined) => void;
+  value: DateRange | undefined;
+  onChange: (range: DateRange | undefined) => void;
 }
 
 export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
@@ -119,7 +124,7 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
             defaultMonth={value?.from}
             selected={value as DayPickerDateRange | undefined}
             onSelect={(selectedRange: DayPickerDateRange | undefined) => {
-              onChange(selectedRange as CustomDateRange | undefined);
+              onChange(selectedRange as DateRange | undefined);
             }}
             numberOfMonths={3}
           />

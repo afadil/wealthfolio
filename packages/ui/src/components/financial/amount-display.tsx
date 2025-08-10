@@ -1,5 +1,4 @@
-import { cn } from '@/lib/utils';
-import { formatAmount } from '@/lib/utils';
+import { cn, formatAmount } from '../../lib/utils';
 
 interface AmountDisplayProps {
   value: number;

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@/components/shell';
+import { ApplicationShell } from '@wealthfolio/ui';
 import { Badge } from '@/components/ui/badge';
 import { useLocation, useParams } from 'react-router-dom';
 import AssetHistoryCard from './asset-history-card';

@@ -3,6 +3,14 @@ import { useState } from 'react';
 import { EditableValue } from './editable-value';
 import { type Goal } from '@wealthfolio/addon-sdk';
 
+// Helper function to format currency with privacy support
+function formatCurrency(amount: number, isHidden: boolean = false): string {
+  if (isHidden) {
+    return '••••';
+  }
+  return `$${amount.toLocaleString()}`;
+}
+
 // Calendar dot component - lightweight without individual tooltips
 function CalendarDot({ 
   filled, 
@@ -72,10 +80,12 @@ interface TooltipData extends DotData {
 
 function Tooltip({ 
   data, 
-  isVisible 
+  isVisible,
+  isBalanceHidden = false
 }: { 
   data: TooltipData | null; 
-  isVisible: boolean; 
+  isVisible: boolean;
+  isBalanceHidden?: boolean;
 }) {
   if (!isVisible || !data) return null;
 
@@ -98,7 +108,7 @@ function Tooltip({
           <div className="space-y-1">
             <h4 className="font-medium leading-none">Step {data.stepIndex + 1}</h4>
             <p className="text-muted-foreground">
-              Target: ${data.stepAmount.toLocaleString()}
+              Target: {formatCurrency(data.stepAmount, isBalanceHidden)}
             </p>
           </div>
           <div className="space-y-2">
@@ -110,7 +120,7 @@ function Tooltip({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Step Size:</span>
-              <span className="font-medium text-xs">${data.stepSize.toLocaleString()}</span>
+              <span className="font-medium text-xs">{formatCurrency(data.stepSize, isBalanceHidden)}</span>
             </div>
           </div>
         </div>
@@ -133,7 +143,8 @@ function InvestmentCalendar({
   isTargetReached,
   selectedGoal,
   onTargetAmountChange,
-  onStepSizeChange
+  onStepSizeChange,
+  isBalanceHidden = false
 }: { 
   currentAmount: number; 
   targetAmount: number; 
@@ -146,6 +157,7 @@ function InvestmentCalendar({
   selectedGoal: Goal | null;
   onTargetAmountChange: (value: number) => void;
   onStepSizeChange: (value: number) => void;
+  isBalanceHidden?: boolean;
 }) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -240,7 +252,7 @@ function InvestmentCalendar({
                 <div className="text-center">
                   <h4 className="mb-1 text-xs text-muted-foreground font-light">Current Amount</h4>
                     <p className="text-xs text-foreground">
-                    ${currentAmount.toLocaleString()}
+                    {formatCurrency(currentAmount, isBalanceHidden)}
                   </p>
                 </div>
 
@@ -248,7 +260,7 @@ function InvestmentCalendar({
                   <h4 className="mb-1 text-xs text-muted-foreground font-light">Target Amount</h4>
                   {selectedGoal ? (
                     <p className="text-xs text-foreground">
-                      ${targetAmount.toLocaleString()}
+                      {formatCurrency(targetAmount, isBalanceHidden)}
                     </p>
                   ) : (
                     <EditableValue
@@ -285,7 +297,7 @@ function InvestmentCalendar({
       </Card>
 
       {/* Shared tooltip */}
-      <Tooltip data={tooltipData} isVisible={showTooltip} />
+      <Tooltip data={tooltipData} isVisible={showTooltip} isBalanceHidden={isBalanceHidden} />
     </>
   );
 }

@@ -1,7 +1,7 @@
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Icons } from '@/components/ui/icons';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Icons } from '../ui/icons';
 
-interface ApplicationShellProps extends React.HTMLAttributes<HTMLDivElement> {
+interface AlertFeedbackProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
   variant?: 'success' | 'error' | 'warning';
 }
@@ -12,7 +12,7 @@ export function AlertFeedback({
   variant,
   className,
   ...props
-}: ApplicationShellProps) {
+}: AlertFeedbackProps) {
   let alertIcon;
 
   switch (variant) {

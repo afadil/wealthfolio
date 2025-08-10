@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 
 import { debounce } from 'lodash';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatDateTime, formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Account, ActivityDetails, ActivitySearchResponse } from '@/lib/types';
 import { ActivityOperations } from './activity-operations';

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@/components/shell';
+import { ApplicationShell } from '@wealthfolio/ui';
 
-import { GainAmount } from '@/components/gain-amount';
-import { GainPercent } from '@/components/gain-percent';
+import { GainAmount } from '@wealthfolio/ui';
+import { GainPercent } from '@wealthfolio/ui';
 import { HistoryChart } from '@/components/history-chart';
 import IntervalSelector from '@/components/interval-selector';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import AccountHoldings from './account-holdings';
 import { AccountValuation, DateRange, TrackedItem, TimePeriod } from '@/lib/types';
 import { useAccounts } from '@/hooks/use-accounts';
 import { AccountContributionLimit } from './account-contribution-limit';
-import { PrivacyAmount } from '@/components/privacy-amount';
+import { PrivacyAmount } from '@wealthfolio/ui';
 import { PrivacyToggle } from '@/components/privacy-toggle';
 import { useValuationHistory } from '@/hooks/use-valuation-history';
 import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';

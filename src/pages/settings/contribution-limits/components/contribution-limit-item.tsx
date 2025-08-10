@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContributionLimitOperations } from './contribution-limit-operations';
 import { Icons } from '@/components/ui/icons';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
 import { AccountSelection } from './account-selection';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';

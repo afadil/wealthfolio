@@ -18,7 +18,7 @@ import {
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Icons } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];

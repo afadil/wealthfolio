@@ -1,6 +1,7 @@
 import { TimePeriod } from '@/lib/types';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
-import { formatAmount, formatDate } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatDate } from '@/lib/utils';
 
 type CustomTooltipProps = {
   active: boolean;

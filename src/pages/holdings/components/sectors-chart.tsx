@@ -1,7 +1,7 @@
 import { Holding, Sector } from '@/lib/types';
 import { useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { PrivacyAmount } from '@/components/privacy-amount';
+import { PrivacyAmount } from '@wealthfolio/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Icons } from '@/components/ui/icons';
@@ -11,7 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatPercent } from '@/lib/utils';
+import { formatPercent } from '@wealthfolio/ui';
 
 function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
