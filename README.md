@@ -47,12 +47,57 @@ Subscriptions, No Cloud.
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
 ![Screenshot](public/screenshot.png)
-Documentation for all Activity types, including the required form fields, is available in [docs/activity-types.md](docs/activity-types.md).
+
+### ✨ Key Features
+
+- **📊 Portfolio Tracking** - Track your investments across multiple accounts and asset types
+- **📈 Performance Analytics** - Detailed performance metrics and historical analysis
+- **💰 Activity Management** - Import and manage all your trading activities
+- **🎯 Goal Planning** - Set and track financial goals with allocation management
+- **🔒 Local Data** - All data stored locally with no cloud dependencies
+- **🧩 Extensible** - Powerful addon system for custom functionality
+- **🌍 Multi-Currency** - Support for multiple currencies with exchange rate management
+- **📱 Cross-Platform** - Available on Windows, macOS, and Linux
+
+### 🧩 Addon System
+
+Wealthfolio features a powerful addon system that allows developers to extend functionality:
+
+- **🔌 Easy Development** - TypeScript SDK with full type safety and hot reload
+- **🔒 Secure** - Comprehensive permission system with user consent
+- **⚡ High Performance** - Optimized for speed with minimal overhead  
+- **🎨 UI Integration** - Add custom pages, navigation items, and components
+- **📡 Real-time Events** - Listen to portfolio updates, market sync, and user actions
+- **🗄️ Full Data Access** - Access to accounts, holdings, activities, and market data
+- **🔐 Secrets Management** - Secure storage for API keys and sensitive data
+
+**Get started building addons:** [Addon Developer Guide](docs/addons/addon-developer-guide.md)
+
+Documentation for all Activity types, including the required form fields, is available in [docs/activities/activity-types.md](docs/activities/activity-types.md).
 
 
 ## Roadmap
 
 See [ROADMAP.md](./ROADMAP.md).
+
+## 📖 Documentation
+
+### Core Application
+- **[Activity Types](docs/activities/activity-types.md)** - Complete guide to all supported activity types and their required fields
+- **[Roadmap](ROADMAP.md)** - Future plans and development roadmap
+
+### Addon Development
+- **[Addon Documentation Hub](docs/addons/index.md)** - Main entry point for addon development
+- **[Developer Guide](docs/addons/addon-developer-guide.md)** - Comprehensive guide from setup to advanced patterns
+- **[API Reference](docs/addons/addon-api-reference.md)** - Complete API documentation with examples
+- **[Permission System](docs/addons/addon-permissions.md)** - Security and permission system guide
+- **[Examples & Tutorials](docs/addons/addon-examples.md)** - Practical examples and step-by-step tutorials
+
+### Quick Links
+- 🚀 **[Get Started with Addons](docs/addons/addon-developer-guide.md#quick-start)**
+- 🔒 **[Security Best Practices](docs/addons/addon-permissions.md#security-best-practices)**
+- 💡 **[Example Addons](addons/)** - Browse sample addons in the repository
+- 🛠️ **[Development Tools](packages/addon-dev-tools/)** - CLI tools for addon development
 
 ## Getting Started
 
@@ -141,6 +186,52 @@ For a consistent development environment across all platforms, you can use the p
    - Once the container is ready, you can start development
    - All necessary tools and dependencies will be available
 
+## Addon Development
+
+Wealthfolio supports a powerful addon ecosystem that allows developers to extend functionality with custom features.
+
+### Quick Start with Addons
+
+1. **Create a new addon**:
+   ```bash
+   npx @wealthfolio/addon-dev-tools create my-addon
+   cd my-addon
+   npm install
+   ```
+
+2. **Start development server**:
+   ```bash
+   npm run dev:server
+   ```
+
+3. **Start Wealthfolio in development mode** (in another terminal):
+   ```bash
+   pnpm tauri dev
+   ```
+
+Your addon will be automatically discovered and loaded with hot reload support!
+
+### Addon Features
+
+- **🎨 UI Integration**: Add custom pages and navigation items
+- **📊 Data Access**: Full access to portfolio, accounts, and market data
+- **📡 Real-time Events**: React to portfolio updates and user actions
+- **🔐 Secure Storage**: Store API keys and sensitive data securely
+- **⚡ Hot Reload**: Seamless development experience
+- **🔒 Permission System**: Transparent security with user consent
+
+### Example Addons
+
+Check out the [addons/](addons/) directory for sample addons including:
+- **Goal Calendar**: Visual goal tracking with calendar interface
+- More examples in the [documentation](docs/addons/addon-examples.md)
+
+### Resources
+
+- **[Complete Developer Guide](docs/addons/addon-developer-guide.md)** - Everything you need to know
+- **[API Reference](docs/addons/addon-api-reference.md)** - Full API documentation
+- **[Permission System](docs/addons/addon-permissions.md)** - Security and permissions guide
+- **[Examples & Tutorials](docs/addons/addon-examples.md)** - Step-by-step tutorials
 
 ## Technologies Used
 
@@ -157,6 +248,15 @@ For a consistent development environment across all platforms, you can use the p
 ### Backend
 
 - **Tauri**: Framework for building tiny, secure, and fast desktop applications.
+- **Rust**: Systems programming language for core backend functionality.
+- **SQLite**: Embedded database for local data storage.
+- **Diesel**: Safe, extensible ORM and query builder for Rust.
+
+### Addon System
+
+- **@wealthfolio/addon-sdk**: TypeScript SDK for addon development with full type safety.
+- **@wealthfolio/addon-dev-tools**: CLI tools and development server for hot reload.
+- **@wealthfolio/ui**: Shared UI component library for consistent styling.
 
 ### Development Tools
 
@@ -164,15 +264,32 @@ For a consistent development environment across all platforms, you can use the p
 - **TypeScript**: Typed superset of JavaScript.
 - **ESLint**: Pluggable linting utility for JavaScript and JSX.
 - **Prettier**: Code formatter.
+- **pnpm**: Fast, disk space efficient package manager.
+- **Turborepo**: High-performance build system for JavaScript and TypeScript codebases.
 
 ## Folder Structure
 
 ```
 wealthfolio/
 ├── src/                 # Main source code for the React application
-├── src-core/            # Core backend functionality
+│   ├── addons/          # Addon system core functionality
+│   ├── components/      # React components
+│   ├── pages/           # Application pages and routes
+│   ├── hooks/           # Custom React hooks
+│   └── lib/             # Utility libraries and helpers
+├── src-core/            # Core backend functionality (Rust)
 ├── src-tauri/           # Tauri-specific code for desktop app functionality
+├── addons/              # Example and sample addons
+│   └── goal-calendar/   # Goal calendar addon example
+├── packages/            # Shared packages and tools
+│   ├── addon-sdk/       # Addon SDK for developers
+│   ├── addon-dev-tools/ # Development tools and CLI
+│   └── ui/              # Shared UI components library
+├── docs/                # Documentation
+│   ├── addons/          # Addon development documentation
+│   └── activities/      # Activity types documentation
 ├── public/              # Public assets
+├── db/                  # Database files and migrations
 ├── LICENSE              # License file
 ├── README.md            # Project documentation
 ├── ROADMAP.md           # Future plans and roadmap
@@ -185,11 +302,27 @@ wealthfolio/
 └── vite.config.ts       # Vite build tool configuration
 ```
 
-### API Keys
+### Security & Data Storage
 
-API credentials are stored using the operating system keyring through the
-`keyring` crate. Use the `set_secret` and `get_secret` commands to manage
-keys for external services without writing them to disk.
+#### Local Data Storage
+All your financial data is stored locally using SQLite database with no cloud dependencies:
+- Portfolio holdings and performance data
+- Trading activities and transaction history
+- Account information and settings
+- Goals and contribution limits
+
+#### API Keys & Secrets
+API credentials are securely stored using the operating system keyring through the `keyring` crate:
+- **Core App**: Use `set_secret` and `get_secret` commands for external services
+- **Addons**: Use the Secrets API (`ctx.api.secrets`) for addon-specific sensitive data
+- **No Disk Storage**: Keys never written to disk or configuration files
+
+#### Permission System
+Addons operate under a comprehensive permission system:
+- Automatic code analysis during installation
+- User consent required for data access
+- Risk-based security warnings
+- Transparent permission declarations
 
 ## Contributing
 

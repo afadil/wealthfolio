@@ -31,6 +31,25 @@ export interface AddonContext {
 }
 ```
 
+### Permission Requirements
+
+All API functions require appropriate permissions declared in your addon's `manifest.json`. The system automatically analyzes your code during installation to verify permission usage.
+
+**Example manifest permissions:**
+```json
+{
+  "permissions": {
+    "accounts": ["read"],
+    "portfolio": ["read"],
+    "activities": ["read", "write"],
+    "market": ["read"],
+    "secrets": ["read", "write"]
+  }
+}
+```
+
+See the [Addon Permissions Guide](addon-permissions.md) for detailed permission information.
+
 ---
 
 ## UI Integration APIs
@@ -1163,6 +1182,7 @@ interface PermissionError extends APIError {
   details: {
     permission: string;
     resource: string;
+    requiredLevel: 'read' | 'write' | 'admin';
   };
 }
 ```
@@ -1178,7 +1198,8 @@ export default function enable(ctx: AddonContext) {
     } catch (error) {
       if (error.code === 'PERMISSION_DENIED') {
         console.error('Missing permission:', error.details);
-        // Handle permission error
+        // Show user-friendly message about missing permissions
+        showPermissionError(error.details.permission, error.details.requiredLevel);
       } else if (error.code === 'VALIDATION_ERROR') {
         console.error('Validation failed:', error.details);
         // Handle validation error
@@ -1188,6 +1209,11 @@ export default function enable(ctx: AddonContext) {
       }
       return [];
     }
+  }
+  
+  function showPermissionError(permission: string, level: string) {
+    // Guide user to check manifest.json
+    console.warn(`Add "${permission}": ["${level}"] to your manifest.json permissions`);
   }
 }
 ```

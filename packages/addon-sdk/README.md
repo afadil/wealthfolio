@@ -71,7 +71,7 @@ Create a `manifest.json` file in your addon root:
   "permissions": [
     {
       "category": "portfolio",
-      "functions": ["holdings", "getHolding"],
+      "functions": ["getHoldings"],
       "purpose": "Display portfolio analytics and performance metrics"
     }
   ],

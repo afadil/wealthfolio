@@ -33,24 +33,29 @@ track their investments and goals.
 
 ### Step 2: More Features (Next 3-6 months)
 
-- [ ] Let you export your data (CSV, sqlite file, json)
-- [ ] Support another market data API (Bring your own API keys) (example
-      https://www.alphavantage.co)
-- [ ] Support Stock Splitting
-- [ ] Let you track more things like houses, gold, and cars
-- [ ] Enhance portfolio History calculation
-- [ ] Build install packages for the remaining platforms
+- [x] Let you export your data (CSV, sqlite file, json)
+- [x] Support another market data API (Bring your own API keys) (example https://www.alphavantage.co)
+- [x] Support Stock Splitting
+- [x] Enhance portfolio History calculation
+- [x] Build install packages for the remaining platforms
+- [x] Advanced CSV import
+
+### Step 3: Smart Tools (3-6 months)
+
+- [ ] Add Addons system to extend the app with custom features
+- [ ] Add AI Chat addon with local first LLM(Ollama, LmStudio, etc) or Bring your own API keys (OpenAI, Anthropic, etc)
+- [ ] Let you track liabilities and debts
+- [ ] Let you track more assets like houses, gold, and cars
 
 ### Step 3: Smart Tools (6-12 months)
-
-- [ ] Advanced CSV import
 - [ ] Some portfolio analysis and insights
 - [ ] Add Monte-Carlo projection
-- [ ] Support another market data API
+- [ ] Add Retirement Planner
 
 ### Step 4: Growing (12-18 months)
 
 - [ ] Make a mobile app that works with your phone securely
+- [ ] Add a web app version that can be deployed on your own server (self-hosted)
 - [ ] Connect with some brokers/ plateform to fetch and update activities automatically
 
 ### Step 5: Building a Community (18+ months)

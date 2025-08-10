@@ -233,6 +233,10 @@ interface AddonContext {
 
 ### Permissions System
 
+Wealthfolio uses an advanced permission system that automatically analyzes your addon's code and compares it with declared permissions for transparent security.
+
+#### Permission Declaration
+
 Define required permissions in your `manifest.json`:
 
 ```json
@@ -246,9 +250,44 @@ Define required permissions in your `manifest.json`:
     "activities": ["read", "write"],
     "market": ["read"],
     "files": ["read"]
-  }
+  },
+  "dataAccess": [
+    {
+      "category": "portfolio",
+      "functions": ["getHoldings"],
+      "purpose": "Display portfolio analytics dashboard"
+    },
+    {
+      "category": "market-data",
+      "functions": ["searchTicker", "sync"],
+      "purpose": "Show price charts and ticker search"
+    }
+  ]
 }
 ```
+
+#### How Permission Analysis Works
+
+1. **Installation Time**: System analyzes your addon's source code
+2. **Function Detection**: Identifies all API function calls automatically
+3. **Risk Assessment**: Categorizes permissions by risk level (Low/Medium/High)
+4. **User Review**: Users see exactly what permissions your addon needs before installation
+5. **Performance**: Analysis cached for ultra-fast runtime performance
+
+#### Permission Categories & Risk Levels
+
+- **🏦 Account Management (High Risk)**: Account creation, modification, deletion
+- **📊 Portfolio Data (Medium Risk)**: Holdings, valuations, performance metrics  
+- **📝 Transaction History (High Risk)**: Trading activities, imports, modifications
+- **📈 Market Data (Low Risk)**: Quotes, prices, financial data
+- **🎯 Financial Planning (Medium Risk)**: Goals, contribution limits
+- **💱 Currency (Low Risk)**: Exchange rates and conversion
+- **⚙️ Application Settings (High Risk)**: App configuration, backups
+- **📂 File Operations (Medium Risk)**: File dialogs, system operations
+- **🎧 Event Listeners (Low Risk)**: Application events, notifications
+- **🎨 User Interface (Low Risk)**: Navigation, UI components
+
+For detailed information, see the [Addon Permissions Guide](addon-permissions.md).
 
 ---
 
@@ -939,7 +978,52 @@ export default function enable(ctx: AddonContext) {
 }
 ```
 
-### 5. Async/Await Best Practices
+### 5. Security & Permissions
+
+Follow security best practices for user trust:
+
+```typescript
+export default function enable(ctx: AddonContext) {
+  // ✅ Use Secrets API for sensitive data
+  async function setupApiKey() {
+    const apiKey = await ctx.api.secrets.get('market-api-key');
+    if (!apiKey) {
+      // Prompt user for API key and store securely
+      const userKey = await promptForApiKey();
+      await ctx.api.secrets.set('market-api-key', userKey);
+    }
+  }
+
+  // ✅ Handle permission errors gracefully
+  async function loadAccountData() {
+    try {
+      return await ctx.api.accounts.getAll();
+    } catch (error) {
+      if (error.code === 'PERMISSION_DENIED') {
+        console.error('Missing accounts permission - check manifest.json');
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  // ✅ Validate inputs before API calls
+  async function createActivity(data: any) {
+    if (!data.accountId || !data.activityType) {
+      throw new Error('Missing required activity data');
+    }
+    return await ctx.api.activities.create(data);
+  }
+}
+```
+
+**Permission Checklist:**
+- ✅ Declare only permissions you actually use
+- ✅ Provide clear purpose descriptions in manifest
+- ✅ Test permission dialog before distribution
+- ✅ Handle permission errors gracefully
+
+### 6. Async/Await Best Practices
 
 Handle async operations properly:
 

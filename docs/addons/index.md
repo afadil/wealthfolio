@@ -15,6 +15,7 @@ Welcome to the comprehensive documentation for developing Wealthfolio addons! Th
 ### Development Guides
 - **[Addon Developer Guide](addon-developer-guide.md)** - Main comprehensive guide
 - **[API Reference](addon-api-reference.md)** - Complete API documentation
+- **[Addon Permissions](addon-permissions.md)** - Security and permission system guide
 - **[Examples & Tutorials](addon-examples.md)** - Practical examples
 
 ## 🎯 Quick Navigation
@@ -149,7 +150,7 @@ my-addon/
 4. Build the [Account Summary Widget](addon-examples.md#example-2-account-summary-widget)
 
 ### Intermediate
-1. Learn about the [API structure](SUBDOMAIN_API_STRUCTURE.md)
+1. Learn about [Addon Permissions](addon-permissions.md) for secure development
 2. Explore [Activity Types](activity-types.md) for trading operations
 3. Build a [Portfolio Pie Chart](addon-examples.md#example-3-portfolio-pie-chart)
 4. Create an [Activity Importer](addon-examples.md#example-4-csv-activity-importer)
@@ -181,11 +182,13 @@ my-addon/
 - ✅ Clean up resources in disable function
 - ✅ Follow React best practices
 
-### Security
-- ✅ Use Secrets API for sensitive data
-- ✅ Declare required permissions in manifest
-- ✅ Validate user inputs
-- ✅ Handle API errors appropriately
+### Security & Permissions
+- ✅ Use Secrets API for sensitive data (API keys, tokens)
+- ✅ Declare only required permissions in manifest
+- ✅ Provide clear permission purposes for user trust
+- ✅ Handle permission errors gracefully
+- ✅ Validate user inputs before API calls
+- ✅ Review permission dialog before distribution
 
 ### Performance
 - ✅ Use React.memo for expensive components
