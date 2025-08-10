@@ -199,6 +199,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
       openCsvDialog: internalAPI.openCsvFileDialog,
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
+
     events: {
       import: {
         onDropHover: internalAPI.listenImportFileDropHover,

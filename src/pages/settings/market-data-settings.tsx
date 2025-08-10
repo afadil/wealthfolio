@@ -23,7 +23,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { getApiKey } from '@/commands/secrets';
+import { getSecret } from '@/commands/secrets';
 import { QueryKeys } from '@/lib/query-keys';
 import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
 import { ActionConfirm } from '@/components/action-confirm';
@@ -34,7 +34,7 @@ const useApiKeyStatus = (providerId: string) => {
 
   const { data: apiKey, isLoading } = useQuery({
     queryKey: QueryKeys.secrets.apiKey(providerId),
-    queryFn: () => getApiKey(providerId),
+    queryFn: () => getSecret(providerId),
     enabled: needsApiKey,
     staleTime: Infinity,
   });

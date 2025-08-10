@@ -92,10 +92,3 @@ export interface AddonContext {
  * Addon enable function signature
  */
 export type AddonEnableFunction = (context: AddonContext) => void | { disable?: () => void };
-
-/**
- * Global context declaration for addons
- */
-declare global {
-  var __WF_CTX__: AddonContext;
-}

@@ -188,7 +188,7 @@ wealthfolio/
 ### API Keys
 
 API credentials are stored using the operating system keyring through the
-`keyring` crate. Use the `set_api_key` and `get_api_key` commands to manage
+`keyring` crate. Use the `set_secret` and `get_secret` commands to manage
 keys for external services without writing them to disk.
 
 ## Contributing

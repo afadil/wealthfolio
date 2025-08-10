@@ -87,6 +87,11 @@ import {
   getAccountImportMapping,
   saveAccountImportMapping,
 } from '@/commands/activity-import';
+import {
+  setSecret,
+  getSecret,
+  deleteSecret,
+} from '@/commands/secrets';
 
 // Store for dynamically added navigation items
 const dynamicNavItems = new Map<string, any>();
@@ -142,138 +147,170 @@ export function triggerAllDisableCallbacks() {
   notifyNavigationUpdate();
 }
 
-export const realCtx: AddonContext = {
-  sidebar: {
-    addItem: (cfg: {
-      id: string;
-      label: string;
-      icon?: React.ReactNode;
-      route?: string;
-      order?: number;
-      onClick?: () => void;
-    }): SidebarItemHandle => {
-      // Create navigation item
-      const navItem = {
-        icon: cfg.icon || '<Icons.Circle className="h-5 w-5" />',
-        title: cfg.label,
-        href: cfg.route || '#',
-        onClick: cfg.onClick,
-        order: cfg.order || 999,
-        id: cfg.id,
-      };
-
-      // Store the navigation item
-      dynamicNavItems.set(cfg.id, navItem);
-
-      // Notify listeners that navigation has changed
-      notifyNavigationUpdate();
-
-      return {
-        remove: () => {
-          dynamicNavItems.delete(cfg.id);
-          notifyNavigationUpdate();
-        },
-      };
+// Create addon-scoped secret functions
+function createAddonScopedSecrets(addonId: string) {
+  const addonPrefix = `addon_${addonId}_`;
+  
+  return {
+    set: async (key: string, value: string): Promise<void> => {
+      const scopedKey = `${addonPrefix}${key}`;
+      return setSecret(scopedKey, value);
     },
-  },
-  router: {
-    add: (r: {
-      path: string;
-      component: React.LazyExoticComponent<React.ComponentType<any>>;
-    }): void => {
-      // Store the route component
-      dynamicRoutes.set(r.path, r.component);
-
-      // Notify listeners that routes have changed
-      notifyNavigationUpdate();
+    get: async (key: string): Promise<string | null> => {
+      const scopedKey = `${addonPrefix}${key}`;
+      return getSecret(scopedKey);
     },
-  },
-  onDisable: (cb: () => void): void => {
-    disableCallbacks.add(cb);
-  },
-  api: createSDKHostAPIBridge({
-    // Core data access
-    getHoldings: getHoldings,
-    getActivities: getActivities,
-    getAccounts: getAccounts,
+    delete: async (key: string): Promise<void> => {
+      const scopedKey = `${addonPrefix}${key}`;
+      return deleteSecret(scopedKey);
+    },
+  };
+}
 
-    // Exchange rates
-    getExchangeRates,
-    updateExchangeRate,
-    addExchangeRate,
+// Create context factory function for addon-specific contexts
+export function createAddonContext(addonId: string): AddonContext {
+  return {
+    sidebar: {
+      addItem: (cfg: {
+        id: string;
+        label: string;
+        icon?: React.ReactNode;
+        route?: string;
+        order?: number;
+        onClick?: () => void;
+      }): SidebarItemHandle => {
+        // Create navigation item
+        const navItem = {
+          icon: cfg.icon || '<Icons.Circle className="h-5 w-5" />',
+          title: cfg.label,
+          href: cfg.route || '#',
+          onClick: cfg.onClick,
+          order: cfg.order || 999,
+          id: cfg.id,
+        };
 
-    // Contribution limits
-    getContributionLimit,
-    createContributionLimit,
-    updateContributionLimit,
-    calculateDepositsForLimit,
+        // Store the navigation item
+        dynamicNavItems.set(cfg.id, navItem);
 
-    // Goals
-    getGoals,
-    createGoal,
-    updateGoal,
-    updateGoalsAllocations,
-    getGoalsAllocation,
+        // Notify listeners that navigation has changed
+        notifyNavigationUpdate();
 
-    // Market data
-    searchTicker,
-    syncHistoryQuotes,
-    getAssetProfile,
-    updateAssetProfile,
-    updateAssetDataSource,
-    updateQuote,
-    syncMarketData,
-    getQuoteHistory,
-    getMarketDataProviders,
+        return {
+          remove: () => {
+            dynamicNavItems.delete(cfg.id);
+            notifyNavigationUpdate();
+          },
+        };
+      },
+    },
+    router: {
+      add: (r: {
+        path: string;
+        component: React.LazyExoticComponent<React.ComponentType<any>>;
+      }): void => {
+        // Store the route component
+        dynamicRoutes.set(r.path, r.component);
 
-    // Portfolio
-    updatePortfolio,
-    recalculatePortfolio,
-    getIncomeSummary,
-    getHistoricalValuations,
-    getLatestValuations,
-    calculatePerformanceHistory,
-    calculatePerformanceSummary,
-    calculateAccountsSimplePerformance,
-    getHolding,
+        // Notify listeners that routes have changed
+        notifyNavigationUpdate();
+      },
+    },
+    onDisable: (cb: () => void): void => {
+      disableCallbacks.add(cb);
+    },
+    api: (() => {
+      const baseAPI = createSDKHostAPIBridge({
+        // Core data access
+        getHoldings: getHoldings,
+        getActivities: getActivities,
+        getAccounts: getAccounts,
 
-    // Settings
-    getSettings,
-    updateSettings,
-    backupDatabase,
+        // Exchange rates
+        getExchangeRates,
+        updateExchangeRate,
+        addExchangeRate,
 
-    // Account management
-    createAccount,
-    updateAccount,
+        // Contribution limits
+        getContributionLimit,
+        createContributionLimit,
+        updateContributionLimit,
+        calculateDepositsForLimit,
 
-    // Activity management
-    searchActivities,
-    createActivity,
-    updateActivity,
-    saveActivities,
+        // Goals
+        getGoals,
+        createGoal,
+        updateGoal,
+        updateGoalsAllocations,
+        getGoalsAllocation,
 
-    // File operations
-    openCsvFileDialog,
-    openFileSaveDialog,
+        // Market data
+        searchTicker,
+        syncHistoryQuotes,
+        getAssetProfile,
+        updateAssetProfile,
+        updateAssetDataSource,
+        updateQuote,
+        syncMarketData,
+        getQuoteHistory,
+        getMarketDataProviders,
 
-    // Event listeners - Import
-    listenImportFileDropHover,
-    listenImportFileDrop,
-    listenImportFileDropCancelled,
+        // Portfolio
+        updatePortfolio,
+        recalculatePortfolio,
+        getIncomeSummary,
+        getHistoricalValuations,
+        getLatestValuations,
+        calculatePerformanceHistory,
+        calculatePerformanceSummary,
+        calculateAccountsSimplePerformance,
+        getHolding,
 
-    // Event listeners - Portfolio
-    listenPortfolioUpdateStart,
-    listenPortfolioUpdateComplete,
-    listenPortfolioUpdateError,
-    listenMarketSyncStart,
-    listenMarketSyncComplete,
+        // Settings
+        getSettings,
+        updateSettings,
+        backupDatabase,
 
-    // Activity import
-    importActivities,
-    checkActivitiesImport,
-    getAccountImportMapping,
-    saveAccountImportMapping,
-  }),
-};
+        // Account management
+        createAccount,
+        updateAccount,
 
-globalThis.__WF_CTX__ = realCtx; 
+        // Activity management
+        searchActivities,
+        createActivity,
+        updateActivity,
+        saveActivities,
+
+        // File operations
+        openCsvFileDialog,
+        openFileSaveDialog,
+
+        // Event listeners - Import
+        listenImportFileDropHover,
+        listenImportFileDrop,
+        listenImportFileDropCancelled,
+
+        // Event listeners - Portfolio
+        listenPortfolioUpdateStart,
+        listenPortfolioUpdateComplete,
+        listenPortfolioUpdateError,
+        listenMarketSyncStart,
+        listenMarketSyncComplete,
+
+        // Activity import
+        importActivities,
+        checkActivitiesImport,
+        getAccountImportMapping,
+        saveAccountImportMapping,
+
+      });
+      
+      // Add the secrets API manually
+      (baseAPI as any).secrets = createAddonScopedSecrets(addonId);
+      
+      return baseAPI;
+    })(),
+  };
+}
+
+// Note: We intentionally do not set a global context to ensure proper secret isolation.
+// Each addon receives its own scoped context via the enable(ctx: AddonContext) function parameter. 

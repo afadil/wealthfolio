@@ -1,6 +1,6 @@
 import { logger } from '@/adapters';
 import { reloadAllAddons } from '@/addons/addons-core';
-import { realCtx } from './addons-runtime-context';
+import { createAddonContext } from './addons-runtime-context';
 
 interface DevModeConfig {
   enabled: boolean;
@@ -200,7 +200,9 @@ class AddonDevManager {
       const mod = await import(/* @vite-ignore */ blobUrl);
       
       if (typeof mod.default === 'function') {
-        const addonInstance = mod.default(realCtx);
+        // Create addon-specific context with scoped secrets
+        const addonSpecificContext = createAddonContext(addonId);
+        const addonInstance = mod.default(addonSpecificContext);
         
         // Store for cleanup
         if (addonInstance && typeof addonInstance.disable === 'function') {
@@ -339,8 +341,9 @@ class AddonDevManager {
    * Inject development tools into addon context
    */
   private injectDevTools(): void {
-    // Add development-specific APIs to the context
-    (realCtx as any).dev = {
+    // Add development-specific APIs to a generic context
+    const devCtx = createAddonContext('dev-tools');
+    (devCtx as any).dev = {
       reload: () => reloadAllAddons(),
       listServers: () => Array.from(this.devServers.values()),
       enableAutoReload: () => { this.config.autoReload = true; },

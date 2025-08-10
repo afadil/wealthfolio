@@ -436,6 +436,35 @@ export interface FilesAPI {
 }
 
 /**
+ * Secrets management APIs
+ * Provides secure storage for addon secrets using the system keyring
+ * Each addon can only access its own secrets
+ */
+export interface SecretsAPI {
+  /**
+   * Store a secret value for this addon
+   * @param key Secret key identifier
+   * @param value Secret value to store
+   * @returns Promise that resolves when secret is stored
+   */
+  set(key: string, value: string): Promise<void>;
+
+  /**
+   * Retrieve a secret value for this addon
+   * @param key Secret key identifier
+   * @returns Promise resolving to secret value or null if not found
+   */
+  get(key: string): Promise<string | null>;
+
+  /**
+   * Delete a secret for this addon
+   * @param key Secret key identifier
+   * @returns Promise that resolves when secret is deleted
+   */
+  delete(key: string): Promise<void>;
+}
+
+/**
  * Event listeners APIs
  */
 export interface EventsAPI {
@@ -551,6 +580,9 @@ export interface HostAPI {
   
   /** File operations */
   files: FilesAPI;
+  
+  /** Secrets management */
+  secrets: SecretsAPI;
   
   /** Event listeners */
   events: EventsAPI;

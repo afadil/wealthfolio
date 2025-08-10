@@ -1,5 +1,5 @@
 import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
-import { realCtx, getDynamicNavItems, getDynamicRoutes } from '@/addons/addons-runtime-context';
+import { createAddonContext, getDynamicNavItems, getDynamicRoutes } from '@/addons/addons-runtime-context';
 import { logger } from '@/adapters';
 import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
 
@@ -124,7 +124,9 @@ async function loadAddon(addonFile: AddonFile, context: AddonContext): Promise<b
       return false;
     }
 
-    const result = await enableFunction(context);
+    // Create addon-specific context with scoped secrets
+    const addonSpecificContext = createAddonContext(extractedAddon.metadata.id);
+    const result = await enableFunction(addonSpecificContext);
     
     // Store addon reference for potential cleanup
     loadedAddons.set(extractedAddon.metadata.id, {
@@ -165,7 +167,8 @@ export async function loadInstalledAddons(): Promise<void> {
 
   let loadedCount = 0;
   const loadPromises = enabledAddonFiles.map(async (addonFile) => {
-    const success = await loadAddon(addonFile, realCtx);
+    // Each addon gets its own context, but loadAddon creates its own internally
+    const success = await loadAddon(addonFile, {} as AddonContext);
     if (success) {
       loadedCount++;
     } else {

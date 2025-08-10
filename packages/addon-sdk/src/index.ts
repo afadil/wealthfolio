@@ -72,29 +72,14 @@ export {
   isAddonManifest,
 } from './utils';
 
-import type { AddonContext } from './types';
-
-// Global context access
-declare global {
-  var __WF_CTX__: AddonContext;
-}
-
 /**
- * Get the current addon context
- * This provides access to Wealthfolio's APIs for your addon
- */
-export function getAddonContext(): AddonContext {
-  if (typeof globalThis !== 'undefined' && globalThis.__WF_CTX__) {
-    return globalThis.__WF_CTX__;
-  }
-  
-  throw new Error(
-    'Addon context not available. Make sure your addon is loaded within Wealthfolio.'
-  );
-}
-
-/**
- * Default export for backward compatibility
- */
-const ctx = typeof globalThis !== 'undefined' ? globalThis.__WF_CTX__ : undefined;
-export default ctx; 
+ * Addons receive their context as a parameter to the enable() function.
+ * Each addon gets its own isolated context with scoped secret storage.
+ * 
+ * Example:
+ * export default function enable(ctx: AddonContext) {
+ *   // Use ctx.api.secrets.set/get/delete for secure storage
+ *   // Use ctx.sidebar.addItem() to add navigation
+ *   // Use ctx.router.add() to register routes
+ * }
+ */ 
