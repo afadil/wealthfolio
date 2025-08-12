@@ -1,9 +1,6 @@
-import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Holding, HoldingType } from '@/lib/types';
 import { useMemo, useState } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
+import { DonutChart, EmptyPlaceholder, Skeleton, Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
@@ -85,7 +82,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
       </CardHeader>
       <CardContent className="pt-0">
         {data.length > 0 ? (
-          <CustomPieChart
+          <DonutChart
             data={data}
             activeIndex={activeIndex}
             onPieEnter={onPieEnter}
@@ -94,9 +91,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder
-            description="There is no class data available for your holdings."
-          />
+          <EmptyPlaceholder description="There is no class data available for your holdings." />
         )}
       </CardContent>
     </Card>

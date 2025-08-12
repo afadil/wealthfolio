@@ -4,7 +4,7 @@ import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { CurrencyInput } from '@wealthfolio/ui';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 

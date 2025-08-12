@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { MoneyInput } from '@/components/ui/money-input';
+import { MoneyInput } from '@wealthfolio/ui';
 
 const exchangeRateSchema = z.object({
   fromCurrency: z.string().min(1, 'From Currency is required'),

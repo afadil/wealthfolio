@@ -1,11 +1,21 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { AccountSelectOption } from '../activity-form';
-import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from '../activity-type-selector';
 import { useFormContext } from 'react-hook-form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { MoneyInput } from '@/components/ui/money-input';
+import {
+  Card,
+  CardContent,
+  MoneyInput,
+  QuantityInput,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@wealthfolio/ui';
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from './common';
-import { QuantityInput } from '@/components/ui/quantity-input';
+import { AccountSelectOption } from '../activity-form';
+import {
+  ActivityTypeSelector,
+  type ActivityType as ActivityTypeUI,
+} from '../activity-type-selector';
 
 
 export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {

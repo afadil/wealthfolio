@@ -1,10 +1,10 @@
 import type React from 'react';
 import { PieChart, Pie, Cell, Sector } from 'recharts';
 import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { useBalancePrivacy } from '@/context/privacy-context';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { formatPercent } from '@wealthfolio/ui';
+import { AmountDisplay } from '../financial/amount-display';
+import { useBalancePrivacy } from '../../hooks/use-balance-privacy';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../ui/chart';
+import { formatPercent } from '../../lib/utils';
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -109,7 +109,7 @@ const renderInactiveShape = (props: any) => {
   );
 };
 
-interface CustomPieChartProps {
+interface DonutChartProps {
   data: { name: string; value: number; currency: string }[];
   activeIndex: number;
   onPieEnter: (event: React.MouseEvent, index: number) => void;
@@ -120,7 +120,7 @@ interface CustomPieChartProps {
   displayTooltip?: boolean;
 }
 
-export const CustomPieChart: React.FC<CustomPieChartProps> = ({
+export const DonutChart: React.FC<DonutChartProps> = ({
   data,
   activeIndex,
   onPieEnter,

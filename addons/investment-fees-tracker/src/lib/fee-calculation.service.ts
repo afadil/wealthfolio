@@ -55,7 +55,7 @@ export interface FeeAnalytics {
   
   // Fee impact on returns
   feeImpactAnalysis: {
-    totalFeesYTD: number;
+    totalFeesPeriod: number;
     estimatedAnnualFees: number;
     potentialReturnLoss: number; // Based on average market return
   };
@@ -73,9 +73,10 @@ interface FeeCalculationParams {
   activities: ActivityDetails[];
   period: 'TOTAL' | 'YTD' | 'LAST_YEAR';
   baseCurrency: string;
+  convertToBaseCurrency?: (amount: number, fromCurrency: string, date?: string) => number;
 }
 
-export function calculateFeeSummary({ activities, period, baseCurrency }: FeeCalculationParams): FeeSummary {
+export function calculateFeeSummary({ activities, period, baseCurrency, convertToBaseCurrency }: FeeCalculationParams): FeeSummary {
   const now = new Date();
   const currentYear = now.getFullYear();
   const lastYear = currentYear - 1;
@@ -118,9 +119,14 @@ export function calculateFeeSummary({ activities, period, baseCurrency }: FeeCal
     const monthKey = `${activityDate.getFullYear()}-${String(activityDate.getMonth() + 1).padStart(2, '0')}`;
     
     // For FEE activities, use the full amount; for others, use the fee field
-    const feeAmount = activity.activityType === 'FEE' 
+    let feeAmount = activity.activityType === 'FEE' 
       ? safeParseNumber(activity.amount)
       : safeParseNumber(activity.fee);
+    
+    // Convert to base currency if conversion function is provided
+    if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
+      feeAmount = convertToBaseCurrency(feeAmount, activity.currency, activity.date.toString());
+    }
     
     totalFees += feeAmount;
 
@@ -189,33 +195,49 @@ export function calculateFeeSummary({ activities, period, baseCurrency }: FeeCal
 interface FeeAnalyticsParams {
   activities: ActivityDetails[];
   portfolioValue: number;
+  period: 'TOTAL' | 'YTD' | 'LAST_YEAR';
+  baseCurrency?: string;
+  convertToBaseCurrency?: (amount: number, fromCurrency: string, date?: string) => number;
 }
 
-export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyticsParams): FeeAnalytics {
+export function calculateFeeAnalytics({ activities, portfolioValue, period, baseCurrency = 'USD', convertToBaseCurrency }: FeeAnalyticsParams): FeeAnalytics {
   const now = new Date();
   const currentYear = now.getFullYear();
-  
-  // Filter to current year for YTD calculations
-  const ytdActivities = activities.filter(activity => 
-    new Date(activity.date).getFullYear() === currentYear
-  );
+  const lastYear = currentYear - 1;
 
-  // Get all fee-related activities
-  const feeActivities = activities.filter(activity => {
-    const fee = safeParseNumber(activity.fee);
-    return activity.activityType === 'FEE' || fee > 0;
+  // Filter activities by period (same logic as calculateFeeSummary)
+  const filteredActivities = activities.filter((activity) => {
+    const activityDate = new Date(activity.date);
+    const activityYear = activityDate.getFullYear();
+
+    switch (period) {
+      case 'YTD':
+        return activityYear === currentYear;
+      case 'LAST_YEAR':
+        return activityYear === lastYear;
+      case 'TOTAL':
+      default:
+        return true;
+    }
   });
 
-  const ytdFeeActivities = ytdActivities.filter(activity => {
+  // Get fee-related activities from filtered set
+  const feeActivities = filteredActivities.filter(activity => {
     const fee = safeParseNumber(activity.fee);
     return activity.activityType === 'FEE' || fee > 0;
   });
 
   // Calculate basic metrics
   const totalFees = feeActivities.reduce((sum, activity) => {
-    const feeAmount = activity.activityType === 'FEE' 
+    let feeAmount = activity.activityType === 'FEE' 
       ? safeParseNumber(activity.amount)
       : safeParseNumber(activity.fee);
+    
+    // Convert to base currency if conversion function is provided
+    if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
+      feeAmount = convertToBaseCurrency(feeAmount, activity.currency, activity.date.toString());
+    }
+    
     return sum + feeAmount;
   }, 0);
 
@@ -228,9 +250,14 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
   let highestFee = 0;
 
   feeActivities.forEach(activity => {
-    const fee = activity.activityType === 'FEE' 
+    let fee = activity.activityType === 'FEE' 
       ? safeParseNumber(activity.amount)
       : safeParseNumber(activity.fee);
+    
+    // Convert to base currency if conversion function is provided
+    if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
+      fee = convertToBaseCurrency(fee, activity.currency, activity.date.toString());
+    }
     
     if (fee > highestFee) {
       highestFee = fee;
@@ -248,9 +275,14 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
   const feeCategories = new Map<string, { amount: number; transactions: number }>();
   
   feeActivities.forEach(activity => {
-    const fee = activity.activityType === 'FEE' 
+    let fee = activity.activityType === 'FEE' 
       ? safeParseNumber(activity.amount)
       : safeParseNumber(activity.fee);
+    
+    // Convert to base currency if conversion function is provided
+    if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
+      fee = convertToBaseCurrency(fee, activity.currency, activity.date.toString());
+    }
     
     let category: string;
     
@@ -281,7 +313,7 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
     transactions: data.transactions,
   }));
 
-  // Asset fee analysis
+  // Asset fee analysis (use filtered activities)
   const assetFeeMap = new Map<string, {
     fees: number;
     transactions: number;
@@ -289,13 +321,18 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
     name: string;
   }>();
 
-  activities.forEach(activity => {
+  filteredActivities.forEach(activity => {
     if (activity.activityType === 'FEE') return; // Skip dedicated fee activities
     
-    const fee = safeParseNumber(activity.fee);
+    let fee = safeParseNumber(activity.fee);
     const amount = safeParseNumber(activity.amount);
     const quantity = safeParseNumber(activity.quantity);
     const unitPrice = safeParseNumber(activity.unitPrice);
+    
+    // Convert fee to base currency if conversion function is provided
+    if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
+      fee = convertToBaseCurrency(fee, activity.currency, activity.date.toString());
+    }
     
     // Calculate volume based on available data
     const volume = amount > 0 ? amount : Math.abs(quantity * unitPrice);
@@ -340,9 +377,15 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
   }>();
 
   feeActivities.forEach(activity => {
-    const fee = activity.activityType === 'FEE' 
+    let fee = activity.activityType === 'FEE' 
       ? safeParseNumber(activity.amount)
       : safeParseNumber(activity.fee);
+    
+    // Convert to base currency if conversion function is provided
+    if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
+      fee = convertToBaseCurrency(fee, activity.currency, activity.date.toString());
+    }
+    
     const accountName = activity.accountName;
     
     const existing = accountFeeMap.get(accountName) || { fees: 0, transactions: 0 };
@@ -363,15 +406,21 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
     .sort((a, b) => b.totalFees - a.totalFees);
 
   // Fee impact analysis
-  const totalFeesYTD = ytdFeeActivities.reduce((sum, activity) => {
-    const feeAmount = activity.activityType === 'FEE' 
-      ? safeParseNumber(activity.amount)
-      : safeParseNumber(activity.fee);
-    return sum + feeAmount;
-  }, 0);
-
-  const monthsElapsed = now.getMonth() + 1;
-  const estimatedAnnualFees = monthsElapsed > 0 ? (totalFeesYTD / monthsElapsed) * 12 : 0;
+  const periodFees = totalFees; // Already calculated from filtered activities
+  
+  // Estimate annual fees based on period
+  let estimatedAnnualFees = 0;
+  if (period === 'YTD') {
+    const monthsElapsed = now.getMonth() + 1; // getMonth() is 0-indexed
+    estimatedAnnualFees = monthsElapsed > 0 ? (periodFees / monthsElapsed) * 12 : 0;
+  } else if (period === 'LAST_YEAR') {
+    estimatedAnnualFees = periodFees; // Last year is a full year
+  } else {
+    // For TOTAL, estimate based on average annual fees
+    const firstActivity = activities.length > 0 ? new Date(activities[0].date) : now;
+    const yearsElapsed = (now.getTime() - firstActivity.getTime()) / (1000 * 60 * 60 * 24 * 365);
+    estimatedAnnualFees = yearsElapsed > 0 ? periodFees / yearsElapsed : 0;
+  }
   
   // Assume 7% average market return for potential return loss calculation
   const potentialReturnLoss = estimatedAnnualFees * 0.07;
@@ -384,7 +433,7 @@ export function calculateFeeAnalytics({ activities, portfolioValue }: FeeAnalyti
     assetFeeAnalysis,
     accountFeeAnalysis,
     feeImpactAnalysis: {
-      totalFeesYTD,
+      totalFeesPeriod: periodFees,
       estimatedAnnualFees,
       potentialReturnLoss,
     },

@@ -1,15 +1,19 @@
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { SettingsHeader } from '../header';
-import { Icons } from '@/components/ui/icons';
-import { useToast } from '@/components/ui/use-toast';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { EmptyPlaceholder } from '@/components/empty-placeholder';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DeleteConfirm } from '@wealthfolio/ui';
+import {
+  DeleteConfirm,
+  Button,
+  EmptyPlaceholder,
+  Badge,
+  Switch,
+  Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Icons,
+  Separator,
+  useToast,
+} from '@wealthfolio/ui';
 import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
 import { AddonUpdateCard } from '@/pages/settings/addons/components/addon-update-card';
 import { useAddonActions } from './hooks/use-addon-actions';
@@ -102,9 +106,9 @@ export default function AddonSettingsPage() {
             </PopoverContent>
           </Popover>
 
-          <Button 
-            variant="outline" 
-            onClick={handleCheckUpdates} 
+          <Button
+            variant="outline"
+            onClick={handleCheckUpdates}
             disabled={isCheckingUpdates || installedAddons.length === 0}
           >
             {isCheckingUpdates ? (
@@ -117,7 +121,10 @@ export default function AddonSettingsPage() {
                 <Icons.Refresh className="mr-2 h-4 w-4" />
                 Check Updates
                 {hasUpdates() && (
-                  <Badge variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'} className="ml-2">
+                  <Badge
+                    variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
+                    className="ml-2"
+                  >
                     {getUpdateCount()}
                   </Badge>
                 )}
@@ -154,11 +161,15 @@ export default function AddonSettingsPage() {
               {lastUpdateCheck && (
                 <span className="flex items-center gap-1">
                   <Icons.Clock className="h-3 w-3" />
-                  Last checked: {lastUpdateCheck.toLocaleDateString()} at {lastUpdateCheck.toLocaleTimeString()}
+                  Last checked: {lastUpdateCheck.toLocaleDateString()} at{' '}
+                  {lastUpdateCheck.toLocaleTimeString()}
                 </span>
               )}
               {hasUpdates() && (
-                <Badge variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'} className="text-xs">
+                <Badge
+                  variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
+                  className="text-xs"
+                >
                   {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
                   {getCriticalUpdateCount() > 0 && ` (${getCriticalUpdateCount()} critical)`}
                 </Badge>

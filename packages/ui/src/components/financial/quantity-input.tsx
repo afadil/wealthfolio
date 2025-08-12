@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { Input } from '../ui/input';
+import { cn } from '../../lib/utils';
 
 export interface QuantityInputProps
   extends Omit<React.ComponentPropsWithoutRef<typeof Input>, 'type' | 'inputMode'> {

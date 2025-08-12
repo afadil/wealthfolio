@@ -45,8 +45,7 @@ import {
   FeePeriodSelector, 
   FeeOverviewCards, 
   FeeHistoryChart, 
-  AccountBreakdown,
-  FeeAnalyticsDashboard 
+  AccountBreakdown
 } from '../components';
 import { useFeeSummary, useFeeAnalytics } from '../hooks';
 
@@ -67,7 +66,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
     data: analyticsData,
     isLoading: isLoadingAnalytics,
     error: analyticsError,
-  } = useFeeAnalytics({ ctx });
+  } = useFeeAnalytics({ ctx, period: selectedPeriod });
 
   const { isBalanceHidden } = useBalancePrivacy();
 
@@ -181,12 +180,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
           />
         </div>
 
-        {/* Analytics Dashboard */}
-        <FeeAnalyticsDashboard
-          feeAnalytics={analyticsData}
-          currency={periodSummary.currency}
-          isBalanceHidden={isBalanceHidden}
-        />
+
       </div>
     </ApplicationShell>
   );
@@ -248,21 +242,7 @@ function FeesDashboardSkeleton() {
           </Card>
         </div>
 
-        {/* Analytics Skeleton */}
-        <div className="grid gap-4 md:grid-cols-4">
-          {[...Array(4)].map((_, index) => (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-[100px]" />
-                <Skeleton className="h-4 w-4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-[120px]" />
-                <Skeleton className="mt-1 h-3 w-[80px]" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+
       </div>
     </ApplicationShell>
   );

@@ -39,7 +39,7 @@ const accountTypes = [
 ] as const;
 
 import { newAccountSchema } from '@/lib/schemas';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { CurrencyInput } from '@wealthfolio/ui';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 

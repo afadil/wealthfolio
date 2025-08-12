@@ -4,9 +4,6 @@ import type { AddonContext, AddonEnableFunction } from '@wealthfolio/addon-sdk';
 import { Icons } from '@wealthfolio/ui';
 import FeesPage from './pages/fees-page';
 
-// Import styles
-import '@wealthfolio/ui/styles';
-
 // Create a query client for this addon
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,7 +44,7 @@ const enable: AddonEnableFunction = (context) => {
   const sidebarItem = context.sidebar.addItem({
     id: 'investment-fees-tracker',
     label: 'Fee Tracker',
-    icon: <Icons.CreditCard className="h-4 w-4" />,
+    icon: <Icons.DollarSign className="h-4 w-4" />,
     route: '/addons/investment-fees-tracker',
     order: 200
   });

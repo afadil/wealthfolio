@@ -1,15 +1,23 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  ResponsiveContainer,
-  Tooltip,
+import { format, parseISO } from 'date-fns';
+import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { AmountDisplay } from '@wealthfolio/ui';
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@wealthfolio/ui';
+import { EmptyPlaceholder, Icons } from '@wealthfolio/ui';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@wealthfolio/ui';
+import { formatAmount } from '@wealthfolio/ui';
 
 interface FeeHistoryChartProps {
   monthlyFeeData: [string, number][];
@@ -28,118 +36,162 @@ export function FeeHistoryChart({
 }: FeeHistoryChartProps) {
   // Prepare data for the chart
   const chartData = monthlyFeeData.map(([month, currentFees], index) => {
-    const [year, monthNum] = month.split('-');
-    const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleDateString('en-US', { 
-      month: 'short' 
-    });
+    const cumulative = monthlyFeeData
+      .slice(0, index + 1)
+      .reduce((sum, [, value]) => {
+        const numericValue = Number(value) || 0;
+        return sum + numericValue;
+      }, 0);
     
-    const previousFees = previousMonthlyFeeData[index]?.[1] || 0;
+    // Calculate cumulative previous period fees
+    const previousCumulative = previousMonthlyFeeData
+      .slice(0, index + 1)
+      .reduce((sum, [, value]) => {
+        const numericValue = Number(value) || 0;
+        return sum + numericValue;
+      }, 0);
     
-    return {
-      month: monthName,
-      fullMonth: month,
-      currentFees,
-      previousFees,
+    // Log the cumulative values for debugging
+    if (isNaN(cumulative)) {
+        console.warn(`Cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: monthlyFeeData.slice(0, index + 1).map(d => d[1]) });
+    }
+    
+    if (isNaN(previousCumulative)) {
+        console.warn(`Previous cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: previousMonthlyFeeData.slice(0, index + 1).map(d => d[1]) });
+    }
+
+    const dataPoint = {
+      month,
+      currentFees: Number(currentFees) || 0,
+      cumulative: cumulative,
+      previousCumulative: previousCumulative,
     };
+    
+    return dataPoint;
   });
 
-  const chartConfig = {
-    currentFees: {
-      label: 'Current Period',
-      color: 'hsl(var(--destructive))',
-    },
-    previousFees: {
-      label: 'Previous Period',
-      color: 'hsl(var(--muted-foreground))',
-    },
-  };
+  const periodDescription =
+    selectedPeriod === 'TOTAL'
+      ? 'All Time'
+      : selectedPeriod === 'YTD'
+        ? 'Year to Date'
+        : 'Last Year';
 
   return (
     <Card className="md:col-span-2">
       <CardHeader>
-        <CardTitle className="text-xl">
-          Fee History - {selectedPeriod === 'TOTAL' ? 'All Time' : selectedPeriod === 'LAST_YEAR' ? 'Last Year' : 'Year to Date'}
-        </CardTitle>
+        <CardTitle className="text-xl">Fee History</CardTitle>
+        <CardDescription>{periodDescription}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="month" 
-                tick={{ fontSize: 12 }}
+        {chartData.length === 0 ? (
+          <EmptyPlaceholder
+            className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
+            icon={<Icons.CreditCard className="h-10 w-10" />}
+            title="No fee history available"
+            description="There is no fee history for the selected period. Try selecting a different time range or check back later."
+          />
+        ) : (
+          <ChartContainer
+            config={{
+              currentFees: {
+                label: 'Monthly Fees',
+                color: 'hsl(var(--destructive))',
+              },
+              cumulative: {
+                label: 'Cumulative Fees',
+                color: 'hsl(var(--chart-5))',
+                lineStyle: 'solid',
+              },
+              previousCumulative: {
+                label: 'Previous Period Cumulative',
+                color: 'hsl(var(--chart-3))',
+                lineStyle: 'dashed',
+              },
+            }}
+          >
+            <ComposedChart data={chartData}>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="month"
                 tickLine={false}
+                tickMargin={10}
                 axisLine={false}
+                tickFormatter={(value) => format(parseISO(`${value}-01`), 'MMM yy')}
               />
-              <YAxis 
-                tick={{ fontSize: 12 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => {
-                  if (isBalanceHidden) return '***';
-                  return new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency,
-                    notation: 'compact',
-                  }).format(value);
-                }}
-              />
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="flex flex-col">
-                            <span className="text-[0.70rem] uppercase text-muted-foreground">
-                              {label}
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name, entry) => {
+                      const formattedValue = isBalanceHidden
+                        ? '••••'
+                        : formatAmount(Number(value), currency);
+                      return (
+                        <>
+                          <div
+                            className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]"
+                            style={
+                              {
+                                '--color-bg': entry.color,
+                                '--color-border': entry.color,
+                              } as React.CSSProperties
+                            }
+                          />
+                          <div className="flex flex-1 items-center justify-between">
+                            <span className="text-muted-foreground">
+                              {name === 'currentFees'
+                                ? 'Monthly Fees'
+                                : name === 'previousCumulative'
+                                  ? 'Previous Period Cumulative'
+                                  : name === 'cumulative'
+                                    ? 'Cumulative Fees'
+                                    : name}
                             </span>
-                            <span className="font-bold text-muted-foreground">
-                              Current: <AmountDisplay 
-                                value={payload[0]?.value as number || 0} 
-                                currency={currency}
-                                isHidden={isBalanceHidden}
-                              />
+                            <span className="ml-2 font-mono font-medium tabular-nums text-foreground">
+                              {formattedValue}
                             </span>
-                            {payload[1] && (
-                              <span className="text-[0.70rem] text-muted-foreground">
-                                Previous: <AmountDisplay 
-                                  value={payload[1]?.value as number || 0} 
-                                  currency={currency}
-                                  isHidden={isBalanceHidden}
-                                />
-                              </span>
-                            )}
                           </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
+                        </>
+                      );
+                    }}
+                    labelFormatter={(label) => {
+                      return format(parseISO(`${label}-01`), 'MMMM yyyy');
+                    }}
+                  />
+                }
               />
-              <Line 
-                type="monotone" 
-                dataKey="currentFees" 
-                stroke="hsl(var(--destructive))" 
+              <ChartLegend content={<ChartLegendContent />} />
+              <Bar
+                yAxisId="left"
+                dataKey="currentFees"
+                fill="var(--color-currentFees)"
+                radius={[8, 8, 0, 0]}
+                barSize={25}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="cumulative"
+                stroke="var(--color-cumulative)"
                 strokeWidth={2}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
+                dot={false}
               />
               {previousMonthlyFeeData.length > 0 && (
-                <Line 
-                  type="monotone" 
-                  dataKey="previousFees" 
-                  stroke="hsl(var(--muted-foreground))" 
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="previousCumulative"
+                  stroke="var(--color-previousCumulative)"
                   strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={{ r: 3 }}
+                  dot={false}
+                  strokeDasharray="3 3"
                 />
               )}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            </ComposedChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

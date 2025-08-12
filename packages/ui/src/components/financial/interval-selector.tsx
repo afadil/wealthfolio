@@ -1,10 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { TimePeriod, DateRange } from '@/lib/types';
 import { Icons } from '@/components/ui/icons';
 import { subWeeks, subMonths, subYears, startOfYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+
+export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
+export type DateRange = {
+  from: Date | undefined;
+  to: Date | undefined;
+};
 
 interface IntervalData {
   code: TimePeriod;
@@ -190,4 +195,4 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   );
 };
 
-export default IntervalSelector;
+export  {IntervalSelector};

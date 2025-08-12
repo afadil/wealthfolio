@@ -1,43 +1,40 @@
 import { useMemo, useState } from 'react';
-import { Holding, Country } from '@/lib/types';
 import { DonutChart, EmptyPlaceholder, Skeleton } from '@wealthfolio/ui';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
 
-interface CountryChartProps {
-  holdings?: Holding[];
-  isLoading?: boolean;
-  onCountrySectionClick?: (countryName: string) => void;
+interface FeeCategoryData {
+  category: string;
+  amount: number;
+  percentage: number;
+  transactions: number;
 }
 
-export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: CountryChartProps) => {
+interface FeeCategoriesChartProps {
+  feeCategories?: FeeCategoryData[];
+  currency: string;
+  isLoading?: boolean;
+  onCategorySectionClick?: (categoryName: string) => void;
+}
+
+export const FeeCategoriesChart = ({ 
+  feeCategories, 
+  currency, 
+  isLoading, 
+  onCategorySectionClick 
+}: FeeCategoriesChartProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => {
-    if (!holdings || holdings.length === 0) return [];
+    if (!feeCategories || feeCategories.length === 0) return [];
 
-    // Assume baseCurrency is consistent across holdings or default to USD
-    const currency = holdings[0]?.baseCurrency || 'USD';
-
-    const countryMap = new Map<string, number>();
-    holdings.forEach((holding) => {
-      const countries = holding.instrument?.countries;
-      const marketValue = Number(holding.marketValue?.base) || 0;
-
-      if (countries && countries.length > 0 && !isNaN(marketValue)) {
-        countries.forEach((country: Country) => {
-          const currentValue = countryMap.get(country.name) || 0;
-          const weight = Number(country.weight) || 0;
-          const weightedValue =
-            marketValue * (weight > 1 ? weight / 100 : weight);
-          countryMap.set(country.name, currentValue + weightedValue);
-        });
-      }
-    });
-
-    return Array.from(countryMap, ([name, value]) => ({ name, value, currency }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10); // Show top 10 countries
-  }, [holdings]);
+    return feeCategories
+      .map(category => ({
+        name: category.category,
+        value: category.amount,
+        currency,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [feeCategories, currency]);
 
   if (isLoading) {
     return (
@@ -62,8 +59,8 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
   };
 
   const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
-    if (onCountrySectionClick) {
-      onCountrySectionClick(sectionData.name);
+    if (onCategorySectionClick) {
+      onCategorySectionClick(sectionData.name);
     }
     const clickedIndex = data.findIndex(d => d.name === sectionData.name);
     if (clickedIndex !== -1) {
@@ -76,7 +73,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-            Country Allocation
+            Fee Categories
           </CardTitle>
         </div>
       </CardHeader>
@@ -93,7 +90,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
           />
         ) : (
           <EmptyPlaceholder
-            description="There is no country data available for your holdings."
+            description="There is no fee category data available."
             className="max-h-[160px]"
           />
         )}

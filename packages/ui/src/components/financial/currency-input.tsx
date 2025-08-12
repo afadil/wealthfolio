@@ -1,7 +1,7 @@
 import { forwardRef, useState } from 'react';
 import { ChevronsUpDown, Check } from 'lucide-react';
-import type { ButtonProps } from './button';
-import { Button } from './button';
+import type { ButtonProps } from '../ui/button';
+import { Button } from '../ui/button';
 import {
   Command,
   CommandEmpty,
@@ -9,9 +9,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from './command';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
-import { ScrollArea } from './scroll-area';
+} from '../ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '../../lib/utils';
 import { worldCurrencies } from '../../lib/currencies';
 

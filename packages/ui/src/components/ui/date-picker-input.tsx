@@ -4,12 +4,12 @@ import {
   Button,
   DatePicker as RacDatePicker,
   DatePickerProps as RacDatePickerProps,
+  DateValue,
   Dialog,
   Group,
   Popover,
 } from 'react-aria-components';
 import {
-  DateValue,
   parseDate,
   parseDateTime,
   CalendarDate,
@@ -90,7 +90,7 @@ interface DatePickerInputProps
   onInteractionEnd?: () => void;
 }
 
-export default function DatePickerInput({
+export function DatePickerInput({
   onChange,
   value,
   disabled,
