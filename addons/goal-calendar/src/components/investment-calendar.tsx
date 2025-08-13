@@ -41,11 +41,11 @@ function CalendarDot({
     partialPercent,
   };
 
-  const dotContent = isPartial ? (
+    const dotContent = isPartial ? (
     <div
-      className="h-4 w-4 flex-shrink-0 cursor-pointer rounded-full border-none transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5"
+      className="h-4 w-4 flex-shrink-0 cursor-pointer rounded-full border-2 border-primary transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5"
       style={{
-        background: `conic-gradient(hsl(73 84% 27%) ${partialPercent * 3.6}deg, hsl(210 40% 92%) 0deg)`,
+        background: `conic-gradient(hsl(var(--primary)) ${partialPercent * 3.6}deg, hsl(var(--muted)) 0deg)`,
       }}
       onMouseLeave={onLeave}
       onClick={(e) => onClick(e, dotData)}
@@ -53,13 +53,14 @@ function CalendarDot({
   ) : (
     <div
       className={`h-4 w-4 flex-shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5 ${
-        filled ? 'scale-105 border-primary bg-primary' : 'border-border bg-none'
+        filled 
+          ? 'scale-105 border-primary bg-primary' 
+          : 'border-muted-foreground/30 bg-muted hover:bg-muted-foreground/10'
       }`}
       onMouseLeave={onLeave}
       onClick={(e) => onClick(e, dotData)}
     />
   );
-
   return <div className="relative inline-block">{dotContent}</div>;
 }
 
@@ -139,8 +140,6 @@ function InvestmentCalendar({
   progressPercent,
   completedSteps,
   totalSteps,
-  remainingAmount,
-  isTargetReached,
   selectedGoal,
   onTargetAmountChange,
   onStepSizeChange,
