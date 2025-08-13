@@ -148,51 +148,61 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
  * - Interactive milestone tracking
  */
 export default function enable(ctx: AddonContext) {
-  console.log('🎯 Investment Target Tracker addon is being enabled!');
+  ctx.api.logger.info('🎯 Investment Target Tracker addon is being enabled!');
 
   // Store references to items for cleanup
   const addedItems: Array<{ remove: () => void }> = [];
 
-  // Add sidebar navigation item
-  const sidebarItem = ctx.sidebar.addItem({
-    id: 'investment-target-tracker',
-    label: 'Target Tracker',
-    icon: <Icons.Goals className="h-5 w-5" />,
-    route: '/addon/investment-target-tracker',
-    order: 200
-  });
-  addedItems.push(sidebarItem);
+  try {
+    // Add sidebar navigation item
+    const sidebarItem = ctx.sidebar.addItem({
+      id: 'investment-target-tracker',
+      label: 'Target Tracker',
+      icon: <Icons.Goals className="h-5 w-5" />,
+      route: '/addon/investment-target-tracker',
+      order: 200
+    });
+    addedItems.push(sidebarItem);
+    
+    ctx.api.logger.debug('Sidebar navigation item added successfully');
 
-  // Create wrapper component with QueryClientProvider
-  const InvestmentTargetTrackerWrapper = () => (
-    <QueryClientProvider client={queryClient}>
-      <InvestmentTargetTracker ctx={ctx} />
-    </QueryClientProvider>
-  );
+    // Create wrapper component with QueryClientProvider
+    const InvestmentTargetTrackerWrapper = () => (
+      <QueryClientProvider client={queryClient}>
+        <InvestmentTargetTracker ctx={ctx} />
+      </QueryClientProvider>
+    );
 
-  // Register route
-  ctx.router.add({
-    path: '/addon/investment-target-tracker',
-    component: React.lazy(() => Promise.resolve({ 
-      default: InvestmentTargetTrackerWrapper 
-    }))
-  });
+    // Register route
+    ctx.router.add({
+      path: '/addon/investment-target-tracker',
+      component: React.lazy(() => Promise.resolve({ 
+        default: InvestmentTargetTrackerWrapper 
+      }))
+    });
+    
+    ctx.api.logger.debug('Route registered successfully');
+    ctx.api.logger.info('Investment Target Tracker addon enabled successfully');
+
+  } catch (error) {
+    ctx.api.logger.error('Failed to initialize addon: ' + (error as Error).message);
+    // Re-throw the error so the addon system can handle it
+    throw error;
+  }
 
   // Register cleanup callback
   ctx.onDisable(() => {
-    console.log('🛑 Investment Target Tracker addon is being disabled');
+    ctx.api.logger.info('🛑 Investment Target Tracker addon is being disabled');
     
     // Remove all sidebar items
     addedItems.forEach(item => {
       try {
         item.remove();
       } catch (error) {
-        console.error('❌ Error removing sidebar item:', error);
+        ctx.api.logger.error('Error removing sidebar item: ' + (error as Error).message);
       }
     });
     
-    console.log('✅ Investment Target Tracker addon has been cleanly disabled');
+    ctx.api.logger.info('Investment Target Tracker addon disabled successfully');
   });
-
-  console.log('✨ Investment Target Tracker addon has been successfully enabled!');
 }

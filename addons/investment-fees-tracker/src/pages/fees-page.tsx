@@ -74,10 +74,12 @@ export default function FeesPage({ ctx }: FeesPageProps) {
     return <FeesDashboardSkeleton />;
   }
 
-  console.log('feeData', feeData);
-  console.log('analyticsData', analyticsData);  
-  console.log('feeError', feeError);
-  console.log('analyticsError', analyticsError);
+  if (feeError) {
+    ctx.api.logger.error('Fee data error: ' + feeError.message);
+  }
+  if (analyticsError) {
+    ctx.api.logger.error('Analytics data error: ' + analyticsError.message);
+  }
 
   if (feeError || analyticsError || !feeData || !analyticsData) {
     return (

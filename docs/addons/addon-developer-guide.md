@@ -167,6 +167,40 @@ discoverAddons()
 reloadAddons()
 ```
 
+### Logging and Debug Output
+
+Wealthfolio provides a built-in logger API that automatically prefixes all log messages with your addon ID for easy identification:
+
+```typescript
+export default function enable(ctx: AddonContext) {
+  // Use the logger API instead of console.log
+  ctx.api.logger.info('Addon initializing...');
+  ctx.api.logger.debug('Loading configuration');
+  
+  try {
+    // Your addon logic
+    const data = await ctx.api.accounts.getAll();
+    ctx.api.logger.debug(`Loaded ${data.length} accounts`);
+  } catch (error) {
+    ctx.api.logger.error('Failed to load accounts: ' + error.message);
+  }
+  
+  // Available log levels:
+  ctx.api.logger.error('Error messages');
+  ctx.api.logger.warn('Warning messages');
+  ctx.api.logger.info('Informational messages');
+  ctx.api.logger.debug('Debug messages');
+  ctx.api.logger.trace('Detailed trace messages');
+}
+```
+
+All log messages will appear in the browser console with your addon ID prefix:
+```
+[your-addon-id] Addon initializing...
+[your-addon-id] Loaded 3 accounts
+[your-addon-id] Failed to load accounts: Network error
+```
+
 ---
 
 ## Addon Architecture

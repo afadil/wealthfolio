@@ -35,53 +35,63 @@ function InvestmentFeesTrackerAddon({ ctx }: { ctx: AddonContext }) {
 
 // Addon enable function - called when the addon is loaded
 const enable: AddonEnableFunction = (context) => {
-  console.log('💰 Investment Fees Tracker addon is being enabled!');
+  context.api.logger.info('💰 Investment Fees Tracker addon is being enabled!');
 
   // Store references to items for cleanup
   const addedItems: Array<{ remove: () => void }> = [];
 
-  // Add sidebar navigation item
-  const sidebarItem = context.sidebar.addItem({
-    id: 'investment-fees-tracker',
-    label: 'Fee Tracker',
-    icon: <Icons.DollarSign className="h-4 w-4" />,
-    route: '/addons/investment-fees-tracker',
-    order: 200
-  });
-  addedItems.push(sidebarItem);
+  try {
+    // Add sidebar navigation item
+    const sidebarItem = context.sidebar.addItem({
+      id: 'investment-fees-tracker',
+      label: 'Fee Tracker',
+      icon: <Icons.DollarSign className="h-4 w-4" />,
+      route: '/addons/investment-fees-tracker',
+      order: 200
+    });
+    addedItems.push(sidebarItem);
+    
+    context.api.logger.debug('Sidebar navigation item added successfully');
 
-  // Create wrapper component with QueryClientProvider
-  const InvestmentFeesTrackerWrapper = () => (
-    <QueryClientProvider client={queryClient}>
-      <InvestmentFeesTrackerAddon ctx={context} />
-    </QueryClientProvider>
-  );
+    // Create wrapper component with QueryClientProvider
+    const InvestmentFeesTrackerWrapper = () => (
+      <QueryClientProvider client={queryClient}>
+        <InvestmentFeesTrackerAddon ctx={context} />
+      </QueryClientProvider>
+    );
 
-  // Register route
-  context.router.add({
-    path: '/addons/investment-fees-tracker',
-    component: React.lazy(() => Promise.resolve({ 
-      default: InvestmentFeesTrackerWrapper 
-    }))
-  });
+    // Register route
+    context.router.add({
+      path: '/addons/investment-fees-tracker',
+      component: React.lazy(() => Promise.resolve({ 
+        default: InvestmentFeesTrackerWrapper 
+      }))
+    });
+    
+    context.api.logger.debug('Route registered successfully');
+    context.api.logger.info('Investment Fees Tracker addon enabled successfully');
+
+  } catch (error) {
+    context.api.logger.error('Failed to initialize addon: ' + (error as Error).message);
+    // Re-throw the error so the addon system can handle it
+    throw error;
+  }
 
   // Register cleanup callback
   context.onDisable(() => {
-    console.log('🛑 Investment Fees Tracker addon is being disabled');
+    context.api.logger.info('🛑 Investment Fees Tracker addon is being disabled');
     
     // Remove all sidebar items
     addedItems.forEach(item => {
       try {
         item.remove();
       } catch (error) {
-        console.error('❌ Error removing sidebar item:', error);
+        context.api.logger.error('Error removing sidebar item: ' + (error as Error).message);
       }
     });
     
-    console.log('✅ Investment Fees Tracker addon has been cleanly disabled');
+    context.api.logger.info('Investment Fees Tracker addon disabled successfully');
   });
-
-  console.log('✨ Investment Fees Tracker addon has been successfully enabled!');
 };
 
 // Export the enable function as default

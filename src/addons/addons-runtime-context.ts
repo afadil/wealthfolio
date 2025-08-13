@@ -92,6 +92,7 @@ import {
   getSecret,
   deleteSecret,
 } from '@/commands/secrets';
+import { logger } from '@/adapters';
 
 // Store for dynamically added navigation items
 const dynamicNavItems = new Map<string, any>();
@@ -302,7 +303,14 @@ export function createAddonContext(addonId: string): AddonContext {
         getAccountImportMapping,
         saveAccountImportMapping,
 
-      });
+        // Logger functions
+        logError: logger.error,
+        logInfo: logger.info,
+        logWarn: logger.warn,
+        logTrace: logger.trace,
+        logDebug: logger.debug,
+
+      }, addonId);
       
       // Add the secrets API manually
       (baseAPI as any).secrets = createAddonScopedSecrets(addonId);

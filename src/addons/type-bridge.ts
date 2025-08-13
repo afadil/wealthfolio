@@ -119,13 +119,29 @@ export interface InternalHostAPI {
   checkActivitiesImport(params: { account_id: string; activities: ActivityImport[] }): Promise<ActivityImport[]>;
   getAccountImportMapping(accountId: string): Promise<ImportMappingData>;
   saveAccountImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>;
+
+  // Logger functions (internal - these are the raw logger functions)
+  logError(message: string): void;
+  logInfo(message: string): void;
+  logWarn(message: string): void;
+  logTrace(message: string): void;
+  logDebug(message: string): void;
 }
 
 /**
  * Type bridge utility to convert between internal and SDK types
  * This handles the mapping between the actual implementation types and the public SDK types
  */
-export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI {
+export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: string): SDKHostAPI {
+  // Create logger with addon prefix
+  const createAddonLogger = (prefix: string) => ({
+    error: (message: string) => internalAPI.logError(`[${prefix}] ${message}`),
+    info: (message: string) => internalAPI.logInfo(`[${prefix}] ${message}`),
+    warn: (message: string) => internalAPI.logWarn(`[${prefix}] ${message}`),
+    trace: (message: string) => internalAPI.logTrace(`[${prefix}] ${message}`),
+    debug: (message: string) => internalAPI.logDebug(`[${prefix}] ${message}`),
+  });
+
   return {
     accounts: {
       getAll: internalAPI.getAccounts,
@@ -199,6 +215,8 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI): SDKHostAPI
       openCsvDialog: internalAPI.openCsvFileDialog,
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
+
+    logger: createAddonLogger(addonId || 'unknown-addon'),
 
     events: {
       import: {

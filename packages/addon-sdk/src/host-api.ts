@@ -465,6 +465,43 @@ export interface SecretsAPI {
 }
 
 /**
+ * Logger APIs
+ * Provides logging functionality with automatic addon prefix
+ * All log messages will be prefixed with the addon ID for easy identification
+ */
+export interface LoggerAPI {
+  /**
+   * Log an error message
+   * @param message Error message to log
+   */
+  error(message: string): void;
+
+  /**
+   * Log an info message
+   * @param message Info message to log
+   */
+  info(message: string): void;
+
+  /**
+   * Log a warning message
+   * @param message Warning message to log
+   */
+  warn(message: string): void;
+
+  /**
+   * Log a trace message (for detailed debugging)
+   * @param message Trace message to log
+   */
+  trace(message: string): void;
+
+  /**
+   * Log a debug message
+   * @param message Debug message to log
+   */
+  debug(message: string): void;
+}
+
+/**
  * Event listeners APIs
  */
 export interface EventsAPI {
@@ -583,6 +620,9 @@ export interface HostAPI {
   
   /** Secrets management */
   secrets: SecretsAPI;
+  
+  /** Logger operations */
+  logger: LoggerAPI;
   
   /** Event listeners */
   events: EventsAPI;

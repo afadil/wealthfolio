@@ -743,6 +743,75 @@ Lists all secret keys (not values).
 const keys = await ctx.api.secrets.list();
 ```
 
+### 📝 Logger API
+
+Logging functionality with automatic addon prefix for easy identification.
+
+All log messages will be automatically prefixed with your addon ID, making it easy to identify which addon is logging messages during development and debugging.
+
+#### Methods
+
+**`error(message: string): void`**
+
+Log an error message.
+
+```typescript
+ctx.api.logger.error('Failed to process data');
+// Output: [your-addon-id] Failed to process data
+```
+
+**`info(message: string): void`**
+
+Log an informational message.
+
+```typescript
+ctx.api.logger.info('Processing completed successfully');
+// Output: [your-addon-id] Processing completed successfully
+```
+
+**`warn(message: string): void`**
+
+Log a warning message.
+
+```typescript
+ctx.api.logger.warn('API rate limit approaching');
+// Output: [your-addon-id] API rate limit approaching
+```
+
+**`debug(message: string): void`**
+
+Log a debug message (typically for development).
+
+```typescript
+ctx.api.logger.debug('Variable value: ' + JSON.stringify(data));
+// Output: [your-addon-id] Variable value: {...}
+```
+
+**`trace(message: string): void`**
+
+Log a trace message (for detailed debugging).
+
+```typescript
+ctx.api.logger.trace('Entering function processData()');
+// Output: [your-addon-id] Entering function processData()
+```
+
+#### Usage Example
+
+```typescript
+export function enable(ctx: AddonContext) {
+  ctx.api.logger.info('Addon enabled');
+  
+  try {
+    // Your addon logic here
+    const data = await processData();
+    ctx.api.logger.debug('Processed data: ' + JSON.stringify(data));
+  } catch (error) {
+    ctx.api.logger.error('Error processing data: ' + error.message);
+  }
+}
+```
+
 ---
 
 ## Event System
