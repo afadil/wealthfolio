@@ -16,6 +16,7 @@ import {
   ActivityTypeSelector,
   type ActivityType as ActivityTypeUI,
 } from '../activity-type-selector';
+import { CashBalanceWarning } from '../cash-balance-warning';
 
 export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
@@ -33,6 +34,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
           <ActivityTypeSelector control={control} types={tradeTypes} columns={2} />
         </div>
       </div>
+      <CashBalanceWarning />
       <Card>
         <CardContent className="space-y-6 pt-2">
           <ConfigurationCheckbox showCurrencyOption={true} />
