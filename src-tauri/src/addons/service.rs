@@ -686,3 +686,64 @@ pub async fn download_addon_package(download_url: &str) -> Result<Vec<u8>, Strin
 
     Ok(zip_data)
 }
+
+/// Fetch available addons from the store API  
+pub async fn fetch_addon_store_listings() -> Result<Vec<serde_json::Value>, String> {
+    // Fetch all addons and let frontend filter by status
+    let api_url = ADDON_STORE_API_BASE_URL.to_string();
+    
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&api_url)
+        .header("User-Agent", "Wealthfolio/1.0")
+        .send()
+        .await
+        .map_err(|e| {
+            log::error!("Failed to fetch addon store listings: {}", e);
+            format!("Failed to fetch addon store listings: {}", e)
+        })?;
+
+    let status = response.status();
+
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        log::error!("Store API returned error {}: {}", status, error_text);
+        return Err(format!("Store API returned error {}: {}", status, error_text));
+    }
+
+    // Get the response text first for logging
+    let response_text = response.text().await
+        .map_err(|e| {
+            log::error!("Failed to read store API response: {}", e);
+            format!("Failed to read store API response: {}", e)
+        })?;
+    
+    // Parse the response as an object first to handle the {"addons": [...]} structure
+    let response_json: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| {
+            log::error!("Failed to parse store API response as JSON: {}", e);
+            log::error!("Response body was: {}", response_text);
+            format!("Failed to parse store API response: {}", e)
+        })?;
+    
+    // Extract the addons array from the response object
+    let store_listings = if let Some(addons) = response_json.get("addons") {
+        if let Some(addons_array) = addons.as_array() {
+            addons_array.clone()
+        } else {
+            log::error!("'addons' field is not an array in API response");
+            return Err("'addons' field is not an array in API response".to_string());
+        }
+    } else {
+        // Fallback: try to parse as direct array for backward compatibility
+        if let Some(direct_array) = response_json.as_array() {
+            direct_array.clone()
+        } else {
+            log::error!("API response is neither {{\"addons\": [...]}} nor a direct array");
+            log::error!("Response structure: {}", serde_json::to_string_pretty(&response_json).unwrap_or_default());
+            return Err("Invalid API response structure".to_string());
+        }
+    };
+
+    Ok(store_listings)
+}

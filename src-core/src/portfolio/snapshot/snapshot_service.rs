@@ -546,10 +546,6 @@ impl SnapshotService {
                         format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
                     // Note: calculated_at remains the same as the previous snapshot
                     current_holdings_snapshot = carried_forward_state;
-                    debug!(
-                        "No activities for account {} on {}. Carrying forward state.",
-                        account_id, current_date
-                    );
                 } else {
                     // Activities occurred, call the calculator
                     match self.holdings_calculator.calculate_next_holdings(

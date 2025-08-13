@@ -1,6 +1,6 @@
 import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
 import { ReactVersion } from '@wealthfolio/addon-sdk';
-import { createAddonContext, getDynamicNavItems, getDynamicRoutes } from '@/addons/addons-runtime-context';
+import { createAddonContext, getDynamicNavItems, getDynamicRoutes, triggerAllDisableCallbacks } from '@/addons/addons-runtime-context';
 import { logger } from '@/adapters';
 import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
 
@@ -229,6 +229,9 @@ export function unloadAllAddons(): void {
   
   loadedAddons.clear();
   loadedAddonIds.clear(); // Clear the set when unloading all
+  
+  // Clear navigation items and routes from runtime context
+  triggerAllDisableCallbacks();
 }
 
 /**

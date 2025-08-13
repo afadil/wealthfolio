@@ -74,7 +74,7 @@ export function AddonUpdateCard({
   const getUpdateBadgeText = () => {
     if (updateInfo.isCritical) return 'Critical Update';
     if (updateInfo.hasBreakingChanges) return 'Breaking Changes';
-    return 'Update Available';
+    return null; // Don't show badge for regular updates
   };
 
   if (!updateInfo.updateAvailable) {
@@ -88,9 +88,11 @@ export function AddonUpdateCard({
           <div className="flex items-center gap-2">
             <Icons.ArrowUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <h4 className="font-medium text-amber-900 dark:text-amber-100">Update Available</h4>
-            <Badge variant={getUpdateBadgeVariant()} className="text-xs">
-              {getUpdateBadgeText()}
-            </Badge>
+            {getUpdateBadgeText() && (
+              <Badge variant={getUpdateBadgeVariant()} className="text-xs">
+                {getUpdateBadgeText()}
+              </Badge>
+            )}
           </div>
           
           <div className="text-sm text-amber-800 dark:text-amber-200">
@@ -113,7 +115,7 @@ export function AddonUpdateCard({
           {(updateInfo.releaseNotes || updateInfo.changelogUrl) && (
             <Dialog open={showReleaseNotes} onOpenChange={setShowReleaseNotes}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
+                <Button variant="ghost" size="sm">
                   <Icons.FileText className="mr-1 h-3 w-3" />
                   Release Notes
                 </Button>
@@ -198,7 +200,6 @@ export function AddonUpdateCard({
             onClick={handleUpdate}
             disabled={isUpdating || disabled}
             size="sm"
-            className="h-8"
           >
             {isUpdating ? (
               <>

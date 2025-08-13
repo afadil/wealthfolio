@@ -55,106 +55,164 @@ export interface PermissionCategory {
  */
 export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   {
+    id: 'accounts',
+    name: 'Account Management',
+    description: 'Access to account information and settings',
+    functions: ['getAll', 'create'],
+    riskLevel: 'high',
+  },
+  {
     id: 'portfolio',
     name: 'Portfolio Data',
     description: 'Access to holdings, portfolio performance, and account valuations',
     functions: [
-      'getHoldings', 'getHolding', 'updatePortfolio', 'recalculatePortfolio',
-      'getIncomeSummary', 'getHistoricalValuations', 'getLatestValuations',
-      'calculatePerformanceHistory', 'calculatePerformanceSummary',
-      'calculateAccountsSimplePerformance'
+      'getHoldings',
+      'getHolding',
+      'update',
+      'recalculate',
+      'getIncomeSummary',
+      'getHistoricalValuations',
+      'getLatestValuations',
     ],
-    riskLevel: 'medium'
+    riskLevel: 'high',
   },
   {
     id: 'activities',
     name: 'Transaction History',
     description: 'Access to transaction records and activity management',
     functions: [
-      'getActivities', 'searchActivities', 'createActivity', 'updateActivity',
-      'saveActivities', 'importActivities', 'checkActivitiesImport',
-      'getAccountImportMapping', 'saveAccountImportMapping'
+      'getAll',
+      'search',
+      'create',
+      'update',
+      'saveMany',
+      'import',
+      'checkImport',
+      'getImportMapping',
+      'saveImportMapping',
     ],
-    riskLevel: 'high'
-  },
-  {
-    id: 'accounts',
-    name: 'Account Management',
-    description: 'Access to account information and settings',
-    functions: [
-      'getAccounts', 'createAccount', 'updateAccount'
-    ],
-    riskLevel: 'high'
+    riskLevel: 'high',
   },
   {
     id: 'market-data',
     name: 'Market Data',
     description: 'Access to market prices, quotes, and financial data',
     functions: [
-      'searchTicker', 'syncHistoryQuotes', 'getAssetProfile', 'updateAssetProfile',
-      'updateAssetDataSource', 'updateQuote', 'syncMarketData',
-      'getQuoteHistory', 'getMarketDataProviders'
+      'searchTicker',
+      'syncHistory',
+      'sync',
+      'getProviders',
     ],
-    riskLevel: 'low'
+    riskLevel: 'low',
   },
   {
-    id: 'financial-planning',
-    name: 'Financial Planning',
-    description: 'Access to goals, contribution limits, and planning tools',
+    id: 'assets',
+    name: 'Asset Management',
+    description: 'Access to asset profiles and data sources',
     functions: [
-      'getGoals', 'createGoal', 'updateGoal', 'updateGoalsAllocations',
-      'getGoalsAllocation', 'getContributionLimit', 'createContributionLimit',
-      'updateContributionLimit', 'calculateDepositsForLimit'
+      'getProfile',
+      'updateProfile',
+      'updateDataSource',
     ],
-    riskLevel: 'medium'
+    riskLevel: 'medium',
+  },
+  {
+    id: 'quotes',
+    name: 'Quote Management',
+    description: 'Access to price quotes and historical data',
+    functions: [
+      'update',
+      'getHistory',
+    ],
+    riskLevel: 'low',
+  },
+  {
+    id: 'performance',
+    name: 'Performance Analytics',
+    description: 'Access to performance calculations and metrics',
+    functions: [
+      'calculateHistory',
+      'calculateSummary',
+      'calculateAccountsSimple',
+    ],
+    riskLevel: 'medium',
   },
   {
     id: 'currency',
     name: 'Exchange Rates',
     description: 'Access to currency exchange rates and conversion data',
+    functions: ['getAll', 'update', 'add'],
+    riskLevel: 'low',
+  },
+  {
+    id: 'goals',
+    name: 'Goals Management',
+    description: 'Access to financial goals and allocations',
     functions: [
-      'getExchangeRates', 'updateExchangeRate', 'addExchangeRate'
+      'getAll',
+      'create',
+      'update',
+      'updateAllocations',
+      'getAllocations',
     ],
-    riskLevel: 'low'
+    riskLevel: 'medium',
+  },
+  {
+    id: 'contribution-limits',
+    name: 'Contribution Limits',
+    description: 'Access to contribution limits and deposit calculations',
+    functions: [
+      'getAll',
+      'create',
+      'update',
+      'calculateDeposits',
+    ],
+    riskLevel: 'medium',
   },
   {
     id: 'settings',
     name: 'Application Settings',
     description: 'Access to application settings and configuration',
-    functions: [
-      'getSettings', 'updateSettings', 'backupDatabase'
-    ],
-    riskLevel: 'high'
+    functions: ['get', 'update', 'backupDatabase'],
+    riskLevel: 'medium',
   },
   {
     id: 'files',
     name: 'File Operations',
     description: 'Access to file dialogs and file system operations',
-    functions: [
-      'openCsvFileDialog', 'openFileSaveDialog'
-    ],
-    riskLevel: 'medium'
+    functions: ['openCsvDialog', 'openSaveDialog'],
+    riskLevel: 'medium',
+  },
+  {
+    id: 'secrets',
+    name: 'Secrets Management',
+    description: 'Access to secure storage for addon secrets',
+    functions: ['set', 'get', 'delete'],
+    riskLevel: 'high',
   },
   {
     id: 'events',
     name: 'Event Listeners',
     description: 'Access to application events and notifications',
     functions: [
-      'onDropHover', 'onDrop', 'onDropCancelled',
-      'onUpdateStart', 'onUpdateComplete', 'onUpdateError',
-      'onSyncStart', 'onSyncComplete'
+      'onDropHover',
+      'onDrop',
+      'onDropCancelled',
+      'onUpdateStart',
+      'onUpdateComplete',
+      'onUpdateError',
+      'onSyncStart',
+      'onSyncComplete',
     ],
-    riskLevel: 'low'
+    riskLevel: 'low',
   },
   {
     id: 'ui',
     name: 'User Interface',
     description: 'Access to modify navigation and add UI components',
-    functions: [
-      'sidebar.addItem', 'router.add'
-    ],
-    riskLevel: 'low'
-  }
+    functions: ['sidebar.addItem', 'router.add'],
+    riskLevel: 'low',
+  },
 ];
 
 /**

@@ -147,3 +147,37 @@ export const updateAddonFromStore = async (addonId: string, downloadUrl: string)
     throw error;
   }
 };
+
+export const downloadAndExtractAddon = async (downloadUrl: string): Promise<ExtractedAddon> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('download_and_extract_addon', { downloadUrl });
+      default:
+        throw new Error('Addon download and extraction is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error downloading and extracting addon.');
+    throw error;
+  }
+};
+
+export const installAddonFromStore = async (
+  downloadUrl: string,
+  enableAfterInstall?: boolean
+): Promise<AddonManifest> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('install_addon_from_store', { 
+          downloadUrl,
+          enableAfterInstall
+        });
+      default:
+        throw new Error('Addon installation from store is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error installing addon from store.');
+    throw error;
+  }
+};

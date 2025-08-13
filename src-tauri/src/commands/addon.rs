@@ -467,3 +467,37 @@ pub async fn update_addon_from_store(
 
     Ok(new_metadata)
 }
+
+/// Fetch available addons from the store
+#[tauri::command]
+pub async fn fetch_addon_store_listings() -> Result<Vec<serde_json::Value>, String> {
+    crate::addons::service::fetch_addon_store_listings().await
+}
+
+/// Download and extract addon from store for permission analysis
+#[tauri::command]
+pub async fn download_and_extract_addon(
+    download_url: String,
+) -> Result<ExtractedAddon, String> {
+    // Download the addon package
+    let zip_data = download_addon_package(&download_url).await
+        .map_err(|e| format!("Failed to download addon from store: {}", e))?;
+
+    // Extract and analyze permissions directly in backend
+    extract_addon_zip_internal(zip_data)
+}
+
+/// Install addon from store after user permission approval
+#[tauri::command]
+pub async fn install_addon_from_store(
+    app_handle: AppHandle,
+    download_url: String,
+    enable_after_install: Option<bool>,
+) -> Result<AddonManifest, String> {
+    // Download the addon package
+    let zip_data = download_addon_package(&download_url).await
+        .map_err(|e| format!("Failed to download addon from store: {}", e))?;
+
+    // Install directly using existing logic
+    install_addon_zip(app_handle, zip_data, enable_after_install).await
+}

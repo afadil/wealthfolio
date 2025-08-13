@@ -76,6 +76,13 @@ import {
   Copy,
   Grid3x3,
   LayoutDashboard,
+  Store,
+  Package,
+  Star,
+  Shield,
+  ExternalLink,
+  Pause,
+  PauseCircle,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -131,6 +138,7 @@ export const Icons = {
   Pencil: Pencil,
   PlusCircle: PlusCircle,
   MinusCircle: MinusCircle,
+  PauseCircle: PauseCircle,
   PieChart: PieChart,
   BarChart: BarChart,
   Spinner: Loader2,
@@ -157,6 +165,12 @@ export const Icons = {
   Percent: Percent,
   Split: Split,
   FileUp: FileUp,
+  Store: Store,
+  Package: Package,
+  Star: Star,
+  Shield: Shield,
+  ExternalLink: ExternalLink,
+
 
   Dashboard: ({ ...props }: LucideProps) => (
     <svg

@@ -51,8 +51,6 @@ export function PermissionDialog({
     return null;
   }
 
-  console.log('Rendering PermissionDialog with manifest:', manifest);
-
   // For installation (not view-only), use manifest permissions
   // For view-only, use declared permissions passed in
   const permissionsToDisplay = isViewOnly ? declaredPermissions : (manifest.permissions || []);
@@ -98,7 +96,7 @@ export function PermissionDialog({
             <AlertFeedback
               variant={getRiskLevelVariant(riskLevel)}
             >
-              {riskLevel === 'low' && 'This addon has minimal access to sensitive data.'}
+              {riskLevel === 'low' && 'This addon has minimal access to your data.'}
               {riskLevel === 'medium' && 'This addon has moderate access to your financial data.'}
               {riskLevel === 'high' && 'This addon has extensive access to sensitive financial data.'}
             </AlertFeedback>
@@ -111,23 +109,6 @@ export function PermissionDialog({
               variant="default"
             />
           </div>
-
-          {/* Warning for high-risk addons */}
-          {riskLevel === 'high' && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Icons.AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="font-medium text-red-800">High-Risk Addon</div>
-                  <p className="text-sm text-red-700">
-                    This addon can access sensitive financial data including transactions, 
-                    account information, and application settings. Only install if you trust 
-                    the author and understand the risks.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <DialogFooter className="gap-3">

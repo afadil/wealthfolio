@@ -40,7 +40,7 @@ class AddonDevManager {
    * Auto-discover running development servers
    */
   private async discoverDevServers(): Promise<void> {
-    const commonPorts = [3001, 3002, 3003, 3004, 3005];
+    const commonPorts = [3001];
     
     logger.info('🔍 Auto-discovering addon development servers...');
     

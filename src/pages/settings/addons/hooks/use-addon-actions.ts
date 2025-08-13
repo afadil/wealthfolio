@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
-import { triggerAllDisableCallbacks } from '@/addons/addons-runtime-context';
+
 import { reloadAllAddons } from '@/addons/addons-core';
 import {
   installAddonZip,
@@ -11,8 +12,9 @@ import {
   uninstallAddon,
   extractAddonZip,
 } from '@/commands/addon';
-import type { InstalledAddon, Permission } from '@/adapters/tauri';
+import type { InstalledAddon, Permission, ExtractedAddon } from '@/adapters/tauri';
 import type { RiskLevel } from '@wealthfolio/addon-sdk';
+import { QueryKeys } from '@/lib/query-keys';
 
 interface PermissionDialogState {
   open: boolean;
@@ -31,10 +33,9 @@ interface ViewPermissionDialogState {
 }
 
 export function useAddonActions() {
-  const [installedAddons, setInstalledAddons] = useState<InstalledAddon[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingAddons, setIsLoadingAddons] = useState(true);
   const [togglingAddonId, setTogglingAddonId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Permission dialog state
   const [permissionDialog, setPermissionDialog] = useState<PermissionDialogState>({
@@ -48,22 +49,16 @@ export function useAddonActions() {
 
   const { toast } = useToast();
 
-  const loadInstalledAddons = useCallback(async () => {
-    try {
-      setIsLoadingAddons(true);
-      const addons = await listInstalledAddons();
-      setInstalledAddons(addons);
-    } catch (error) {
-      console.error('Error loading installed addons:', error);
-      toast({
-        title: 'Error loading addons',
-        description: error instanceof Error ? error.message : 'Failed to load installed addons',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoadingAddons(false);
-    }
-  }, [toast]);
+  // Use TanStack Query for installed addons
+  const {
+    data: installedAddons = [],
+    isLoading: isLoadingAddons,
+    refetch: loadInstalledAddons,
+  } = useQuery({
+    queryKey: [QueryKeys.INSTALLED_ADDONS],
+    queryFn: listInstalledAddons,
+    staleTime: 30 * 1000, // 30 seconds
+  });
 
   // Helper function to calculate risk level from permissions
   const calculateRiskLevel = (permissions: Permission[]): RiskLevel => {
@@ -142,13 +137,38 @@ export function useAddonActions() {
     }
   };
 
+  const handleShowPermissionDialog = (extractedAddon: ExtractedAddon, onApprove: () => Promise<void>) => {
+    // Calculate risk level based on permissions
+    const permissions = extractedAddon.metadata.permissions || [];
+    const riskLevel = calculateRiskLevel(permissions);
+
+    // Show permission dialog
+    setPermissionDialog({
+      open: true,
+      manifest: extractedAddon.metadata,
+      permissions,
+      riskLevel,
+      onApprove: async () => {
+        setPermissionDialog({ open: false });
+        await onApprove();
+        // Invalidate and refetch installed addons query
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
+        await reloadAllAddons();
+        toast({
+          title: 'Addon installed successfully',
+          description: `${extractedAddon.metadata.name} has been installed and is now active.`,
+        });
+      },
+    });
+  };
+
   const performAddonInstallation = async (fileData: Uint8Array) => {
     try {
       // Install the ZIP addon persistently
       const metadata = await installAddonZip(fileData, true);
 
-      // Refresh the addon list
-      await loadInstalledAddons();
+      // Invalidate and refetch installed addons query
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
 
       // Reload all addons to load the newly installed addon immediately
       await reloadAllAddons();
@@ -169,8 +189,8 @@ export function useAddonActions() {
       const newEnabled = !currentEnabled;
       await toggleAddon(addonId, newEnabled);
 
-      // Refresh the addon list
-      await loadInstalledAddons();
+      // Invalidate and refetch installed addons query
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
 
       const addon = installedAddons.find((a) => a.metadata.id === addonId);
       if (addon) {
@@ -182,11 +202,6 @@ export function useAddonActions() {
 
       // Reload all addons to apply the changes immediately
       await reloadAllAddons();
-
-      // If disabling, trigger cleanup callbacks (this is now redundant since reloadAllAddons handles it)
-      if (!newEnabled) {
-        triggerAllDisableCallbacks();
-      }
     } catch (error) {
       console.error('Error toggling addon:', error);
       toast({
@@ -206,8 +221,8 @@ export function useAddonActions() {
 
       await uninstallAddon(addonId);
 
-      // Refresh the addon list
-      await loadInstalledAddons();
+      // Invalidate and refetch installed addons query
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
 
       toast({
         title: 'Addon uninstalled',
@@ -216,9 +231,6 @@ export function useAddonActions() {
 
       // Reload all addons to remove the uninstalled addon from runtime
       await reloadAllAddons();
-
-      // Trigger disable callbacks for cleanup (this is now redundant since reloadAllAddons handles it)
-      triggerAllDisableCallbacks();
     } catch (error) {
       console.error('Error uninstalling addon:', error);
       toast({
@@ -265,6 +277,8 @@ export function useAddonActions() {
     // Actions
     loadInstalledAddons,
     handleLoadAddon,
+    handleInstallZipAddon,
+    handleShowPermissionDialog,
     handleToggleAddon,
     handleUninstallAddon,
     handleViewPermissions,

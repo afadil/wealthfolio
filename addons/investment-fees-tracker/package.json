@@ -1,5 +1,5 @@
 {
-  "name": "@investment-fees-tracker/addon",
+  "name": "investment-fees-tracker-addon",
   "version": "1.0.0",
   "description": "An addon for tracking and analyzing investment fees across your portfolio",
   "type": "module",

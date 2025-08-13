@@ -157,6 +157,9 @@ pub fn main() {
             commands::addon::check_addon_update,
             commands::addon::check_all_addon_updates,
             commands::addon::update_addon_from_store,
+            commands::addon::fetch_addon_store_listings,
+            commands::addon::download_and_extract_addon,
+            commands::addon::install_addon_from_store,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

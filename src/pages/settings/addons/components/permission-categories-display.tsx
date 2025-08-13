@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import type { Permission, FunctionPermission } from '@/adapters/tauri';
 import { getPermissionCategory } from '@wealthfolio/addon-sdk';
+import { getFunctionDisplayName } from '@/pages/settings/addons/components/addon-function-names';
 
 interface PermissionForDisplay {
   category: string;
@@ -32,11 +33,11 @@ const convertToDisplayPermission = (permission: Permission): PermissionForDispla
 const getRiskBadgeColor = (riskLevel: string) => {
   switch (riskLevel) {
     case 'low':
-      return 'border-green-200 text-green-600';
+      return 'border-success/20 text-success bg-success/10';
     case 'medium':
-      return 'border-yellow-200 text-yellow-600';
+      return 'border-warning/20 text-warning bg-warning/10';
     case 'high':
-      return 'border-red-200 text-red-600';
+      return 'border-destructive/20 text-destructive bg-destructive/10';
     default:
       return 'border-gray-200 text-gray-600';
   }
@@ -108,8 +109,9 @@ export function PermissionCategoriesDisplay({
                           key={func.name}
                           variant={getFunctionBadgeVariant(func)}
                           className={isCompact ? 'text-xs' : 'text-xs'}
+                          title={func.name} // Show technical name on hover
                         >
-                          {func.name}
+                          {getFunctionDisplayName(permission.category, func.name)}
                         </Badge>
                       ))}
                     </div>

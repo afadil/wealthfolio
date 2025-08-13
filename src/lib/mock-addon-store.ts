@@ -25,9 +25,10 @@ const MOCK_STORE_DATA: Record<string, AddonStoreListing> = {
     downloads: 1250,
     rating: 4.8,
     reviewCount: 23,
-    verified: true,
+    status: 'active' as const,
     lastUpdated: '2025-01-20T10:30:00Z',
     images: [],
+    tags: ['demo', 'tutorial', 'beginner'],
     releaseNotes: `# Hello World Addon v1.2.0
 
 ## What's New
@@ -77,9 +78,10 @@ This update is compatible with all existing configurations.`,
     downloads: 5680,
     rating: 4.9,
     reviewCount: 89,
-    verified: true,
+    status: 'active' as const,
     lastUpdated: '2025-01-15T14:20:00Z',
     images: [],
+    tags: ['portfolio', 'analytics', 'performance', 'tracking'],
     releaseNotes: `# Advanced Portfolio Tracker v2.1.0
 
 ## 🚨 CRITICAL SECURITY UPDATE

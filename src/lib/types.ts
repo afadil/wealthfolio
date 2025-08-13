@@ -509,3 +509,23 @@ export type TrackedItem = {
   name: string;
 };
 
+// Addon Store Types
+export interface AddonStoreListing {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  downloadUrl: string;
+  downloads: number;
+  rating: number;
+  reviewCount: number;
+  status?: 'active' | 'inactive' | 'deprecated' | 'coming-soon';
+  lastUpdated: string;
+  releaseNotes: string;
+  changelogUrl: string;
+  images: string[];
+  /** Classification tags for filtering */
+  tags?: string[];
+}
+

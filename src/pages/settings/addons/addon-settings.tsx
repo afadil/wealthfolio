@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { SettingsHeader } from '../header';
 import {
   DeleteConfirm,
@@ -6,20 +6,25 @@ import {
   EmptyPlaceholder,
   Badge,
   Switch,
-  Label,
   Popover,
   PopoverContent,
   PopoverTrigger,
   Icons,
-  Separator,
   useToast,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@wealthfolio/ui';
 import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
 import { AddonUpdateCard } from '@/pages/settings/addons/components/addon-update-card';
+import { AddonStoreBrowser } from '@/pages/settings/addons/components/addon-store-browser';
 import { useAddonActions } from './hooks/use-addon-actions';
 import { useAddonUpdates } from './hooks/use-addon-updates';
 
 export default function AddonSettingsPage() {
+  const [activeTab, setActiveTab] = useState<'installed' | 'store'>('installed');
+
   const {
     installedAddons,
     isLoading,
@@ -38,21 +43,18 @@ export default function AddonSettingsPage() {
 
   const {
     isCheckingUpdates,
-    lastUpdateCheck,
     checkAllUpdates,
     getUpdateResult,
     hasUpdates,
     getUpdateCount,
     getCriticalUpdateCount,
     clearUpdateResult,
-  } = useAddonUpdates();
+  } = useAddonUpdates({
+    installedAddons,
+    autoCheck: true,
+  });
 
   const { toast } = useToast();
-
-  // Load installed addons on component mount
-  useEffect(() => {
-    loadInstalledAddons();
-  }, [loadInstalledAddons]);
 
   const handleCheckUpdates = async () => {
     try {
@@ -68,6 +70,8 @@ export default function AddonSettingsPage() {
     clearUpdateResult(addonId);
   };
 
+  const installedAddonIds = installedAddons.map((addon) => addon.metadata.id);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -79,7 +83,7 @@ export default function AddonSettingsPage() {
         <div className="flex items-center gap-3">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="ghost" size="icon">
                 <Icons.Info className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
@@ -105,234 +109,310 @@ export default function AddonSettingsPage() {
               </div>
             </PopoverContent>
           </Popover>
-
-          <Button
-            variant="outline"
-            onClick={handleCheckUpdates}
-            disabled={isCheckingUpdates || installedAddons.length === 0}
-          >
-            {isCheckingUpdates ? (
-              <>
-                <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
-                Checking...
-              </>
-            ) : (
-              <>
-                <Icons.Refresh className="mr-2 h-4 w-4" />
-                Check Updates
-                {hasUpdates() && (
-                  <Badge
-                    variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
-                    className="ml-2"
-                  >
-                    {getUpdateCount()}
-                  </Badge>
-                )}
-              </>
-            )}
-          </Button>
-
-          <Button onClick={handleLoadAddon} disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
-                Installing...
-              </>
-            ) : (
-              <>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                Install Addon
-              </>
-            )}
-          </Button>
         </div>
       </div>
 
-      <Separator />
+      <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="installed" className="flex items-center gap-2">
+            <Icons.Package className="h-4 w-4" />
+            Installed Addons
+            {installedAddons.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {installedAddons.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="store" className="flex items-center gap-2">
+            <Icons.Store className="h-4 w-4" />
+            Browse Store
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-medium">Installed Addons</h3>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>
-                {installedAddons.length} addon{installedAddons.length !== 1 ? 's' : ''} installed
-              </span>
-              {lastUpdateCheck && (
-                <span className="flex items-center gap-1">
-                  <Icons.Clock className="h-3 w-3" />
-                  Last checked: {lastUpdateCheck.toLocaleDateString()} at{' '}
-                  {lastUpdateCheck.toLocaleTimeString()}
-                </span>
-              )}
-              {hasUpdates() && (
-                <Badge
-                  variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
-                  className="text-xs"
-                >
-                  {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
-                  {getCriticalUpdateCount() > 0 && ` (${getCriticalUpdateCount()} critical)`}
-                </Badge>
-              )}
-            </div>
-          </div>
-
-          <a
-            href="https://wealthfolio.app/addons"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            Browse Plugin Store
-            <Icons.Globe className="h-3 w-3" />
-          </a>
-        </div>
-
-        {isLoadingAddons ? (
-          <div className="flex items-center justify-center py-12">
-            <Icons.Loader className="h-8 w-8 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-muted-foreground">Loading addons...</span>
-          </div>
-        ) : installedAddons.length === 0 ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="FileText" />
-            <EmptyPlaceholder.Title>No addons installed</EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              Get started by installing your first addon package to extend Wealthfolio's
-              functionality.
-            </EmptyPlaceholder.Description>
-            <div className="flex items-center gap-3">
-              <Button onClick={handleLoadAddon} disabled={isLoading}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                Install Your First Addon
-              </Button>
-              <a href="https://wealthfolio.app/addons" target="_blank" rel="noopener noreferrer">
-                <Button variant="outline">
-                  Browse Store
-                  <Icons.Globe className="ml-2 h-4 w-4" />
-                </Button>
-              </a>
-            </div>
-          </EmptyPlaceholder>
-        ) : (
-          <div className="space-y-3">
-            {installedAddons.map((addon) => (
-              <div
-                key={addon.metadata.id}
-                className="group rounded-lg border bg-card p-6 transition-all duration-200 hover:bg-accent/30 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 flex-1 space-y-3">
-                    {/* Header section with name and version */}
-                    <div className="flex items-center gap-3">
-                      <h4 className="truncate text-lg font-semibold">{addon.metadata.name}</h4>
-                      <Badge variant="outline" className="shrink-0 text-xs">
-                        v{addon.metadata.version}
-                      </Badge>
-                    </div>
-
-                    {/* Description */}
-                    {addon.metadata.description && (
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {addon.metadata.description}
-                      </p>
-                    )}
-
-                    {/* Author info */}
-                    {addon.metadata.author && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Icons.Users className="h-4 w-4" />
-                        <span>By {addon.metadata.author}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Controls section */}
-                  <div className="ml-6 flex items-center gap-2">
-                    {/* Permissions button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewPermissions(addon)}
-                      className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+        <TabsContent value="installed" className="space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">Installed Addons</h3>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span>
+                    {installedAddons.length} addon{installedAddons.length !== 1 ? 's' : ''}{' '}
+                    installed
+                  </span>
+                  {hasUpdates() && (
+                    <Badge
+                      variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
+                      className="text-xs"
                     >
-                      <Icons.Settings className="h-4 w-4" />
-                      <span className="sr-only">View permissions</span>
-                    </Button>
+                      {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
+                      {getCriticalUpdateCount() > 0 && ` (${getCriticalUpdateCount()} critical)`}
+                    </Badge>
+                  )}
+                </div>
+              </div>
 
-                    {/* Delete button with confirmation */}
-                    <DeleteConfirm
-                      deleteConfirmTitle="Remove Addon"
-                      deleteConfirmMessage={
-                        <div className="space-y-2">
-                          <p>
-                            Are you sure you want to remove <strong>{addon.metadata.name}</strong>?
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            This action cannot be undone. The addon will be completely removed from
-                            your system.
-                          </p>
+              {/* Tab Actions */}
+              <div className="flex items-center gap-2">
+                {/* Check Updates */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleCheckUpdates}
+                        disabled={isCheckingUpdates || installedAddons.length === 0}
+                        className="relative hover:bg-muted/50"
+                        title="Check for Updates"
+                      >
+                        {isCheckingUpdates ? (
+                          <Icons.Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Icons.Refresh className="h-4 w-4" />
+                        )}
+                        {hasUpdates() && (
+                          <div className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+                        )}
+                      </Button>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" side="bottom" align="end">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Icons.Refresh className="h-4 w-4" />
+                        <span className="font-medium">Check for Updates</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Check all installed addons for available updates from their sources.
+                      </p>
+                      {hasUpdates() && (
+                        <div className="border-t pt-2">
+                          <Badge
+                            variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
+                            className="text-xs"
+                          >
+                            {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
+                          </Badge>
                         </div>
-                      }
-                      handleDeleteConfirm={() => handleUninstallAddon(addon.metadata.id)}
-                      isPending={false}
-                      button={
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Install from File */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleLoadAddon}
+                        disabled={isLoading}
+                        className="hover:bg-muted/50"
+                        title="Install from File"
+                      >
+                        {isLoading ? (
+                          <Icons.Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Icons.Plus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" side="bottom" align="end">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Icons.Plus className="h-4 w-4" />
+                        <span className="font-medium">Install from File</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Install an addon from a local ZIP file. Only install addons from trusted
+                        sources.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Browse Store */}
+                <Button
+                  variant="outline"
+                  onClick={() => setActiveTab('store')}
+                  className="flex items-center gap-1"
+                >
+                  <Icons.Store className="h-4 w-4" />
+                  Browse Store
+                </Button>
+              </div>
+            </div>
+
+            {isLoadingAddons ? (
+              <div className="flex items-center justify-center py-12">
+                <Icons.Loader className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading addons...</span>
+              </div>
+            ) : installedAddons.length === 0 ? (
+              <EmptyPlaceholder>
+                <EmptyPlaceholder.Icon name="Package" />
+                <EmptyPlaceholder.Title>No addons installed</EmptyPlaceholder.Title>
+                <EmptyPlaceholder.Description>
+                  Get started by installing your first addon to extend Wealthfolio's functionality.
+                </EmptyPlaceholder.Description>
+                <div className="flex items-center gap-3">
+                  <Button onClick={() => setActiveTab('store')}>
+                    <Icons.Store className="mr-2 h-4 w-4" />
+                    Browse Store
+                  </Button>
+                  <Button variant="outline" onClick={handleLoadAddon} disabled={isLoading}>
+                    <Icons.Plus className="mr-2 h-4 w-4" />
+                    Install from File
+                  </Button>
+                </div>
+              </EmptyPlaceholder>
+            ) : (
+              <div className="space-y-3">
+                {installedAddons.map((addon) => (
+                  <div
+                    key={addon.metadata.id}
+                    className={`group rounded-lg border p-6 transition-all duration-200 ${
+                      addon.metadata.enabled
+                        ? 'bg-card hover:bg-accent/30 hover:shadow-md'
+                        : 'bg-muted/30 border-dashed opacity-75 hover:opacity-90'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 flex-1 space-y-3">
+                        {/* Header section with name and version */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            {!addon.metadata.enabled && (
+                              <Icons.PauseCircle className="h-5 w-5 text-muted-foreground/60" />
+                            )}
+                            <h4 className={`truncate text-lg font-semibold ${
+                              addon.metadata.enabled ? '' : 'text-muted-foreground'
+                            }`}>
+                              {addon.metadata.name}
+                            </h4>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 text-xs text-muted-foreground"
+                          >
+                            v{addon.metadata.version}
+                          </Badge>
+                          {!addon.metadata.enabled && (
+                            <Badge variant="secondary" className="shrink-0 text-xs bg-warning/10 text-warning border-warning/20">
+                              <Icons.AlertCircle className="mr-1 h-3 w-3" />
+                              Disabled
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Description */}
+                        {addon.metadata.description && (
+                          <p className={`text-sm leading-relaxed ${
+                            addon.metadata.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
+                          }`}>
+                            {addon.metadata.description}
+                          </p>
+                        )}
+
+                        {/* Author info */}
+                        {addon.metadata.author && (
+                          <div className={`flex items-center gap-2 text-sm ${
+                            addon.metadata.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
+                          }`}>
+                            <Icons.Users className="h-4 w-4" />
+                            <span>By {addon.metadata.author}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Controls section */}
+                      <div className="ml-6 flex items-center gap-2">
+                        {/* Permissions button */}
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                          onClick={() => handleViewPermissions(addon)}
+                          className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
                         >
-                          <Icons.Trash className="h-4 w-4" />
-                          <span className="sr-only">Remove addon</span>
+                          <Icons.Eye className="h-4 w-4" />
+                          <span className="sr-only">View permissions</span>
                         </Button>
-                      }
-                    />
 
-                    {/* Enable/Disable Switch */}
-                    <div className="mr-2 flex items-center gap-3">
-                      <Label
-                        htmlFor={`addon-${addon.metadata.id}`}
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        {togglingAddonId === addon.metadata.id
-                          ? 'Loading...'
-                          : addon.metadata.enabled
-                            ? 'Enabled'
-                            : 'Disabled'}
-                      </Label>
-                      <Switch
-                        id={`addon-${addon.metadata.id}`}
-                        checked={addon.metadata.enabled}
-                        onCheckedChange={(checked) =>
-                          handleToggleAddon(addon.metadata.id, !checked)
-                        }
-                        className="data-[state=checked]:bg-green-600"
-                        disabled={togglingAddonId === addon.metadata.id}
-                      />
+                        {/* Delete button with confirmation */}
+                        <DeleteConfirm
+                          deleteConfirmTitle="Remove Addon"
+                          deleteConfirmMessage={
+                            <div className="space-y-2">
+                              <p>
+                                Are you sure you want to remove{' '}
+                                <strong>{addon.metadata.name}</strong>?
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                This action cannot be undone. The addon will be completely removed
+                                from your system.
+                              </p>
+                            </div>
+                          }
+                          handleDeleteConfirm={() => handleUninstallAddon(addon.metadata.id)}
+                          isPending={false}
+                          button={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                            >
+                              <Icons.Trash className="h-4 w-4" />
+                              <span className="sr-only">Remove addon</span>
+                            </Button>
+                          }
+                        />
+
+                        {/* Enable/Disable Switch */}
+                        <div className="mr-2 flex items-center gap-3">
+                          <Switch
+                            id={`addon-${addon.metadata.id}`}
+                            checked={addon.metadata.enabled}
+                            onCheckedChange={(checked) =>
+                              handleToggleAddon(addon.metadata.id, !checked)
+                            }
+                            className="data-[state=checked]:bg-green-600"
+                            disabled={togglingAddonId === addon.metadata.id}
+                          />
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Update Card - Show if update is available */}
+                    {(() => {
+                      const updateResult = getUpdateResult(addon.metadata.id);
+                      return updateResult?.updateInfo.updateAvailable ? (
+                        <div className="mt-3">
+                          <AddonUpdateCard
+                            addonId={addon.metadata.id}
+                            addonName={addon.metadata.name}
+                            updateInfo={updateResult.updateInfo}
+                            onUpdateComplete={() => handleUpdateComplete(addon.metadata.id)}
+                            disabled={togglingAddonId === addon.metadata.id}
+                          />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
-                </div>
-
-                {/* Update Card - Show if update is available */}
-                {(() => {
-                  const updateResult = getUpdateResult(addon.metadata.id);
-                  return updateResult?.updateInfo.updateAvailable ? (
-                    <div className="mt-3">
-                      <AddonUpdateCard
-                        addonId={addon.metadata.id}
-                        addonName={addon.metadata.name}
-                        updateInfo={updateResult.updateInfo}
-                        onUpdateComplete={() => handleUpdateComplete(addon.metadata.id)}
-                        disabled={togglingAddonId === addon.metadata.id}
-                      />
-                    </div>
-                  ) : null;
-                })()}
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        </TabsContent>
+
+        <TabsContent value="store">
+          <AddonStoreBrowser
+            installedAddonIds={installedAddonIds}
+            onInstallSuccess={loadInstalledAddons}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Permission Dialog */}
       <PermissionDialog

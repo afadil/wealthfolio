@@ -1,5 +1,5 @@
 {
-  "id": "investment-fees-tracker",
+  "id": "investment-fees-tracker-addon",
   "name": "Investment Fees Tracker",
   "version": "1.0.0",
   "description": "Track and analyze investment fees across your portfolio with detailed analytics and insights",
@@ -17,6 +17,16 @@
       "category": "activities",
       "functions": ["getAll"],
       "purpose": "Access transaction activities to track fee data"
+    },
+    {
+      "category": "currency",
+      "functions": ["getAll"],
+      "purpose": "Access to exchange rates and currency data"
+    },
+    {
+      "category": "settings",
+      "functions": ["get"],
+      "purpose": "Access settings to get base currency for fees calculation"
     },
     {
       "category": "ui",

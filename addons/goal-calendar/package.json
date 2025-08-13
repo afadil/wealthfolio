@@ -1,5 +1,5 @@
 {
-  "name": "wealthfolio-goal-calendar-addon",
+  "name": "goal-calendar-addon",
   "version": "1.0.0",
   "description": "An addon for tracking investment progress towards target amounts with calendar visualization",
   "type": "module",
