@@ -147,6 +147,12 @@ export async function listenMarketSyncStartTauri<T>(
   return listen('market:sync-start', handler);
 }
 
+export async function listenNavigateToRouteTauri<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
+  return listen('navigate-to-route', handler);
+}
+
 
 export const openFileSaveDialogTauri = async (
   fileContent: string | Blob | Uint8Array,

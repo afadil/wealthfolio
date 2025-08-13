@@ -1,10 +1,12 @@
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Manager, Runtime, Emitter};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
         .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("open_settings", "Settings...").build(app)?)
         .separator()
         .item(&PredefinedMenuItem::hide(app, None).unwrap())
         .item(&PredefinedMenuItem::hide_others(app, None).unwrap())
@@ -48,6 +50,12 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
 
 pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
     match event_id {
+        "open_settings" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let payload = serde_json::json!({ "route": "/settings/general" });
+                let _ = window.emit("navigate-to-route", payload);
+            }
+        }
         "report_issue" => {
             app.dialog()
                 .message("If you encounter any issues, please email us at wealthfolio@teymz.com")

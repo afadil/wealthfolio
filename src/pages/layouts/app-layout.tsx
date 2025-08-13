@@ -6,6 +6,7 @@ import { useSettings } from '@/hooks/use-settings';
 import { ErrorBoundary } from '@wealthfolio/ui';
 import { getDynamicNavItems, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 import { useState, useEffect } from 'react';
+import useNavigationEventListener from '@/hooks/use-navigation-event-listener';
 
 const staticNavigation: NavigationProps = {
   primary: [
@@ -48,6 +49,9 @@ const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
   const [dynamicItems, setDynamicItems] = useState<any[]>([]);
+
+  // Setup navigation event listener for menu navigation
+  useNavigationEventListener();
 
   // Subscribe to navigation updates from addons
   useEffect(() => {
