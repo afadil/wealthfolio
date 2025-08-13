@@ -6284,7 +6284,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "1.1.6"
+version = "1.2.0"
 dependencies = [
  "chrono",
  "diesel",
@@ -6309,7 +6309,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio_core"
-version = "1.1.6"
+version = "1.2.0"
 dependencies = [
  "async-trait",
  "chrono",
