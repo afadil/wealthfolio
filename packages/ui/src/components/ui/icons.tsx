@@ -83,7 +83,9 @@ import {
   ExternalLink,
   Pause,
   PauseCircle,
+  ReceiptText,
 } from 'lucide-react';
+import { text } from 'stream/consumers';
 
 export type Icon = LucideIcon;
 
@@ -162,6 +164,7 @@ export const Icons = {
   ArrowRightLeft: ArrowRightLeft,
   ArrowLeftRight: ArrowLeftRight,
   Receipt: Receipt,
+  ReceiptText: ReceiptText,
   Percent: Percent,
   Split: Split,
   FileUp: FileUp,
