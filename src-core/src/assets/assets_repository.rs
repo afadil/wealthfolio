@@ -95,6 +95,7 @@ impl AssetRepositoryTrait for AssetRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
                     .set((
+                        assets::name.eq(&payload_owned.name),
                         assets::sectors.eq(&payload_owned.sectors),
                         assets::countries.eq(&payload_owned.countries),
                         assets::notes.eq(&payload_owned.notes),

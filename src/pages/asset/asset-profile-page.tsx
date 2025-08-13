@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { ApplicationHeader } from '@/components/header';
 import { ApplicationShell } from '@wealthfolio/ui';
 import { Badge } from '@/components/ui/badge';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, Link } from 'react-router-dom';
 import AssetHistoryCard from './asset-history-card';
 import { Holding, Quote, Sector, Country, Asset } from '@/lib/types';
 import { DataSource, PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
@@ -24,6 +24,7 @@ import AssetLotsTable from './asset-lots-table';
 import { getAssetProfile } from '@/commands/market-data';
 
 interface AssetProfileFormData {
+  name: string;
   sectors: Array<Sector>;
   countries: Array<Country>;
   assetClass: string;
@@ -60,7 +61,9 @@ export const AssetProfilePage = () => {
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = queryParams.get('tab') || 'overview';
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [formData, setFormData] = useState<AssetProfileFormData>({
+    name: '',
     sectors: [],
     countries: [],
     assetClass: '',
@@ -108,6 +111,7 @@ export const AssetProfilePage = () => {
 
   useEffect(() => {
     setFormData({
+      name: holding?.instrument?.name || '',
       sectors: holding?.instrument?.sectors || [],
       countries: holding?.instrument?.countries || [],
       assetSubClass: holding?.instrument?.assetSubclass || '',
@@ -120,6 +124,7 @@ export const AssetProfilePage = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setFormData({
+      name: holding?.instrument?.name || '',
       sectors: holding?.instrument?.sectors || [],
       countries: holding?.instrument?.countries || [],
       assetSubClass: holding?.instrument?.assetSubclass || '',
@@ -204,6 +209,7 @@ export const AssetProfilePage = () => {
     if (!holding) return;
     updateAssetProfileMutation.mutate({
       symbol,
+      name: formData.name,
       sectors: JSON.stringify(formData.sectors),
       countries: JSON.stringify(formData.countries),
       notes: formData.notes,
@@ -211,6 +217,19 @@ export const AssetProfilePage = () => {
       assetClass: formData.assetClass,
     });
     setIsEditing(false);
+  };
+
+  const handleSaveTitle = () => {
+    if (!holding) return;
+    updateAssetProfileMutation.mutate({
+      symbol,
+      name: formData.name,
+      sectors: JSON.stringify(formData.sectors),
+      countries: JSON.stringify(formData.countries),
+      notes: formData.notes,
+      assetSubClass: formData.assetSubClass,
+      assetClass: formData.assetClass,
+    });
   };
 
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
@@ -293,12 +312,70 @@ export const AssetProfilePage = () => {
   return (
     <ApplicationShell className="p-6">
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <ApplicationHeader
-          heading={profile?.name || holding?.instrument?.symbol || symbol || '-'}
-          headingPrefix={profile?.symbol || holding?.instrument?.symbol}
-          displayBack={true}
-          backUrl={location.state?.from || '/holdings?tab=holdings'} // Use from state or default back
-        >
+        {/* Custom Header with Editable Title */}
+        <div className="flex w-full items-center justify-between">
+          <div className="flex items-center gap-2 flex-1">
+            <Link to={location.state?.from || '/holdings?tab=holdings'}>
+              <Button variant="ghost" size="icon">
+                <Icons.ArrowLeft />
+              </Button>
+            </Link>
+            <div data-tauri-drag-region="true" className="draggable flex items-center space-x-4 flex-1">
+              {(profile?.symbol || holding?.instrument?.symbol) && (
+                <>
+                  <h1 className="font-heading text-xl font-bold tracking-tight text-muted-foreground">
+                    {profile?.symbol || holding?.instrument?.symbol}
+                  </h1>
+                  <span className="h-6 border-l-2"></span>
+                </>
+              )}
+              <div className="group relative flex items-center flex-1">
+                {isEditingTitle ? (
+                  <Input
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Enter asset name"
+                    className="font-heading text-xl font-bold tracking-tight w-full max-w-md"
+                    onBlur={() => {
+                      setIsEditingTitle(false);
+                      handleSaveTitle();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setIsEditingTitle(false);
+                        handleSaveTitle();
+                      }
+                      if (e.key === 'Escape') {
+                        setIsEditingTitle(false);
+                        // Reset the name to original value
+                        setFormData((prev) => ({
+                          ...prev,
+                          name: holding?.instrument?.name || '',
+                        }));
+                      }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <>
+                    <h1 className="font-heading text-xl font-bold tracking-tight">
+                      {formData.name || holding?.instrument?.symbol || symbol || '-'}
+                    </h1>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsEditingTitle(true)}
+                      className="ml-2 h-6 w-6 opacity-0 group-hover:opacity-100"
+                    >
+                      <Icons.Pencil className="h-3 w-3" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
             <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
               {/* Overview Tab: Requires profile */}
@@ -328,7 +405,7 @@ export const AssetProfilePage = () => {
               </TabsTrigger>
             </TabsList>
           </div>
-        </ApplicationHeader>
+        </div>
 
         {/* Overview Content: Requires profile */}
         {profile && (

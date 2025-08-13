@@ -81,11 +81,9 @@ import {
   Star,
   Shield,
   ExternalLink,
-  Pause,
   PauseCircle,
   ReceiptText,
 } from 'lucide-react';
-import { text } from 'stream/consumers';
 
 export type Icon = LucideIcon;
 
