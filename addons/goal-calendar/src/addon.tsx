@@ -96,7 +96,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
               </h1>
               <HelpPopover />
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {selectedGoal 
                 ? `Tracking progress for: ${selectedGoal.title}`
                 : "Select a goal to track your investment progress"
