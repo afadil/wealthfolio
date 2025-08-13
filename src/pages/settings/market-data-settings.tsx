@@ -23,6 +23,11 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { getSecret } from '@/commands/secrets';
 import { QueryKeys } from '@/lib/query-keys';
 import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
@@ -101,39 +106,72 @@ function ProviderSettings({
     <Card
       key={provider.id}
       className={cn(
-        'transition-all duration-200',
-        provider.enabled ? 'border-primary/20 bg-card shadow-sm' : 'border-muted bg-muted/50',
+        'group rounded-lg border transition-all duration-200',
+        provider.enabled
+          ? 'bg-card hover:bg-accent/30 hover:shadow-md'
+          : 'bg-muted/30 border-dashed opacity-75 hover:opacity-90'
       )}
     >
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {provider.logoFilename && (
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                <img
-                  src={`/market-data/${provider.logoFilename}`}
-                  alt={`${provider.name} logo`}
-                  className="h-10 w-10 rounded-md object-contain"
-                />
-              </div>
-            )}
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <CardTitle className="text-lg font-semibold">{provider.name}</CardTitle>
-                {isConfigured ? (
-                  <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
-                    Configured
-                  </Badge>
-                ) : (
-                  <Badge
-                    variant="outline"
-                    className="border-orange-200 bg-orange-50 text-orange-700"
-                  >
-                    Not Configured
-                  </Badge>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="min-w-0 flex-1 space-y-3">
+            {/* Header section with name and logo */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {provider.logoFilename && (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                    <img
+                      src={`/market-data/${provider.logoFilename}`}
+                      alt={`${provider.name} logo`}
+                      className="h-10 w-10 rounded-md object-contain"
+                    />
+                  </div>
                 )}
+                <CardTitle className={`truncate text-lg font-semibold ${
+                  provider.enabled ? '' : 'text-muted-foreground'
+                }`}>
+                  {provider.name}
+                </CardTitle>
               </div>
-              <CardDescription className="mt-1 text-xs">
+              {!provider.enabled && (
+                <Badge variant="secondary" className="shrink-0 text-xs bg-warning/10 text-warning border-warning/20">
+                  <Icons.AlertCircle className="mr-1 h-3 w-3" />
+                  Disabled
+                </Badge>
+              )}
+              {!isConfigured && provider.enabled && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full text-amber-500 hover:bg-amber-50 hover:text-amber-600"
+                    >
+                      <Icons.AlertTriangle className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <Icons.AlertTriangle className="h-4 w-4 text-amber-500" />
+                          Configuration Required
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          This provider requires an API key to function properly. Configure the API key in the settings below to start fetching market data.
+                        </p>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            {/* Description */}
+            {provider.description && (
+              <CardDescription className={`text-sm leading-relaxed ${
+                provider.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
+              }`}>
                 {provider.description}
                 {provider.url && (
                   <div className="mt-1">
@@ -148,17 +186,19 @@ function ProviderSettings({
                   </div>
                 )}
               </CardDescription>
-            </div>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`${provider.id}-enabled`} className="text-sm font-medium">
-              Enable
-            </Label>
-            <Switch
-              id={`${provider.id}-enabled`}
-              checked={provider.enabled}
-              onCheckedChange={(checked) => onUpdate({ enabled: checked })}
-            />
+
+          {/* Controls section */}
+          <div className="ml-6 flex items-center gap-2">
+            <div className="mr-2 flex items-center gap-3">
+              <Switch
+                id={`${provider.id}-enabled`}
+                checked={provider.enabled}
+                onCheckedChange={(checked) => onUpdate({ enabled: checked })}
+                className="data-[state=checked]:bg-green-600"
+              />
+            </div>
           </div>
         </div>
       </CardHeader>
