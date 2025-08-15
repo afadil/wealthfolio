@@ -24,7 +24,7 @@ const sidebarNavItems = [
     href: 'market-data',
   },
   {
-    title: 'Addons',
+    title: 'Add-ons',
     href: 'addons',
   },
   {

@@ -1,6 +1,6 @@
 # Activity Types Reference
 
-This document provides a comprehensive reference for Activity types used in Wealthfolio addons. Understanding these types is essential for creating activities programmatically through the addon API.
+This document provides a comprehensive reference for Activity types used in Wealthfolio. Understanding these types is essential for creating activities programmatically through the addon API.
 
 > **Note**: For complete addon development guidance, see the [Addon Developer Guide](addon-developer-guide.md) and [API Reference](addon-api-reference.md).
 

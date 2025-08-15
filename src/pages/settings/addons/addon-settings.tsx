@@ -90,9 +90,9 @@ export default function AddonSettingsPage() {
             <PopoverContent className="w-80">
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <h4 className="font-medium">🔌 Addons & Extensions</h4>
+                  <h4 className="font-medium">🔌 Add-ons & Extensions</h4>
                   <p className="text-sm text-muted-foreground">
-                    Addons let you extend Wealthfolio with new features, custom analytics, and
+                    Add-ons let you extend Wealthfolio with new features, custom analytics, and
                     additional functionality to enhance your financial management experience.
                   </p>
                 </div>
@@ -101,7 +101,7 @@ export default function AddonSettingsPage() {
                     <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     <p className="text-xs text-muted-foreground">
                       <span className="font-medium text-amber-600">Security Notice:</span> Only
-                      install addons from trusted sources. Addons have access to your application
+                      install add-ons from trusted sources. Add-ons have access to your application
                       data.
                     </p>
                   </div>
@@ -116,7 +116,7 @@ export default function AddonSettingsPage() {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="installed" className="flex items-center gap-2">
             <Icons.Package className="h-4 w-4" />
-            Installed Addons
+            Installed Add-ons
             {installedAddons.length > 0 && (
               <Badge variant="secondary" className="ml-1">
                 {installedAddons.length}
@@ -125,7 +125,7 @@ export default function AddonSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="store" className="flex items-center gap-2">
             <Icons.Store className="h-4 w-4" />
-            Browse Store
+            Available Add-ons
           </TabsTrigger>
         </TabsList>
 
@@ -133,10 +133,10 @@ export default function AddonSettingsPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-medium">Installed Addons</h3>
+                <h3 className="text-lg font-medium">Installed Add-ons</h3>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>
-                    {installedAddons.length} addon{installedAddons.length !== 1 ? 's' : ''}{' '}
+                    {installedAddons.length} add-on{installedAddons.length !== 1 ? 's' : ''}{' '}
                     installed
                   </span>
                   {hasUpdates() && (
@@ -183,7 +183,7 @@ export default function AddonSettingsPage() {
                         <span className="font-medium">Check for Updates</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Check all installed addons for available updates from their sources.
+                        Check all installed add-ons for available updates from their sources.
                       </p>
                       {hasUpdates() && (
                         <div className="border-t pt-2">
@@ -226,21 +226,21 @@ export default function AddonSettingsPage() {
                         <span className="font-medium">Install from File</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Install an addon from a local ZIP file. Only install addons from trusted
+                        Install an add-on from a local ZIP file. Only install add-ons from trusted
                         sources.
                       </p>
                     </div>
                   </PopoverContent>
                 </Popover>
 
-                {/* Browse Store */}
+                {/* Browse Addons */}
                 <Button
                   variant="outline"
                   onClick={() => setActiveTab('store')}
                   className="flex items-center gap-1"
                 >
                   <Icons.Store className="h-4 w-4" />
-                  Browse Store
+                  Browse Add-ons
                 </Button>
               </div>
             </div>
@@ -248,19 +248,19 @@ export default function AddonSettingsPage() {
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
                 <Icons.Loader className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading addons...</span>
+                <span className="ml-2 text-muted-foreground">Loading add-ons...</span>
               </div>
             ) : installedAddons.length === 0 ? (
               <EmptyPlaceholder>
                 <EmptyPlaceholder.Icon name="Package" />
-                <EmptyPlaceholder.Title>No addons installed</EmptyPlaceholder.Title>
+                <EmptyPlaceholder.Title>No add-ons installed</EmptyPlaceholder.Title>
                 <EmptyPlaceholder.Description>
-                  Get started by installing your first addon to extend Wealthfolio's functionality.
+                  Get started by installing your first add-on to extend Wealthfolio's functionality.
                 </EmptyPlaceholder.Description>
                 <div className="flex items-center gap-3">
                   <Button onClick={() => setActiveTab('store')}>
                     <Icons.Store className="mr-2 h-4 w-4" />
-                    Browse Store
+                    Browse Add-ons
                   </Button>
                   <Button variant="outline" onClick={handleLoadAddon} disabled={isLoading}>
                     <Icons.Plus className="mr-2 h-4 w-4" />
