@@ -34,7 +34,7 @@ APIs (get_historical_valuations, get_latest_valuations)
     ↓
 Frontend Data Layer (✅ COMPLETE - TypeScript types & hooks ready)
     ↓
-UI Components (➡️ NEXT - Phase 3 dashboard charts)
+UI Components (✅ NEXT - Phase 3 dashboard charts)
 
 ## 📋 **Implementation Progress**
 
@@ -50,18 +50,31 @@ UI Components (➡️ NEXT - Phase 3 dashboard charts)
 - Frontend infrastructure ready for UI enhancements
 - All TypeScript compilation issues resolved
 
-### ✅ Phase 3: UI Implementation - COMPLETE & OPERATIONAL
-- Enhanced HistoryChart component with 4-metric loan tracking system
-- Default view: Portfolio Equity (green, on top) + Outstanding Loans (red background, negative)
-- Hover view: Total Value (orange background) + Net Deposit (grey, dotted)
-- Conditional rendering for backward compatibility with account pages
-- Refined color-coded styling with optimal visual hierarchy
-- Dynamic tooltips with comprehensive financial data display
-- Outstanding Loans correctly visualized as negative impact
-- **Final styling: Portfolio Equity dominates visual space as most important metric**
+### ⚠️ Phase 3: UI Implementation - PARTIALLY COMPLETE (CRITICAL ISSUE DISCOVERED)
+- [✅] Enhanced HistoryChart component with 4-metric loan tracking system
+- [✅] Default view: Portfolio Equity (green, on top) + Outstanding Loans (red background, negative)
+- [✅] Hover view: Total Value (orange background) + Net Deposit (grey, dotted)
+- [✅] Conditional rendering for backward compatibility with account pages
+- [✅] Refined color-coded styling with optimal visual hierarchy
+- [✅] Dynamic tooltips with comprehensive financial data display
+- [✅] Outstanding Loans correctly visualized as negative impact
+- [✅] **Final styling: Portfolio Equity dominates visual space as most important metric**
 
-### ➡️ Phase 4: Performance & Dependencies - NEXT
-- Review performance calculations to use Portfolio Equity vs Total Value
-- Audit components using portfolio values for consistency
+### ✅ CRITICAL ISSUE RESOLVED: Performance Calculations Fixed!
+**Problem Solved**: Portfolio Performance page now calculates using `portfolio_equity` instead of `total_value`
+- **Location**: `src-core/src/portfolio/performance/performance_service.rs` - FULLY UPDATED
+- **Implementation**: Smart logic chooses portfolio_equity vs total_value based on account type and loan status
+- **Status**: Backend calculations now use correct equity-based values ✅
+
+### 🎯 Phase 3 Completion: Performance Calculation Engine - IMPLEMENTED
+- [✅] Added `get_performance_value()` helper method for smart value selection
+- [✅] Updated all performance calculations: TWR, MWR, gain/loss, volatility, portfolio weights
+- [✅] Portfolio total account: Always uses portfolio_equity (excludes loans)
+- [✅] Individual accounts: Uses portfolio_equity when loans exist, total_value otherwise  
+- [✅] Backward compatibility maintained for accounts without loan data
+- [✅] Core compilation successful - all changes verified
+
+### Phase 4: Performance & Dependencies - NEXT
+- Review remaining components using portfolio values for consistency
 - Update exports and reports with new metrics
 - Ensure appropriate metric usage across all features

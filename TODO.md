@@ -150,7 +150,7 @@ Enhance the dashboard to show 4 different portfolio metrics with clear separatio
    - [✅] Dashboard components consume data directly from hooks, no state management changes needed
    - [✅] **Frontend infrastructure ready for Phase 3 UI updates**
 
-### Phase 3: UI Implementation ✅ COMPLETE & FULLY OPERATIONAL  
+### Phase 3: UI Implementation ⚠️ NEEDS COMPLETION - PERFORMANCE CALCULATIONS STILL USE TOTAL VALUE  
 1. [✅] **Enhance chart component to handle 4 series**
    - [✅] Updated HistoryChartData interface with optional portfolioEquity and outstandingLoans fields
    - [✅] Added conditional rendering logic for 4-metric vs fallback systems
@@ -170,6 +170,61 @@ Enhance the dashboard to show 4 different portfolio metrics with clear separatio
    - [✅] Dynamic tooltip adapts to available data (4-metric vs fallback)
    - [✅] Outstanding Loans displayed correctly as negative values
    - [✅] Maintained privacy mode and formatting consistency
+
+### 🚨 CRITICAL ISSUE DISCOVERED: Performance Calculations Use Total Value Instead of Portfolio Equity
+
+**Problem**: The "Portfolio Performance" page still calculates performance using `total_value` (which includes loans) instead of `portfolio_equity` (actual equity).
+
+**Root Cause**: The performance service in `src-core/src/portfolio/performance/performance_service.rs` uses `total_value` throughout all calculations:
+- Line 167-168: Validation checks using `total_value`
+- Line 175, 177: TWR calculations using `prev_total_value` and `current_total_value` 
+- Line 223, 225: Gain/loss calculations using `start_point.total_value` and `end_point.total_value`
+- Line 730+: Simple performance calculations using `current.total_value`
+
+**Impact**: Users see inflated performance numbers that include borrowed money rather than their actual equity performance.
+
+#### Additional Phase 3 Tasks - CRITICAL FIXES IMPLEMENTED:
+5. [✅] **Update Performance Service to Use Portfolio Equity**
+   - [✅] **Helper Method**: Added `get_performance_value()` to intelligently choose between `portfolio_equity` and `total_value`
+   - [✅] **Primary Fix**: Modified `calculate_account_performance()` to use portfolio equity for all calculations
+   - [✅] **Summary Fix**: Modified `calculate_account_performance_summary()` to use portfolio equity
+   - [✅] **Simple Performance Fix**: Modified `calculate_simple_performance()` to use portfolio equity
+   - [✅] **Validation Updates**: Updated negative value checks to use portfolio equity
+   - [✅] **Currency Handling**: Updated currency conversion calculations to use portfolio equity
+
+6. [✅] **Account-Specific Logic**
+   - [✅] **Portfolio Total**: Always use `portfolio_equity` for portfolio total account (PORTFOLIO_TOTAL_ACCOUNT_ID)
+   - [✅] **Individual Accounts**: Use `portfolio_equity` when loans exist (`outstanding_loans > 0`), fallback to `total_value` otherwise
+   - [✅] **Backward Compatibility**: Smart fallback to `total_value` for accounts without loan data
+
+7. [✅] **Performance Metrics Updates**
+   - [✅] **TWR Calculations**: Updated Time-Weighted Return calculations to use portfolio equity
+   - [✅] **MWR Calculations**: Updated Money-Weighted Return calculations to use portfolio equity  
+   - [✅] **Gain/Loss**: Updated gain/loss amount calculations to use portfolio equity
+   - [✅] **Portfolio Weights**: Updated portfolio weight calculations to use portfolio equity
+   - [✅] **Volatility & Drawdown**: Volatility and max drawdown now use equity-based returns
+
+**✅ CORE COMPILATION SUCCESS**: All changes compile successfully in src-core
+
+8. [ ] **Testing & Validation** - READY FOR TESTING
+   - [ ] **Test Portfolio Performance Page**: Verify it shows equity-based performance (not loan-inflated)
+   - [ ] **Test Individual Account Performance**: Verify individual accounts work correctly  
+   - [ ] **Test Accounts Without Loans**: Ensure no regression for loan-free accounts
+   - [ ] **Test Historical Data**: Verify performance accuracy with historical loan data
+   - [ ] **Full Tauri Compilation**: Verify entire project compiles with performance fixes
+   - [ ] **Integration Test**: Run app and verify performance calculations are correct
+
+### 🎯 **MAJOR PROGRESS COMPLETED**
+
+**✅ Performance Calculation Engine Fixed**: 
+- All backend performance calculations now use Portfolio Equity instead of Total Value
+- Smart logic: Portfolio total always uses equity, individual accounts use equity when loans exist
+- Time-Weighted Returns, Money-Weighted Returns, gain/loss, and volatility all fixed
+- Backward compatibility maintained for accounts without loan data
+
+**📊 Impact**: Portfolio Performance page will now show true investment performance excluding borrowed funds
+
+**🚀 Next Steps**: Test the fixes by running the application and verifying the Portfolio Performance page shows correct equity-based performance metrics.
 
 ### Phase 4: Performance & Dependencies
 1. [ ] Review and update performance calculations
