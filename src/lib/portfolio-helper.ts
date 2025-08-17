@@ -13,11 +13,17 @@ export function calculateGoalProgress(
   // Determine base currency (assuming consistency across account valuations data)
   const baseCurrency = accountsValuations[0].baseCurrency || 'USD'; // Use first account's base currency
 
-  // Create a map of accountId to totalValue in baseCurrency for quick lookup
+  // Create a map of accountId to portfolio equity in baseCurrency for quick lookup
   const accountValueMap = new Map<string, number>();
   accountsValuations.forEach((account) => {
-    // Convert account total value to base currency
-    const valueInBaseCurrency = (account.totalValue || 0) * (account.fxRateToBase || 1);
+    // Convert account portfolio equity to base currency (fallback to totalValue for compatibility)
+    // Use robust number conversion with fallbacks
+    const portfolioEquity = Number(account.portfolioEquity) || 0;
+    const totalValue = Number(account.totalValue) || 0;
+    
+    let accountValue = portfolioEquity || totalValue || 0;
+    
+    const valueInBaseCurrency = accountValue * (account.fxRateToBase || 1);
     accountValueMap.set(account.accountId, valueInBaseCurrency);
   });
 

@@ -227,7 +227,9 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
 
       const { gainLossAmount, simpleReturn } = calculatePerformanceMetrics([valuation], true);
 
-      const totalValueAccountCurrency = valuation.totalValue;
+      // Use portfolio equity for more accurate account value (fallback to totalValue for compatibility)
+      const accountEquity = valuation.portfolioEquity ?? valuation.totalValue;
+      const totalValueAccountCurrency = accountEquity;
       const fxRate = valuation.fxRateToBase ?? 1;
       const totalValueBaseCurrency = totalValueAccountCurrency * fxRate;
       const totalGainLossAmountAccountCurrency = gainLossAmount;
