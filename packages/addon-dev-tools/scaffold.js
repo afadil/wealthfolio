@@ -76,10 +76,21 @@ class AddonScaffold {
       fs.mkdirSync(targetDir, { recursive: true });
     }
     
+    // Create src directory and subdirectories
     const srcDir = path.join(targetDir, 'src');
+    const srcSubDirs = ['components', 'hooks', 'pages', 'lib', 'types'];
+    
     if (!fs.existsSync(srcDir)) {
       fs.mkdirSync(srcDir);
     }
+    
+    // Create all subdirectories
+    srcSubDirs.forEach(subDir => {
+      const subDirPath = path.join(srcDir, subDir);
+      if (!fs.existsSync(subDirPath)) {
+        fs.mkdirSync(subDirPath, { recursive: true });
+      }
+    });
 
     // Template file mappings
     const fileTemplates = [
@@ -88,7 +99,12 @@ class AddonScaffold {
       { template: 'vite.config.ts', output: 'vite.config.ts' },
       { template: 'tsconfig.json', output: 'tsconfig.json' },
       { template: 'README.md', output: 'README.md' },
-      { template: 'addon.tsx', output: 'src/addon.tsx' }
+      { template: 'addon.tsx', output: 'src/addon.tsx' },
+      { template: 'components-index.ts', output: 'src/components/index.ts' },
+      { template: 'hooks-index.ts', output: 'src/hooks/index.ts' },
+      { template: 'pages-index.ts', output: 'src/pages/index.ts' },
+      { template: 'lib-index.ts', output: 'src/lib/index.ts' },
+      { template: 'types-index.ts', output: 'src/types/index.ts' }
     ];
 
     // Process and write each template

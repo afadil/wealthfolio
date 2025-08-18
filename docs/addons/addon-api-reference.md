@@ -838,7 +838,7 @@ Listens for file drop hover events.
 
 ```typescript
 const unlisten = await ctx.api.events.import.onDropHover((event) => {
-  console.log('File hovering over drop zone:', event.payload);
+  ctx.api.logger.debug('File hovering over drop zone:', event.payload);
 });
 ```
 
@@ -848,7 +848,7 @@ Listens for file drop events.
 
 ```typescript
 const unlisten = await ctx.api.events.import.onDrop((event) => {
-  console.log('File dropped:', event.payload);
+  ctx.api.logger.debug('File dropped:', event.payload);
   // Handle file import
 });
 ```
@@ -859,7 +859,7 @@ Listens for cancelled file drops.
 
 ```typescript
 const unlisten = await ctx.api.events.import.onDropCancelled((event) => {
-  console.log('File drop cancelled');
+  ctx.api.logger.debug('File drop cancelled');
 });
 ```
 
@@ -873,7 +873,7 @@ Listens for portfolio update start.
 
 ```typescript
 const unlisten = await ctx.api.events.portfolio.onUpdateStart((event) => {
-  console.log('Portfolio update started');
+  ctx.api.logger.debug('Portfolio update started');
 });
 ```
 
@@ -883,7 +883,7 @@ Listens for portfolio update completion.
 
 ```typescript
 const unlisten = await ctx.api.events.portfolio.onUpdateComplete((event) => {
-  console.log('Portfolio update completed:', event.payload);
+  ctx.api.logger.debug('Portfolio update completed:', event.payload);
   // Refresh your addon's data
 });
 ```
@@ -894,7 +894,7 @@ Listens for portfolio update errors.
 
 ```typescript
 const unlisten = await ctx.api.events.portfolio.onUpdateError((event) => {
-  console.error('Portfolio update failed:', event.payload);
+  ctx.api.logger.error('Portfolio update failed:', event.payload);
 });
 ```
 
@@ -908,7 +908,7 @@ Listens for market sync start.
 
 ```typescript
 const unlisten = await ctx.api.events.market.onSyncStart((event) => {
-  console.log('Market sync started');
+  ctx.api.logger.debug('Market sync started');
 });
 ```
 
@@ -918,7 +918,7 @@ Listens for market sync completion.
 
 ```typescript
 const unlisten = await ctx.api.events.market.onSyncComplete((event) => {
-  console.log('Market sync completed:', event.payload);
+  ctx.api.logger.debug('Market sync completed:', event.payload);
 });
 ```
 

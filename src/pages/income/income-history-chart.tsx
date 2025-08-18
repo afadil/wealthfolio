@@ -43,11 +43,6 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         const numericValue = Number(value) || 0;
         return sum + numericValue;
       }, 0);
-    
-    // Log the cumulative value for debugging
-    if (isNaN(cumulative)) {
-        console.warn(`Cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: monthlyIncomeData.slice(0, index + 1).map(d => d[1]) });
-    }
 
     const dataPoint = {
       month,

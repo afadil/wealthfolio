@@ -10,9 +10,9 @@
     "build": "vite build",
     "dev": "vite build --watch",
     "dev:server": "wealthfolio dev",
-    "clean": "rm -rf dist *.zip",
-    "package": "zip -r {{packageName}}.zip manifest.json dist/ README.md",
-    "bundle": "npm run clean && npm run build && npm run package",
+    "clean": "rm -rf dist",
+    "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
+    "bundle": "pnpm clean && pnpm build && pnpm package",
     "lint": "tsc --noEmit",
     "type-check": "tsc --noEmit"
   },

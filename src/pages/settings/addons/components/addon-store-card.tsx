@@ -14,8 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  StarRatingDisplay,
 } from '@wealthfolio/ui';
+import { RatingDialog } from './rating-dialog';
 import type { AddonStoreListing } from '@/lib/types';
+import React from 'react';
 
 interface AddonStoreCardProps {
   listing: AddonStoreListing;
@@ -23,6 +26,8 @@ interface AddonStoreCardProps {
   isInstalling?: boolean;
   onInstall?: (listing: AddonStoreListing) => void;
   onTagClick?: (tag: string) => void;
+  onSubmitRating?: (addonId: string, rating: number, review?: string) => Promise<void>;
+  isRatingSubmitting?: boolean;
 }
 
 export function AddonStoreCard({ 
@@ -31,7 +36,10 @@ export function AddonStoreCard({
   isInstalling = false,
   onInstall,
   onTagClick,
+  onSubmitRating: _onSubmitRating,
+  isRatingSubmitting: _isRatingSubmitting = false,
 }: AddonStoreCardProps) {
+  const [ratingDialogOpen, setRatingDialogOpen] = React.useState(false);
 
   const formatDownloads = (downloads: number) => {
     if (downloads >= 1000000) {
@@ -66,6 +74,16 @@ export function AddonStoreCard({
             <span className="text-xs">v{listing.version}</span>
           </div>
         </div>
+
+        {/* Rating Display */}
+        {listing.rating > 0 && (
+          <StarRatingDisplay 
+            rating={listing.rating} 
+            reviewCount={listing.reviewCount}
+            size="sm"
+            className="mt-1"
+          />
+        )}
       </CardContent>
 
       {/* Overlay Actions - Show on Hover */}
@@ -125,14 +143,42 @@ export function AddonStoreCard({
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Reviews</p>
-                  <p className="text-2xl font-bold text-primary">{listing.reviewCount}</p>
+                  <p className="text-sm font-medium">Rating</p>
+                  <div className="flex flex-col gap-1">
+                    <StarRatingDisplay 
+                      rating={listing.rating || 0} 
+                      reviewCount={listing.reviewCount || 0}
+                      size="sm"
+                      showText={true}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Author</p>
                   <p className="text-sm text-muted-foreground">{listing.author}</p>
                 </div>
               </div>
+
+              {/* Rate this addon section */}
+              {isInstalled && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Rate this Add-on</h4>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRatingDialogOpen(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Icons.Star className="h-4 w-4" />
+                      Write a Review
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Share your experience with other users
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Tags */}
               {listing.tags && listing.tags.length > 0 && (
@@ -192,6 +238,19 @@ export function AddonStoreCard({
           </DialogContent>
         </Dialog>
 
+        {/* Rate Button - Show only for installed addons */}
+        {isInstalled && (
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            className="bg-white/90 text-black hover:bg-white"
+            onClick={() => setRatingDialogOpen(true)}
+          >
+            <Icons.Star className="mr-2 h-4 w-4" />
+            Rate
+          </Button>
+        )}
+
         {/* Install Button */}
         {!isInstalled && (
           <Button
@@ -237,13 +296,10 @@ export function AddonStoreCard({
         )}
         {listing.status && listing.status !== 'active' && (
           listing.status === 'coming-soon' ? (
-            <div
-              aria-label="Coming soon"
-              className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 via-fuchsia-500 to-rose-500 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white "
-            >
-              <Icons.Clock className="h-3 w-3" />
+            <Badge variant="default" className="text-xs capitalize bg-primary text-primary-foreground">
+              <Icons.Clock className="mr-1 h-3 w-3" />
               Coming Soon
-            </div>
+            </Badge>
           ) : (
             <Badge 
               variant={listing.status === 'deprecated' ? 'destructive' : 'outline'}
@@ -254,6 +310,17 @@ export function AddonStoreCard({
           )
         )}
       </div>
+
+      {/* Rating Dialog */}
+      <RatingDialog
+        open={ratingDialogOpen}
+        onOpenChange={setRatingDialogOpen}
+        addonId={listing.id}
+        addonName={listing.name}
+        onRatingSubmitted={() => {
+          // Could refresh rating data here if needed
+        }}
+      />
     </Card>
   );
 }

@@ -12,8 +12,12 @@ Welcome to the comprehensive documentation for developing Wealthfolio addons! Th
 
 ## 📚 Core Documentation
 
+### Architecture & Design
+- **[Addon Architecture](addon-architecture.md)** - Deep dive into addon system design and architecture
+
 ### Development Guides
 - **[Addon Developer Guide](addon-developer-guide.md)** - Main comprehensive guide
+- **[Addon Packages](addon-packages.md)** - Available packages and dependencies for addon development
 - **[API Reference](addon-api-reference.md)** - Complete API documentation
 - **[Addon Permissions](addon-permissions.md)** - Security and permission system guide
 - **[Examples & Tutorials](addon-examples.md)** - Practical examples

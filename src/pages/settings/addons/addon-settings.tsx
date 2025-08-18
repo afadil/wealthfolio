@@ -19,11 +19,17 @@ import {
 import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
 import { AddonUpdateCard } from '@/pages/settings/addons/components/addon-update-card';
 import { AddonStoreBrowser } from '@/pages/settings/addons/components/addon-store-browser';
+import { RatingDialog } from '@/pages/settings/addons/components/rating-dialog';
 import { useAddonActions } from './hooks/use-addon-actions';
 import { useAddonUpdates } from './hooks/use-addon-updates';
 
 export default function AddonSettingsPage() {
   const [activeTab, setActiveTab] = useState<'installed' | 'store'>('installed');
+  const [ratingDialog, setRatingDialog] = useState<{
+    open: boolean;
+    addonId?: string;
+    addonName?: string;
+  }>({ open: false });
 
   const {
     installedAddons,
@@ -68,6 +74,22 @@ export default function AddonSettingsPage() {
     // Refresh addon list and clear update result
     await loadInstalledAddons();
     clearUpdateResult(addonId);
+  };
+
+  const handleRateAddon = (addonId: string, addonName: string) => {
+    setRatingDialog({ 
+      open: true, 
+      addonId, 
+      addonName 
+    });
+  };
+
+  const handleRatingSubmitted = () => {
+    // Could refresh addon data here if needed in the future
+    toast({
+      title: 'Thank you!',
+      description: 'Your rating has been submitted successfully.',
+    });
   };
 
   const installedAddonIds = installedAddons.map((addon) => addon.metadata.id);
@@ -340,6 +362,17 @@ export default function AddonSettingsPage() {
                           <span className="sr-only">View permissions</span>
                         </Button>
 
+                        {/* Rating button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRateAddon(addon.metadata.id, addon.metadata.name)}
+                          className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                        >
+                          <Icons.Star className="h-4 w-4" />
+                          <span className="sr-only">Rate addon</span>
+                        </Button>
+
                         {/* Delete button with confirmation */}
                         <DeleteConfirm
                           deleteConfirmTitle="Remove Addon"
@@ -452,6 +485,15 @@ export default function AddonSettingsPage() {
           isViewOnly={true}
         />
       )}
+
+      {/* Rating Dialog */}
+      <RatingDialog
+        open={ratingDialog.open}
+        onOpenChange={(open) => setRatingDialog({ ...ratingDialog, open })}
+        addonId={ratingDialog.addonId || ''}
+        addonName={ratingDialog.addonName || ''}
+        onRatingSubmitted={handleRatingSubmitted}
+      />
     </div>
   );
 }

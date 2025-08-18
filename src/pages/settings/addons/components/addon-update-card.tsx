@@ -6,7 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { updateAddonFromStore } from '@/commands/addon';
+import { updateAddon } from '@/commands/addon';
 import { reloadAllAddons } from '@/addons/addons-core';
 import type { AddonUpdateInfo } from '@wealthfolio/addon-sdk';
 
@@ -42,7 +42,7 @@ export function AddonUpdateCard({
     try {
       setIsUpdating(true);
       
-      await updateAddonFromStore(addonId, updateInfo.downloadUrl);
+      await updateAddon(addonId);
       
       // Reload addons to apply the update
       await reloadAllAddons();

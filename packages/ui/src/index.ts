@@ -44,6 +44,7 @@ export * from './components/ui/progress-indicator';
 export * from './components/ui/radio-group';
 export * from './components/ui/tag-input';
 export * from './components/ui/data-table';
+export * from './components/ui/star-rating';
 
 
 // Export utilities

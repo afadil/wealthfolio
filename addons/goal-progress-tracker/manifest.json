@@ -1,8 +1,8 @@
 {
-  "id": "goal-calendar-addon",
-  "name": "Goal Calendar",
+  "id": "goal-progress-tracker-addon",
+  "name": "Goal Progress Tracker",
   "version": "1.0.0",
-  "description": "Track your investment progress towards target amounts with a visual calendar representation",
+  "description": "A simple addon to track your investment progress towards target amounts with a visual representation",
   "author": "Wealthfolio",
   "main": "dist/addon.js",
   "sdkVersion": "1.0.0",

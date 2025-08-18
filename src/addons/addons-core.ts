@@ -2,7 +2,7 @@ import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
 import { ReactVersion } from '@wealthfolio/addon-sdk';
 import { createAddonContext, getDynamicNavItems, getDynamicRoutes, triggerAllDisableCallbacks } from '@/addons/addons-runtime-context';
 import { logger } from '@/adapters';
-import { listInstalledAddons, loadAddonForRuntime } from '@/commands/addon';
+import { getInstalledAddons, loadAddon as loadAddonRuntime } from '@/commands/addon';
 
 interface AddonFile {
   path: string;
@@ -19,7 +19,7 @@ const loadedAddonIds = new Set<string>(); // Prevent re-loading already processe
  */
 async function discoverAddons(): Promise<AddonFile[]> {
   try {
-    const installedAddons = await listInstalledAddons();
+    const installedAddons = await getInstalledAddons();
     const addonFiles: AddonFile[] = [];
 
     for (const addon of installedAddons) {
@@ -71,7 +71,8 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     }
 
     // Load addon using Tauri command instead of direct file access
-    const extractedAddon = await loadAddonForRuntime(addonFile.manifest.id);
+        // Load addon for runtime execution using Tauri command
+    const extractedAddon = await loadAddonRuntime(addonFile.manifest.id);
     
     // Find the main file from the extracted addon files
     const mainFile = extractedAddon.files.find(file => file.isMain);
@@ -93,7 +94,7 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     
     // Runtime guards: Verify React singletons are available before addon execution
     if ((globalThis as any).React?.version && (globalThis as any).React.version !== ReactVersion) {
-      console.warn(`⚠️ React version mismatch: host=${(globalThis as any).React.version} sdk=${ReactVersion}`);
+      logger.warn(`⚠️ React version mismatch: host=${(globalThis as any).React.version} sdk=${ReactVersion}`);
     }
 
     if (typeof (globalThis as any).ReactDOM?.createPortal !== 'function') {

@@ -92,7 +92,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
-                Goal Progress Calendar
+                Goal Progress Tracker
               </h1>
               <HelpPopover />
             </div>

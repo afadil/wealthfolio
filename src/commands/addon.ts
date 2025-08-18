@@ -2,7 +2,7 @@ import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
 import type { InstalledAddon, ExtractedAddon } from '@/adapters/tauri';
 import type { AddonManifest, AddonUpdateCheckResult } from '@wealthfolio/addon-sdk';
 
-export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
+export const getInstalledAddons = async (): Promise<InstalledAddon[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -16,7 +16,7 @@ export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
   }
 };
 
-export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAddon> => {
+export const loadAddon = async (addonId: string): Promise<ExtractedAddon> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -30,7 +30,7 @@ export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAdd
   }
 };
 
-export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAddon> => {
+export const extractAddon = async (zipData: Uint8Array): Promise<ExtractedAddon> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -44,7 +44,7 @@ export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAdd
   }
 };
 
-export const installAddonZip = async (
+export const installAddon = async (
   zipData: Uint8Array, 
   enableAfterInstall?: boolean
 ): Promise<AddonManifest> => {
@@ -92,7 +92,7 @@ export const uninstallAddon = async (addonId: string): Promise<void> => {
   }
 };
 
-export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => {
+export const getEnabledAddons = async (): Promise<ExtractedAddon[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -134,50 +134,104 @@ export const checkAllAddonUpdates = async (): Promise<AddonUpdateCheckResult[]> 
   }
 };
 
-export const updateAddonFromStore = async (addonId: string, downloadUrl: string): Promise<AddonManifest> => {
+export const updateAddon = async (addonId: string): Promise<AddonManifest> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('update_addon_from_store', { addonId, downloadUrl });
+        return invokeTauri('update_addon_from_store_by_id', { addonId });
       default:
         throw new Error('Addon updating is only supported on desktop');
     }
   } catch (error) {
-    logger.error('Error updating addon from store.');
+    logger.error('Error updating addon from store by ID.');
     throw error;
   }
 };
 
-export const downloadAndExtractAddon = async (downloadUrl: string): Promise<ExtractedAddon> => {
+export const downloadAddonForReview = async (addonId: string): Promise<ExtractedAddon> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('download_and_extract_addon', { downloadUrl });
+        return invokeTauri('download_addon_to_staging', { addonId });
       default:
-        throw new Error('Addon download and extraction is only supported on desktop');
+        throw new Error('Addon staging is only supported on desktop');
     }
   } catch (error) {
-    logger.error('Error downloading and extracting addon.');
+    logger.error('Error downloading addon to staging.');
     throw error;
   }
 };
 
-export const installAddonFromStore = async (
-  downloadUrl: string,
+export const installFromStaging = async (
+  addonId: string,
   enableAfterInstall?: boolean
 ): Promise<AddonManifest> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('install_addon_from_store', { 
-          downloadUrl,
+        return invokeTauri('install_addon_from_staging', {
+          addonId,
           enableAfterInstall
         });
       default:
-        throw new Error('Addon installation from store is only supported on desktop');
+        throw new Error('Addon installation from staging is only supported on desktop');
     }
   } catch (error) {
-    logger.error('Error installing addon from store.');
+    logger.error('Error installing addon from staging.');
+    throw error;
+  }
+};
+
+export const clearAddonStaging = async (addonId?: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('clear_addon_staging', { addonId });
+      default:
+        throw new Error('Addon staging cleanup is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error clearing addon staging.');
+    throw error;
+  }
+};
+
+export const getAddonRatings = async (addonId: string): Promise<any[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('get_addon_ratings', { addonId });
+      default:
+        throw new Error('Addon ratings are only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error getting addon ratings.');
+    throw error;
+  }
+};
+
+export const submitAddonRating = async (
+  addonId: string,
+  rating: number,
+  review?: string
+): Promise<any> => {
+  try {
+    if (rating < 1 || rating > 5) {
+      throw new Error('Rating must be between 1 and 5');
+    }
+    
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('submit_addon_rating', { 
+          addonId, 
+          rating, 
+          review 
+        });
+      default:
+        throw new Error('Addon rating submission is only supported on desktop');
+    }
+  } catch (error) {
+    logger.error('Error submitting addon rating.');
     throw error;
   }
 };

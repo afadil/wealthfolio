@@ -153,13 +153,14 @@ pub fn main() {
             commands::addon::uninstall_addon,
             commands::addon::load_addon_for_runtime,
             commands::addon::get_enabled_addons_on_startup,
-            commands::addon::redetect_addon_permissions,
             commands::addon::check_addon_update,
             commands::addon::check_all_addon_updates,
-            commands::addon::update_addon_from_store,
+            commands::addon::update_addon_from_store_by_id,
             commands::addon::fetch_addon_store_listings,
-            commands::addon::download_and_extract_addon,
-            commands::addon::install_addon_from_store,
+            commands::addon::download_addon_to_staging,
+            commands::addon::install_addon_from_staging,
+            commands::addon::clear_addon_staging,
+            commands::addon::submit_addon_rating,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

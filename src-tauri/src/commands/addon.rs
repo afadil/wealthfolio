@@ -1,9 +1,11 @@
 use std::fs;
-use tauri::AppHandle;
+use std::sync::Arc;
+use tauri::{AppHandle, State};
 use tauri::Manager;
 
-// Import addon modules
+// Import addon modules  
 use crate::addons::*;
+use crate::context::ServiceContext;
 
 #[tauri::command]
 pub async fn install_addon_zip(
@@ -40,21 +42,6 @@ pub async fn install_addon_zip(
         }
         fs::write(&file_path, &file.content)
             .map_err(|e| format!("Failed to write addon file {}: {}", file.name, e))?;
-    }
-
-    // Use the already-detected permissions from extract_addon_zip_internal
-    // No need to call detect_addon_permissions again since it was already done
-    log::debug!("Using pre-detected permissions for addon: {}", addon_id);
-    let merged_permissions = extracted.metadata.permissions.clone().unwrap_or_default();
-    
-    // Debug log the final merged permissions
-    log::debug!("Final merged permissions for addon {}: {:#?}", addon_id, merged_permissions);
-    for perm in &merged_permissions {
-        log::debug!("Category '{}': {} functions", perm.category, perm.functions.len());
-        for func in &perm.functions {
-            log::debug!("  Function '{}': declared={}, detected={}, detected_at={:?}", 
-                func.name, func.is_declared, func.is_detected, func.detected_at);
-        }
     }
 
     // Convert to installed manifest with runtime fields and use the merged permissions
@@ -289,103 +276,16 @@ pub async fn extract_addon_zip(
     extract_addon_zip_internal(zip_data)
 }
 
-#[tauri::command]
-pub async fn redetect_addon_permissions(
-    app_handle: AppHandle,
-    addon_id: String,
-) -> Result<Vec<AddonPermission>, String> {
-    let app_data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?
-        .to_str()
-        .ok_or("Failed to convert app data dir path to string")?
-        .to_string();
-
-    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
-    let manifest_path = addon_dir.join("manifest.json");
-    
-    if !manifest_path.exists() {
-        return Err("Addon not found".to_string());
-    }
-
-    // Read current manifest
-    let manifest_content = fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("Failed to read manifest file: {}", e))?;
-    let mut metadata: AddonManifest = serde_json::from_str(&manifest_content)
-        .map_err(|e| format!("Failed to parse manifest: {}", e))?;
-
-    // Load addon files for permission detection
-    let mut files = Vec::new();
-    read_addon_files_recursive(&addon_dir, &addon_dir, &mut files)?;
-    
-    // Re-detect permissions
-    let detected_permissions = detect_addon_permissions(&files);
-    
-    // Merge with existing declared permissions
-    let mut merged_permissions = Vec::new();
-    
-    // First, preserve declared permissions
-    if let Some(existing_perms) = &metadata.permissions {
-        for perm in existing_perms {
-            // Only preserve functions that were declared
-            let declared_functions: Vec<FunctionPermission> = perm.functions
-                .iter()
-                .filter(|f| f.is_declared)
-                .cloned()
-                .collect();
-            
-            if !declared_functions.is_empty() {
-                merged_permissions.push(AddonPermission {
-                    category: perm.category.clone(),
-                    functions: declared_functions,
-                    purpose: perm.purpose.clone(),
-                });
-            }
-        }
-    }
-    
-    // Then, add detected permissions and merge with declared ones
-    for detected_perm in detected_permissions {
-        if let Some(existing) = merged_permissions.iter_mut().find(|p| p.category == detected_perm.category) {
-            // Merge detected functions with declared functions
-            for detected_func in &detected_perm.functions {
-                // Check if this function already exists in declared functions
-                if let Some(existing_func) = existing.functions.iter_mut().find(|f| f.name == detected_func.name) {
-                    // Mark existing declared function as also detected
-                    existing_func.is_detected = true;
-                    existing_func.detected_at = detected_func.detected_at.clone();
-                } else {
-                    // Add new detected function
-                    existing.functions.push(detected_func.clone());
-                }
-            }
-        } else {
-            // Add as detected-only permission category
-            merged_permissions.push(detected_perm);
-        }
-    }
-    
-    // Update manifest with new permissions
-    metadata.permissions = Some(merged_permissions.clone());
-    
-    // Write back manifest
-    let manifest_json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
-    fs::write(&manifest_path, manifest_json)
-        .map_err(|e| format!("Failed to write manifest: {}", e))?;
-
-    Ok(merged_permissions)
-}
-
 /// Check for updates for a specific addon from the addon store
 #[tauri::command]
 pub async fn check_addon_update(
     addon_id: String,
     current_version: String,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<AddonUpdateCheckResult, String> {
+    let instance_id = state.instance_id.as_str();
     // Check for updates from addon store
-    match check_addon_update_from_api(&addon_id, &current_version).await {
+    match check_addon_update_from_api(&addon_id, &current_version, Some(instance_id)).await {
         Ok(update_check_result) => {
             // The API already provides the complete result, just return it
             Ok(update_check_result)
@@ -416,27 +316,52 @@ pub async fn check_addon_update(
 #[tauri::command]
 pub async fn check_all_addon_updates(
     app_handle: AppHandle,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<AddonUpdateCheckResult>, String> {
     let installed_addons = list_installed_addons(app_handle.clone()).await?;
     let mut results = Vec::new();
+    let instance_id = state.instance_id.as_str();
     
     for addon in installed_addons {
-        let result = check_addon_update(addon.metadata.id.clone(), addon.metadata.version.clone()).await?;
-        results.push(result);
+        match check_addon_update_from_api(&addon.metadata.id, &addon.metadata.version, Some(instance_id)).await {
+            Ok(result) => results.push(result),
+            Err(error) => {
+                log::error!("Failed to check update for addon {}: {}", addon.metadata.id, error);
+                // Create a fallback result with error
+                results.push(AddonUpdateCheckResult {
+                    addon_id: addon.metadata.id,
+                    update_info: AddonUpdateInfo {
+                        current_version: addon.metadata.version,
+                        latest_version: "unknown".to_string(),
+                        update_available: false,
+                        download_url: None,
+                        release_notes: None,
+                        release_date: None,
+                        changelog_url: None,
+                        is_critical: None,
+                        has_breaking_changes: None,
+                        min_wealthfolio_version: None,
+                    },
+                    error: Some(error),
+                });
+            }
+        }
     }
     
     Ok(results)
 }
 
-/// Download and update an addon from the store
+/// Download and update an addon from the store by ID
 #[tauri::command]
-pub async fn update_addon_from_store(
+pub async fn update_addon_from_store_by_id(
     app_handle: AppHandle,
     addon_id: String,
-    download_url: String,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<AddonManifest, String> {
-    // Download the addon package
-    let zip_data = download_addon_package(&download_url).await
+    let instance_id = state.instance_id.as_str();
+    
+    // Download the addon package using the new download API
+    let zip_data = download_addon_from_store(&addon_id, instance_id).await
         .map_err(|e| format!("Failed to download addon: {}", e))?;
 
     // Get the current addon state before updating
@@ -470,34 +395,101 @@ pub async fn update_addon_from_store(
 
 /// Fetch available addons from the store
 #[tauri::command]
-pub async fn fetch_addon_store_listings() -> Result<Vec<serde_json::Value>, String> {
-    crate::addons::service::fetch_addon_store_listings().await
+pub async fn fetch_addon_store_listings(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let instance_id = state.instance_id.as_str();
+    crate::addons::service::fetch_addon_store_listings(Some(instance_id)).await
 }
 
-/// Download and extract addon from store for permission analysis
+/// Download addon to staging directory for permission review
 #[tauri::command]
-pub async fn download_and_extract_addon(
-    download_url: String,
+pub async fn download_addon_to_staging(
+    app_handle: AppHandle,
+    addon_id: String,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ExtractedAddon, String> {
-    // Download the addon package
-    let zip_data = download_addon_package(&download_url).await
-        .map_err(|e| format!("Failed to download addon from store: {}", e))?;
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .to_str()
+        .ok_or("Failed to convert app data dir path to string")?
+        .to_string();
 
-    // Extract and analyze permissions directly in backend
+    let instance_id = state.instance_id.as_str();
+    
+    // Download addon data
+    let zip_data = download_addon_from_store(&addon_id, instance_id).await
+        .map_err(|e| {
+            // Clean up any partial staging on download failure
+            let _ = remove_addon_from_staging(&addon_id, &app_data_dir);
+            format!("Failed to download addon: {}", e)
+        })?;
+
+    // Save to staging directory with validation
+    let _staged_path = save_addon_to_staging(&addon_id, &app_data_dir, &zip_data)
+        .map_err(|e| format!("Failed to stage addon: {}", e))?;
+
+    // Extract and analyze permissions
     extract_addon_zip_internal(zip_data)
 }
 
-/// Install addon from store after user permission approval
+/// Install addon from staging directory after permission approval
 #[tauri::command]
-pub async fn install_addon_from_store(
+pub async fn install_addon_from_staging(
     app_handle: AppHandle,
-    download_url: String,
+    addon_id: String,
     enable_after_install: Option<bool>,
 ) -> Result<AddonManifest, String> {
-    // Download the addon package
-    let zip_data = download_addon_package(&download_url).await
-        .map_err(|e| format!("Failed to download addon from store: {}", e))?;
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .to_str()
+        .ok_or("Failed to convert app data dir path to string")?
+        .to_string();
 
-    // Install directly using existing logic
-    install_addon_zip(app_handle, zip_data, enable_after_install).await
+    // Load addon from staging
+    let zip_data = load_addon_from_staging(&addon_id, &app_data_dir)?;
+    
+    // Install the addon
+    let result = install_addon_zip(app_handle, zip_data, enable_after_install).await;
+    
+    // Clean up staging regardless of install success/failure
+    let _ = remove_addon_from_staging(&addon_id, &app_data_dir);
+    
+    result
+}
+
+/// Clear specific addon from staging or entire staging directory
+#[tauri::command]
+pub async fn clear_addon_staging(
+    app_handle: AppHandle,
+    addon_id: Option<String>,
+) -> Result<(), String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .to_str()
+        .ok_or("Failed to convert app data dir path to string")?
+        .to_string();
+
+    match addon_id {
+        Some(id) => remove_addon_from_staging(&id, &app_data_dir),
+        None => clear_staging_directory(&app_data_dir),
+    }
+}
+
+/// Submit or update a rating for an addon
+#[tauri::command]
+pub async fn submit_addon_rating(
+    addon_id: String,
+    rating: u8,
+    review: Option<String>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<serde_json::Value, String> {
+    let instance_id = state.instance_id.as_str();
+    crate::addons::service::submit_addon_rating(&addon_id, rating, review, instance_id).await
 }

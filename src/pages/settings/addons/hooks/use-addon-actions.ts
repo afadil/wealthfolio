@@ -4,25 +4,28 @@ import { useToast } from '@/components/ui/use-toast';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 
+
 import { reloadAllAddons } from '@/addons/addons-core';
 import {
-  installAddonZip,
-  listInstalledAddons,
+  installAddon,
+  getInstalledAddons,
   toggleAddon,
   uninstallAddon,
-  extractAddonZip,
+  extractAddon,
+  clearAddonStaging,
 } from '@/commands/addon';
-import type { InstalledAddon, Permission, ExtractedAddon } from '@/adapters/tauri';
-import type { RiskLevel } from '@wealthfolio/addon-sdk';
+import { type InstalledAddon, type Permission, type ExtractedAddon, logger } from '@/adapters/tauri';
+import type { RiskLevel, AddonManifest } from '@wealthfolio/addon-sdk';
 import { QueryKeys } from '@/lib/query-keys';
 
 interface PermissionDialogState {
   open: boolean;
-  manifest?: any;
+  manifest?: AddonManifest;
   permissions?: Permission[];
   riskLevel?: RiskLevel;
   fileData?: Uint8Array;
   onApprove?: () => void;
+  onCancel?: () => void;
 }
 
 interface ViewPermissionDialogState {
@@ -56,7 +59,7 @@ export function useAddonActions() {
     refetch: loadInstalledAddons,
   } = useQuery({
     queryKey: [QueryKeys.INSTALLED_ADDONS],
-    queryFn: listInstalledAddons,
+    queryFn: getInstalledAddons,
     staleTime: 30 * 1000, // 30 seconds
   });
 
@@ -91,7 +94,7 @@ export function useAddonActions() {
       const fileData = await readFile(filePath);
       await handleInstallZipAddon(filePath, fileData);
     } catch (error) {
-      console.error('Error loading addon:', error);
+      logger.error('Error loading addon: ' + (error as Error).message);
       toast({
         title: 'Error loading addon',
         description: error instanceof Error ? error.message : 'Failed to load addon',
@@ -105,7 +108,7 @@ export function useAddonActions() {
   const handleInstallZipAddon = async (_filePath: string, fileData: Uint8Array) => {
     try {
       // First, extract and analyze the addon to check permissions
-      const extractedAddon = await extractAddonZip(fileData);
+      const extractedAddon = await extractAddon(fileData);
 
       // Calculate risk level based on permissions
       const permissions = extractedAddon.metadata.permissions || [];
@@ -150,14 +153,33 @@ export function useAddonActions() {
       riskLevel,
       onApprove: async () => {
         setPermissionDialog({ open: false });
-        await onApprove();
-        // Invalidate and refetch installed addons query
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
-        await reloadAllAddons();
-        toast({
-          title: 'Addon installed successfully',
-          description: `${extractedAddon.metadata.name} has been installed and is now active.`,
-        });
+        try {
+          await onApprove();
+          // Invalidate and refetch installed addons query
+          queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
+          await reloadAllAddons();
+          toast({
+            title: 'Addon installed successfully',
+            description: `${extractedAddon.metadata.name} has been installed and is now active.`,
+          });
+        } catch (error) {
+          // Clear staging for this specific addon on installation failure
+          try {
+            await clearAddonStaging(extractedAddon.metadata.id);
+          } catch (cleanupError) {
+            console.error('Failed to clear staging after installation failure:', cleanupError);
+          }
+          throw error;
+        }
+      },
+      onCancel: async () => {
+        setPermissionDialog({ open: false });
+        // Clear staging for this specific addon on cancellation
+        try {
+          await clearAddonStaging(extractedAddon.metadata.id);
+        } catch (error) {
+          console.error('Failed to clear staging directory:', error);
+        }
       },
     });
   };
@@ -165,7 +187,7 @@ export function useAddonActions() {
   const performAddonInstallation = async (fileData: Uint8Array) => {
     try {
       // Install the ZIP addon persistently
-      const metadata = await installAddonZip(fileData, true);
+      const metadata = await installAddon(fileData, true);
 
       // Invalidate and refetch installed addons query
       queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });

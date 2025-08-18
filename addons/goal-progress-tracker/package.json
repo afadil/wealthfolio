@@ -1,7 +1,7 @@
 {
-  "name": "goal-calendar-addon",
+  "name": "goal-progress-tracker-addon",
   "version": "1.0.0",
-  "description": "An addon for tracking investment progress towards target amounts with calendar visualization",
+  "description": "An addon for tracking investment progress towards target amounts with progress visualization",
   "type": "module",
   "main": "dist/addon.js",
   "author": "Wealthfolio",
@@ -11,17 +11,17 @@
     "wealthfolio",
     "addon",
     "investment",
-    "target",
+    "goal",
+    "progress",
     "tracker",
-    "calendar",
     "visualization"
   ],
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
     "dev:server": "wealthfolio dev",
-    "clean": "rm -rf dist investment-target-tracker-addon.zip",
-    "package": "zip -r $npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
+    "clean": "rm -rf dist",
+    "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
     "bundle": "pnpm clean && pnpm build && pnpm package",
     "lint": "tsc --noEmit",
     "type-check": "tsc --noEmit"

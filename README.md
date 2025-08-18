@@ -223,7 +223,7 @@ Your addon will be automatically discovered and loaded with hot reload support!
 ### Example Addons
 
 Check out the [addons/](addons/) directory for sample addons including:
-- **Goal Calendar**: Visual goal tracking with calendar interface
+- **Goal Progress Tracker**: Visual goal tracking with calendar like interface
 - More examples in the [documentation](docs/addons/addon-examples.md)
 
 ### Resources
@@ -271,35 +271,35 @@ Check out the [addons/](addons/) directory for sample addons including:
 
 ```
 wealthfolio/
-├── src/                 # Main source code for the React application
-│   ├── addons/          # Addon system core functionality
-│   ├── components/      # React components
-│   ├── pages/           # Application pages and routes
-│   ├── hooks/           # Custom React hooks
-│   └── lib/             # Utility libraries and helpers
-├── src-core/            # Core backend functionality (Rust)
-├── src-tauri/           # Tauri-specific code for desktop app functionality
-├── addons/              # Example and sample addons
-│   └── goal-calendar/   # Goal calendar addon example
-├── packages/            # Shared packages and tools
-│   ├── addon-sdk/       # Addon SDK for developers
-│   ├── addon-dev-tools/ # Development tools and CLI
-│   └── ui/              # Shared UI components library
-├── docs/                # Documentation
-│   ├── addons/          # Addon development documentation
-│   └── activities/      # Activity types documentation
-├── public/              # Public assets
-├── db/                  # Database files and migrations
-├── LICENSE              # License file
-├── README.md            # Project documentation
-├── ROADMAP.md           # Future plans and roadmap
-├── components.json      # Component configuration
-├── package.json         # Node.js dependencies and scripts
-├── pnpm-lock.yaml       # Lock file for pnpm
-├── postcss.config.js    # PostCSS configuration
-├── tailwind.config.js   # Tailwind CSS configuration
-├── tsconfig.json        # TypeScript configuration
-└── vite.config.ts       # Vite build tool configuration
+├── src/                         # Main source code for the React application
+│   ├── addons/                  # Addon system core functionality
+│   ├── components/              # React components
+│   ├── pages/                   # Application pages and routes
+│   ├── hooks/                   # Custom React hooks
+│   └── lib/                     # Utility libraries and helpers
+├── src-core/                    # Core backend functionality (Rust)
+├── src-tauri/                   # Tauri-specific code for desktop app functionality
+├── addons/                      # Example and sample addons
+│   └── goal-progress-tracker/   # Goal Progress tracker addon example
+├── packages/                    # Shared packages and tools
+│   ├── addon-sdk/               # Addon SDK for developers
+│   ├── addon-dev-tools/         # Development tools and CLI
+│   └── ui/                      # Shared UI components library
+├── docs/                        # Documentation
+│   ├── addons/                  # Addon development documentation
+│   └── activities/              # Activity types documentation
+├── public/                      # Public assets
+├── db/                          # Database files and migrations
+├── LICENSE                      # License file
+├── README.md                    # Project documentation
+├── ROADMAP.md                   # Future plans and roadmap
+├── components.json              # Component configuration
+├── package.json                 # Node.js dependencies and scripts
+├── pnpm-lock.yaml               # Lock file for pnpm
+├── postcss.config.js            # PostCSS configuration
+├── tailwind.config.js           # Tailwind CSS configuration
+├── tsconfig.json                # TypeScript configuration
+└── vite.config.ts               # Vite build tool configuration
 ```
 
 ### Security & Data Storage

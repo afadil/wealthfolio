@@ -5,7 +5,47 @@ use std::path::{Path, PathBuf};
 use super::models::*;
 
 // Constants
-pub const ADDON_STORE_API_BASE_URL: &str = "http://localhost:4321/api/addons";
+pub const ADDON_STORE_API_BASE_URL: &str = "https://wealthfolio.app/api/addons";
+
+/// Helper function to create a request with common headers
+fn create_request_with_headers(client: &reqwest::Client, method: reqwest::Method, url: &str, instance_id: Option<&str>) -> reqwest::RequestBuilder {
+    let mut request = client.request(method, url)
+        .header("User-Agent", "Wealthfolio/1.0");
+    
+    // Add instance ID header if provided
+    if let Some(instance_id) = instance_id {
+        request = request.header("X-Instance-Id", instance_id);
+    }
+    
+    request
+}
+
+/// Helper function to handle API response and parse JSON
+async fn handle_api_response<T>(response: reqwest::Response, operation: &str) -> Result<T, String> 
+where
+    T: serde::de::DeserializeOwned,
+{
+    let status = response.status();
+    
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        log::error!("{} API returned error {}: {}", operation, status, error_text);
+        return Err(format!("{} API returned error {}: {}", operation, status, error_text));
+    }
+
+    let response_text = response.text().await
+        .map_err(|e| {
+            log::error!("Failed to read {} API response: {}", operation, e);
+            format!("Failed to read {} API response: {}", operation, e)
+        })?;
+    
+    serde_json::from_str(&response_text)
+        .map_err(|e| {
+            log::error!("Failed to parse {} API response as JSON: {}", operation, e);
+            log::error!("Response body was: {}", response_text);
+            format!("Failed to parse {} API response: {}", operation, e)
+        })
+}
 
 /// Initialize the addons directory in app_data
 pub fn ensure_addons_directory(app_data_dir: &str) -> Result<PathBuf, String> {
@@ -624,14 +664,12 @@ pub fn read_addon_files_recursive(
 }
 
 /// Check for addon updates from the API server
-pub async fn check_addon_update_from_api(addon_id: &str, current_version: &str) -> Result<AddonUpdateCheckResult, String> {
+pub async fn check_addon_update_from_api(addon_id: &str, current_version: &str, instance_id: Option<&str>) -> Result<AddonUpdateCheckResult, String> {
     let api_url = format!("{}/update-check?addonId={}&currentVersion={}", 
                          ADDON_STORE_API_BASE_URL, addon_id, current_version);
     
     let client = reqwest::Client::new();
-    let response = client
-        .get(&api_url)
-        .header("User-Agent", "Wealthfolio/1.0")
+    let response = create_request_with_headers(&client, reqwest::Method::GET, &api_url, instance_id)
         .send()
         .await
         .map_err(|e| {
@@ -639,63 +677,271 @@ pub async fn check_addon_update_from_api(addon_id: &str, current_version: &str) 
             format!("Failed to fetch addon info from API: {}", e)
         })?;
 
-    let status = response.status();
-
-    if !status.is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        log::error!("API returned error {}: {}", status, error_text);
-        return Err(format!("API returned error {}: {}", status, error_text));
-    }
-
-    // Get the response text first for logging
-    let response_text = response.text().await
-        .map_err(|e| {
-            log::error!("Failed to read API response: {}", e);
-            format!("Failed to read API response: {}", e)
-        })?;
-    
-    let update_check_result: AddonUpdateCheckResult = serde_json::from_str(&response_text)
-        .map_err(|e| {
-            log::error!("Failed to parse API response as JSON: {}", e);
-            log::error!("Response body was: {}", response_text);
-            format!("Failed to parse API response: {}", e)
-        })?;
-
-    Ok(update_check_result)
+    handle_api_response(response, "Update check").await
 }
 
 /// Download addon package from URL
 pub async fn download_addon_package(download_url: &str) -> Result<Vec<u8>, String> {
+    log::info!("Downloading addon package from URL: {}", download_url);
+    
     let client = reqwest::Client::new();
     let response = client
         .get(download_url)
         .header("User-Agent", "Wealthfolio/1.0")
         .send()
         .await
-        .map_err(|e| format!("Failed to download addon package: {}", e))?;
+        .map_err(|e| {
+            log::error!("Failed to download addon package from '{}': {}", download_url, e);
+            format!("Failed to download addon package: {}", e)
+        })?;
 
-    if !response.status().is_success() {
-        return Err(format!("Download failed with status: {}", response.status()));
+    let status = response.status();
+    log::debug!("Package download response status from '{}': {}", download_url, status);
+
+    if !status.is_success() {
+        log::error!("Package download failed with status {} from URL: {}", status, download_url);
+        return Err(format!("Download failed with status: {}", status));
     }
 
     let zip_data = response
         .bytes()
         .await
-        .map_err(|e| format!("Failed to read download data: {}", e))?
+        .map_err(|e| {
+            log::error!("Failed to read download data from '{}': {}", download_url, e);
+            format!("Failed to read download data: {}", e)
+        })?
         .to_vec();
+
+    log::info!("Successfully downloaded addon package ({} bytes) from: {}", zip_data.len(), download_url);
 
     Ok(zip_data)
 }
 
+/// Get staging directory for downloads
+pub fn get_staging_directory(app_data_dir: &str) -> Result<PathBuf, String> {
+    let staging_dir = Path::new(app_data_dir).join("addons").join("staging");
+    
+    if !staging_dir.exists() {
+        fs::create_dir_all(&staging_dir)
+            .map_err(|e| format!("Failed to create staging directory: {}", e))?;
+    }
+    
+    Ok(staging_dir)
+}
+
+/// Clear staging directory
+pub fn clear_staging_directory(app_data_dir: &str) -> Result<(), String> {
+    let staging_dir = get_staging_directory(app_data_dir)?;
+    
+    if staging_dir.exists() {
+        fs::remove_dir_all(&staging_dir)
+            .map_err(|e| format!("Failed to clear staging directory: {}", e))?;
+        
+        // Recreate the empty staging directory
+        fs::create_dir_all(&staging_dir)
+            .map_err(|e| format!("Failed to recreate staging directory: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+/// Download addon from store using GET request
+pub async fn download_addon_from_store(addon_id: &str, instance_id: &str) -> Result<Vec<u8>, String> {
+    let download_api_url = format!("{}/{}/download", ADDON_STORE_API_BASE_URL, addon_id);
+    
+    log::info!("Calling download API for addon '{}' at URL: {}", addon_id, download_api_url);
+    log::debug!("Using instance ID: {}", instance_id);
+    
+    let client = reqwest::Client::new();
+    let response = create_request_with_headers(&client, reqwest::Method::GET, &download_api_url, Some(instance_id))
+        .send()
+        .await
+        .map_err(|e| {
+            log::error!("Failed to call download API for addon {}: {}", addon_id, e);
+            format!("Failed to call download API: {}", e)
+        })?;
+
+    let status = response.status();
+    log::debug!("Download API response status for addon '{}': {}", addon_id, status);
+    
+    // Log response headers for debugging
+    let content_type = response.headers().get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown");
+    log::debug!("Response content-type: {}", content_type);
+    
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        log::error!("Download API returned error {} for addon '{}' at URL '{}': {}", status, addon_id, download_api_url, error_text);
+        return match status.as_u16() {
+            404 => Err("Addon not found or coming soon".to_string()),
+            410 => Err("Addon is inactive or deprecated".to_string()),
+            503 => Err("Download service temporarily unavailable".to_string()),
+            _ => Err(format!("Download API returned error {}: {}", status, error_text)),
+        };
+    }
+
+    // Check if response is JSON (containing download URL) or direct ZIP data
+    if content_type.contains("application/json") {
+        log::debug!("Response is JSON, parsing for download URL");
+        
+        // Parse JSON response to get actual download URL
+        let response_text = response.text().await
+            .map_err(|e| {
+                log::error!("Failed to read JSON download response: {}", e);
+                format!("Failed to read download response: {}", e)
+            })?;
+        
+        log::debug!("Download API JSON response: {}", response_text);
+        
+        let download_response: serde_json::Value = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                log::error!("Failed to parse download API response as JSON: {}", e);
+                format!("Failed to parse download response: {}", e)
+            })?;
+
+        // Extract the actual download URL
+        let actual_download_url = download_response
+            .get("downloadUrl")
+            .and_then(|v| v.as_str())
+            .ok_or("Download API response missing downloadUrl field")?;
+
+        log::info!("Got download URL for addon '{}': {}", addon_id, actual_download_url);
+
+        // Now download the actual file
+        return download_addon_package(actual_download_url).await;
+    } else {
+        log::debug!("Response is binary data, treating as direct ZIP download");
+        
+        // Download the addon package directly (GET request returns the file)
+        let zip_data = response
+            .bytes()
+            .await
+            .map_err(|e| {
+                log::error!("Failed to read download data for addon '{}': {}", addon_id, e);
+                format!("Failed to read download data: {}", e)
+            })?
+            .to_vec();
+
+        log::info!("Successfully downloaded addon package ({} bytes) for addon '{}'", zip_data.len(), addon_id);
+        
+        // Quick check of downloaded data
+        if zip_data.len() < 100 {
+            log::warn!("Downloaded data for addon '{}' is suspiciously small: {} bytes", addon_id, zip_data.len());
+            if !zip_data.is_empty() {
+                let preview = String::from_utf8_lossy(&zip_data);
+                log::debug!("Small download content: {}", preview);
+            }
+        }
+
+        Ok(zip_data)
+    }
+}
+
+/// Save addon data to staging directory
+pub fn save_addon_to_staging(addon_id: &str, app_data_dir: &str, zip_data: &[u8]) -> Result<PathBuf, String> {
+    let staging_dir = get_staging_directory(app_data_dir)?;
+    let staged_file_path = staging_dir.join(format!("{}.zip", addon_id));
+    
+    // Validate zip data before saving
+    if zip_data.is_empty() {
+        return Err("Cannot stage empty addon data".to_string());
+    }
+    
+    log::debug!("Validating ZIP data for addon '{}': {} bytes", addon_id, zip_data.len());
+    
+    // Log first few bytes for debugging
+    if zip_data.len() >= 4 {
+        log::debug!("First 4 bytes: {:02x} {:02x} {:02x} {:02x}", 
+                   zip_data[0], zip_data[1], zip_data[2], zip_data[3]);
+    }
+    
+    // Check for ZIP signature
+    if zip_data.len() < 4 || &zip_data[0..4] != b"PK\x03\x04" {
+        if zip_data.len() >= 100 {
+            // Log first 100 bytes as string to see if it's an error response
+            let preview = String::from_utf8_lossy(&zip_data[0..100]);
+            log::error!("Invalid ZIP signature for addon '{}'. Data preview: {}", addon_id, preview);
+        }
+        return Err(format!("Invalid ZIP data: missing ZIP signature (got {} bytes)", zip_data.len()));
+    }
+    
+    // Quick validation that it's a valid zip
+    use zip::ZipArchive;
+    use std::io::Cursor;
+    
+    let cursor = Cursor::new(zip_data);
+    let archive_result = ZipArchive::new(cursor);
+    
+    match archive_result {
+        Ok(mut archive) => {
+            log::debug!("ZIP validation successful for addon '{}': {} files", addon_id, archive.len());
+            // Verify we can read at least the manifest
+            let mut manifest_found = false;
+            for i in 0..archive.len() {
+                if let Ok(file) = archive.by_index(i) {
+                    if file.name() == "manifest.json" || file.name().ends_with("/manifest.json") {
+                        manifest_found = true;
+                        break;
+                    }
+                }
+            }
+            if !manifest_found {
+                log::warn!("No manifest.json found in ZIP for addon '{}'", addon_id);
+            }
+        }
+        Err(e) => {
+            log::error!("ZIP validation failed for addon '{}': {}", addon_id, e);
+            return Err(format!("Invalid ZIP data for staging: {}", e));
+        }
+    }
+    
+    fs::write(&staged_file_path, zip_data)
+        .map_err(|e| format!("Failed to write staged addon file: {}", e))?;
+    
+    log::info!("Addon '{}' staged at: {:?} ({} bytes)", addon_id, staged_file_path, zip_data.len());
+    
+    Ok(staged_file_path)
+}
+
+/// Load addon from staging directory
+pub fn load_addon_from_staging(addon_id: &str, app_data_dir: &str) -> Result<Vec<u8>, String> {
+    let staging_dir = get_staging_directory(app_data_dir)?;
+    let staged_file_path = staging_dir.join(format!("{}.zip", addon_id));
+    
+    if !staged_file_path.exists() {
+        return Err(format!("Staged addon file not found for addon: {}", addon_id));
+    }
+    
+    let zip_data = fs::read(&staged_file_path)
+        .map_err(|e| format!("Failed to read staged addon file: {}", e))?;
+    
+    log::info!("Loaded addon '{}' from staging ({} bytes)", addon_id, zip_data.len());
+    
+    Ok(zip_data)
+}
+
+/// Remove specific addon from staging
+pub fn remove_addon_from_staging(addon_id: &str, app_data_dir: &str) -> Result<(), String> {
+    let staging_dir = get_staging_directory(app_data_dir)?;
+    let staged_file_path = staging_dir.join(format!("{}.zip", addon_id));
+    
+    if staged_file_path.exists() {
+        fs::remove_file(&staged_file_path)
+            .map_err(|e| format!("Failed to remove staged addon file: {}", e))?;
+        log::info!("Removed addon '{}' from staging", addon_id);
+    }
+    
+    Ok(())
+}
+
 /// Fetch available addons from the store API  
-pub async fn fetch_addon_store_listings() -> Result<Vec<serde_json::Value>, String> {
+pub async fn fetch_addon_store_listings(instance_id: Option<&str>) -> Result<Vec<serde_json::Value>, String> {
     // Fetch all addons and let frontend filter by status
     let api_url = ADDON_STORE_API_BASE_URL.to_string();
     
     let client = reqwest::Client::new();
-    let response = client
-        .get(&api_url)
-        .header("User-Agent", "Wealthfolio/1.0")
+    let response = create_request_with_headers(&client, reqwest::Method::GET, &api_url, instance_id)
         .send()
         .await
         .map_err(|e| {
@@ -704,14 +950,13 @@ pub async fn fetch_addon_store_listings() -> Result<Vec<serde_json::Value>, Stri
         })?;
 
     let status = response.status();
-
     if !status.is_success() {
         let error_text = response.text().await.unwrap_or_default();
         log::error!("Store API returned error {}: {}", status, error_text);
         return Err(format!("Store API returned error {}: {}", status, error_text));
     }
 
-    // Get the response text first for logging
+    // Get the response text first for custom parsing
     let response_text = response.text().await
         .map_err(|e| {
             log::error!("Failed to read store API response: {}", e);
@@ -746,4 +991,59 @@ pub async fn fetch_addon_store_listings() -> Result<Vec<serde_json::Value>, Stri
     };
 
     Ok(store_listings)
+}
+
+
+/// Submit or update a rating for an addon
+pub async fn submit_addon_rating(
+    addon_id: &str, 
+    rating: u8, 
+    review: Option<String>, 
+    instance_id: &str
+) -> Result<serde_json::Value, String> {
+    if rating < 1 || rating > 5 {
+        return Err("Rating must be between 1 and 5".to_string());
+    }
+
+    let api_url = format!("{}/{}/ratings", ADDON_STORE_API_BASE_URL, addon_id);
+    
+    let mut request_body = serde_json::json!({
+        "rating": rating
+    });
+    
+    if let Some(review_text) = review {
+        request_body["review"] = serde_json::Value::String(review_text);
+    }
+    
+    let client = reqwest::Client::new();
+    let response = create_request_with_headers(&client, reqwest::Method::POST, &api_url, Some(instance_id))
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| {
+            log::error!("Failed to submit rating for addon {}: {}", addon_id, e);
+            format!("Failed to submit rating: {}", e)
+        })?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        log::error!("Rating submission API returned error {} for addon {}: {}", status, addon_id, error_text);
+        return Err(format!("Failed to submit rating: HTTP {}", status));
+    }
+
+    let response_text = response.text().await
+        .map_err(|e| {
+            log::error!("Failed to read rating submission API response: {}", e);
+            format!("Failed to read rating submission API response: {}", e)
+        })?;
+
+    let response_json: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| {
+            log::error!("Failed to parse rating submission API response as JSON: {}", e);
+            log::error!("Response body was: {}", response_text);
+            format!("Failed to parse rating submission API response: {}", e)
+        })?;
+
+    Ok(response_json)
 }

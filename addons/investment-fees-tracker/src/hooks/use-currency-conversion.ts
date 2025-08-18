@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { AddonContext, ExchangeRate, Settings } from '@wealthfolio/addon-sdk';
 
+
 interface UseCurrencyConversionOptions {
   ctx: AddonContext;
   enabled?: boolean;
@@ -63,7 +64,7 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
     }
 
     // If no rate found, return original amount
-    console.warn(`No exchange rate found for ${fromCurrency} to ${baseCurrency}`);
+    ctx.api.logger.warn(`No exchange rate found for ${fromCurrency} to ${baseCurrency}`);
     return amount;
   };
 

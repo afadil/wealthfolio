@@ -11,6 +11,10 @@ import {
   Icons,
   EmptyPlaceholder,
   Separator,
+  Skeleton,
+  Card,
+  CardContent,
+  CardHeader,
 } from '@wealthfolio/ui';
 import { AddonStoreCard } from './addon-store-card';
 import { PermissionDialog } from './addon-permission-dialog';
@@ -36,6 +40,8 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
     fetchStoreListings,
     installFromStore,
     isAddonInstalling,
+    submitRating,
+    isRatingSubmitting,
   } = useAddonStore();
 
   const addonActions = useAddonActions();
@@ -149,13 +155,55 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
 
   const popularTags = getPopularTags();
 
-  if (isLoadingStore) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Icons.Loader className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-muted-foreground">Loading addon store...</span>
+  const AddonStoreSkeleton = () => (
+    <div className="space-y-6">
+      {/* Filters and Search Skeleton */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <Skeleton className="h-10 w-full sm:w-[180px]" />
+        <Skeleton className="h-10 w-full sm:w-[180px]" />
+        <Skeleton className="h-10 w-10" />
       </div>
-    );
+
+      {/* Results summary skeleton */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-48" />
+      </div>
+
+      {/* Addon Grid Skeleton */}
+      <div className="grid gap-6 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="h-full">
+            <CardHeader className="pb-2">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <Skeleton className="h-3 w-3 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <Skeleton className="h-3 w-3 rounded-full" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                  <Skeleton className="h-3 w-8" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (isLoadingStore) {
+    return <AddonStoreSkeleton />;
   }
 
   return (
@@ -267,6 +315,8 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
                 isInstalling={isAddonInstalling(listing.id)}
                 onInstall={handleInstall}
                 onTagClick={setSelectedTag}
+                onSubmitRating={submitRating}
+                isRatingSubmitting={isRatingSubmitting(listing.id)}
               />
             ))}
           </div>

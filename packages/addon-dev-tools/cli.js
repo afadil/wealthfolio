@@ -116,10 +116,24 @@ async function createAddon(name, options) {
     info(`Directory: ${result.addonDir}`);
     info(`Addon ID: ${result.addonId}`);
     info(`Package name: ${result.packageName}`);
+    info(`Structure created:`);
+    info(`  ├── src/`);
+    info(`  │   ├── addon.tsx           # Main addon entry point`);
+    info(`  │   ├── components/         # React components`);
+    info(`  │   ├── hooks/              # React hooks`);
+    info(`  │   ├── pages/              # Addon pages`);
+    info(`  │   ├── lib/                # Utility functions and shared logic`);
+    info(`  │   └── types/              # Type definitions`);
+    info(`  ├── dist/                   # Built files (generated)`);
+    info(`  ├── manifest.json           # Addon metadata and permissions`);
+    info(`  ├── package.json            # NPM package configuration`);
+    info(`  ├── vite.config.ts          # Build configuration`);
+    info(`  ├── tsconfig.json           # TypeScript configuration`);
+    info(`  └── README.md               # Documentation`);
     info(`Next steps:`);
     info(`  1. cd ${addonId}`);
-    info(`  2. npm install`);
-    info(`  3. npm run dev:server`);
+    info(`  2. pnpm install`);
+    info(`  3. pnpm run dev:server`);
     
   } catch (err) {
     error(`Failed to create addon: ${err.message}`);
@@ -173,7 +187,7 @@ async function buildAddon() {
       return;
     }
     
-    await execAsync('npm run build');
+    await execAsync('pnpm run build');
     success('Addon built successfully!');
     
   } catch (err) {
@@ -190,7 +204,7 @@ async function packageAddon() {
     await buildAddon();
     
     // Create package
-    await execAsync('npm run package');
+    await execAsync('pnpm run package');
     success('Addon packaged successfully!');
     
   } catch (err) {
@@ -216,7 +230,7 @@ async function testSetup() {
     // Check if dist exists
     const distPath = path.resolve(process.cwd(), 'dist');
     if (!fs.existsSync(distPath)) {
-      warn('⚠️  No dist directory found. Run `npm run build` first.');
+      warn('⚠️  No dist directory found. Run `pnpm run build` first.');
     } else {
       success('✅ Dist directory exists');
     }
@@ -231,27 +245,16 @@ async function testSetup() {
       }
     } catch (error) {
       warn('⚠️  Development server not running on port 3001');
-      info('   Start it with: npm run dev:server');
+      info('   Start it with: pnpm run dev:server');
     }
     
     info('\nNext steps:');
-    info('1. Start dev server: npm run dev:server');
+    info('1. Start dev server: pnpm run dev:server');
     info('2. Start main app in dev mode');
     info('3. Check console: discoverAddons()');
     
   } catch (err) {
     error(`Test failed: ${err.message}`);
-  }
-}
-async function installAddon(zipPath) {
-  try {
-    info(`Installing addon from ${zipPath}`);
-    
-    // This would integrate with the main app's addon installation
-    warn('Install command not yet implemented. Use the main app to install.');
-    
-  } catch (err) {
-    error(`Installation failed: ${err.message}`);
   }
 }
 

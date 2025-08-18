@@ -1,4 +1,4 @@
-# Goal Calendar Addon
+# Goal Progress Tracker Addon
 
 A Wealthfolio addon that helps you visualize your investment progress towards target amounts using a calendar-style representation.
 

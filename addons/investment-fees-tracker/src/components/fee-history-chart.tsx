@@ -50,15 +50,6 @@ export function FeeHistoryChart({
         const numericValue = Number(value) || 0;
         return sum + numericValue;
       }, 0);
-    
-    // Log the cumulative values for debugging
-    if (isNaN(cumulative)) {
-        console.warn(`Cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: monthlyFeeData.slice(0, index + 1).map(d => d[1]) });
-    }
-    
-    if (isNaN(previousCumulative)) {
-        console.warn(`Previous cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: previousMonthlyFeeData.slice(0, index + 1).map(d => d[1]) });
-    }
 
     const dataPoint = {
       month,

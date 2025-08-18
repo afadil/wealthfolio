@@ -1,7 +1,5 @@
 import type React from 'react';
 import { PieChart, Pie, Cell, Sector } from 'recharts';
-import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
-import { AmountDisplay } from '@wealthfolio/ui';
 import { useBalancePrivacy } from '@wealthfolio/ui';
 
 const COLORS = [
@@ -126,7 +124,6 @@ export const DonutChart: React.FC<DonutChartProps> = ({
   onSectionClick,
   startAngle = 180,
   endAngle = 0,
-  displayTooltip = false,
 }) => {
   return (
     <div className="h-[160px] w-full p-0">

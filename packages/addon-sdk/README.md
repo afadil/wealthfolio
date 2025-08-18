@@ -136,13 +136,13 @@ export default function enable(context: AddonContext) {
   // Register cleanup callback
   context.onDisable(() => {
     sidebarItem.remove();
-    console.log('Portfolio Analytics addon disabled');
+    context.api.logger.info('Portfolio Analytics addon disabled');
   });
 
   return {
     disable: () => {
       // Optional: Additional cleanup logic
-      console.log('Addon cleanup completed');
+      context.api.logger.info('Addon cleanup completed');
     }
   };
 }
@@ -175,7 +175,7 @@ export function AnalyticsDashboard() {
         setHoldings(holdingsData);
         setAccounts(accountsData);
       } catch (error) {
-        console.error('Failed to load data:', error);
+        ctx.api.logger.error('Failed to load data:', error);
       } finally {
         setLoading(false);
       }
