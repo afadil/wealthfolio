@@ -126,6 +126,14 @@ export interface InternalHostAPI {
   logWarn(message: string): void;
   logTrace(message: string): void;
   logDebug(message: string): void;
+
+  // Navigation functions
+  navigateToRoute(route: string): Promise<void>;
+
+  // Query functions
+  getQueryClient(): any;
+  invalidateQueries(queryKey: string | string[]): void;
+  refetchQueries(queryKey: string | string[]): void;
 }
 
 /**
@@ -233,6 +241,16 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
         onSyncStart: internalAPI.listenMarketSyncStart,
         onSyncComplete: internalAPI.listenMarketSyncComplete,
       },
+    },
+
+    navigation: {
+      navigate: internalAPI.navigateToRoute,
+    },
+
+    query: {
+      getClient: internalAPI.getQueryClient,
+      invalidateQueries: internalAPI.invalidateQueries,
+      refetchQueries: internalAPI.refetchQueries,
     },
   } as any as SDKHostAPI;
 }

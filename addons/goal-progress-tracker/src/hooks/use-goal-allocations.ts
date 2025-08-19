@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { type AddonContext, type GoalAllocation } from '@wealthfolio/addon-sdk';
+import { type AddonContext, type GoalAllocation, QueryKeys } from '@wealthfolio/addon-sdk';
 
 interface UseGoalAllocationsOptions {
   ctx: AddonContext;
@@ -8,7 +8,7 @@ interface UseGoalAllocationsOptions {
 
 export function useGoalAllocations({ ctx, enabled = true }: UseGoalAllocationsOptions) {
   return useQuery<GoalAllocation[]>({
-    queryKey: ['goal_allocations'],
+    queryKey: [QueryKeys.GOALS_ALLOCATIONS],
     queryFn: async () => {
       if (!ctx.api) {
         throw new Error('API context is required');

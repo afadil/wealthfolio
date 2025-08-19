@@ -1,22 +1,10 @@
 import { type AddonContext, type Goal } from '@wealthfolio/addon-sdk';
-import { Icons } from '@wealthfolio/ui';
+import { Icons, EmptyPlaceholder, Button } from '@wealthfolio/ui';
 import React, { useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { InvestmentCalendar, GoalSelector, HelpPopover } from './components';
 import { useGoalProgress } from './hooks';
 import { useBalancePrivacy } from '@wealthfolio/ui';
-
-// Create a query client instance
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
-      retry: 3,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 // Main Investment Target Tracker component
 function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
@@ -79,6 +67,43 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
           <p className="text-sm">
             {error?.message}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty placeholder if no goals exist
+  if (!goals || goals.length === 0) {
+    return (
+      <div className="bg-background min-h-screen">
+        {/* Header */}
+        <header className="w-full p-3 sm:p-6 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
+              Goal Progress Tracker
+            </h1>
+            <HelpPopover />
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Track your investment progress towards your financial goals
+          </p>
+        </header>
+
+        {/* Empty State */}
+        <div className="flex justify-center px-3 sm:px-6">
+          <div className="w-full max-w-lg">
+            <EmptyPlaceholder className="mt-16">
+              <EmptyPlaceholder.Icon name="Goals" />
+              <EmptyPlaceholder.Title>No Goals Found</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Description>
+                You haven't created any investment goals yet. Create your first goal to start tracking your progress.
+              </EmptyPlaceholder.Description>
+              <Button onClick={() => ctx.api.navigation.navigate('/settings/goals')}>
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                Create Your First Goal
+              </Button>
+            </EmptyPlaceholder>
+          </div>
         </div>
       </div>
     );
@@ -166,12 +191,15 @@ export default function enable(ctx: AddonContext) {
     
     ctx.api.logger.debug('Sidebar navigation item added successfully');
 
-    // Create wrapper component with QueryClientProvider
-    const InvestmentTargetTrackerWrapper = () => (
-      <QueryClientProvider client={queryClient}>
-        <InvestmentTargetTracker ctx={ctx} />
-      </QueryClientProvider>
-    );
+    // Create wrapper component with QueryClientProvider using shared client
+    const InvestmentTargetTrackerWrapper = () => {
+      const sharedQueryClient = ctx.api.query.getClient();
+      return (
+        <QueryClientProvider client={sharedQueryClient}>
+          <InvestmentTargetTracker ctx={ctx} />
+        </QueryClientProvider>
+      );
+    };
 
     // Register route
     ctx.router.add({

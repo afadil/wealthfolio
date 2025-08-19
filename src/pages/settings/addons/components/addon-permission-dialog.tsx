@@ -25,14 +25,13 @@ interface PermissionDialogProps {
   isViewOnly?: boolean;
 }
 
-const getRiskLevelVariant = (riskLevel: RiskLevel): 'success' | 'warning' | 'error' => {
-  switch (riskLevel) {
-    case 'low':
-      return 'success';
-    case 'medium':
-      return 'warning';
-    case 'high':
-      return 'error';
+const getWarningVariantByFunctionCount = (functionCount: number): 'success' | 'warning' | 'error' => {
+  if (functionCount <= 3) {
+    return 'success';
+  } else if (functionCount <= 8) {
+    return 'warning';
+  } else {
+    return 'error';
   }
 };
 
@@ -41,7 +40,7 @@ export function PermissionDialog({
   onOpenChange,
   manifest,
   declaredPermissions = [],
-  riskLevel,
+  riskLevel: _riskLevel, // Keep in interface but not used in implementation
   onApprove,
   onDeny,
   isViewOnly = false,
@@ -54,6 +53,15 @@ export function PermissionDialog({
   // For installation (not view-only), use manifest permissions
   // For view-only, use declared permissions passed in
   const permissionsToDisplay = isViewOnly ? declaredPermissions : (manifest.permissions || []);
+
+  // Calculate total function count from all permissions (excluding UI category)
+  const totalFunctionCount = permissionsToDisplay.reduce((total, permission) => {
+    // Exclude 'ui' category from the count as it's low risk
+    if (permission.category === 'ui') {
+      return total;
+    }
+    return total + permission.functions.length;
+  }, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -91,14 +99,14 @@ export function PermissionDialog({
       </DialogHeader>
 
         <div className="flex-1 overflow-hidden space-y-6">
-          {/* Risk Level */}
+          {/* Function Count Warning */}
           <div className="space-y-3">
             <AlertFeedback
-              variant={getRiskLevelVariant(riskLevel)}
+              variant={getWarningVariantByFunctionCount(totalFunctionCount)}
             >
-              {riskLevel === 'low' && 'This addon has minimal access to your data.'}
-              {riskLevel === 'medium' && 'This addon has moderate access to your financial data.'}
-              {riskLevel === 'high' && 'This addon has extensive access to sensitive financial data.'}
+              {totalFunctionCount <= 3 && 'This addon has minimal access to your data.'}
+              {totalFunctionCount > 3 && totalFunctionCount <= 8 && 'This addon has moderate access to your financial data.'}
+              {totalFunctionCount > 8 && 'This addon has extensive access to sensitive financial data.'}
             </AlertFeedback>
           </div>
 
@@ -106,7 +114,7 @@ export function PermissionDialog({
           <div className="flex-1 overflow-auto">
             <PermissionCategoriesDisplay
               permissions={permissionsToDisplay}
-              variant="default"
+              variant="no-risk-badges"
             />
           </div>
         </div>

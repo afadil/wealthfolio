@@ -578,6 +578,41 @@ export interface EventsAPI {
 }
 
 /**
+ * Navigation APIs
+ */
+export interface NavigationAPI {
+  /**
+   * Navigate to a route in the application
+   * @param route The route path to navigate to
+   * @returns Promise that resolves when navigation is complete
+   */
+  navigate(route: string): Promise<void>;
+}
+
+/**
+ * Query management APIs for React Query integration
+ */
+export interface QueryAPI {
+  /**
+   * Get the shared QueryClient instance from the main application
+   * @returns The shared QueryClient instance
+   */
+  getClient(): any; // QueryClient from @tanstack/react-query
+
+  /**
+   * Invalidate queries by key
+   * @param queryKey The query key to invalidate
+   */
+  invalidateQueries(queryKey: string | string[]): void;
+
+  /**
+   * Refetch queries by key
+   * @param queryKey The query key to refetch
+   */
+  refetchQueries(queryKey: string | string[]): void;
+}
+
+/**
  * Comprehensive Host API interface providing access to all Wealthfolio functionality
  * Organized by functional domains for better discoverability and maintainability
  */
@@ -626,4 +661,10 @@ export interface HostAPI {
   
   /** Event listeners */
   events: EventsAPI;
+  
+  /** Navigation operations */
+  navigation: NavigationAPI;
+  
+  /** React Query operations */
+  query: QueryAPI;
 }

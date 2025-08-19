@@ -814,6 +814,49 @@ export function enable(ctx: AddonContext) {
 
 ---
 
+### 🧭 Navigation API
+
+Programmatic navigation functionality for addons to navigate to different routes in the application.
+
+#### Methods
+
+**`navigate(route: string): Promise<void>`**
+
+Navigate to a specific route in the application.
+
+```typescript
+// Navigate to different pages
+await ctx.api.navigation.navigate('/dashboard');
+await ctx.api.navigation.navigate('/holdings');
+await ctx.api.navigation.navigate('/settings/goals');
+await ctx.api.navigation.navigate('/settings/accounts');
+```
+
+#### Usage Example
+
+```typescript
+export function enable(ctx: AddonContext) {
+  // Add a button that navigates to goals settings
+  const handleCreateGoal = () => {
+    ctx.api.navigation.navigate('/settings/goals');
+  };
+  
+  // Navigate based on conditions
+  const handleNavigation = async () => {
+    const goals = await ctx.api.goals.getAll();
+    if (goals.length === 0) {
+      // Navigate to goals setup if no goals exist
+      await ctx.api.navigation.navigate('/settings/goals');
+    } else {
+      // Navigate to dashboard if goals exist
+      await ctx.api.navigation.navigate('/dashboard');
+    }
+  };
+}
+```
+
+---
+
 ## Event System
 
 The event system allows you to listen for various application events organized by category.

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { type AddonContext, type AccountValuation } from '@wealthfolio/addon-sdk';
+import { type AddonContext, type AccountValuation, QueryKeys } from '@wealthfolio/addon-sdk';
 
 interface UseLatestValuationsOptions {
   accountIds: string[];
@@ -9,7 +9,7 @@ interface UseLatestValuationsOptions {
 
 export function useLatestValuations({ accountIds, ctx, enabled = true }: UseLatestValuationsOptions) {
   return useQuery<AccountValuation[]>({
-    queryKey: ['latest_valuations', accountIds],
+    queryKey: [QueryKeys.latestValuations, accountIds],
     queryFn: async () => {
       if (!ctx.api || !accountIds.length) {
         return [];

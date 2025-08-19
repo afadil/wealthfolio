@@ -310,6 +310,35 @@ export function createAddonContext(addonId: string): AddonContext {
         logTrace: logger.trace,
         logDebug: logger.debug,
 
+        // Navigation functions
+        navigateToRoute: async (route: string) => {
+          // Use the browser's navigation API through React Router
+          const navigate = (window as any).__wealthfolio_navigate__;
+          if (navigate) {
+            navigate(route);
+          } else {
+            // Fallback: change the URL directly
+            window.location.hash = route;
+          }
+        },
+
+        // Query functions
+        getQueryClient: () => {
+          return (window as any).__wealthfolio_query_client__;
+        },
+        invalidateQueries: (queryKey: string | string[]) => {
+          const queryClient = (window as any).__wealthfolio_query_client__;
+          if (queryClient) {
+            queryClient.invalidateQueries({ queryKey: Array.isArray(queryKey) ? queryKey : [queryKey] });
+          }
+        },
+        refetchQueries: (queryKey: string | string[]) => {
+          const queryClient = (window as any).__wealthfolio_query_client__;
+          if (queryClient) {
+            queryClient.refetchQueries({ queryKey: Array.isArray(queryKey) ? queryKey : [queryKey] });
+          }
+        },
+
       }, addonId);
       
       // Add the secrets API manually

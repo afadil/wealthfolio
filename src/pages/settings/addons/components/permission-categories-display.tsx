@@ -14,7 +14,7 @@ interface PermissionForDisplay {
 
 interface PermissionCategoriesDisplayProps {
   permissions: Permission[];
-  variant?: 'default' | 'compact';
+  variant?: 'default' | 'compact' | 'no-risk-badges';
 }
 
 // Helper to convert SDK Permission to display format
@@ -57,6 +57,7 @@ export function PermissionCategoriesDisplay({
   variant = 'default',
 }: PermissionCategoriesDisplayProps) {
   const isCompact = variant === 'compact';
+  const showRiskBadges = variant !== 'no-risk-badges';
   
   if (permissions.length === 0) {
     return (
@@ -90,12 +91,14 @@ export function PermissionCategoriesDisplay({
                   <span className={`font-medium ${isCompact ? 'text-sm' : 'text-sm'}`}>
                     {permission.name}
                   </span>
-                  <Badge
-                    variant="outline"
-                    className={getRiskBadgeColor(permission.riskLevel)}
-                  >
-                    {permission.riskLevel}
-                  </Badge>
+                  {showRiskBadges && (
+                    <Badge
+                      variant="outline"
+                      className={getRiskBadgeColor(permission.riskLevel)}
+                    >
+                      {permission.riskLevel}
+                    </Badge>
+                  )}
                 </div>
                 <p className={`text-muted-foreground ${isCompact ? 'text-xs' : 'text-xs'}`}>
                   {permission.description}

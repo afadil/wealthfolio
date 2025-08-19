@@ -25,6 +25,10 @@ export type {
 // Host API interface
 export type { HostAPI } from './host-api';
 
+// Query Client and Keys exports
+export type { QueryClient } from '@tanstack/react-query';
+export { QueryKeys } from './query-keys';
+
 // Comprehensive data types
 export type * from './data-types';
 
