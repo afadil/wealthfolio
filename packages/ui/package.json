@@ -28,6 +28,18 @@
   ],
   "author": "Wealthfolio Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/afadil/wealthfolio.git",
+    "directory": "packages/ui"
+  },
+  "bugs": {
+    "url": "https://github.com/afadil/wealthfolio/issues"
+  },
+  "homepage": "https://github.com/afadil/wealthfolio/tree/main/packages/ui#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup && npm run build:css",
     "build:css": "tailwindcss -c ../../tailwind.config.js -i ./src/styles.css -o ./dist/styles.css --minify",
