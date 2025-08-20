@@ -13,12 +13,14 @@ import { useActivityMutations } from './hooks/use-activity-mutations';
 import { ActivityForm } from './components/activity-form';
 import EditableActivityTable from './components/editable-activity-table';
 import ActivityTable from './components/activity-table';
+import { BulkHoldingsModal } from './components/forms/bulk-holdings-modal';
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<ActivityDetails | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showEditableTable, setShowEditableTable] = useState(false);
+  const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
 
   const { data: accountsData } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -52,23 +54,29 @@ const ActivityPage = () => {
 
 
   return (
-    <div className="flex flex-col p-6">
-      <ApplicationHeader heading="Activity">
-        <div className="absolute right-6 flex items-center space-x-2">
-          <Button size="sm" title="Import" asChild>
-            <Link to={'/import'}>
-              <Icons.Import className="mr-2 h-4 w-4" />
-              Import from CSV
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
-            <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add Manually
-          </Button>
-        </div>
-      </ApplicationHeader>
-      <Separator className="my-6" />
-      <div className="pt-6">
+    <div className="flex flex-col p-6 h-screen">
+      <div className="flex-shrink-0">
+        <ApplicationHeader heading="Activity">
+          <div className="absolute right-6 flex items-center space-x-2">
+            <Button size="sm" title="Import" asChild>
+              <Link to={'/import'}>
+                <Icons.Import className="mr-2 h-4 w-4" />
+                Import from CSV
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowBulkHoldingsForm(true)}>
+              <Icons.ListChecks className="mr-2 h-4 w-4" />
+              Add Holdings
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
+              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              Add Manually
+            </Button>
+          </div>
+        </ApplicationHeader>
+        <Separator className="my-6" />
+      </div>
+      <div className="flex-1 min-h-0">
         {showEditableTable ? (
             <EditableActivityTable
               accounts={accounts}
@@ -108,6 +116,19 @@ const ActivityPage = () => {
           setShowDeleteAlert(false);
           setSelectedActivity(undefined);
         }}
+      />
+      <BulkHoldingsModal
+        accounts={
+          accounts
+            ?.filter((acc) => acc.isActive)
+            .map((account) => ({
+              value: account.id,
+              label: account.name,
+              currency: account.currency,
+            })) || []
+        }
+        open={showBulkHoldingsForm}
+        onClose={() => setShowBulkHoldingsForm(false)}
       />
     </div>
   );

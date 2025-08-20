@@ -416,8 +416,8 @@ export const ActivityTable = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="h-full flex flex-col">
+      <div className="flex justify-between items-center flex-shrink-0 mb-4">
         <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
         <ToggleGroup
           type="single"
@@ -443,11 +443,11 @@ export const ActivityTable = ({
       </div>
 
       <div
-        className="h-[700px] overflow-y-auto rounded-md border"
+        className="flex-1 min-h-0 overflow-auto rounded-md border"
         onScroll={(e) => fetchMoreOnBottomReachedDebounced(e.target as HTMLDivElement)}
       >
         <Table>
-          <TableHeader className="bg-muted-foreground/5">
+          <TableHeader className="bg-muted-foreground/5 sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -486,7 +486,7 @@ export const ActivityTable = ({
           </TableBody>
         </Table>
       </div>
-      <div className="flex pl-2 text-xs text-muted-foreground">
+      <div className="flex pl-2 text-xs text-muted-foreground flex-shrink-0 mt-2">
         {isFetching ? <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
         {totalFetched} / {totalDBRowCount} activities
       </div>
