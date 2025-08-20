@@ -8,7 +8,7 @@ import { RateCell } from './rate-cell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { AddExchangeRateForm } from './add-exchange-rate-form';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import {

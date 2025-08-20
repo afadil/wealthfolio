@@ -1,10 +1,8 @@
 import { z } from 'zod';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, FormField, FormItem, FormLabel, FormControl, FormMessage, MoneyInput } from '@wealthfolio/ui';
+import { useFormContext } from 'react-hook-form';
 import { AccountSelectOption } from '../activity-form';
 import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from '../activity-type-selector';
-import { useFormContext } from 'react-hook-form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { MoneyInput } from '@/components/ui/money-input';
 import { ConfigurationCheckbox, CommonFields } from './common';
 import { cashActivitySchema } from './schemas';
 

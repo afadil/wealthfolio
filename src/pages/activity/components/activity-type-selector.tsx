@@ -1,5 +1,5 @@
 import { Control } from 'react-hook-form';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import { FormControl, FormField, FormItem } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';

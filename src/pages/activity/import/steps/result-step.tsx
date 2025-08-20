@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Account, ActivityImport } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { ImportPreviewTable } from '../import-preview-table';
 import { ImportAlert } from '../components/import-alert';
 import { useNavigate } from 'react-router-dom';

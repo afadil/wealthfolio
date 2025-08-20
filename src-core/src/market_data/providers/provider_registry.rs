@@ -47,7 +47,7 @@ impl ProviderRegistry {
             let provider_id_str = &setting.id;
 
             let api_key = if provider_id_str == DATA_SOURCE_MARKET_DATA_APP || provider_id_str == DATA_SOURCE_ALPHA_VANTAGE {
-                match SecretManager::get_api_key(provider_id_str) {
+                match SecretManager::get_secret(provider_id_str) {
                     Ok(key_opt) => key_opt,
                     Err(e) => {
                         warn!(

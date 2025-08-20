@@ -1,4 +1,4 @@
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { motion } from 'framer-motion';
 
 interface Step {

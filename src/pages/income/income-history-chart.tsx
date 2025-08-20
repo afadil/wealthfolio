@@ -16,9 +16,9 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
@@ -43,11 +43,6 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         const numericValue = Number(value) || 0;
         return sum + numericValue;
       }, 0);
-    
-    // Log the cumulative value for debugging
-    if (isNaN(cumulative)) {
-        console.warn(`Cumulative NaN found for month ${month} at index ${index}`, { sum: 'check input data', value: monthlyIncomeData.slice(0, index + 1).map(d => d[1]) });
-    }
 
     const dataPoint = {
       month,

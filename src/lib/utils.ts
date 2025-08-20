@@ -1,12 +1,13 @@
+import { format, isValid, parseISO, parse } from 'date-fns';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, isValid, parseISO, parse } from 'date-fns';
 import { logger } from '@/adapters';
 import { AccountValuation } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
 
 /**
  * Attempts to parse a date string in multiple formats using date-fns
@@ -231,14 +232,6 @@ export function formatPercent(value: number | null | undefined) {
     logger.error(`Error formatting percent ${value}: ${error}`);
     // Fallback to simple string conversion if formatting fails
     return `${value}%`; // Keep original fallback but it might still be incorrect
-  }
-}
-export function formatStockQuantity(quantity: string | number) {
-  const numQuantity = parseFloat(String(quantity));
-  if (Number.isInteger(numQuantity)) {
-    return numQuantity.toString();
-  } else {
-    return numQuantity.toFixed(6);
   }
 }
 

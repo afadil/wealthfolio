@@ -1,6 +1,6 @@
 import { Holding } from '@/lib/types';
-import { Icons } from '@/components/icons';
-import { AmountDisplay } from '@/components/amount-display';
+import { Icons } from '@/components/ui/icons';
+import { AmountDisplay } from '@wealthfolio/ui';
 import { cn } from '@/lib/utils';
 import { useBalancePrivacy } from '@/context/privacy-context';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -1,30 +1,30 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { format } from 'date-fns';
+import { Quote } from '@/lib/types';
+
 import {
+  Button,
+  Input,
+  Icons,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
-import { Quote } from '@/lib/types';
-import { Icons } from '@/components/icons';
-import DatePickerInput from '@/components/ui/date-picker-input';
-import {
+  DatePickerInput,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/components/ui/popover';
-import { MoneyInput } from '@/components/ui/money-input';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { formatAmount, formatQuantity } from '@/lib/utils';
+  Switch,
+  Label,
+  MoneyInput,
+  Popover, PopoverContent, PopoverTrigger, PopoverClose,
+  formatAmount,
+} from '@wealthfolio/ui';
+import { formatQuantity } from '@/lib/utils';
 import {
   useReactTable,
   getCoreRowModel,

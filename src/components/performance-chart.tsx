@@ -1,7 +1,7 @@
 import { ReturnData } from '@/lib/types';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
-import { formatPercent } from '@/lib/utils';
+import { formatPercent } from '@wealthfolio/ui';
 import {
   ChartConfig,
   ChartContainer,

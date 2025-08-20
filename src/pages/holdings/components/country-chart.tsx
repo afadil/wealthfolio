@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Holding, Country } from '@/lib/types';
-import { CustomPieChart } from '@/components/custom-pie-chart';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DonutChart, EmptyPlaceholder, Skeleton } from '@wealthfolio/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 
 interface CountryChartProps {
   holdings?: Holding[];
@@ -84,7 +82,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
       </CardHeader>
       <CardContent className="pt-0">
         {data.length > 0 ? (
-          <CustomPieChart
+          <DonutChart
             data={data}
             activeIndex={activeIndex}
             onPieEnter={onPieEnter}

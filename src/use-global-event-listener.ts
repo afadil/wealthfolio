@@ -10,7 +10,7 @@ import {
   listenPortfolioUpdateError,
   listenMarketSyncStart,
 } from '@/commands/portfolio-listener';
-import { logger } from './adapters/tauri';
+import { logger } from './adapters';
 
 function handleMarketSyncStart() {
   toast({

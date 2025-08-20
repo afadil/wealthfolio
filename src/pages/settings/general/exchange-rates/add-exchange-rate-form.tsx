@@ -5,9 +5,9 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 
-import { worldCurrencies } from '@/lib/currencies';
+import { worldCurrencies } from '@wealthfolio/ui';
 import { ExchangeRate } from '@/lib/types';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import {
   DialogDescription,
   DialogFooter,
@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { MoneyInput } from '@/components/ui/money-input';
+import { MoneyInput } from '@wealthfolio/ui';
 
 const exchangeRateSchema = z.object({
   fromCurrency: z.string().min(1, 'From Currency is required'),

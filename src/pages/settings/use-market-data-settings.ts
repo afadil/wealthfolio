@@ -4,7 +4,7 @@ import {
   getMarketDataProviderSettings,
   updateMarketDataProviderSettings,
 } from '@/commands/market-data';
-import { setApiKey, deleteApiKey } from '@/commands/secrets';
+import { setSecret, deleteSecret } from '@/commands/secrets';
 import { toast } from '@/components/ui/use-toast';
 
 export function useMarketDataProviderSettings() {
@@ -40,7 +40,7 @@ export function useSetApiKey() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (variables: { providerId: string; apiKey: string }) =>
-      setApiKey(variables.providerId, variables.apiKey),
+      setSecret(variables.providerId, variables.apiKey),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
       toast({
@@ -61,7 +61,7 @@ export function useSetApiKey() {
 export function useDeleteApiKey() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (variables: { providerId: string }) => deleteApiKey(variables.providerId),
+    mutationFn: async (variables: { providerId: string }) => deleteSecret(variables.providerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
       toast({

@@ -15,7 +15,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 const appearanceFormSchema = z.object({
   theme: z.enum(['light', 'dark', 'system'], {

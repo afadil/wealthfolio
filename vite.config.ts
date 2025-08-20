@@ -9,8 +9,12 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@/components/ui': path.resolve(__dirname, 'packages/ui/src/components/ui'),
+      '@wealthfolio/addon-sdk': path.resolve(__dirname, 'packages/addon-sdk/src'),
+      '@wealthfolio/ui': path.resolve(__dirname, 'packages/ui/src'),
       '@': path.resolve(__dirname, './src'),
     },
+    extensions: ['.js', '.ts', '.jsx', '.tsx', '.json'],
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

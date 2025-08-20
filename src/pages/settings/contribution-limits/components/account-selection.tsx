@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Account, ContributionLimit, DepositsCalculation } from '@/lib/types';
 import { useContributionLimitMutations } from '../use-contribution-limit-mutations';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
 
 interface AccountSelectionProps {
   limit: ContributionLimit;

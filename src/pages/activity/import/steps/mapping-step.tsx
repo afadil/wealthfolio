@@ -6,8 +6,7 @@ import { validateTickerSymbol } from '../utils/validation-utils';
 import { useImportMapping } from '../hooks/use-import-mapping';
 import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
 import { ImportAlert } from '../components/import-alert';
-import { Icons } from '@/components/icons';
-import { LucideIcon } from 'lucide-react';
+import { Icons, Icon } from '@/components/ui/icons';
 
 interface MappingStepProps {
   headers: string[];
@@ -214,7 +213,7 @@ export const MappingStep = ({
           size="sm"
           title="Activities"
           description={`${distinctActivityTypes.length - activitiesToMapCount} of ${distinctActivityTypes.length} mapped`}
-          icon={Icons.Activity as LucideIcon}
+          icon={Icons.Activity as Icon}
           rightIcon={activitiesToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
         />
 
@@ -224,7 +223,7 @@ export const MappingStep = ({
           size="sm"
           title="Symbols"
           description={`${distinctSymbols.length - symbolsToMapCount} of ${distinctSymbols.length} mapped`}
-          icon={Icons.Tag as LucideIcon}
+          icon={Icons.Tag as Icon}
           rightIcon={symbolsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
         />
         
@@ -239,7 +238,7 @@ export const MappingStep = ({
                 ? `${distinctAccountIds.length - accountsToMapCount} of ${distinctAccountIds.length} mapped`
                 : "No unmapped account IDs found"
             }
-            icon={Icons.Wallet as LucideIcon}
+            icon={Icons.Wallet as Icon}
             rightIcon={accountsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
           />
         )}

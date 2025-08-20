@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Account, CsvRowError } from '@/lib/types';
 import { CSVFileViewer } from '../components/csv-file-viewer';
 import { AccountSelector } from '../../../../components/account-selector';
-import { ImportProgressIndicator } from '../components/progress-indicator';
-import { Icons } from '@/components/icons';
+import { ProgressIndicator } from '@/components/ui/progress-indicator';
+import { Icons } from '@/components/ui/icons';
 import { ImportAlert } from '../components/import-alert';
 
 interface AccountSelectionStepProps {
@@ -58,7 +58,6 @@ export const AccountSelectionStep = ({
       : isParsing
         ? 'loading'
         : 'valid';
-
 
   const handleFileChange = (file: File | null) => {
     setCsvFile(file);
@@ -168,11 +167,7 @@ export const AccountSelectionStep = ({
 
       {/* Row 4: Next button */}
       <div className="flex justify-between">
-        <Button 
-          variant="outline" 
-          onClick={onBack}
-          disabled={isParsing}
-        >
+        <Button variant="outline" onClick={onBack} disabled={isParsing}>
           Cancel
         </Button>
         <Button onClick={onNext} disabled={!canProceed}>
@@ -181,7 +176,13 @@ export const AccountSelectionStep = ({
         </Button>
       </div>
       {/* Loading indicator */}
-      <ImportProgressIndicator isLoading={isParsing} open={isParsing} />
+      <ProgressIndicator
+        title="Reading the file"
+        description="Please wait while the application processes your data."
+        message="Reading the file..."
+        isLoading={isParsing}
+        open={isParsing}
+      />
     </div>
   );
 };

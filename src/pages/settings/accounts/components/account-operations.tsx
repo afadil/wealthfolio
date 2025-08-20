@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 import type { Account } from '@/lib/types';
 

@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { EmptyPlaceholder } from '@/components/empty-placeholder';
-import { Separator } from '@/components/ui/separator';
+import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
 import { GoalItem } from './components/goal-item';
 import { GoalEditModal } from './components/goal-edit-modal';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
 import type { Goal, GoalAllocation } from '@/lib/types';
 import { SettingsHeader } from '../header';
 import { getGoals, getGoalsAllocation } from '@/commands/goal';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import GoalsAllocations from './components/goal-allocations';
 import { useAccounts } from '@/hooks/use-accounts';

@@ -1,4 +1,4 @@
-import { AlertFeedback } from '@/components/alert-feedback';
+import { AlertFeedback } from '@wealthfolio/ui';
 import { ApplicationHeader } from '@/components/header';
 import { Separator } from '@/components/ui/separator';
 import React, {useState } from 'react';

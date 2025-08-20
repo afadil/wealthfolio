@@ -3,8 +3,7 @@ import { AccountSelectOption } from '../activity-form';
 import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from '../activity-type-selector';
 import { useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { MoneyInput } from '@/components/ui/money-input';
-import { QuantityInput } from '@/components/ui/quantity-input';
+import { MoneyInput, QuantityInput } from '@wealthfolio/ui';
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from './common';
 
 export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
@@ -15,16 +14,17 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
   const otherTypes: ActivityTypeUI[] = [
     { value: 'SPLIT', label: 'Split', icon: 'Split', description: 'Record a stock split. This changes the number of shares you own but typically not the total value of your holding (e.g., a 2-for-1 split doubles your shares).' },
     { value: 'FEE', label: 'Fee', icon: 'Receipt', description: 'Record a standalone fee or charge not directly tied to a specific trade, such as an account maintenance fee. This will decrease your cash balance.' },
+    { value: 'TAX', label: 'Tax', icon: 'ReceiptText', description: 'Record tax payments related to your investments, such as capital gains tax or withholding tax. This will decrease your cash balance.' },
   ];
 
-  const shouldShowSymbolLookup = activityType !== 'FEE';
+  const shouldShowSymbolLookup = activityType !== 'FEE' && activityType !== 'TAX';
   const isSplitType = activityType === 'SPLIT';
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <ActivityTypeSelector control={control} types={otherTypes} columns={2} />
+          <ActivityTypeSelector control={control} types={otherTypes} columns={3} />
         </div>
       </div>
       <Card>
@@ -40,6 +40,20 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fee Amount</FormLabel>
+                  <FormControl>
+                    <MoneyInput {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : activityType === 'TAX' ? (
+            <FormField
+              control={control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tax Amount</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>

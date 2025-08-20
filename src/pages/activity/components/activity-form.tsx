@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { logger } from '@/adapters';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -50,6 +50,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   TRANSFER_IN: 'cash',
   TRANSFER_OUT: 'cash',
   FEE: 'other',
+  TAX: 'other',
   ADD_HOLDING: 'holdings',
   REMOVE_HOLDING: 'holdings',
 };
@@ -110,7 +111,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (
-        ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
+        ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TAX', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
           submitData.activityType,
         )
       ) {

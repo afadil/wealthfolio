@@ -6,15 +6,15 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+  Badge,
+  SearchableSelect,
+} from '@wealthfolio/ui';
 import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, ImportRequiredField, Account } from '@/lib/types';
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
 import TickerSearchInput from '@/components/ticker-search';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
-import { SearchableSelect } from '@/components/searchable-select';
 import { AccountSelector } from '@/components/account-selector';
 
 const SKIP_FIELD_VALUE = '__skip__';

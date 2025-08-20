@@ -10,7 +10,8 @@
     "cssVariables": true
   },
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils"
+    "components": "@wealthfolio/ui/components",
+    "utils": "@wealthfolio/ui/lib/utils",
+    "ui": "@wealthfolio/ui/components/ui"
   }
 }

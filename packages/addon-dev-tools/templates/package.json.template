@@ -1,0 +1,35 @@
+{
+  "name": "{{packageName}}",
+  "version": "1.0.0",
+  "description": "{{description}}",
+  "type": "module",
+  "main": "dist/addon.js",
+  "keywords": ["wealthfolio", "addon"],
+  "license": "MIT",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "dev:server": "wealthfolio dev",
+    "clean": "rm -rf dist",
+    "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
+    "bundle": "pnpm clean && pnpm build && pnpm package",
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wealthfolio/addon-sdk": "^1.0.0",
+    "@wealthfolio/ui": "^1.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@wealthfolio/addon-dev-tools": "^1.0.0",
+    "@types/node": "^22.14.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "rollup-plugin-external-globals": "^0.13.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.2.7"
+  }
+}
