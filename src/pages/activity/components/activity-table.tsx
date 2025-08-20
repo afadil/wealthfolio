@@ -34,6 +34,7 @@ import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivit
 import { ActivityType, ActivityTypeNames } from '@/lib/constants';
 import { useActivityMutations } from '../hooks/use-activity-mutations';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TickerAvatar } from '@/components/ticker-avatar';
 
 const fetchSize = 25;
 
@@ -68,6 +69,42 @@ export const ActivityTable = ({
 
   const columns: ColumnDef<ActivityDetails>[] = useMemo(
     () => [
+       {
+        id: 'assetSymbol',
+        accessorKey: 'assetSymbol',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+        cell: ({ row }) => {
+          let symbol = row.getValue('assetSymbol') as string;
+          const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+          // For TickerAvatar, use $CASH for all cash symbols to get the proper icon
+          const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
+
+          const isCash = symbol.startsWith('$CASH');
+          const content = (
+            <div className="flex items-center">
+              <TickerAvatar symbol={avatarSymbol} className="w-8 h-8 mr-2" />
+              <div className="flex flex-col">
+                <span className="font-medium">{displaySymbol}</span>
+                <span className="text-xs text-muted-foreground">{row.getValue('assetName')}</span>
+              </div>
+            </div>
+          );
+
+          if (isCash) {
+            return content;
+          }
+
+          return (
+            <Link 
+              to={`/holdings/${encodeURIComponent(symbol)}`} 
+              className="block hover:bg-muted/50 rounded-sm p-1 -m-1 transition-colors"
+            >
+              {content}
+            </Link>
+          );
+        },
+        enableHiding: false,
+      },
       {
         id: 'date',
         accessorKey: 'date',
@@ -113,36 +150,6 @@ export const ActivityTable = ({
         filterFn: (row, id, value: string) => {
           return value.includes(row.getValue(id));
         },
-      },
-
-      {
-        id: 'assetSymbol',
-        accessorKey: 'assetSymbol',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
-        cell: ({ row }) => {
-          let symbol = row.getValue('assetSymbol') as string;
-          if (symbol.startsWith('$CASH')) {
-            symbol = symbol.split('-')[0];
-          }
-
-          const badge = (
-            <Badge className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm">
-              {symbol}
-            </Badge>
-          );
-
-          return (
-            <div className="w-3/3 flex items-center">
-                {symbol.startsWith('$CASH-') ? (
-                  badge
-                ) : (
-                  <Link to={`/holdings/${encodeURIComponent(symbol)}`}>{badge}</Link>
-                )}
-              <span className="ml-2 text-xs">{row.getValue('assetName')}</span>
-            </div>
-          );
-        },
-        enableHiding: false,
       },
       {
         id: 'quantity',

@@ -74,7 +74,6 @@ pub struct SnapshotService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
-    asset_repository: Arc<dyn AssetRepositoryTrait>,
     holdings_calculator: HoldingsCalculator,
 }
 
@@ -101,7 +100,6 @@ impl SnapshotService {
             account_repository,
             activity_repository,
             snapshot_repository,
-            asset_repository,
             holdings_calculator,
         }
     }

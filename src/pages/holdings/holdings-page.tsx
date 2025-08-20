@@ -146,9 +146,9 @@ export const HoldingsPage = () => {
   }, [holdings]);
 
   return (
-    <ApplicationShell className="p-6">
-      <Tabs defaultValue={defaultTab} className="space-y-4">
-        <div className="space-y-2">
+    <ApplicationShell className="p-6 h-screen flex flex-col">
+      <Tabs defaultValue={defaultTab} className="flex flex-col h-full w-full">
+        <div className="space-y-2 flex-shrink-0">
           <ApplicationHeader heading="Holdings">
             <div className="flex items-center space-x-2">
               <AccountSelector
@@ -176,7 +176,7 @@ export const HoldingsPage = () => {
           <CashHoldingsWidget cashHoldings={cashHoldings || []} isLoading={isLoading} />
         </div>
 
-        <TabsContent value="holdings" className="space-y-4">
+        <TabsContent value="holdings" className="flex-1 min-h-0">
           <HoldingsTable holdings={nonCashHoldings || []} isLoading={isLoading} />
         </TabsContent>
 

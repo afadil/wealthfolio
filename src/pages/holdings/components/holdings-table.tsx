@@ -1,5 +1,4 @@
 import { Icons } from '@/components/ui/icons';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
@@ -15,6 +14,7 @@ import { AmountDisplay } from '@wealthfolio/ui';
 import { QuantityDisplay } from '@wealthfolio/ui';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TickerAvatar } from '@/components/ticker-avatar';
 
 // Helper function to get display value and currency based on toggle state
 const getDisplayValueAndCurrency = (
@@ -83,7 +83,7 @@ export const HoldingsTable = ({
   ];
 
   return (
-    <div className="pt-6">
+    <div className="h-full flex flex-col">
       <DataTable
         data={holdings}
         columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
@@ -122,21 +122,36 @@ const getColumns = (
       const holding = row.original;
       const symbol = holding.instrument?.symbol ?? holding.id;
       const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+      // For TickerAvatar, use the full symbol for cash (including $CASH) to get the proper icon
+      const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
 
       const handleNavigate = () => {
         const navSymbol = holding.instrument?.symbol ?? holding.id;
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
-      return (
-        <div className="flex items-center">
-          <Badge
-            className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
-            onClick={handleNavigate}
-          >
-            {displaySymbol}
-          </Badge>
 
-          <span className="ml-2 line-clamp-1">{holding.instrument?.name || holding.id}</span>
+      const isCash = symbol.startsWith('$CASH');
+      const content = (
+        <div className="flex items-center">
+          <TickerAvatar symbol={avatarSymbol} className="w-8 h-8 mr-2" />
+          <div className="flex flex-col">
+            <span className="font-medium">{displaySymbol}</span>
+            <span className="text-xs text-muted-foreground line-clamp-1">{holding.instrument?.name || holding.id}</span>
+          </div>
+        </div>
+      );
+
+      if (isCash) {
+        return (
+          <div className="flex items-center p-2">
+            {content}
+          </div>
+        );
+      }
+
+      return (
+        <div className="cursor-pointer hover:bg-muted/50 rounded-sm p-1 -m-1 transition-colors" onClick={handleNavigate}>
+          {content}
         </div>
       );
     },
