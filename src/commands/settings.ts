@@ -44,3 +44,32 @@ export const backupDatabase = async (): Promise<{ filename: string; data: Uint8A
     throw error;
   }
 };
+
+export const backupDatabaseToPath = async (backupDir: string): Promise<string> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return await invokeTauri<string>('backup_database_to_path', { backupDir });
+      default:
+        throw new Error(`Unsupported environment for database backup`);
+    }
+  } catch (error) {
+    logger.error('Error backing up database to path.');
+    throw error;
+  }
+};
+
+export const restoreDatabase = async (backupFilePath: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri('restore_database', { backupFilePath });
+        break;
+      default:
+        throw new Error(`Unsupported environment for database restore`);
+    }
+  } catch (error) {
+    logger.error('Error restoring database.');
+    throw error;
+  }
+};
