@@ -95,6 +95,7 @@ pub async fn initialize_context(
         account_repository.clone(),
         activity_repository.clone(),
         snapshot_repository.clone(),
+        asset_repository.clone(),
         fx_service.clone(),
     ));
 

@@ -102,6 +102,8 @@ pub enum CalculatorError {
         activity_id: String,
         activity_currency: String,
     },
+    #[error("Currency conversion failed: {0}")]
+    CurrencyConversion(String),
     #[error("FX rate {0}->{1} not found in pre-fetched cache for date {2}")]
     MissingFxRate(String, String, NaiveDate),
     #[error("Position not found for asset {asset_id} in account {account_id} during operation")]
