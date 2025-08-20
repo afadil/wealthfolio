@@ -120,8 +120,7 @@ export const ActivityTable = ({
         accessorKey: 'assetSymbol',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
         cell: ({ row }) => {
-          let ogSymbol = row.getValue('assetSymbol') as string;
-          let symbol = ogSymbol.split('.')[0];
+          let symbol = row.getValue('assetSymbol') as string;
           if (symbol.startsWith('$CASH')) {
             symbol = symbol.split('-')[0];
           }
@@ -134,10 +133,10 @@ export const ActivityTable = ({
 
           return (
             <div className="w-3/3 flex items-center">
-                {ogSymbol.startsWith('$CASH-') ? (
+                {symbol.startsWith('$CASH-') ? (
                   badge
                 ) : (
-                  <Link to={`/holdings/${encodeURIComponent(ogSymbol)}`}>{badge}</Link>
+                  <Link to={`/holdings/${encodeURIComponent(symbol)}`}>{badge}</Link>
                 )}
               <span className="ml-2 text-xs">{row.getValue('assetName')}</span>
             </div>

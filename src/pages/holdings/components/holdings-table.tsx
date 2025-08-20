@@ -120,7 +120,7 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
-      const symbol = holding.instrument?.symbol?.split('.')[0] ?? holding.id;
+      const symbol = holding.instrument?.symbol ?? holding.id;
       const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
 
       const handleNavigate = () => {
