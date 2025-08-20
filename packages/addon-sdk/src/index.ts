@@ -100,3 +100,6 @@ export const ReactVersion = '18.3.1';
 
 export const React = (window as any).React as typeof import('react');
 export const ReactDOM = (window as any).ReactDOM as typeof import('react-dom'); 
+
+// Version
+export { SDK_VERSION } from './version';

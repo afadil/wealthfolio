@@ -22,7 +22,7 @@ export function GainAmount({
   const { isBalanceHidden } = useBalancePrivacy();
 
   // Dynamic import for NumberFlow to avoid SSR issues
-  const [NumberFlow, setNumberFlow] = React.useState<any>(null);
+  const [NumberFlow, setNumberFlow] = React.useState<React.ComponentType<any> | null>(null);
 
   React.useEffect(() => {
     import('@number-flow/react').then((module) => {

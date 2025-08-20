@@ -3,6 +3,7 @@
  */
 
 import type { AddonManifest, AddonValidationResult } from './manifest';
+import { SDK_VERSION } from './version';
 
 /**
  * Validates an addon manifest
@@ -68,7 +69,7 @@ export function validateManifest(manifest: AddonManifest): AddonValidationResult
 /**
  * Checks if an addon version is compatible with the current SDK
  */
-export function isCompatibleVersion(addonSdkVersion?: string, currentSdkVersion = '1.1.0'): boolean {
+export function isCompatibleVersion(addonSdkVersion?: string, currentSdkVersion = SDK_VERSION): boolean {
   if (!addonSdkVersion) return true; // Assume compatible if not specified
   
   const [addonMajor, addonMinor] = addonSdkVersion.split('.').map(Number);
