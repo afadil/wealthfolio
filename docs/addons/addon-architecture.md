@@ -9,15 +9,27 @@ Addons are TypeScript modules that extend Wealthfolio's functionality. Each addo
 ## Basic Structure
 
 ```
-Host Application
-├─ Addon Runtime
-│  ├─ Permission System
-│  ├─ API Bridge
-│  └─ Context Manager
-└─ Individual Addons
-   ├─ Enable Function
-   ├─ UI Components
-   └─ API Calls
+┌─────────────────────────────────────────────────────────────────┐
+│                    Wealthfolio Host Application                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Addon Runtime  │  │  Permission     │  │   API Bridge    │  │
+│  │                 │  │   System        │  │                 │  │
+│  │ • Load/Unload   │  │ • Detection     │  │ • Type Bridge   │  │
+│  │ • Lifecycle     │  │ • Validation    │  │ • Domain APIs   │  │
+│  │ • Context Mgmt  │  │ • Enforcement   │  │ • Scoped Access │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                        Individual Addons                        │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │   Addon A   │ │   Addon B   │ │   Addon C   │ │   Addon D   │ │
+│ │             │ │             │ │             │ │             │ │
+│ │ enable()    │ │ enable()    │ │ enable()    │ │ enable()    │ │
+│ │ disable()   │ │ disable()   │ │ disable()   │ │ disable()   │ │
+│ │ UI/Routes   │ │ UI/Routes   │ │ UI/Routes   │ │ UI/Routes   │ │
+│ │ API Calls   │ │ API Calls   │ │ API Calls   │ │ API Calls   │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 The system has two main parts:
@@ -27,7 +39,17 @@ The system has two main parts:
 ## Addon Lifecycle
 
 ```
-ZIP File → Extract → Validate → Analyze Permissions → Load → Enable → Running
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│             │    │             │    │             │    │             │
+│  ZIP File   │───▶│   Extract   │───▶│  Validate   │───▶│  Analyze    │
+│             │    │             │    │             │    │ Permissions │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                                                                   │
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐              │
+│             │    │             │    │             │              │
+│   Running   │◀───│   Enable    │◀───│    Load     │◀─────────────┘
+│             │    │             │    │             │
+└─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 1. **Extract**: Unzip addon package and read files
@@ -77,6 +99,20 @@ The Rust backend scans for patterns like:
 - `api.accounts.getAll(`  
 - `.api.accounts.getAll(`
 
+### Permission Flow
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│                 │    │                 │    │                 │
+│ Static Analysis │───▶│ Declaration     │───▶│ Runtime         │
+│                 │    │ Matching        │    │ Validation      │
+│ • Scan code     │    │                 │    │                 │
+│ • Detect APIs   │    │ • Compare with  │    │ • Check perms   │
+│ • Build list    │    │   manifest      │    │ • Allow/Block   │
+│                 │    │ • Show dialog   │    │ • Log calls     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
 ### Permission Categories
 
 Based on the actual code, these are the permission categories:
@@ -117,11 +153,61 @@ await ctx.api.secrets.set('api-key', 'value');
 // Stored as: "addon_my-addon_api-key"
 ```
 
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Secret Storage                              │
+├─────────────────────────────────────────────────────────────────┤
+│ addon_analytics_api-key    = "sk-1234..."                       │
+│ addon_analytics_token      = "token-5678..."                    │
+├─────────────────────────────────────────────────────────────────┤
+│ addon_importer_database    = "postgres://..."                   │
+│ addon_importer_username    = "user123"                          │
+├─────────────────────────────────────────────────────────────────┤
+│ addon_tracker_webhook      = "https://..."                      │
+│ addon_tracker_secret       = "secret-key"                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 The scoping prevents addons from accessing each other's secrets.
 
 ## API Architecture
 
 The API is organized by financial domain:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         HostAPI                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │  accounts   │ │ portfolio   │ │ activities  │ │   market    │ │
+│ │             │ │             │ │             │ │             │ │
+│ │ • getAll    │ │ • holdings  │ │ • getAll    │ │ • search    │ │
+│ │ • create    │ │ • update    │ │ • create    │ │ • sync      │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │   assets    │ │   quotes    │ │performance  │ │exchangeRates│ │
+│ │             │ │             │ │             │ │             │ │
+│ │ • profile   │ │ • update    │ │ • calculate │ │ • getAll    │ │
+│ │ • update    │ │ • history   │ │ • summary   │ │ • update    │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │    goals    │ │contribution │ │  settings   │ │    files    │ │
+│ │             │ │   Limits    │ │             │ │             │ │
+│ │ • getAll    │ │ • getAll    │ │ • get       │ │ • openCsv   │ │
+│ │ • create    │ │ • calculate │ │ • update    │ │ • openSave  │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐                                 │
+│ │   events    │ │   secrets   │                                 │
+│ │             │ │             │                                 │
+│ │ • onDrop    │ │ • set       │                                 │
+│ │ • onUpdate  │ │ • get       │                                 │
+│ │ • onSync    │ │ • delete    │                                 │
+│ └─────────────┘ └─────────────┘                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ```typescript
 interface HostAPI {
@@ -146,6 +232,17 @@ interface HostAPI {
 
 The system uses a type bridge to convert between internal types and SDK types:
 
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│                 │    │                 │    │                 │
+│ Internal Types  │───▶│   Type Bridge   │───▶│   SDK Types     │
+│                 │    │                 │    │                 │
+│ getHoldings(id) │    │ • Convert args  │    │ api.portfolio.  │
+│ → Holding[]     │    │ • Map returns   │    │   getHoldings() │
+│                 │    │ • Type safety   │    │ → Holding[]     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
 ```typescript
 // Internal command function
 getHoldings(accountId: string): Promise<Holding[]>
@@ -163,6 +260,31 @@ This allows the internal implementation to change without breaking addon compati
 Development addons run from local servers:
 
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│              Development Environment                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐              ┌─────────────────┐           │
+│  │ Wealthfolio App │◀─ discover ─▶│ Dev Server      │           │
+│  │                 │              │ localhost:3001  │           │
+│  │ • Auto-discover │              │                 │           │
+│  │ • Load addons   │              │ /health    ✓    │           │
+│  │ • Hot reload    │              │ /status    ✓    │           │
+│  └─────────────────┘              │ /manifest.json  │           │
+│           │                       │ /addon.js       │           │
+│           │                       └─────────────────┘           │
+│           │                                                     │
+│  ┌─────────────────┐              ┌─────────────────┐           │
+│  │     Port Scan   │              │ More Dev Servers│           │
+│  │                 │              │                 │           │
+│  │ • Check 3001    │              │ localhost:3002  │           │
+│  │ • Check 3002    │              │ localhost:3003  │           │
+│  │ • Check 3003    │              │ ...             │           │
+│  └─────────────────┘              └─────────────────┘           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+```
 Development Server (localhost:3001)
 ├─ /health          # Health check
 ├─ /status          # Build status  
@@ -175,7 +297,12 @@ The host application discovers running dev servers by checking common ports (300
 ### Build Process
 
 ```
-Source (.tsx/.ts) → TypeScript → Vite Bundle → Single .js File
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│             │    │             │    │             │    │             │
+│ Source Code │───▶│ TypeScript  │───▶│ Vite Bundle │───▶│ Single File │
+│             │    │ Compiler    │    │             │    │             │
+│ .tsx/.ts    │    │             │    │             │    │ addon.js    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 The addon is bundled into a single JavaScript file that exports an enable function.
@@ -203,6 +330,33 @@ export function AddonNameAddon(ctx) { ... }
 ### Context Creation
 
 Each addon gets its own isolated context:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Context Creation                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ createAddonContext(addonId) ──┐                                 │
+│                               │                                 │
+│    ┌──────────────────────────▼──────────────────────────────┐  │
+│    │              AddonContext                              │  │
+│    ├─────────────────────────────────────────────────────────┤  │
+│    │ sidebar: { addItem: ... }                              │  │
+│    │ router:  { add: ... }                                  │  │
+│    │ onDisable: (cb) => callbacks.add(cb)                   │  │
+│    │ api: createScopedAPI(addonId) ─┐                       │  │
+│    └─────────────────────────────────┼───────────────────────┘  │
+│                                     │                          │
+│    ┌────────────────────────────────▼──────────────────────┐    │
+│    │              Scoped API                              │    │
+│    ├─────────────────────────────────────────────────────────┤    │
+│    │ accounts: AccountsAPI                                │    │
+│    │ portfolio: PortfolioAPI                              │    │
+│    │ ...                                                  │    │
+│    │ secrets: createAddonScopedSecrets(addonId)           │    │
+│    └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ```typescript
 function createAddonContext(addonId: string): AddonContext {
@@ -238,6 +392,31 @@ If an addon tries to call an unauthorized API:
 ## Security Model
 
 ### Isolation
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Security Boundaries                          │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │   Addon A   │ │   Addon B   │ │   Addon C   │ │   Addon D   │ │
+│ │             │ │             │ │             │ │             │ │
+│ │ Context A   │ │ Context B   │ │ Context C   │ │ Context D   │ │
+│ │ Secrets A   │ │ Secrets B   │ │ Secrets C   │ │ Secrets D   │ │
+│ │             │ │             │ │             │ │             │ │
+│ │   ┌─────┐   │ │   ┌─────┐   │ │   ┌─────┐   │ │   ┌─────┐   │ │
+│ │   │ API │   │ │   │ API │   │ │   │ API │   │ │   │ API │   │ │
+│ │   │ Perms│   │ │   │ Perms│   │ │   │ Perms│   │ │   │ Perms│   │ │
+│ │   └─────┘   │ │   └─────┘   │ │   └─────┘   │ │   └─────┘   │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+│       │               │               │               │         │
+│       └───────────────┼───────────────┼───────────────┘         │
+│                       │               │                         │
+│             ┌─────────▼───────────────▼─────────┐               │
+│             │      Permission Validator        │               │
+│             │      Runtime Enforcement         │               │
+│             └─────────────────────────────────────┘               │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 - Each addon runs in its own context
 - Secrets are scoped by addon ID
@@ -365,4 +544,37 @@ my-addon/
 ├─ package.json     # Dependencies
 ├─ vite.config.ts   # Build config
 └─ tsconfig.json    # TypeScript config
+```
+
+### Package Structure Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Addon Package                               │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────┐                                             │
+│ │ manifest.json   │  ← Metadata, permissions, entry point      │
+│ │                 │                                             │
+│ │ {               │                                             │
+│ │   "id": "...",  │                                             │
+│ │   "name": "...",│                                             │
+│ │   "main": "..." │                                             │
+│ │ }               │                                             │
+│ └─────────────────┘                                             │
+│                                                                 │
+│ ┌─────────────────┐                                             │
+│ │ addon.js        │  ← Bundled JavaScript with enable()        │
+│ │                 │                                             │
+│ │ export default  │                                             │
+│ │ function enable │                                             │
+│ │ (ctx) { ... }   │                                             │
+│ └─────────────────┘                                             │
+│                                                                 │
+│ ┌─────────────────┐                                             │
+│ │ assets/         │  ← Optional static assets                   │
+│ │ ├─ icon.png     │                                             │
+│ │ ├─ logo.svg     │                                             │
+│ │ └─ styles.css   │                                             │
+│ └─────────────────┘                                             │
+└─────────────────────────────────────────────────────────────────┘
 ```

@@ -1,28 +1,8 @@
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import type { AddonContext, AddonEnableFunction } from '@wealthfolio/addon-sdk';
 import { Icons } from '@wealthfolio/ui';
 import FeesPage from './pages/fees-page';
-
-// Create a query client for this addon
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
-      retry: (failureCount, error) => {
-        // Don't retry on 4xx errors
-        if (error && typeof error === 'object' && 'status' in error) {
-          const status = (error as any).status;
-          if (status >= 400 && status < 500) {
-            return false;
-          }
-        }
-        return failureCount < 3;
-      },
-    },
-  },
-});
 
 // Main addon component
 function InvestmentFeesTrackerAddon({ ctx }: { ctx: AddonContext }) {
@@ -53,12 +33,15 @@ const enable: AddonEnableFunction = (context) => {
     
     context.api.logger.debug('Sidebar navigation item added successfully');
 
-    // Create wrapper component with QueryClientProvider
-    const InvestmentFeesTrackerWrapper = () => (
-      <QueryClientProvider client={queryClient}>
-        <InvestmentFeesTrackerAddon ctx={context} />
-      </QueryClientProvider>
-    );
+    // Create wrapper component with QueryClientProvider using shared client
+    const InvestmentFeesTrackerWrapper = () => {
+      const sharedQueryClient = context.api.query.getClient();
+      return (
+        <QueryClientProvider client={sharedQueryClient}>
+          <InvestmentFeesTrackerAddon ctx={context} />
+        </QueryClientProvider>
+      );
+    };
 
     // Register route
     context.router.add({

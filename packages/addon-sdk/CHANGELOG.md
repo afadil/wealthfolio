@@ -1,7 +1,5 @@
 # Changelog
 
-All notable changes to the Wealthfolio Addon SDK will be documented in this file.
-
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -28,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical
 - ESM module format with TypeScript declarations
 - React peer dependency support (^18.0.0)
-- Node.js 18+ compatibility
+- Node.js 20+ compatibility
 - MIT licensed for maximum compatibility
 - Complete build pipeline with tsup
 - Comprehensive type exports and module structure

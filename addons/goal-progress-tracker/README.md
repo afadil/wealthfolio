@@ -1,23 +1,31 @@
 # Goal Progress Tracker Addon
 
-A Wealthfolio addon that helps you visualize your investment progress towards target amounts using a calendar-style representation.
+A Wealthfolio addon that helps you visualize your investment progress towards financial goals using an interactive calendar-style representation.
 
 ## Features
 
-- **Visual Progress Tracking**: See your investment progress with a calendar grid where each dot represents a milestone
-- **Configurable Targets**: Set your investment target amount and step size per dot
-- **Real-time Portfolio Integration**: Automatically loads your current portfolio value using the Wealthfolio API
-- **Interactive Milestones**: Click on dots to see the target amount for each milestone
-- **Progress Metrics**: View current amount, target, progress percentage, and remaining amount
+- **Goal Integration**: Seamlessly integrates with your existing Wealthfolio goals through a searchable dropdown selector
+- **Visual Progress Tracking**: Calendar grid visualization where each dot represents a milestone towards your goal
+- **Real-time Portfolio Sync**: Automatically calculates progress using your actual portfolio allocations and current valuations
+- **Interactive Tooltips**: Hover or click on dots to see detailed milestone information including target amounts and status
+- **Configurable Step Size**: Customize how much each calendar dot represents (editable when no goal is selected)
+- **Privacy Support**: Respects your balance privacy settings to hide sensitive financial information
+- **Responsive Design**: Optimized layout that works on both desktop and mobile devices
+- **Empty State Handling**: Graceful handling when no goals exist with helpful guidance to create your first goal
 
 ## How It Works
 
-1. **Set Your Target**: Configure your investment target amount (default: $100,000)
-2. **Choose Step Size**: Set how much each dot represents (default: $10,000)
-3. **View Progress**: The calendar shows:
-   - ✅ Green dots for completed milestones
-   - 🟡 Partially filled dot for current progress
-   - ⚪ Empty dots for future milestones
+1. **Select a Goal**: Choose from your existing Wealthfolio goals using the searchable dropdown, or work without a goal for custom tracking
+2. **View Real-time Progress**: The addon calculates your current progress using:
+   - Your actual portfolio holdings and valuations
+   - Goal allocations (when a goal is selected)
+   - Account balances across all your investment accounts
+3. **Interactive Calendar Display**:
+   - ✅ **Filled dots** for completed milestones
+   - 🟡 **Partially filled dot** showing current progress within the milestone
+   - ⚪ **Empty dots** for future milestones
+   - 💡 **Tooltips** with detailed information on hover/click
+4. **Customize Settings**: Adjust step size to change what each dot represents (when no goal is selected)
 
 ## Installation
 
@@ -54,36 +62,42 @@ pnpm bundle
 ## API Usage
 
 This addon demonstrates how to:
-- Use the `ctx.api.portfolio.getHoldings` and `ctx.api.goals.getAll` functions to access portfolio and goals data
-- Create custom React hooks within addons
-- Build interactive UI components
-- Handle loading and error states
-- Integrate with the Wealthfolio sidebar and routing system
+- Use `ctx.api.goals.getAll()` to fetch user's investment goals
+- Access portfolio data through multiple hooks (`useHoldings`, `useAccounts`, `useLatestValuations`)
+- Calculate goal progress using proper allocation logic with `useGoalAllocations`
+- Create custom React hooks for complex data fetching and processing
+- Build interactive UI components with tooltips and searchable dropdowns
+- Handle loading states, error states, and empty states gracefully
+- Integrate with the Wealthfolio sidebar navigation and routing system
+- Use the shared QueryClient for optimal data caching and performance
 
 ## Permissions Required
 
-- **Portfolio Access**: To read current holdings and calculate total investment value
-- **Storage Access**: To save user preferences for target amount and step size
+- **Goals Access**: To read your investment goals and their target amounts
+- **Portfolio Access**: To read current holdings, account balances, and calculate investment progress
+- **Accounts Access**: To access account information for portfolio calculations
 
 ## Settings
 
-- **Target Amount**: Your investment goal (range: $1,000 - $10,000,000)
-- **Step Size**: Amount each calendar dot represents (range: $1,000 - $100,000)
+- **Goal Selection**: Choose from your existing investment goals via searchable dropdown
+- **Step Size**: Amount each calendar dot represents (editable when no goal is selected, range: $100+)
+- **Target Amount**: Automatically set when a goal is selected, or manually configurable for custom tracking
 
-## Screenshot
+## Features Overview
 
-The addon displays a calendar grid similar to GitHub's contribution calendar, but for investment milestones:
+The addon displays an interactive calendar grid that adapts to your screen size and goal complexity:
 
 ```
-⚫⚫⚫⚫⚫⚫⚫
-⚫⚫🟢⚪⚪⚪⚪
-⚪⚪⚪⚪⚪⚪⚪
+⚫⚫⚫🟢⚪⚪⚪⚪
+⚪⚪⚪⚪⚪⚪⚪⚪
+⚪⚪⚪⚪⚪⚪⚪⚪
 ```
 
 Where:
-- ⚫ = Completed milestone
-- 🟢 = Partially completed current milestone  
-- ⚪ = Future milestone
+- ⚫ = Completed milestone (filled dot)
+- 🟢 = Current progress (partially filled dot with percentage)  
+- ⚪ = Future milestone (empty dot)
+
 
 ## License
 

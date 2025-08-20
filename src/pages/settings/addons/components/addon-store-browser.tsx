@@ -328,7 +328,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         <div className="space-y-4">
           <Separator />
           <div>
-            <h3 className="mb-3 text-lg font-semibold">Popular Categories</h3>
+            <h3 className="mb-3 text-lg font-semibold">Categories</h3>
             <div className="flex flex-wrap gap-2">
               {popularTags.map((tag) => (
                 <Badge
