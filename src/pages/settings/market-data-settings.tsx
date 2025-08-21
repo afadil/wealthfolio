@@ -380,7 +380,14 @@ export default function MarketDataSettingsPage() {
         ) : (
           <div className="space-y-6">
             {providers
-              ?.sort((a, b) => a.priority - b.priority)
+              ?.slice()
+              .sort((a, b) => {
+                // Enabled providers first, then by priority ascending
+                if (a.enabled === b.enabled) {
+                  return a.priority - b.priority;
+                }
+                return a.enabled ? -1 : 1;
+              })
               .map((provider) => (
                 <ProviderSettings
                   key={provider.id}

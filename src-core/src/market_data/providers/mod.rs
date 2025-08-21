@@ -6,4 +6,8 @@ pub mod metal_price_api_provider;
 pub mod models;
 pub mod provider_registry;
 pub mod yahoo_provider;
+
+#[cfg(test)]
+pub mod metal_price_api_provider_test;
+
 pub use provider_registry::ProviderRegistry;
