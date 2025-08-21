@@ -176,7 +176,7 @@ export const HoldingsPage = () => {
           <CashHoldingsWidget cashHoldings={cashHoldings || []} isLoading={isLoading} />
         </div>
 
-        <TabsContent value="holdings" className="flex-1 min-h-0">
+        <TabsContent value="holdings" className="flex-1 min-h-0 py-2">
           <HoldingsTable holdings={nonCashHoldings || []} isLoading={isLoading} />
         </TabsContent>
 

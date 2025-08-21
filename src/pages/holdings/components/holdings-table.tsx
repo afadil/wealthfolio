@@ -150,7 +150,7 @@ const getColumns = (
       }
 
       return (
-        <div className="cursor-pointer hover:bg-muted/50 rounded-sm p-1 -m-1 transition-colors" onClick={handleNavigate}>
+        <div className="cursor-pointer p-1 -m-1" onClick={handleNavigate}>
           {content}
         </div>
       );
@@ -280,8 +280,16 @@ const getColumns = (
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.marketValue.base ?? 0;
-      const valueB = rowB.original.marketValue.base ?? 0;
+      const holdingA = rowA.original;
+      const holdingB = rowB.original;
+
+      const valueA = showConvertedValues
+        ? (holdingA.marketValue.base ?? 0)
+        : safeDivide(holdingA.marketValue.base ?? 0, holdingA.fxRate ?? 1);
+      const valueB = showConvertedValues
+        ? (holdingB.marketValue.base ?? 0)
+        : safeDivide(holdingB.marketValue.base ?? 0, holdingB.fxRate ?? 1);
+
       return valueA - valueB;
     },
   },
@@ -314,8 +322,16 @@ const getColumns = (
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.totalGain?.base ?? 0;
-      const valueB = rowB.original.totalGain?.base ?? 0;
+      const holdingA = rowA.original;
+      const holdingB = rowB.original;
+
+      const valueA = showConvertedValues
+        ? (holdingA.totalGain?.base ?? 0)
+        : safeDivide(holdingA.totalGain?.base ?? 0, holdingA.fxRate ?? 1);
+      const valueB = showConvertedValues
+        ? (holdingB.totalGain?.base ?? 0)
+        : safeDivide(holdingB.totalGain?.base ?? 0, holdingB.fxRate ?? 1);
+
       return valueA - valueB;
     },
   },

@@ -859,10 +859,6 @@ pub struct HoldingsCalculator {
         debug!("Getting position currency for asset_id: {}", asset_id);
         match self.asset_repository.get_by_id(asset_id) {
             Ok(asset) => {
-                debug!(
-                    "Asset found - symbol: {}, currency: {}",
-                    asset.symbol, asset.currency
-                );
                 Ok(asset.currency)
             }
             Err(e) => {

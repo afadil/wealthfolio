@@ -97,7 +97,7 @@ export const ActivityTable = ({
           return (
             <Link 
               to={`/holdings/${encodeURIComponent(symbol)}`} 
-              className="block hover:bg-muted/50 rounded-sm p-1 -m-1 transition-colors"
+              className="block p-1 -m-1"
             >
               {content}
             </Link>
@@ -417,7 +417,7 @@ export const ActivityTable = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center flex-shrink-0 mb-4">
+      <div className="flex justify-between items-center flex-shrink-0 mb-2">
         <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
         <ToggleGroup
           type="single"
