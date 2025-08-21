@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useFormContext, useFieldArray } from 'react-hook-form';
 import {
   Card,
@@ -35,25 +35,37 @@ interface BulkHoldingsFormProps {
 }
 
 export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => {
-  const { control, watch } = useFormContext();
+  const { control, watch, setFocus } = useFormContext();
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'holdings',
   });
-  
+
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
+  // Focus account selector on mount
+  useEffect(() => {
+    setFocus('accountId');
+  }, [setFocus]);
+
   // Handle account selection
-  const handleAccountSelect = useCallback((account: Account) => {
-    setSelectedAccount(account);
-    onAccountChange?.(account);
-  }, [onAccountChange]);
+  const handleAccountSelect = useCallback(
+    (account: Account) => {
+      setSelectedAccount(account);
+      onAccountChange?.(account);
+      if (fields.length > 0) {
+        setFocus('holdings.0.ticker');
+      }
+    },
+    [onAccountChange, fields.length, setFocus],
+  );
 
   // Add a new holding row
   const addRow = useCallback(() => {
+    const newIndex = fields.length;
     append({
-      id: (fields.length + 1).toString(),
+      id: (newIndex + 1).toString(),
       ticker: '',
       name: '',
       sharesOwned: 0,
@@ -61,14 +73,20 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
       totalValue: 0,
       assetId: '',
     });
-  }, [append, fields.length]);
+    setTimeout(() => {
+      setFocus(`holdings.${newIndex}.ticker`);
+    }, 0);
+  }, [append, fields.length, setFocus]);
 
   // Remove a holding row
-  const removeRow = useCallback((index: number) => {
-    if (fields.length > 1) {
-      remove(index);
-    }
-  }, [remove, fields.length]);
+  const removeRow = useCallback(
+    (index: number) => {
+      if (fields.length > 1) {
+        remove(index);
+      }
+    },
+    [remove, fields.length],
+  );
 
   // Calculate total value
   const calculateTotalValue = useCallback((shares: number, price: number): number => {
@@ -134,14 +152,17 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
             {fields.map((field, index) => {
               const watchedShares = watch(`holdings.${index}.sharesOwned`) || 0;
               const watchedPrice = watch(`holdings.${index}.averageCost`) || 0;
-              const totalValue = calculateTotalValue(Number(watchedShares), Number(watchedPrice));
+              const totalValue = calculateTotalValue(
+                Number(watchedShares),
+                Number(watchedPrice),
+              );
 
               return (
                 <div
                   key={field.id}
                   className={cn(
-                    "grid grid-cols-12 gap-3 rounded-lg border-b border-border/50 px-3 py-3 transition-colors hover:bg-muted/50 last:border-b-0",
-                    selectedRowId === field.id && "bg-muted"
+                    'grid grid-cols-12 gap-3 rounded-lg border-b border-border/50 px-3 py-3 transition-colors hover:bg-muted/50 last:border-b-0',
+                    selectedRowId === field.id && 'bg-muted',
                   )}
                   onClick={() => setSelectedRowId(field.id)}
                 >
@@ -155,8 +176,10 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                           name={`holdings.${index}.ticker`}
                           render={({ field: tickerField }) => (
                             <TickerSearchInput
+                              ref={tickerField.ref}
                               onSelectResult={(symbol: string) => {
                                 tickerField.onChange(symbol);
+                                setFocus(`holdings.${index}.sharesOwned`);
                               }}
                               value={tickerField.value}
                               placeholder="Search ticker..."
@@ -178,6 +201,12 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                           {...sharesField}
                           placeholder="Add shares"
                           className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              setFocus(`holdings.${index}.averageCost`);
+                            }
+                          }}
                         />
                       )}
                     />
@@ -193,6 +222,16 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                           {...priceField}
                           placeholder="Average cost"
                           className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (index === fields.length - 1) {
+                                addRow();
+                              } else {
+                                setFocus(`holdings.${index + 1}.ticker`);
+                              }
+                            }
+                          }}
                         />
                       )}
                     />
@@ -200,10 +239,12 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
 
                   {/* Total Value */}
                   <div className="col-span-2 flex items-center justify-end">
-                    <span className={cn(
-                      "text-sm font-medium",
-                      totalValue > 0 ? "text-foreground" : "text-muted-foreground"
-                    )}>
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        totalValue > 0 ? 'text-foreground' : 'text-muted-foreground',
+                      )}
+                    >
                       ${totalValue.toFixed(2)}
                     </span>
                   </div>

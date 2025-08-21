@@ -1,4 +1,4 @@
-import { useState, forwardRef } from 'react';
+import { useState, forwardRef, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Command as CommandPrimitive } from 'cmdk';
 import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -47,6 +47,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       }
       return '';
     });
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const handleSelectResult = (ticker: QuoteSummary) => {
       onSelectResult(ticker?.symbol);
@@ -73,8 +74,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <Button
             variant="outline"
             role="combobox"
-            className={cn("w-full justify-between", className)}
+            className={cn('w-full justify-between', open && 'ring-2 ring-ring', className)}
             ref={ref}
+            onFocus={() => setOpen(true)}
           >
             {displayName}
             <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -85,9 +87,17 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           side="bottom"
           align="start"
           className="h-auto w-[--radix-popover-trigger-width] p-0"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            setTimeout(() => {
+              inputRef.current?.focus();
+            }, 0);
+          }}
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <Command shouldFilter={false} className="border-none">
             <CommandInput
+              ref={inputRef}
               value={searchQuery}
               onValueChange={setSearchQuery}
               placeholder="Search for symbol"
