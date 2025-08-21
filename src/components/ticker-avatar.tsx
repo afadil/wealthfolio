@@ -16,7 +16,7 @@ export const TickerAvatar = ({ symbol, className = "w-8 h-8" }: TickerAvatarProp
 
   return (
     <Avatar className={cn(
-      "bg-input/40 dark:bg-white/10 backdrop-blur-md border-white/20 p-1.5",
+      "bg-primary text-white dark:bg-white/10 backdrop-blur-md border-white/20 p-1.5",
       className
     )}>
       {!logoError && baseSymbol && (
