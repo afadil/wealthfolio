@@ -247,9 +247,6 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
       id: `holding-${Date.now()}-${newIndex}`, // More unique ID
       ticker: '',
       name: '',
-      sharesOwned: 0,
-      averageCost: 0,
-      totalValue: 0,
       assetId: '',
     });
     
