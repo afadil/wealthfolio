@@ -33,7 +33,7 @@ const accountTypeIcons: Record<string, any> = {
 interface AccountSelectorProps {
   selectedAccount?: Account | null;
   setSelectedAccount: (account: Account) => void;
-  variant?: 'card' | 'dropdown' | 'button';
+  variant?: 'card' | 'dropdown' | 'button' | 'form';
   buttonText?: string;
   filterActive?: boolean;
   includePortfolio?: boolean;
@@ -302,6 +302,35 @@ export function AccountSelector({
           </Button>
         );
       
+      case 'form':
+        return (
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+              className
+            )}
+          >
+            <div className="flex items-center gap-2 flex-1">
+              {selectedAccount ? (
+                <>
+                  {(() => {
+                    const IconComponent =
+                      accountTypeIcons[selectedAccount.accountType] || Icons.CreditCard;
+                    return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
+                  })()}
+                  <span className="truncate">{selectedAccount.name}</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">Select an account</span>
+              )}
+            </div>
+            <Icons.ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        );
+      
       case 'button':
         return (
           <Button
@@ -356,7 +385,7 @@ export function AccountSelector({
                       return (
                         <CommandItem
                           key={account.id}
-                          value={account.id}
+                          value={`${account.name} ${account.currency} ${account.accountType}`}
                           onSelect={() => {
                             setSelectedAccount(account);
                             setOpen(false);
