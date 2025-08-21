@@ -8,9 +8,9 @@ use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE};
+use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API};
 
-#[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
     pub id: String,
@@ -104,7 +104,7 @@ impl From<&Quote> for QuoteDb {
 }
 
 /// Summary model for quote search results
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteSummary {
     pub exchange: String,
@@ -124,13 +124,15 @@ pub struct QuoteRequest {
     pub currency: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsExpression)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsExpression, Default)]
 #[diesel(sql_type = Text)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum DataSource {
     Yahoo,
     MarketDataApp,
     AlphaVantage,
+    MetalPriceApi,
+    #[default]
     Manual,
 }
 
@@ -140,6 +142,7 @@ impl DataSource {
             DataSource::Yahoo => DATA_SOURCE_YAHOO,
             DataSource::MarketDataApp => DATA_SOURCE_MARKET_DATA_APP,
             DataSource::AlphaVantage => DATA_SOURCE_ALPHA_VANTAGE,
+            DataSource::MetalPriceApi => DATA_SOURCE_METAL_PRICE_API,
             DataSource::Manual => DATA_SOURCE_MANUAL,
         }
     }
@@ -157,6 +160,7 @@ impl From<&str> for DataSource {
             DATA_SOURCE_YAHOO => DataSource::Yahoo,
             DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
             DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
+            DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
             _ => DataSource::Manual,
         }
     }
