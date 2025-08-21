@@ -47,7 +47,7 @@ impl ProviderRegistry {
 
             let provider_id_str = &setting.id;
 
-            let api_key = if provider_id_str == DATA_SOURCE_MARKET_DATA_APP || provider_id_str == DATA_SOURCE_ALPHA_VANTAGE {
+            let api_key = if provider_id_str != DATA_SOURCE_YAHOO {
                 match SecretManager::get_secret(provider_id_str) {
                     Ok(key_opt) => key_opt,
                     Err(e) => {
@@ -87,23 +87,6 @@ impl ProviderRegistry {
                         (None, None)
                     }
                 }
-                DATA_SOURCE_METAL_PRICE_API => {
-                    if let Some(key) = api_key {
-                        if !key.is_empty() {
-                            let p = Arc::new(MetalPriceApiProvider::new(key));
-                            (
-                                Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
-                                Some(p as Arc<dyn AssetProfiler + Send + Sync>),
-                            )
-                        } else {
-                            warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
-                            (None, None)
-                        }
-                    } else {
-                        warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
-                        (None, None)
-                    }
-                }
                 DATA_SOURCE_ALPHA_VANTAGE => {
                     if let Some(key) = api_key {
                         if !key.is_empty() {
@@ -118,6 +101,23 @@ impl ProviderRegistry {
                         }
                     } else {
                         warn!("AlphaVantage provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
+                        (None, None)
+                    }
+                }
+                DATA_SOURCE_METAL_PRICE_API => {
+                    if let Some(key) = api_key {
+                        if !key.is_empty() {
+                            let p = Arc::new(MetalPriceApiProvider::new(key));
+                            (
+                                Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                                Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                            )
+                        } else {
+                            warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but API key is empty. Skipping.", setting.name, setting.id);
+                            (None, None)
+                        }
+                    } else {
+                        warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
                         (None, None)
                     }
                 }
