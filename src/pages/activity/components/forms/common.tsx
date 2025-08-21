@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@wealthfolio/ui';
 import { DatePickerInput } from '@wealthfolio/ui';
+import { Textarea } from '@/components/ui/textarea';
 import TickerSearchInput from '@/components/ticker-search';
 import { DataSource } from '@/lib/constants';
 
@@ -152,6 +153,25 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
           )}
         />
       )}
+      <FormField
+        control={control}
+        name="comment"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Description</FormLabel>
+            <FormControl>
+              <Textarea 
+                placeholder="Add an optional description or comment for this transaction..."
+                className="resize-none"
+                rows={3}
+                {...field}
+                value={field.value || ''}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </>
   );
 };
