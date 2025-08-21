@@ -58,11 +58,19 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     Number(holding.averageCost) > 0
   ) || false;
 
-  // Reset form when modal is closed
+  // Reset form when modal is closed and handle initial focus
   useEffect(() => {
     if (!open) {
       form.reset();
       setSelectedAccount(null);
+    } else {
+      // When modal opens, focus the account field with proper timing
+      // Use a longer delay to ensure modal is fully rendered
+      const timeoutId = setTimeout(() => {
+        form.setFocus('accountId');
+      }, 150);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [open, form]);
 

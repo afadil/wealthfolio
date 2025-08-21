@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { useFormContext, useFieldArray, useWatch } from 'react-hook-form';
 import {
   Card,
@@ -103,7 +103,7 @@ const HoldingRow = memo(({
     }
   }, [index, isLast, onAddRow, setFocus]);
 
-  const handleTickerSelect = useCallback((symbol: string) => {
+  const handleTickerSelect = useCallback((_symbol: string) => {
     setFocus(`holdings.${index}.sharesOwned`);
   }, [index, setFocus]);
 
@@ -223,18 +223,16 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
-  // Focus account selector on mount
-  useEffect(() => {
-    setFocus('accountId');
-  }, [setFocus]);
-
-  // Handle account selection
+  // Handle account selection with improved focus management
   const handleAccountSelect = useCallback(
     (account: Account) => {
       setSelectedAccount(account);
       onAccountChange?.(account);
+      // Focus first ticker field after account selection, with proper timing
       if (fields.length > 0) {
-        setFocus('holdings.0.ticker');
+        requestAnimationFrame(() => {
+          setFocus('holdings.0.ticker');
+        });
       }
     },
     [onAccountChange, fields.length, setFocus],
@@ -244,7 +242,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
   const addRow = useCallback(() => {
     const newIndex = fields.length;
     append({
-      id: `holding-${Date.now()}-${newIndex}`, // More unique ID
+      id: `holding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
       ticker: '',
       name: '',
       assetId: '',
@@ -277,13 +275,6 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
     setSelectedRowId(id);
   }, []);
 
-  // Initialize with one empty row if none exist
-  useEffect(() => {
-    if (fields.length === 0) {
-      addRow();
-    }
-  }, []); // Only on mount
-
   return (
     <div className="space-y-6">
       {/* Holdings Table */}
@@ -299,6 +290,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                   <FormLabel>Account</FormLabel>
                   <FormControl>
                     <AccountSelector
+                      ref={field.ref}
                       selectedAccount={selectedAccount}
                       setSelectedAccount={(account) => {
                         handleAccountSelect(account);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import {
@@ -102,7 +102,7 @@ const iconVariants = {
   }
 };
 
-export function AccountSelector({ 
+export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProps>(({ 
   selectedAccount, 
   setSelectedAccount, 
   variant = 'card',
@@ -110,7 +110,7 @@ export function AccountSelector({
   filterActive = true,
   includePortfolio = false,
   className
-}: AccountSelectorProps) {
+}, ref) => {
   const [open, setOpen] = useState(false);
   const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
   const { data: settings, isLoading: isLoadingSettings } = useSettings();
@@ -305,6 +305,7 @@ export function AccountSelector({
       case 'form':
         return (
           <Button
+            ref={ref}
             variant="outline"
             role="combobox"
             aria-expanded={open}
@@ -414,4 +415,6 @@ export function AccountSelector({
       </PopoverContent>
     </Popover>
   );
-} 
+});
+
+AccountSelector.displayName = 'AccountSelector'; 
