@@ -1,5 +1,7 @@
 use crate::activities::{Activity, ActivityType};
-use crate::errors::{CalculatorError, Result};
+use crate::assets::AssetRepositoryTrait;
+use crate::constants::CASH_ASSET_PREFIX;
+use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::Position;
@@ -16,13 +18,17 @@ use std::sync::{Arc, RwLock};
 pub struct HoldingsCalculator {
     pub fx_service: Arc<dyn FxServiceTrait>, // only deals with activity/account currency adjustments
     pub base_currency: Arc<RwLock<String>>,
-}
-
-impl HoldingsCalculator {
-    pub fn new(fx_service: Arc<dyn FxServiceTrait>, base_currency: Arc<RwLock<String>>) -> Self {
+    pub asset_repository: Arc<dyn AssetRepositoryTrait>,
+}impl HoldingsCalculator {
+    pub fn new(
+        fx_service: Arc<dyn FxServiceTrait>,
+        base_currency: Arc<RwLock<String>>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
+    ) -> Self {
         Self {
             fx_service,
             base_currency,
+            asset_repository,
         }
     }
 
@@ -193,13 +199,25 @@ impl HoldingsCalculator {
         let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
 
-        let position = Self::get_or_create_position_mut(
+        let position = self.get_or_create_position_mut(
             state,
             &activity.asset_id,
             activity_currency, 
             activity.activity_date,
         )?;
-        let _cost_basis_asset_curr = position.add_lot(activity)?;
+
+        // Check if currency conversion is needed and handle accordingly
+        let converted_activity;
+        let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+            // No conversion needed, use original activity directly
+            activity
+        } else {
+            // Conversion needed, convert and store in local variable
+            converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::Buy)?;
+            &converted_activity
+        };
+
+        let _cost_basis_asset_curr = position.add_lot(activity_to_use)?;
 
         // Calculate total cost in Account Currency for cash adjustment
         let unit_price_acct = match self.fx_service.convert_currency_for_date(
@@ -257,8 +275,19 @@ impl HoldingsCalculator {
         let total_proceeds_acct = (activity.quantity * unit_price_acct) - fee_acct;
 
         if let Some(position) = state.positions.get_mut(&activity.asset_id) {
+            // Check if currency conversion is needed and handle accordingly
+            let converted_activity;
+            let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+                // No conversion needed, use original activity directly
+                activity
+            } else {
+                // Conversion needed, convert and store in local variable
+                converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::Sell)?;
+                &converted_activity
+            };
+
             let (_qty_reduced, _cost_basis_sold_asset_curr) = 
-                position.reduce_lots_fifo(activity.quantity)?;
+                position.reduce_lots_fifo(activity_to_use.quantity)?;
             
             *state
                 .cash_balances
@@ -420,13 +449,25 @@ impl HoldingsCalculator {
         let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
 
-        let position = Self::get_or_create_position_mut(
+        let position = self.get_or_create_position_mut(
             state,
             &activity.asset_id,
             activity_currency, 
             activity.activity_date,
         )?;
-        let cost_basis_asset_curr = position.add_lot(activity)?;
+
+        // Check if currency conversion is needed and handle accordingly
+        let converted_activity;
+        let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+            // No conversion needed, use original activity directly
+            activity
+        } else {
+            // Conversion needed, convert and store in local variable
+            converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::AddHolding)?;
+            &converted_activity
+        };
+
+        let cost_basis_asset_curr = position.add_lot(activity_to_use)?;
 
         // Adjust cash for fee (already in account currency)
         *state
@@ -492,8 +533,20 @@ impl HoldingsCalculator {
                 if position.currency.is_empty() {
                      warn!("Position {} being removed has no currency set. Cannot calculate net deposit impact accurately.", position.id);
                 }
+                
+                // Check if currency conversion is needed and handle accordingly
+                let converted_activity;
+                let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+                    // No conversion needed, use original activity directly
+                    activity
+                } else {
+                    // Conversion needed, convert and store in local variable
+                    converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::RemoveHolding)?;
+                    &converted_activity
+                };
+
                 let (_qty_reduced, cost_basis_removed) = 
-                    position.reduce_lots_fifo(activity.quantity)?;
+                    position.reduce_lots_fifo(activity_to_use.quantity)?;
                 cost_basis_removed_asset_curr_opt = Some(cost_basis_removed);
             }
         } // Borrow ends
@@ -569,7 +622,7 @@ impl HoldingsCalculator {
         amount_acct: Decimal, // Already converted (if cash) using activity date
         fee_acct: Decimal, // Already converted using activity date
     ) -> Result<()> {
-        if activity.asset_id.starts_with("$CASH") {
+        if activity.asset_id.starts_with(CASH_ASSET_PREFIX) {
             // Cash transfer
             let base_ccy = self.base_currency.read().unwrap();
             let activity_date = activity.activity_date.naive_utc().date();
@@ -599,13 +652,25 @@ impl HoldingsCalculator {
             let activity_currency = &activity.currency;
             let activity_date = activity.activity_date.naive_utc().date();
 
-            let position = Self::get_or_create_position_mut(
+            let position = self.get_or_create_position_mut(
                 state,
                 &activity.asset_id,
                 activity_currency,
                 activity.activity_date,
             )?;
-            let cost_basis_asset_curr = position.add_lot(activity)?;
+
+            // Check if currency conversion is needed and handle accordingly
+            let converted_activity;
+            let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+                // No conversion needed, use original activity directly
+                activity
+            } else {
+                // Conversion needed, convert and store in local variable
+                converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::TransferIn)?;
+                &converted_activity
+            };
+
+            let cost_basis_asset_curr = position.add_lot(activity_to_use)?;
 
             // Adjust cash for fee (already in account currency)
             *state
@@ -661,7 +726,7 @@ impl HoldingsCalculator {
         amount_acct: Decimal, // Already converted (if cash) using activity date
         fee_acct: Decimal,    // Already converted using activity date
     ) -> Result<()> {
-        if activity.asset_id.starts_with("$CASH") {
+        if activity.asset_id.starts_with(CASH_ASSET_PREFIX) {
             // Cash transfer
             let base_ccy = self.base_currency.read().unwrap();
             let activity_date = activity.activity_date.naive_utc().date();
@@ -700,8 +765,20 @@ impl HoldingsCalculator {
                      if position.currency.is_empty() {
                          warn!("Position {} being transferred out has no currency set. Cannot calculate net deposit impact accurately.", position.id);
                      }
+                    
+                    // Check if currency conversion is needed and handle accordingly
+                    let converted_activity;
+                    let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+                        // No conversion needed, use original activity directly
+                        activity
+                    } else {
+                        // Conversion needed, convert and store in local variable
+                        converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::TransferOut)?;
+                        &converted_activity
+                    };
+
                     let (_qty_reduced, cost_basis_removed) = 
-                        position.reduce_lots_fifo(activity.quantity)?;
+                        position.reduce_lots_fifo(activity_to_use.quantity)?;
                     cost_basis_removed_asset_curr_opt = Some(cost_basis_removed);
                 }
             } // Borrow ends
@@ -776,14 +853,89 @@ impl HoldingsCalculator {
         activity.amount.unwrap_or(Decimal::ZERO)
     }
 
-    /// Helper method to get/create position. Sets Position currency based on the first activity.
+    /// Determines the correct currency for a position based on the asset's listing currency.
+    /// If the asset's listing currency cannot be determined, falls back to the activity currency.
+    fn get_position_currency(&self, asset_id: &str) -> Result<String> {
+        debug!("Getting position currency for asset_id: {}", asset_id);
+        match self.asset_repository.get_by_id(asset_id) {
+            Ok(asset) => {
+                Ok(asset.currency)
+            }
+            Err(e) => {
+                error!(
+                    "Failed to get asset for asset_id '{}': {}",
+                    asset_id, e
+                );
+                Err(Error::Calculation(CalculatorError::Calculation(format!(
+                    "Asset not found for id: {}",
+                    asset_id
+                ))))
+            }
+        }
+    }
+
+    /// Converts an activity to match the position's currency if needed.
+    /// Returns a converted activity only when conversion is actually required.
+    fn convert_activity_to_position_currency(
+        &self,
+        activity: &Activity,
+        position: &Position,
+        activity_type: &ActivityType, // Use enum instead of string
+    ) -> Result<Activity> {
+        // Early return without cloning if no conversion is needed
+        if position.currency.is_empty() || position.currency == activity.currency {
+            return Err(CalculatorError::InvalidActivity(
+                "convert_activity_to_position_currency should only be called when conversion is needed".to_string()
+            ).into());
+        }
+
+        let activity_date = activity.activity_date.naive_utc().date();
+        
+        // Convert unit_price to position currency
+        let converted_unit_price = self.fx_service.convert_currency_for_date(
+            activity.unit_price,
+            &activity.currency,
+            &position.currency,
+            activity_date,
+        ).map_err(|e| {
+            CalculatorError::CurrencyConversion(format!(
+                "Failed to convert {:?} activity {} unit price from {} to position currency {}: {}",
+                activity_type, activity.id, activity.currency, position.currency, e
+            ))
+        })?;
+
+        // Convert fee to position currency
+        let converted_fee = self.fx_service.convert_currency_for_date(
+            activity.fee,
+            &activity.currency,
+            &position.currency,
+            activity_date,
+        ).map_err(|e| {
+            CalculatorError::CurrencyConversion(format!(
+                "Failed to convert {:?} activity {} fee from {} to position currency {}: {}",
+                activity_type, activity.id, activity.currency, position.currency, e
+            ))
+        })?;
+
+        // Create converted activity only when actually needed
+        let mut converted_activity = activity.clone();
+        converted_activity.unit_price = converted_unit_price;
+        converted_activity.fee = converted_fee;
+        converted_activity.currency = position.currency.clone();
+
+        Ok(converted_activity)
+    }
+
+    /// Helper method to get/create position. Sets Position currency based on the asset's listing currency.
+    /// Falls back to activity currency if asset listing currency cannot be determined.
     fn get_or_create_position_mut<'a>(
+        &self,
         state: &'a mut AccountStateSnapshot,
         asset_id: &str,
-        activity_currency: &str, // Currency from the activity establishing the position
+        activity_currency: &str, // Currency from the activity (used as fallback)
         date: DateTime<Utc>,
     ) -> std::result::Result<&'a mut Position, CalculatorError> {
-        if asset_id.is_empty() || asset_id.starts_with("$CASH") {
+        if asset_id.is_empty() || asset_id.starts_with(CASH_ASSET_PREFIX) {
             return Err(CalculatorError::InvalidActivity(format!(
                 "Invalid asset_id for position: {}",
                 asset_id
@@ -793,11 +945,15 @@ impl HoldingsCalculator {
             .positions
             .entry(asset_id.to_string())
             .or_insert_with(|| {
-                // Create new position using the currency from the first activity
+                // Create new position using the asset's listing currency
+                let position_currency = self.get_position_currency(asset_id).unwrap_or_else(|_| {
+                    warn!("Failed to get asset currency for {}, using activity currency {}", asset_id, activity_currency);
+                    activity_currency.to_string()
+                });
                 Position::new(
                     state.account_id.clone(),
                     asset_id.to_string(),
-                    activity_currency.to_string(), 
+                    position_currency, 
                     date,
                 )
             }))

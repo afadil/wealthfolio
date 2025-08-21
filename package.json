@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "tsc": "tsc -b",
-    "build": "tsc && vite build && pnpm -C packages/addon-sdk build",
+    "build": "tsc && vite build && pnpm -r build",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",

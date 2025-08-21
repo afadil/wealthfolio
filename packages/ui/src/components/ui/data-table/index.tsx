@@ -88,11 +88,13 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-4">
-      <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} />
-      <div className={`rounded-md border ${scrollable ? 'h-[700px] overflow-y-auto' : ''}`}>
+    <div className="h-full flex flex-col">
+      <div className="flex-shrink-0 mb-2">
+        <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} />
+      </div>
+      <div className={`rounded-md border flex-1 min-h-0 ${scrollable ? 'overflow-auto' : ''}`}>
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-muted/50 sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {

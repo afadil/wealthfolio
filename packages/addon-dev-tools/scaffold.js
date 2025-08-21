@@ -99,6 +99,7 @@ class AddonScaffold {
       { template: 'vite.config.ts', output: 'vite.config.ts' },
       { template: 'tsconfig.json', output: 'tsconfig.json' },
       { template: 'README.md', output: 'README.md' },
+      { template: 'CHANGELOG.md', output: 'CHANGELOG.md' },
       { template: 'addon.tsx', output: 'src/addon.tsx' },
       { template: 'components-index.ts', output: 'src/components/index.ts' },
       { template: 'hooks-index.ts', output: 'src/hooks/index.ts' },

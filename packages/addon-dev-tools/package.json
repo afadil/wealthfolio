@@ -14,14 +14,38 @@
     "hot-reload"
   ],
   "author": "Wealthfolio Team",
+
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/afadil/wealthfolio.git",
+    "directory": "packages/addon-dev-tools"
+  },
+  "bugs": {
+    "url": "https://github.com/afadil/wealthfolio/issues"
+  },
+  "homepage": "https://github.com/afadil/wealthfolio/tree/main/packages/addon-dev-tools#readme",
+  "files": [
+    "cli.js",
+    "dev-server.js",
+    "index.js",
+    "scaffold.js",
+    "templates/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
   "dependencies": {
     "commander": "^14.0.0",
     "express": "^4.21.2",
-    "cors": "^2.8.5", 
+    "cors": "^2.8.5",
     "chokidar": "^4.0.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

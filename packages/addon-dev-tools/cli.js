@@ -109,6 +109,10 @@ async function createAddon(name, options) {
       return;
     }
     
+    // Add current date for changelog
+    const currentDate = new Date().toISOString().split('T')[0];
+    config.currentDate = currentDate;
+    
     // Create addon using scaffold service
     const result = await scaffold.createAddon(config, addonDir);
     
@@ -129,6 +133,7 @@ async function createAddon(name, options) {
     info(`  ├── package.json            # NPM package configuration`);
     info(`  ├── vite.config.ts          # Build configuration`);
     info(`  ├── tsconfig.json           # TypeScript configuration`);
+    info(`  ├── CHANGELOG.md            # Version history and release notes`);
     info(`  └── README.md               # Documentation`);
     info(`Next steps:`);
     info(`  1. cd ${addonId}`);

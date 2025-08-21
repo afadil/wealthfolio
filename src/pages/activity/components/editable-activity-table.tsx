@@ -540,6 +540,25 @@ const EditableActivityTable = ({
   const columnsDefinition = useMemo(
     (): ExtendedColumnDef<LocalActivityDetails>[] => [
       {
+        accessorKey: 'assetSymbol',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
+        cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => {
+          let symbol = row.original.assetSymbol || '';
+          if (symbol.startsWith('$CASH')) symbol = symbol.split('-')[0];
+          return (
+            <div className="flex min-w-[120px] items-center">
+              <Link to={`/holdings/${encodeURIComponent(symbol)}`}>
+                <Badge className="flex min-w-[60px] cursor-pointer items-center justify-center rounded-sm">
+                  {symbol || '-'}
+                </Badge>
+              </Link>
+            </div>
+          );
+        },
+        meta: { type: 'assetSymbolSearch' },
+        size: 150,
+      },
+      {
         accessorKey: 'date',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
         cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => {
@@ -585,25 +604,6 @@ const EditableActivityTable = ({
         },
         validationSchema: tradeActivitySchema.shape.activityType,
         size: 10,
-      },
-      {
-        accessorKey: 'assetSymbol',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
-        cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => {
-          let symbol = row.original.assetSymbol || '';
-          if (symbol.startsWith('$CASH')) symbol = symbol.split('-')[0];
-          return (
-            <div className="flex min-w-[120px] items-center">
-              <Link to={`/holdings/${encodeURIComponent(symbol)}`}>
-                <Badge className="flex min-w-[60px] cursor-pointer items-center justify-center rounded-sm">
-                  {symbol || '-'}
-                </Badge>
-              </Link>
-            </div>
-          );
-        },
-        meta: { type: 'assetSymbolSearch' },
-        size: 150,
       },
       {
         accessorKey: 'quantity',
@@ -1442,8 +1442,8 @@ const EditableActivityTable = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between flex-shrink-0 mb-4">
         <DataTableToolbar
           table={table}
           searchBy="assetSymbol"
@@ -1503,7 +1503,7 @@ const EditableActivityTable = ({
         </div>
       </div>
 
-      <div className="pt-0">
+      <div className="flex-1 min-h-0 overflow-auto border rounded-md">
         {isLoading && <div className="p-4 text-center">Loading activities...</div>}
         {isError && (
           <div className="p-4 text-center text-destructive">Error loading activities.</div>
@@ -1514,7 +1514,7 @@ const EditableActivityTable = ({
 
         {(localActivities.length > 0 || (isLoading && localActivities.length === 0)) && (
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-none bg-muted-foreground/10">
                   {headerGroup.headers.map((header) => {
@@ -1554,7 +1554,9 @@ const EditableActivityTable = ({
         )}
       </div>
       {localActivities.length > 0 && activitiesPage && activitiesPage.meta.totalRowCount > 0 && (
-        <DataTablePagination table={table} />
+        <div className="flex-shrink-0 mt-2">
+          <DataTablePagination table={table} />
+        </div>
       )}
     </div>
   );

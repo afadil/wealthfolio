@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import {
@@ -33,7 +33,7 @@ const accountTypeIcons: Record<string, any> = {
 interface AccountSelectorProps {
   selectedAccount?: Account | null;
   setSelectedAccount: (account: Account) => void;
-  variant?: 'card' | 'dropdown' | 'button';
+  variant?: 'card' | 'dropdown' | 'button' | 'form';
   buttonText?: string;
   filterActive?: boolean;
   includePortfolio?: boolean;
@@ -102,7 +102,7 @@ const iconVariants = {
   }
 };
 
-export function AccountSelector({ 
+export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProps>(({ 
   selectedAccount, 
   setSelectedAccount, 
   variant = 'card',
@@ -110,7 +110,7 @@ export function AccountSelector({
   filterActive = true,
   includePortfolio = false,
   className
-}: AccountSelectorProps) {
+}, ref) => {
   const [open, setOpen] = useState(false);
   const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
   const { data: settings, isLoading: isLoadingSettings } = useSettings();
@@ -302,6 +302,36 @@ export function AccountSelector({
           </Button>
         );
       
+      case 'form':
+        return (
+          <Button
+            ref={ref}
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+              className
+            )}
+          >
+            <div className="flex items-center gap-2 flex-1">
+              {selectedAccount ? (
+                <>
+                  {(() => {
+                    const IconComponent =
+                      accountTypeIcons[selectedAccount.accountType] || Icons.CreditCard;
+                    return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
+                  })()}
+                  <span className="truncate">{selectedAccount.name}</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">Select an account</span>
+              )}
+            </div>
+            <Icons.ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        );
+      
       case 'button':
         return (
           <Button
@@ -356,7 +386,7 @@ export function AccountSelector({
                       return (
                         <CommandItem
                           key={account.id}
-                          value={account.id}
+                          value={`${account.name} ${account.currency} ${account.accountType}`}
                           onSelect={() => {
                             setSelectedAccount(account);
                             setOpen(false);
@@ -385,4 +415,6 @@ export function AccountSelector({
       </PopoverContent>
     </Popover>
   );
-} 
+});
+
+AccountSelector.displayName = 'AccountSelector'; 

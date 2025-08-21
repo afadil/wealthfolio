@@ -105,13 +105,132 @@ pub fn backup_database(app_data_dir: &str) -> Result<String> {
         "Creating database backup from {} to {}",
         db_path, backup_path
     );
+
+    // Copy main database file
     fs::copy(&db_path, &backup_path).map_err(|e| {
         error!("Failed to create database backup: {}", e);
         Error::Database(DatabaseError::BackupFailed(e.to_string()))
     })?;
 
-    info!("Database backup created successfully");
+    // Copy WAL file if it exists
+    let wal_source = format!("{}-wal", db_path);
+    let wal_target = format!("{}-wal", backup_path);
+    if Path::new(&wal_source).exists() {
+        fs::copy(&wal_source, &wal_target).map_err(|e| {
+            error!("Failed to copy WAL file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    // Copy SHM file if it exists
+    let shm_source = format!("{}-shm", db_path);
+    let shm_target = format!("{}-shm", backup_path);
+    if Path::new(&shm_source).exists() {
+        fs::copy(&shm_source, &shm_target).map_err(|e| {
+            error!("Failed to copy SHM file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    info!("Database backup created successfully (including WAL/SHM files if present)");
     Ok(backup_path)
+}
+
+pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()> {
+    let db_path = get_db_path(app_data_dir);
+    
+    info!(
+        "Restoring database from {} to {}",
+        backup_file_path, db_path
+    );
+
+    // Verify backup file exists
+    if !Path::new(backup_file_path).exists() {
+        return Err(Error::Database(DatabaseError::BackupFailed(
+            "Backup file not found".to_string(),
+        )));
+    }
+
+    // Create backup of current database before restore
+    let restore_backup_path = format!("{}.pre-restore-{}", 
+        db_path, 
+        Local::now().format("%Y%m%d_%H%M%S")
+    );
+    
+    if Path::new(&db_path).exists() {
+        // Copy main database file
+        fs::copy(&db_path, &restore_backup_path).map_err(|e| {
+            error!("Failed to create pre-restore backup: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+
+        // Copy WAL file if it exists
+        let current_wal_path = format!("{}-wal", db_path);
+        let backup_wal_path = format!("{}-wal", restore_backup_path);
+        if Path::new(&current_wal_path).exists() {
+            fs::copy(&current_wal_path, &backup_wal_path).map_err(|e| {
+                error!("Failed to copy WAL file during pre-restore backup: {}", e);
+                Error::Database(DatabaseError::BackupFailed(e.to_string()))
+            })?;
+        }
+
+        // Copy SHM file if it exists
+        let current_shm_path = format!("{}-shm", db_path);
+        let backup_shm_path = format!("{}-shm", restore_backup_path);
+        if Path::new(&current_shm_path).exists() {
+            fs::copy(&current_shm_path, &backup_shm_path).map_err(|e| {
+                error!("Failed to copy SHM file during pre-restore backup: {}", e);
+                Error::Database(DatabaseError::BackupFailed(e.to_string()))
+            })?;
+        }
+
+        info!("Created pre-restore backup at: {} (including WAL/SHM files if present)", restore_backup_path);
+    }
+
+    // Remove existing WAL and SHM files to ensure clean state
+    let wal_path = format!("{}-wal", db_path);
+    let shm_path = format!("{}-shm", db_path);
+    
+    if Path::new(&wal_path).exists() {
+        fs::remove_file(&wal_path).map_err(|e| {
+            error!("Failed to remove existing WAL file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+    
+    if Path::new(&shm_path).exists() {
+        fs::remove_file(&shm_path).map_err(|e| {
+            error!("Failed to remove existing SHM file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    // Copy the main backup file
+    fs::copy(backup_file_path, &db_path).map_err(|e| {
+        error!("Failed to restore database: {}", e);
+        Error::Database(DatabaseError::BackupFailed(e.to_string()))
+    })?;
+
+    // Copy WAL file if it exists in backup
+    let backup_wal_path = format!("{}-wal", backup_file_path);
+    if Path::new(&backup_wal_path).exists() {
+        fs::copy(&backup_wal_path, &wal_path).map_err(|e| {
+            error!("Failed to restore WAL file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    // Copy SHM file if it exists in backup
+    let backup_shm_path = format!("{}-shm", backup_file_path);
+    if Path::new(&backup_shm_path).exists() {
+        fs::copy(&backup_shm_path, &shm_path).map_err(|e| {
+            error!("Failed to restore SHM file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    info!("Database restored successfully");
+    Ok(())
 }
 
 /// Gets a connection from the pool

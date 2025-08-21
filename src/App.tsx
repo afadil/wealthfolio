@@ -3,6 +3,7 @@ import { SettingsProvider } from '@/lib/settings-provider';
 import { PrivacyProvider } from './context/privacy-context';
 import { AppRoutes } from './routes';
 import { useState } from 'react';
+import { TooltipProvider } from '@wealthfolio/ui';
 
 function App() {
   const [queryClient] = useState(
@@ -25,7 +26,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <PrivacyProvider>
         <SettingsProvider>
-          <AppRoutes />
+          <TooltipProvider>
+            <AppRoutes />
+          </TooltipProvider>
         </SettingsProvider>
       </PrivacyProvider>
     </QueryClientProvider>

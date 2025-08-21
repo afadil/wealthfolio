@@ -101,6 +101,17 @@ export const openCsvFileDialogTauri = async (): Promise<null | string | string[]
   return open({ filters: [{ name: 'CSV', extensions: ['csv'] }] });
 };
 
+export const openFolderDialogTauri = async (): Promise<string | null> => {
+  return open({ directory: true });
+};
+
+export const openDatabaseFileDialogTauri = async (): Promise<string | null> => {
+  const result = await open({ 
+    filters: [{ name: 'Database', extensions: ['db', 'sqlite'] }] 
+  });
+  return Array.isArray(result) ? result[0] || null : result;
+};
+
 export const listenFileDropHoverTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
@@ -127,6 +138,12 @@ export const listenPortfolioUpdateCompleteTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
   return listen<T>('portfolio:update-complete', handler);
+};
+
+export const listenDatabaseRestoredTauri = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
+  return listen<T>('database-restored', handler);
 };
 
 export const listenPortfolioUpdateErrorTauri = async <T>(

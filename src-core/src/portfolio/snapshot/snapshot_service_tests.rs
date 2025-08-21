@@ -13,6 +13,7 @@ mod tests {
         ActivitySearchResponse, ActivityUpdate, ImportMapping as ActivityImportMapping,
         NewActivity, Sort as ActivitySort,
     };
+    use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
     use crate::fx::fx_model::{ExchangeRate, NewExchangeRate};
@@ -137,6 +138,102 @@ mod tests {
             _to_currency: &str,
         ) -> AppResult<()> {
             Ok(())
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct MockAssetRepository {
+        assets: HashMap<String, Asset>,
+    }
+
+    impl MockAssetRepository {
+        fn new() -> Self {
+            let mut assets = HashMap::new();
+            
+            // Add predefined test assets with their listing currencies
+            assets.insert("AAPL".to_string(), Asset {
+                id: "AAPL".to_string(),
+                isin: Some("US0378331005".to_string()),
+                name: Some("Apple Inc.".to_string()),
+                asset_type: Some("STOCK".to_string()),
+                symbol: "AAPL".to_string(),
+                symbol_mapping: Some("AAPL".to_string()),
+                asset_class: Some("EQUITY".to_string()),
+                asset_sub_class: Some("LARGE_CAP".to_string()),
+                notes: None,
+                countries: Some("US".to_string()),
+                categories: Some("Technology".to_string()),
+                classes: Some("Equity".to_string()),
+                attributes: None,
+                currency: "USD".to_string(), // USD listing
+                data_source: "MANUAL".to_string(),
+                sectors: Some("Technology".to_string()),
+                url: None,
+                created_at: chrono::Utc::now().naive_utc(),
+                updated_at: chrono::Utc::now().naive_utc(),
+            });
+
+            assets.insert("SHOP".to_string(), Asset {
+                id: "SHOP".to_string(),
+                isin: Some("CA82509L1076".to_string()),
+                name: Some("Shopify Inc.".to_string()),
+                asset_type: Some("STOCK".to_string()),
+                symbol: "SHOP".to_string(),
+                symbol_mapping: Some("SHOP".to_string()),
+                asset_class: Some("EQUITY".to_string()),
+                asset_sub_class: Some("LARGE_CAP".to_string()),
+                notes: None,
+                countries: Some("CA".to_string()),
+                categories: Some("Technology".to_string()),
+                classes: Some("Equity".to_string()),
+                attributes: None,
+                currency: "CAD".to_string(), // CAD listing
+                data_source: "MANUAL".to_string(),
+                sectors: Some("Technology".to_string()),
+                url: None,
+                created_at: chrono::Utc::now().naive_utc(),
+                updated_at: chrono::Utc::now().naive_utc(),
+            });
+
+            Self { assets }
+        }
+    }
+
+    #[async_trait]
+    impl AssetRepositoryTrait for MockAssetRepository {
+        async fn create(&self, _new_asset: NewAsset) -> AppResult<Asset> {
+            unimplemented!("create not implemented for MockAssetRepository")
+        }
+
+        async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> AppResult<Asset> {
+            unimplemented!("update_profile not implemented for MockAssetRepository")
+        }
+
+        async fn update_data_source(&self, _asset_id: &str, _data_source: String) -> AppResult<Asset> {
+            unimplemented!("update_data_source not implemented for MockAssetRepository")
+        }
+
+        fn get_by_id(&self, asset_id: &str) -> AppResult<Asset> {
+            self.assets
+                .get(asset_id)
+                .cloned()
+                .ok_or_else(|| Error::Asset(format!("Asset not found: {}", asset_id)))
+        }
+
+        fn list(&self) -> AppResult<Vec<Asset>> {
+            Ok(self.assets.values().cloned().collect())
+        }
+
+        fn list_cash_assets(&self, _base_currency: &str) -> AppResult<Vec<Asset>> {
+            Ok(vec![])
+        }
+
+        fn list_by_symbols(&self, symbols: &Vec<String>) -> AppResult<Vec<Asset>> {
+            Ok(self.assets
+                .values()
+                .filter(|asset| symbols.contains(&asset.symbol))
+                .cloned()
+                .collect())
         }
     }
 
@@ -728,11 +825,13 @@ mod tests {
         let base_currency_arc = Arc::new(RwLock::new(base_portfolio_currency.to_string()));
 
         // Create the SnapshotService with our mock repositories
+        let mock_asset_repo = Arc::new(MockAssetRepository::new());
         let snapshot_service = SnapshotService::new(
             base_currency_arc.clone(),
             mock_account_repo_arc.clone(),
             mock_activity_repo_arc,
             mock_snapshot_repo_arc.clone(),
+            mock_asset_repo,
             mock_fx_service_arc.clone(),
         );
 
@@ -886,12 +985,14 @@ mod tests {
 
         let fx = Arc::new(MockFxService::new());
         let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
 
         let svc = SnapshotService::new(
             base_currency_arc,
             account_repo.clone(),
             activity_repo.clone(),
             snapshot_repo.clone(),
+            asset_repo,
             fx.clone(),
         );
 
@@ -942,12 +1043,14 @@ mod tests {
 
         let fx = Arc::new(MockFxService::new());
         let snaps = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
 
         let svc = SnapshotService::new(
             base.clone(),
             Arc::new(account_repo),
             act_repo,
             snaps.clone(),
+            asset_repo,
             fx,
         );
 

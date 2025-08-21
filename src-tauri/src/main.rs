@@ -132,6 +132,8 @@ pub fn main() {
             commands::limits::delete_contribution_limit,
             commands::limits::calculate_deposits_for_contribution_limit,
             commands::utilities::backup_database,
+            commands::utilities::backup_database_to_path,
+            commands::utilities::restore_database,
             commands::asset::get_asset_profile,
             commands::asset::update_asset_profile,
             commands::asset::update_asset_data_source,
