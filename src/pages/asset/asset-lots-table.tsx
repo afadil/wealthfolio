@@ -7,10 +7,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Lot } from '@/lib/types';
-import { formatAmount, formatDate } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatDate } from '@/lib/utils';
 import { Card, CardContent} from '@/components/ui/card';
-import { GainAmount } from '@/components/gain-amount';
-import { GainPercent } from '@/components/gain-percent';
+import { GainAmount } from '@wealthfolio/ui';
+import { GainPercent } from '@wealthfolio/ui';
 
 interface AssetLotsTableProps {
   lots: Lot[];

@@ -12,7 +12,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Icons } from './icons';
+import { Icons } from '@/components/ui/icons';
 import { searchTicker } from '@/commands/market-data';
 import { QuoteSummary } from '@/lib/types';
 

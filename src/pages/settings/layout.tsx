@@ -20,12 +20,16 @@ const sidebarNavItems = [
     href: 'goals',
   },
   {
-    title: 'Appearance',
-    href: 'appearance',
-  },
-  {
     title: 'Market Data',
     href: 'market-data',
+  },
+  {
+    title: 'Add-ons',
+    href: 'addons',
+  },
+  {
+    title: 'Appearance',
+    href: 'appearance',
   },
   {
     title: 'Data Export',

@@ -8,7 +8,7 @@ import { searchTicker } from '@/commands/market-data';
 import { cn } from '@/lib/utils';
 import { QuoteSummary } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Icons } from './icons';
+import { Icons } from '@/components/ui/icons';
 
 interface SearchProps {
   selectedResult?: QuoteSummary;

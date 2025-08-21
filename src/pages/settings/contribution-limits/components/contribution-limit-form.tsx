@@ -4,7 +4,7 @@ import * as z from 'zod';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Card, CardContent } from '@/components/ui/card';
 
 import {
@@ -13,8 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import {
   Form,
   FormControl,
   FormField,
@@ -22,13 +20,13 @@ import {
   FormLabel,
   FormMessage,
   FormDescription,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import DatePickerInput from '@/components/ui/date-picker-input';
+  DatePickerInput,
+  Input,
+} from '@wealthfolio/ui';
 
 import { newContributionLimitSchema } from '@/lib/schemas';
 import { useContributionLimitMutations } from '../use-contribution-limit-mutations';
-import { MoneyInput } from '@/components/ui/money-input';
+import { MoneyInput } from '@wealthfolio/ui';
 
 type NewContributionLimit = z.infer<typeof newContributionLimitSchema>;
 

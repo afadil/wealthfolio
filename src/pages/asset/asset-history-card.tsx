@@ -1,16 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { format, subMonths } from 'date-fns';
-import { Card, CardTitle, CardContent, CardHeader } from '@/components/ui/card';
-import { formatPercent } from '@/lib/utils';
+import {
+  Button,
+  Card,
+  CardTitle,
+  CardContent,
+  CardHeader,
+  Badge,
+  Icons,
+  IntervalSelector,
+  AmountDisplay,
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+  formatPercent,
+} from '@wealthfolio/ui';
 import HistoryChart from '@/components/history-chart-symbol';
-import IntervalSelector from '@/components/interval-selector';
 import { Quote, TimePeriod, DateRange } from '@/lib/types';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Icons } from '@/components/icons';
-import { Badge } from '@/components/ui/badge';
 import { useSyncMarketDataMutation } from '@/hooks/use-sync-market-data';
-import { Button } from '@/components/ui/button';
-import { AmountDisplay } from '@/components/amount-display';
 import { useBalancePrivacy } from '@/context/privacy-context';
 
 interface AssetHistoryProps {
@@ -23,7 +30,7 @@ interface AssetHistoryProps {
   className?: string;
 }
 
-const AssetHistoryCard: React.FC<AssetHistoryProps> = ({ 
+const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   marketPrice,
   totalGainAmount,
   totalGainPercent,
@@ -31,7 +38,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   quoteHistory,
   symbol,
   className,
- }) => {
+}) => {
   const syncMarketDataMutation = useSyncMarketDataMutation();
   const { isBalanceHidden } = useBalancePrivacy();
 
@@ -44,34 +51,40 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
 
   const filteredData = useMemo(() => {
     if (!quoteHistory) return [];
-    
+
     if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === 'ALL') {
-      return quoteHistory
-        .map((quote) => ({
-          timestamp: quote.timestamp,
-          totalValue: quote.close,
-          currency: currency,
-        }))
+      return quoteHistory.map((quote) => ({
+        timestamp: quote.timestamp,
+        totalValue: quote.close,
+        currency: currency,
+      }));
     }
 
     return quoteHistory
       .filter((quote) => {
         const quoteDate = new Date(quote.timestamp);
-        return dateRange.from && dateRange.to && quoteDate >= dateRange.from && quoteDate <= dateRange.to;
+        return (
+          dateRange.from && dateRange.to && quoteDate >= dateRange.from && quoteDate <= dateRange.to
+        );
       })
       .map((quote) => ({
         timestamp: quote.timestamp,
         totalValue: quote.close,
         currency: currency,
-      }))
+      }));
   }, [dateRange, quoteHistory, currency, selectedIntervalCode]);
 
   const { ganAmount, percentage, calculatedAt } = useMemo(() => {
     const lastFilteredDate = filteredData.at(-1)?.timestamp;
 
     if (selectedIntervalCode === 'ALL') {
-      const lastQuoteDate = quoteHistory.length > 0 ? quoteHistory[quoteHistory.length - 1].timestamp : undefined;
-      return { ganAmount: totalGainAmount, percentage: totalGainPercent, calculatedAt: lastQuoteDate };
+      const lastQuoteDate =
+        quoteHistory.length > 0 ? quoteHistory[quoteHistory.length - 1].timestamp : undefined;
+      return {
+        ganAmount: totalGainAmount,
+        percentage: totalGainPercent,
+        calculatedAt: lastQuoteDate,
+      };
     }
 
     const startValue = filteredData[0]?.totalValue;
@@ -80,12 +93,10 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
 
     return {
       ganAmount:
-        typeof startValue === 'number' && typeof endValue === 'number'
-          ? endValue - startValue
-          : 0,
+        typeof startValue === 'number' && typeof endValue === 'number' ? endValue - startValue : 0,
       percentage:
         isValidStartValue && typeof endValue === 'number'
-          ? ((endValue - startValue) / startValue)
+          ? (endValue - startValue) / startValue
           : 0,
       calculatedAt: lastFilteredDate,
     };
@@ -94,7 +105,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const handleIntervalSelect = (
     code: TimePeriod,
     description: string,
-    range: DateRange | undefined
+    range: DateRange | undefined,
   ) => {
     setSelectedIntervalCode(code);
     setSelectedIntervalDesc(description);

@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import {
   DialogDescription,
   DialogFooter,
@@ -39,7 +39,7 @@ const accountTypes = [
 ] as const;
 
 import { newAccountSchema } from '@/lib/schemas';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { CurrencyInput } from '@wealthfolio/ui';
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -139,7 +139,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
                   <FormControl>
                     <CurrencyInput
                       value={field.value}
-                      onChange={(value) => field.onChange(value)}
+                      onChange={(value: string) => field.onChange(value)}
                     />
                   </FormControl>
                   <FormMessage />

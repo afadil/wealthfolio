@@ -1,5 +1,5 @@
 import { ApplicationHeader } from '@/components/header';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCallback, useState} from 'react';

@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Icons } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 // Status Card Component
@@ -50,9 +50,9 @@ export function MappingStatusCard({
         </p>
       </div>
       {isComplete ? (
-        <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
+        <Icons.CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
       ) : (
-        <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
+        <Icons.AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
       )}
     </div>
   );

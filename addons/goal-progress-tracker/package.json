@@ -1,0 +1,48 @@
+{
+  "name": "goal-progress-tracker-addon",
+  "version": "1.0.0",
+  "description": "An addon for tracking investment progress towards target amounts with progress visualization",
+  "type": "module",
+  "main": "dist/addon.js",
+  "author": "Wealthfolio",
+  "license": "MIT",
+  "homepage": "https://github.com/afadil/wealthfolio",
+  "keywords": [
+    "wealthfolio",
+    "addon",
+    "investment",
+    "goal",
+    "progress",
+    "tracker",
+    "visualization"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "dev:server": "wealthfolio dev",
+    "clean": "rm -rf dist",
+    "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
+    "bundle": "pnpm clean && pnpm build && pnpm package",
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wealthfolio/addon-sdk": "workspace:*",
+    "@wealthfolio/ui": "workspace:*",
+    "@tanstack/react-query": "^5.62.7",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@wealthfolio/addon-dev-tools": "workspace:*",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "rollup-plugin-external-globals": "^0.13.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "files": [
+    "dist/",
+    "manifest.json",
+    "README.md"
+  ]
+}

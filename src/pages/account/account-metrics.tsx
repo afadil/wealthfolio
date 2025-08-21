@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
-
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  MoneyInput,
+  PrivacyAmount,
+  Button,
+  Icons,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  Separator,
+  Skeleton,
+} from '@wealthfolio/ui';
 import { AccountValuation, PerformanceMetrics } from '@/lib/types';
-import { PrivacyAmount } from '@/components/privacy-amount';
 import { PerformanceGrid } from '@/pages/account/performance-grid';
 import { formatDate } from '@/lib/utils';
-import { MoneyInput } from '@/components/ui/money-input';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 import { useBalanceUpdate } from './use-balance-update';
 
 interface EditableBalanceProps {

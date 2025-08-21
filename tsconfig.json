@@ -14,7 +14,11 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"],
+      "@wealthfolio/ui": ["packages/ui/src"],
+      "@wealthfolio/ui/*": ["packages/ui/src/*"],
+      "@/components/ui/*": ["packages/ui/src/components/ui/*"]
     },
 
     /* Bundler mode */
@@ -32,6 +36,5 @@
     "noFallthroughCasesInSwitch": true
     
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }

@@ -1,0 +1,63 @@
+{
+  "name": "@wealthfolio/addon-sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for building Wealthfolio addons with enhanced functionality and type safety",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
+    },
+    "./types": {
+      "import": "./dist/types.mjs",
+      "types": "./dist/types.d.mts"
+    },
+    "./permissions": {
+      "import": "./dist/permissions.mjs",
+      "types": "./dist/permissions.d.mts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "wealthfolio",
+    "addon",
+    "plugin",
+    "sdk",
+    "typescript",
+    "financial",
+    "portfolio"
+  ],
+  "author": "Wealthfolio Team",
+  "license": "MIT",
+  "homepage": "https://wealthfolio.app/addons",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/afadil/wealthfolio.git",
+    "directory": "packages/addon-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/afadil/wealthfolio/issues"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+} 

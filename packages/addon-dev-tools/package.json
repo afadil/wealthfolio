@@ -1,0 +1,27 @@
+{
+  "name": "@wealthfolio/addon-dev-tools",
+  "version": "1.0.0",
+  "description": "Development tools for Wealthfolio addons - hot reload server and CLI",
+  "main": "index.js",
+  "bin": {
+    "wealthfolio": "cli.js"
+  },
+  "keywords": [
+    "wealthfolio",
+    "addon",
+    "development",
+    "cli",
+    "hot-reload"
+  ],
+  "author": "Wealthfolio Team",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.0",
+    "express": "^4.21.2",
+    "cors": "^2.8.5", 
+    "chokidar": "^4.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

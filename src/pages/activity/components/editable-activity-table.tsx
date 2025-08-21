@@ -54,25 +54,29 @@ import {
   NewActivityFormValues,
 } from './forms/schemas';
 import { ZodType, ZodTypeDef } from 'zod';
-import { formatDateTime, formatAmount, cn } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatDateTime, cn } from '@/lib/utils';
 
-import DatePickerInput from '@/components/ui/date-picker-input';
-import { SearchableSelect } from '@/components/searchable-select';
+import {
+  SearchableSelect,
+  CurrencyInput,
+  MoneyInput,
+  QuantityInput,
+  DatePickerInput,
+  ToggleGroup,
+  ToggleGroupItem,
+  Button,
+  Icons,
+  DeleteConfirm,
+  toast,
+} from '@wealthfolio/ui';
 import TickerSearchInput from '@/components/ticker-search';
 import { AccountSelector } from '@/components/account-selector';
-import { CurrencyInput } from '@/components/ui/currency-input';
-import { MoneyInput } from '@/components/ui/money-input';
-import { QuantityInput } from '@/components/ui/quantity-input';
-import { DeleteConfirm } from '@/components/delete-confirm';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 // New imports for data table enhancements
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
 import { DataTablePagination } from '@/components/ui/data-table/data-table-pagination';
-import { toast } from '@/components/ui/use-toast';
 
 type LocalActivityDetails = ActivityDetails & { isNew?: boolean };
 

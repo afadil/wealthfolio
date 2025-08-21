@@ -1,11 +1,14 @@
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Toaster } from '@/components/ui/toaster';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { type NavigationProps, SidebarNav } from './sidebar-nav';
 import { useSettings } from '@/hooks/use-settings';
-import { ErrorBoundary } from '@/components/error-boundary';
+import { ErrorBoundary } from '@wealthfolio/ui';
+import { getDynamicNavItems, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
+import { useState, useEffect } from 'react';
+import useNavigationEventListener from '@/hooks/use-navigation-event-listener';
 
-const navigation: NavigationProps = {
+const staticNavigation: NavigationProps = {
   primary: [
     {
       icon: <Icons.Dashboard className="h-5 w-5" />,
@@ -32,18 +35,47 @@ const navigation: NavigationProps = {
       title: 'Activities',
       href: '/activities',
     },
+  ],
+  secondary: [
     {
       icon: <Icons.Settings className="h-5 w-5" />,
       title: 'Settings',
       href: '/settings/general',
     },
   ],
-  secondary: [],
 };
 
 const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
+  const [dynamicItems, setDynamicItems] = useState<any[]>([]);
+
+  // Setup navigation event listener for menu navigation
+  useNavigationEventListener();
+
+  // Subscribe to navigation updates from addons
+  useEffect(() => {
+    const updateDynamicItems = () => {
+      const itemsFromRuntime = getDynamicNavItems();
+      setDynamicItems(itemsFromRuntime);
+    };
+
+    // Initial load
+    updateDynamicItems();
+
+    // Subscribe to updates
+    const unsubscribe = subscribeToNavigationUpdates(updateDynamicItems);
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Combine static and dynamic navigation items
+  const navigation: NavigationProps = {
+    primary: [...staticNavigation.primary, ...dynamicItems],
+    secondary: staticNavigation.secondary,
+  };
 
   if (isSettingsLoading) {
     return null;

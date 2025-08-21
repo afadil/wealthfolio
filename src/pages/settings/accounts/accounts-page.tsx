@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { EmptyPlaceholder } from '@/components/empty-placeholder';
-import { Separator } from '@/components/ui/separator';
+import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
 import { AccountItem } from './components/account-item';
 import { AccountEditModal } from './components/account-edit-modal';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
 import type { Account } from '@/lib/types';
 import { SettingsHeader } from '../header';
 import { getAccounts } from '@/commands/account';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
 import { useAccountMutations } from './components/use-account-mutations';
