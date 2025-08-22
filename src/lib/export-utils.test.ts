@@ -1,19 +1,19 @@
 import { convertToCSV } from './export-utils';
 
 describe('convertToCSV', () => {
-  it('should use "symbol" as header instead of "assetID"', () => {
-    const dataWithAssetID = [
-      { assetID: 'AAPL', name: 'Apple Inc.', quantity: 10 },
-      { assetID: 'GOOG', name: 'Alphabet Inc.', quantity: 5 },
+  it('should use "symbol" as header instead of "assetId"', () => {
+    const dataWithAssetId = [
+      { assetId: 'AAPL', name: 'Apple Inc.', quantity: 10 },
+      { assetId: 'GOOG', name: 'Alphabet Inc.', quantity: 5 },
     ];
-    const csvOutput = convertToCSV(dataWithAssetID);
+    const csvOutput = convertToCSV(dataWithAssetId);
     const [headerRow] = csvOutput.split('\n');
 
-    expect(headerRow).toContain('symbol');
-    expect(headerRow).not.toContain('assetID');
+    expect(headerRow).toContain('"symbol"');
+    expect(headerRow).not.toContain('assetId');
     // Check other headers to ensure they are preserved
-    expect(headerRow).toContain('name');
-    expect(headerRow).toContain('quantity');
+    expect(headerRow).toContain('"name"');
+    expect(headerRow).toContain('"quantity"');
   });
 
   it('should handle empty data', () => {
@@ -30,7 +30,7 @@ describe('convertToCSV', () => {
     const rows = csvOutput.split('\n');
 
     expect(rows.length).toBe(3); // Header + 2 data rows
-    expect(rows[0]).toBe('id,name,value');
+    expect(rows[0]).toBe('"id","name","value"');
     expect(rows[1]).toBe('1,"Test 1",100');
     expect(rows[2]).toBe('2,"Test 2",200');
   });
@@ -42,22 +42,22 @@ describe('convertToCSV', () => {
     const csvOutput = convertToCSV(data);
     const rows = csvOutput.split('\n');
 
-    expect(rows[0]).toBe('id,description,notes');
+    expect(rows[0]).toBe('"id","description","notes"');
     // Values with quotes, commas, or newlines should be properly stringified
-    expect(rows[1]).toBe('1,"Item with ""quotes""","Comma, and new\nline"');
+    expect(rows[1]).toBe('1,"Item with \\"quotes\\"","Comma, and new\\nline"');
   });
 
-  it('should use "symbol" as header when assetID is present along with other columns', () => {
-    const dataWithAssetIDAndOthers = [
-      { assetID: 'MSFT', type: 'Stock', price: 300.50 },
-      { assetID: 'TSLA', type: 'Stock', price: 700.75 },
+  it('should use "symbol" as header when assetId is present along with other columns', () => {
+    const dataWithAssetIdAndOthers = [
+      { assetId: 'MSFT', type: 'Stock', price: 300.50 },
+      { assetId: 'TSLA', type: 'Stock', price: 700.75 },
     ];
-    const csvOutput = convertToCSV(dataWithAssetIDAndOthers);
+    const csvOutput = convertToCSV(dataWithAssetIdAndOthers);
     const [headerRow] = csvOutput.split('\n');
 
-    expect(headerRow).toContain('symbol');
-    expect(headerRow).toContain('type');
-    expect(headerRow).toContain('price');
-    expect(headerRow).not.toContain('assetID');
+    expect(headerRow).toContain('"symbol"');
+    expect(headerRow).toContain('"type"');
+    expect(headerRow).toContain('"price"');
+    expect(headerRow).not.toContain('assetId');
   });
 });

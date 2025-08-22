@@ -107,8 +107,9 @@ export const importActivitySchema = z.object({
 }).refine(
   (data) => {
     // For cash activities, income activities or cash transfers, either amount or both quantity and unit price must be provided
+    // Exclude FEE activities as they have their own validation rule
     const isCashOrIncomeActivity = 
-      isCashActivity(data.activityType as string) || 
+      (isCashActivity(data.activityType as string) && data.activityType !== ActivityType.FEE) || 
       isIncomeActivity(data.activityType as string) || 
       (data.symbol && isCashTransfer(data.activityType as string, data.symbol));
     

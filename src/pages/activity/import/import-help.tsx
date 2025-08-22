@@ -17,62 +17,39 @@ export function ImportHelpPopover() {
         <div className="mt-4 grid grid-cols-2 gap-6">
           {/* Left Column - Instructions */}
           <div>
-            <p className="mt-2">
-              Follow these steps to import your account activities from a CSV file:
+            <p className="mt-2 text-sm text-muted-foreground">
+              Import your account activities from CSV files with automatic data normalization and flexible column mapping.
             </p>
-            <ol className="mt-2 list-inside list-decimal space-y-1">
+            <ol className="mt-3 list-inside list-decimal space-y-1 text-sm">
+              <li>Ensure your CSV has headers with the required fields</li>
+              <li>Select account and upload your CSV file</li>
               <li>
-                Make sure the first line of your CSV file is the header and contains all the
-                required fields
+                Map CSV columns to required fields:
+                <span className="ml-2 text-xs text-muted-foreground">
+                  date, symbol, quantity, activityType, unitPrice, currency, fee, amount
+                </span>
               </li>
-              <li>
-                Select an account and drop your CSV file in the upload area or click to select it
-              </li>
-              <li>
-                Map your CSV columns to the required fields:
-                <ul className="ml-6 mt-1 list-inside list-disc space-y-1">
-                  <li>
-                    <strong>date</strong> - Transaction date
-                  </li>
-                  <li>
-                    <strong>symbol</strong> - Stock/Asset symbol
-                  </li>
-                  <li>
-                    <strong>quantity</strong> - Number of units
-                  </li>
-                  <li>
-                    <strong>activityType</strong> - Type of transaction
-                  </li>
-                  <li>
-                    <strong>unitPrice</strong> - Price per unit
-                  </li>
-                  <li>
-                    <strong>currency</strong> - Transaction currency
-                  </li>
-                  <li>
-                    <strong>fee</strong> - Transaction fee (optional)
-                  </li>
-                  <li>
-                    <strong>amount</strong> - Total amount (mandatory for cash activities)
-                  </li>
-                </ul>
-              </li>
-              <li>Map your activity types to our supported types</li>
-              <li>Map your stock symbols if needed</li>
-              <li>Preview and verify the mapped data</li>
-              <li>Click Import to confirm and save your activities</li>
+              <li>Map activity types and symbols if needed</li>
+              <li>Preview, verify, and import your activities</li>
             </ol>
-            <div className="mt-4 space-y-2">
-              <p>
-                <strong>Note:</strong> Don't worry if your CSV columns have different names or your
-                activity types don't match exactly - you'll be able to map them during the import
-                process. The mapping is saved for future imports for this account.
-              </p>
-              <p>
-                <strong>About the amount field:</strong> For cash activities (DIVIDEND, DEPOSIT,
-                WITHDRAWAL, TAX, FEE, INTEREST, TRANSFER_IN, TRANSFER_OUT), the amount is mandatory,
-                and quantity/unitPrice are ignored.
-              </p>
+            <div className="mt-4 space-y-3">
+              <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
+                <p className="text-sm">
+                  <strong className="text-blue-700 dark:text-blue-300">💡 Tip:</strong> Column names and activity types don't need to match exactly - you can map them during import. Mappings are saved for future imports.
+                </p>
+              </div>
+              
+              <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
+                <p className="text-sm">
+                  <strong className="text-green-700 dark:text-green-300">💰 Amount field:</strong> For cash activities (DIVIDEND, DEPOSIT, WITHDRAWAL, TAX, FEE, INTEREST, TRANSFER_IN, TRANSFER_OUT), amount is preferred when provided, otherwise calculated from quantity × unitPrice.
+                </p>
+              </div>
+
+              <div className="border-purple-500 bg-purple-50 p-3 dark:bg-purple-900/50">
+                <p className="text-sm">
+                  <strong className="text-purple-700 dark:text-purple-300">⚡ Auto-formatting:</strong> Negative values, currency symbols ($, £, €), commas, and parentheses are automatically handled. No manual data cleanup needed.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -89,10 +66,10 @@ export function ImportHelpPopover() {
                     <li>INTEREST</li>
                     <li>DEPOSIT</li>
                     <li>WITHDRAWAL</li>
-                    <li>ADD_HOLDING (Increases quantity, fee may apply)</li>
-                    <li>REMOVE_HOLDING (Decreases quantity, fee may apply)</li>
-                    <li>TRANSFER_IN (Increases cash or asset quantity)</li>
-                    <li>TRANSFER_OUT (Decreases cash or asset quantity)</li>
+                    <li>ADD_HOLDING (Increases quantity, cash not impacted)</li>
+                    <li>REMOVE_HOLDING (Decreases quantity, cash not impacted)</li>
+                    <li>TRANSFER_IN (Increases cash)</li>
+                    <li>TRANSFER_OUT (Decreases cash)</li>
                     <li>FEE</li>
                     <li>TAX</li>
                     <li>SPLIT (Adjusts quantity & unit cost, no cash impact)</li>
@@ -102,20 +79,23 @@ export function ImportHelpPopover() {
 
               <div>
                 <p className="font-semibold">Example CSV format:</p>
-                <pre className="mt-2 overflow-x-auto bg-muted p-4 text-xs">
+                <pre className="mt-2 overflow-x-auto bg-muted p-3 text-xs leading-relaxed">
+                  <span className="text-muted-foreground"># Standard format:</span>
+                  <br />
                   date,symbol,quantity,activityType,unitPrice,currency,fee,amount
                   <br />
-                  2024-01-01T15:02:36.329Z,MSFT,1,DIVIDEND,57.5,USD,0,57.5
+                  2024-01-01,MSFT,1,DIVIDEND,57.5,USD,0,57.5
                   <br />
-                  2023-12-15T15:02:36.329Z,MSFT,30,BUY,368.60,USD,0
+                  2023-12-15,MSFT,30,BUY,368.60,USD,0
                   <br />
-                  2023-08-11T14:55:30.863Z,$CASH-USD,1,DEPOSIT,1,USD,0,600.03
+                  2023-08-11,$CASH-USD,1,DEPOSIT,1,USD,0,600.03
                   <br />
-                  2023-06-05T09:15:22.456Z,$CASH-USD,1,INTEREST,180.5,USD,0,180.5
                   <br />
-                  2023-05-18T13:45:30.789Z,GOOGL,5,SELL,2500.75,USD,10
+                  <span className="text-muted-foreground"># With currency symbols (auto-parsed):</span>
                   <br />
-                  2023-04-02T11:20:15.321Z,$CASH-USD,1,WITHDRAWAL,1,USD,0,1000
+                  06/27/2025,AAPL,25,SELL,$48.95,USD,,$1223.63
+                  <br />
+                  06/20/2025,AAPL,8,BUY,$86.56,USD,,-$692.48
                 </pre>
               </div>
               <p className="mt-2 text-xs">
