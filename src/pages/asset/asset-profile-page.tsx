@@ -16,6 +16,7 @@ import { Icons } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { getHolding } from '@/commands/portfolio';
 import { QueryKeys } from '@/lib/query-keys';
+import { TickerAvatar } from '@/components/ticker-avatar';
 import { useQuoteHistory } from '@/hooks/use-quote-history';
 import AssetDetailCard from './asset-detail-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -323,6 +324,10 @@ export const AssetProfilePage = () => {
             <div data-tauri-drag-region="true" className="draggable flex items-center space-x-4 flex-1">
               {(profile?.symbol || holding?.instrument?.symbol) && (
                 <>
+                  <TickerAvatar 
+                    symbol={profile?.symbol || holding?.instrument?.symbol || symbol} 
+                    className="w-8 h-8"
+                  />
                   <h1 className="font-heading text-xl font-bold tracking-tight text-muted-foreground">
                     {profile?.symbol || holding?.instrument?.symbol}
                   </h1>
