@@ -86,11 +86,9 @@ hello-world-addon/
   "description": "My first Wealthfolio addon",
   "author": "Your Name",
   "permissions": {
-     {
       "category": "ui",
       "functions": ["sidebar.addItem", "router.add"],
       "purpose": "Add navigation items and routes"
-    }
   }
 }
 ```
@@ -102,6 +100,7 @@ hello-world-addon/
 ```typescript
 import React from 'react';
 import type { AddonContext } from '@wealthfolio/addon-sdk';
+import { Icons } from '@wealthfolio/ui';
 
 function HelloWorldPage() {
   return (
