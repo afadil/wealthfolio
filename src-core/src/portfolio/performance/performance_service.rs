@@ -65,6 +65,26 @@ impl PerformanceService {
         }
     }
 
+    /// Helper method to determine which value to use for performance calculations.
+    /// For portfolio total account: always use portfolio_equity
+    /// For individual accounts: use portfolio_equity if loans exist, otherwise use total_value
+    fn get_performance_value(valuation: &DailyAccountValuation) -> Decimal {
+        // For portfolio total, always use portfolio_equity to exclude borrowed funds
+        if valuation.account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+            return valuation.portfolio_equity;
+        }
+
+        // For individual accounts, use portfolio_equity if it's meaningfully different from total_value
+        // This indicates loans exist. Otherwise use total_value for backward compatibility.
+        if !valuation.outstanding_loans.is_zero() {
+            valuation.portfolio_equity
+        } else {
+            // If no outstanding loans, portfolio_equity should equal total_value
+            // Use total_value for backward compatibility with accounts that don't have loan data
+            valuation.total_value
+        }
+    }
+
     fn get_account_boundary_data(
         &self,
         account_id: &str,
@@ -164,33 +184,36 @@ impl PerformanceService {
             let prev_point = &window[0];
             let curr_point = &window[1];
 
-            if prev_point.total_value.is_sign_negative()
-                || curr_point.total_value.is_sign_negative()
+            let prev_performance_value = Self::get_performance_value(&prev_point);
+            let curr_performance_value = Self::get_performance_value(&curr_point);
+
+            if prev_performance_value.is_sign_negative()
+                || curr_performance_value.is_sign_negative()
             {
                 return Err(errors::Error::Validation(ValidationError::InvalidInput(
-                    "Negative total value found in valuation history records".to_string(),
+                    "Negative performance value found in valuation history records".to_string(),
                 )));
             }
 
-            let prev_total_value = prev_point.total_value;
+            let prev_performance_value = Self::get_performance_value(&prev_point);
             let prev_net_contribution = prev_point.net_contribution;
-            let current_total_value = curr_point.total_value;
+            let current_performance_value = Self::get_performance_value(&curr_point);
             let current_net_contribution = curr_point.net_contribution;
 
             let cash_flow = current_net_contribution - prev_net_contribution;
 
             let twr_period_return = {
-                let denominator = prev_total_value + cash_flow;
+                let denominator = prev_performance_value + cash_flow;
                 if denominator.is_zero() {
                     Decimal::ZERO
                 } else {
-                    (current_total_value / denominator) - one
+                    (current_performance_value / denominator) - one
                 }
             };
 
             let mwr_period_return = {
-                let numerator = current_total_value - prev_total_value - cash_flow;
-                let denominator = prev_total_value + (cash_flow / two);
+                let numerator = current_performance_value - prev_performance_value - cash_flow;
+                let denominator = prev_performance_value + (cash_flow / two);
                 if denominator.is_zero() {
                     Decimal::ZERO
                 } else {
@@ -220,9 +243,9 @@ impl PerformanceService {
         let end_net_contribution = end_point.net_contribution;
         let net_cash_flow = end_net_contribution - start_net_contribution;
 
-        let start_value_for_gain_calc = start_point.total_value;
+        let start_value_for_gain_calc = Self::get_performance_value(&start_point);
     
-        let gain_loss_amount = end_point.total_value - start_value_for_gain_calc - net_cash_flow;
+        let gain_loss_amount = Self::get_performance_value(&end_point) - start_value_for_gain_calc - net_cash_flow;
 
         let simple_total_return = if start_value_for_gain_calc.is_zero() {
             // If the effective start value for gain calculation is zero, simple return is tricky.
@@ -286,8 +309,8 @@ impl PerformanceService {
             String,
         ) = self.get_account_boundary_data(account_id, start_date_opt, end_date_opt)?;
 
-        let start_value = start_point.total_value;
-        let end_value = end_point.total_value;
+        let start_value = Self::get_performance_value(&start_point);
+        let end_value = Self::get_performance_value(&end_point);
         let start_net_contribution = start_point.net_contribution;
         let end_net_contribution = end_point.net_contribution;
         let net_cash_flow = end_net_contribution - start_net_contribution;
@@ -584,8 +607,9 @@ impl PerformanceService {
         previous: Option<&DailyAccountValuation>,
         total_portfolio_value_base: Option<Decimal>,
     ) -> SimplePerformanceMetrics {
-        // Use self for the current valuation data
-        let total_gain_loss_amount = current.total_value - current.net_contribution;
+        // Use portfolio equity for performance calculations
+        let current_performance_value = Self::get_performance_value(current);
+        let total_gain_loss_amount = current_performance_value - current.net_contribution;
         let denominator_cumulative_return = current.net_contribution;
         let cumulative_return_percent = if !denominator_cumulative_return.is_zero() {
             Some((total_gain_loss_amount / denominator_cumulative_return).round_dp(4))
@@ -598,8 +622,8 @@ impl PerformanceService {
         };
 
         let (day_gain_loss_amount, day_return_percent_mod_dietz) = if let Some(prev) = previous {
-            let start_value = prev.total_value;
-            let end_value = current.total_value;
+            let start_value = Self::get_performance_value(prev);
+            let end_value = current_performance_value;
             let cash_flow_day = current.net_contribution - prev.net_contribution;
             let gain_day = end_value - start_value - cash_flow_day;
 
@@ -619,7 +643,7 @@ impl PerformanceService {
             (None, None)
         };
 
-        let total_value_base = current.total_value * current.fx_rate_to_base;
+        let total_value_base = current_performance_value * current.fx_rate_to_base;
         let portfolio_weight = if let Some(total_portfolio) = total_portfolio_value_base {
             if !total_portfolio.is_zero() {
                 Some(

@@ -392,6 +392,8 @@ export interface AccountValuation {
   totalValue: number;
   costBasis: number;
   netContribution: number;
+  outstandingLoans: number;
+  portfolioEquity: number;
   calculatedAt: string;
 }
 
