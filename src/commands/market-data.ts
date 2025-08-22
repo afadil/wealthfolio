@@ -35,6 +35,18 @@ export const searchTicker = async (query: string): Promise<QuoteSummary[]> => {
   }
 };
 
+export const importQuotes = async (quotes: Quote[]): Promise<void> => {
+  try {
+    const runEnv = await getRunEnv();
+    if (runEnv === RUN_ENV.DESKTOP) {
+      return invokeTauri('import_quotes', { quotes });
+    }
+  } catch (error) {
+    logger.error('Error importing quotes');
+    throw error;
+  }
+};
+
 export const syncHistoryQuotes = async (): Promise<void> => {
   try {
     switch (getRunEnv()) {

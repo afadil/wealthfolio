@@ -1,9 +1,20 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use tauri::AppHandle;
-use tauri::Manager;
-use wealthfolio_core::db;
+use std::sync::Arc;
+
+use chrono::{DateTime, NaiveDate, Utc};
+use log::debug;
+use rust_decimal::Decimal;
+use serde::Deserialize;
+use tauri::{AppHandle, Manager, State};
+use wealthfolio_core::{
+    db,
+    errors::Result,
+    market_data::{MarketDataServiceTrait, Quote},
+};
+
+use crate::context::ServiceContext;
 
 #[tauri::command]
 pub async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {
@@ -32,4 +43,19 @@ pub async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>),
         .to_string();
 
     Ok((filename, buffer))
+}
+
+#[tauri::command]
+pub async fn import_quotes(
+    quotes: Vec<Quote>,
+    state: State<'_, Arc<ServiceContext>>,
+    _handle: AppHandle,
+) -> Result<(), String> {
+    debug!("Importing {} quotes", quotes.len());
+
+    state
+        .market_data_service()
+        .add_quotes(quotes)
+        .await
+        .map_err(|e| e.to_string())
 }

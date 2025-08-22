@@ -91,6 +91,10 @@ impl MarketDataServiceTrait for MarketDataService {
         self.repository.save_quote(quote).await
     }
 
+    async fn add_quotes(&self, quotes: Vec<Quote>) -> Result<()> {
+        self.repository.save_quotes(&quotes).await
+    }
+
     async fn update_quote(&self, quote: Quote) -> Result<Quote> {
         self.repository.save_quote(&quote).await
     }

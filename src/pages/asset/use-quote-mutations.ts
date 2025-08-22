@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateQuote, deleteQuote } from '@/commands/market-data';
+import { updateQuote, deleteQuote, importQuotes } from '@/commands/market-data';
 import { toast } from '@/components/ui/use-toast';
 import { QueryKeys } from '@/lib/query-keys';
 import { logger } from '@/adapters';
@@ -53,8 +53,22 @@ export const useQuoteMutations = (symbol: string) => {
     },
   });
 
+  const importQuotesMutation = useMutation({
+    mutationFn: async (quotes: Quote[]) => {
+      await importQuotes(quotes);
+    },
+    onSuccess: () => {
+      handleSuccess('Quotes imported successfully.');
+    },
+    onError: (error) => {
+      logger.error(`Error importing quotes: ${error}`);
+      handleError('importing quotes');
+    },
+  });
+
   return {
     saveQuoteMutation,
     deleteQuoteMutation,
+    importQuotesMutation,
   };
 };

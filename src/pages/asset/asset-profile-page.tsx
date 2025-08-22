@@ -107,7 +107,8 @@ export const AssetProfilePage = () => {
   }, [quoteHistory]);
 
   const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();
-  const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
+  const { saveQuoteMutation, deleteQuoteMutation, importQuotesMutation } =
+    useQuoteMutations(symbol);
 
   useEffect(() => {
     setFormData({
@@ -256,6 +257,11 @@ export const AssetProfilePage = () => {
           data={quoteHistory ?? []}
           // Default to non-manual source, disable changing it as there's no profile context
           isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
+          symbol={symbol}
+          currency={profile?.currency || 'USD'}
+          onImportQuotes={(quotes: Quote[]) => {
+            importQuotesMutation.mutate(quotes);
+          }}
           onSaveQuote={(quote: Quote) => {
             let updatedQuote = { ...quote };
             // Generate id if missing
@@ -591,6 +597,11 @@ export const AssetProfilePage = () => {
             <QuoteHistoryTable
               data={quoteHistory ?? []}
               isManualDataSource={formData.dataSource === DataSource.MANUAL}
+              symbol={symbol}
+              currency={profile?.currency || 'USD'}
+              onImportQuotes={(quotes: Quote[]) => {
+                importQuotesMutation.mutate(quotes);
+              }}
               onSaveQuote={(quote: Quote) => {
                 let updatedQuote = { ...quote };
                 // Generate id if missing

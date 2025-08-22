@@ -19,6 +19,7 @@ pub trait MarketDataServiceTrait: Send + Sync {
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
     async fn add_quote(&self, quote: &Quote) -> Result<Quote>;
+    async fn add_quotes(&self, quotes: Vec<Quote>) -> Result<()>;
     async fn update_quote(&self, quote: Quote) -> Result<Quote>;
     async fn delete_quote(&self, quote_id: &str) -> Result<()>;
     async fn get_historical_quotes_from_provider(

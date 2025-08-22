@@ -36,12 +36,17 @@ import {
   ColumnDef,
 } from '@tanstack/react-table';
 
+import { QuoteImportDialog } from './quote-import-dialog';
+
 interface QuoteHistoryTableProps {
   data: Quote[];
   isManualDataSource?: boolean;
   onSaveQuote?: (quote: Quote) => void;
   onDeleteQuote?: (quoteId: string) => void;
   onChangeDataSource?: (isManual: boolean) => void;
+  onImportQuotes?: (quotes: Quote[]) => void;
+  symbol: string;
+  currency: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -62,6 +67,9 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   onSaveQuote,
   onDeleteQuote,
   onChangeDataSource,
+  onImportQuotes,
+  symbol,
+  currency,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedValues, setEditedValues] = useState<Partial<Quote>>({});
@@ -390,15 +398,22 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
               </PopoverContent>
             </Popover>
             {isManualDataSource && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setIsAddingQuote(true)}
-                disabled={isAddingQuote}
-              >
-                <Icons.PlusCircle className="mr-2 h-4 w-4" />
-                Add Quote
-              </Button>
+              <div className="flex items-center space-x-2">
+                <QuoteImportDialog
+                  onImport={onImportQuotes!}
+                  symbol={symbol}
+                  currency={currency}
+                />
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setIsAddingQuote(true)}
+                  disabled={isAddingQuote}
+                >
+                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  Add Quote
+                </Button>
+              </div>
             )}
           </div>
         </div>
