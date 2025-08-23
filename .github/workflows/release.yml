@@ -13,52 +13,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            arch: x86_64
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            arch: aarch64
-            target: aarch64-apple-darwin
-          - os: windows-latest
-            arch: x86_64
-            target: x86_64-pc-windows-msvc
-          - os: windows-latest
-            arch: aarch64
-            target: aarch64-pc-windows-msvc
-          - os: ubuntu-latest
-            arch: x86_64
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-latest
-            arch: aarch64
-            target: aarch64-unknown-linux-gnu
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'windows-latest'
+            args: '--target x86_64-pc-windows-msvc'
+          - platform: 'windows-latest'
+            args: '--target aarch64-pc-windows-msvc'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'ubuntu-22.04-arm'
+            args: ''
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies (ubuntu only)
-        if: matrix.os == 'ubuntu-latest'
+        if: contains(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf pkg-config libssl-dev libsoup2.4-dev javascriptcoregtk-4.0 webkit2gtk-4.0
-          # Install ARM64 cross-compilation dependencies if building for ARM64
-          if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-            # Add ARM64 architecture and configure sources for cross-compilation
-            sudo dpkg --add-architecture arm64
-            # Update sources.list to include ARM64 packages from ports.ubuntu.com
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs) main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/arm64.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64.list
-            sudo apt-get update || true  # Continue even if some repos fail
-            # Install ARM64 SSL and other dependencies
-            sudo apt-get install -y libssl-dev:arm64 pkg-config:arm64 libwebkit2gtk-4.1-dev:arm64 libappindicator3-dev:arm64 librsvg2-dev:arm64 libsoup2.4-dev:arm64 || true
-          fi
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf pkg-config libssl-dev libsoup2.4-dev javascriptcoregtk-4.0 webkit2gtk-4.0
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: pnpm Setup
         run: npm install -g pnpm
@@ -79,7 +62,8 @@ jobs:
         run: pnpm install # Change this to npm, yarn or pnpm.
 
       - name: Install Rust targets
-        run: rustup target add ${{ matrix.target }}
+        if: matrix.platform == 'windows-latest'
+        run: rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
@@ -94,21 +78,10 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          # ARM64 Linux cross-compilation
-          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
-          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
-          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          PKG_CONFIG_ALLOW_CROSS: 1
-          PKG_CONFIG_PATH_aarch64_unknown_linux_gnu: /usr/lib/aarch64-linux-gnu/pkgconfig
-          # OpenSSL configuration for ARM64 cross-compilation
-          OPENSSL_DIR: ${{ matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest' && '/usr' || '' }}
-          OPENSSL_LIB_DIR: ${{ matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest' && '/usr/lib/aarch64-linux-gnu' || '' }}
-          OPENSSL_INCLUDE_DIR: ${{ matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest' && '/usr/include' || '' }}
         with:
           tagName: ${{ github.ref_name }} # This only works if the workflow triggers on new tags.
           releaseName: 'Wealthfolio v__VERSION__' # tauri-action replaces \_\_VERSION\_\_ with the app version.
           releaseBody: 'See the assets to download and install this version.'
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: ${{ matrix.args }}
