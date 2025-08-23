@@ -188,21 +188,49 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
     }
 
     // Remove existing WAL and SHM files to ensure clean state
+    // On Windows, these files might be locked by active connections, so we need to handle this gracefully
     let wal_path = format!("{}-wal", db_path);
     let shm_path = format!("{}-shm", db_path);
     
     if Path::new(&wal_path).exists() {
-        fs::remove_file(&wal_path).map_err(|e| {
+        // Try to remove WAL file, but don't fail if it's locked (Windows issue)
+        if let Err(e) = fs::remove_file(&wal_path) {
             error!("Failed to remove existing WAL file: {}", e);
-            Error::Database(DatabaseError::BackupFailed(e.to_string()))
-        })?;
+            #[cfg(target_os = "windows")]
+            {
+                // On Windows, if the file is locked, we'll proceed anyway
+                // The restore will still work, but might leave the old WAL file
+                if e.kind() == std::io::ErrorKind::PermissionDenied {
+                    info!("WAL file is locked by another process, proceeding with restore anyway");
+                } else {
+                    return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
+            }
+        }
     }
     
     if Path::new(&shm_path).exists() {
-        fs::remove_file(&shm_path).map_err(|e| {
+        // Try to remove SHM file, but don't fail if it's locked (Windows issue)
+        if let Err(e) = fs::remove_file(&shm_path) {
             error!("Failed to remove existing SHM file: {}", e);
-            Error::Database(DatabaseError::BackupFailed(e.to_string()))
-        })?;
+            #[cfg(target_os = "windows")]
+            {
+                // On Windows, if the file is locked, we'll proceed anyway
+                if e.kind() == std::io::ErrorKind::PermissionDenied {
+                    info!("SHM file is locked by another process, proceeding with restore anyway");
+                } else {
+                    return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
+            }
+        }
     }
 
     // Copy the main backup file
@@ -231,6 +259,27 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
 
     info!("Database restored successfully");
     Ok(())
+}
+
+/// Function to safely restore database with connection management
+/// This is the main function that should be called from Tauri commands
+pub fn restore_database_safe(app_data_dir: &str, backup_file_path: &str) -> Result<()> {
+    // First, execute a checkpoint to force WAL content to be written to the main database file
+    // This helps reduce the chance of WAL files being locked on Windows
+    let db_path = get_db_path(app_data_dir);
+    
+    // Try to checkpoint the database before restore
+    if let Ok(mut conn) = SqliteConnection::establish(&db_path) {
+        use diesel::RunQueryDsl;
+        let _ = diesel::sql_query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&mut conn);
+        info!("Executed WAL checkpoint before restore");
+    }
+    
+    // Small delay to allow any pending operations to complete
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    
+    // Now perform the actual restore
+    restore_database(app_data_dir, backup_file_path)
 }
 
 /// Gets a connection from the pool
