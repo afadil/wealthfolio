@@ -180,9 +180,13 @@ impl ActivityServiceTrait for ActivityService {
 
         for mut activity in activities {
             activity.id = Some(Uuid::new_v4().to_string());
-            activity.account_name = Some(account.name.clone());
-            activity.account_id = Some(account_id.clone());
-
+            if activity.account_name.is_none() {
+                activity.account_name = Some(account.name.clone());
+            }
+            if activity.account_id.is_none() {
+                activity.account_id = Some(account_id.clone());
+            }
+        
             // Determine context currency for potential asset creation during check
             let asset_context_currency = if !activity.currency.is_empty() {
                 activity.currency.clone()
