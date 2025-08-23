@@ -53,7 +53,8 @@ jobs:
             echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64.list
             echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64.list
             sudo apt-get update || true  # Continue even if some repos fail
-            sudo apt-get install -y libwebkit2gtk-4.1-dev:arm64 libappindicator3-dev:arm64 librsvg2-dev:arm64 libsoup2.4-dev:arm64 || true
+            # Install ARM64 SSL and other dependencies
+            sudo apt-get install -y libssl-dev:arm64 pkg-config:arm64 libwebkit2gtk-4.1-dev:arm64 libappindicator3-dev:arm64 librsvg2-dev:arm64 libsoup2.4-dev:arm64 || true
           fi
 
       - name: Rust setup
@@ -100,6 +101,10 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           PKG_CONFIG_ALLOW_CROSS: 1
           PKG_CONFIG_PATH_aarch64_unknown_linux_gnu: /usr/lib/aarch64-linux-gnu/pkgconfig
+          # OpenSSL configuration for ARM64 cross-compilation
+          OPENSSL_DIR: ${{ matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest' && '/usr' || '' }}
+          OPENSSL_LIB_DIR: ${{ matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest' && '/usr/lib/aarch64-linux-gnu' || '' }}
+          OPENSSL_INCLUDE_DIR: ${{ matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest' && '/usr/include' || '' }}
         with:
           tagName: ${{ github.ref_name }} # This only works if the workflow triggers on new tags.
           releaseName: 'Wealthfolio v__VERSION__' # tauri-action replaces \_\_VERSION\_\_ with the app version.
