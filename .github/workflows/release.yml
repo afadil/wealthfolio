@@ -21,9 +21,9 @@ jobs:
             args: '--target x86_64-pc-windows-msvc'
           - platform: 'windows-latest'
             args: '--target aarch64-pc-windows-msvc'
-          - platform: 'ubuntu-22.04'
+          - platform: 'ubuntu-24.04'
             args: ''
-          - platform: 'ubuntu-22.04-arm'
+          - platform: 'ubuntu-24.04-arm'
             args: ''
 
     runs-on: ${{ matrix.platform }}
