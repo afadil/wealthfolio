@@ -99,7 +99,14 @@ pub async fn restore_database(
         .expect("failed to convert path to string")
         .to_string();
 
-    db::restore_database(&app_data_dir, &backup_file_path).map_err(|e| e.to_string())?;
+    // Try to get the ServiceContext to perform graceful operations before restore
+    if app_handle.try_state::<std::sync::Arc<crate::context::ServiceContext>>().is_some() {
+        // Give some time for any pending operations to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    }
+
+    // Use the safe restore function that handles Windows file locking issues
+    db::restore_database_safe(&app_data_dir, &backup_file_path).map_err(|e| e.to_string())?;
     
     // After successful restore, emit event and show restart dialog
     app_handle
