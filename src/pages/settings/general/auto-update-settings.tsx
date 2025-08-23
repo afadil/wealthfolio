@@ -1,6 +1,6 @@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { updateSettings } from '@/commands/settings';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
