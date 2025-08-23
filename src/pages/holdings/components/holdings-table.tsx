@@ -283,12 +283,9 @@ const getColumns = (
       const holdingA = rowA.original;
       const holdingB = rowB.original;
 
-      const valueA = showConvertedValues
-        ? (holdingA.marketValue.base ?? 0)
-        : safeDivide(holdingA.marketValue.base ?? 0, holdingA.fxRate ?? 1);
-      const valueB = showConvertedValues
-        ? (holdingB.marketValue.base ?? 0)
-        : safeDivide(holdingB.marketValue.base ?? 0, holdingB.fxRate ?? 1);
+      // Always sort by base currency value for consistency
+      const valueA = holdingA.marketValue.base ?? 0;
+      const valueB = holdingB.marketValue.base ?? 0;
 
       return valueA - valueB;
     },
@@ -325,12 +322,9 @@ const getColumns = (
       const holdingA = rowA.original;
       const holdingB = rowB.original;
 
-      const valueA = showConvertedValues
-        ? (holdingA.totalGain?.base ?? 0)
-        : safeDivide(holdingA.totalGain?.base ?? 0, holdingA.fxRate ?? 1);
-      const valueB = showConvertedValues
-        ? (holdingB.totalGain?.base ?? 0)
-        : safeDivide(holdingB.totalGain?.base ?? 0, holdingB.fxRate ?? 1);
+      // Always sort by base currency value for consistency
+      const valueA = holdingA.totalGain?.base ?? 0;
+      const valueB = holdingB.totalGain?.base ?? 0;
 
       return valueA - valueB;
     },
