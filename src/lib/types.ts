@@ -324,6 +324,7 @@ export interface Settings {
   font: string;
   baseCurrency: string;
   onboardingCompleted: boolean;
+  autoUpdateCheckEnabled: boolean;
 }
 
 export interface SettingsContextType {

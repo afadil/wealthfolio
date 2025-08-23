@@ -29,6 +29,20 @@ export const updateSettings = async (settingsUpdate: Settings): Promise<Settings
   }
 };
 
+export const isAutoUpdateCheckEnabled = async (): Promise<boolean> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('is_auto_update_check_enabled');
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error checking auto-update setting.');
+    return true; // Default to enabled
+  }
+};
+
 export const backupDatabase = async (): Promise<{ filename: string; data: Uint8Array }> => {
   try {
     switch (getRunEnv()) {

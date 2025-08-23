@@ -16,6 +16,8 @@ pub trait SettingsServiceTrait: Send + Sync {
     fn get_base_currency(&self) -> Result<Option<String>>;
 
     async fn update_base_currency(&self, new_base_currency: &str) -> Result<()>;
+
+    fn is_auto_update_check_enabled(&self) -> Result<bool>;
 }
 
 pub struct SettingsService {
@@ -78,6 +80,14 @@ impl SettingsServiceTrait for SettingsService {
         self.settings_repository
             .update_setting("base_currency", new_base_currency).await?;
         Ok(())
+    }
+
+    fn is_auto_update_check_enabled(&self) -> Result<bool> {
+        match self.settings_repository.get_setting("auto_update_check_enabled") {
+            Ok(value) => Ok(value.parse().unwrap_or(true)),
+            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => Ok(true),
+            Err(e) => Err(e),
+        }
     }
 }
 
