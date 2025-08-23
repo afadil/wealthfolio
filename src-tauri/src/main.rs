@@ -105,6 +105,7 @@ pub fn main() {
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
             commands::settings::get_settings,
+            commands::settings::is_auto_update_check_enabled,
             commands::settings::update_settings,
             commands::settings::get_latest_exchange_rates,
             commands::settings::update_exchange_rate,
@@ -173,7 +174,7 @@ pub fn main() {
 /// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
 fn spawn_background_tasks(
     handle: AppHandle,
-    _context: Arc<ServiceContext>, // Context no longer needed directly here
+    context: Arc<ServiceContext>,
     instance_id: Arc<String>,
 ) {
     // Set up menu (can happen after state is managed)
@@ -196,10 +197,18 @@ fn spawn_background_tasks(
         });
     });
 
-    // Check for updates on startup
+    // Check for updates on startup (if enabled)
     let update_handle = handle.clone();
     let instance_id_update = instance_id.clone();
-    spawn(async move { check_for_update(update_handle, &*instance_id_update, false).await });
+    let update_context = context.clone();
+    spawn(async move { 
+        // Check if auto-update is enabled before performing the check
+        if let Ok(is_enabled) = update_context.settings_service().is_auto_update_check_enabled() {
+            if is_enabled {
+                check_for_update(update_handle, &*instance_id_update, false).await;
+            }
+        }
+    });
 
     // Trigger initial portfolio update on startup
     // Defaults: no specific accounts (all), sync market data (all symbols), incremental calculation
