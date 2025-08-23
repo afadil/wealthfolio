@@ -1,7 +1,7 @@
 {
   "id": "investment-fees-tracker-addon",
   "name": "Investment Fees Tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Track and analyze investment fees across your portfolio with detailed analytics and insights",
   "author": "Wealthfolio",
   "main": "dist/addon.js",

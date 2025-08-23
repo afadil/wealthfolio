@@ -69,6 +69,13 @@ function safeParseNumber(value: string | number | null | undefined): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+  
+function calculateFeeAmount(activity:ActivityDetails):number {
+  const amount = safeParseNumber(activity.amount)
+  const fee = safeParseNumber(activity.fee)
+  return (activity.activityType === 'FEE' && amount !== 0) ? amount : fee
+}
+
 interface FeeCalculationParams {
   activities: ActivityDetails[];
   period: 'TOTAL' | 'YTD' | 'LAST_YEAR';
@@ -100,7 +107,7 @@ export function calculateFeeSummary({ activities, period, baseCurrency, convertT
   // Extract all fees from activities
   const feeActivities = filteredActivities.filter((activity) => {
     const fee = safeParseNumber(activity.fee);
-    const amount = safeParseNumber(activity.amount);
+    // const amount = safeParseNumber(activity.amount);
     
     // Include dedicated FEE activities and transaction fees from other activities
     return activity.activityType === 'FEE' || fee > 0;
@@ -117,11 +124,7 @@ export function calculateFeeSummary({ activities, period, baseCurrency, convertT
   feeActivities.forEach((activity) => {
     const activityDate = new Date(activity.date);
     const monthKey = `${activityDate.getFullYear()}-${String(activityDate.getMonth() + 1).padStart(2, '0')}`;
-    
-    // For FEE activities, use the full amount; for others, use the fee field
-    let feeAmount = activity.activityType === 'FEE' 
-      ? safeParseNumber(activity.amount)
-      : safeParseNumber(activity.fee);
+    let feeAmount = calculateFeeAmount(activity)
     
     // Convert to base currency if conversion function is provided
     if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
@@ -200,6 +203,7 @@ interface FeeAnalyticsParams {
   convertToBaseCurrency?: (amount: number, fromCurrency: string, date?: string) => number;
 }
 
+
 export function calculateFeeAnalytics({ activities, portfolioValue, period, baseCurrency = 'USD', convertToBaseCurrency }: FeeAnalyticsParams): FeeAnalytics {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -229,9 +233,7 @@ export function calculateFeeAnalytics({ activities, portfolioValue, period, base
 
   // Calculate basic metrics
   const totalFees = feeActivities.reduce((sum, activity) => {
-    let feeAmount = activity.activityType === 'FEE' 
-      ? safeParseNumber(activity.amount)
-      : safeParseNumber(activity.fee);
+    let feeAmount = calculateFeeAmount(activity)
     
     // Convert to base currency if conversion function is provided
     if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
@@ -250,9 +252,7 @@ export function calculateFeeAnalytics({ activities, portfolioValue, period, base
   let highestFee = 0;
 
   feeActivities.forEach(activity => {
-    let fee = activity.activityType === 'FEE' 
-      ? safeParseNumber(activity.amount)
-      : safeParseNumber(activity.fee);
+    let fee = calculateFeeAmount(activity)
     
     // Convert to base currency if conversion function is provided
     if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
@@ -275,9 +275,7 @@ export function calculateFeeAnalytics({ activities, portfolioValue, period, base
   const feeCategories = new Map<string, { amount: number; transactions: number }>();
   
   feeActivities.forEach(activity => {
-    let fee = activity.activityType === 'FEE' 
-      ? safeParseNumber(activity.amount)
-      : safeParseNumber(activity.fee);
+    let fee = calculateFeeAmount(activity)
     
     // Convert to base currency if conversion function is provided
     if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
@@ -287,6 +285,9 @@ export function calculateFeeAnalytics({ activities, portfolioValue, period, base
     let category: string;
     
     switch (activity.activityType) {
+      case 'FEE':
+        category = 'Management Fees';
+        break;
       case 'BUY':
       case 'SELL':
         category = 'Trading Fees';
@@ -377,9 +378,7 @@ export function calculateFeeAnalytics({ activities, portfolioValue, period, base
   }>();
 
   feeActivities.forEach(activity => {
-    let fee = activity.activityType === 'FEE' 
-      ? safeParseNumber(activity.amount)
-      : safeParseNumber(activity.fee);
+    let fee = calculateFeeAmount(activity)
     
     // Convert to base currency if conversion function is provided
     if (convertToBaseCurrency && activity.currency && activity.currency !== baseCurrency) {
