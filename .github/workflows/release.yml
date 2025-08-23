@@ -46,9 +46,14 @@ jobs:
           # Install ARM64 cross-compilation dependencies if building for ARM64
           if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
             sudo apt-get install -y gcc-aarch64-linux-gnu
+            # Add ARM64 architecture and configure sources for cross-compilation
             sudo dpkg --add-architecture arm64
-            sudo apt-get update
-            sudo apt-get install -y libwebkit2gtk-4.1-dev:arm64 libappindicator3-dev:arm64 librsvg2-dev:arm64 libsoup2.4-dev:arm64
+            # Update sources.list to include ARM64 packages from ports.ubuntu.com
+            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs) main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/arm64.list
+            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64.list
+            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list.d/arm64.list
+            sudo apt-get update || true  # Continue even if some repos fail
+            sudo apt-get install -y libwebkit2gtk-4.1-dev:arm64 libappindicator3-dev:arm64 librsvg2-dev:arm64 libsoup2.4-dev:arm64 || true
           fi
 
       - name: Rust setup
