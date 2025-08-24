@@ -90,12 +90,24 @@ export function useExportData() {
 
         if (exportedData) {
           return openFileSaveDialog(exportedData, fileName);
+        } else {
+          // No data to export, return a specific indicator
+          return { success: false, reason: 'no-data' };
         }
       }
     },
     onSuccess: (result) => {
       if (result === null) {
         // User cancelled the operation, don't show any message
+        return;
+      }
+
+      if (result && typeof result === 'object' && 'reason' in result && result.reason === 'no-data') {
+        toast({
+          title: 'No data to export.',
+          description: 'There is no data available for the selected export type.',
+          variant: 'info',
+        });
         return;
       }
       
