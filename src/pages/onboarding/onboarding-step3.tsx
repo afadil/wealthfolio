@@ -18,17 +18,17 @@ const checklistItems = [
 
 export const OnboardingStep3: React.FC<OnboardingStep3Props> = ({ onNext, onBack }) => {
   return (
-    <div className="space-y-2 px-12 md:px-16 lg:px-20">
-      <h1 className="mb-2 text-3xl font-bold">Next Steps</h1>
-      <p className="pb-6 text-base text-muted-foreground">
+    <div className="space-y-2 px-4 md:px-12 lg:px-16 xl:px-20">
+      <h1 className="mb-2 text-2xl font-bold md:text-3xl">Next Steps</h1>
+      <p className="pb-4 text-sm text-muted-foreground md:pb-6 md:text-base">
         Here are a few things you can do to get the most out of Wealthfolio:
       </p>
       <Card>
-        <CardContent className="p-8">
+        <CardContent className="p-4 md:p-8">
           <div className="space-y-4">
             {checklistItems.map((item, index) => (
               <div key={item.id} className="flex items-center space-x-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-background">
+                <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background">
                   <span className="text-xs text-background">{index + 1}</span>
                 </div>
                 <label
@@ -42,12 +42,12 @@ export const OnboardingStep3: React.FC<OnboardingStep3Props> = ({ onNext, onBack
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack} type="button">
+      <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:justify-between">
+        <Button variant="outline" onClick={onBack} type="button" className="w-full sm:w-auto">
           <Icons.ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <Button onClick={onNext} type="button">
+        <Button onClick={onNext} type="button" className="w-full sm:w-auto">
           Finish Setup
           <Icons.Check className="ml-2 h-4 w-4" />
         </Button>

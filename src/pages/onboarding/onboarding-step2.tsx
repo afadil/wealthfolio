@@ -104,15 +104,15 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
   }
 
   return (
-    <div className="space-y-2 px-12 md:px-16 lg:px-20">
-      <h1 className="mb-2 text-3xl font-bold">Settings</h1>
-      <p className="pb-6 text-base text-muted-foreground">
+    <div className="space-y-2 px-4 md:px-12 lg:px-16 xl:px-20">
+      <h1 className="mb-2 text-2xl font-bold md:text-3xl">Settings</h1>
+      <p className="pb-4 text-sm text-muted-foreground md:pb-6 md:text-base">
         Just a couple preferences to get you started
       </p>
       <Card>
-        <CardContent className="p-8">
+        <CardContent className="p-4 md:p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 md:space-y-12">
               {/* --- Base Currency Field --- */}
               <FormField
                 control={form.control}
@@ -120,7 +120,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Setup your base currency</FormLabel>
-                    <FormControl className="mt-2 w-[300px]">
+                    <FormControl className="mt-2 w-full max-w-[300px]">
                       <CurrencyInput
                         value={field.value}
                         onChange={field.onChange}
@@ -144,7 +144,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                       onValueChange={field.onChange}
                       value={field.value}
                       aria-labelledby="theme-selection-label"
-                      className="grid max-w-md grid-cols-2 gap-8 pt-2"
+                      className="grid max-w-md grid-cols-1 gap-4 pt-2 sm:grid-cols-2 sm:gap-8"
                     >
                       {[
                         { value: 'light', labelText: 'Light' },
@@ -269,8 +269,8 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
           </Form>
         </CardContent>
       </Card>
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack} type="button">
+      <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:justify-between">
+        <Button variant="outline" onClick={onBack} type="button" className="w-full sm:w-auto">
           <Icons.ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -279,11 +279,13 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
             initial={{ opacity: 0 }}
             animate={{ opacity: form.formState.isValid ? 1 : 0 }}
             transition={{ duration: 0.3 }}
+            className="w-full sm:w-auto"
           >
             <Button
               onClick={form.handleSubmit(onSubmit)}
               type="button"
               disabled={!form.formState.isValid}
+              className="w-full sm:w-auto"
             >
               Next: Final Steps
               <Icons.ArrowRight className="ml-2 h-4 w-4" />

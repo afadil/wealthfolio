@@ -93,7 +93,7 @@ const AppLayout = () => {
         <ErrorBoundary>
           <main className="flex w-full flex-1 flex-col">
             <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto pb-16 md:pb-0">
               <Outlet />
             </div>
           </main>

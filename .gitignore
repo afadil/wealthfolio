@@ -63,6 +63,9 @@ target/
 **/*.rs.bk
 Cargo.lock
 
+# Tauri generated files
+src-tauri/gen/
+
 # OS generated files
 .DS_Store
 .DS_Store?
