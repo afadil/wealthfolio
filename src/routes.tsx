@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Suspense, useState, useEffect } from 'react';
 
 import { AppLayout } from '@/pages/layouts/app-layout';
+import { OnboardingLayout } from '@/pages/layouts/onboarding-layout';
 import SettingsLayout from '@/pages/settings/layout';
 
 import DashboardPage from '@/pages/dashboard/dashboard-page';
@@ -52,6 +53,12 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Onboarding with dedicated layout */}
+        <Route path="/onboarding" element={<OnboardingLayout />}>
+          <Route index element={<OnboardingPage />} />
+        </Route>
+        
+        {/* Main app with sidebar */}
         <Route path="/" element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -60,7 +67,6 @@ export function AppRoutes() {
           <Route path="holdings/:symbol" element={<AssetProfilePage />} />
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />;
-          <Route path="onboarding" element={<OnboardingPage />} />;
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           {/* Dynamic addon routes */}

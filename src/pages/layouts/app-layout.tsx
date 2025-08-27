@@ -92,8 +92,9 @@ const AppLayout = () => {
       <div className="relative flex w-full overflow-hidden">
         <div data-tauri-drag-region="true" className="draggable absolute left-0 right-0 top-0 h-6 w-full"></div>
         <ErrorBoundary>
-          <main className="flex w-full flex-1 flex-col min-h-0">
-            <div className="flex-1 overflow-auto">
+          <main className="flex w-full flex-1 flex-col">
+            <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
+            <div className="flex-1 overflow-auto pb-16 md:pb-0">
               <Outlet />
             </div>
           </main>

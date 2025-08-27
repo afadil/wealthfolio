@@ -16,21 +16,23 @@ interface OnboardingStep1Props {
 
 export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
   return (
-    <div className="space-y-4 px-12 md:px-16 lg:px-20">
-      <h1 className="mb-2 text-3xl font-bold">Welcome to Wealthfolio!</h1>
-      <p className="text-base text-muted-foreground">
-        Let's start by understanding how you can track your assets.
-      </p>
-      <div className="grid grid-cols-1 gap-16 pt-4 md:grid-cols-2">
+    <div className="space-y-4 px-4 md:px-12 lg:px-16 xl:px-20">
+      <div className="text-center">
+        <h1 className="mb-2 text-2xl font-bold md:text-3xl">Welcome to Wealthfolio!</h1>
+        <p className="text-sm text-muted-foreground md:text-base">
+          Let's start by understanding how you can track your assets.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-8 pt-4 md:grid-cols-2 md:gap-16">
         <Card className="flex h-full flex-col border-none shadow-none">
-          <CardHeader className="min-h-[110px]">
-            <CardTitle className="flex items-center pb-2 text-lg">Simple Tracking</CardTitle>
-            <CardDescription className="font-normal">
+          <CardHeader className="min-h-[90px] md:min-h-[110px]">
+            <CardTitle className="flex items-center pb-2 text-base md:text-lg">Simple Tracking</CardTitle>
+            <CardDescription className="text-sm font-normal">
               <strong>Focus:</strong> Quickly get started by adding your current holdings.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
-            <ul className="ml-1 space-y-6 text-sm [&>li]:mt-1">
+            <ul className="ml-1 space-y-4 text-xs md:space-y-6 md:text-sm [&>li]:mt-1">
               <li className="flex items-start">
                 <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
                 <span>
@@ -65,15 +67,15 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
           </CardFooter>
         </Card>
         <Card className="bordeer-muted flex h-full flex-col border-none shadow-none">
-          <CardHeader className="min-h-[110px]">
-            <CardTitle className="flex items-center pb-2 text-lg">Full Tracking</CardTitle>
-            <CardDescription className="font-normal">
+          <CardHeader className="min-h-[90px] md:min-h-[110px]">
+            <CardTitle className="flex items-center pb-2 text-base md:text-lg">Full Tracking</CardTitle>
+            <CardDescription className="text-sm font-normal">
               <strong>Focus:</strong> Track every deposit, trade, and dividend for exact
               performance.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
-            <ul className="ml-1 space-y-6 text-sm [&>li]:mt-1">
+            <ul className="ml-1 space-y-4 text-xs md:space-y-6 md:text-sm [&>li]:mt-1">
               <li className="flex items-start">
                 <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
                 <span>
@@ -111,7 +113,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
         </Card>
       </div>
 
-      <p className="pt-4 text-xs text-muted-foreground">
+      <p className="pt-4 text-xs text-muted-foreground md:text-sm">
         You can mix both transaction types whenever you need them. For more details,{' '}
         <a
           href="https://wealthfolio.app/docs/concepts/activity-types"
@@ -124,7 +126,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
       </p>
 
       <div className="flex justify-end pt-4">
-        <Button onClick={onNext}>
+        <Button onClick={onNext} className="w-full md:w-auto">
           Got it, Next: Set Preferences
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>

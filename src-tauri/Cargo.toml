@@ -36,6 +36,10 @@ tokio = { version = "1", features = ["time"] }
 custom-protocol = ["tauri/custom-protocol"]
 appstore = [] # Feature flag for App Store builds
 
+[lib]
+name = "wealthfolio_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2.7.0"
 tauri-plugin-window-state = "2"
