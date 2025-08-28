@@ -38,7 +38,10 @@ pub async fn initialize_context(
     let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
     let goal_repo = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
     let market_data_repo = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
-    let limit_repository = Arc::new(ContributionLimitRepository::new(pool.clone(), writer.clone()));
+    let limit_repository = Arc::new(ContributionLimitRepository::new(
+        pool.clone(),
+        writer.clone(),
+    ));
     let fx_repository = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
@@ -126,6 +129,7 @@ pub async fn initialize_context(
     Ok(ServiceContext {
         base_currency,
         instance_id,
+        db_pool: pool,
         settings_service,
         account_service,
         activity_service,

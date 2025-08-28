@@ -12,6 +12,9 @@ diesel::table! {
         created_at -> Timestamp,
         updated_at -> Timestamp,
         platform_id -> Nullable<Text>,
+        updated_version -> Integer,
+        origin -> Text,
+        deleted -> Integer,
     }
 }
 
@@ -31,6 +34,9 @@ diesel::table! {
         comment -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+        updated_version -> Integer,
+        origin -> Text,
+        deleted -> Integer,
     }
 }
 
@@ -74,6 +80,9 @@ diesel::table! {
         data_source -> Text,
         sectors -> Nullable<Text>,
         url -> Nullable<Text>,
+        updated_version -> Integer,
+        origin -> Text,
+        deleted -> Integer,
     }
 }
 
@@ -182,6 +191,36 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    sync_device (id) {
+        id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    sync_peer_checkpoint (peer_id) {
+        peer_id -> Nullable<Text>,
+        last_version_sent -> Integer,
+        last_version_received -> Integer,
+    }
+}
+
+diesel::table! {
+    sync_sequence (name) {
+        name -> Nullable<Text>,
+        value -> Integer,
+    }
+}
+
+diesel::table! {
+    sync_trusted_peers (peer_id) {
+        peer_id -> Nullable<Text>,
+        fingerprint -> Text,
+        name -> Nullable<Text>,
+        added_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
 diesel::joinable!(goals_allocation -> goals (goal_id));
@@ -201,4 +240,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     market_data_providers,
     platforms,
     quotes,
+    sync_device,
+    sync_peer_checkpoint,
+    sync_sequence,
+    sync_trusted_peers,
 );
