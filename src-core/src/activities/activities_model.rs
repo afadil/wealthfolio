@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
-use crate::accounts::Account;
 use crate::Result;
 use crate::activities::activities_errors::ActivityError;
 
@@ -69,14 +68,16 @@ pub struct Activity {
 /// Database model for activities
 #[derive(
     Queryable,
-    Selectable,
     Identifiable,
-    Associations,
     Insertable,
     AsChangeset,
+    Selectable,
     PartialEq,
+    Serialize,
+    Deserialize,
     Debug,
     Clone,
+    Default
 )]
 #[diesel(table_name = crate::schema::activities)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -97,6 +98,9 @@ pub struct ActivityDB {
     pub comment: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub updated_version: i32,
+    pub origin: String,
+    pub deleted: i32,
 }
 
 /// Input model for creating a new activity
@@ -608,6 +612,9 @@ impl From<NewActivity> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
+            updated_version: 0, // Default for new records
+            origin: "manual".to_string(), // Default for new records
+            deleted: 0, // Default for new records
         }
     }
 }
@@ -671,6 +678,9 @@ impl From<ActivityUpdate> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
             updated_at: now.to_rfc3339(),
+            updated_version: 0, // Default for new records
+            origin: "manual".to_string(), // Default for new records
+            deleted: 0, // Default for new records
         }
     }
 }#[derive(Debug, Serialize, QueryableByName)]

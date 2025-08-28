@@ -6,6 +6,9 @@ pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
     pub instance_id: Arc<String>,
 
+    // DB pool for sync engine
+    pub db_pool: Arc<wealthfolio_core::db::DbPool>,
+
     // Services
     pub settings_service: Arc<dyn settings::SettingsServiceTrait>,
     pub activity_service: Arc<dyn activities::ActivityServiceTrait>,
@@ -25,6 +28,10 @@ pub struct ServiceContext {
 impl ServiceContext {
     pub fn get_base_currency(&self) -> String {
         self.base_currency.read().unwrap().clone()
+    }
+
+    pub fn db_pool(&self) -> Arc<wealthfolio_core::db::DbPool> {
+        Arc::clone(&self.db_pool)
     }
 
     pub fn update_base_currency(&self, new_currency: String) {

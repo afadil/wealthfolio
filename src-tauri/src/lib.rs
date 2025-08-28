@@ -13,13 +13,15 @@ mod menu;
 mod updater;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-use log::error;
+use log::{error};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use updater::check_for_update;
 
 use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
+use uuid;
+use chrono;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::async_runtime::spawn;
@@ -29,6 +31,25 @@ use tauri::Manager;
 
 use context::ServiceContext;
 use events::{emit_portfolio_trigger_update, PortfolioRequestPayload};
+use wealthfolio_core::sync::engine::{SyncEngine, Peer};
+use tokio::sync::mpsc;
+use std::net::SocketAddr;
+
+#[derive(Clone)]
+pub struct SyncHandles {
+    pub engine: SyncEngine,
+}
+
+fn get_or_create_device_id() -> Result<String, Box<dyn std::error::Error>> {
+    use keyring::Entry;
+    let entry = Entry::new("wealthfolio", "device_id")?;
+    if let Ok(existing) = entry.get_password() {
+        return Ok(existing);
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    entry.set_password(&id)?;
+    Ok(id)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -176,6 +197,7 @@ pub fn run() {
             commands::addon::install_addon_from_staging,
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
+            // commands::sync::sync_now,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
@@ -232,4 +254,70 @@ fn spawn_background_tasks(
         .refetch_all_market_data(false)
         .build();
     emit_portfolio_trigger_update(&handle, initial_payload);
+
+    // P2P sync (desktop and mobile)
+    let handle_clone = handle.clone();
+    let ctx_for_sync = _context.clone();
+    tauri::async_runtime::spawn(async move {
+        // 1) Get DB pool
+        let pool = ctx_for_sync.db_pool(); // new accessor
+
+        // 2) Stable device_id (keychain)
+        let device_id_str = get_or_create_device_id().unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+        let device_id = uuid::Uuid::parse_str(&device_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4());
+
+        // Mirror device_id into DB for triggers
+        {
+            use diesel::prelude::*;
+            let mut conn = pool.get().expect("db conn");
+            let _ = diesel::sql_query("PRAGMA foreign_keys = ON;").execute(&mut conn);
+            let _ = diesel::sql_query("INSERT OR REPLACE INTO sync_device(id) VALUES (?1)")
+                .bind::<diesel::sql_types::Text, _>(&device_id_str)
+                .execute(&mut conn);
+        }
+
+        // 3) Create and start the engine
+        let engine = SyncEngine::with_device_id(pool.clone(), device_id)
+            .expect("sync engine");
+        if let Err(e) = engine.start().await {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            log::error!("sync start error: {e}");
+            return;
+        }
+
+        // 4) Start browsing and feed discoveries to engine
+        let (tx, mut rx) = mpsc::unbounded_channel::<(String, SocketAddr)>();
+        let discovery = wealthfolio_core::sync::discovery::browse(move |id, addr| {
+            let _ = tx.send((id, addr));
+        }).ok();
+
+        // Add peers as they show up
+        let engine_for_peers = engine.clone();
+        let my_device_id = device_id;
+        tauri::async_runtime::spawn(async move {
+            use chrono::Utc;
+            while let Some((peer_id_str, addr)) = rx.recv().await {
+                // Skip self
+                if uuid::Uuid::parse_str(&peer_id_str).ok() == Some(my_device_id) {
+                    continue;
+                }
+                let peer = Peer {
+                    id: uuid::Uuid::parse_str(&peer_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4()),
+                    name: format!("Peer@{}", addr.ip()),
+                    address: addr.to_string(),
+                    fingerprint: String::new(),
+                    paired: true, // or gate behind UI trust
+                    last_seen: Utc::now(),
+                    last_sync: None,
+                };
+                if let Err(e) = engine_for_peers.add_peer(peer).await {
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    log::warn!("Failed to add discovered peer: {e}");
+                }
+            }
+        });
+
+        // 5) Keep engine reachable from commands if needed
+        handle_clone.manage(SyncHandles { engine });
+    });
 }

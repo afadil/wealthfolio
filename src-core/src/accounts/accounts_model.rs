@@ -111,6 +111,9 @@ pub struct AccountDB {
     #[diesel(skip_insertion)]
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    pub updated_version: i32,
+    pub origin: String,
+    pub deleted: i32,
 }
 
 // Conversion implementations
@@ -145,6 +148,9 @@ impl From<NewAccount> for AccountDB {
             created_at: now,
             updated_at: now,
             platform_id: domain.platform_id,
+            updated_version: 0,
+            origin: String::new(),
+            deleted: 0,
         }
     }
 }
@@ -162,6 +168,9 @@ impl From<AccountUpdate> for AccountDB {
             created_at: NaiveDateTime::default(), // This will be filled from existing record
             updated_at: chrono::Utc::now().naive_utc(),
             platform_id: domain.platform_id,
+            updated_version: 0,
+            origin: String::new(),
+            deleted: 0,
         }
     }
 } 

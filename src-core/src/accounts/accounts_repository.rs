@@ -57,6 +57,7 @@ impl AccountRepositoryTrait for AccountRepository {
                 let mut account_db: AccountDB = account_update.into();
 
                 let existing = accounts 
+                    .select(AccountDB::as_select())
                     .find(&account_db.id)
                     .first::<AccountDB>(conn)?;
 
@@ -77,7 +78,7 @@ impl AccountRepositoryTrait for AccountRepository {
     fn get_by_id(&self, account_id: &str) -> Result<Account> {
         let mut conn = get_connection(&self.pool)?;
 
-        let account = accounts.find(account_id).first::<AccountDB>(&mut conn)?;
+        let account = accounts.select(AccountDB::as_select()).find(account_id).first::<AccountDB>(&mut conn)?;
 
         Ok(account.into())
     }
@@ -101,6 +102,7 @@ impl AccountRepositoryTrait for AccountRepository {
         }
 
         let results = query
+            .select(AccountDB::as_select())
             .order((is_active.desc(), name.asc()))
             .load::<AccountDB>(&mut conn)?;
 

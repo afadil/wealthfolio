@@ -226,6 +226,9 @@ pub struct AssetDB {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
+    pub updated_version: i32,
+    pub origin: String,
+    pub deleted: i32,
 }
 
 // Conversion implementations
@@ -278,6 +281,9 @@ impl From<NewAsset> for AssetDB {
             data_source: domain.data_source,
             sectors: domain.sectors,
             url: domain.url,
+            updated_version: 1,
+            origin: "manual".to_string(),
+            deleted: 0,
         }
     }
 }

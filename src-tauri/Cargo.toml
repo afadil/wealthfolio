@@ -13,7 +13,7 @@ edition = "2021"
 tauri-build = { version = "2.1.1", features = [] }
 
 [dependencies]
-wealthfolio_core = { path = "../src-core" }
+wealthfolio_core = { path = "../src-core", features = ["p2p", "tls", "crypto-id"] } 
 tauri = { version = "2.4.1", features = [] }
 diesel = { version = "2.2", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15.7"
@@ -28,7 +28,9 @@ log = "0.4"
 futures = "0.3"
 zip = "2.2.0"
 reqwest = { version = "0.12", features = ["json"] }
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "sync"] }
+keyring = "2.0"
+uuid = { version = "1.0", features = ["v4"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
