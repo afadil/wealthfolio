@@ -58,7 +58,7 @@ export function CalendarView({ trades, selectedMonth, onMonthChange, currency }:
       
       const realizedPL = monthTrades.reduce((sum, trade) => sum + trade.realizedPL, 0)
       const totalCostBasis = monthTrades.reduce((sum, trade) => sum + trade.entryPrice * trade.quantity, 0)
-      const returnPercent = totalCostBasis > 0 ? (realizedPL / totalCostBasis) * 100 : 0
+      const returnPercent = totalCostBasis > 0 ? (realizedPL / totalCostBasis) : 0
 
       return {
         date: month,
@@ -77,7 +77,7 @@ export function CalendarView({ trades, selectedMonth, onMonthChange, currency }:
     
     const yearlyPL = yearTrades.reduce((sum, trade) => sum + trade.realizedPL, 0)
     const yearlyTotalCostBasis = yearTrades.reduce((sum, trade) => sum + trade.entryPrice * trade.quantity, 0)
-    const yearlyReturnPercent = yearlyTotalCostBasis > 0 ? (yearlyPL / yearlyTotalCostBasis) * 100 : 0
+    const yearlyReturnPercent = yearlyTotalCostBasis > 0 ? (yearlyPL / yearlyTotalCostBasis) : 0
 
     return {
       year: selectedYear,

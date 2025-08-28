@@ -39,6 +39,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
     fn get_activity(&self, activity_id: &str) -> Result<Activity> {
         let mut conn = get_connection(&self.pool)?;
         let activity_db = activities::table
+            .select(ActivityDB::as_select())
             .find(activity_id)
             .first::<ActivityDB>(&mut conn)
             .map_err(|e| Error::from(ActivityError::NotFound(e.to_string())))?;
@@ -220,6 +221,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<Activity> {
                 let mut activity_to_update = activity_db_owned;
                 let existing = activities::table
+                    .select(ActivityDB::as_select())
                     .find(&activity_id_owned)
                     .first::<ActivityDB>(conn)?;
 
@@ -238,6 +240,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Activity> {
                 let activity = activities::table
+                    .select(ActivityDB::as_select())
                     .find(&activity_id)
                     .first::<ActivityDB>(conn)?;
                 diesel::delete(activities::table.filter(activities::id.eq(&activity_id)))
