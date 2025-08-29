@@ -30,7 +30,7 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
     if (difference === 0) return;
 
     const activityType = difference > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
-    const amount = Math.abs(difference);
+    const amount = parseFloat(Math.abs(difference).toFixed(2));
 
     const newActivity: ActivityCreate = {
       accountId: account.accountId,

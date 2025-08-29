@@ -5,7 +5,7 @@ import { ContributionLimit, DepositsCalculation } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PrivacyAmount } from '@/components/privacy-amount';
+import { PrivacyAmount } from '@wealthfolio/ui';
 
 interface AccountContributionLimitProps {
   accountId: string;

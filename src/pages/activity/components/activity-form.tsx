@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { logger } from '@/adapters';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -50,6 +50,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   TRANSFER_IN: 'cash',
   TRANSFER_OUT: 'cash',
   FEE: 'other',
+  TAX: 'other',
   ADD_HOLDING: 'holdings',
   REMOVE_HOLDING: 'holdings',
 };
@@ -110,7 +111,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (
-        ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
+        ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TAX', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
           submitData.activityType,
         )
       ) {
@@ -134,8 +135,8 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
   }
 
   const defaultTab = activity
-    ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'holdings'
-    : 'holdings';
+    ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'trade'
+    : 'trade';
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -183,13 +184,13 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
         <Tabs defaultValue={defaultTab} className="w-full">
           {!activity?.id && (
             <TabsList className="mb-6 grid grid-cols-5">
-              <TabsTrigger value="holdings" className="flex items-center gap-2">
-                <Icons.Wallet className="h-4 w-4" />
-                Holdings
-              </TabsTrigger>
               <TabsTrigger value="trade" className="flex items-center gap-2">
                 <Icons.ArrowRightLeft className="h-4 w-4" />
                 Trade
+              </TabsTrigger>
+              <TabsTrigger value="holdings" className="flex items-center gap-2">
+                <Icons.Wallet className="h-4 w-4" />
+                Holdings
               </TabsTrigger>
               <TabsTrigger value="cash" className="flex items-center gap-2">
                 <Icons.DollarSign className="h-4 w-4" />
@@ -209,11 +210,11 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid gap-4">
-                <TabsContent value="holdings">
-                  <HoldingsForm accounts={accounts} />
-                </TabsContent>
                 <TabsContent value="trade">
                   <TradeForm accounts={accounts} />
+                </TabsContent>
+                <TabsContent value="holdings">
+                  <HoldingsForm accounts={accounts} />
                 </TabsContent>
                 <TabsContent value="cash">
                   <CashForm accounts={accounts} />

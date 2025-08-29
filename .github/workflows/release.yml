@@ -12,30 +12,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        settings:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest' # for Intel based macs.
+        include:
+          - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
-            args: ''
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
           - platform: 'windows-latest'
+            args: '--target x86_64-pc-windows-msvc'
+          - platform: 'windows-latest'
+            args: '--target aarch64-pc-windows-msvc'
+          - platform: 'ubuntu-24.04'
+            args: ''
+          - platform: 'ubuntu-24.04-arm'
             args: ''
 
-    runs-on: ${{ matrix.settings.platform }}
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies (ubuntu only)
-        if: matrix.settings.platform == 'ubuntu-22.04'
+        if: contains(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup2.4-dev javascriptcoregtk-4.0 webkit2gtk-4.0
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf pkg-config libssl-dev libsoup2.4-dev javascriptcoregtk-4.0 webkit2gtk-4.0
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: pnpm Setup
         run: npm install -g pnpm
@@ -55,8 +61,9 @@ jobs:
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: pnpm install # Change this to npm, yarn or pnpm.
 
-      - name: Install Rust x86_64 Support (macOS)
-        run: rustup target add x86_64-apple-darwin
+      - name: Install Rust targets
+        if: matrix.platform == 'windows-latest'
+        run: rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
@@ -77,4 +84,4 @@ jobs:
           releaseBody: 'See the assets to download and install this version.'
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.settings.args }}
+          args: ${{ matrix.args }}

@@ -15,7 +15,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import {
   Table,
   TableBody,
@@ -29,7 +29,8 @@ import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-col
 import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
 import { DataTableFacetedFilterProps } from '@/components/ui/data-table/data-table-faceted-filter';
 import type { Account, ActivityImport } from '@/lib/types';
-import { formatAmount, formatDateTime, toPascalCase, cn } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
+import { formatDateTime, toPascalCase, cn } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table/data-table-pagination';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';

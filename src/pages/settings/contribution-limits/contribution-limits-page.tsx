@@ -1,12 +1,8 @@
 import { useState } from 'react';
-import { EmptyPlaceholder } from '@/components/empty-placeholder';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
 import type { ContributionLimit } from '@/lib/types';
 import { SettingsHeader } from '../header';
 import { getContributionLimit } from '@/commands/contribution-limits';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { QueryKeys } from '@/lib/query-keys';
 import { useContributionLimitMutations } from './use-contribution-limit-mutations';

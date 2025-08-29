@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { formatDate } from '@/lib/utils';
-import { ChartConfig, ChartContainer } from './ui/chart';
+import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { AmountDisplay } from './amount-display';
-import { Skeleton } from './ui/skeleton';
+import { AmountDisplay } from '@wealthfolio/ui';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
   isBalanceHidden: boolean;

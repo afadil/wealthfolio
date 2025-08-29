@@ -18,6 +18,57 @@ export function validateTickerSymbol(symbol: string): boolean {
   return tickerRegex.test(symbol.trim());
 }
 
+/**
+ * Normalizes and cleans numeric values from CSV data
+ * Handles currency symbols, commas, spaces, and other formatting characters
+ * 
+ * @param value The raw string value from CSV
+ * @returns Cleaned numeric value or undefined if invalid
+ */
+export function normalizeNumericValue(value: string | undefined): number | undefined {
+  if (!value || typeof value !== 'string') {
+    return undefined;
+  }
+
+  // Trim whitespace
+  let cleaned = value.trim();
+  
+  // Handle empty strings
+  if (cleaned === '' || cleaned === '-' || cleaned === 'N/A' || cleaned.toLowerCase() === 'null') {
+    return undefined;
+  }
+
+  // Remove common currency symbols and formatting
+  cleaned = cleaned
+    .replace(/[$£€¥₹₦₹₽¢]/g, '') // Remove currency symbols
+    .replace(/[,\s]/g, '') // Remove commas and spaces
+    .replace(/[()]/g, '') // Remove parentheses (sometimes used for negative values)
+    .trim();
+
+  // Handle empty string after cleaning
+  if (cleaned === '') {
+    return undefined;
+  }
+
+  // Parse as float
+  const parsed = parseFloat(cleaned);
+  
+  // Return undefined if parsing resulted in NaN
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+/**
+ * Safely parses a numeric value and returns its absolute value
+ * Uses normalization to handle currency symbols and formatting
+ * 
+ * @param value The raw string value from CSV
+ * @returns Absolute numeric value or undefined if invalid
+ */
+export function parseAndAbsoluteValue(value: string | undefined): number | undefined {
+  const normalized = normalizeNumericValue(value);
+  return normalized !== undefined ? Math.abs(normalized) : undefined;
+}
+
 // Use the importValidationResult from types.ts
 export type ValidationResult = ImportValidationResult;
 
@@ -28,17 +79,19 @@ export type ValidationResult = ImportValidationResult;
  * 2. If only unit price is > 0, use unit price
  * 3. Otherwise, use quantity
  *
+ * Note: Uses absolute values to handle brokers that use negative values to indicate transaction direction
+ *
  * @param quantity The quantity value, if available
  * @param unitPrice The unit price value, if available
- * @returns The calculated amount
+ * @returns The calculated amount (always positive)
  */
 export function calculateCashActivityAmount(
   quantity: number | undefined,
   unitPrice: number | undefined,
 ): number {
-  // Type guard - convert undefined to 0 for safe calculations
-  const safeQuantity = quantity !== undefined && !isNaN(quantity) ? quantity : 0;
-  const safeUnitPrice = unitPrice !== undefined && !isNaN(unitPrice) ? unitPrice : 0;
+  // Type guard - convert undefined to 0 for safe calculations and ensure absolute values
+  const safeQuantity = quantity !== undefined && !isNaN(quantity) ? Math.abs(quantity) : 0;
+  const safeUnitPrice = unitPrice !== undefined && !isNaN(unitPrice) ? Math.abs(unitPrice) : 0;
 
   // Both quantity and unit price are positive
   if (safeQuantity > 0 && safeUnitPrice > 0) {
@@ -74,18 +127,18 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.BUY]: {
     calculateSymbol: (activity) => activity.symbol, // Keep original symbol
     calculateAmount: (activity) => {
-      // Calculate amount = quantity * price if both positive
+      // Calculate amount = quantity * price if both positive, using absolute values
       if (
         activity.quantity &&
-        activity.quantity > 0 &&
+        Math.abs(activity.quantity) > 0 &&
         activity.unitPrice &&
-        activity.unitPrice > 0
+        Math.abs(activity.unitPrice) > 0
       ) {
-        return activity.quantity * activity.unitPrice;
+        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
       }
-      return activity.amount; // Fallback to provided amount
+      return activity.amount ? Math.abs(activity.amount) : activity.amount; // Fallback to provided amount with absolute value
     },
-    calculateFee: (activity) => activity.fee ?? 0, // Use provided fee or 0
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0, // Use absolute value of provided fee or 0
   },
   [ActivityType.SELL]: {
     // Similar logic to BUY
@@ -93,51 +146,115 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     calculateAmount: (activity) => {
       if (
         activity.quantity &&
-        activity.quantity > 0 &&
+        Math.abs(activity.quantity) > 0 &&
         activity.unitPrice &&
-        activity.unitPrice > 0
+        Math.abs(activity.unitPrice) > 0
       ) {
-        return activity.quantity * activity.unitPrice;
+        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
       }
-      return activity.amount;
+      return activity.amount ? Math.abs(activity.amount) : activity.amount;
     },
-    calculateFee: (activity) => activity.fee ?? 0,
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.DEPOSIT]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
-      activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
-    calculateFee: (activity) => activity.fee ?? 0,
+      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.WITHDRAWAL]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
-      activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
-    calculateFee: (activity) => activity.fee ?? 0,
+      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.INTEREST]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
-      activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
-    calculateFee: (activity) => activity.fee ?? 0,
+      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.DIVIDEND]: {
     calculateSymbol: (activity) => activity.symbol, // Usually associated with a stock
     calculateAmount: (activity) =>
-      activity.amount ?? calculateCashActivityAmount(activity.quantity, activity.unitPrice),
-    calculateFee: (activity) => activity.fee ?? 0,
+      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.FEE]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => activity.amount ?? 0, // Fees usually don't have a separate 'amount'
-    calculateFee: (activity) =>
-      activity.fee ??
-      activity.amount ??
-      calculateCashActivityAmount(activity.quantity, activity.unitPrice),
+    calculateAmount: (activity) => {
+      // For FEE activities, amount should typically be 0 unless explicitly provided
+      return activity.amount ? Math.abs(activity.amount) : 0;
+    },
+    calculateFee: (activity) => {
+      // For FEE activities, prefer fee field, then amount as fallback, then calculated amount
+      if (activity.fee && Math.abs(activity.fee) > 0) {
+        return Math.abs(activity.fee);
+      }
+      if (activity.amount && Math.abs(activity.amount) > 0) {
+        return Math.abs(activity.amount);
+      }
+      return Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice));
+    },
+  },
+  [ActivityType.TAX]: {
+    calculateSymbol: (activity, accountCurrency) =>
+      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  },
+  [ActivityType.TRANSFER_IN]: {
+    calculateSymbol: (activity, accountCurrency) =>
+      activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  },
+  [ActivityType.TRANSFER_OUT]: {
+    calculateSymbol: (activity, accountCurrency) =>
+      activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  },
+  [ActivityType.ADD_HOLDING]: {
+    calculateSymbol: (activity) => activity.symbol,
+    calculateAmount: (activity) => {
+      // Calculate amount = quantity * price if both positive, using absolute values
+      if (
+        activity.quantity &&
+        Math.abs(activity.quantity) > 0 &&
+        activity.unitPrice &&
+        Math.abs(activity.unitPrice) > 0
+      ) {
+        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
+      }
+      return activity.amount ? Math.abs(activity.amount) : activity.amount;
+    },
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  },
+  [ActivityType.REMOVE_HOLDING]: {
+    calculateSymbol: (activity) => activity.symbol,
+    calculateAmount: (activity) => {
+      // Calculate amount = quantity * price if both positive, using absolute values
+      if (
+        activity.quantity &&
+        Math.abs(activity.quantity) > 0 &&
+        activity.unitPrice &&
+        Math.abs(activity.unitPrice) > 0
+      ) {
+        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
+      }
+      return activity.amount ? Math.abs(activity.amount) : activity.amount;
+    },
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  },
+  [ActivityType.SPLIT]: {
+    calculateSymbol: (activity) => activity.symbol,
+    calculateAmount: () => 0, // SPLIT has no cash impact according to docs
+    calculateFee: () => 0, // SPLIT typically has no fee
   },
   // ... Add configurations for other ActivityTypes (TAX, TRANSFER_IN, TRANSFER_OUT, etc.)
 };
@@ -145,8 +262,8 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
 // Default logic if type-specific logic isn't found
 const defaultLogic: ActivityLogicConfig = {
   calculateSymbol: (activity) => activity.symbol,
-  calculateAmount: (activity) => activity.amount,
-  calculateFee: (activity) => activity.fee ?? 0,
+  calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : activity.amount,
+  calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
 };
 
 // Helper function to transform a CSV row into an Activity object
@@ -178,18 +295,12 @@ function transformRowToActivity(
   activity.symbol = getMappedValue(ImportFormat.SYMBOL);
   const csvActivityType = getMappedValue(ImportFormat.ACTIVITY_TYPE);
   // Store raw parsed values temporarily before applying logic
-  const rawQuantity = getMappedValue(ImportFormat.QUANTITY)
-    ? parseFloat(getMappedValue(ImportFormat.QUANTITY)!)
-    : undefined;
-  const rawUnitPrice = getMappedValue(ImportFormat.UNIT_PRICE)
-    ? parseFloat(getMappedValue(ImportFormat.UNIT_PRICE)!)
-    : undefined;
-  const rawFee = getMappedValue(ImportFormat.FEE)
-    ? parseFloat(getMappedValue(ImportFormat.FEE)!)
-    : undefined;
-  const rawAmount = getMappedValue(ImportFormat.AMOUNT)
-    ? parseFloat(getMappedValue(ImportFormat.AMOUNT)!)
-    : undefined;
+  // Use absolute values for numeric fields to handle brokers that use negative values for direction
+  // Also normalize values to handle currency symbols and formatting
+  const rawQuantity = parseAndAbsoluteValue(getMappedValue(ImportFormat.QUANTITY));
+  const rawUnitPrice = parseAndAbsoluteValue(getMappedValue(ImportFormat.UNIT_PRICE));
+  const rawFee = parseAndAbsoluteValue(getMappedValue(ImportFormat.FEE));
+  const rawAmount = parseAndAbsoluteValue(getMappedValue(ImportFormat.AMOUNT));
 
   // Assign potentially NaN values first, they will be cleaned up later
   activity.quantity = rawQuantity;

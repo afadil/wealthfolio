@@ -2,9 +2,9 @@ import React from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { formatPercent } from '@/lib/utils';
-import { AmountDisplay } from '@/components/amount-display';
-import { QuantityDisplay } from '@/components/quantity-display';
+import { formatPercent } from '@wealthfolio/ui';
+import { AmountDisplay } from '@wealthfolio/ui';
+import { QuantityDisplay } from '@wealthfolio/ui';
 import { useBalancePrivacy } from '@/context/privacy-context';
 
 interface AssetDetail {

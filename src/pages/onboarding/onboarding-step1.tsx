@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import React from 'react';
 import {
   Card,
@@ -34,14 +34,14 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
               <li className="flex items-start">
                 <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
                 <span>
-                  Use <code className="font-semibold">Add Asset</code> to increase an asset's
+                  Use <code className="font-semibold">Add Holding</code> to increase an asset's
                   position
                 </span>
               </li>
               <li className="flex items-start">
                 <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
                 <span>
-                  Use <code className="font-semibold">Remove Asset</code> to reduce an asset's
+                  Use <code className="font-semibold">Remove Holding</code> to reduce an asset's
                   position
                 </span>
               </li>

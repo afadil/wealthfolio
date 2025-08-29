@@ -1,7 +1,7 @@
 import type React from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Icons, type Icon } from "@/components/ui/icons"
 import { cn } from "@/lib/utils"
-import { AlertCircle, AlertTriangle, CheckCircle2, type LucideIcon } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 type AlertVariant = "warning" | "success" | "destructive"
@@ -12,8 +12,8 @@ interface ImportAlertProps {
   title: React.ReactNode
   description?: React.ReactNode
   className?: string
-  icon?: LucideIcon
-  rightIcon?: LucideIcon
+  icon?: Icon
+  rightIcon?: Icon
   size?: AlertSize
   children?: React.ReactNode
 }
@@ -33,13 +33,13 @@ export function ImportAlert({
   if (!Icon) {
     switch (variant) {
       case "success":
-        Icon = CheckCircle2
+        Icon = Icons.CheckCircle
         break
       case "warning":
-        Icon = AlertTriangle
+        Icon = Icons.AlertTriangle
         break
       case "destructive":
-        Icon = AlertCircle
+        Icon = Icons.AlertCircle
         break
     }
   }

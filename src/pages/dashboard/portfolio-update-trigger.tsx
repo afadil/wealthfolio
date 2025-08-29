@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
 import { formatDateTime } from '@/lib/utils';
 

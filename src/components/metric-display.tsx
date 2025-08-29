@@ -2,8 +2,8 @@ import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Info } from 'lucide-react';
-import { GainPercent } from '@/components/gain-percent';
+import { Icons } from '@/components/ui/icons';
+import { GainPercent } from '@wealthfolio/ui';
 import { cn } from '@/lib/utils';
 
 // Explanatory texts for info popovers
@@ -59,7 +59,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="ml-1 h-4 w-4 rounded-full p-0">
-            <Info className="h-3 w-3" />
+            <Icons.Info className="h-3 w-3" />
             <span className="sr-only">More info about {label}</span>
           </Button>
         </PopoverTrigger>
@@ -114,7 +114,7 @@ export const MetricLabelWithInfo: React.FC<MetricLabelWithInfoProps> = ({ label,
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="ml-1 h-4 w-4 rounded-full p-0">
-            <Info className="h-3 w-3" />
+            <Icons.Info className="h-3 w-3" />
             <span className="sr-only">More info about {label}</span>
           </Button>
         </PopoverTrigger>

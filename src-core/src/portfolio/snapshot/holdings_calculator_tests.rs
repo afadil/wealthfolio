@@ -2,6 +2,7 @@
 #[cfg(test)]
 mod tests {
     use crate::activities::{Activity, ActivityType};
+    use crate::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::fx::FxError;
     use crate::fx::fx_traits::FxServiceTrait;
     use crate::portfolio::snapshot::holdings_calculator::HoldingsCalculator;
@@ -16,6 +17,82 @@ mod tests {
     use std::sync::RwLock;
     use crate::errors::Result;
     use async_trait;
+
+    // --- Mock AssetRepository ---
+    #[derive(Clone)]
+    struct MockAssetRepository {
+        assets: HashMap<String, Asset>,
+    }
+
+    impl MockAssetRepository {
+        fn new() -> Self {
+            let mut mock = MockAssetRepository {
+                assets: HashMap::new(),
+            };
+            
+            // Add some common test assets with their listing currencies
+            mock.add_asset("AAPL", "USD");  // Apple listed in USD
+            mock.add_asset("AMZN", "USD");  // Amazon listed in USD  
+            mock.add_asset("MSFT", "USD");  // Microsoft listed in USD
+            mock.add_asset("TESTUSD", "USD");  // Test stock in USD
+            mock.add_asset("TSLA", "USD");  // Tesla listed in USD
+            mock.add_asset("XYZ", "USD");   // Test stock in USD
+            mock.add_asset("ADS.DE", "EUR"); // Adidas listed in EUR
+            
+            mock
+        }
+        
+        fn add_asset(&mut self, symbol: &str, currency: &str) {
+            let asset = Asset {
+                id: symbol.to_string(),
+                symbol: symbol.to_string(),
+                currency: currency.to_string(),
+                name: Some(format!("Mock Asset {}", symbol)),
+                asset_type: Some("STOCK".to_string()),
+                asset_class: Some("EQUITY".to_string()),
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+                data_source: "MOCK".to_string(),
+                ..Default::default()
+            };
+            self.assets.insert(symbol.to_string(), asset);
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl AssetRepositoryTrait for MockAssetRepository {
+        async fn create(&self, _new_asset: NewAsset) -> Result<Asset> {
+            unimplemented!("Not needed for tests")
+        }
+        
+        async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> Result<Asset> {
+            unimplemented!("Not needed for tests")
+        }
+        
+        async fn update_data_source(&self, _asset_id: &str, _data_source: String) -> Result<Asset> {
+            unimplemented!("Not needed for tests")
+        }
+        
+        fn get_by_id(&self, asset_id: &str) -> Result<Asset> {
+            self.assets.get(asset_id)
+                .cloned()
+                .ok_or_else(|| crate::Error::Repository(format!("Asset not found: {}", asset_id)))
+        }
+        
+        fn list(&self) -> Result<Vec<Asset>> {
+            Ok(self.assets.values().cloned().collect())
+        }
+        
+        fn list_cash_assets(&self, _base_currency: &str) -> Result<Vec<Asset>> {
+            Ok(vec![]) // Not needed for these tests
+        }
+        
+        fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
+            Ok(symbols.iter()
+                .filter_map(|symbol| self.assets.get(symbol).cloned())
+                .collect())
+        }
+    }
 
     // --- Mock FxService ---
     #[derive(Clone)]
@@ -224,13 +301,27 @@ mod tests {
         fx_service.add_bidirectional_rate("USD", "CAD", date, rate);
     }
 
+    // --- Helper to create calculator with mock dependencies ---
+    fn create_calculator(
+        fx_service: Arc<dyn FxServiceTrait>, 
+        base_currency: Arc<RwLock<String>>
+    ) -> HoldingsCalculator {
+        let asset_repository = Arc::new(MockAssetRepository::new());
+        HoldingsCalculator::new(fx_service, base_currency, asset_repository)
+    }
+
     // --- Tests ---
     #[test]
     fn test_buy_activity_updates_holdings_and_cash() {
-        let mock_fx_service = Arc::new(MockFxService::new());
+        let mut mock_fx_service = MockFxService::new();
         let account_currency = "CAD";
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(mock_fx_service.clone(), base_currency);
+        
+        // Add CAD to USD conversion rate
+        let target_date = NaiveDate::from_str("2023-01-01").unwrap();
+        mock_fx_service.add_bidirectional_rate("CAD", "USD", target_date, dec!(0.75)); // 1 CAD = 0.75 USD
+        
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let activity_currency = "CAD";
         let target_date_str = "2023-01-01";
@@ -255,13 +346,16 @@ mod tests {
         assert!(result.is_ok());
         let next_state = result.unwrap();
 
-        // Check position
+        // Check position - amounts should be converted from CAD to USD
         assert_eq!(next_state.positions.len(), 1);
         let position = next_state.positions.get("AAPL").unwrap();
         assert_eq!(position.quantity, dec!(10));
-        assert_eq!(position.average_cost, dec!(150.5)); // Expected: 150 + (5/10)
-        assert_eq!(position.total_cost_basis, dec!(1505)); // Expected: (10 * 150) + 5
-        assert_eq!(position.currency, activity_currency);
+        // Original: CAD $150 per share + CAD $0.50 fee per share = CAD $150.50 per share
+        // Converted to USD: CAD $150.50 * 0.75 = USD $112.875 per share
+        assert_eq!(position.average_cost, dec!(112.875)); 
+        // Total cost: CAD $1505 * 0.75 = USD $1128.75
+        assert_eq!(position.total_cost_basis, dec!(1128.75)); 
+        assert_eq!(position.currency, "USD"); // Position created in AAPL's listing currency (USD)
 
         // Check cash balance (in account currency)
         let expected_cash = dec!(0) - (buy_activity.quantity * buy_activity.unit_price + buy_activity.fee);
@@ -276,7 +370,7 @@ mod tests {
         let mock_fx_service = Arc::new(MockFxService::new());
         let account_currency = "CAD";
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(mock_fx_service.clone(), base_currency);
+        let calculator = create_calculator(mock_fx_service.clone(), base_currency);
 
         let activity_currency = "CAD";
         let target_date_str = "2023-01-02";
@@ -362,7 +456,7 @@ mod tests {
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.25
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let previous_snapshot = create_initial_snapshot("acc_fx_buy", account_currency, "2023-01-02");
         
@@ -422,7 +516,7 @@ mod tests {
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.25
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_deposit_fx", account_currency, "2023-01-03");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000)); // Initial 1000 CAD
@@ -485,7 +579,7 @@ mod tests {
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.25
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_withdraw_fx", account_currency, "2023-01-04");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(2000)); // Initial 2000 CAD
@@ -548,7 +642,7 @@ mod tests {
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.30
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_income", account_currency, "2023-01-05");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000));
@@ -617,7 +711,7 @@ mod tests {
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.30
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_charge", account_currency, "2023-01-06");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000));
@@ -692,7 +786,7 @@ mod tests {
         let rate_remove_date = usd_cad_rate(target_date_remove_str); // 1.30
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service.clone()), base_currency);
 
         // --- Initial State ---
         let mut previous_snapshot_add = create_initial_snapshot("acc_add_remove", account_currency, "2023-01-07");
@@ -807,7 +901,7 @@ mod tests {
         let rate_cash_date = usd_cad_rate(target_date_cash_transfer_str); // 1.30
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service.clone()), base_currency);
 
         // --- Initial State ---
         let mut previous_snapshot_asset_tx = create_initial_snapshot("acc_transfer", account_currency, "2023-01-09");
@@ -939,7 +1033,7 @@ mod tests {
         let rate_usd_cad = usd_cad_rate(target_date_str); // 1.30
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service.clone()), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service.clone()), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_multi_act", account_currency, "2023-01-11");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(1000000)); // 1M CAD
@@ -1019,7 +1113,7 @@ mod tests {
         let activity_currency = "EUR"; // Activity in EUR, account in CAD
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         let mut previous_snapshot = create_initial_snapshot("acc_fx_fail", account_currency, "2023-01-12");
         previous_snapshot.cash_balances.insert(account_currency.to_string(), dec!(10000)); // 10000 CAD
@@ -1099,7 +1193,7 @@ mod tests {
         let rate_eur_cad = dec!(1.50);
 
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
-        let calculator = HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency);
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
 
         // Initial Snapshot
         let mut previous_snapshot = create_initial_snapshot("acc_multi_cash", account_currency, "2023-01-14");
@@ -1199,6 +1293,303 @@ mod tests {
             next_state.cost_basis,
             expected_snapshot_cost_basis,
             "Snapshot cost basis mismatch"
+        );
+    }
+
+    #[test]
+    fn test_multi_currency_same_asset_buy_activities() {
+        // This test covers the specific use case where the same asset (e.g., AMZN) 
+        // is bought in different currencies and should be properly
+        // aggregated into a single position with currency conversion.
+        // We test both scenarios: EUR first then USD, and USD first then EUR.
+        
+        test_multi_currency_scenario_eur_first();
+        test_multi_currency_scenario_usd_first();
+    }
+
+    fn test_multi_currency_scenario_eur_first() {
+        // Scenario 1: First buy in EUR, second buy in USD
+        // Position should be in EUR, USD activity should be converted to EUR
+        
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR"; // Account currency is EUR
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        
+        // Set up exchange rates for the test dates
+        let date1_str = "2025-08-19"; // First buy in EUR
+        let date2_str = "2025-08-20"; // Second buy in USD
+        let rate_usd_eur_date1 = dec!(0.90); // 1 USD = 0.90 EUR on date1
+        let rate_usd_eur_date2 = dec!(0.85); // 1 USD = 0.85 EUR on date2 (EUR strengthened)
+        
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", NaiveDate::from_str(date1_str).unwrap(), rate_usd_eur_date1);
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", NaiveDate::from_str(date2_str).unwrap(), rate_usd_eur_date2);
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Initial state - empty account
+        let mut snapshot_after_first = create_initial_snapshot("test_account_eur", account_currency, "2025-08-18");
+        snapshot_after_first.cash_balances.insert(account_currency.to_string(), dec!(10000)); // Start with €10,000
+
+        // First activity: Buy 1 AMZN share at €190 EUR on 2025-08-19
+        let buy_eur_activity = create_default_activity(
+            "activity_1",
+            ActivityType::Buy,
+            "AMZN",
+            dec!(1),    // quantity
+            dec!(190),  // unit_price in EUR
+            dec!(0),    // fee
+            "EUR",      // currency
+            date1_str,
+        );
+
+        let activities_day1 = vec![buy_eur_activity.clone()];
+        let target_date1 = NaiveDate::from_str(date1_str).unwrap();
+
+        let result1 = calculator.calculate_next_holdings(&snapshot_after_first, &activities_day1, target_date1);
+        assert!(result1.is_ok(), "First calculation failed: {:?}", result1.err());
+        let snapshot_after_first = result1.unwrap();
+
+        // Verify first buy created position in USD (AMZN's listing currency)
+        assert_eq!(snapshot_after_first.positions.len(), 1);
+        let position_after_first = snapshot_after_first.positions.get("AMZN").unwrap();
+        assert_eq!(position_after_first.currency, "USD", "Position should be in USD (AMZN's listing currency)");
+        assert_eq!(position_after_first.quantity, dec!(1), "Should have 1 share after first buy");
+        // Cost should be converted from EUR to USD: €190 / 0.90 EUR/USD = $211.11...
+        let eur_price_in_usd = dec!(190) / rate_usd_eur_date1; // €190 / 0.90 = $211.111...
+        assert_eq!(position_after_first.average_cost.round_dp(8), eur_price_in_usd.round_dp(8), "Average cost should be converted to USD");
+        assert_eq!(position_after_first.total_cost_basis.round_dp(8), eur_price_in_usd.round_dp(8), "Total cost basis should be converted to USD");
+        assert_eq!(position_after_first.lots.len(), 1, "Should have 1 lot");
+
+        // Verify cash was deducted in account currency (EUR)
+        let expected_cash_after_first = dec!(10000) - dec!(190);
+        assert_eq!(
+            snapshot_after_first.cash_balances.get(account_currency).copied().unwrap_or_default(),
+            expected_cash_after_first,
+            "Cash should be deducted by €190"
+        );
+
+        // Second activity: Buy 1 AMZN share at $222 USD on 2025-08-20
+        let buy_usd_activity = create_default_activity(
+            "activity_2",
+            ActivityType::Buy,
+            "AMZN",
+            dec!(1),    // quantity
+            dec!(222),  // unit_price in USD
+            dec!(0),    // fee
+            "USD",      // currency - different from first!
+            date2_str,
+        );
+
+        let activities_day2 = vec![buy_usd_activity.clone()];
+        let target_date2 = NaiveDate::from_str(date2_str).unwrap();
+
+        let result2 = calculator.calculate_next_holdings(&snapshot_after_first, &activities_day2, target_date2);
+        assert!(result2.is_ok(), "Second calculation failed: {:?}", result2.err());
+        let final_snapshot = result2.unwrap();
+
+        // Verify the USD activity was added to the same USD position
+        assert_eq!(final_snapshot.positions.len(), 1, "Should still have only 1 position for AMZN");
+        let final_position = final_snapshot.positions.get("AMZN").unwrap();
+        
+        // Position should remain in USD (AMZN's listing currency)
+        assert_eq!(final_position.currency, "USD", "Position should remain in USD");
+        
+        // Should now have 2 shares total
+        assert_eq!(final_position.quantity, dec!(2), "Should have 2 shares total");
+        
+        // Should have 2 lots
+        assert_eq!(final_position.lots.len(), 2, "Should have 2 lots");
+        
+        // Verify first lot (converted from EUR to USD)
+        let lot1 = &final_position.lots[0]; // Should be sorted by date
+        assert_eq!(lot1.quantity, dec!(1), "First lot should have 1 share");
+        assert_eq!(lot1.acquisition_price.round_dp(8), eur_price_in_usd.round_dp(8), "First lot should be converted to USD");
+        assert_eq!(lot1.cost_basis.round_dp(8), eur_price_in_usd.round_dp(8), "First lot cost basis should be in USD");
+        
+        // Verify second lot (USD, no conversion needed)
+        let lot2 = &final_position.lots[1];
+        assert_eq!(lot2.quantity, dec!(1), "Second lot should have 1 share");
+        assert_eq!(lot2.acquisition_price, dec!(222), "Second lot should be $222 per share");
+        assert_eq!(lot2.cost_basis, dec!(222), "Second lot cost basis should be $222");
+        
+        // Verify total cost basis and average cost (all in USD)
+        let expected_total_cost_basis = eur_price_in_usd + dec!(222); // Converted EUR amount + USD amount
+        assert_eq!(final_position.total_cost_basis.round_dp(8), expected_total_cost_basis.round_dp(8), "Total cost basis should be sum of both lots in USD");
+        
+        let expected_average_cost = expected_total_cost_basis / dec!(2); 
+        assert_eq!(final_position.average_cost.round_dp(8), expected_average_cost.round_dp(8), "Average cost should be weighted average in USD");
+        
+        // Verify cash balance - second buy should deduct $222 worth of EUR from the balance
+        let usd_cost_in_account_eur = dec!(222) * rate_usd_eur_date2; // Convert USD to EUR for cash deduction
+        let expected_final_cash = expected_cash_after_first - usd_cost_in_account_eur;
+        assert_eq!(
+            final_snapshot.cash_balances.get(account_currency).copied().unwrap_or_default().round_dp(6),
+            expected_final_cash.round_dp(6),
+            "Cash should be further deducted by converted USD amount"
+        );
+    }
+
+    fn test_multi_currency_scenario_usd_first() {
+        // Scenario 2: First buy in USD, second buy in EUR
+        // Position should be in USD, EUR activity should be converted to USD
+        
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR"; // Account currency is still EUR
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        
+        // Set up exchange rates for the test dates
+        let date1_str = "2025-08-19"; // First buy in USD
+        let date2_str = "2025-08-20"; // Second buy in EUR
+        let rate_usd_eur_date1 = dec!(0.90); // 1 USD = 0.90 EUR on date1
+        let rate_usd_eur_date2 = dec!(0.85); // 1 USD = 0.85 EUR on date2
+        
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", NaiveDate::from_str(date1_str).unwrap(), rate_usd_eur_date1);
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", NaiveDate::from_str(date2_str).unwrap(), rate_usd_eur_date2);
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Initial state - empty account
+        let mut snapshot_after_first = create_initial_snapshot("test_account_usd", account_currency, "2025-08-18");
+        snapshot_after_first.cash_balances.insert(account_currency.to_string(), dec!(10000)); // Start with €10,000
+
+        // First activity: Buy 1 AMZN share at $222 USD on 2025-08-19
+        let buy_usd_activity = create_default_activity(
+            "activity_1",
+            ActivityType::Buy,
+            "AMZN",
+            dec!(1),    // quantity
+            dec!(222),  // unit_price in USD
+            dec!(0),    // fee
+            "USD",      // currency
+            date1_str,
+        );
+
+        let activities_day1 = vec![buy_usd_activity.clone()];
+        let target_date1 = NaiveDate::from_str(date1_str).unwrap();
+
+        let result1 = calculator.calculate_next_holdings(&snapshot_after_first, &activities_day1, target_date1);
+        assert!(result1.is_ok(), "First calculation failed: {:?}", result1.err());
+        let snapshot_after_first = result1.unwrap();
+
+        // Verify first buy created position in USD (first currency used)
+        assert_eq!(snapshot_after_first.positions.len(), 1);
+        let position_after_first = snapshot_after_first.positions.get("AMZN").unwrap();
+        assert_eq!(position_after_first.currency, "USD", "Position should be in USD (first currency)");
+        assert_eq!(position_after_first.quantity, dec!(1), "Should have 1 share after first buy");
+        assert_eq!(position_after_first.average_cost, dec!(222), "Average cost should be $222");
+        assert_eq!(position_after_first.total_cost_basis, dec!(222), "Total cost basis should be $222");
+
+        // Second activity: Buy 1 AMZN share at €190 EUR on 2025-08-20
+        let buy_eur_activity = create_default_activity(
+            "activity_2",
+            ActivityType::Buy,
+            "AMZN",
+            dec!(1),    // quantity
+            dec!(190),  // unit_price in EUR
+            dec!(0),    // fee
+            "EUR",      // currency - different from first!
+            date2_str,
+        );
+
+        let activities_day2 = vec![buy_eur_activity.clone()];
+        let target_date2 = NaiveDate::from_str(date2_str).unwrap();
+
+        let result2 = calculator.calculate_next_holdings(&snapshot_after_first, &activities_day2, target_date2);
+        assert!(result2.is_ok(), "Second calculation failed: {:?}", result2.err());
+        let final_snapshot = result2.unwrap();
+
+        // Verify the EUR activity was converted to USD and added to the same position
+        let final_position = final_snapshot.positions.get("AMZN").unwrap();
+        
+        // Position should remain in USD (original currency)
+        assert_eq!(final_position.currency, "USD", "Position should remain in USD");
+        assert_eq!(final_position.quantity, dec!(2), "Should have 2 shares total");
+        assert_eq!(final_position.lots.len(), 2, "Should have 2 lots");
+        
+        // Verify second lot (converted from EUR to USD)
+        let lot2 = &final_position.lots[1];
+        
+        // €190 converted to USD at date2 rate: €190 / 0.85 EUR/USD = $223.529...
+        let eur_price_in_usd = dec!(190) / rate_usd_eur_date2;
+        let eur_price_in_usd_rounded = eur_price_in_usd.round_dp(8);
+        assert_eq!(lot2.acquisition_price.round_dp(8), eur_price_in_usd_rounded, "Second lot should be converted to USD");
+        assert_eq!(lot2.cost_basis.round_dp(8), eur_price_in_usd_rounded, "Second lot cost basis should be in USD");
+        
+        // Verify total cost basis
+        let expected_total_cost_basis = dec!(222) + eur_price_in_usd_rounded;
+        assert_eq!(final_position.total_cost_basis.round_dp(8), expected_total_cost_basis, "Total cost basis should be sum of both lots in USD");
+    }
+
+    #[test]
+    fn test_position_created_in_stock_listing_currency_not_activity_currency() {
+        // This test verifies that when the first activity for a stock is in a different currency
+        // than the stock's listing currency, the position should be created in the stock's 
+        // listing currency, not the activity's currency.
+        // 
+        // Example: AAPL is listed in USD, but first buy activity is in EUR.
+        // Position should be created in USD (stock's listing currency), not EUR (activity currency).
+        
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR"; 
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        
+        let activity_date_str = "2025-08-19";
+        let rate_usd_eur = dec!(0.90); // 1 USD = 0.90 EUR
+        
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", NaiveDate::from_str(activity_date_str).unwrap(), rate_usd_eur);
+        
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Initial state 
+        let mut initial_snapshot = create_initial_snapshot("test_account_listing_currency", account_currency, "2025-08-18");
+        initial_snapshot.cash_balances.insert(account_currency.to_string(), dec!(10000)); // €10,000
+
+        // First activity: Buy AAPL (USD-listed stock) with EUR currency
+        // This should create position in USD (stock's listing currency), not EUR (activity currency)
+        let buy_aapl_eur_activity = create_default_activity(
+            "activity_1",
+            ActivityType::Buy,
+            "AAPL",     // AAPL is a USD-listed stock
+            dec!(10),   // quantity
+            dec!(150),  // unit_price in EUR (but AAPL should be tracked in USD)
+            dec!(5),    // fee in EUR
+            "EUR",      // activity currency
+            activity_date_str,
+        );
+
+        let activities = vec![buy_aapl_eur_activity.clone()];
+        let target_date = NaiveDate::from_str(activity_date_str).unwrap();
+
+        let result = calculator.calculate_next_holdings(&initial_snapshot, &activities, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let final_snapshot = result.unwrap();
+
+        // Verify position was created 
+        assert_eq!(final_snapshot.positions.len(), 1);
+        let aapl_position = final_snapshot.positions.get("AAPL").unwrap();
+        
+        // CRITICAL: Position should be in USD (stock's listing currency), NOT EUR (activity currency)
+        // Currently this will fail because the system uses activity currency instead of stock listing currency
+        assert_eq!(aapl_position.currency, "USD", "Position should be in USD (AAPL's listing currency), not EUR (activity currency)");
+        
+        // Verify the EUR activity was properly converted to USD for the position
+        assert_eq!(aapl_position.quantity, dec!(10), "Should have 10 shares");
+        
+        // EUR 150 converted to USD: EUR 150 / 0.90 EUR/USD = USD 166.67 (approximately)
+        let eur_price_in_usd = dec!(150) / rate_usd_eur;
+        let eur_fee_in_usd = dec!(5) / rate_usd_eur;
+        let expected_cost_basis_per_share = (eur_price_in_usd * dec!(10) + eur_fee_in_usd) / dec!(10);
+        
+        assert_eq!(aapl_position.average_cost.round_dp(6), expected_cost_basis_per_share.round_dp(6), "Average cost should be in USD");
+        assert_eq!(aapl_position.total_cost_basis.round_dp(6), (eur_price_in_usd * dec!(10) + eur_fee_in_usd).round_dp(6), "Total cost basis should be in USD");
+        
+        // Verify cash balance was properly deducted in account currency (EUR)
+        let total_eur_cost = dec!(150) * dec!(10) + dec!(5); // €1,505
+        let expected_cash = dec!(10000) - total_eur_cost; // €8,495
+        assert_eq!(
+            final_snapshot.cash_balances.get(account_currency).copied().unwrap_or_default(),
+            expected_cash,
+            "Cash should be deducted in account currency (EUR)"
         );
     }
 } 

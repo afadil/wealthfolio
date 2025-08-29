@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import React, { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -15,18 +15,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+import { CurrencyInput } from '@wealthfolio/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { worldCurrencies } from '@/lib/currencies';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 
 // Simplified schema for onboarding - removed 'system' theme option for direct selection
@@ -130,58 +120,13 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Setup your base currency</FormLabel>
-                    <Popover modal={true}>
-                      <PopoverTrigger asChild>
-                        <FormControl className="mt-2 w-[300px]">
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            autoFocus
-                            className={cn(
-                              'justify-between',
-                              !field.value && 'text-muted-foreground',
-                            )}
-                          >
-                            {field.value
-                              ? worldCurrencies.find((currency) => currency.value === field.value)
-                                  ?.label
-                              : 'Select currency'}
-                            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0">
-                        <Command>
-                          <CommandInput placeholder="Search currency..." />
-                          <CommandList>
-                            <CommandEmpty>No currency found.</CommandEmpty>
-                            <CommandGroup>
-                              <ScrollArea className="max-h-72 overflow-y-auto">
-                                {worldCurrencies.map((currency) => (
-                                  <CommandItem
-                                    value={currency.label}
-                                    key={currency.value}
-                                    onSelect={() => {
-                                      form.setValue(field.name, currency.value);
-                                    }}
-                                  >
-                                    <Icons.Check
-                                      className={cn(
-                                        'mr-2 h-4 w-4',
-                                        currency.value === field.value
-                                          ? 'opacity-100'
-                                          : 'opacity-0',
-                                      )}
-                                    />
-                                    {currency.label}
-                                  </CommandItem>
-                                ))}
-                              </ScrollArea>
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl className="mt-2 w-[300px]">
+                      <CurrencyInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        autoFocus
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

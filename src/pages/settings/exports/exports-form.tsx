@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { ExportDataType, ExportedFileFormat } from '@/lib/types';
 import { useExportData } from './use-export-data';
 
@@ -83,9 +83,9 @@ const dataTypes = {
   SQLite: [
     {
       key: 'full',
-      name: 'Full Database Backup',
+      name: 'Export the full SQLite Database',
       icon: Icons.Database,
-      description: 'Complete, queryable SQLite database backup of all your information',
+      description: 'Complete database backup with WAL/SHM files - choose your backup location',
     },
   ],
 };

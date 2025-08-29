@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
 import { Account, Goal, GoalAllocation } from '@/lib/types';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount } from '@wealthfolio/ui';
 import React, { useState, useEffect } from 'react';
 
 interface GoalsAllocationsProps {

@@ -1,11 +1,22 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { AccountSelectOption } from '../activity-form';
-import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from '../activity-type-selector';
 import { useFormContext } from 'react-hook-form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { MoneyInput } from '@/components/ui/money-input';
-import { QuantityInput } from '@/components/ui/quantity-input';
+import {
+  Card, 
+  CardContent,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  MoneyInput,
+  QuantityInput,
+} from '@wealthfolio/ui';
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from './common';
+import { AccountSelectOption } from '../activity-form';
+import {
+  ActivityTypeSelector,
+  type ActivityType as ActivityTypeUI,
+} from '../activity-type-selector';
+import { CashBalanceWarning } from '../cash-balance-warning';
 
 export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
@@ -23,6 +34,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
           <ActivityTypeSelector control={control} types={tradeTypes} columns={2} />
         </div>
       </div>
+      <CashBalanceWarning />
       <Card>
         <CardContent className="space-y-6 pt-2">
           <ConfigurationCheckbox showCurrencyOption={true} />

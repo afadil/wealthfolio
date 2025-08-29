@@ -1,5 +1,6 @@
 pub mod account;
 pub mod activity;
+pub mod addon;
 pub mod asset;
 pub mod goal;
 pub mod limits;

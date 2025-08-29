@@ -2,7 +2,7 @@ import React from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 interface ValidationAlertProps {
   success: boolean;

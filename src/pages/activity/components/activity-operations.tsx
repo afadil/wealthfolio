@@ -5,7 +5,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 
 import type { Activity, ActivityDetails } from '@/lib/types';
 import { Row } from '@tanstack/react-table';

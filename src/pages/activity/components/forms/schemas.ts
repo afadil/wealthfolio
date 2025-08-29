@@ -28,6 +28,30 @@ export const holdingsActivitySchema = baseActivitySchema.extend({
   assetDataSource: z.enum([DataSource.YAHOO, DataSource.MANUAL]).default(DataSource.YAHOO),
 });
 
+export const bulkHoldingRowSchema = z.object({
+  id: z.string(),
+  ticker: z.string().min(1, { message: 'Ticker is required' }),
+  name: z.string().optional(),
+  sharesOwned: z.coerce
+    .number({
+      required_error: 'Shares owned is required.',
+      invalid_type_error: 'Shares must be a number.',
+    })
+    .positive({ message: 'Shares must be greater than 0' }),
+  averageCost: z.coerce
+    .number({
+      required_error: 'Average cost is required.',
+      invalid_type_error: 'Average cost must be a number.',
+    })
+    .positive({ message: 'Average cost must be greater than 0' }),
+  totalValue: z.number().optional(),
+  assetId: z.string().optional(),
+});
+
+export const bulkHoldingsFormSchema = baseActivitySchema.extend({
+  holdings: z.array(bulkHoldingRowSchema).min(1, { message: 'At least one holding is required' }),
+});
+
 export const tradeActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.BUY, ActivityType.SELL]),
   assetId: z.string().min(1, { message: 'Please select a security' }),

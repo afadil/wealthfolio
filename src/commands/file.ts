@@ -1,6 +1,8 @@
 import {
   getRunEnv,
   openCsvFileDialogTauri,
+  openFolderDialogTauri,
+  openDatabaseFileDialogTauri,
   openFileSaveDialogTauri,
   RUN_ENV,
   logger,
@@ -17,6 +19,36 @@ export const openCsvFileDialog = async (): Promise<null | string | string[]> => 
     }
   } catch (error) {
     logger.error('Error open csv file.');
+    throw error;
+  }
+};
+
+// openFolderDialog
+export const openFolderDialog = async (): Promise<string | null> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return openFolderDialogTauri();
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error opening folder dialog.');
+    throw error;
+  }
+};
+
+// openDatabaseFileDialog
+export const openDatabaseFileDialog = async (): Promise<string | null> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return openDatabaseFileDialogTauri();
+      default:
+        throw new Error(`Unsupported`);
+    }
+  } catch (error) {
+    logger.error('Error opening database file dialog.');
     throw error;
   }
 };

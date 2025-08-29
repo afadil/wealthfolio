@@ -1,20 +1,20 @@
-import { Icons } from '@/components/icons';
-import { Badge } from '@/components/ui/badge';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
 import { safeDivide } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
-import { GainPercent } from '@/components/gain-percent';
+import { GainPercent } from '@wealthfolio/ui';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
 import { useNavigate } from 'react-router-dom';
 import { useBalancePrivacy } from '@/context/privacy-context';
-import { AmountDisplay } from '@/components/amount-display';
-import { QuantityDisplay } from '@/components/quantity-display';
+import { AmountDisplay } from '@wealthfolio/ui';
+import { QuantityDisplay } from '@wealthfolio/ui';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TickerAvatar } from '@/components/ticker-avatar';
 
 // Helper function to get display value and currency based on toggle state
 const getDisplayValueAndCurrency = (
@@ -83,7 +83,7 @@ export const HoldingsTable = ({
   ];
 
   return (
-    <div className="pt-6">
+    <div className="h-full flex flex-col">
       <DataTable
         data={holdings}
         columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
@@ -120,23 +120,38 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
-      const symbol = holding.instrument?.symbol?.split('.')[0] ?? holding.id;
+      const symbol = holding.instrument?.symbol ?? holding.id;
       const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+      // For TickerAvatar, use the full symbol for cash (including $CASH) to get the proper icon
+      const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
 
       const handleNavigate = () => {
         const navSymbol = holding.instrument?.symbol ?? holding.id;
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
-      return (
-        <div className="flex items-center">
-          <Badge
-            className="flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
-            onClick={handleNavigate}
-          >
-            {displaySymbol}
-          </Badge>
 
-          <span className="ml-2 line-clamp-1">{holding.instrument?.name || holding.id}</span>
+      const isCash = symbol.startsWith('$CASH');
+      const content = (
+        <div className="flex items-center">
+          <TickerAvatar symbol={avatarSymbol} className="w-8 h-8 mr-2" />
+          <div className="flex flex-col">
+            <span className="font-medium">{displaySymbol}</span>
+            <span className="text-xs text-muted-foreground line-clamp-1">{holding.instrument?.name || holding.id}</span>
+          </div>
+        </div>
+      );
+
+      if (isCash) {
+        return (
+          <div className="flex items-center p-2">
+            {content}
+          </div>
+        );
+      }
+
+      return (
+        <div className="cursor-pointer p-1 -m-1" onClick={handleNavigate}>
+          {content}
         </div>
       );
     },
@@ -265,8 +280,13 @@ const getColumns = (
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.marketValue.base ?? 0;
-      const valueB = rowB.original.marketValue.base ?? 0;
+      const holdingA = rowA.original;
+      const holdingB = rowB.original;
+
+      // Always sort by base currency value for consistency
+      const valueA = holdingA.marketValue.base ?? 0;
+      const valueB = holdingB.marketValue.base ?? 0;
+
       return valueA - valueB;
     },
   },
@@ -299,8 +319,13 @@ const getColumns = (
       );
     },
     sortingFn: (rowA, rowB) => {
-      const valueA = rowA.original.totalGain?.base ?? 0;
-      const valueB = rowB.original.totalGain?.base ?? 0;
+      const holdingA = rowA.original;
+      const holdingB = rowB.original;
+
+      // Always sort by base currency value for consistency
+      const valueA = holdingA.totalGain?.base ?? 0;
+      const valueB = holdingB.totalGain?.base ?? 0;
+
       return valueA - valueB;
     },
   },

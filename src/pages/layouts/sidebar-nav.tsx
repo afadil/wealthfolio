@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -42,7 +42,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               <nav
                 data-tauri-drag-region="true"
                 aria-label="Sidebar"
-                className="flex flex-shrink-0 flex-col space-y-3 p-2"
+                className="flex flex-shrink-0 flex-col p-2"
               >
                 <div
                   data-tauri-drag-region="true"

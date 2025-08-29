@@ -2,6 +2,7 @@ use super::holdings_calculator::HoldingsCalculator;
 use super::snapshot_repository::SnapshotRepositoryTrait;
 use crate::accounts::{Account, AccountRepositoryTrait};
 use crate::activities::{Activity, ActivityRepositoryTrait};
+use crate::assets::AssetRepositoryTrait;
 use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
@@ -89,10 +90,11 @@ impl SnapshotService {
         account_repository: Arc<dyn AccountRepositoryTrait>,
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
         snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
         let holdings_calculator =
-            HoldingsCalculator::new(fx_service.clone(), base_currency.clone());
+            HoldingsCalculator::new(fx_service.clone(), base_currency.clone(), asset_repository.clone());
         Self {
             base_currency: base_currency.clone(),
             account_repository,
@@ -546,10 +548,6 @@ impl SnapshotService {
                         format!("{}_{}", account_id, current_date.format("%Y-%m-%d"));
                     // Note: calculated_at remains the same as the previous snapshot
                     current_holdings_snapshot = carried_forward_state;
-                    debug!(
-                        "No activities for account {} on {}. Carrying forward state.",
-                        account_id, current_date
-                    );
                 } else {
                     // Activities occurred, call the calculator
                     match self.holdings_calculator.calculate_next_holdings(

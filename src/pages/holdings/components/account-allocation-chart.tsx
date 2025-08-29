@@ -1,9 +1,6 @@
-import { CustomPieChart } from '@/components/custom-pie-chart';
 import { Account } from '@/lib/types';
 import { useMemo, useState } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
+import { DonutChart, EmptyPlaceholder, Skeleton, Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getAccounts } from '@/commands/account';
 import { useAccountsSimplePerformance } from '@/hooks/use-accounts-simple-performance';
@@ -108,7 +105,7 @@ export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSect
       </CardHeader>
       <CardContent className="pt-0">
         {data.length > 0 ? (
-          <CustomPieChart
+          <DonutChart
             data={data}
             activeIndex={activeIndex}
             onPieEnter={onPieEnter}
