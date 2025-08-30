@@ -10,22 +10,24 @@ export function useSwingActivities(ctx: AddonContext) {
     queryKey: ["swing-activities", preferences.selectedAccounts],
     queryFn: async (): Promise<SwingActivity[]> => {
       try {
-        // Get all activities
-        const activities = await ctx.api.activities.getAll()
+        // Use search API with filters for BUY/SELL activities only
+        const filters = {
+          activityType: ["BUY", "SELL"], // Filter for trading activities only
+          ...(preferences.selectedAccounts.length > 0 && {
+            accountId: preferences.selectedAccounts
+          })
+        }
 
-        // Filter to only BUY and SELL activities
-        const tradingActivities = activities.filter(
-          (activity) => activity.activityType === "BUY" || activity.activityType === "SELL",
+        const response = await ctx.api.activities.search(
+          0, // page
+          10000, // large page size to get all relevant activities
+          filters,
+          "", // no search keyword
+          { id: "date", desc: true } // sort by date descending
         )
 
-        // Filter by selected accounts if any
-        const filteredActivities =
-          preferences.selectedAccounts.length > 0
-            ? tradingActivities.filter((activity) => preferences.selectedAccounts.includes(activity.accountId))
-            : tradingActivities
-
         // Transform to SwingActivity format
-        const swingActivities: SwingActivity[] = filteredActivities.map((activity) => ({
+        const swingActivities: SwingActivity[] = response.data.map((activity) => ({
           ...activity,
           isSelected: preferences.selectedActivityIds.includes(activity.id),
           hasSwingTag: activity.comment?.toLowerCase().includes("swing") || false,

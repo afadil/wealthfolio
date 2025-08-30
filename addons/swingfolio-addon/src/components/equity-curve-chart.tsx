@@ -25,7 +25,7 @@ interface EquityCurveChartProps {
   data: EquityPoint[]
   currency: string
   height?: number
-  periodType?: 'daily' | 'monthly'
+  periodType?: 'daily' | 'weekly' | 'monthly'
 }
 
 export function EquityCurveChart({ data, currency, periodType = 'monthly' }: EquityCurveChartProps) {
@@ -47,12 +47,14 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
 
   if (data.length === 0) {
     return (
-      <EmptyPlaceholder
-        className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
-        icon={<Icons.TrendingUp className="h-10 w-10" />}
-        title="No equity curve data available"
-        description="There is no equity curve data for the selected period. Try selecting a different time range or check back later."
-      />
+      <div className="flex h-full min-h-[400px] w-full items-center justify-center py-12">
+        <EmptyPlaceholder
+          className="mx-auto flex max-w-[420px] items-center justify-center"
+          icon={<Icons.TrendingUp className="h-10 w-10" />}
+          title="No equity curve data available"
+          description="There is no equity curve data for the selected period. Try selecting a different time range or check back later."
+        />
+      </div>
     )
   }
 
@@ -61,20 +63,21 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
   const tooltipDateFormat = periodType === 'daily' ? "MMMM dd, yyyy" : "MMMM yyyy";
 
   return (
-    <ChartContainer
-      config={{
-        periodPL: {
-          label: `${periodLabel} P/L`,
-          color: 'hsl(var(--chart-1))',
-        },
-        cumulativeRealizedPL: {
-          label: 'Cumulative Equity',
-          color: 'hsl(var(--primary))',
-          lineStyle: 'solid',
-        },
-      }}
-      className="h-[300px] w-full"
-    >
+    <div className="flex h-full min-h-[400px] w-full items-center justify-center py-12">
+      <ChartContainer
+        config={{
+          periodPL: {
+            label: `${periodLabel} P/L`,
+            color: 'hsl(var(--chart-1))',
+          },
+          cumulativeRealizedPL: {
+            label: 'Cumulative Equity',
+            color: 'hsl(var(--primary))',
+            lineStyle: 'solid',
+          },
+        }}
+        className="h-full w-full"
+      >
       <ComposedChart data={chartData}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -140,6 +143,7 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
           dot={false}
         />
       </ComposedChart>
-    </ChartContainer>
+      </ChartContainer>
+    </div>
   )
 }

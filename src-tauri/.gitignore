@@ -4,3 +4,6 @@
 
 # default DB path
 /app.db
+
+# generated files
+/gen/
