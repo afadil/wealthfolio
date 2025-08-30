@@ -1,0 +1,55 @@
+{
+  "name": "swingfolio-addon",
+  "version": "1.0.0",
+  "description": "Advanced swing trading tracker with performance analytics for Wealthfolio",
+  "type": "module",
+  "main": "dist/addon.js",
+  "author": "Wealthfolio",
+  "license": "MIT",
+  "homepage": "https://github.com/afadil/wealthfolio",
+  "keywords": [
+    "wealthfolio",
+    "addon",
+    "swing-trading",
+    "performance",
+    "analytics",
+    "trading",
+    "calendar"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "dev:server": "wealthfolio dev",
+    "clean": "rm -rf dist",
+    "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ assets/ README.md",
+    "bundle": "pnpm clean && pnpm build && pnpm package",
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.62.7",
+    "@wealthfolio/addon-sdk": "workspace:*",
+    "@wealthfolio/ui": "workspace:*",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.0.0",
+    "recharts": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "rollup-plugin-external-globals": "^0.13.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "files": [
+    "dist/",
+    "manifest.json",
+    "README.md"
+  ]
+}
