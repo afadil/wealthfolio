@@ -75,6 +75,7 @@ export function useSwingDashboard(
       preferences.selectedActivityIds,
       preferences.lotMatchingMethod,
       preferences.includeFees,
+      preferences.includeDividends,
       holdings?.length,
       exchangeRates,
     ],
@@ -90,6 +91,7 @@ export function useSwingDashboard(
       const tradeMatcher = new TradeMatcher({
         lotMethod: preferences.lotMatchingMethod,
         includeFees: preferences.includeFees,
+        includeDividends: preferences.includeDividends,
       });
       
       const { closedTrades, openPositions } = tradeMatcher.matchTrades(selectedActivities);

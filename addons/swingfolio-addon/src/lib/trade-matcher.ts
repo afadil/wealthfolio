@@ -6,6 +6,7 @@ interface Lot {
   activity: ActivityDetails
   remainingQuantity: number
   originalQuantity: number
+  dividends: ActivityDetails[]
 }
 
 interface AverageLot {
@@ -15,11 +16,13 @@ interface AverageLot {
   averagePrice: number
   activities: ActivityDetails[]
   remainingQuantity: number
+  dividends: ActivityDetails[]
 }
 
 export interface TradeMatcherOptions {
   lotMethod?: "FIFO" | "LIFO" | "AVERAGE"
   includeFees?: boolean
+  includeDividends?: boolean
 }
 
 /**
@@ -28,23 +31,28 @@ export interface TradeMatcherOptions {
 export class TradeMatcher {
   private lotMethod: "FIFO" | "LIFO" | "AVERAGE"
   private includeFees: boolean
+  private includeDividends: boolean
 
   constructor(options: TradeMatcherOptions = {}) {
     this.lotMethod = options.lotMethod || "FIFO"
     this.includeFees = options.includeFees !== false // Default to true
+    this.includeDividends = options.includeDividends !== false // Default to true
   }
 
   /**
    * Match trades from a list of activities
    */
   matchTrades(activities: ActivityDetails[]): TradeMatchResult {
-
-    console.log(JSON.stringify(activities, null, 2))
     // Ensure all numeric fields are properly parsed
     const parsedActivities = this.parseActivities(activities)
     
+    // Separate trading activities from dividends
+    const tradingActivities = parsedActivities.filter(a => a.activityType === "BUY" || a.activityType === "SELL")
+    const dividendActivities = parsedActivities.filter(a => a.activityType === "DIVIDEND")
+    
     // Group activities by symbol
-    const bySymbol = this.groupBySymbol(parsedActivities)
+    const bySymbol = this.groupBySymbol(tradingActivities)
+    const dividendsBySymbol = this.groupBySymbol(dividendActivities)
 
     const closedTrades: ClosedTrade[] = []
     const openPositions: OpenPosition[] = []
@@ -53,7 +61,8 @@ export class TradeMatcher {
 
     // Process each symbol separately
     for (const [symbol, symbolActivities] of Object.entries(bySymbol)) {
-      const result = this.matchSymbolTrades(symbol, symbolActivities)
+      const symbolDividends = dividendsBySymbol[symbol] || []
+      const result = this.matchSymbolTrades(symbol, symbolActivities, symbolDividends)
 
       closedTrades.push(...result.closedTrades)
       openPositions.push(...result.openPositions)
@@ -111,16 +120,16 @@ export class TradeMatcher {
   /**
    * Match trades for a specific symbol
    */
-  private matchSymbolTrades(symbol: string, activities: ActivityDetails[]): TradeMatchResult {
+  private matchSymbolTrades(symbol: string, activities: ActivityDetails[], dividends: ActivityDetails[] = []): TradeMatchResult {
     // Sort activities chronologically
     const sortedActivities = [...activities].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     )
 
     if (this.lotMethod === "AVERAGE") {
-      return this.matchSymbolTradesAverage(symbol, sortedActivities)
+      return this.matchSymbolTradesAverage(symbol, sortedActivities, dividends)
     } else {
-      return this.matchSymbolTradesSpecific(symbol, sortedActivities)
+      return this.matchSymbolTradesSpecific(symbol, sortedActivities, dividends)
     }
   }
 
@@ -129,7 +138,8 @@ export class TradeMatcher {
    */
   private matchSymbolTradesAverage(
     symbol: string, 
-    activities: ActivityDetails[]
+    activities: ActivityDetails[],
+    dividends: ActivityDetails[] = []
   ): TradeMatchResult {
     const closedTrades: ClosedTrade[] = []
     const openPositions: OpenPosition[] = []
@@ -143,8 +153,20 @@ export class TradeMatcher {
         // Add to average lot
         if (!averageLot) {
           averageLot = this.createNewAverageLot(activity, symbol)
+          // Add dividends that occurred after any buy activity
+          if (this.includeDividends) {
+            averageLot.dividends = dividends.filter(div => new Date(div.date) >= new Date(activity.date))
+          }
         } else {
           this.updateAverageLot(averageLot, activity)
+          // Update dividends to include those after this new buy activity
+          if (this.includeDividends) {
+            const newDividends = dividends.filter(div => new Date(div.date) >= new Date(activity.date))
+            // Merge with existing dividends, avoiding duplicates
+            const existingDivIds = new Set(averageLot.dividends.map(d => d.id))
+            const uniqueNewDivs = newDividends.filter(d => !existingDivIds.has(d.id))
+            averageLot.dividends.push(...uniqueNewDivs)
+          }
         }
       } else if (activity.activityType === "SELL") {
         // Process sell against average lot
@@ -187,6 +209,8 @@ export class TradeMatcher {
       }
     }
 
+    // Note: Dividends are already allocated during average lot creation/updates
+
     // Create open position from remaining average lot
     if (averageLot && averageLot.remainingQuantity > 0) {
       const openPosition = this.createOpenPositionAverage(averageLot, symbol)
@@ -212,6 +236,7 @@ export class TradeMatcher {
       averagePrice: activity.unitPrice,
       activities: [activity],
       remainingQuantity: activity.quantity,
+      dividends: [],
     }
   }
 
@@ -236,7 +261,8 @@ export class TradeMatcher {
    */
   private matchSymbolTradesSpecific(
     symbol: string, 
-    activities: ActivityDetails[]
+    activities: ActivityDetails[],
+    dividends: ActivityDetails[] = []
   ): TradeMatchResult {
     const closedTrades: ClosedTrade[] = []
     const openPositions: OpenPosition[] = []
@@ -246,11 +272,19 @@ export class TradeMatcher {
 
     for (const activity of activities) {
       if (activity.activityType === "BUY") {
-        lots.push({
+        const lot: Lot = {
           activity: activity,
           remainingQuantity: activity.quantity,
           originalQuantity: activity.quantity,
-        })
+          dividends: [],
+        }
+        
+        // Allocate dividends that occurred after this buy
+        if (this.includeDividends) {
+          lot.dividends = dividends.filter(div => new Date(div.date) >= new Date(activity.date))
+        }
+        
+        lots.push(lot)
       } else if (activity.activityType === "SELL") {
         let sellQuantityRemaining = activity.quantity
 
@@ -263,7 +297,8 @@ export class TradeMatcher {
             lot.activity, 
             activity, 
             matchedQuantity, 
-            symbol
+            symbol,
+            lot.dividends
           )
           closedTrades.push(closedTrade)
 
@@ -283,6 +318,8 @@ export class TradeMatcher {
         }
       }
     }
+
+    // Note: Dividends are already allocated during lot creation
 
     // Create open positions from remaining lots
     for (const lot of lots) {
@@ -328,10 +365,18 @@ export class TradeMatcher {
       : 0
     const totalFees = buyFeeAllocation + sellFeeAllocation
 
+    // Calculate dividends for this trade
+    const totalDividends = this.calculateTradeDividends(
+      entryDate,
+      exitDate,
+      quantity,
+      averageLot.dividends
+    )
+
     // Calculate P/L using average cost
     const costBasis = averageLot.averagePrice * quantity
     const proceeds = sellActivity.unitPrice * quantity
-    const realizedPL = proceeds - costBasis - totalFees
+    const realizedPL = proceeds - costBasis - totalFees + totalDividends
     const returnPercent = costBasis > 0 ? (realizedPL / costBasis) * 100 : 0
 
     // Get the most relevant buy activity
@@ -347,6 +392,7 @@ export class TradeMatcher {
       entryPrice: averageLot.averagePrice,
       exitPrice: sellActivity.unitPrice,
       totalFees,
+      totalDividends,
       realizedPL,
       returnPercent,
       holdingPeriodDays,
@@ -367,11 +413,16 @@ export class TradeMatcher {
     )
     const daysOpen = differenceInDays(new Date(), openDate)
 
+    // Calculate total dividends for open position
+    const totalDividends = this.includeDividends
+      ? averageLot.dividends.reduce((sum, div) => sum + div.amount, 0)
+      : 0
+
     // Initial values (will be updated with real market prices)
     const currentPrice = averageLot.averagePrice
     const marketValue = currentPrice * averageLot.remainingQuantity
     const costBasis = averageLot.averagePrice * averageLot.remainingQuantity
-    const unrealizedPL = marketValue - costBasis
+    const unrealizedPL = marketValue - costBasis + totalDividends
     const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0
 
     const latestActivity = averageLot.activities[averageLot.activities.length - 1]
@@ -386,6 +437,7 @@ export class TradeMatcher {
       marketValue,
       unrealizedPL,
       unrealizedReturnPercent,
+      totalDividends,
       daysOpen,
       openDate,
       accountId: latestActivity.accountId,
@@ -403,6 +455,7 @@ export class TradeMatcher {
     sellActivity: ActivityDetails,
     quantity: number,
     symbol: string,
+    dividends: ActivityDetails[] = []
   ): ClosedTrade {
     const entryDate = new Date(buyActivity.date)
     const exitDate = new Date(sellActivity.date)
@@ -417,10 +470,18 @@ export class TradeMatcher {
       : 0
     const totalFees = buyFeeAllocation + sellFeeAllocation
 
+    // Calculate dividends for this trade
+    const totalDividends = this.calculateTradeDividends(
+      entryDate,
+      exitDate,
+      quantity,
+      dividends
+    )
+
     // Calculate P/L
     const costBasis = buyActivity.unitPrice * quantity
     const proceeds = sellActivity.unitPrice * quantity
-    const realizedPL = proceeds - costBasis - totalFees
+    const realizedPL = proceeds - costBasis - totalFees + totalDividends
     const returnPercent = costBasis > 0 ? (realizedPL / costBasis) * 100 : 0
 
     return {
@@ -433,6 +494,7 @@ export class TradeMatcher {
       entryPrice: buyActivity.unitPrice,
       exitPrice: sellActivity.unitPrice,
       totalFees,
+      totalDividends,
       realizedPL,
       returnPercent,
       holdingPeriodDays,
@@ -451,11 +513,16 @@ export class TradeMatcher {
     const openDate = new Date(lot.activity.date)
     const daysOpen = differenceInDays(new Date(), openDate)
 
+    // Calculate total dividends for open position
+    const totalDividends = this.includeDividends
+      ? lot.dividends.reduce((sum, div) => sum + div.amount, 0)
+      : 0
+
     // Initial values (will be updated with real market prices)
     const currentPrice = lot.activity.unitPrice
     const marketValue = currentPrice * lot.remainingQuantity
     const costBasis = lot.activity.unitPrice * lot.remainingQuantity
-    const unrealizedPL = marketValue - costBasis
+    const unrealizedPL = marketValue - costBasis + totalDividends
     const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0
 
     return {
@@ -468,6 +535,7 @@ export class TradeMatcher {
       marketValue,
       unrealizedPL,
       unrealizedReturnPercent,
+      totalDividends,
       daysOpen,
       openDate,
       accountId: lot.activity.accountId,
@@ -475,5 +543,27 @@ export class TradeMatcher {
       currency: lot.activity.currency,
       activityIds: [lot.activity.id],
     }
+  }
+
+  /**
+   * Calculate total dividends for a trade based on holding period
+   */
+  private calculateTradeDividends(
+    entryDate: Date,
+    exitDate: Date,
+    quantity: number,
+    dividends: ActivityDetails[]
+  ): number {
+    if (!this.includeDividends || dividends.length === 0) return 0
+
+    return dividends
+      .filter(dividend => {
+        const divDate = new Date(dividend.date)
+        return divDate >= entryDate && divDate <= exitDate
+      })
+      .reduce((sum, dividend) => {
+        // For dividends, the total amount is in the 'amount' field, not unitPrice * quantity
+        return sum + dividend.amount
+      }, 0)
   }
 }

@@ -1,5 +1,3 @@
-"use client"
-
 import { 
   GainAmount, 
   GainPercent, 
@@ -9,7 +7,9 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
+  Icons,
+  EmptyPlaceholder
 } from "@wealthfolio/ui"
 import { TickerAvatar } from "./ticker-avatar"
 import type { OpenPosition } from "../types"
@@ -20,7 +20,16 @@ interface OpenTradesTableProps {
 
 export function OpenTradesTable({ positions }: OpenTradesTableProps) {
   if (positions.length === 0) {
-    return <div className="text-center py-8 text-muted-foreground">No open positions</div>
+    return (
+      <div className="flex h-[300px] w-full items-center justify-center">
+        <EmptyPlaceholder
+          className="mx-auto flex max-w-[400px] items-center justify-center"
+          icon={<Icons.TrendingUp className="h-10 w-10" />}
+          title="No Open Positions"
+          description="You don't have any open swing trading positions at the moment. Closed trades will appear in your performance metrics."
+        />
+      </div>
+    )
   }
 
   return (

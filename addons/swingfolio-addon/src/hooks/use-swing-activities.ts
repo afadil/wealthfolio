@@ -7,12 +7,17 @@ export function useSwingActivities(ctx: AddonContext) {
   const { preferences } = useSwingPreferences(ctx)
 
   return useQuery({
-    queryKey: ["swing-activities", preferences.selectedAccounts],
+    queryKey: ["swing-activities", preferences.selectedAccounts, preferences.includeDividends],
     queryFn: async (): Promise<SwingActivity[]> => {
       try {
-        // Use search API with filters for BUY/SELL activities only
+        // Use search API with filters for BUY/SELL activities, and optionally DIVIDEND
+        const activityTypes = ["BUY", "SELL"];
+        if (preferences.includeDividends) {
+          activityTypes.push("DIVIDEND");
+        }
+        
         const filters = {
-          activityType: ["BUY", "SELL"], // Filter for trading activities only
+          activityType: activityTypes,
           ...(preferences.selectedAccounts.length > 0 && {
             accountId: preferences.selectedAccounts
           })

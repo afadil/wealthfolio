@@ -9,6 +9,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   formatAmount,
+  EmptyPlaceholder,
+  Icons,
 } from '@wealthfolio/ui';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import type { TradeDistribution } from '../types';
@@ -76,15 +78,19 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
+  // Check if there's data for charts
+  const hasSymbolData = symbolData.length > 0;
+  const hasHoldingPeriodData = holdingPeriodData.length > 0;
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* P/L by Symbol */}
-     
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">P/L by Symbol</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">P/L by Symbol</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasSymbolData ? (
             <ChartContainer config={chartConfig} className="h-[300px]">
               <BarChart data={symbolData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid vertical={false} />
@@ -109,18 +115,37 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                     />
                   }
                 />
-                <Bar dataKey="pl" fill="var(--color-pl)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="pl" fill="var(--color-pl)" radius={[2, 2, 0, 0]}>
+                  {symbolData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.pl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                      fillOpacity={0.6}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ChartContainer>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="flex h-[300px] w-full items-center justify-center">
+              <EmptyPlaceholder
+                className="mx-auto flex max-w-[420px] items-center justify-center"
+                icon={<Icons.BarChart className="h-10 w-10" />}
+                title="No Symbol Data"
+                description="No completed trades in this period to analyze P/L by symbol. Switch to a different time period or wait for more trading activity."
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* P/L by Holding Period */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-lg'>P/L by Holding Period</CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* P/L by Holding Period */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='text-lg'>P/L by Holding Period</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasHoldingPeriodData ? (
             <ChartContainer config={chartConfig} className="h-[300px]">
               <BarChart
                 data={holdingPeriodData}
@@ -148,11 +173,29 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                     />
                   }
                 />
-                <Bar dataKey="pl" fill="hsl(var(--chart-3))" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="pl" fill="hsl(var(--chart-3))" radius={[2, 2, 0, 0]}>
+                  {holdingPeriodData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.pl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                      fillOpacity={0.6}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ChartContainer>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="flex h-[300px] w-full items-center justify-center">
+              <EmptyPlaceholder
+                className="mx-auto flex max-w-[420px] items-center justify-center"
+                icon={<Icons.Clock className="h-10 w-10" />}
+                title="No Holding Period Data"
+                description="No completed trades in this period to analyze P/L by holding period. This chart shows performance across different time horizons."
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
    
       {/* Trade Count Distribution */}
       {/* <Card>

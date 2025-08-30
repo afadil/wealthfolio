@@ -1,5 +1,3 @@
-"use client"
-
 import { ComponentProps } from "react"
 import { getLocalTimeZone, today } from "@internationalized/date"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"

@@ -1,4 +1,4 @@
-"use client"
+
 import {
   ApplicationShell,
   Card,
@@ -13,7 +13,6 @@ import {
   SelectValue,
   Checkbox,
   Label,
-  Input,
   Icons,
 } from "@wealthfolio/ui"
 import type { AddonContext } from "@wealthfolio/addon-sdk"
@@ -42,24 +41,6 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
     updatePreferences({ includeDividends: checked })
   }
 
-  const handleColorThresholdChange = (
-    type: "positive" | "negative",
-    level: "light" | "medium" | "dark",
-    value: string,
-  ) => {
-    const numValue = Number.parseFloat(value)
-    if (!isNaN(numValue)) {
-      updatePreferences({
-        calendarColorThresholds: {
-          ...preferences.calendarColorThresholds,
-          [type]: {
-            ...preferences.calendarColorThresholds[type],
-            [level]: type === "negative" ? -Math.abs(numValue) : Math.abs(numValue),
-          },
-        },
-      })
-    }
-  }
 
   return (
     <ApplicationShell className="p-6">
@@ -160,111 +141,6 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
             </p>
           </CardContent>
         </Card>
-
-        {/* Calendar Color Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendar Color Thresholds</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">Set return percentage thresholds for calendar day coloring</p>
-
-            <div className="grid grid-cols-2 gap-6">
-              {/* Positive Thresholds */}
-              <div>
-                <h4 className="text-sm font-medium text-green-600 mb-3">Positive Returns</h4>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="pos-light" className="text-xs">
-                      Light Green (%)
-                    </Label>
-                    <Input
-                      id="pos-light"
-                      type="number"
-                      step="0.1"
-                      value={preferences.calendarColorThresholds.positive.light}
-                      onChange={(e) => handleColorThresholdChange("positive", "light", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pos-medium" className="text-xs">
-                      Medium Green (%)
-                    </Label>
-                    <Input
-                      id="pos-medium"
-                      type="number"
-                      step="0.1"
-                      value={preferences.calendarColorThresholds.positive.medium}
-                      onChange={(e) => handleColorThresholdChange("positive", "medium", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pos-dark" className="text-xs">
-                      Dark Green (%)
-                    </Label>
-                    <Input
-                      id="pos-dark"
-                      type="number"
-                      step="0.1"
-                      value={preferences.calendarColorThresholds.positive.dark}
-                      onChange={(e) => handleColorThresholdChange("positive", "dark", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Negative Thresholds */}
-              <div>
-                <h4 className="text-sm font-medium text-red-600 mb-3">Negative Returns</h4>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="neg-light" className="text-xs">
-                      Light Red (%)
-                    </Label>
-                    <Input
-                      id="neg-light"
-                      type="number"
-                      step="0.1"
-                      value={Math.abs(preferences.calendarColorThresholds.negative.light)}
-                      onChange={(e) => handleColorThresholdChange("negative", "light", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="neg-medium" className="text-xs">
-                      Medium Red (%)
-                    </Label>
-                    <Input
-                      id="neg-medium"
-                      type="number"
-                      step="0.1"
-                      value={Math.abs(preferences.calendarColorThresholds.negative.medium)}
-                      onChange={(e) => handleColorThresholdChange("negative", "medium", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="neg-dark" className="text-xs">
-                      Dark Red (%)
-                    </Label>
-                    <Input
-                      id="neg-dark"
-                      type="number"
-                      step="0.1"
-                      value={Math.abs(preferences.calendarColorThresholds.negative.dark)}
-                      onChange={(e) => handleColorThresholdChange("negative", "dark", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Save Status */}
         {isUpdating && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
