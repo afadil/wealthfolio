@@ -51,8 +51,8 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<Icons.TrendingUp className="h-10 w-10" />}
-          title="No equity curve data available"
-          description="There is no equity curve data for the selected period. Try selecting a different time range or check back later."
+          title="No data available"
+          description="There is no equity curve data for the selected period. Try selecting a different time range or check the selected activities."
         />
       </div>
     )
@@ -63,7 +63,7 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
   const tooltipDateFormat = periodType === 'daily' ? "MMMM dd, yyyy" : "MMMM yyyy";
 
   return (
-    <div className="flex h-full min-h-[400px] w-full items-center justify-center py-12">
+    <div className="flex h-full min-h-[300px] w-full items-center justify-center py-12">
       <ChartContainer
         config={{
           periodPL: {

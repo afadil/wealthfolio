@@ -1,7 +1,7 @@
 {
   "id": "swingfolio-addon",
   "name": "Swingfolio: Simple Stock Trading Tracker",
-  "version": "1.0.4",
+  "version": "1.0.0",
   "description": "A simple swing stock trading tracker with performance analytics and calendar views",
   "author": "Wealthfolio",
   "main": "dist/addon.js",
@@ -13,10 +13,16 @@
       "functions": [
         "search"
       ],
+      "functions": [
+        "search"
+      ],
       "purpose": "Access and manage trading activities for swing trading analysis"
     },
     {
       "category": "portfolio",
+      "functions": [
+        "getHoldings"
+      ],
       "functions": [
         "getHoldings"
       ],
@@ -35,9 +41,25 @@
         "get"
       ],
       "purpose": "Access to application settings to get the base currency"
+      "category": "currency",
+      "functions": [
+        "getAll"
+      ],
+      "purpose": "Access to exchange rates and currency data"
+    },
+    {
+      "category": "settings",
+      "functions": [
+        "get"
+      ],
+      "purpose": "Access to application settings to get the base currency"
     },
     {
       "category": "ui",
+      "functions": [
+        "sidebar.addItem",
+        "router.add"
+      ],
       "functions": [
         "sidebar.addItem",
         "router.add"
