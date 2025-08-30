@@ -110,13 +110,13 @@ export class TradeMatcher {
       unmatchedSells.push(...result.unmatchedSells)
 =======
     const parsedActivities = this.parseActivities(activities);
-
+    
     // Separate trading activities from dividends
     const tradingActivities = parsedActivities.filter(
       (a) => a.activityType === 'BUY' || a.activityType === 'SELL',
     );
     const dividendActivities = parsedActivities.filter((a) => a.activityType === 'DIVIDEND');
-
+    
     // Group activities by symbol
     const bySymbol = this.groupBySymbol(tradingActivities);
     const dividendsBySymbol = this.groupBySymbol(dividendActivities);
@@ -967,4 +967,3 @@ export class TradeMatcher {
       }, 0);
   }
 }
->>>>>>> 321ae1d (Resolve merge conflict in trade-matcher.ts)
