@@ -10,10 +10,7 @@ const DEFAULT_PREFERENCES: SwingTradePreferences = {
   defaultDateRange: "YTD",
   includeFees: true,
   includeDividends: false,
-  calendarColorThresholds: {
-    positive: { light: 0.5, medium: 2.0, dark: 5.0 },
-    negative: { light: -0.5, medium: -2.0, dark: -5.0 },
-  },
+  reportingCurrency: "USD",
 }
 
 const PREFERENCES_KEY = "swingfolio_preferences"

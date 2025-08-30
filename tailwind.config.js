@@ -10,6 +10,7 @@ export default {
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
     './packages/ui/src/**/*.{ts,tsx}',
+    './addons/**/*.{ts,tsx}',
   ],
   theme: {
     container: {

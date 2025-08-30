@@ -45,13 +45,13 @@ export class TradeMatcher {
   matchTrades(activities: ActivityDetails[]): TradeMatchResult {
     // Ensure all numeric fields are properly parsed
     const parsedActivities = this.parseActivities(activities);
-
+    
     // Separate trading activities from dividends
     const tradingActivities = parsedActivities.filter(
       (a) => a.activityType === 'BUY' || a.activityType === 'SELL',
     );
     const dividendActivities = parsedActivities.filter((a) => a.activityType === 'DIVIDEND');
-
+    
     // Group activities by symbol
     const bySymbol = this.groupBySymbol(tradingActivities);
     const dividendsBySymbol = this.groupBySymbol(dividendActivities);

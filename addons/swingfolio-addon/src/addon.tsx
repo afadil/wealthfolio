@@ -1,10 +1,10 @@
 import React from "react"
 import { QueryClientProvider } from "@tanstack/react-query"
 import type { AddonContext, AddonEnableFunction } from "@wealthfolio/addon-sdk"
-import { Icons } from "@wealthfolio/ui"
 import DashboardPage from "./pages/dashboard-page"
 import ActivitySelectorPage from "./pages/activity-selector-page"
 import SettingsPage from "./pages/settings-page"
+import { SwingfolioIcon } from "./components/swingfolio-icon"
 
 // Main addon component wrapper
 function SwingfolioAddon({ ctx }: { ctx: AddonContext }) {
@@ -27,7 +27,7 @@ const enable: AddonEnableFunction = (context) => {
     const sidebarItem = context.sidebar.addItem({
       id: "swingfolio",
       label: "Swingfolio",
-      icon: <Icons.ChartBar className="h-5 w-5" />,
+      icon: <SwingfolioIcon />,
       route: "/addons/swingfolio",
       order: 150,
     })

@@ -1,4 +1,4 @@
-import { Button, Icons, GainAmount, Card, CardHeader, CardContent } from '@wealthfolio/ui';
+import { Button, Icons, GainAmount } from '@wealthfolio/ui';
 import type { CalendarMonth, CalendarDay } from '../types';
 import {
   format,
@@ -126,33 +126,31 @@ function DailyCalendarView({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Daily Trading Calendar</h3>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <span>Monthly P/L:</span>
-              <GainAmount value={monthlyPL} currency={currency} />
-              <span>•</span>
-              <span>{monthlyTrades} trades</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
-              <Icons.ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-3 text-sm font-medium">
-              {format(selectedYear, 'MMM yyyy')}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleNextMonth}>
-              <Icons.ChevronRight className="h-4 w-4" />
-            </Button>
+    <div>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold">Daily Trading Calendar</h3>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span>Monthly P/L:</span>
+            <GainAmount value={monthlyPL} currency={currency} />
+            <span>•</span>
+            <span>{monthlyTrades} trades</span>
           </div>
         </div>
-      </CardHeader>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={handlePreviousMonth} className="rounded-full">
+            <Icons.ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="px-3 text-sm font-medium">
+            {format(selectedYear, 'MMM yyyy')}
+          </span> 
+          <Button variant="outline" size="sm" onClick={handleNextMonth} className="rounded-full">
+            <Icons.ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
       
-      <CardContent className="p-4">
+      <div className="p-4">
         {/* Calendar table - bulletproof layout with centering */}
         <div className="w-full flex justify-center">
           <div className="w-full max-w-2xl"> {/* Max width to prevent over-stretching */}
@@ -255,8 +253,8 @@ function DailyCalendarView({
             </table>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -295,31 +293,29 @@ function YearlyCalendarView({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Yearly Trading Calendar</h3>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <span>Yearly P/L:</span>
-              <GainAmount value={yearlyPL} currency={currency} />
-              <span>•</span>
-              <span>{yearlyTrades} trades</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={handlePreviousYear}>
-              <Icons.ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-3 text-sm font-medium">{format(selectedYear, 'yyyy')}</span>
-            <Button variant="outline" size="sm" onClick={handleNextYear}>
-              <Icons.ChevronRight className="h-4 w-4" />
-            </Button>
+    <div>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold">Yearly Trading Calendar</h3>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span>Yearly P/L:</span>
+            <GainAmount value={yearlyPL} currency={currency} />
+            <span>•</span>
+            <span>{yearlyTrades} trades</span>
           </div>
         </div>
-      </CardHeader>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={handlePreviousYear} className="rounded-full">
+            <Icons.ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="px-3 text-sm font-medium">{format(selectedYear, 'yyyy')}</span>
+          <Button variant="outline" size="sm" onClick={handleNextYear} className="rounded-full" >
+            <Icons.ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
       
-      <CardContent className="p-4">
+      <div className="p-4">
         {/* Yearly Calendar Table - same design as daily calendar */}
         <div className="w-full flex justify-center">
           <div className="w-full max-w-2xl">
@@ -391,7 +387,7 @@ function YearlyCalendarView({
             </table>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

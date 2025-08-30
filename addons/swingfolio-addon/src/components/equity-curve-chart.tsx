@@ -1,5 +1,3 @@
-"use client"
-
 import { format, parseISO } from "date-fns"
 import {
   Bar,
@@ -8,6 +6,7 @@ import {
   Line,
   XAxis,
   YAxis,
+  Cell,
 } from 'recharts';
 import {
   ChartContainer,
@@ -51,8 +50,8 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<Icons.TrendingUp className="h-10 w-10" />}
-          title="No equity curve data available"
-          description="There is no equity curve data for the selected period. Try selecting a different time range or check back later."
+          title="No data available"
+          description="There is no equity curve data for the selected period. Try selecting a different time range or check the selected activities."
         />
       </div>
     )
@@ -63,7 +62,7 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
   const tooltipDateFormat = periodType === 'daily' ? "MMMM dd, yyyy" : "MMMM yyyy";
 
   return (
-    <div className="flex h-full min-h-[400px] w-full items-center justify-center py-12">
+    <div className="flex h-full min-h-[300px] w-full items-center justify-center py-12">
       <ChartContainer
         config={{
           periodPL: {
@@ -79,6 +78,7 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
         className="h-full w-full"
       >
       <ComposedChart data={chartData}>
+
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
@@ -130,10 +130,18 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
         <Bar
           yAxisId="left"
           dataKey="periodPL"
-          fill="var(--color-periodPL)"
+          fill="hsl(var(--chart-1))"
           radius={[4, 4, 0, 0]}
           barSize={20}
-        />
+        >
+          {chartData.map((entry, index) => (
+            <Cell
+              key={`cell-${index}`}
+              fill={entry.periodPL >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+              fillOpacity={0.6}
+            />
+          ))}
+        </Bar>
         <Line
           yAxisId="right"
           type="monotone"

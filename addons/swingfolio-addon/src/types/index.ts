@@ -9,10 +9,6 @@ export interface SwingTradePreferences {
   defaultDateRange: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL' | 'CUSTOM';
   includeFees: boolean;
   includeDividends: boolean;
-  calendarColorThresholds: {
-    positive: { light: number; medium: number; dark: number }
-    negative: { light: number; medium: number; dark: number }
-  }
 }
 
 export interface ClosedTrade {
@@ -25,6 +21,7 @@ export interface ClosedTrade {
   entryPrice: number
   exitPrice: number
   totalFees: number
+  totalDividends: number
   realizedPL: number
   returnPercent: number
   holdingPeriodDays: number
@@ -45,6 +42,7 @@ export interface OpenPosition {
   marketValue: number
   unrealizedPL: number
   unrealizedReturnPercent: number
+  totalDividends: number
   daysOpen: number
   openDate: Date
   accountId: string
