@@ -16,8 +16,7 @@ import { useSwingDashboard } from '../hooks/use-swing-dashboard';
 import { EquityCurveChart } from '../components/equity-curve-chart';
 import { OpenTradesTable } from '../components/open-trades-table';
 import { DistributionCharts } from '../components/distribution-charts';
-import { YearlyCalendarView } from '../components/yearly-calendar-view';
-
+import { AdaptiveCalendarView } from '../components/adaptive-calendar-view';
 
 const periods: { code: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL'; label: string }[] = [
   { code: '1M', label: '1M' },
@@ -28,33 +27,17 @@ const periods: { code: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL'; label: string 
   { code: 'ALL', label: 'ALL' },
 ];
 
-type ChartPeriodType = 'daily' | 'monthly';
-
-const ChartPeriodSelector: React.FC<{
-  selectedType: ChartPeriodType;
-  onTypeSelect: (type: ChartPeriodType) => void;
-}> = ({ selectedType, onTypeSelect }) => (
-  <div className="flex justify-end">
-    <div className="flex space-x-1 rounded-full bg-secondary p-1">
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedType === 'daily' ? 'default' : 'ghost'}
-        onClick={() => onTypeSelect('daily')}
-      >
-        Daily
-      </Button>
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedType === 'monthly' ? 'default' : 'ghost'}
-        onClick={() => onTypeSelect('monthly')}
-      >
-        Monthly
-      </Button>
-    </div>
-  </div>
-);
+// Chart period type is now automatically determined based on selected period
+const getChartPeriodDisplay = (period: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL') => {
+  switch (period) {
+    case '1M':
+      return { type: 'Daily', description: 'Daily P/L and cumulative equity performance' };
+    case '3M':
+      return { type: 'Weekly', description: 'Weekly P/L and cumulative equity performance' };
+    default:
+      return { type: 'Monthly', description: 'Monthly P/L and cumulative equity performance' };
+  }
+};
 
 const PeriodSelector: React.FC<{
   selectedPeriod: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
@@ -85,10 +68,9 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL'>(
     'YTD',
   );
-  const [chartPeriodType, setChartPeriodType] = useState<ChartPeriodType>('monthly');
   const [selectedYear, setSelectedYear] = useState(new Date());
 
-  const { data: dashboardData, isLoading, error, refetch } = useSwingDashboard(ctx, selectedPeriod, chartPeriodType);
+  const { data: dashboardData, isLoading, error, refetch } = useSwingDashboard(ctx, selectedPeriod);
 
   const handleNavigateToActivities = () => {
     ctx.api.navigation.navigate('/addons/swingfolio/activities');
@@ -119,7 +101,28 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
     );
   }
 
-  const { metrics, closedTrades, openPositions, periodPL, distribution, calendar } = dashboardData;
+  const { metrics, openPositions, periodPL, distribution, calendar } = dashboardData;
+
+  // Check if no activities are selected
+  if (metrics.totalTrades === 0 && metrics.openPositions === 0) {
+    return (
+      <ApplicationShell className="p-6">
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+          <div className="text-center">
+            <Icons.BarChart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold">No Swing Trading Activities Selected</h3>
+            <p className="mb-4 text-muted-foreground">
+              Select BUY and SELL activities to start tracking your swing trading performance
+            </p>
+            <Button onClick={handleNavigateToActivities} className="mx-auto">
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Select Activities
+            </Button>
+          </div>
+        </div>
+      </ApplicationShell>
+    );
+  }
 
   // Transform PeriodPL data to EquityPoint format for the chart
   const chartEquityData = periodPL.map((period, index) => {
@@ -127,7 +130,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
     const cumulativeRealizedPL = periodPL
       .slice(0, index + 1)
       .reduce((sum, p) => sum + p.realizedPL, 0);
-    
+
     return {
       date: period.date,
       cumulativeRealizedPL,
@@ -147,10 +150,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
+          <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
           <Button variant="outline" onClick={handleNavigateToActivities}>
             <Icons.Settings className="mr-2 h-4 w-4" />
             Select Activities
@@ -175,11 +175,11 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
-                  {metrics.totalTrades + metrics.openPositions} positions
+                  {selectedPeriod !== 'ALL'
+                    ? `${selectedPeriod} realized + all open`
+                    : 'All positions'}
                 </p>
-                <div className="text-xs font-medium text-muted-foreground">
-                  Combined P/L
-                </div>
+                <div className="text-xs font-medium text-muted-foreground">Combined P/L</div>
               </div>
             </CardContent>
           </Card>
@@ -195,13 +195,11 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
-                  {metrics.totalTrades} closed trades
+                  {selectedPeriod !== 'ALL'
+                    ? `${metrics.totalTrades} trades (${selectedPeriod})`
+                    : `${metrics.totalTrades} closed trades`}
                 </p>
-                <GainPercent 
-                  value={metrics.winRate / 100} 
-                  className="text-xs"
-                  showSign={false}
-                />
+                <GainPercent value={metrics.winRate / 100} className="text-xs" showSign={false} />
               </div>
             </CardContent>
           </Card>
@@ -221,12 +219,10 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
-                  {metrics.openPositions} open positions
+                  {metrics.openPositions} open positions (all)
                 </p>
                 {metrics.totalUnrealizedPL !== 0 && (
-                  <div className="text-xs font-medium text-muted-foreground">
-                    Mark to market
-                  </div>
+                  <div className="text-xs font-medium text-muted-foreground">Mark to market</div>
                 )}
               </div>
             </CardContent>
@@ -234,70 +230,118 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Key Metrics</CardTitle>
+              <CardTitle className="text-sm font-medium">Performance Metrics</CardTitle>
               <Icons.BarChart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Win Rate</span>
-                  <GainPercent value={metrics.winRate / 100} className="text-sm font-semibold" showSign={false} />
+              <div className="space-y-3">
+                {/* Primary Metrics Row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Win Rate</div>
+                    <div className="text-lg font-bold">
+                      <GainPercent
+                        value={metrics.winRate / 100}
+                        className="text-lg font-bold"
+                        showSign={false}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Profit Factor</div>
+                    <div className="text-lg font-bold">
+                      {metrics.profitFactor === Number.POSITIVE_INFINITY
+                        ? '∞'
+                        : metrics.profitFactor.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Profit Factor</span>
-                  <span className="text-sm font-semibold">
-                    {metrics.profitFactor === Number.POSITIVE_INFINITY ? '∞' : metrics.profitFactor.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Expectancy</span>
-                  <GainAmount 
-                    value={metrics.expectancy} 
-                    currency={metrics.currency} 
-                    className="text-sm font-semibold"
-                    displayDecimal={false}
-                  />
+                
+                {/* Secondary Metrics */}
+                <div className="space-y-2 pt-1 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Expectancy</span>
+                    <GainAmount
+                      value={metrics.expectancy}
+                      currency={metrics.currency}
+                      className="text-sm font-semibold"
+                      displayDecimal={false}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Avg Win</span>
+                    <GainAmount
+                      value={metrics.averageWin}
+                      currency={metrics.currency}
+                      className="text-sm font-semibold"
+                      displayDecimal={false}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Avg Loss</span>
+                    <GainAmount
+                      value={-metrics.averageLoss}
+                      currency={metrics.currency}
+                      className="text-sm font-semibold"
+                      displayDecimal={false}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Avg Hold</span>
+                    <span className="text-sm font-semibold">
+                      {metrics.averageHoldingDays.toFixed(1)}d
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts Row - Equity Curve 3/4 and Performance Metrics 1/4 */}
+        {/* Charts Row - Equity Curve and Calendar */}
         <div className="grid gap-6 md:grid-cols-4">
           {/* Equity Curve */}
-          <Card className="md:col-span-3">
-            <CardHeader className="pb-4">
+          <Card className="md:col-span-2 flex flex-col">
+            <CardHeader className="pb-4 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className='text-lg'>
-                    {chartPeriodType === 'daily' ? 'Daily' : 'Monthly'} Equity Curve
+                  <CardTitle className="text-lg">
+                    {getChartPeriodDisplay(selectedPeriod).type} Equity Curve
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {chartPeriodType === 'daily' ? 'Daily' : 'Monthly'} P/L and cumulative equity performance
+                    {getChartPeriodDisplay(selectedPeriod).description}
                   </p>
                 </div>
-                <ChartPeriodSelector
-                  selectedType={chartPeriodType}
-                  onTypeSelect={setChartPeriodType}
-                />
+                <div className="rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
+                  {selectedPeriod} → {getChartPeriodDisplay(selectedPeriod).type}
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-                <EquityCurveChart 
-                  data={chartEquityData} 
-                  currency={metrics.currency} 
-                  periodType={chartPeriodType}
-                />
+            <CardContent className="py-12 flex-1 flex flex-col min-h-0">
+              <EquityCurveChart
+                data={chartEquityData}
+                currency={metrics.currency}
+                periodType={
+                  selectedPeriod === '1M' ? 'daily' : selectedPeriod === '3M' ? 'weekly' : 'monthly'
+                }
+              />
             </CardContent>
           </Card>
-
+          <div className="md:col-span-2">
+            <AdaptiveCalendarView
+              calendar={calendar}
+              selectedPeriod={selectedPeriod}
+              selectedYear={selectedYear}
+              onYearChange={setSelectedYear}
+              currency={metrics.currency}
+            />
+          </div>
           {/* Performance Metrics */}
-          <Card className="md:col-span-1">
+          {/* <Card className="md:col-span-1">
             <CardHeader className="pb-4">
-              <CardTitle className='text-lg'>Performance Metrics</CardTitle>
+              <CardTitle className="text-lg">Performance Metrics</CardTitle>
             </CardHeader>
-            <CardContent className="pt-0 space-y-6">
+            <CardContent className="space-y-6 pt-0">
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Expectancy</span>
                 <span className="text-sm font-medium">
@@ -321,24 +365,16 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
                 <span className="text-sm font-medium">{metrics.averageHoldingDays.toFixed(1)}</span>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
 
         {/* Calendar and Open Positions */}
         <div className="grid gap-6 lg:grid-cols-2">
-        
-              <YearlyCalendarView
-                calendar={calendar}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                currency={metrics.currency}
-              />
-          
-
           <Card>
             <CardHeader>
-              <CardTitle className='text-lg'>Open Positions</CardTitle>
-              <p className='text-sm text-muted-foreground'>  {openPositions.length} open position{openPositions.length !== 1 ? "s" : ""}</p>
+              <CardTitle className="text-lg">
+                Open Positions <span className="font-light text-muted-foreground">({openPositions.length})</span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <OpenTradesTable positions={openPositions} />

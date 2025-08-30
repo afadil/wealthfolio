@@ -17,11 +17,14 @@ interface AverageLot {
   remainingQuantity: number
 }
 
-interface TradeMatcherOptions {
+export interface TradeMatcherOptions {
   lotMethod?: "FIFO" | "LIFO" | "AVERAGE"
   includeFees?: boolean
 }
 
+/**
+ * TradeMatcher class for matching buy and sell activities to compute closed trades and open positions
+ */
 export class TradeMatcher {
   private lotMethod: "FIFO" | "LIFO" | "AVERAGE"
   private includeFees: boolean
@@ -31,18 +34,17 @@ export class TradeMatcher {
     this.includeFees = options.includeFees !== false // Default to true
   }
 
+  /**
+   * Match trades from a list of activities
+   */
   matchTrades(activities: ActivityDetails[]): TradeMatchResult {
-    // Ensure all numeric fields are numbers, not strings from JSON
-    const parsedActivities = activities.map(a => ({
-      ...a,
-      quantity: typeof a.quantity === 'string' ? parseFloat(a.quantity) : a.quantity,
-      unitPrice: typeof a.unitPrice === 'string' ? parseFloat(a.unitPrice) : a.unitPrice,
-      fee: typeof a.fee === 'string' ? parseFloat(a.fee) : a.fee,
-      amount: typeof a.amount === 'string' ? parseFloat(a.amount) : a.amount,
-    }));
 
+    console.log(JSON.stringify(activities, null, 2))
+    // Ensure all numeric fields are properly parsed
+    const parsedActivities = this.parseActivities(activities)
+    
     // Group activities by symbol
-    const bySymbol = this.groupBySymbol(parsedActivities as ActivityDetails[])
+    const bySymbol = this.groupBySymbol(parsedActivities)
 
     const closedTrades: ClosedTrade[] = []
     const openPositions: OpenPosition[] = []
@@ -67,6 +69,31 @@ export class TradeMatcher {
     }
   }
 
+  /**
+   * Parse activities to ensure numeric fields are numbers
+   */
+  private parseActivities(activities: ActivityDetails[]): ActivityDetails[] {
+    return activities.map(a => ({
+      ...a,
+      quantity: this.parseNumber(a.quantity),
+      unitPrice: this.parseNumber(a.unitPrice),
+      fee: this.parseNumber(a.fee),
+      amount: this.parseNumber(a.amount),
+    }))
+  }
+
+  /**
+   * Safely parse a value to number
+   */
+  private parseNumber(value: any): number {
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') return parseFloat(value) || 0
+    return 0
+  }
+
+  /**
+   * Group activities by symbol
+   */
   private groupBySymbol(activities: ActivityDetails[]): Record<string, ActivityDetails[]> {
     return activities.reduce(
       (acc, activity) => {
@@ -81,8 +108,14 @@ export class TradeMatcher {
     )
   }
 
+  /**
+   * Match trades for a specific symbol
+   */
   private matchSymbolTrades(symbol: string, activities: ActivityDetails[]): TradeMatchResult {
-    const sortedActivities = [...activities].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    // Sort activities chronologically
+    const sortedActivities = [...activities].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
 
     if (this.lotMethod === "AVERAGE") {
       return this.matchSymbolTradesAverage(symbol, sortedActivities)
@@ -91,38 +124,27 @@ export class TradeMatcher {
     }
   }
 
-  private matchSymbolTradesAverage(symbol: string, activities: ActivityDetails[]): TradeMatchResult {
+  /**
+   * Match trades using average cost method
+   */
+  private matchSymbolTradesAverage(
+    symbol: string, 
+    activities: ActivityDetails[]
+  ): TradeMatchResult {
     const closedTrades: ClosedTrade[] = []
     const openPositions: OpenPosition[] = []
     const unmatchedBuys: ActivityDetails[] = []
     const unmatchedSells: ActivityDetails[] = []
 
-    // Process all activities in chronological order for average cost
-    const allActivities = activities
-    
     let averageLot: AverageLot | null = null
     
-    for (const activity of allActivities) {
+    for (const activity of activities) {
       if (activity.activityType === "BUY") {
         // Add to average lot
         if (!averageLot) {
-          averageLot = {
-            symbol,
-            totalQuantity: activity.quantity,
-            totalCostBasis: activity.unitPrice * activity.quantity,
-            averagePrice: activity.unitPrice,
-            activities: [activity],
-            remainingQuantity: activity.quantity,
-          }
+          averageLot = this.createNewAverageLot(activity, symbol)
         } else {
-          const newTotalQuantity = averageLot.remainingQuantity + activity.quantity
-          const newTotalCostBasis = (averageLot.averagePrice * averageLot.remainingQuantity) + (activity.unitPrice * activity.quantity)
-          
-          averageLot.totalQuantity = averageLot.totalQuantity + activity.quantity
-          averageLot.remainingQuantity = newTotalQuantity
-          averageLot.totalCostBasis = newTotalCostBasis
-          averageLot.averagePrice = newTotalCostBasis / newTotalQuantity
-          averageLot.activities.push(activity)
+          this.updateAverageLot(averageLot, activity)
         }
       } else if (activity.activityType === "SELL") {
         // Process sell against average lot
@@ -137,7 +159,12 @@ export class TradeMatcher {
           const matchedQuantity = Math.min(sellQuantityRemaining, averageLot.remainingQuantity)
 
           // Create closed trade using average price
-          const closedTrade = this.createClosedTradeAverage(averageLot, activity, matchedQuantity, symbol)
+          const closedTrade = this.createClosedTradeAverage(
+            averageLot, 
+            activity, 
+            matchedQuantity, 
+            symbol
+          )
           closedTrades.push(closedTrade)
 
           // Update quantities
@@ -145,11 +172,12 @@ export class TradeMatcher {
           averageLot.remainingQuantity -= matchedQuantity
         }
 
+        // Reset average lot if fully sold
         if (averageLot.remainingQuantity <= 0) {
           averageLot = null
         }
 
-        // If sell quantity remains, it's unmatched
+        // Handle remaining unmatched sell quantity
         if (sellQuantityRemaining > 0) {
           unmatchedSells.push({
             ...activity,
@@ -173,7 +201,43 @@ export class TradeMatcher {
     }
   }
 
-  private matchSymbolTradesSpecific(symbol: string, activities: ActivityDetails[]): TradeMatchResult {
+  /**
+   * Create a new average lot
+   */
+  private createNewAverageLot(activity: ActivityDetails, symbol: string): AverageLot {
+    return {
+      symbol,
+      totalQuantity: activity.quantity,
+      totalCostBasis: activity.unitPrice * activity.quantity,
+      averagePrice: activity.unitPrice,
+      activities: [activity],
+      remainingQuantity: activity.quantity,
+    }
+  }
+
+  /**
+   * Update existing average lot with new buy activity
+   */
+  private updateAverageLot(averageLot: AverageLot, activity: ActivityDetails): void {
+    const newTotalQuantity = averageLot.remainingQuantity + activity.quantity
+    const newTotalCostBasis = 
+      (averageLot.averagePrice * averageLot.remainingQuantity) + 
+      (activity.unitPrice * activity.quantity)
+    
+    averageLot.totalQuantity += activity.quantity
+    averageLot.remainingQuantity = newTotalQuantity
+    averageLot.totalCostBasis = newTotalCostBasis
+    averageLot.averagePrice = newTotalCostBasis / newTotalQuantity
+    averageLot.activities.push(activity)
+  }
+
+  /**
+   * Match trades using FIFO or LIFO method
+   */
+  private matchSymbolTradesSpecific(
+    symbol: string, 
+    activities: ActivityDetails[]
+  ): TradeMatchResult {
     const closedTrades: ClosedTrade[] = []
     const openPositions: OpenPosition[] = []
     const unmatchedSells: ActivityDetails[] = []
@@ -191,17 +255,16 @@ export class TradeMatcher {
         let sellQuantityRemaining = activity.quantity
 
         while (sellQuantityRemaining > 0 && lots.length > 0) {
-          let lotIndex: number
-          if (this.lotMethod === "FIFO") {
-            lotIndex = 0
-          } else { // LIFO
-            lotIndex = lots.length - 1
-          }
-          
+          const lotIndex = this.lotMethod === "FIFO" ? 0 : lots.length - 1
           const lot = lots[lotIndex]
           const matchedQuantity = Math.min(sellQuantityRemaining, lot.remainingQuantity)
 
-          const closedTrade = this.createClosedTrade(lot.activity, activity, matchedQuantity, symbol)
+          const closedTrade = this.createClosedTrade(
+            lot.activity, 
+            activity, 
+            matchedQuantity, 
+            symbol
+          )
           closedTrades.push(closedTrade)
 
           sellQuantityRemaining -= matchedQuantity
@@ -221,6 +284,7 @@ export class TradeMatcher {
       }
     }
 
+    // Create open positions from remaining lots
     for (const lot of lots) {
       if (lot.remainingQuantity > 0) {
         const openPosition = this.createOpenPosition(lot, symbol)
@@ -228,7 +292,6 @@ export class TradeMatcher {
       }
     }
 
-    // For specific matching, any buy not fully matched is considered open, not "unmatched"
     return {
       closedTrades,
       openPositions,
@@ -237,6 +300,9 @@ export class TradeMatcher {
     }
   }
 
+  /**
+   * Create a closed trade from average lot
+   */
   private createClosedTradeAverage(
     averageLot: AverageLot,
     sellActivity: ActivityDetails,
@@ -244,25 +310,31 @@ export class TradeMatcher {
     symbol: string,
   ): ClosedTrade {
     // Use the earliest buy date for entry date
-    const entryDate = new Date(Math.min(...averageLot.activities.map(a => new Date(a.date).getTime())))
+    const entryDate = new Date(
+      Math.min(...averageLot.activities.map(a => new Date(a.date).getTime()))
+    )
     const exitDate = new Date(sellActivity.date)
     const holdingPeriodDays = differenceInDays(exitDate, entryDate)
 
     // Calculate fees proportionally
     const totalBuyFees = averageLot.activities.reduce((sum, activity) => sum + activity.fee, 0)
-    const buyFeeAllocation = this.includeFees ? (totalBuyFees * quantity) / averageLot.totalQuantity : 0
+    const buyFeeAllocation = this.includeFees 
+      ? (totalBuyFees * quantity) / averageLot.totalQuantity 
+      : 0
     
     // Sell fees: Calculate proportionally for this sell
-    const sellFeeAllocation = this.includeFees ? (sellActivity.fee * quantity) / sellActivity.quantity : 0
+    const sellFeeAllocation = this.includeFees 
+      ? (sellActivity.fee * quantity) / sellActivity.quantity 
+      : 0
     const totalFees = buyFeeAllocation + sellFeeAllocation
 
-    // Calculate P/L using average cost (without fees) + allocated fees
+    // Calculate P/L using average cost
     const costBasis = averageLot.averagePrice * quantity
     const proceeds = sellActivity.unitPrice * quantity
     const realizedPL = proceeds - costBasis - totalFees
     const returnPercent = costBasis > 0 ? (realizedPL / costBasis) * 100 : 0
 
-    // Get the most relevant buy activity (latest one that contributes to this trade)
+    // Get the most relevant buy activity
     const relevantBuyActivity = averageLot.activities[averageLot.activities.length - 1]
 
     return {
@@ -286,16 +358,21 @@ export class TradeMatcher {
     }
   }
 
+  /**
+   * Create an open position from average lot
+   */
   private createOpenPositionAverage(averageLot: AverageLot, symbol: string): OpenPosition {
-    const openDate = new Date(Math.min(...averageLot.activities.map(a => new Date(a.date).getTime())))
+    const openDate = new Date(
+      Math.min(...averageLot.activities.map(a => new Date(a.date).getTime()))
+    )
     const daysOpen = differenceInDays(new Date(), openDate)
 
-    // For now, use average price as current price (will be updated with real prices)
+    // Initial values (will be updated with real market prices)
     const currentPrice = averageLot.averagePrice
     const marketValue = currentPrice * averageLot.remainingQuantity
     const costBasis = averageLot.averagePrice * averageLot.remainingQuantity
     const unrealizedPL = marketValue - costBasis
-    const unrealizedReturnPercent = (unrealizedPL / costBasis) * 100
+    const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0
 
     const latestActivity = averageLot.activities[averageLot.activities.length - 1]
 
@@ -318,6 +395,9 @@ export class TradeMatcher {
     }
   }
 
+  /**
+   * Create a closed trade from specific lot matching
+   */
   private createClosedTrade(
     buyActivity: ActivityDetails,
     sellActivity: ActivityDetails,
@@ -329,8 +409,12 @@ export class TradeMatcher {
     const holdingPeriodDays = differenceInDays(exitDate, entryDate)
 
     // Calculate fees proportionally
-    const buyFeeAllocation = this.includeFees ? (buyActivity.fee * quantity) / buyActivity.quantity : 0
-    const sellFeeAllocation = this.includeFees ? (sellActivity.fee * quantity) / sellActivity.quantity : 0
+    const buyFeeAllocation = this.includeFees 
+      ? (buyActivity.fee * quantity) / buyActivity.quantity 
+      : 0
+    const sellFeeAllocation = this.includeFees 
+      ? (sellActivity.fee * quantity) / sellActivity.quantity 
+      : 0
     const totalFees = buyFeeAllocation + sellFeeAllocation
 
     // Calculate P/L
@@ -360,16 +444,19 @@ export class TradeMatcher {
     }
   }
 
+  /**
+   * Create an open position from a lot
+   */
   private createOpenPosition(lot: Lot, symbol: string): OpenPosition {
     const openDate = new Date(lot.activity.date)
     const daysOpen = differenceInDays(new Date(), openDate)
 
-    // For now, use entry price as current price (will be updated with real prices)
+    // Initial values (will be updated with real market prices)
     const currentPrice = lot.activity.unitPrice
     const marketValue = currentPrice * lot.remainingQuantity
     const costBasis = lot.activity.unitPrice * lot.remainingQuantity
     const unrealizedPL = marketValue - costBasis
-    const unrealizedReturnPercent = (unrealizedPL / costBasis) * 100
+    const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0
 
     return {
       id: `${lot.activity.id}-open-${Date.now()}`,
