@@ -10,7 +10,6 @@ const DEFAULT_PREFERENCES: SwingTradePreferences = {
   defaultDateRange: "YTD",
   includeFees: true,
   includeDividends: false,
-  reportingCurrency: "USD",
 }
 
 const PREFERENCES_KEY = "swingfolio_preferences"

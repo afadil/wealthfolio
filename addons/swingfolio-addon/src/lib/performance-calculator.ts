@@ -44,10 +44,10 @@ export class PerformanceCalculator {
     const winningTrades = this.closedTrades.filter((trade) => trade.realizedPL > 0)
     const losingTrades = this.closedTrades.filter((trade) => trade.realizedPL < 0)
 
-    // Calculate win rate
+    // Calculate win rate (as decimal, component will format as percentage)
     const winRate =
       this.closedTrades.length > 0 
-        ? (winningTrades.length / this.closedTrades.length) * 100 
+        ? winningTrades.length / this.closedTrades.length
         : 0
 
     // Calculate profit and loss totals
@@ -331,7 +331,7 @@ export class PerformanceCalculator {
    * Calculate expectancy (average expected profit per trade)
    */
   private calculateExpectancy(winRate: number, averageWin: number, averageLoss: number): number {
-    return (winRate / 100) * averageWin - ((100 - winRate) / 100) * averageLoss
+    return winRate * averageWin - (1 - winRate) * averageLoss
   }
 
   /**

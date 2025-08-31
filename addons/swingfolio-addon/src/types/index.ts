@@ -5,7 +5,6 @@ export interface SwingTradePreferences {
   includeSwingTag: boolean;
   selectedAccounts: string[];
   lotMatchingMethod: 'FIFO' | 'LIFO' | 'AVERAGE';
-  reportingCurrency: string;
   defaultDateRange: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL' | 'CUSTOM';
   includeFees: boolean;
   includeDividends: boolean;
