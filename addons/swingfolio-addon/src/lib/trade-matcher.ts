@@ -377,7 +377,7 @@ export class TradeMatcher {
     const costBasis = averageLot.averagePrice * quantity
     const proceeds = sellActivity.unitPrice * quantity
     const realizedPL = proceeds - costBasis - totalFees + totalDividends
-    const returnPercent = costBasis > 0 ? (realizedPL / costBasis) * 100 : 0
+    const returnPercent = costBasis > 0 ? realizedPL / costBasis : 0
 
     // Get the most relevant buy activity
     const relevantBuyActivity = averageLot.activities[averageLot.activities.length - 1]
@@ -423,7 +423,7 @@ export class TradeMatcher {
     const marketValue = currentPrice * averageLot.remainingQuantity
     const costBasis = averageLot.averagePrice * averageLot.remainingQuantity
     const unrealizedPL = marketValue - costBasis + totalDividends
-    const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0
+    const unrealizedReturnPercent = costBasis > 0 ? unrealizedPL / costBasis : 0
 
     const latestActivity = averageLot.activities[averageLot.activities.length - 1]
 
@@ -482,7 +482,7 @@ export class TradeMatcher {
     const costBasis = buyActivity.unitPrice * quantity
     const proceeds = sellActivity.unitPrice * quantity
     const realizedPL = proceeds - costBasis - totalFees + totalDividends
-    const returnPercent = costBasis > 0 ? (realizedPL / costBasis) * 100 : 0
+    const returnPercent = costBasis > 0 ? realizedPL / costBasis : 0
 
     return {
       id: `${buyActivity.id}-${sellActivity.id}-${Date.now()}`,
@@ -523,7 +523,7 @@ export class TradeMatcher {
     const marketValue = currentPrice * lot.remainingQuantity
     const costBasis = lot.activity.unitPrice * lot.remainingQuantity
     const unrealizedPL = marketValue - costBasis + totalDividends
-    const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0
+    const unrealizedReturnPercent = costBasis > 0 ? unrealizedPL / costBasis : 0
 
     return {
       id: `${lot.activity.id}-open-${Date.now()}`,

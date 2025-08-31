@@ -234,7 +234,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Win Rate</span>
                   <GainPercent
-                    value={metrics.winRate / 100}
+                    value={metrics.winRate}
                     className="text-sm font-semibold"
                     showSign={false}
                   />
@@ -302,7 +302,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
         </div>
 
         {/* Charts Row - Equity Curve and Calendar */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {/* Equity Curve */}
           <Card className="flex flex-col">
             <CardHeader className="flex-shrink-0 pb-3">

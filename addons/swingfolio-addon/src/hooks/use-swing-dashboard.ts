@@ -96,9 +96,11 @@ export function useSwingDashboard(
       
       const { closedTrades, openPositions } = tradeMatcher.matchTrades(selectedActivities);
 
-      // Set up currency conversion
-      const reportingCurrency = preferences.reportingCurrency || baseCurrency;
+      // Set up currency conversion - use base currency instead of preference to avoid unnecessary conversion
+      const reportingCurrency = baseCurrency; // Always use base currency for consistency
       const fxRateMap = createFxRateMap(exchangeRates, reportingCurrency);
+      
+
 
       // Update ALL open positions with current market prices (never filtered by period)
       const updatedOpenPositions = updateOpenPositionsWithMarketPrices(
@@ -112,6 +114,8 @@ export function useSwingDashboard(
       // Filter closed trades for the selected period (historical performance)
       const periodClosedTrades = filterTradesByPeriod(closedTrades, startDate, endDate);
 
+
+
       // Calculate metrics with hybrid approach:
       // - Realized P/L: only from period-filtered closed trades
       // - Unrealized P/L: from ALL open positions (current portfolio state)
@@ -122,6 +126,8 @@ export function useSwingDashboard(
         reportingCurrency,
         fxRateMap,
       );
+      
+
 
       // For charts and historical analysis, use period-filtered data
       const historicalCalculator = new PerformanceCalculator(periodClosedTrades);
@@ -194,15 +200,21 @@ function createFxRateMap(
   exchangeRates: any[] | undefined, 
   reportingCurrency: string
 ): Record<string, number> {
-  const fxRateMap = (exchangeRates || []).reduce((acc, rate) => {
-    acc[rate.fromCurrency] = rate.rate;
-    return acc;
-  }, {} as Record<string, number>);
+  const fxRateMap: Record<string, number> = {};
   
-  // Ensure reporting currency has a rate of 1
-  if (!fxRateMap[reportingCurrency]) {
-    fxRateMap[reportingCurrency] = 1;
-  }
+  // Set reporting currency rate to 1
+  fxRateMap[reportingCurrency] = 1;
+  
+  // Build conversion rates to reporting currency
+  (exchangeRates || []).forEach(rate => {
+    if (rate.toCurrency === reportingCurrency) {
+      // Direct rate: fromCurrency -> reportingCurrency
+      fxRateMap[rate.fromCurrency] = rate.rate;
+    } else if (rate.fromCurrency === reportingCurrency) {
+      // Inverse rate: toCurrency -> reportingCurrency (1/rate)
+      fxRateMap[rate.toCurrency] = rate.rate > 0 ? 1 / rate.rate : 1;
+    }
+  });
   
   return fxRateMap;
 }
@@ -219,11 +231,29 @@ function updateOpenPositionsWithMarketPrices(
     const matchingHolding = findMatchingHolding(position.symbol, holdings);
 
     if (matchingHolding && matchingHolding.price != null && matchingHolding.price > 0) {
-      const currentPrice = matchingHolding.price;
+      // Get current price and ensure it's in the same currency as the position
+      let currentPrice = matchingHolding.price;
+      
+      // If holding has different currency than position, we need to convert
+      if (matchingHolding.localCurrency && 
+          matchingHolding.localCurrency !== position.currency &&
+          matchingHolding.fxRate) {
+        // Convert holding price from local currency to position currency
+        if (matchingHolding.baseCurrency === position.currency) {
+          // Holding is in local currency, position is in base currency
+          currentPrice = matchingHolding.price * matchingHolding.fxRate;
+        } else if (matchingHolding.localCurrency === position.currency) {
+          // Already in correct currency
+          currentPrice = matchingHolding.price;
+        }
+        // Note: More complex currency conversions would need additional FX rate lookups
+      }
+      
       const marketValue = currentPrice * position.quantity;
       const costBasis = position.averageCost * position.quantity;
-      const unrealizedPL = marketValue - costBasis;
-      const unrealizedReturnPercent = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0;
+      // Include dividends in unrealized P/L calculation to match TradeMatcher
+      const unrealizedPL = marketValue - costBasis + (position.totalDividends || 0);
+      const unrealizedReturnPercent = costBasis > 0 ? unrealizedPL / costBasis : 0;
 
       return {
         ...position,
