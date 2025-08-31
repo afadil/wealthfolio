@@ -88,14 +88,14 @@ export function testTradeMatcher() {
     console.log(`   Entry: ${trade.entryDate.toISOString().slice(0, 10)} @ $${trade.entryPrice}`);
     console.log(`   Exit: ${trade.exitDate.toISOString().slice(0, 10)} @ $${trade.exitPrice}`);
     console.log(`   Fees: $${trade.totalFees.toFixed(2)}, Dividends: $${trade.totalDividends.toFixed(2)}`);
-    console.log(`   P&L: $${trade.realizedPL.toFixed(2)} (${trade.returnPercent.toFixed(2)}%)`);
+    console.log(`   P&L: $${trade.realizedPL.toFixed(2)} (${(trade.returnPercent * 100).toFixed(2)}%)`);
   });
 
   // Test open positions
   console.log("\n=== OPEN POSITIONS ===");
   fullResult.openPositions.forEach(pos => {
     console.log(`${pos.symbol}: ${pos.quantity} shares @ avg $${pos.averageCost.toFixed(2)}`);
-    console.log(`   Dividends: $${pos.totalDividends.toFixed(2)}, Unrealized P&L: $${pos.unrealizedPL.toFixed(2)}`);
+    console.log(`   Dividends: $${pos.totalDividends.toFixed(2)}, Unrealized P&L: $${pos.unrealizedPL.toFixed(2)} (${(pos.unrealizedReturnPercent * 100).toFixed(2)}%)`);
   });
 
   // Test 5: Compare lot methods with full calculations
