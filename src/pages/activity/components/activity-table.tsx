@@ -50,12 +50,14 @@ export const ActivityTable = ({
   handleDelete,
   isEditable,
   onToggleEditable,
+  isBalanceHidden,
 }: {
   accounts: Account[];
   handleEdit: (activity?: ActivityDetails) => void;
   handleDelete: (activity: ActivityDetails) => void;
   isEditable: boolean;
   onToggleEditable: (value: boolean) => void;
+  isBalanceHidden: boolean; 
 }) => {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
@@ -175,6 +177,10 @@ export const ActivityTable = ({
           ) {
             return <div className="pr-4 text-right">-</div>;
           }
+          
+          if (isBalanceHidden) {
+            return <div className="pr-4 text-right">••••</div>; 
+          }
 
           return <div className="pr-4 text-right">{quantity}</div>;
         },
@@ -196,6 +202,10 @@ export const ActivityTable = ({
           const amount = row.original.amount as number;
           const currency = (row.getValue('currency') as string) || 'USD';
           const assetSymbol = row.getValue('assetSymbol') as string;
+
+          if (isBalanceHidden) {
+            return <div className="pr-4 text-right">••••</div>; 
+          }
 
           if (activityType === 'FEE') {
             return <div className="pr-4 text-right">-</div>;
@@ -222,6 +232,10 @@ export const ActivityTable = ({
           const activityType = row.getValue('activityType') as string;
           const fee = row.getValue('fee') as number;
           const currency = (row.getValue('currency') as string) || 'USD';
+          
+          if (isBalanceHidden) {
+            return <div className="pr-4 text-right">••••</div>; 
+          }
 
           return (
             <div className="text-right">
@@ -242,6 +256,10 @@ export const ActivityTable = ({
           const activity = row.original;
           const activityType = activity.activityType;
           const currency = activity.currency || 'USD';
+          
+          if (isBalanceHidden) {
+            return <div className="pr-4 text-right">••••</div>; 
+          }
 
           if (activityType === 'SPLIT') {
             return <div className="pr-4 text-right">-</div>;
@@ -300,7 +318,7 @@ export const ActivityTable = ({
         enableHiding: false,
       },
     ],
-    [handleEdit, handleDelete],
+    [handleEdit, handleDelete, isBalanceHidden],
   );
 
   const accountOptions =
