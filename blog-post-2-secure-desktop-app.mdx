@@ -1,69 +1,156 @@
-# Wealthfolio's Architecture: Present and Future
+# A Technical Deep Dive into Wealthfolio's Architecture: Present and Future
 
-Wealthfolio is a privacy-focused, open-source investment tracker that is constantly evolving. In this blog post, we'll take a deep dive into its architecture, exploring both its current state and its exciting future, as outlined in the official roadmap. This will give you a comprehensive understanding of how Wealthfolio is built for security, reliability, and future growth.
+Wealthfolio is a privacy-focused, open-source investment tracker that is constantly evolving. In this technical paper, we'll take a deep dive into its architecture, exploring both its current state and its exciting future, as outlined in the official roadmap. This will give you a comprehensive understanding of how Wealthfolio is built for security, reliability, and future growth.
 
-## The Current Architecture: A Detailed Look
+## The Current Architecture: A Hybrid Approach
 
-Wealthfolio is a desktop application built with a modern tech stack that prioritizes security and performance. It's a Tauri application, which means it has a Rust backend and a web-based frontend.
+Wealthfolio is a desktop application built with a modern tech stack that prioritizes security and performance. It's a Tauri application, which means it has a Rust backend and a web-based frontend. This hybrid approach allows for a rich user experience, while leveraging the power of Rust for the core business logic.
 
-### Frontend: React and Tauri
+Here's a high-level overview of the current architecture:
 
-The frontend is a single-page application built with React and TypeScript. It uses a rich ecosystem of modern web technologies, including:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       Wealthfolio Desktop App                   │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                     React Frontend (WebView)              │  │
+│  │                                                           │  │
+│  │ • UI Components (Shadcn/UI, Tailwind CSS)                 │  │
+│  │ • State Management (React Query)                          │  │
+│  │ • Routing (React Router)                                  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                           ▲                                     │
+│                           │ Tauri API Bridge (IPC)              │
+│                           ▼                                     │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                Tauri Runtime (src-tauri)                  │  │
+│  │                                                           │  │
+│  │ • Tauri Commands (Exposed Rust functions)                 │  │
+│  │ • Event Handling                                          │  │
+│  │ • Window Management                                       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                           ▲                                     │
+│                           │                                     │
+│                           ▼                                     │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │              Wealthfolio Core (src-core)                  │  │
+│  │                                                           │  │
+│  │ • Business Logic (Portfolio, Accounts, etc.)              │  │
+│  │ • Database Interaction (Diesel ORM)                       │  │
+│  │ • Market Data Providers                                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                           ▲                                     │
+│                           │                                     │
+│                           ▼                                     │
+│  ┌─────────────────────┐       ┌───────────────────────────┐    │
+│  │   SQLite Database   │       │   OS Keyring (for secrets)│    │
+│  └─────────────────────┘       └───────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-*   **Vite**: For fast development and optimized builds.
-*   **Tailwind CSS** and **Shadcn/UI**: for a beautiful and consistent user interface.
-*   **React Query**: For efficient data fetching and state management.
-*   **React Router**: For client-side routing.
+### Frontend-Backend Communication: Tauri Commands and `serde`
 
-The frontend communicates with the backend through Tauri's secure API bridge, which allows calling Rust functions from JavaScript.
+The communication between the React frontend and the Rust backend is handled by Tauri commands. These are Rust functions that are exposed to the frontend and can be called from JavaScript/TypeScript.
 
-### Backend: Rust and `src-core`
+Here's an example of how the `create_account` command is defined in `src-tauri/src/commands/account.rs`:
 
-The backend is written in Rust, a language renowned for its safety and performance. The core business logic is encapsulated in the `src-core` crate, which is responsible for:
+```rust
+// src-tauri/src/commands/account.rs
 
-*   Database management
-*   Portfolio calculations
-*   User data management
-*   And much more...
+#[tauri::command]
+pub async fn create_account(
+    account: NewAccount, // The payload from the frontend
+    state: State<'_, Arc<ServiceContext>>,
+    handle: tauri::AppHandle,
+) -> Result<Account, String> {
+    // ... implementation ...
+}
+```
 
-This separation of concerns makes the code modular, testable, and easy to maintain.
+The `NewAccount` struct, which is the payload from the frontend, is defined in `wealthfolio-core`. For this to work, the struct needs to derive `serde::Deserialize`.
 
-### Database: SQLite and Diesel
+```rust
+// wealthfolio-core/src/accounts/accounts_model.rs
+use serde::{Deserialize, Serialize};
 
-Wealthfolio uses SQLite for its database, which is an ideal choice for a desktop application as it's lightweight and doesn't require a separate server. All your financial data is stored locally on your computer.
+#[derive(Queryable, Identifiable, Serialize, Deserialize, Debug, Clone, AsChangeset)]
+#[diesel(table_name = crate::schema::accounts)]
+pub struct Account {
+    // ... fields ...
+}
 
-To interact with the database, Wealthfolio uses **Diesel**, a popular ORM and query builder for Rust. Diesel provides a type-safe way to write queries, which helps prevent SQL injection vulnerabilities and makes the code more robust.
+#[derive(Deserialize, Insertable, Debug)]
+#[diesel(table_name = crate::schema::accounts)]
+pub struct NewAccount {
+    pub name: String,
+    pub institution: String,
+    // ... other fields ...
+}
+```
 
-### Secrets Management: The `keyring` Crate
+When the frontend calls the `create_account` command, it passes a JSON object that corresponds to the `NewAccount` struct. Tauri, with the help of `serde_json`, automatically deserializes the JSON object into a `NewAccount` instance. Similarly, the `Account` struct that is returned by the function derives `serde::Serialize`, so it's automatically serialized into a JSON object before being sent back to the frontend. This seamless serialization and deserialization is one of the key features that makes Tauri so powerful.
 
-For storing sensitive data like API keys, Wealthfolio uses the `keyring` crate. This crate provides a cross-platform way to store secrets in the operating system's native keyring (e.g., Windows Credential Manager, macOS Keychain, or the Secret Service on Linux). This is a very secure way to store secrets, as they are encrypted by the operating system and are not stored in plain text on the disk.
+### The Market Data Sync Process
 
-### Market Data and Syncing
+The market data sync process is a good example of the backend's capabilities. It's orchestrated by the `MarketDataService` in `src-core`, which uses a `ProviderRegistry` to manage the different market data providers.
 
-Wealthfolio can fetch market data from various providers (currently, Yahoo Finance is supported out of the box, with more to come). The market data sync process is handled by the `MarketDataService` in the `src-core`.
+The `ProviderRegistry` is initialized with a list of provider settings from the database. When a sync is requested, the `MarketDataService` iterates through the enabled providers and fetches the required data. This modular design makes it easy to add new providers in the future.
 
-When a sync is triggered from the frontend (via the `useSyncMarketDataMutation` hook), the `MarketDataService` fetches the required data from the configured provider, and then saves it to the local SQLite database. This ensures that you always have access to the latest market data, even when you're offline.
+## The Future Architecture: A Multi-Platform Vision
 
-## The Future Architecture: A Glimpse into the Roadmap
+The official `ROADMAP.md` outlines an ambitious future for Wealthfolio, with plans to expand to mobile and web platforms. This will require a significant evolution of the architecture.
 
-Wealthfolio has an exciting future ahead, with plans to expand its architecture to support mobile and web platforms. This is all detailed in the official `ROADMAP.md`.
+Here's a diagram of the proposed future architecture:
 
-### Mobile Apps with Tauri
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Wealthfolio Ecosystem                   │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────────┐   ┌──────────────────┐   ┌────────────────┐ │
+│  │   Mobile App     │   │     Web App      │   │  Desktop App   │ │
+│  │ (Tauri Mobile)   │   │   (React)        │   │    (Tauri)     │ │
+│  └──────────────────┘   └──────────────────┘   └────────────────┘ │
+│         │                      │                    │             │
+│         └───────────────┬──────┴───────────┬────────┘             │
+│                         │                  │                      │
+│                         ▼                  ▼                      │
+│      ┌──────────────────────────────────────────────────┐         │
+│      │               REST API Server (axum)             │         │
+│      └──────────────────────────────────────────────────┘         │
+│                         │                                         │
+│                         ▼                                         │
+│      ┌──────────────────────────────────────────────────┐         │
+│      │           Wealthfolio Core Library               │         │
+│      └──────────────────────────────────────────────────┘         │
+│                         │                                         │
+│                         ▼                                         │
+│      ┌──────────────────────────────────────────────────┐         │
+│      │              PostgreSQL Database                 │         │
+│      └──────────────────────────────────────────────────┘         │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-One of the most exciting future developments is the plan to create a mobile app for both iOS and Android. This will be made possible by **Tauri Mobile**, which allows building mobile apps with the same web-based frontend and Rust backend. This will provide a seamless experience for users who want to track their investments on the go, while still maintaining the same level of security and privacy.
+### The REST API Server
 
-### A Self-Hosted Web App with a REST API
+The centerpiece of the future architecture is a new REST API server. This server would encapsulate the `wealthfolio-core` library and expose its functionality through a set of RESTful endpoints. A good choice for building this server would be a modern Rust web framework like **`axum`**, which is known for its ergonomics, modularity, and tight integration with the `tokio` ecosystem.
 
-The roadmap also includes plans for a self-hosted web app. This would involve a significant architectural evolution:
+### The Clients: Mobile, Web, and Desktop
 
-*   **REST API Server**: The core logic from the `wealthfolio-core` library would be extracted into a separate REST API server. This server would expose the application's functionality through a set of RESTful endpoints.
-*   **Web Frontend**: The existing React frontend would be adapted to communicate with the new REST API instead of the Tauri backend.
-*   **Docker Deployment**: The entire application (frontend and backend) would be packaged as a Docker image, making it easy to deploy on a personal server or a cloud provider.
+With the REST API in place, Wealthfolio will be able to support multiple clients:
 
-This future architecture would give users the ultimate flexibility, allowing them to access their financial data from anywhere, on any device, while still maintaining full control over their data.
+*   **Mobile App**: The roadmap mentions a mobile app for iOS and Android, built with Tauri Mobile. This would allow for a high degree of code reuse between the desktop and mobile apps.
+*   **Web App**: A new web app would be created, which would communicate with the REST API server. This would make Wealthfolio accessible from any device with a web browser.
+*   **Desktop App**: The existing desktop app would be refactored to communicate with the REST API server instead of directly with the `src-core` library.
 
-## Conclusion: An Architecture Built for Today and Tomorrow
+### Challenges of the New Architecture
 
-Wealthfolio's current architecture is a testament to the power of modern technologies like Rust and Tauri for building secure and performant desktop applications. Its future architecture, as outlined in the roadmap, shows a clear vision for a platform that is not only secure and private, but also flexible and accessible.
+This new architecture presents a number of challenges that will need to be addressed:
 
-Whether you're a user who values privacy or a developer who is interested in modern application architecture, Wealthfolio is a project to watch.
+*   **Authentication and Authorization**: A robust authentication and authorization system will be needed to secure the REST API.
+*   **Data Synchronization**: A strategy for synchronizing data between the different clients will be crucial. This is a complex problem, especially in an occasionally connected environment.
+*   **Deployment**: The REST API server and the web app will need to be packaged and deployed, likely as Docker images. This will require a CI/CD pipeline and a hosting solution.
+
+## Conclusion: A Robust Foundation for Future Growth
+
+Wealthfolio's current architecture is a solid foundation for a secure and performant desktop application. The future architecture, as outlined in the roadmap, is a bold vision that will transform Wealthfolio into a multi-platform ecosystem. While there are many challenges to overcome, the choice of Rust and its rich ecosystem of libraries provides a strong foundation for success.
