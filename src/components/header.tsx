@@ -2,6 +2,7 @@ import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
+import { PrivacyToggle } from '@/components/privacy-toggle';
 
 interface ApplicationHeaderProps {
   heading: string;
@@ -11,6 +12,7 @@ interface ApplicationHeaderProps {
   children?: React.ReactNode;
   displayBack?: boolean;
   backUrl?: string;
+  displayPrivacyToggle?:boolean;
 }
 
 export function ApplicationHeader({
@@ -21,6 +23,7 @@ export function ApplicationHeader({
   children,
   displayBack,
   backUrl,
+  displayPrivacyToggle
 }: ApplicationHeaderProps) {
   const navigate = useNavigate();
   return (
@@ -52,6 +55,9 @@ export function ApplicationHeader({
           <h1 className="font-heading text-xl font-bold tracking-tight">{heading}</h1>
           {text && <p className="ml-4 text-lg font-light text-muted-foreground">{text}</p>}
         </div>
+        {displayPrivacyToggle ? (
+          <PrivacyToggle />
+        ): null}
       </div>
       {children}
     </div>
