@@ -14,6 +14,7 @@ import { ActivityForm } from './components/activity-form';
 import EditableActivityTable from './components/editable-activity-table';
 import ActivityTable from './components/activity-table';
 import { BulkHoldingsModal } from './components/forms/bulk-holdings-modal';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
@@ -21,6 +22,7 @@ const ActivityPage = () => {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showEditableTable, setShowEditableTable] = useState(false);
   const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
+  const { isBalanceHidden } = useBalancePrivacy();
 
   const { data: accountsData } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -56,7 +58,7 @@ const ActivityPage = () => {
   return (
     <div className="flex h-screen flex-col p-6">
       <div className="flex-shrink-0">
-        <ApplicationHeader heading="Activity">
+        <ApplicationHeader heading="Activity" displayPrivacyToggle>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" title="Import" asChild>
               <Link to={'/import'}>
@@ -93,6 +95,7 @@ const ActivityPage = () => {
             handleDelete={handleDelete}
             isEditable={showEditableTable}
             onToggleEditable={setShowEditableTable}
+            isBalanceHidden = {isBalanceHidden}
           />
         )}
       </div>
