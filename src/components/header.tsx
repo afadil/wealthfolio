@@ -12,7 +12,7 @@ interface ApplicationHeaderProps {
   children?: React.ReactNode;
   displayBack?: boolean;
   backUrl?: string;
-  displayPrivacyToggle?:boolean;
+  displayPrivacyToggle?: boolean;
 }
 
 export function ApplicationHeader({
