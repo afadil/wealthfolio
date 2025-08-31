@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Holding, Country } from '@/lib/types';
 import { DonutChart, EmptyPlaceholder, Skeleton } from '@wealthfolio/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 interface CountryChartProps {
   holdings?: Holding[];
@@ -11,6 +12,7 @@ interface CountryChartProps {
 
 export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: CountryChartProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
+  const { isBalanceHidden } = useBalancePrivacy();
 
   const data = useMemo(() => {
     if (!holdings || holdings.length === 0) return [];
@@ -90,6 +92,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
             startAngle={180}
             endAngle={0}
             displayTooltip={false}
+            isBalanceHidden={isBalanceHidden}
           />
         ) : (
           <EmptyPlaceholder

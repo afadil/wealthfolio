@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getAccounts } from '@/commands/account';
 import { useAccountsSimplePerformance } from '@/hooks/use-accounts-simple-performance';
 import { QueryKeys } from '@/lib/query-keys';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 interface AccountAllocationChartProps {
   isLoading?: boolean;
@@ -13,12 +14,12 @@ interface AccountAllocationChartProps {
 
 export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSectionClick }: AccountAllocationChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
 
+  const { isBalanceHidden } = useBalancePrivacy();
   const {
     data: performanceData,
     isLoading: isLoadingPerformance,
@@ -112,6 +113,7 @@ export function AccountAllocationChart({ isLoading: isLoadingProp, onAccountSect
             onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}
+            isBalanceHidden = {isBalanceHidden}
           />
         ) : (
           <EmptyPlaceholder description="No account valuation data available." />

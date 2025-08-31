@@ -1,6 +1,7 @@
 import { Holding, HoldingType } from '@/lib/types';
 import { useMemo, useState } from 'react';
 import { DonutChart, EmptyPlaceholder, Skeleton, Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
+import { useBalancePrivacy } from '@/context/privacy-context';
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
@@ -38,6 +39,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
+  const { isBalanceHidden } = useBalancePrivacy();
 
   const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
     if (onClassSectionClick) {
@@ -89,6 +91,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
             onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}
+            isBalanceHidden={isBalanceHidden}
           />
         ) : (
           <EmptyPlaceholder description="There is no class data available for your holdings." />
