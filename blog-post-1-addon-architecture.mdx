@@ -1,0 +1,163 @@
+# Extending Wealthfolio: A Deep Dive into its Addon Architecture
+
+Wealthfolio is more than just an investment tracker; it's a privacy-focused, open-source platform that puts users in control of their financial data. One of its most powerful features is its extensible addon system. This system allows developers to build and share new functionalities, from custom analytics to integration with external services.
+
+In this blog post, we'll take a deep dive into the architecture of Wealthfolio's addon system. We'll explore how it's designed for security, flexibility, and ease of development. Whether you're a user who wants to understand how addons work or a developer who's excited to build your own, this post will give you a comprehensive overview of what makes Wealthfolio's addon system so special.
+
+## The Architecture: A Bird's Eye View
+
+At its core, the addon architecture is designed to be simple and robust. It consists of two main parts: the **Wealthfolio Host Application** and the **Individual Addons**.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Wealthfolio Host Application                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Addon Runtime  │  │  Permission     │  │   API Bridge    │  │
+│  │                 │  │   System        │  │                 │  │
+│  │ • Load/Unload   │  │ • Detection     │  │ • Type Bridge   │  │
+│  │ • Lifecycle     │  │ • Validation    │  │ • Domain APIs   │  │
+│  │ • Context Mgmt  │  │ • Enforcement   │  │ • Scoped Access │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                        Individual Addons                        │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │   Addon A   │ │   Addon B   │ │   Addon C   │ │   Addon D   │ │
+│ │             │ │             │ │             │ │             │ │
+│ │ enable()    │ │ enable()    │ │ enable()    │ │ enable()    │ │
+│ │ disable()   │ │ disable()   │ │ disable()   │ │ disable()   │ │
+│ │ UI/Routes   │ │ UI/Routes   │ │ UI/Routes   │ │ UI/Routes   │ │
+│ │ API Calls   │ │ API Calls   │ │ API Calls   │ │ API Calls   │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The Host Application
+
+The host application is the backbone of the addon system. It's responsible for:
+
+*   **Addon Runtime**: Managing the lifecycle of each addon, including loading, enabling, disabling, and unloading.
+*   **Permission System**: Enforcing the security model, validating permissions, and ensuring that addons only access the data they are authorized to.
+*   **API Bridge**: Exposing the core functionalities of Wealthfolio to the addons in a secure and controlled manner.
+
+### Individual Addons
+
+Addons are self-contained packages of code that extend Wealthfolio. Each addon is a JavaScript function that receives a context object from the host. Through this context, addons can:
+
+*   Register new UI components, pages, and navigation items.
+*   Access financial data and other core functionalities through the provided APIs.
+*   Listen to events and react to changes in the application.
+
+## The Addon Lifecycle: From Installation to Execution
+
+The lifecycle of an addon is a well-defined process that ensures security and stability. Here's a breakdown of the steps:
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│             │    │             │    │             │    │             │
+│  ZIP File   │───▶│   Extract   │───▶│  Validate   │───▶│  Analyze    │
+│             │    │             │    │             │    │ Permissions │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                                                                   │
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐              │
+│             │    │             │    │             │              │
+│   Running   │◀───│   Enable    │◀───│    Load     │◀─────────────┘
+│             │    │             │    │             │
+└─────────────┘    └─────────────┘    └─────────────┘
+```
+
+1.  **ZIP File**: The addon is packaged as a `.zip` file, which contains the addon's code, manifest, and any other assets.
+2.  **Extract**: When a user installs the addon, Wealthfolio extracts the contents of the zip file.
+3.  **Validate**: The host application validates the addon's `manifest.json` file to ensure it has the required fields and is compatible with the current version of Wealthfolio.
+4.  **Analyze Permissions**: This is a crucial security step. The host application scans the addon's code to detect which APIs it uses. This is compared against the permissions declared in the `manifest.json`.
+5.  **Load**: If the validation and permission analysis are successful, the addon is loaded into an isolated context.
+6.  **Enable**: The host application calls the addon's `enable()` function, which is the entry point of the addon. This is where the addon registers its UI components, routes, and event listeners.
+7.  **Running**: The addon is now active and running. It can interact with the host application through the provided APIs and context.
+
+## Security First: The Permission System
+
+A key challenge with any plugin system is security. Wealthfolio addresses this with a multi-layered permission system that ensures addons can only access the data and functionality they need.
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│                 │    │                 │    │                 │
+│ Static Analysis │───▶│ Declaration     │───▶│ Runtime         │
+│                 │    │ Matching        │    │ Validation      │
+│ • Scan code     │    │                 │    │                 │
+│ • Detect APIs   │    │ • Compare with  │    │ • Check perms   │
+│ • Build list    │    │   manifest      │    │ • Allow/Block   │
+│                 │    │ • Show dialog   │    │ • Log calls     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+The permission system works in three stages:
+
+1.  **Static Analysis**: When an addon is installed, Wealthfolio scans its code to detect which APIs it's trying to use. This provides a clear picture of the addon's capabilities, independent of what the developer has declared.
+
+2.  **Declaration Matching & User Approval**: The detected API usage is then compared with the permissions declared in the addon's `manifest.json` file. The user is shown a dialog with both the detected and declared permissions and must approve them before the addon can be installed. This transparency is crucial for user trust.
+
+3.  **Runtime Validation**: Even after an addon is installed and approved, every API call is checked against the approved permissions at runtime. If an addon tries to access an API it doesn't have permission for, the call is blocked, and an error is logged. This provides an extra layer of security.
+
+## The Addon API: Your Gateway to Wealthfolio
+
+The Addon API is the bridge between your addon and the core functionality of Wealthfolio. It's designed to be comprehensive, easy to use, and secure. The API is organized into several domains, each with its own set of functions:
+
+*   **Accounts**: Manage user accounts.
+*   **Portfolio**: Access holdings and performance data.
+*   **Activities**: Read and write financial activities.
+*   **Market Data**: Fetch market data for various assets.
+*   **And many more...**
+
+### Creating Your First Addon
+
+Here's a simple example of what an addon's code looks like. This addon adds a new item to the sidebar, which, when clicked, navigates to a new page that displays "Hello, World!".
+
+```typescript
+import type { AddonContext } from '@wealthfolio/addon-sdk';
+import { Icons } from '@wealthfolio/ui';
+
+// A simple React component for our new page
+function HelloWorldPage() {
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold">Hello, World!</h1>
+    </div>
+  );
+}
+
+export default function enable(ctx: AddonContext) {
+  // 1. Add a new item to the sidebar
+  const sidebarItem = ctx.sidebar.addItem({
+    id: 'hello-world-addon',
+    icon: <Icons.Sparkles className="h-5 w-5" />,
+    label: 'Hello World',
+    route: '/hello-world'
+  });
+
+  // 2. Register a new route for our page
+  ctx.router.add({
+    path: '/hello-world',
+    component: HelloWorldPage
+  });
+
+  // 3. Return a cleanup function
+  // This will be called when the addon is disabled
+  return {
+    disable() {
+      sidebarItem.remove();
+    }
+  };
+}
+```
+
+This example demonstrates the three main parts of an addon's lifecycle:
+
+1.  **Initialization**: When the addon is enabled, it registers its UI components and routes.
+2.  **Interaction**: The user can now interact with the new UI elements.
+3.  **Cleanup**: When the addon is disabled, the `disable` function is called to remove the UI elements and unregister any listeners.
+
+## Conclusion: A Platform for Innovation
+
+Wealthfolio's addon architecture is a powerful example of how to build an extensible and secure desktop application. By providing a clear and well-defined API, a robust permission system, and a simple lifecycle, Wealthfolio empowers developers to create a vibrant ecosystem of addons that can cater to a wide range of needs.
+
+Whether you're a developer looking to build your own financial tools or a user who wants to customize your Wealthfolio experience, the addon system provides a solid foundation for innovation. We're excited to see what the community will build!
