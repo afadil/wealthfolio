@@ -24,6 +24,10 @@ const sidebarNavItems = [
     href: 'market-data',
   },
   {
+    title: 'Import Quotes',
+    href: 'import-quotes',
+  },
+  {
     title: 'Add-ons',
     href: 'addons',
   },

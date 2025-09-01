@@ -2,6 +2,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
+use log::{debug, error};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use async_trait::async_trait;
@@ -402,5 +403,132 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
                 },
             )
             .await
+    }
+
+    // --- Quote Import Methods ---
+
+    async fn bulk_insert_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize> {
+        if quote_records.is_empty() {
+            return Ok(0);
+        }
+
+        let quotes_owned = quote_records.clone();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let mut total_inserted = 0;
+                for chunk in quotes_owned.chunks(1000) {
+                    total_inserted += diesel::insert_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(MarketDataError::DatabaseError)?;
+                }
+                Ok(total_inserted)
+            })
+            .await
+    }
+
+    async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize> {
+        if quote_records.is_empty() {
+            return Ok(0);
+        }
+
+        let quotes_owned = quote_records.clone();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let mut total_updated = 0;
+                for chunk in quotes_owned.chunks(1000) {
+                    total_updated += diesel::replace_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(MarketDataError::DatabaseError)?;
+                }
+                Ok(total_updated)
+            })
+            .await
+    }
+
+    async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize> {
+        debug!("🚀 REPOSITORY: bulk_upsert_quotes called with {} quotes", quote_records.len());
+        
+        if quote_records.is_empty() {
+            debug!("⚠️ No quotes to insert, returning 0");
+            return Ok(0);
+        }
+
+        debug!("🔄 Converting {} Quote structs to QuoteDb structs", quote_records.len());
+        let quotes_owned = quote_records.clone();
+        let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
+        debug!("✅ Converted to {} QuoteDb records", db_rows.len());
+        debug!("🎯 Sample QuoteDb: id={}, symbol={}, timestamp={}, data_source={}", 
+               db_rows[0].id, db_rows[0].symbol, db_rows[0].timestamp, db_rows[0].data_source);
+
+        debug!("💾 Executing database transaction...");
+        let result = self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                debug!("🔄 Inside database transaction");
+                let mut total_upserted = 0;
+                let chunk_size = 1000;
+                let total_chunks = (db_rows.len() + chunk_size - 1) / chunk_size;
+                
+                debug!("📦 Processing {} quotes in {} chunks of {}", db_rows.len(), total_chunks, chunk_size);
+                
+                for (chunk_index, chunk) in db_rows.chunks(chunk_size).enumerate() {
+                    debug!("💾 Processing chunk {}/{} with {} quotes", chunk_index + 1, total_chunks, chunk.len());
+                    
+                    let count = diesel::replace_into(quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(|e| {
+                            error!("❌ Database error in chunk {}/{}: {}", chunk_index + 1, total_chunks, e);
+                            MarketDataError::DatabaseError(e)
+                        })?;
+                        
+                    debug!("✅ Chunk {}/{} inserted {} records", chunk_index + 1, total_chunks, count);
+                    total_upserted += count;
+                }
+                
+                debug!("✅ Transaction completed successfully, total upserted: {}", total_upserted);
+                Ok(total_upserted)
+            })
+            .await;
+
+        match result {
+            Ok(count) => {
+                debug!("✅ REPOSITORY: bulk_upsert_quotes completed successfully, upserted {} quotes", count);
+                Ok(count)
+            }
+            Err(e) => {
+                error!("❌ REPOSITORY: bulk_upsert_quotes failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    fn quote_exists(&self, symbol_param: &str, date: &str) -> Result<bool> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let count: i64 = quotes
+            .filter(crate::schema::quotes::dsl::symbol.eq(symbol_param))
+            .filter(crate::schema::quotes::dsl::timestamp.like(format!("{}%", date)))
+            .count()
+            .get_result(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?;
+
+        Ok(count > 0)
+    }
+
+    fn get_existing_quotes_for_period(&self, symbol_param: &str, start_date: &str, end_date: &str) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        Ok(quotes
+            .filter(crate::schema::quotes::dsl::symbol.eq(symbol_param))
+            .filter(crate::schema::quotes::dsl::timestamp.ge(start_date))
+            .filter(crate::schema::quotes::dsl::timestamp.le(end_date))
+            .order(timestamp.asc())
+            .load::<QuoteDb>(&mut conn)
+            .map_err(MarketDataError::DatabaseError)?
+            .into_iter()
+            .map(Quote::from)
+            .collect())
     }
 }
