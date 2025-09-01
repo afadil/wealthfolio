@@ -3,6 +3,6 @@ pub mod types;
 pub mod transport;
 // pub mod transport_tls;
 pub mod engine;
-pub mod discovery;
+// discovery removed in favor of explicit QR pairing
 // pub mod security;
 pub mod store;
