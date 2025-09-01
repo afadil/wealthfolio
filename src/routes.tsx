@@ -23,7 +23,7 @@ import ContributionLimitPage from './pages/settings/contribution-limits/contribu
 import PerformancePage from '@/pages/performance/performance-page';
 import MarketDataSettingsPage from './pages/settings/market-data-settings';
 import AddonSettingsPage from './pages/settings/addons/addon-settings';
-
+import SyncSettingsPage from './pages/settings/sync/sync-page';
 import AboutSettingsPage from './pages/settings/about/about-page';
 import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 
@@ -95,6 +95,7 @@ export function AppRoutes() {
             <Route path="market-data" element={<MarketDataSettingsPage />} />
 
             <Route path="addons" element={<AddonSettingsPage />} />
+            <Route path="sync" element={<SyncSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />
         </Route>

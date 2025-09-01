@@ -33,6 +33,10 @@ const sidebarNavItems = [
     href: 'addons',
   },
   {
+    title: 'Sync',
+    href: 'sync',
+  },
+  {
     title: 'Data Export',
     href: 'exports',
   },

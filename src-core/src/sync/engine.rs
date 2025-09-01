@@ -1,6 +1,5 @@
 // sync/engine.rs
 use crate::db::DbPool;
-use crate::sync::discovery::advertise;
 use crate::sync::store;
 use crate::sync::transport::{connect_to_peer, send_message, start_server};
 use crate::sync::types::WireMessage;
@@ -101,28 +100,14 @@ impl SyncEngine {
             }
         });
 
-        // Advertise via mDNS (Bonjour)
-        let port: u16 = self
-            .server_addr
-            .split(':')
-            .nth(1)
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(33445);
-        
-        match advertise(&self.device_id.to_string(), port) {
-            Ok(_) => {
-                info!("mDNS advertisement started successfully");
-            }
-            Err(e) => {
-                warn!("mDNS advertisement failed: {e}");
-                warn!("Sync will still work - peers can be added manually via IP address");
-            }
-        }
+    // Discovery removed – pairing now initiated via QR code (manual connect).
 
         // Periodic background loop
         self.start_sync_loop().await;
         Ok(())
     }
+
+    pub fn device_id(&self) -> Uuid { self.device_id }
 
     pub async fn stop(&self) -> anyhow::Result<()> {
         let mut is_running = self.is_running.write().await;
