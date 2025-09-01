@@ -31,9 +31,7 @@ use tauri::Manager;
 
 use context::ServiceContext;
 use events::{emit_portfolio_trigger_update, PortfolioRequestPayload};
-use wealthfolio_core::sync::engine::{SyncEngine, Peer};
-use tokio::sync::mpsc;
-use std::net::SocketAddr;
+use wealthfolio_core::sync::engine::SyncEngine;
 
 #[derive(Clone)]
 pub struct SyncHandles {
@@ -197,6 +195,10 @@ pub fn run() {
             commands::addon::install_addon_from_staging,
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
+            // Sync (QR pairing)
+            commands::sync::get_sync_status,
+            commands::sync::generate_pairing_payload,
+            commands::sync::sync_with_master,
             // commands::sync::sync_now,
         ])
         .build(tauri::generate_context!())
@@ -285,39 +287,7 @@ fn spawn_background_tasks(
             return;
         }
 
-        // 4) Start browsing and feed discoveries to engine
-        let (tx, mut rx) = mpsc::unbounded_channel::<(String, SocketAddr)>();
-        let discovery = wealthfolio_core::sync::discovery::browse(move |id, addr| {
-            let _ = tx.send((id, addr));
-        }).ok();
-
-        // Add peers as they show up
-        let engine_for_peers = engine.clone();
-        let my_device_id = device_id;
-        tauri::async_runtime::spawn(async move {
-            use chrono::Utc;
-            while let Some((peer_id_str, addr)) = rx.recv().await {
-                // Skip self
-                if uuid::Uuid::parse_str(&peer_id_str).ok() == Some(my_device_id) {
-                    continue;
-                }
-                let peer = Peer {
-                    id: uuid::Uuid::parse_str(&peer_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4()),
-                    name: format!("Peer@{}", addr.ip()),
-                    address: addr.to_string(),
-                    fingerprint: String::new(),
-                    paired: true, // or gate behind UI trust
-                    last_seen: Utc::now(),
-                    last_sync: None,
-                };
-                if let Err(e) = engine_for_peers.add_peer(peer).await {
-                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                    log::warn!("Failed to add discovered peer: {e}");
-                }
-            }
-        });
-
-        // 5) Keep engine reachable from commands if needed
+    // Keep engine reachable from commands
         handle_clone.manage(SyncHandles { engine });
     });
 }
