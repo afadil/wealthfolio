@@ -18,6 +18,8 @@ function performanceToValuations(metrics: SimplePerformanceMetrics[]): AccountVa
       investmentMarketValue: 0,
       costBasis: 0,
       netContribution: pm.totalValue ?? 0,
+      outstandingLoans: 0,
+      portfolioEquity: pm.totalValue ?? 0,
       calculatedAt: new_date.toISOString(),
     };
   });
