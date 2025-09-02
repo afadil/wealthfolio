@@ -1,15 +1,21 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use csv::ReaderBuilder;
 use log::{debug, error};
+use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::BufReader;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 use super::market_data_constants::*;
+use super::market_data_errors::MarketDataError;
 use super::market_data_model::{
     LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting, Quote, QuoteRequest,
-    QuoteSummary, UpdateMarketDataProviderSetting,
+    QuoteSummary, UpdateMarketDataProviderSetting, QuoteImport, QuoteImportPreview,
+    ImportValidationStatus,
 };
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
@@ -295,6 +301,131 @@ impl MarketDataServiceTrait for MarketDataService {
         
         Ok(updated_setting)
     }
+
+    // --- Quote Import Methods ---
+
+    async fn validate_csv_quotes(&self, file_path: &str) -> Result<QuoteImportPreview> {
+        let quotes = self.parse_csv_file(file_path)?;
+        let mut valid_count = 0;
+        let mut invalid_count = 0;
+        let mut duplicate_count = 0;
+        let mut sample_quotes = Vec::new();
+
+        // Check for duplicates and validate each quote
+        for mut quote in quotes {
+            // Check if quote already exists
+            if self.repository.quote_exists(&quote.symbol, &quote.date)? {
+                duplicate_count += 1;
+                quote.validation_status = ImportValidationStatus::Warning("Quote already exists".to_string());
+            } else {
+                quote.validation_status = self.validate_quote_data(&quote);
+                if matches!(quote.validation_status, ImportValidationStatus::Valid) {
+                    valid_count += 1;
+                } else {
+                    invalid_count += 1;
+                }
+            }
+
+            if sample_quotes.len() < 10 {
+                sample_quotes.push(quote);
+            }
+        }
+
+        let detected_columns = HashMap::new(); // TODO: Implement column detection
+
+        Ok(QuoteImportPreview {
+            total_rows: valid_count + invalid_count + duplicate_count,
+            valid_rows: valid_count,
+            invalid_rows: invalid_count,
+            sample_quotes,
+            detected_columns,
+            duplicate_count,
+        })
+    }
+
+    async fn import_quotes_from_csv(&self, quotes: Vec<QuoteImport>, overwrite: bool) -> Result<Vec<QuoteImport>> {
+        debug!("🚀 SERVICE: import_quotes_from_csv called");
+        debug!("📊 Processing {} quotes, overwrite: {}", quotes.len(), overwrite);
+        
+        let mut results = Vec::new();
+        let mut quotes_to_import = Vec::new();
+
+        debug!("🔍 Starting quote validation and duplicate checking...");
+        for (index, mut quote) in quotes.into_iter().enumerate() {
+            debug!("📋 Processing quote {}/{}: symbol={}, date={}", index + 1, results.len() + quotes_to_import.len() + 1, quote.symbol, quote.date);
+            
+            // Check if quote already exists
+            let exists = self.repository.quote_exists(&quote.symbol, &quote.date)?;
+            debug!("🔍 Quote exists check: {}", exists);
+            
+            if exists {
+                if overwrite {
+                    debug!("🔄 Quote exists but overwrite=true, will import");
+                    quote.validation_status = ImportValidationStatus::Valid;
+                    quotes_to_import.push(quote.clone());
+                } else {
+                    debug!("⚠️ Quote exists and overwrite=false, skipping");
+                    quote.validation_status = ImportValidationStatus::Warning("Quote already exists, skipping".to_string());
+                }
+            } else {
+                debug!("✨ New quote, validating...");
+                quote.validation_status = self.validate_quote_data(&quote);
+                debug!("📋 Validation result: {:?}", quote.validation_status);
+                if matches!(quote.validation_status, ImportValidationStatus::Valid) {
+                    quotes_to_import.push(quote.clone());
+                }
+            }
+            results.push(quote);
+        }
+
+        debug!("📊 Validation complete: {} total, {} to import", results.len(), quotes_to_import.len());
+
+        // Convert to Quote structs and import
+        debug!("🔄 Converting import quotes to database quotes...");
+        let quotes_for_db: Vec<Quote> = quotes_to_import
+            .iter()
+            .enumerate()
+            .filter_map(|(index, import_quote)| {
+                match self.convert_import_quote_to_quote(import_quote) {
+                    Ok(quote) => {
+                        debug!("✅ Converted quote {}: {}", index + 1, quote.symbol);
+                        Some(quote)
+                    }
+                    Err(e) => {
+                        error!("❌ Failed to convert quote {}: {}", index + 1, e);
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        debug!("📦 Successfully converted {} quotes for database insertion", quotes_for_db.len());
+
+        if !quotes_for_db.is_empty() {
+            debug!("💾 Calling repository.bulk_upsert_quotes with {} quotes", quotes_for_db.len());
+            debug!("🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}", 
+                   quotes_for_db[0].id, quotes_for_db[0].symbol, quotes_for_db[0].timestamp, quotes_for_db[0].data_source);
+            
+            match self.repository.bulk_upsert_quotes(quotes_for_db).await {
+                Ok(count) => {
+                    debug!("✅ Successfully inserted/updated {} quotes in database", count);
+                }
+                Err(e) => {
+                    error!("❌ Database insertion failed: {}", e);
+                    return Err(e);
+                }
+            }
+        } else {
+            debug!("⚠️ No quotes to import after conversion");
+        }
+
+        debug!("✅ SERVICE: import_quotes_from_csv completed successfully");
+        Ok(results)
+    }
+
+    async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize> {
+        self.repository.bulk_upsert_quotes(quotes).await
+    }
 }
 
 impl MarketDataService {
@@ -531,5 +662,143 @@ impl MarketDataService {
                 }
             }
         }
+    }
+
+    // --- Quote Import Helper Methods ---
+
+    fn parse_csv_file(&self, file_path: &str) -> Result<Vec<QuoteImport>> {
+        let file = File::open(file_path).map_err(|_e| MarketDataError::DatabaseError(diesel::result::Error::NotFound))?;
+        let buf_reader = BufReader::new(file);
+        let mut csv_reader = ReaderBuilder::new()
+            .has_headers(true)
+            .flexible(true)
+            .from_reader(buf_reader);
+
+        let mut quotes = Vec::new();
+        let headers = csv_reader.headers()
+            .map_err(|_e| MarketDataError::DatabaseError(diesel::result::Error::NotFound))?
+            .clone();
+
+        for result in csv_reader.records() {
+            let record = result.map_err(|_e| MarketDataError::DatabaseError(diesel::result::Error::NotFound))?;
+            let mut quote = QuoteImport {
+                symbol: String::new(),
+                date: String::new(),
+                open: None,
+                high: None,
+                low: None,
+                close: Decimal::ZERO,
+                volume: None,
+                currency: "USD".to_string(), // Default currency
+                validation_status: ImportValidationStatus::Valid,
+                error_message: None,
+            };
+
+            // Parse each field based on headers
+            for (i, field) in record.iter().enumerate() {
+                if i >= headers.len() {
+                    continue;
+                }
+                let header = headers[i].to_lowercase();
+
+                match header.as_str() {
+                    "symbol" => quote.symbol = field.to_string(),
+                    "date" => quote.date = field.to_string(),
+                    "open" => {
+                        if !field.is_empty() {
+                            quote.open = field.parse::<Decimal>().ok();
+                        }
+                    }
+                    "high" => {
+                        if !field.is_empty() {
+                            quote.high = field.parse::<Decimal>().ok();
+                        }
+                    }
+                    "low" => {
+                        if !field.is_empty() {
+                            quote.low = field.parse::<Decimal>().ok();
+                        }
+                    }
+                    "close" => {
+                        if let Ok(close_val) = field.parse::<Decimal>() {
+                            quote.close = close_val;
+                        }
+                    }
+                    "volume" => {
+                        if !field.is_empty() {
+                            quote.volume = field.parse::<Decimal>().ok();
+                        }
+                    }
+                    "currency" => {
+                        if !field.is_empty() {
+                            quote.currency = field.to_string();
+                        }
+                    }
+                    _ => {} // Ignore unknown columns
+                }
+            }
+
+            quotes.push(quote);
+        }
+
+        Ok(quotes)
+    }
+
+    fn validate_quote_data(&self, quote: &QuoteImport) -> ImportValidationStatus {
+        // Validate symbol
+        if quote.symbol.trim().is_empty() {
+            return ImportValidationStatus::Error("Symbol is required".to_string());
+        }
+
+        // Validate date format
+        if let Err(_) = chrono::NaiveDate::parse_from_str(&quote.date, "%Y-%m-%d") {
+            return ImportValidationStatus::Error("Invalid date format. Expected YYYY-MM-DD".to_string());
+        }
+
+        // Validate close price (required)
+        if quote.close <= Decimal::ZERO {
+            return ImportValidationStatus::Error("Close price must be greater than 0".to_string());
+        }
+
+        // Validate OHLC logic
+        if let (Some(open), Some(high), Some(low)) = (quote.open, quote.high, quote.low) {
+            if high < low {
+                return ImportValidationStatus::Error("High price cannot be less than low price".to_string());
+            }
+            if open > high || open < low {
+                return ImportValidationStatus::Warning("Open price is outside high-low range".to_string());
+            }
+            if quote.close > high || quote.close < low {
+                return ImportValidationStatus::Warning("Close price is outside high-low range".to_string());
+            }
+        }
+
+        ImportValidationStatus::Valid
+    }
+
+    fn convert_import_quote_to_quote(&self, import_quote: &QuoteImport) -> Result<Quote> {
+
+        use super::market_data_model::DataSource;
+
+        let timestamp = chrono::NaiveDate::parse_from_str(&import_quote.date, "%Y-%m-%d")?
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_local_timezone(Utc)
+            .unwrap();
+
+        Ok(Quote {
+            id: format!("{}_{}", import_quote.symbol, import_quote.date),
+            symbol: import_quote.symbol.clone(),
+            timestamp,
+            open: import_quote.open.unwrap_or(import_quote.close),
+            high: import_quote.high.unwrap_or(import_quote.close),
+            low: import_quote.low.unwrap_or(import_quote.close),
+            close: import_quote.close,
+            adjclose: import_quote.close, // Assume no adjustment for imported data
+            volume: import_quote.volume.unwrap_or(Decimal::ZERO),
+            currency: import_quote.currency.clone(),
+            data_source: DataSource::Manual,
+            created_at: Utc::now(),
+        })
     }
 }
