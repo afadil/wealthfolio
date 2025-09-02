@@ -32,6 +32,7 @@ tokio = { version = "1", features = ["time", "sync"] }
 keyring = "2.0"
 uuid = { version = "1.0", features = ["v4"] }
 local-ip-address = "0.6"
+get_if_addrs = "0.5"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

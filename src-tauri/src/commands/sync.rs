@@ -33,17 +33,41 @@ pub async fn get_sync_status(state: State<'_, SyncHandles>) -> Result<serde_json
 
 #[tauri::command]
 pub async fn generate_pairing_payload() -> Result<String, String> {
-    // Determine a local IP (best-effort). Fallback to localhost.
-    let host = local_ip_address::local_ip().map(|ip| ip.to_string()).unwrap_or_else(|_| "127.0.0.1".into());
     let port = 33445; // fixed for now
+    let (host, alt) = select_ips();
     let payload = serde_json::json!({
         "v": 1,
         "host": host,
+        "alt": alt,
         "port": port,
         "ts": Utc::now().to_rfc3339(),
         "note": "Scan with mobile Wealthfolio app to sync"
     });
     Ok(payload.to_string())
+}
+
+fn select_ips() -> (String, Vec<String>) {
+    // Env override first
+    if let Ok(host) = std::env::var("WF_SYNC_HOST") { return (host.clone(), vec![host]); }
+    let mut primary: Option<String> = None;
+    let mut candidates: Vec<String> = Vec::new();
+    if let Ok(ifaces) = get_if_addrs::get_if_addrs() {
+        for iface in ifaces {
+            let name = iface.name.to_lowercase();
+            if name.starts_with("lo") || name.contains("awdl") || name.contains("utun") || name.contains("llw") { continue; }
+            let ip = match iface.addr { get_if_addrs::IfAddr::V4(v4) => v4.ip.to_string(), _ => continue };
+            if ip.starts_with("169.254.") || ip.starts_with("192.0.0.") { continue; }
+            let is_private = ip.starts_with("10.") || ip.starts_with("192.168.") || (ip.starts_with("172.") && ip.split('.').nth(1).and_then(|s| s.parse::<u8>().ok()).map(|b| (16..=31).contains(&b)).unwrap_or(false));
+            if !is_private { continue; }
+            if !candidates.contains(&ip) { candidates.push(ip.clone()); }
+            if name == "en0" && primary.is_none() { primary = Some(ip.clone()); }
+        }
+    }
+    if primary.is_none() { primary = candidates.first().cloned(); }
+    let fallback = local_ip_address::local_ip().map(|ip| ip.to_string()).unwrap_or_else(|_| "127.0.0.1".into());
+    let chosen = primary.unwrap_or(fallback.clone());
+    if !candidates.contains(&chosen) { candidates.insert(0, chosen.clone()); }
+    (chosen, candidates)
 }
 
 #[tauri::command]

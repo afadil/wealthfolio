@@ -16,8 +16,8 @@
       "icons/icon.ico"
     ],
     "copyright": "2025 Teymz Inc.",
-    "category": "Finance",
-    "createUpdaterArtifacts": "v1Compatible"
+  "category": "Finance",
+  "createUpdaterArtifacts": "v1Compatible"
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
@@ -52,6 +52,6 @@
     ],
     "security": {
       "csp": null
-    }
+  }
   }
 }

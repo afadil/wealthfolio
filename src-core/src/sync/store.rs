@@ -48,7 +48,7 @@ pub fn get_checkpoint(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i64> {
         last_version_received: Option<i64>,
     }
     let row = sql_query(
-        "SELECT last_version_received FROM peer_checkpoint WHERE peer_id = ?1",
+        "SELECT last_version_received FROM sync_peer_checkpoint WHERE peer_id = ?1",
     )
     .bind::<Text, _>(peer_id)
     .get_result::<Row>(conn)
@@ -58,7 +58,7 @@ pub fn get_checkpoint(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i64> {
 
 pub fn set_checkpoint_received(conn: &mut DbConn, peer_id: &str, v: i64) -> anyhow::Result<()> {
     sql_query(
-        "INSERT INTO peer_checkpoint(peer_id, last_version_received)
+        "INSERT INTO sync_peer_checkpoint(peer_id, last_version_received)
          VALUES (?1, ?2)
          ON CONFLICT(peer_id) DO UPDATE SET last_version_received = excluded.last_version_received",
     )
@@ -70,7 +70,7 @@ pub fn set_checkpoint_received(conn: &mut DbConn, peer_id: &str, v: i64) -> anyh
 
 pub fn set_checkpoint_sent(conn: &mut DbConn, peer_id: &str, v: i64) -> anyhow::Result<()> {
     sql_query(
-        "INSERT INTO peer_checkpoint(peer_id, last_version_sent)
+        "INSERT INTO sync_peer_checkpoint(peer_id, last_version_sent)
          VALUES (?1, ?2)
          ON CONFLICT(peer_id) DO UPDATE SET last_version_sent = excluded.last_version_sent",
     )
@@ -321,7 +321,7 @@ pub fn get_checkpoint_received(conn: &mut DbConn, peer_id: &str) -> anyhow::Resu
         last_version_received: Option<i64>,
     }
     let row = sql_query(
-        "SELECT last_version_received FROM peer_checkpoint WHERE peer_id = ?1",
+        "SELECT last_version_received FROM sync_peer_checkpoint WHERE peer_id = ?1",
     )
     .bind::<Text, _>(peer_id)
     .get_result::<Row>(conn)
@@ -336,7 +336,7 @@ pub fn get_checkpoint_sent(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i
         last_version_sent: Option<i64>,
     }
     let row = sql_query(
-        "SELECT last_version_sent FROM peer_checkpoint WHERE peer_id = ?1",
+        "SELECT last_version_sent FROM sync_peer_checkpoint WHERE peer_id = ?1",
     )
     .bind::<Text, _>(peer_id)
     .get_result::<Row>(conn)
@@ -361,7 +361,7 @@ struct AssetsQueryRow {
     #[diesel(sql_type = Nullable<Text>)] symbol_mapping: Option<String>,
     #[diesel(sql_type = Nullable<Text>)] asset_class: Option<String>,
     #[diesel(sql_type = Nullable<Text>)] asset_sub_class: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] comment: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)] notes: Option<String>,
     #[diesel(sql_type = Nullable<Text>)] countries: Option<String>,
     #[diesel(sql_type = Nullable<Text>)] categories: Option<String>,
     #[diesel(sql_type = Nullable<Text>)] classes: Option<String>,
@@ -382,7 +382,7 @@ impl From<AssetsQueryRow> for AssetSyncRow {
             id: r.id, isin: r.isin, name: r.name, asset_type: r.asset_type,
             symbol: r.symbol, symbol_mapping: r.symbol_mapping,
             asset_class: r.asset_class, asset_sub_class: r.asset_sub_class,
-            comment: r.comment, countries: r.countries, categories: r.categories,
+            notes: r.notes, countries: r.countries, categories: r.categories,
             classes: r.classes, attributes: r.attributes,
             created_at: r.created_at, updated_at: r.updated_at,
             currency: r.currency, data_source: r.data_source,
@@ -395,7 +395,7 @@ pub fn get_assets_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow::Re
     let rows = sql_query(
         r#"
         SELECT id, isin, name, asset_type, symbol, symbol_mapping,
-               asset_class, asset_sub_class, comment, countries, categories, classes, attributes,
+               asset_class, asset_sub_class, notes, countries, categories, classes, attributes,
                created_at, updated_at, currency, data_source, sectors, url,
                updated_version, origin, deleted
           FROM assets
@@ -418,7 +418,7 @@ pub fn apply_assets(conn: &mut DbConn, rows: &[AssetSyncRow]) -> anyhow::Result<
                 r#"
                 INSERT INTO assets (
                     id, isin, name, asset_type, symbol, symbol_mapping,
-                    asset_class, asset_sub_class, comment, countries, categories, classes, attributes,
+                    asset_class, asset_sub_class, notes, countries, categories, classes, attributes,
                     created_at, updated_at, currency, data_source, sectors, url,
                     updated_version, origin, deleted
                 )
@@ -434,7 +434,7 @@ pub fn apply_assets(conn: &mut DbConn, rows: &[AssetSyncRow]) -> anyhow::Result<
                     symbol_mapping = excluded.symbol_mapping,
                     asset_class    = excluded.asset_class,
                     asset_sub_class= excluded.asset_sub_class,
-                    comment        = excluded.comment,
+                    notes          = excluded.notes,
                     countries      = excluded.countries,
                     categories     = excluded.categories,
                     classes        = excluded.classes,
@@ -460,7 +460,7 @@ pub fn apply_assets(conn: &mut DbConn, rows: &[AssetSyncRow]) -> anyhow::Result<
             .bind::<Nullable<Text>,_>(&r.symbol_mapping)
             .bind::<Nullable<Text>,_>(&r.asset_class)
             .bind::<Nullable<Text>,_>(&r.asset_sub_class)
-            .bind::<Nullable<Text>,_>(&r.comment)
+            .bind::<Nullable<Text>,_>(&r.notes)
             .bind::<Nullable<Text>,_>(&r.countries)
             .bind::<Nullable<Text>,_>(&r.categories)
             .bind::<Nullable<Text>,_>(&r.classes)
