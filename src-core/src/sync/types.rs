@@ -69,7 +69,7 @@ pub struct AssetSyncRow {
     pub symbol_mapping: Option<String>,
     pub asset_class: Option<String>,
     pub asset_sub_class: Option<String>,
-    pub comment: Option<String>,
+    pub notes: Option<String>,
     pub countries: Option<String>,
     pub categories: Option<String>,
     pub classes: Option<String>,
