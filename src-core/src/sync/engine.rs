@@ -1,12 +1,12 @@
 // sync/engine.rs
 use crate::db::DbPool;
-use crate::sync::store;
+use crate::sync::{store, peer_store};
 use crate::sync::transport::{connect_to_peer, send_message, start_server};
 use crate::sync::types::WireMessage;
 
 use anyhow::Context;
 use futures::StreamExt;
-use log::{error, info, warn};
+use log::{error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -79,35 +79,104 @@ impl SyncEngine {
     pub async fn start(&self) -> anyhow::Result<()> {
         let mut is_running = self.is_running.write().await;
         if *is_running {
-            warn!("Sync engine already running");
-            return Ok(());
+            return Ok(()); // Already running
         }
-        *is_running = true;
-        drop(is_running);
-
+        
         info!(
-            "Starting sync engine as {} on {}",
+            "Starting P2P sync engine with device_id: {} on {}",
             self.device_id, self.server_addr
         );
+
+        // Load saved peers from database
+        if let Ok(mut conn) = self.db_pool.get() {
+            if let Ok(saved_peers) = peer_store::load_peers(&mut conn) {
+                let mut peers = self.peers.write().await;
+                for peer in saved_peers {
+                    info!("Loaded saved peer: {} at {}", peer.name, peer.address);
+                    peers.insert(peer.id, peer);
+                }
+            }
+        }
 
         // Start WebSocket server (plain ws). For wss, call your TLS server here.
         let addr = self.server_addr.clone();
         let pool = self.db_pool.clone();
         let device = self.device_id;
+
         tokio::spawn(async move {
             if let Err(e) = start_server(&addr, pool, device).await {
                 error!("Transport server error: {e}");
             }
         });
 
-    // Discovery removed – pairing now initiated via QR code (manual connect).
+        // Give the server a moment to start
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-        // Periodic background loop
+        *is_running = true;
         self.start_sync_loop().await;
         Ok(())
-    }
+    }    pub fn device_id(&self) -> Uuid { self.device_id }
 
-    pub fn device_id(&self) -> Uuid { self.device_id }
+    pub fn get_db_pool(&self) -> Arc<DbPool> { self.db_pool.clone() }
+
+    /// Initialize sync metadata for existing data that was created before sync was enabled.
+    /// This should be called once after enabling sync on existing databases.
+    pub async fn initialize_existing_data(&self) -> anyhow::Result<(usize, usize, usize)> {
+        use diesel::prelude::*;
+        use diesel::sql_query;
+        
+        let mut conn = self.db_pool.get()?;
+        store::enable_pragmas(&mut conn)?;
+        
+        let current_clock = store::max_version(&mut conn)?;
+        let mut next_version = current_clock + 1;
+        let device_id = self.device_id.to_string();
+        
+        // Update accounts with version 0 (existing data from before sync)
+        let accounts_updated = sql_query(
+            "UPDATE accounts SET updated_version = ?1, origin = ?2 WHERE updated_version = 0"
+        )
+        .bind::<diesel::sql_types::BigInt, _>(next_version)
+        .bind::<diesel::sql_types::Text, _>(&device_id)
+        .execute(&mut conn)?;
+        
+        if accounts_updated > 0 {
+            next_version += 1;
+        }
+        
+        // Update activities with version 0
+        let activities_updated = sql_query(
+            "UPDATE activities SET updated_version = ?1, origin = ?2 WHERE updated_version = 0"
+        )
+        .bind::<diesel::sql_types::BigInt, _>(next_version)
+        .bind::<diesel::sql_types::Text, _>(&device_id)
+        .execute(&mut conn)?;
+        
+        if activities_updated > 0 {
+            next_version += 1;
+        }
+        
+        // Update assets with version 0
+        let assets_updated = sql_query(
+            "UPDATE assets SET updated_version = ?1, origin = ?2 WHERE updated_version = 0"
+        )
+        .bind::<diesel::sql_types::BigInt, _>(next_version)
+        .bind::<diesel::sql_types::Text, _>(&device_id)
+        .execute(&mut conn)?;
+        
+        if assets_updated > 0 {
+            next_version += 1;
+        }
+        
+        // Update the global clock
+        if accounts_updated > 0 || activities_updated > 0 || assets_updated > 0 {
+            sql_query("UPDATE sync_sequence SET value = ?1 WHERE name = 'clock'")
+                .bind::<diesel::sql_types::BigInt, _>(next_version - 1)
+                .execute(&mut conn)?;
+        }
+        
+        Ok((accounts_updated, activities_updated, assets_updated))
+    }
 
     pub async fn stop(&self) -> anyhow::Result<()> {
         let mut is_running = self.is_running.write().await;
@@ -116,17 +185,54 @@ impl SyncEngine {
     }
 
     pub async fn add_peer(&self, peer: Peer) -> anyhow::Result<()> {
+        // Save to database for persistence
+        if let Ok(mut conn) = self.db_pool.get() {
+            if let Err(e) = peer_store::save_peer(&mut conn, &peer) {
+                error!("Failed to save peer to database: {}", e);
+            }
+        }
+        
+        // Add to in-memory store
         self.peers.write().await.insert(peer.id, peer);
         Ok(())
     }
 
     pub async fn remove_peer(&self, peer_id: Uuid) -> anyhow::Result<()> {
+        // Remove from database
+        if let Ok(mut conn) = self.db_pool.get() {
+            if let Err(e) = peer_store::remove_peer(&mut conn, &peer_id) {
+                error!("Failed to remove peer from database: {}", e);
+            }
+        }
+        
+        // Remove from in-memory store
         self.peers.write().await.remove(&peer_id);
+        Ok(())
+    }
+
+    pub async fn refresh_peers_from_db(&self) -> anyhow::Result<()> {
+        // Reload peers from database to pick up any that were added via WebSocket connections
+        if let Ok(mut conn) = self.db_pool.get() {
+            if let Ok(saved_peers) = peer_store::load_peers(&mut conn) {
+                let mut peers = self.peers.write().await;
+                for peer in saved_peers {
+                    // Only add if not already present to avoid overwriting in-memory state
+                    if !peers.contains_key(&peer.id) {
+                        info!("Adding newly connected peer: {} at {}", peer.name, peer.address);
+                        peers.insert(peer.id, peer);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
     pub async fn get_peers(&self) -> Vec<Peer> {
         self.peers.read().await.values().cloned().collect()
+    }
+
+    pub async fn is_server_running(&self) -> bool {
+        *self.is_running.read().await
     }
 
     async fn start_sync_loop(&self) {
@@ -260,7 +366,20 @@ impl SyncEngine {
                             break;
                         }
                     }
-                    Ok(WireMessage::Hello { .. }) => { /* ignore */ }
+                    Ok(WireMessage::Hello { device_id: master_device_id, .. }) => {
+                        // Register the master device in our database when we receive Hello response
+                        if let Ok(mut conn) = db_pool.get() {
+                            let master_name = format!("Master@{}", master_device_id.to_string()[..8].to_uppercase());
+                            if let Err(e) = peer_store::save_master_peer(&mut conn, &master_device_id, &master_name, &peer.address) {
+                                error!("Failed to register master device: {}", e);
+                            } else {
+                                // Also ensure the master device ID is recorded in sync_device table
+                                if let Err(e) = store::ensure_device_id(&mut conn, &master_device_id.to_string()) {
+                                    error!("Failed to ensure master device ID: {}", e);
+                                }
+                            }
+                        }
+                    }
                     Ok(WireMessage::Pull { .. }) => {
                         // Peer shouldn't Pull in this direction during our pull phase.
                     }
@@ -367,6 +486,14 @@ impl SyncEngine {
         if acked > 0 {
             let mut conn = db_pool.get()?;
             store::set_checkpoint_sent(&mut conn, &peer.id.to_string(), ack_max)?;
+        }
+
+        // Update peer's last_sync timestamp
+        if let Ok(mut conn) = db_pool.get() {
+            let now = chrono::Utc::now();
+            if let Err(e) = peer_store::update_peer_last_sync(&mut conn, &peer.id, now) {
+                error!("Failed to update peer last_sync: {}", e);
+            }
         }
 
         info!("Sync completed with peer {}", peer.name);

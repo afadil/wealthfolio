@@ -34,6 +34,11 @@
     "shell:default",
     "core:app:allow-set-app-theme",
     "core:window:allow-set-theme",
-    "log:default"
+    "log:default",
+    "barcode-scanner:allow-scan",
+    "barcode-scanner:allow-cancel",
+    "barcode-scanner:allow-request-permissions",
+    "barcode-scanner:allow-check-permissions",
+    "barcode-scanner:allow-vibrate"
   ]
 }

@@ -32,10 +32,6 @@ pub fn calculate_valuation(
     target_date: NaiveDate,
     base_currency: &str, // Pass base currency directly
 ) -> Result<DailyAccountValuation> {
-    debug!(
-        "Calculating valuation for account {} on date {} with base currency {}",
-        holdings_snapshot.account_id, target_date, base_currency
-    );
 
     let account_currency = &holdings_snapshot.currency;
 
