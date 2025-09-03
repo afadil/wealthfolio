@@ -3,7 +3,10 @@ use diesel::sql_types::{BigInt, Bool, Integer, Nullable, Text};
 use diesel::{r2d2::ConnectionManager, sql_query, SqliteConnection};
 use serde::{Deserialize, Serialize};
 
-use crate::sync::types::{AccountSyncRow, ActivitySyncRow, AssetSyncRow};
+use crate::sync::types::{
+    AccountSyncRow, ActivityImportProfileSyncRow, ActivitySyncRow, AppSettingSyncRow, AssetSyncRow,
+    ContributionLimitSyncRow, GoalAllocationSyncRow, GoalSyncRow,
+};
 
 pub type DbConn = SqliteConnection;
 pub type DbPool = r2d2::Pool<ConnectionManager<DbConn>>;
@@ -36,6 +39,16 @@ pub fn max_version(conn: &mut DbConn) -> anyhow::Result<i64> {
            SELECT MAX(updated_version) AS v FROM activities
            UNION ALL
            SELECT MAX(updated_version) AS v FROM assets
+           UNION ALL
+           SELECT MAX(updated_version) AS v FROM activity_import_profiles
+           UNION ALL
+           SELECT MAX(updated_version) AS v FROM app_settings
+           UNION ALL
+           SELECT MAX(updated_version) AS v FROM contribution_limits
+           UNION ALL
+           SELECT MAX(updated_version) AS v FROM goals
+           UNION ALL
+           SELECT MAX(updated_version) AS v FROM goals_allocation
          )",
     )
     .get_result(conn)?;
@@ -49,12 +62,11 @@ pub fn get_checkpoint(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i64> {
         #[diesel(sql_type = Nullable<BigInt>)]
         last_version_received: Option<i64>,
     }
-    let row = sql_query(
-        "SELECT last_version_received FROM sync_peer_checkpoint WHERE peer_id = ?1",
-    )
-    .bind::<Text, _>(peer_id)
-    .get_result::<Row>(conn)
-    .optional()?;
+    let row =
+        sql_query("SELECT last_version_received FROM sync_peer_checkpoint WHERE peer_id = ?1")
+            .bind::<Text, _>(peer_id)
+            .get_result::<Row>(conn)
+            .optional()?;
     Ok(row.and_then(|r| r.last_version_received).unwrap_or(0))
 }
 
@@ -85,19 +97,32 @@ pub fn set_checkpoint_sent(conn: &mut DbConn, peer_id: &str, v: i64) -> anyhow::
 // Outbound: accounts since
 #[derive(QueryableByName, Serialize, Deserialize)]
 struct AccountsQueryRow {
-    #[diesel(sql_type = Text)] id: String,
-    #[diesel(sql_type = Text)] name: String,
-    #[diesel(sql_type = Text)] account_type: String,
-    #[diesel(sql_type = Nullable<Text>)] group: Option<String>,
-    #[diesel(sql_type = Text)] currency: String,
-    #[diesel(sql_type = Bool)] is_default: bool,
-    #[diesel(sql_type = Bool)] is_active: bool,
-    #[diesel(sql_type = Text)] created_at: String,
-    #[diesel(sql_type = Text)] updated_at: String,
-    #[diesel(sql_type = Nullable<Text>)] platform_id: Option<String>,
-    #[diesel(sql_type = BigInt)] updated_version: i64,
-    #[diesel(sql_type = Text)] origin: String,
-    #[diesel(sql_type = Integer)] deleted: i32,
+    #[diesel(sql_type = Text)]
+    id: String,
+    #[diesel(sql_type = Text)]
+    name: String,
+    #[diesel(sql_type = Text)]
+    account_type: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    group: Option<String>,
+    #[diesel(sql_type = Text)]
+    currency: String,
+    #[diesel(sql_type = Bool)]
+    is_default: bool,
+    #[diesel(sql_type = Bool)]
+    is_active: bool,
+    #[diesel(sql_type = Text)]
+    created_at: String,
+    #[diesel(sql_type = Text)]
+    updated_at: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    platform_id: Option<String>,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
 }
 
 impl From<AccountsQueryRow> for AccountSyncRow {
@@ -120,7 +145,11 @@ impl From<AccountsQueryRow> for AccountSyncRow {
     }
 }
 
-pub fn get_accounts_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow::Result<Vec<AccountSyncRow>> {
+pub fn get_accounts_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<AccountSyncRow>> {
     let rows = sql_query(
         r#"
         SELECT id, name, account_type, "group", currency,
@@ -141,23 +170,40 @@ pub fn get_accounts_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow::
 // Outbound: activities since
 #[derive(QueryableByName, Serialize, Deserialize)]
 struct ActivitiesQueryRow {
-    #[diesel(sql_type = Text)] id: String,
-    #[diesel(sql_type = Text)] account_id: String,
-    #[diesel(sql_type = Text)] asset_id: String,
-    #[diesel(sql_type = Text)] activity_type: String,
-    #[diesel(sql_type = Text)] activity_date: String,
-    #[diesel(sql_type = Text)] quantity: String,
-    #[diesel(sql_type = Text)] unit_price: String,
-    #[diesel(sql_type = Text)] currency: String,
-    #[diesel(sql_type = Text)] fee: String,
-    #[diesel(sql_type = Nullable<Text>)] amount: Option<String>,
-    #[diesel(sql_type = Bool)] is_draft: bool,
-    #[diesel(sql_type = Nullable<Text>)] comment: Option<String>,
-    #[diesel(sql_type = Text)] created_at: String,
-    #[diesel(sql_type = Text)] updated_at: String,
-    #[diesel(sql_type = BigInt)] updated_version: i64,
-    #[diesel(sql_type = Text)] origin: String,
-    #[diesel(sql_type = Integer)] deleted: i32,
+    #[diesel(sql_type = Text)]
+    id: String,
+    #[diesel(sql_type = Text)]
+    account_id: String,
+    #[diesel(sql_type = Text)]
+    asset_id: String,
+    #[diesel(sql_type = Text)]
+    activity_type: String,
+    #[diesel(sql_type = Text)]
+    activity_date: String,
+    #[diesel(sql_type = Text)]
+    quantity: String,
+    #[diesel(sql_type = Text)]
+    unit_price: String,
+    #[diesel(sql_type = Text)]
+    currency: String,
+    #[diesel(sql_type = Text)]
+    fee: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    amount: Option<String>,
+    #[diesel(sql_type = Bool)]
+    is_draft: bool,
+    #[diesel(sql_type = Nullable<Text>)]
+    comment: Option<String>,
+    #[diesel(sql_type = Text)]
+    created_at: String,
+    #[diesel(sql_type = Text)]
+    updated_at: String,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
 }
 
 impl From<ActivitiesQueryRow> for ActivitySyncRow {
@@ -184,7 +230,11 @@ impl From<ActivitiesQueryRow> for ActivitySyncRow {
     }
 }
 
-pub fn get_activities_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow::Result<Vec<ActivitySyncRow>> {
+pub fn get_activities_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<ActivitySyncRow>> {
     let rows = sql_query(
         r#"
         SELECT id, account_id, asset_id, activity_type, activity_date,
@@ -319,20 +369,17 @@ pub fn apply_activities(conn: &mut DbConn, rows: &[ActivitySyncRow]) -> anyhow::
     Ok(())
 }
 
-// Add to sync/store.rs
-
 pub fn get_checkpoint_received(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i64> {
     #[derive(QueryableByName)]
     struct Row {
         #[diesel(sql_type = Nullable<BigInt>)]
         last_version_received: Option<i64>,
     }
-    let row = sql_query(
-        "SELECT last_version_received FROM sync_peer_checkpoint WHERE peer_id = ?1",
-    )
-    .bind::<Text, _>(peer_id)
-    .get_result::<Row>(conn)
-    .optional()?;
+    let row =
+        sql_query("SELECT last_version_received FROM sync_peer_checkpoint WHERE peer_id = ?1")
+            .bind::<Text, _>(peer_id)
+            .get_result::<Row>(conn)
+            .optional()?;
     Ok(row.and_then(|r| r.last_version_received).unwrap_or(0))
 }
 
@@ -342,64 +389,102 @@ pub fn get_checkpoint_sent(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i
         #[diesel(sql_type = Nullable<BigInt>)]
         last_version_sent: Option<i64>,
     }
-    let row = sql_query(
-        "SELECT last_version_sent FROM sync_peer_checkpoint WHERE peer_id = ?1",
-    )
-    .bind::<Text, _>(peer_id)
-    .get_result::<Row>(conn)
-    .optional()?;
+    let row = sql_query("SELECT last_version_sent FROM sync_peer_checkpoint WHERE peer_id = ?1")
+        .bind::<Text, _>(peer_id)
+        .get_result::<Row>(conn)
+        .optional()?;
     Ok(row.and_then(|r| r.last_version_sent).unwrap_or(0))
 }
-
 
 /* checkpoints helpers (same as before) */
 #[derive(QueryableByName)]
 #[allow(dead_code)] // Used by queries but not directly in code
-struct CheckRow { #[diesel(sql_type = Nullable<BigInt>)] v: Option<i64> }
-
+struct CheckRow {
+    #[diesel(sql_type = Nullable<BigInt>)]
+    v: Option<i64>,
+}
 
 /* Outbound: assets since */
 #[derive(QueryableByName)]
 struct AssetsQueryRow {
-    #[diesel(sql_type = Text)] id: String,
-    #[diesel(sql_type = Nullable<Text>)] isin: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] name: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] asset_type: Option<String>,
-    #[diesel(sql_type = Text)] symbol: String,
-    #[diesel(sql_type = Nullable<Text>)] symbol_mapping: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] asset_class: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] asset_sub_class: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] notes: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] countries: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] categories: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] classes: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] attributes: Option<String>,
-    #[diesel(sql_type = Text)] created_at: String,
-    #[diesel(sql_type = Text)] updated_at: String,
-    #[diesel(sql_type = Text)] currency: String,
-    #[diesel(sql_type = Text)] data_source: String,
-    #[diesel(sql_type = Nullable<Text>)] sectors: Option<String>,
-    #[diesel(sql_type = Nullable<Text>)] url: Option<String>,
-    #[diesel(sql_type = BigInt)] updated_version: i64,
-    #[diesel(sql_type = Text)] origin: String,
-    #[diesel(sql_type = Integer)] deleted: i32,
+    #[diesel(sql_type = Text)]
+    id: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    isin: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    name: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    asset_type: Option<String>,
+    #[diesel(sql_type = Text)]
+    symbol: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    symbol_mapping: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    asset_class: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    asset_sub_class: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    notes: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    countries: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    categories: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    classes: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    attributes: Option<String>,
+    #[diesel(sql_type = Text)]
+    created_at: String,
+    #[diesel(sql_type = Text)]
+    updated_at: String,
+    #[diesel(sql_type = Text)]
+    currency: String,
+    #[diesel(sql_type = Text)]
+    data_source: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    sectors: Option<String>,
+    #[diesel(sql_type = Nullable<Text>)]
+    url: Option<String>,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
 }
 impl From<AssetsQueryRow> for AssetSyncRow {
     fn from(r: AssetsQueryRow) -> Self {
         Self {
-            id: r.id, isin: r.isin, name: r.name, asset_type: r.asset_type,
-            symbol: r.symbol, symbol_mapping: r.symbol_mapping,
-            asset_class: r.asset_class, asset_sub_class: r.asset_sub_class,
-            notes: r.notes, countries: r.countries, categories: r.categories,
-            classes: r.classes, attributes: r.attributes,
-            created_at: r.created_at, updated_at: r.updated_at,
-            currency: r.currency, data_source: r.data_source,
-            sectors: r.sectors, url: r.url,
-            updated_version: r.updated_version, origin: r.origin, deleted: r.deleted as i64
+            id: r.id,
+            isin: r.isin,
+            name: r.name,
+            asset_type: r.asset_type,
+            symbol: r.symbol,
+            symbol_mapping: r.symbol_mapping,
+            asset_class: r.asset_class,
+            asset_sub_class: r.asset_sub_class,
+            notes: r.notes,
+            countries: r.countries,
+            categories: r.categories,
+            classes: r.classes,
+            attributes: r.attributes,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            currency: r.currency,
+            data_source: r.data_source,
+            sectors: r.sectors,
+            url: r.url,
+            updated_version: r.updated_version,
+            origin: r.origin,
+            deleted: r.deleted as i64,
         }
     }
 }
-pub fn get_assets_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow::Result<Vec<AssetSyncRow>> {
+pub fn get_assets_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<AssetSyncRow>> {
     let rows = sql_query(
         r#"
         SELECT id, isin, name, asset_type, symbol, symbol_mapping,
@@ -412,8 +497,8 @@ pub fn get_assets_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow::Re
          LIMIT ?2
         "#,
     )
-    .bind::<BigInt,_>(since)
-    .bind::<BigInt,_>(limit)
+    .bind::<BigInt, _>(since)
+    .bind::<BigInt, _>(limit)
     .load::<AssetsQueryRow>(conn)?;
     Ok(rows.into_iter().map(Into::into).collect())
 }
@@ -482,6 +567,483 @@ pub fn apply_assets(conn: &mut DbConn, rows: &[AssetSyncRow]) -> anyhow::Result<
             .bind::<BigInt,_>(r.updated_version)
             .bind::<Text,_>(&r.origin)
             .bind::<Integer,_>(r.deleted as i32)
+            .execute(c)?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })?;
+    Ok(())
+}
+
+// Activity import profiles functions
+#[derive(QueryableByName)]
+struct ActivityImportProfilesQueryRow {
+    #[diesel(sql_type = Text)]
+    account_id: String,
+    #[diesel(sql_type = Text)]
+    field_mappings: String,
+    #[diesel(sql_type = Text)]
+    activity_mappings: String,
+    #[diesel(sql_type = Text)]
+    symbol_mappings: String,
+    #[diesel(sql_type = Text)]
+    created_at: String,
+    #[diesel(sql_type = Text)]
+    updated_at: String,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
+}
+
+impl From<ActivityImportProfilesQueryRow> for ActivityImportProfileSyncRow {
+    fn from(r: ActivityImportProfilesQueryRow) -> Self {
+        Self {
+            account_id: r.account_id,
+            field_mappings: r.field_mappings,
+            activity_mappings: r.activity_mappings,
+            symbol_mappings: r.symbol_mappings,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            updated_version: r.updated_version,
+            origin: r.origin,
+            deleted: r.deleted as i64,
+        }
+    }
+}
+
+pub fn get_activity_import_profiles_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<ActivityImportProfileSyncRow>> {
+    let rows = sql_query(
+        r#"
+        SELECT account_id, field_mappings, activity_mappings, symbol_mappings,
+               created_at, updated_at, updated_version, origin, deleted
+          FROM activity_import_profiles
+         WHERE updated_version > ?1
+         ORDER BY updated_version ASC
+         LIMIT ?2
+        "#,
+    )
+    .bind::<BigInt, _>(since)
+    .bind::<BigInt, _>(limit)
+    .load::<ActivityImportProfilesQueryRow>(conn)?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+pub fn apply_activity_import_profiles(
+    conn: &mut DbConn,
+    rows: &[ActivityImportProfileSyncRow],
+) -> anyhow::Result<()> {
+    conn.immediate_transaction(|c| {
+        for r in rows {
+            sql_query(
+                r#"
+                INSERT INTO activity_import_profiles (
+                    account_id, field_mappings, activity_mappings, symbol_mappings,
+                    created_at, updated_at, updated_version, origin, deleted
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                ON CONFLICT(account_id) DO UPDATE SET
+                    field_mappings = excluded.field_mappings,
+                    activity_mappings = excluded.activity_mappings,
+                    symbol_mappings = excluded.symbol_mappings,
+                    updated_at = excluded.updated_at,
+                    updated_version = excluded.updated_version,
+                    origin = excluded.origin,
+                    deleted = excluded.deleted
+                WHERE
+                  excluded.updated_version > activity_import_profiles.updated_version OR
+                  (excluded.updated_version = activity_import_profiles.updated_version AND excluded.origin > activity_import_profiles.origin)
+                "#
+            )
+            .bind::<Text, _>(&r.account_id)
+            .bind::<Text, _>(&r.field_mappings)
+            .bind::<Text, _>(&r.activity_mappings)
+            .bind::<Text, _>(&r.symbol_mappings)
+            .bind::<Text, _>(&r.created_at)
+            .bind::<Text, _>(&r.updated_at)
+            .bind::<BigInt, _>(r.updated_version)
+            .bind::<Text, _>(&r.origin)
+            .bind::<Integer, _>(r.deleted as i32)
+            .execute(c)?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })?;
+    Ok(())
+}
+
+// App settings functions
+#[derive(QueryableByName)]
+struct AppSettingsQueryRow {
+    #[diesel(sql_type = Text)]
+    setting_key: String,
+    #[diesel(sql_type = Text)]
+    setting_value: String,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
+}
+
+impl From<AppSettingsQueryRow> for AppSettingSyncRow {
+    fn from(r: AppSettingsQueryRow) -> Self {
+        Self {
+            setting_key: r.setting_key,
+            setting_value: r.setting_value,
+            updated_version: r.updated_version,
+            origin: r.origin,
+            deleted: r.deleted as i64,
+        }
+    }
+}
+
+pub fn get_app_settings_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<AppSettingSyncRow>> {
+    let rows = sql_query(
+        r#"
+        SELECT setting_key, setting_value, updated_version, origin, deleted
+          FROM app_settings
+         WHERE updated_version > ?1
+         ORDER BY updated_version ASC
+         LIMIT ?2
+        "#,
+    )
+    .bind::<BigInt, _>(since)
+    .bind::<BigInt, _>(limit)
+    .load::<AppSettingsQueryRow>(conn)?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+pub fn apply_app_settings(conn: &mut DbConn, rows: &[AppSettingSyncRow]) -> anyhow::Result<()> {
+    conn.immediate_transaction(|c| {
+        for r in rows {
+            sql_query(
+                r#"
+                INSERT INTO app_settings (
+                    setting_key, setting_value, updated_version, origin, deleted
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value = excluded.setting_value,
+                    updated_version = excluded.updated_version,
+                    origin = excluded.origin,
+                    deleted = excluded.deleted
+                WHERE
+                  excluded.updated_version > app_settings.updated_version OR
+                  (excluded.updated_version = app_settings.updated_version AND excluded.origin > app_settings.origin)
+                "#
+            )
+            .bind::<Text, _>(&r.setting_key)
+            .bind::<Text, _>(&r.setting_value)
+            .bind::<BigInt, _>(r.updated_version)
+            .bind::<Text, _>(&r.origin)
+            .bind::<Integer, _>(r.deleted as i32)
+            .execute(c)?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })?;
+    Ok(())
+}
+
+// Contribution limits functions
+#[derive(QueryableByName)]
+struct ContributionLimitsQueryRow {
+    #[diesel(sql_type = Text)]
+    id: String,
+    #[diesel(sql_type = Text)]
+    group_name: String,
+    #[diesel(sql_type = Integer)]
+    contribution_year: i32,
+    #[diesel(sql_type = Text)]
+    limit_amount: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    account_ids: Option<String>,
+    #[diesel(sql_type = Text)]
+    created_at: String,
+    #[diesel(sql_type = Text)]
+    updated_at: String,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
+}
+
+impl From<ContributionLimitsQueryRow> for ContributionLimitSyncRow {
+    fn from(r: ContributionLimitsQueryRow) -> Self {
+        Self {
+            id: r.id,
+            group_name: r.group_name,
+            contribution_year: r.contribution_year,
+            limit_amount: r.limit_amount,
+            account_ids: r.account_ids,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            updated_version: r.updated_version,
+            origin: r.origin,
+            deleted: r.deleted as i64,
+        }
+    }
+}
+
+pub fn get_contribution_limits_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<ContributionLimitSyncRow>> {
+    let rows = sql_query(
+        r#"
+        SELECT id, group_name, contribution_year,
+               CAST(limit_amount AS TEXT) AS limit_amount,
+               account_ids, created_at, updated_at,
+               updated_version, origin, deleted
+          FROM contribution_limits
+         WHERE updated_version > ?1
+         ORDER BY updated_version ASC
+         LIMIT ?2
+        "#,
+    )
+    .bind::<BigInt, _>(since)
+    .bind::<BigInt, _>(limit)
+    .load::<ContributionLimitsQueryRow>(conn)?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+pub fn apply_contribution_limits(
+    conn: &mut DbConn,
+    rows: &[ContributionLimitSyncRow],
+) -> anyhow::Result<()> {
+    conn.immediate_transaction(|c| {
+        for r in rows {
+            sql_query(
+                r#"
+                INSERT INTO contribution_limits (
+                    id, group_name, contribution_year, limit_amount, account_ids,
+                    created_at, updated_at, updated_version, origin, deleted
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                ON CONFLICT(id) DO UPDATE SET
+                    group_name = excluded.group_name,
+                    contribution_year = excluded.contribution_year,
+                    limit_amount = excluded.limit_amount,
+                    account_ids = excluded.account_ids,
+                    updated_at = excluded.updated_at,
+                    updated_version = excluded.updated_version,
+                    origin = excluded.origin,
+                    deleted = excluded.deleted
+                WHERE
+                  excluded.updated_version > contribution_limits.updated_version OR
+                  (excluded.updated_version = contribution_limits.updated_version AND excluded.origin > contribution_limits.origin)
+                "#
+            )
+            .bind::<Text, _>(&r.id)
+            .bind::<Text, _>(&r.group_name)
+            .bind::<Integer, _>(r.contribution_year)
+            .bind::<Text, _>(&r.limit_amount)
+            .bind::<Nullable<Text>, _>(&r.account_ids)
+            .bind::<Text, _>(&r.created_at)
+            .bind::<Text, _>(&r.updated_at)
+            .bind::<BigInt, _>(r.updated_version)
+            .bind::<Text, _>(&r.origin)
+            .bind::<Integer, _>(r.deleted as i32)
+            .execute(c)?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })?;
+    Ok(())
+}
+
+// Goals functions
+#[derive(QueryableByName)]
+struct GoalsQueryRow {
+    #[diesel(sql_type = Text)]
+    id: String,
+    #[diesel(sql_type = Text)]
+    title: String,
+    #[diesel(sql_type = Nullable<Text>)]
+    description: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Double)]
+    target_amount: f64,
+    #[diesel(sql_type = Nullable<Bool>)]
+    is_achieved: Option<bool>,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
+}
+
+impl From<GoalsQueryRow> for GoalSyncRow {
+    fn from(r: GoalsQueryRow) -> Self {
+        Self {
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            target_amount: r.target_amount,
+            is_achieved: r.is_achieved,
+            updated_version: r.updated_version,
+            origin: r.origin,
+            deleted: r.deleted as i64,
+        }
+    }
+}
+
+pub fn get_goals_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<GoalSyncRow>> {
+    let rows = sql_query(
+        r#"
+        SELECT id, title, description, target_amount, is_achieved,
+               updated_version, origin, deleted
+          FROM goals
+         WHERE updated_version > ?1
+         ORDER BY updated_version ASC
+         LIMIT ?2
+        "#,
+    )
+    .bind::<BigInt, _>(since)
+    .bind::<BigInt, _>(limit)
+    .load::<GoalsQueryRow>(conn)?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+pub fn apply_goals(conn: &mut DbConn, rows: &[GoalSyncRow]) -> anyhow::Result<()> {
+    conn.immediate_transaction(|c| {
+        for r in rows {
+            sql_query(
+                r#"
+                INSERT INTO goals (
+                    id, title, description, target_amount, is_achieved,
+                    updated_version, origin, deleted
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    description = excluded.description,
+                    target_amount = excluded.target_amount,
+                    is_achieved = excluded.is_achieved,
+                    updated_version = excluded.updated_version,
+                    origin = excluded.origin,
+                    deleted = excluded.deleted
+                WHERE
+                  excluded.updated_version > goals.updated_version OR
+                  (excluded.updated_version = goals.updated_version AND excluded.origin > goals.origin)
+                "#
+            )
+            .bind::<Text, _>(&r.id)
+            .bind::<Text, _>(&r.title)
+            .bind::<Nullable<Text>, _>(&r.description)
+            .bind::<diesel::sql_types::Double, _>(r.target_amount)
+            .bind::<Nullable<Bool>, _>(r.is_achieved)
+            .bind::<BigInt, _>(r.updated_version)
+            .bind::<Text, _>(&r.origin)
+            .bind::<Integer, _>(r.deleted as i32)
+            .execute(c)?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })?;
+    Ok(())
+}
+
+// Goals allocation functions
+#[derive(QueryableByName)]
+struct GoalsAllocationQueryRow {
+    #[diesel(sql_type = Text)]
+    id: String,
+    #[diesel(sql_type = Integer)]
+    percent_allocation: i32,
+    #[diesel(sql_type = Text)]
+    goal_id: String,
+    #[diesel(sql_type = Text)]
+    account_id: String,
+    #[diesel(sql_type = BigInt)]
+    updated_version: i64,
+    #[diesel(sql_type = Text)]
+    origin: String,
+    #[diesel(sql_type = Integer)]
+    deleted: i32,
+}
+
+impl From<GoalsAllocationQueryRow> for GoalAllocationSyncRow {
+    fn from(r: GoalsAllocationQueryRow) -> Self {
+        Self {
+            id: r.id,
+            percent_allocation: r.percent_allocation,
+            goal_id: r.goal_id,
+            account_id: r.account_id,
+            updated_version: r.updated_version,
+            origin: r.origin,
+            deleted: r.deleted as i64,
+        }
+    }
+}
+
+pub fn get_goals_allocation_since(
+    conn: &mut DbConn,
+    since: i64,
+    limit: i64,
+) -> anyhow::Result<Vec<GoalAllocationSyncRow>> {
+    let rows = sql_query(
+        r#"
+        SELECT id, percent_allocation, goal_id, account_id,
+               updated_version, origin, deleted
+          FROM goals_allocation
+         WHERE updated_version > ?1
+         ORDER BY updated_version ASC
+         LIMIT ?2
+        "#,
+    )
+    .bind::<BigInt, _>(since)
+    .bind::<BigInt, _>(limit)
+    .load::<GoalsAllocationQueryRow>(conn)?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+pub fn apply_goals_allocation(
+    conn: &mut DbConn,
+    rows: &[GoalAllocationSyncRow],
+) -> anyhow::Result<()> {
+    conn.immediate_transaction(|c| {
+        for r in rows {
+            sql_query(
+                r#"
+                INSERT INTO goals_allocation (
+                    id, percent_allocation, goal_id, account_id,
+                    updated_version, origin, deleted
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                ON CONFLICT(id) DO UPDATE SET
+                    percent_allocation = excluded.percent_allocation,
+                    goal_id = excluded.goal_id,
+                    account_id = excluded.account_id,
+                    updated_version = excluded.updated_version,
+                    origin = excluded.origin,
+                    deleted = excluded.deleted
+                WHERE
+                  excluded.updated_version > goals_allocation.updated_version OR
+                  (excluded.updated_version = goals_allocation.updated_version AND excluded.origin > goals_allocation.origin)
+                "#
+            )
+            .bind::<Text, _>(&r.id)
+            .bind::<Integer, _>(r.percent_allocation)
+            .bind::<Text, _>(&r.goal_id)
+            .bind::<Text, _>(&r.account_id)
+            .bind::<BigInt, _>(r.updated_version)
+            .bind::<Text, _>(&r.origin)
+            .bind::<Integer, _>(r.deleted as i32)
             .execute(c)?;
         }
         Ok::<(), anyhow::Error>(())
