@@ -10,8 +10,8 @@ pub enum WireMessage {
         app: String,
         schema: u32,
         capabilities: Vec<String>, // ["lww"]
-        // Optional: dataset_id if you separate device_id and dataset/workspace id
-        // dataset_id: String,
+                                   // Optional: dataset_id if you separate device_id and dataset/workspace id
+                                   // dataset_id: String,
     },
     Pull {
         message_id: Uuid,
@@ -33,6 +33,36 @@ pub enum WireMessage {
     ActivitiesBatch {
         message_id: Uuid,
         rows: Vec<ActivitySyncRow>,
+        max_version: i64,
+        done: bool,
+    },
+    ActivityImportProfilesBatch {
+        message_id: Uuid,
+        rows: Vec<ActivityImportProfileSyncRow>,
+        max_version: i64,
+        done: bool,
+    },
+    AppSettingsBatch {
+        message_id: Uuid,
+        rows: Vec<AppSettingSyncRow>,
+        max_version: i64,
+        done: bool,
+    },
+    ContributionLimitsBatch {
+        message_id: Uuid,
+        rows: Vec<ContributionLimitSyncRow>,
+        max_version: i64,
+        done: bool,
+    },
+    GoalsBatch {
+        message_id: Uuid,
+        rows: Vec<GoalSyncRow>,
+        max_version: i64,
+        done: bool,
+    },
+    GoalsAllocationBatch {
+        message_id: Uuid,
+        rows: Vec<GoalAllocationSyncRow>,
         max_version: i64,
         done: bool,
     },
@@ -102,6 +132,70 @@ pub struct ActivitySyncRow {
     pub comment: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+
+    pub updated_version: i64,
+    pub origin: String,
+    pub deleted: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityImportProfileSyncRow {
+    pub account_id: String,
+    pub field_mappings: String,
+    pub activity_mappings: String,
+    pub symbol_mappings: String,
+    pub created_at: String,
+    pub updated_at: String,
+
+    pub updated_version: i64,
+    pub origin: String,
+    pub deleted: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettingSyncRow {
+    pub setting_key: String,
+    pub setting_value: String,
+
+    pub updated_version: i64,
+    pub origin: String,
+    pub deleted: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContributionLimitSyncRow {
+    pub id: String,
+    pub group_name: String,
+    pub contribution_year: i32,
+    pub limit_amount: String,
+    pub account_ids: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+
+    pub updated_version: i64,
+    pub origin: String,
+    pub deleted: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalSyncRow {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub target_amount: f64,
+    pub is_achieved: Option<bool>,
+
+    pub updated_version: i64,
+    pub origin: String,
+    pub deleted: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalAllocationSyncRow {
+    pub id: String,
+    pub percent_allocation: i32,
+    pub goal_id: String,
+    pub account_id: String,
 
     pub updated_version: i64,
     pub origin: String,
