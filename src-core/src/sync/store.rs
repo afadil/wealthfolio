@@ -22,7 +22,7 @@ pub fn ensure_device_id(conn: &mut DbConn, device_id: &str) -> anyhow::Result<()
     Ok(())
 }
 
-// Compute a global max version across both tables
+// Compute a global max version across all tables
 pub fn max_version(conn: &mut DbConn) -> anyhow::Result<i64> {
     #[derive(QueryableByName)]
     struct VRow {
@@ -34,6 +34,8 @@ pub fn max_version(conn: &mut DbConn) -> anyhow::Result<i64> {
            SELECT MAX(updated_version) AS v FROM accounts
            UNION ALL
            SELECT MAX(updated_version) AS v FROM activities
+           UNION ALL
+           SELECT MAX(updated_version) AS v FROM assets
          )",
     )
     .get_result(conn)?;
@@ -148,6 +150,7 @@ struct ActivitiesQueryRow {
     #[diesel(sql_type = Text)] unit_price: String,
     #[diesel(sql_type = Text)] currency: String,
     #[diesel(sql_type = Text)] fee: String,
+    #[diesel(sql_type = Nullable<Text>)] amount: Option<String>,
     #[diesel(sql_type = Bool)] is_draft: bool,
     #[diesel(sql_type = Nullable<Text>)] comment: Option<String>,
     #[diesel(sql_type = Text)] created_at: String,
@@ -169,6 +172,7 @@ impl From<ActivitiesQueryRow> for ActivitySyncRow {
             unit_price: r.unit_price,
             currency: r.currency,
             fee: r.fee,
+            amount: r.amount,
             is_draft: r.is_draft,
             comment: r.comment,
             created_at: r.created_at,
@@ -188,6 +192,7 @@ pub fn get_activities_since(conn: &mut DbConn, since: i64, limit: i64) -> anyhow
                CAST(unit_price AS TEXT) AS unit_price,
                currency,
                CAST(fee AS TEXT) AS fee,
+               CAST(amount AS TEXT) AS amount,
                is_draft, comment, created_at, updated_at,
                updated_version, origin, deleted
           FROM activities
@@ -261,14 +266,14 @@ pub fn apply_activities(conn: &mut DbConn, rows: &[ActivitySyncRow]) -> anyhow::
                 r#"
                 INSERT INTO activities (
                     id, account_id, asset_id, activity_type, activity_date,
-                    quantity, unit_price, currency, fee, is_draft,
+                    quantity, unit_price, currency, fee, amount, is_draft,
                     comment, created_at, updated_at,
                     updated_version, origin, deleted
                 )
                 VALUES (?1, ?2, ?3, ?4, ?5,
-                        ?6, ?7, ?8, ?9, ?10,
-                        ?11, ?12, ?13,
-                        ?14, ?15, ?16)
+                        ?6, ?7, ?8, ?9, ?10, ?11,
+                        ?12, ?13, ?14,
+                        ?15, ?16, ?17)
                 ON CONFLICT(id) DO UPDATE SET
                     account_id      = excluded.account_id,
                     asset_id        = excluded.asset_id,
@@ -278,6 +283,7 @@ pub fn apply_activities(conn: &mut DbConn, rows: &[ActivitySyncRow]) -> anyhow::
                     unit_price      = excluded.unit_price,
                     currency        = excluded.currency,
                     fee             = excluded.fee,
+                    amount          = excluded.amount,
                     is_draft        = excluded.is_draft,
                     comment         = excluded.comment,
                     updated_at      = excluded.updated_at,
@@ -298,6 +304,7 @@ pub fn apply_activities(conn: &mut DbConn, rows: &[ActivitySyncRow]) -> anyhow::
             .bind::<Text, _>(&r.unit_price)
             .bind::<Text, _>(&r.currency)
             .bind::<Text, _>(&r.fee)
+            .bind::<Nullable<Text>, _>(&r.amount)
             .bind::<Bool, _>(r.is_draft)
             .bind::<Nullable<Text>, _>(&r.comment)
             .bind::<Text, _>(&r.created_at)
@@ -347,6 +354,7 @@ pub fn get_checkpoint_sent(conn: &mut DbConn, peer_id: &str) -> anyhow::Result<i
 
 /* checkpoints helpers (same as before) */
 #[derive(QueryableByName)]
+#[allow(dead_code)] // Used by queries but not directly in code
 struct CheckRow { #[diesel(sql_type = Nullable<BigInt>)] v: Option<i64> }
 
 

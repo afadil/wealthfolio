@@ -21,7 +21,6 @@ use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
 use uuid;
-use chrono;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::async_runtime::spawn;
@@ -72,6 +71,12 @@ pub fn run() {
             {
                 let _ = app.handle().plugin(tauri_plugin_updater::Builder::new().build());
                 let _ = app.handle().plugin(tauri_plugin_window_state::Builder::new().build());
+            }
+
+            // Initialize mobile-only plugins
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                let _ = app.handle().plugin(tauri_plugin_barcode_scanner::init());
             }
 
             let handle = app.handle().clone();
@@ -197,9 +202,14 @@ pub fn run() {
             commands::addon::submit_addon_rating,
             // Sync (QR pairing)
             commands::sync::get_sync_status,
+            commands::sync::get_device_name,
             commands::sync::generate_pairing_payload,
             commands::sync::sync_with_master,
-            // commands::sync::sync_now,
+            commands::sync::force_full_sync_with_master,
+            commands::sync::sync_now,
+            commands::sync::initialize_sync_for_existing_data,
+            commands::sync::set_as_master,
+            commands::sync::remove_master_device,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");
@@ -281,9 +291,9 @@ fn spawn_background_tasks(
         // 3) Create and start the engine
         let engine = SyncEngine::with_device_id(pool.clone(), device_id)
             .expect("sync engine");
-        if let Err(e) = engine.start().await {
+        if let Err(_e) = engine.start().await {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            log::error!("sync start error: {e}");
+            log::error!("sync start error: {_e}");
             return;
         }
 

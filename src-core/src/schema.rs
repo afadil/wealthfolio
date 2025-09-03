@@ -206,18 +206,24 @@ diesel::table! {
 }
 
 diesel::table! {
-    sync_sequence (name) {
-        name -> Nullable<Text>,
-        value -> Integer,
+    sync_peers (id) {
+        id -> Nullable<Text>,
+        name -> Text,
+        address -> Text,
+        fingerprint -> Text,
+        paired -> Bool,
+        trusted -> Bool,
+        is_master -> Bool,
+        last_seen -> Text,
+        last_sync -> Nullable<Text>,
+        created_at -> Text,
     }
 }
 
 diesel::table! {
-    sync_trusted_peers (peer_id) {
-        peer_id -> Nullable<Text>,
-        fingerprint -> Text,
+    sync_sequence (name) {
         name -> Nullable<Text>,
-        added_at -> Timestamp,
+        value -> Integer,
     }
 }
 
@@ -242,6 +248,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     quotes,
     sync_device,
     sync_peer_checkpoint,
+    sync_peers,
     sync_sequence,
-    sync_trusted_peers,
 );

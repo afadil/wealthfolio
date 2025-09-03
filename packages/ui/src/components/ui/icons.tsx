@@ -88,6 +88,11 @@ import {
   ReceiptText,
   TrendingUp,
   TrendingDown,
+  Monitor,
+  QrCode,
+  Camera,
+  Wifi,
+  Smartphone,
 } from 'lucide-react';
 
 export type Icon = LucideIcon;
@@ -144,6 +149,11 @@ export const Icons = {
   PlusCircle: PlusCircle,
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
+  Monitor: Monitor,
+  QrCode: QrCode,
+  Camera: Camera,
+  Wifi: Wifi,
+  Smartphone: Smartphone,
   PieChart: PieChart,
   BarChart: BarChart,
   Spinner: Loader2,

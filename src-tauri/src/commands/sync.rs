@@ -3,9 +3,10 @@ use crate::SyncHandles;
 use serde::Serialize;
 use chrono::Utc;
 use uuid::Uuid;
+use wealthfolio_core::sync::peer_store;
 
 #[derive(Serialize)]
-struct PeerInfo {
+pub struct PeerInfo {
     id: String,
     name: String,
     address: String,
@@ -14,21 +15,85 @@ struct PeerInfo {
     last_sync: Option<String>,
 }
 
+#[derive(Serialize)]
+pub struct SyncStatusResponse {
+    device_id: String,
+    device_name: String,
+    is_master: bool,
+    server_running: bool,
+    master_device: Option<PeerInfo>,
+    other_peers: Vec<PeerInfo>,
+}
+
 #[tauri::command]
-pub async fn get_sync_status(state: State<'_, SyncHandles>) -> Result<serde_json::Value, String> {
+pub async fn get_device_name() -> Result<String, String> {
+    // Try to get hostname/computer name
+    match hostname::get() {
+        Ok(name) => {
+            if let Some(name_str) = name.to_str() {
+                Ok(name_str.to_string())
+            } else {
+                Ok("Unknown Device".to_string())
+            }
+        }
+        Err(_) => Ok("Unknown Device".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn get_sync_status(state: State<'_, SyncHandles>) -> Result<SyncStatusResponse, String> {
+    // Refresh peers from database to pick up any new connections
+    state.engine.refresh_peers_from_db().await.map_err(|e| e.to_string())?;
+    
     let peers = state.engine.get_peers().await;
-    let list: Vec<PeerInfo> = peers.into_iter().map(|p| PeerInfo {
-        id: p.id.to_string(),
-        name: p.name,
-        address: p.address,
-        paired: p.paired,
-        last_seen: Some(p.last_seen.to_rfc3339()),
-        last_sync: p.last_sync.map(|d| d.to_rfc3339()),
-    }).collect();
-    Ok(serde_json::json!({
-        "device_id": state.engine.device_id().to_string(),
-        "peers": list
-    }))
+    let device_name = get_device_name().await.unwrap_or_else(|_| "Unknown Device".to_string());
+    
+    // Check if this device is set as master
+    let is_master = check_is_master(&state).await;
+    
+    // Separate master device from other peers
+    let mut master_device = None;
+    let mut other_peers = Vec::new();
+    
+    for peer in peers {
+        let is_master = peer.name.contains("Master@");
+        
+        let peer_info = PeerInfo {
+            id: peer.id.to_string(),
+            name: peer.name,
+            address: peer.address,
+            paired: peer.paired,
+            last_seen: Some(peer.last_seen.to_rfc3339()),
+            last_sync: peer.last_sync.map(|d| d.to_rfc3339()),
+        };
+        
+        if is_master {
+            master_device = Some(peer_info);
+        } else {
+            other_peers.push(peer_info);
+        }
+    }
+    
+    Ok(SyncStatusResponse {
+        device_id: state.engine.device_id().to_string(),
+        device_name,
+        is_master,
+        server_running: state.engine.is_server_running().await,
+        master_device,
+        other_peers,
+    })
+}
+
+async fn check_is_master(state: &State<'_, SyncHandles>) -> bool {
+    // Check if this device is configured as master in the database
+    let db_pool = state.engine.get_db_pool();
+    
+    match db_pool.get() {
+        Ok(mut conn) => {
+            peer_store::is_master(&mut conn).unwrap_or(false)
+        }
+        Err(_) => false,
+    }
 }
 
 #[tauri::command]
@@ -71,11 +136,18 @@ fn select_ips() -> (String, Vec<String>) {
 }
 
 #[tauri::command]
-pub async fn sync_with_master(state: State<'_, SyncHandles>, payload: String) -> Result<(), String> {
+pub async fn sync_with_master(state: State<'_, SyncHandles>, payload: String) -> Result<String, String> {
     #[derive(serde::Deserialize)]
     struct PairPayload { host: String, port: u16 }
-    let parsed: PairPayload = serde_json::from_str(&payload).map_err(|e| e.to_string())?;
-    // Create ephemeral peer struct
+    
+    let parsed: PairPayload = serde_json::from_str(&payload).map_err(|e| format!("Invalid payload: {}", e))?;
+    
+    // Check if sync engine is running
+    if !state.engine.is_server_running().await {
+        return Err("Sync engine is not running. Please restart the app.".to_string());
+    }
+    
+    // Create peer struct
     let peer = wealthfolio_core::sync::engine::Peer {
         id: Uuid::new_v4(),
         name: format!("Master@{}", parsed.host),
@@ -85,14 +157,141 @@ pub async fn sync_with_master(state: State<'_, SyncHandles>, payload: String) ->
         last_seen: Utc::now(),
         last_sync: None,
     };
-    state.engine.add_peer(peer.clone()).await.map_err(|e| e.to_string())?; // store for visibility
-    state.engine.sync_with_peer(peer.id).await.map_err(|e| e.to_string())
+    
+    // Test connection first
+    let test_url = format!("ws://{}/ws", peer.address);
+    log::info!("Testing connection to {}", test_url);
+    
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        wealthfolio_core::sync::transport::connect_to_peer(&test_url)
+    ).await {
+        Ok(Ok(_ws)) => {
+            log::info!("Connection test successful");
+        }
+        Ok(Err(e)) => {
+            return Err(format!("Cannot connect to {}: {}", peer.address, e));
+        }
+        Err(_) => {
+            return Err(format!("Connection timeout to {}", peer.address));
+        }
+    }
+    
+    // Add peer and sync
+    state.engine.add_peer(peer.clone()).await.map_err(|e| e.to_string())?;
+    state.engine.sync_with_peer(peer.id).await.map_err(|e| format!("Sync failed: {}", e))?;
+    
+    Ok(format!("Successfully synced with {}", peer.name))
 }
 
 #[tauri::command]
 pub async fn sync_now(state: State<'_, SyncHandles>, peer_id: String) -> Result<(), String> {
     let id = uuid::Uuid::parse_str(&peer_id).map_err(|e| e.to_string())?;
     state.engine.sync_with_peer(id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn force_full_sync_with_master(state: State<'_, SyncHandles>, payload: String) -> Result<String, String> {
+    #[derive(serde::Deserialize)]
+    struct PairPayload { host: String, port: u16 }
+    let parsed: PairPayload = serde_json::from_str(&payload).map_err(|e| format!("Invalid payload: {}", e))?;
+    
+    // Check if sync engine is running
+    if !state.engine.is_server_running().await {
+        return Err("Sync engine is not running. Please restart the app.".to_string());
+    }
+    
+    // Create peer struct
+    let peer = wealthfolio_core::sync::engine::Peer {
+        id: Uuid::new_v4(),
+        name: format!("Master@{}", parsed.host),
+        address: format!("{}:{}", parsed.host, parsed.port),
+        fingerprint: String::new(),
+        paired: true,
+        last_seen: Utc::now(),
+        last_sync: None,
+    };
+    
+    // Reset checkpoints to force full sync (start from 0)
+    let pool = state.engine.get_db_pool();
+    let mut conn = pool.get().map_err(|e| e.to_string())?;
+    wealthfolio_core::sync::store::set_checkpoint_received(&mut conn, &peer.id.to_string(), 0)
+        .map_err(|e| e.to_string())?;
+    wealthfolio_core::sync::store::set_checkpoint_sent(&mut conn, &peer.id.to_string(), 0)
+        .map_err(|e| e.to_string())?;
+    
+    state.engine.add_peer(peer.clone()).await.map_err(|e| e.to_string())?;
+    state.engine.sync_with_peer(peer.id).await.map_err(|e| format!("Full sync failed: {}", e))?;
+    
+    Ok(format!("Full sync completed with {}", peer.name))
+}
+
+#[tauri::command]
+pub async fn initialize_sync_for_existing_data(state: State<'_, SyncHandles>) -> Result<String, String> {
+    let (accounts_updated, activities_updated, assets_updated) = state.engine
+        .initialize_existing_data()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let summary = format!(
+        "Initialized sync metadata: {} accounts, {} activities, {} assets updated and ready for sync",
+        accounts_updated, activities_updated, assets_updated
+    );
+    
+    Ok(summary)
+}
+
+#[tauri::command]
+pub async fn set_as_master(state: State<'_, SyncHandles>) -> Result<String, String> {
+    let device_name = get_device_name().await.unwrap_or_else(|_| "This Device".to_string());
+    let db_pool = state.engine.get_db_pool();
+    
+    match db_pool.get() {
+        Ok(mut conn) => {
+            peer_store::set_as_master(&mut conn, &device_name)
+                .map_err(|e| format!("Failed to set master status: {}", e))?;
+        }
+        Err(e) => return Err(format!("Failed to get database connection: {}", e)),
+    }
+    
+    // Remove all master devices from peers to establish this device as master
+    let peers = state.engine.get_peers().await;
+    for peer in peers {
+        if peer.name.contains("Master@") {
+            state.engine.remove_peer(peer.id).await.map_err(|e| e.to_string())?;
+        }
+    }
+    
+    // Ensure sync server is running for master devices
+    if !state.engine.is_server_running().await {
+        return Err("Cannot set as master: sync server is not running. Please restart the app.".to_string());
+    }
+    
+    Ok("Device set as master. Other devices can now connect to this one.".to_string())
+}
+
+#[tauri::command]
+pub async fn remove_master_device(state: State<'_, SyncHandles>) -> Result<String, String> {
+    let db_pool = state.engine.get_db_pool();
+    
+    // Remove master status from this device
+    match db_pool.get() {
+        Ok(mut conn) => {
+            peer_store::remove_master_status(&mut conn)
+                .map_err(|e| format!("Failed to remove master status: {}", e))?;
+        }
+        Err(e) => return Err(format!("Failed to get database connection: {}", e)),
+    }
+    
+    // Remove all master devices from peers
+    let peers = state.engine.get_peers().await;
+    for peer in peers {
+        if peer.name.contains("Master@") {
+            state.engine.remove_peer(peer.id).await.map_err(|e| e.to_string())?;
+        }
+    }
+    
+    Ok("Master status removed. You can now pair with a new master device.".to_string())
 }
 
 // Exports for invoke_handler macro (to be added in lib.rs later if desired)

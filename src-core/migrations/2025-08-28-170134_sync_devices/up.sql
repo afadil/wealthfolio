@@ -41,12 +41,18 @@ CREATE TABLE IF NOT EXISTS sync_peer_checkpoint (
   last_version_received INTEGER NOT NULL DEFAULT 0
 );
 
--- Optional: trusted peers + fingerprint pinning (for TLS/mTLS later)
-CREATE TABLE IF NOT EXISTS sync_trusted_peers (
-  peer_id     TEXT PRIMARY KEY,
-  fingerprint TEXT NOT NULL,
-  name        TEXT,
-  added_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- 5) Persistent peer storage for device pairing and trust management
+CREATE TABLE IF NOT EXISTS sync_peers (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL,
+  address      TEXT NOT NULL,
+  fingerprint  TEXT NOT NULL DEFAULT '',
+  paired       BOOLEAN NOT NULL DEFAULT false,
+  trusted      BOOLEAN NOT NULL DEFAULT false,
+  is_master    BOOLEAN NOT NULL DEFAULT false,
+  last_seen    TEXT NOT NULL,
+  last_sync    TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- 5) Triggers for accounts: INSERT/UPDATE stamp, DELETE -> tombstone
