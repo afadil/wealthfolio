@@ -131,9 +131,9 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               key={item.title}
               to={item.href}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center py-2 px-1 mx-1 text-xs transition-all duration-200 rounded-xl min-h-[44px] active:scale-95',
+                'flex flex-1 flex-col items-center justify-center py-2 px-1 mx-1 text-xs transition-all duration-200 min-h-[44px] active:scale-95',
                 location.pathname.includes(item.href)
-                  ? 'text-foreground bg-muted shadow-sm scale-105'
+                  ? 'text-foreground bg-success/10 scale-105'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105'
               )}
               style={{

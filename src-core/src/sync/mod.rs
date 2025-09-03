@@ -6,3 +6,4 @@ pub mod engine;
 // discovery removed in favor of explicit QR pairing
 // pub mod security;
 pub mod store;
+pub mod peer_store;

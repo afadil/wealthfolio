@@ -97,6 +97,7 @@ pub struct ActivitySyncRow {
     pub unit_price: String,
     pub currency: String,
     pub fee: String,
+    pub amount: Option<String>,
     pub is_draft: bool,
     pub comment: Option<String>,
     pub created_at: String,

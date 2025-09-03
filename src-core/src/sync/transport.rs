@@ -18,7 +18,7 @@ use tokio_tungstenite::{
 };
 
 use crate::db::DbPool;
-use crate::sync::store;
+use crate::sync::{store, peer_store};
 use crate::sync::types::WireMessage;
 
 #[derive(Clone)]
@@ -44,6 +44,17 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                     // Handshake
                     Ok(WireMessage::Hello { device_id, .. }) => {
                         remote_id = Some(device_id);
+                        
+                        // Automatically register connecting device as a peer on the master
+                        if let Ok(mut conn) = state.db_pool.get() {
+                            let peer_name = format!("Client@{}", device_id.to_string()[..8].to_uppercase());
+                            
+                            // Save the connecting peer to the database
+                            if let Err(e) = peer_store::save_connecting_peer(&mut conn, &device_id, &peer_name) {
+                                eprintln!("WS server: failed to save connecting peer: {e}");
+                            }
+                        }
+                        
                         let reply = WireMessage::Hello {
                             message_id: uuid::Uuid::new_v4(),
                             device_id: state.device_id,

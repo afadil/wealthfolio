@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
@@ -7,6 +8,7 @@ interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
     href: string;
     title: string;
+    icon?: ReactNode;
   }[];
 }
 
@@ -30,6 +32,11 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
             'justify-start',
           )}
         >
+          {item.icon && (
+            <span className="mr-2 hidden lg:inline-block">
+              {item.icon}
+            </span>
+          )}
           {item.title}
         </NavLink>
       ))}

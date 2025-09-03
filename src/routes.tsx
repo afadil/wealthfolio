@@ -24,6 +24,7 @@ import PerformancePage from '@/pages/performance/performance-page';
 import MarketDataSettingsPage from './pages/settings/market-data-settings';
 import AddonSettingsPage from './pages/settings/addons/addon-settings';
 import SyncSettingsPage from './pages/settings/sync/sync-page';
+import QRScannerPage from './pages/qr-scanner/qr-scanner-page';
 import AboutSettingsPage from './pages/settings/about/about-page';
 import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 
@@ -53,6 +54,9 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* QR Scanner - No layout for fullscreen camera access */}
+        <Route path="/qr-scanner" element={<QRScannerPage />} />
+        
         {/* Onboarding with dedicated layout */}
         <Route path="/onboarding" element={<OnboardingLayout />}>
           <Route index element={<OnboardingPage />} />
