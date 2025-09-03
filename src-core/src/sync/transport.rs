@@ -8,18 +8,17 @@ use axum::{
     routing::get,
     Router,
 };
-use futures::{SinkExt};
+use futures::SinkExt;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_tungstenite::{
-    connect_async,
-    tungstenite::protocol::Message as TungsteniteMessage,
-    MaybeTlsStream, WebSocketStream,
+    connect_async, tungstenite::protocol::Message as TungsteniteMessage, MaybeTlsStream,
+    WebSocketStream,
 };
 
 use crate::db::DbPool;
-use crate::sync::{store, peer_store};
 use crate::sync::types::WireMessage;
+use crate::sync::{peer_store, store};
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -44,17 +43,20 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                     // Handshake
                     Ok(WireMessage::Hello { device_id, .. }) => {
                         remote_id = Some(device_id);
-                        
+
                         // Automatically register connecting device as a peer on the master
                         if let Ok(mut conn) = state.db_pool.get() {
-                            let peer_name = format!("Client@{}", device_id.to_string()[..8].to_uppercase());
-                            
+                            let peer_name =
+                                format!("Client@{}", device_id.to_string()[..8].to_uppercase());
+
                             // Save the connecting peer to the database
-                            if let Err(e) = peer_store::save_connecting_peer(&mut conn, &device_id, &peer_name) {
+                            if let Err(e) =
+                                peer_store::save_connecting_peer(&mut conn, &device_id, &peer_name)
+                            {
                                 eprintln!("WS server: failed to save connecting peer: {e}");
                             }
                         }
-                        
+
                         let reply = WireMessage::Hello {
                             message_id: uuid::Uuid::new_v4(),
                             device_id: state.device_id,
@@ -95,8 +97,8 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                             }
 
                             // Assets
-                            let assets =
-                                store::get_assets_since(&mut conn, since, limit).unwrap_or_default();
+                            let assets = store::get_assets_since(&mut conn, since, limit)
+                                .unwrap_or_default();
                             let batch = WireMessage::AssetsBatch {
                                 message_id: uuid::Uuid::new_v4(),
                                 rows: assets,
@@ -112,11 +114,101 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                             }
 
                             // Activities
-                            let acts =
-                                store::get_activities_since(&mut conn, since, limit).unwrap_or_default();
+                            let acts = store::get_activities_since(&mut conn, since, limit)
+                                .unwrap_or_default();
                             let batch = WireMessage::ActivitiesBatch {
                                 message_id: uuid::Uuid::new_v4(),
                                 rows: acts,
+                                max_version: max_v,
+                                done: false,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&batch).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send activities batch failed: {e}");
+                                break;
+                            }
+
+                            // Activity Import Profiles
+                            let profiles =
+                                store::get_activity_import_profiles_since(&mut conn, since, limit)
+                                    .unwrap_or_default();
+                            let batch = WireMessage::ActivityImportProfilesBatch {
+                                message_id: uuid::Uuid::new_v4(),
+                                rows: profiles,
+                                max_version: max_v,
+                                done: false,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&batch).unwrap().into()))
+                                .await
+                            {
+                                eprintln!(
+                                    "WS server: send activity import profiles batch failed: {e}"
+                                );
+                                break;
+                            }
+
+                            // App Settings
+                            let settings = store::get_app_settings_since(&mut conn, since, limit)
+                                .unwrap_or_default();
+                            let batch = WireMessage::AppSettingsBatch {
+                                message_id: uuid::Uuid::new_v4(),
+                                rows: settings,
+                                max_version: max_v,
+                                done: false,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&batch).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send app settings batch failed: {e}");
+                                break;
+                            }
+
+                            // Contribution Limits
+                            let limits =
+                                store::get_contribution_limits_since(&mut conn, since, limit)
+                                    .unwrap_or_default();
+                            let batch = WireMessage::ContributionLimitsBatch {
+                                message_id: uuid::Uuid::new_v4(),
+                                rows: limits,
+                                max_version: max_v,
+                                done: false,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&batch).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send contribution limits batch failed: {e}");
+                                break;
+                            }
+
+                            // Goals
+                            let goals =
+                                store::get_goals_since(&mut conn, since, limit).unwrap_or_default();
+                            let batch = WireMessage::GoalsBatch {
+                                message_id: uuid::Uuid::new_v4(),
+                                rows: goals,
+                                max_version: max_v,
+                                done: false,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&batch).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send goals batch failed: {e}");
+                                break;
+                            }
+
+                            // Goals Allocation (final batch with done=true)
+                            let allocations =
+                                store::get_goals_allocation_since(&mut conn, since, limit)
+                                    .unwrap_or_default();
+                            let batch = WireMessage::GoalsAllocationBatch {
+                                message_id: uuid::Uuid::new_v4(),
+                                rows: allocations,
                                 max_version: max_v,
                                 done: true,
                             };
@@ -124,7 +216,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                                 .send(Message::Text(serde_json::to_string(&batch).unwrap().into()))
                                 .await
                             {
-                                eprintln!("WS server: send activities batch failed: {e}");
+                                eprintln!("WS server: send goals allocation batch failed: {e}");
                                 break;
                             }
                         }
@@ -137,7 +229,8 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                             // Advance last_version_received using applied rows only
                             let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
                             if m > 0 {
-                                let _ = store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
                             }
                             // ACK with applied_through = max applied this batch (safe; no over-advance)
                             let ack = WireMessage::Ack {
@@ -159,7 +252,8 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                             let _ = store::apply_assets(&mut conn, &rows);
                             let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
                             if m > 0 {
-                                let _ = store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
                             }
                             let ack = WireMessage::Ack {
                                 message_id: uuid::Uuid::new_v4(),
@@ -180,7 +274,8 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                             let _ = store::apply_activities(&mut conn, &rows);
                             let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
                             if m > 0 {
-                                let _ = store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
                             }
                             let ack = WireMessage::Ack {
                                 message_id: uuid::Uuid::new_v4(),
@@ -195,9 +290,118 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<ServerState>) {
                             }
                         }
                     }
+                    Ok(WireMessage::ActivityImportProfilesBatch { rows, .. }) => {
+                        if let (Some(pid), Ok(mut conn)) = (remote_id, state.db_pool.get()) {
+                            let _ = store::apply_activity_import_profiles(&mut conn, &rows);
+                            let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
+                            if m > 0 {
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                            }
+                            let ack = WireMessage::Ack {
+                                message_id: uuid::Uuid::new_v4(),
+                                applied_through: m,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&ack).unwrap().into()))
+                                .await
+                            {
+                                eprintln!(
+                                    "WS server: send activity import profiles ack failed: {e}"
+                                );
+                                break;
+                            }
+                        }
+                    }
+                    Ok(WireMessage::AppSettingsBatch { rows, .. }) => {
+                        if let (Some(pid), Ok(mut conn)) = (remote_id, state.db_pool.get()) {
+                            let _ = store::apply_app_settings(&mut conn, &rows);
+                            let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
+                            if m > 0 {
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                            }
+                            let ack = WireMessage::Ack {
+                                message_id: uuid::Uuid::new_v4(),
+                                applied_through: m,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&ack).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send app settings ack failed: {e}");
+                                break;
+                            }
+                        }
+                    }
+                    Ok(WireMessage::ContributionLimitsBatch { rows, .. }) => {
+                        if let (Some(pid), Ok(mut conn)) = (remote_id, state.db_pool.get()) {
+                            let _ = store::apply_contribution_limits(&mut conn, &rows);
+                            let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
+                            if m > 0 {
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                            }
+                            let ack = WireMessage::Ack {
+                                message_id: uuid::Uuid::new_v4(),
+                                applied_through: m,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&ack).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send contribution limits ack failed: {e}");
+                                break;
+                            }
+                        }
+                    }
+                    Ok(WireMessage::GoalsBatch { rows, .. }) => {
+                        if let (Some(pid), Ok(mut conn)) = (remote_id, state.db_pool.get()) {
+                            let _ = store::apply_goals(&mut conn, &rows);
+                            let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
+                            if m > 0 {
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                            }
+                            let ack = WireMessage::Ack {
+                                message_id: uuid::Uuid::new_v4(),
+                                applied_through: m,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&ack).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send goals ack failed: {e}");
+                                break;
+                            }
+                        }
+                    }
+                    Ok(WireMessage::GoalsAllocationBatch { rows, .. }) => {
+                        if let (Some(pid), Ok(mut conn)) = (remote_id, state.db_pool.get()) {
+                            let _ = store::apply_goals_allocation(&mut conn, &rows);
+                            let m = rows.iter().map(|r| r.updated_version).max().unwrap_or(0);
+                            if m > 0 {
+                                let _ =
+                                    store::set_checkpoint_received(&mut conn, &pid.to_string(), m);
+                            }
+                            let ack = WireMessage::Ack {
+                                message_id: uuid::Uuid::new_v4(),
+                                applied_through: m,
+                            };
+                            if let Err(e) = socket
+                                .send(Message::Text(serde_json::to_string(&ack).unwrap().into()))
+                                .await
+                            {
+                                eprintln!("WS server: send goals allocation ack failed: {e}");
+                                break;
+                            }
+                        }
+                    }
 
                     // Client informs us we can advance our last_version_sent for this peer
-                    Ok(WireMessage::Ack { applied_through, .. }) => {
+                    Ok(WireMessage::Ack {
+                        applied_through, ..
+                    }) => {
                         if let (Some(pid), Ok(mut conn)) = (remote_id, state.db_pool.get()) {
                             let _ = store::set_checkpoint_sent(
                                 &mut conn,
@@ -246,6 +450,8 @@ pub async fn send_message(
     msg: &WireMessage,
 ) -> Result<(), anyhow::Error> {
     let json = serde_json::to_string(msg)?;
-    ws_stream.send(TungsteniteMessage::Text(json.into())).await?;
+    ws_stream
+        .send(TungsteniteMessage::Text(json.into()))
+        .await?;
     Ok(())
 }
