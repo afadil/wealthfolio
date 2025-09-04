@@ -1,11 +1,13 @@
 import type { ExchangeRate } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from '@/adapters';
 
 export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('get_latest_exchange_rates');
+      case RUN_ENV.WEB:
+        return invokeWeb('get_latest_exchange_rates');
       default:
         throw new Error('Unsupported environment');
     }
@@ -20,6 +22,8 @@ export const updateExchangeRate = async (updatedRate: ExchangeRate): Promise<Exc
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('update_exchange_rate', { rate: updatedRate });
+      case RUN_ENV.WEB:
+        return invokeWeb('update_exchange_rate', { rate: updatedRate });
       default:
         throw new Error('Unsupported environment');
     }
@@ -34,6 +38,8 @@ export const addExchangeRate = async (newRate: Omit<ExchangeRate, 'id'>): Promis
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('add_exchange_rate', { newRate });
+      case RUN_ENV.WEB:
+        return invokeWeb('add_exchange_rate', { newRate });
       default:
         throw new Error('Unsupported environment');
     }
@@ -48,6 +54,8 @@ export const deleteExchangeRate = async (rateId: string): Promise<void> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('delete_exchange_rate', { rateId });
+      case RUN_ENV.WEB:
+        return invokeWeb('delete_exchange_rate', { rateId });
       default:
         throw new Error('Unsupported environment');
     }

@@ -1,16 +1,17 @@
 import type { EventCallback, UnlistenFn } from '@/adapters';
-import { listenNavigateToRouteTauri } from '@/adapters';
-import { logger } from '@/adapters';
+import { listenNavigateToRouteTauri, getRunEnv, RUN_ENV, logger } from '@/adapters';
 
 export async function listenNavigateToRoute<T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> {
   try {
-    if (typeof window !== 'undefined' && '__TAURI__' in window) {
-      return listenNavigateToRouteTauri<T>(handler);
-    } else {
-      // Return a no-op function for non-Tauri environments
-      return () => {};
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return listenNavigateToRouteTauri<T>(handler);
+      case RUN_ENV.WEB:
+        return () => {};
+      default:
+        return () => {};
     }
   } catch (error) {
     logger.error('Error listen navigate-to-route event.');

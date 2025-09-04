@@ -59,6 +59,11 @@ export function SavingGoals() {
   const isLoading = isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
   const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
 
+  console.log('goals errors',  isErrorGoals);
+
+  console.log('goals errorValuations', errorValuations);
+  console.log('isErrorAllocations', isErrorAllocations);
+  console.log('isErrorAccounts', isErrorAccounts);
   if (isLoading) {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">

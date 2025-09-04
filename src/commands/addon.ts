@@ -1,4 +1,4 @@
-import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from '@/adapters';
 import type { InstalledAddon, ExtractedAddon } from '@/adapters/tauri';
 import type { AddonManifest, AddonUpdateCheckResult } from '@wealthfolio/addon-sdk';
 
@@ -7,6 +7,8 @@ export const getInstalledAddons = async (): Promise<InstalledAddon[]> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('list_installed_addons');
+      case RUN_ENV.WEB:
+        return invokeWeb('list_installed_addons');
       default:
         throw new Error('Addon management is only supported on desktop');
     }
@@ -21,6 +23,8 @@ export const loadAddon = async (addonId: string): Promise<ExtractedAddon> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('load_addon_for_runtime', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('load_addon_for_runtime', { addonId });
       default:
         throw new Error('Addon loading is only supported on desktop');
     }
@@ -35,6 +39,8 @@ export const extractAddon = async (zipData: Uint8Array): Promise<ExtractedAddon>
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('extract_addon_zip', { zipData: Array.from(zipData) });
+      case RUN_ENV.WEB:
+        return invokeWeb('extract_addon_zip', { zipData: Array.from(zipData) });
       default:
         throw new Error('Addon extraction is only supported on desktop');
     }
@@ -51,7 +57,12 @@ export const installAddon = async (
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('install_addon_zip', { 
+        return invokeTauri('install_addon_zip', {
+          zipData: Array.from(zipData),
+          enableAfterInstall
+        });
+      case RUN_ENV.WEB:
+        return invokeWeb('install_addon_zip', {
           zipData: Array.from(zipData),
           enableAfterInstall
         });
@@ -69,6 +80,8 @@ export const toggleAddon = async (addonId: string, enabled: boolean): Promise<vo
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('toggle_addon', { addonId, enabled });
+      case RUN_ENV.WEB:
+        return invokeWeb('toggle_addon', { addonId, enabled });
       default:
         throw new Error('Addon toggle is only supported on desktop');
     }
@@ -83,6 +96,8 @@ export const uninstallAddon = async (addonId: string): Promise<void> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('uninstall_addon', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('uninstall_addon', { addonId });
       default:
         throw new Error('Addon uninstallation is only supported on desktop');
     }
@@ -97,6 +112,8 @@ export const getEnabledAddons = async (): Promise<ExtractedAddon[]> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('get_enabled_addons_on_startup');
+      case RUN_ENV.WEB:
+        return invokeWeb('get_enabled_addons_on_startup');
       default:
         throw new Error('Addon startup loading is only supported on desktop');
     }
@@ -111,6 +128,8 @@ export const checkAddonUpdate = async (addonId: string): Promise<AddonUpdateChec
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('check_addon_update', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('check_addon_update', { addonId });
       default:
         throw new Error('Addon update checking is only supported on desktop');
     }
@@ -125,6 +144,8 @@ export const checkAllAddonUpdates = async (): Promise<AddonUpdateCheckResult[]> 
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('check_all_addon_updates');
+      case RUN_ENV.WEB:
+        return invokeWeb('check_all_addon_updates');
       default:
         throw new Error('Addon update checking is only supported on desktop');
     }
@@ -139,6 +160,8 @@ export const updateAddon = async (addonId: string): Promise<AddonManifest> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('update_addon_from_store_by_id', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('update_addon_from_store_by_id', { addonId });
       default:
         throw new Error('Addon updating is only supported on desktop');
     }
@@ -153,6 +176,8 @@ export const downloadAddonForReview = async (addonId: string): Promise<Extracted
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('download_addon_to_staging', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('download_addon_to_staging', { addonId });
       default:
         throw new Error('Addon staging is only supported on desktop');
     }
@@ -173,6 +198,11 @@ export const installFromStaging = async (
           addonId,
           enableAfterInstall
         });
+      case RUN_ENV.WEB:
+        return invokeWeb('install_addon_from_staging', {
+          addonId,
+          enableAfterInstall
+        });
       default:
         throw new Error('Addon installation from staging is only supported on desktop');
     }
@@ -187,6 +217,8 @@ export const clearAddonStaging = async (addonId?: string): Promise<void> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('clear_addon_staging', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('clear_addon_staging', { addonId });
       default:
         throw new Error('Addon staging cleanup is only supported on desktop');
     }
@@ -201,6 +233,8 @@ export const getAddonRatings = async (addonId: string): Promise<any[]> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('get_addon_ratings', { addonId });
+      case RUN_ENV.WEB:
+        return invokeWeb('get_addon_ratings', { addonId });
       default:
         throw new Error('Addon ratings are only supported on desktop');
     }
@@ -222,10 +256,16 @@ export const submitAddonRating = async (
     
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('submit_addon_rating', { 
-          addonId, 
-          rating, 
-          review 
+        return invokeTauri('submit_addon_rating', {
+          addonId,
+          rating,
+          review
+        });
+      case RUN_ENV.WEB:
+        return invokeWeb('submit_addon_rating', {
+          addonId,
+          rating,
+          review
         });
       default:
         throw new Error('Addon rating submission is only supported on desktop');
