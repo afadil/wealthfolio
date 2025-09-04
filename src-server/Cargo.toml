@@ -1,0 +1,32 @@
+[package]
+name = "wealthfolio-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7", features = ["json", "macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "timeout", "request-id", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json"] }
+uuid = { version = "1", features = ["v4"] }
+dotenvy = "0.15"
+anyhow = "1"
+thiserror = "1"
+utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "4", features = ["axum"] }
+serde_with = "3"
+chrono = { version = "0.4", features = ["serde"] }
+serde_urlencoded = "0.7"
+
+# path dependency to core
+wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }
+
+hyper = { version = "0.14", features = ["full"] }
+
+[dev-dependencies]
+reqwest = { version = "0.11", features = ["json"] }
+tempfile = "3"

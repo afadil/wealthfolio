@@ -1,11 +1,13 @@
 import { Settings } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from '@/adapters';
 
 export const getSettings = async (): Promise<Settings> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('get_settings');
+      case RUN_ENV.WEB:
+        return invokeWeb('get_settings');
       default:
         throw new Error(`Unsupported`);
     }
@@ -20,6 +22,8 @@ export const updateSettings = async (settingsUpdate: Settings): Promise<Settings
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('update_settings', { settingsUpdate });
+      case RUN_ENV.WEB:
+        return invokeWeb('update_settings', { settingsUpdate });
       default:
         throw new Error(`Unsupported`);
     }
@@ -34,6 +38,8 @@ export const isAutoUpdateCheckEnabled = async (): Promise<boolean> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('is_auto_update_check_enabled');
+      case RUN_ENV.WEB:
+        return invokeWeb('is_auto_update_check_enabled');
       default:
         throw new Error(`Unsupported`);
     }
@@ -50,6 +56,8 @@ export const backupDatabase = async (): Promise<{ filename: string; data: Uint8A
         const result = await invokeTauri<[string, number[]]>('backup_database');
         const [filename, data] = result;
         return { filename, data: new Uint8Array(data) };
+      case RUN_ENV.WEB:
+        return invokeWeb('backup_database');
       default:
         throw new Error(`Unsupported environment for database backup`);
     }
@@ -64,6 +72,8 @@ export const backupDatabaseToPath = async (backupDir: string): Promise<string> =
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return await invokeTauri<string>('backup_database_to_path', { backupDir });
+      case RUN_ENV.WEB:
+        return invokeWeb('backup_database_to_path', { backupDir });
       default:
         throw new Error(`Unsupported environment for database backup`);
     }
@@ -78,6 +88,9 @@ export const restoreDatabase = async (backupFilePath: string): Promise<void> => 
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         await invokeTauri('restore_database', { backupFilePath });
+        break;
+      case RUN_ENV.WEB:
+        await invokeWeb('restore_database', { backupFilePath });
         break;
       default:
         throw new Error(`Unsupported environment for database restore`);

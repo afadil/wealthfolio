@@ -16,6 +16,8 @@ export const listenImportFileDropHover = async <T>(
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenFileDropHoverTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
@@ -31,6 +33,8 @@ export const listenImportFileDrop = async <T>(handler: EventCallback<T>): Promis
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenFileDropTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
@@ -48,6 +52,8 @@ export const listenImportFileDropCancelled = async <T>(
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenFileDropCancelledTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }

@@ -1,11 +1,13 @@
 import { ContributionLimit, NewContributionLimit, DepositsCalculation } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri, logger } from '@/adapters';
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from '@/adapters';
 
 export const getContributionLimit = async (): Promise<ContributionLimit[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('get_contribution_limits');
+      case RUN_ENV.WEB:
+        return invokeWeb('get_contribution_limits');
       default:
         throw new Error(`Unsupported`);
     }
@@ -22,6 +24,8 @@ export const createContributionLimit = async (
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('create_contribution_limit', { newLimit });
+      case RUN_ENV.WEB:
+        return invokeWeb('create_contribution_limit', { newLimit });
       default:
         throw new Error(`Unsupported`);
     }
@@ -39,6 +43,8 @@ export const updateContributionLimit = async (
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('update_contribution_limit', { id, updatedLimit });
+      case RUN_ENV.WEB:
+        return invokeWeb('update_contribution_limit', { id, updatedLimit });
       default:
         throw new Error(`Unsupported`);
     }
@@ -53,6 +59,8 @@ export const deleteContributionLimit = async (id: string): Promise<void> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('delete_contribution_limit', { id });
+      case RUN_ENV.WEB:
+        return invokeWeb('delete_contribution_limit', { id });
       default:
         throw new Error(`Unsupported`);
     }
@@ -69,6 +77,8 @@ export const calculateDepositsForLimit = async (
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return invokeTauri('calculate_deposits_for_contribution_limit', { limitId });
+      case RUN_ENV.WEB:
+        return invokeWeb('calculate_deposits_for_contribution_limit', { limitId });
       default:
         throw new Error(`Unsupported`);
     }
