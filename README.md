@@ -156,6 +156,69 @@ Ensure you have the following installed on your machine:
   pnpm tauri build
   ```
 
+### Web Mode (Browser + REST API server)
+
+Run the web UI with a local Axum server, with one command.
+
+1) Optional: create `.env.web` for web dev overrides (copy from `.env.web.example`):
+
+```
+WF_LISTEN_ADDR=127.0.0.1:8080
+WF_DB_PATH=./db/web-dev.db
+WF_CORS_ALLOW_ORIGINS=http://localhost:1420
+WF_REQUEST_TIMEOUT_MS=30000
+WF_STATIC_DIR=dist
+VITE_API_TARGET=http://127.0.0.1:8080
+```
+
+2) Start both backend and Vite:
+
+```
+pnpm run dev:web
+```
+
+Vite runs at `http://localhost:1420` and proxies API calls to the backend.
+
+Notes
+- The server logs the effective database path on startup.
+- Stop either process (Ctrl+C) to shut everything down.
+
+### Server Only
+
+Run just the HTTP server (from repo root):
+
+```
+cargo run --manifest-path src-server/Cargo.toml
+```
+
+Common env vars:
+- `WF_LISTEN_ADDR` (e.g., `0.0.0.0:8080`)
+- `WF_DB_PATH` (e.g., `./db/app.db`)
+- `WF_CORS_ALLOW_ORIGINS` (e.g., `http://localhost:1420`)
+- `WF_STATIC_DIR` (defaults to `dist`)
+
+## Docker
+
+Build image
+
+```
+docker build -t wealthfolio-web .
+```
+
+Run container (with data volume and CORS for Vite)
+
+```
+docker run --rm -it \
+  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  -e WF_DB_PATH=/data/wealthfolio.db \
+  -e WF_CORS_ALLOW_ORIGINS=http://localhost:1420 \
+  -p 8080:8080 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  wealthfolio-web
+```
+
+The image contains the compiled frontend in `/app/dist` and the `wealthfolio-server` binary.
+
 ### Development with DevContainer
 
 For a consistent development environment across all platforms, you can use the provided DevContainer configuration. This method requires fewer manual setup steps and provides an isolated environment with all necessary dependencies.

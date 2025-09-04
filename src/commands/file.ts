@@ -14,6 +14,8 @@ export const openCsvFileDialog = async (): Promise<null | string | string[]> => 
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return openCsvFileDialogTauri();
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported in web`);
       default:
         throw new Error(`Unsupported`);
     }
@@ -29,6 +31,8 @@ export const openFolderDialog = async (): Promise<string | null> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return openFolderDialogTauri();
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported in web`);
       default:
         throw new Error(`Unsupported`);
     }
@@ -44,6 +48,8 @@ export const openDatabaseFileDialog = async (): Promise<string | null> => {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return openDatabaseFileDialogTauri();
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported in web`);
       default:
         throw new Error(`Unsupported`);
     }
@@ -61,6 +67,8 @@ export async function openFileSaveDialog(
   switch (getRunEnv()) {
     case RUN_ENV.DESKTOP:
       return openFileSaveDialogTauri(fileContent, fileName);
+    case RUN_ENV.WEB:
+      throw new Error(`Unsupported environment for file download`);
     default:
       throw new Error(`Unsupported environment for file download`);
   }

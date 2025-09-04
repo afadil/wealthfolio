@@ -6,6 +6,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "dev": "vite",
+    "dev:web": "node scripts/dev-web.mjs",
     "tsc": "tsc -b",
     "build": "tsc && vite build && pnpm -r build",
     "preview": "vite preview",

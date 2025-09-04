@@ -73,15 +73,18 @@ pub fn run_migrations(pool: &DbPool) -> Result<()> {
     Ok(())
 }
 
-pub fn get_db_path(app_data_dir: &str) -> String {
-    // Try to get the database URL from the environment variable
-    std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        Path::new(app_data_dir)
-            .join("app.db")
-            .to_str()
-            .unwrap()
-            .to_string()
-    })
+pub fn get_db_path(input: &str) -> String {
+    // 1) Prefer DATABASE_URL if provided
+    if let Ok(url) = std::env::var("DATABASE_URL") {
+        return url;
+    }
+    // 2) If input looks like a file (has an extension), use it directly
+    let p = Path::new(input);
+    if p.extension().is_some() {
+        return p.to_str().unwrap().to_string();
+    }
+    // 3) Otherwise, treat it as a directory and append default filename
+    p.join("app.db").to_str().unwrap().to_string()
 }
 
 pub fn create_backup_path(app_data_dir: &str) -> Result<String> {

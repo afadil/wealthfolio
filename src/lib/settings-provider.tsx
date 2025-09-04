@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { getCurrentWindow, Theme } from '@tauri-apps/api/window';
+import { getRunEnv, RUN_ENV } from '@/adapters';
 
 import { Settings, SettingsContextType } from '@/lib/types';
 import { useSettings } from '@/hooks/use-settings';
@@ -82,6 +83,13 @@ const applySettingsToDocument = async (newSettings: Settings) => {
 
   // Color scheme must be applied to document element (`<html>`)
   document.documentElement.style.colorScheme = newSettings.theme;
-  const currentWindow = await getCurrentWindow();
-  currentWindow.setTheme(newSettings.theme as Theme);
+  // Only call Tauri window APIs when running the desktop app
+  if (getRunEnv() === RUN_ENV.DESKTOP) {
+    try {
+      const currentWindow = await getCurrentWindow();
+      currentWindow.setTheme(newSettings.theme as Theme);
+    } catch (_) {
+      // Ignore if Tauri internals are not available
+    }
+  }
 };
