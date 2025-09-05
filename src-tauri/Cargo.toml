@@ -10,20 +10,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.1.1", features = [] }
+tauri-build = { version = "2.4", features = [] }
 
 [dependencies]
+tauri = { version = "2.8.5", features = [] }
 wealthfolio_core = { path = "../src-core", features = ["p2p", "tls", "crypto-id"] } 
-tauri = { version = "2.4.1", features = [] }
 diesel = { version = "2.2", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.128"
 chrono = { version = "0.4.38", features = ["serde"] }
-tauri-plugin-fs = "2.2.1"
-tauri-plugin-dialog = "2.2.1"
-tauri-plugin-shell = "2.2.1"
-tauri-plugin-log = "2.3.1"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-log = "2"
 log = "0.4"
 futures = "0.3"
 zip = "2.2.0"
@@ -46,7 +46,7 @@ name = "wealthfolio_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.7.0"
+tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
