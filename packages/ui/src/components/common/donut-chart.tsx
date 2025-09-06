@@ -7,15 +7,15 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../ui/chart';
 import { formatPercent } from '../../lib/utils';
 
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-6))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-8))',
-  'hsl(var(--chart-9))',
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
+  'var(--chart-9)',
 ];
 
 const renderActiveShape = (props: any) => {
@@ -57,7 +57,7 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 35}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs font-medium"
@@ -69,7 +69,7 @@ const renderActiveShape = (props: any) => {
         x={cx}
         y={cy - 20}
         textAnchor="middle"
-        fill="hsl(var(--foreground))"
+        fill="var(--foreground)"
         dominantBaseline="central"
         className="text-xs font-bold "
       >
@@ -79,7 +79,7 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 5}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs"
@@ -152,7 +152,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         {displayTooltip && (
           <ChartTooltip
-            cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+            cursor={{ fill: 'var(--muted)', opacity: 0.3 }}
             content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
             position={{ y: 0 }}
           />

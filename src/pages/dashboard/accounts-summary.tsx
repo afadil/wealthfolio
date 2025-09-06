@@ -417,7 +417,7 @@ export const AccountsSummary = React.memo(({ className }: { className?: string }
   ]);
 
   return (
-    <Card className={`border-none bg-transparent shadow-none ${className || ''}`}>
+    <Card className="border-none bg-transparent shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1">
         <CardTitle className="text-md"></CardTitle>
         <Button

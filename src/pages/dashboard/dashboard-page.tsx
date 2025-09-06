@@ -150,7 +150,7 @@ export default function DashboardPage() {
       <div className="flex-grow bg-gradient-to-t from-success/30 via-success/15 to-success/10 px-0 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
         <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2">
-            <AccountsSummary className="border-none bg-transparent shadow-none" />
+            <AccountsSummary  />
           </div>
           <div className="sm:col-span-1">
             <SavingGoals />

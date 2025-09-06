@@ -87,16 +87,16 @@ export function FeeHistoryChart({
             config={{
               currentFees: {
                 label: 'Monthly Fees',
-                color: 'hsl(var(--destructive))',
+                color: 'var(--destructive)',
               },
               cumulative: {
                 label: 'Cumulative Fees',
-                color: 'hsl(var(--chart-5))',
+                color: 'var(--chart-5)',
                 lineStyle: 'solid',
               },
               previousCumulative: {
                 label: 'Previous Period Cumulative',
-                color: 'hsl(var(--chart-3))',
+                color: 'var(--chart-3)',
                 lineStyle: 'dashed',
               },
             }}

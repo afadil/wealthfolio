@@ -140,15 +140,18 @@ export const otherActivitySchema = baseActivitySchema.extend({
 
 
 
-export const newActivitySchema = z.discriminatedUnion('activityType', [
+export const newActivitySchema = z
+  .discriminatedUnion('activityType', [
   tradeActivitySchema,
   cashActivitySchema,
   incomeActivitySchema,
   otherActivitySchema,
   holdingsActivitySchema,
-]);
+])
+  .and(
+    z.object({
+      showCurrencySelect: z.boolean().optional(),
+    }),
+  );
 
-export type NewActivityFormValues = z.infer<typeof newActivitySchema> & {
-  showCurrencySelect?: boolean;
-}; 
-
+export type NewActivityFormValues = z.infer<typeof newActivitySchema>;
