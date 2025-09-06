@@ -169,8 +169,7 @@ export function SavingGoals() {
 
                               <Progress
                                 value={currentProgress * 100}
-                                className="h-2.5 w-full"
-                                indicatorClassName="bg-success"
+                                className="h-2.5 w-full [&>div]:bg-success"
                               />
                             </div>
                           </TooltipTrigger>

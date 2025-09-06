@@ -68,15 +68,14 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
   const chartConfig = {
     pl: {
       label: 'P/L',
-      color: 'hsl(var(--chart-1))',
+      color: 'var(--chart-1)',
     },
     count: {
       label: 'Trades',
-      color: 'hsl(var(--chart-2))',
+      color: 'var(--chart-2)',
     },
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
   // Check if there's data for charts
   const hasSymbolData = symbolData.length > 0;
@@ -119,7 +118,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                   {symbolData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.pl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                      fill={entry.pl >= 0 ? 'var(--success)' : 'var(--destructive)'}
                       fillOpacity={0.6}
                     />
                   ))}
@@ -173,11 +172,11 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                     />
                   }
                 />
-                <Bar dataKey="pl" fill="hsl(var(--chart-3))" radius={[2, 2, 0, 0]}>
+                <Bar dataKey="pl" fill="var(--chart-3)" radius={[2, 2, 0, 0]}>
                   {holdingPeriodData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.pl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                      fill={entry.pl >= 0 ? 'var(--success)' : 'var(--destructive)'}
                       fillOpacity={0.6}
                     />
                   ))}

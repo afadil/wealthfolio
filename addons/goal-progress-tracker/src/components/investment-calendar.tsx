@@ -45,7 +45,7 @@ function CalendarDot({
     <div
       className="h-4 w-4 flex-shrink-0 cursor-pointer rounded-full border-2 border-primary transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5"
       style={{
-        background: `conic-gradient(hsl(var(--primary)) ${partialPercent * 3.6}deg, hsl(var(--muted)) 0deg)`,
+        background: `conic-gradient(var(--primary) ${partialPercent * 3.6}deg, var(--muted) 0deg)`,
       }}
       onMouseLeave={onLeave}
       onClick={(e) => onClick(e, dotData)}

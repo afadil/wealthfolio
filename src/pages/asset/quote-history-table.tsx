@@ -21,7 +21,7 @@ import {
   Switch,
   Label,
   MoneyInput,
-  Popover, PopoverContent, PopoverTrigger, PopoverClose,
+  Popover, PopoverContent, PopoverTrigger,
   formatAmount,
 } from '@wealthfolio/ui';
 import { formatQuantity } from '@/lib/utils';
@@ -279,11 +279,9 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                       cannot be undone.
                     </p>
                     <div className="flex space-x-2">
-                      <PopoverClose asChild>
-                        <Button variant="ghost" size="sm">
-                          Cancel
-                        </Button>
-                      </PopoverClose>
+                      <Button variant="ghost" size="sm">
+                        Cancel
+                      </Button>
                       <Button
                         variant="destructive"
                         size="sm"
@@ -373,11 +371,9 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     </>
                   )}
                   <div className="flex justify-end space-x-2">
-                    <PopoverClose asChild>
-                      <Button variant="ghost" size="sm">
-                        Cancel
-                      </Button>
-                    </PopoverClose>
+                    <Button variant="ghost" size="sm">
+                      Cancel
+                    </Button>
                     <Button
                       variant="default"
                       size="sm"

@@ -3,7 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type InputProps } from './input';
+
+type InputProps = React.ComponentProps<'input'>;
 
 type InputTagsProps = Omit<InputProps, 'value' | 'onChange'> & {
   value: string[];
@@ -41,7 +42,7 @@ const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
           className,
         )}
       >
-        {value.map((item) => (
+        {value.map((item: string) => (
           <Badge key={item} variant="secondary">
             {item}
             <Button
@@ -49,7 +50,7 @@ const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
               size="icon"
               className="ml-2 h-3 w-3"
               onClick={() => {
-                onChange(value.filter((i) => i !== item));
+                onChange(value.filter((i: string) => i !== item));
               }}
             >
               <XIcon className="w-3" />

@@ -68,7 +68,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
         delayChildren: 0.1 
       }
     }
-  };
+  } as const;
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -77,10 +77,10 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
       y: 0,
       transition: { 
         duration: 0.5,
-        ease: [0.22, 1, 0.36, 1]
+        ease: [0.22, 1, 0.36, 1] as [number, number, number, number]
       }
     }
-  };
+  } as const;
 
   const iconContainerVariants = {
     hidden: { scale: 0.8, opacity: 0 },
@@ -94,7 +94,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
         duration: 0.5
       }
     }
-  };
+  } as const;
 
   const iconVariants = {
     hidden: { rotate: -90, opacity: 0 },
@@ -108,7 +108,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
         stiffness: 120 
       }
     }
-  };
+  } as const;
 
   const textVariants = {
     hidden: { opacity: 0, y: 10 },
@@ -117,7 +117,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
       y: 0,
       transition: { duration: 0.4, delay: 0.4 }
     }
-  };
+  } as const;
 
   const buttonsVariants = {
     hidden: { opacity: 0, y: 10 },
@@ -126,7 +126,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
       y: 0,
       transition: { duration: 0.4, delay: 0.7 }
     }
-  };
+  } as const;
 
   return (
     <motion.div

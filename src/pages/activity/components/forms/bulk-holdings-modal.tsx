@@ -1,4 +1,4 @@
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, type Resolver, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -31,7 +31,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   
   const form = useForm<BulkHoldingsFormValues>({
-    resolver: zodResolver(bulkHoldingsFormSchema),
+    resolver: zodResolver(bulkHoldingsFormSchema) as Resolver<BulkHoldingsFormValues>,
     mode: 'onSubmit',
     defaultValues: {
       accountId: '',
@@ -97,7 +97,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     }
   });
 
-  const handleSubmit = useCallback((data: BulkHoldingsFormValues) => {
+  const handleSubmit: SubmitHandler<BulkHoldingsFormValues> = useCallback((data) => {
     // Validate holdings data
     const validHoldings = data.holdings.filter(holding => 
       holding.ticker?.trim() && 

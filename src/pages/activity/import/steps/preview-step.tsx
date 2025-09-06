@@ -172,17 +172,17 @@ export const DataPreviewStep = ({
     initial: { scale: 1 },
     hover: { scale: 1.01 },
     tap: { scale: 0.99 },
-  };
+  } as const;
 
   // Pulse animation variants
   const pulseVariants = {
     pulse: {
-      scale: [1, 1.015, 1],
+      scale: [1, 1.015, 1] as number[],
       transition: {
         duration: 2,
         repeat: Infinity,
         repeatType: 'loop' as const,
-        ease: 'easeInOut',
+        ease: [0.42, 0, 0.58, 1] as [number, number, number, number],
       },
     },
   };

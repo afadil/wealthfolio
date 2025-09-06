@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ContributionLimitOperations } from './contribution-limit-operations';
-import { Icons } from '@/components/ui/icons';
-import { formatAmount } from '@wealthfolio/ui';
-import { AccountSelection } from './account-selection';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Account, ContributionLimit } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useContributionLimitProgress } from '../use-contribution-limit-mutations';
+import { AccountSelection } from './account-selection';
+import { ContributionLimitOperations } from './contribution-limit-operations';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Icons,
+  Progress,
+  Skeleton,
+  formatAmount,
+} from '@wealthfolio/ui';
 
 type ContributionLimitItemProps = {
   limit: ContributionLimit;
@@ -134,7 +139,6 @@ export function ContributionLimitItem({
           <Progress
             value={progressPercentageNumber > 100 ? 100 : progressPercentageNumber}
             className={`w-full ${isOverLimit ? 'bg-destructive/20' : ''}`}
-            showPercentage
           />
         )}
         {isExpanded && (

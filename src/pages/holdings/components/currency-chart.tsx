@@ -9,10 +9,10 @@ import type { Holding } from '@/lib/types';
 
 // Using theme chart colors
 const INDICATOR_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-9))',
+  'var(--chart-1)',
+  'var(--chart-5)',
+  'var(--chart-7)',
+  'var(--chart-9)',
 ];
 
 interface CurrencyData {

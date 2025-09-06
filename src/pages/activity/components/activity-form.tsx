@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form';
 import { logger } from '@/adapters';
 import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
@@ -88,7 +88,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
   };
 
   const form = useForm<NewActivityFormValues>({
-    resolver: zodResolver(newActivitySchema),
+    resolver: zodResolver(newActivitySchema) as Resolver<NewActivityFormValues>,
     defaultValues,
   });
 
@@ -105,7 +105,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
-  async function onSubmit(data: NewActivityFormValues) {
+  const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
       const { showCurrencySelect, id, ...submitData } = { ...data, isDraft: false };
       const account = accounts.find((a) => a.value === submitData.accountId);

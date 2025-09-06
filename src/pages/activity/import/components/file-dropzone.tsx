@@ -108,7 +108,7 @@ export const FileDropzone = ({
       rotate: 10,
       transition: { duration: 0.3 },
     },
-  };
+  } as const;
 
   // Animation variants for icons
   const iconVariants = {
@@ -122,7 +122,7 @@ export const FileDropzone = ({
         stiffness: 300,
       },
     },
-  };
+  } as const;
 
   return (
     <div

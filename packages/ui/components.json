@@ -4,14 +4,17 @@
   "rsc": false,
   "tsx": true,
   "tailwind": {
-    "config": "tailwind.config.js",
+    "config": "../../tailwind.config.js",
     "css": "src/styles.css",
     "baseColor": "slate",
     "cssVariables": true
   },
   "aliases": {
-    "components": "@wealthfolio/ui/components",
-    "utils": "@wealthfolio/ui/lib/utils",
-    "ui": "@wealthfolio/ui/components/ui"
-  }
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "registries": {}
 }

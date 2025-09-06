@@ -16,7 +16,8 @@ export default defineConfig({
   esbuildOptions(options) {
     options.alias = {
       '@/components': './src/components',
-      '@/lib': './src/lib'
+      '@/lib': './src/lib',
+      '@wealthfolio/ui': './src'
     };
   },
 });

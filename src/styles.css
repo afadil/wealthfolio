@@ -1,108 +1,259 @@
-@import '@fontsource/ibm-plex-mono';
-@import '@fontsource/ibm-plex-mono/200.css';
-@import '@fontsource/ibm-plex-mono/300.css';
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
-@import '@fontsource/ibm-plex-mono/600.css';
-@import '@fontsource/ibm-plex-mono/700.css';
-@import '@fontsource/ibm-plex-mono/400-italic.css';
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource/ibm-plex-mono";
+@import "@fontsource/ibm-plex-mono/200.css";
+@import "@fontsource/ibm-plex-mono/300.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+@import "@fontsource/ibm-plex-mono/400-italic.css";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Enable class-based dark mode across the subtree */
+@custom-variant dark (&:is(.dark *));
 
-@layer base {
-  :root {
-    /* Flexoki Light Theme Variables */
-    --flexoki-bg: 48 100% 97%;
-    --flexoki-bg-2: 51 59% 95%;
-    --flexoki-ui: 51 21% 88%;
-    --flexoki-ui-2: 50 14% 83%;
-    --flexoki-ui-3: 55 10% 79%;
-    --flexoki-tx: 0 3% 6%;
-    --flexoki-tx-2: 50 3% 42%;
-    --flexoki-tx-3: 49 7% 70%;
-    --flexoki-re: 3 62% 42%;
-    --flexoki-gr: 73 84% 27%;
-    --flexoki-ye: 45 99% 34%;
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  
+  /* Semantic colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  /* Chart colors */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+  --color-chart-9: var(--chart-9);
+  
+  /* Sidebar colors */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-    /* Shadcn Theme Mapping */
-    --background: var(--flexoki-bg);
-    --foreground: var(--flexoki-tx);
-    --card: var(--flexoki-bg-2);
-    --card-foreground: var(--flexoki-tx);
-    --popover: var(--flexoki-bg);
-    --popover-foreground: var(--flexoki-tx);
-    --primary: var(--flexoki-tx);
-    --primary-foreground: var(--flexoki-bg);
-    --secondary: var(--flexoki-ui-2);
-    --secondary-foreground: var(--flexoki-tx-2);
-    --muted: var(--flexoki-ui);
-    --muted-foreground: var(--flexoki-tx-2);
-    --accent: var(--flexoki-ui);
-    --accent-foreground: var(--flexoki-tx-2);
-    --destructive: var(--flexoki-re);
-    --destructive-foreground: var(--flexoki-bg);
-    --success: var(--flexoki-gr);
-    --success-foreground: var(--flexoki-bg);
-    --warning: var(--flexoki-ye);
-    --warning-foreground: var(--flexoki-bg);
-    --border: var(--flexoki-ui);
-    --input: var(--flexoki-ui-2);
-    --ring: var(--flexoki-ui-3);
-    --radius: 0.5rem;
+  /* Custom color palettes */
+  --color-blue-50: #E1ECEB;
+  --color-blue-100: #C6DDE8;
+  --color-blue-150: #ABCFE2;
+  --color-blue-200: #92BFDB;
+  --color-blue-300: #66A0C8;
+  --color-blue-400: #4385BE;
+  --color-blue-500: #3171B2;
+  --color-blue-600: #205EA6;
+  --color-blue-700: #1A4F8C;
+  --color-blue-800: #163B66;
+  --color-blue-850: #133051;
+  --color-blue-900: #12253B;
+  --color-blue-950: #101A24;
 
-    /* Chart Colors */
-    --chart-1: 40 3% 20%; /* #1C1B1A - Darkest */
-    --chart-2: 45 2% 33%; /* #575653 - More distinct from 2 */
-    --chart-3: 50 3% 42%; /* #6F6E6B */
-    --chart-4: 43 3% 52%; /* #878580 */
-    --chart-5: 47 4% 61%; /* #9F9D96 */
-    --chart-6: 49 7% 70%; /* #B7B5AC */
-    --chart-7: 55 10% 79%; /* #CECDC3 */
-    --chart-8: 50 14% 83%; /* #E6E4D9 */
-    --chart-9: 51 21% 88%; /* #F2F0E5 */
-  }
+  --color-cyan-50: #DDF1E4;
+  --color-cyan-100: #BFE8D9;
+  --color-cyan-150: #A2DECE;
+  --color-cyan-200: #87D3C3;
+  --color-cyan-300: #5ABDAC;
+  --color-cyan-400: #3AA99F;
+  --color-cyan-500: #2F968D;
+  --color-cyan-600: #24837B;
+  --color-cyan-700: #1C6C66;
+  --color-cyan-800: #164F4A;
+  --color-cyan-850: #143F3C;
+  --color-cyan-900: #122F2C;
+  --color-cyan-950: #101F1D;
 
-  .dark {
-    /* Flexoki Dark Theme Variables */
-    --flexoki-bg: 0 3% 6%;
-    --flexoki-bg-2: 30 4% 11%;
-    --flexoki-ui: 30 3% 15%;
-    --flexoki-ui-2: 40 3% 20%;
-    --flexoki-ui-3: 30 3% 24%;
-    --flexoki-tx: 55 10% 79%;
-    --flexoki-tx-2: 43 3% 52%;
-    --flexoki-tx-3: 45 2% 33%;
-    --flexoki-re: 5 61% 54%;
-    --flexoki-gr: 72 46% 41%;
-    --flexoki-ye: 45 82% 45%;
+  --color-green-50: #EDEECF;
+  --color-green-100: #DDE2B2;
+  --color-green-150: #CDD597;
+  --color-green-200: #BEC97E;
+  --color-green-300: #A0AF54;
+  --color-green-400: #879A39;
+  --color-green-500: #768D21;
+  --color-green-600: #66800B;
+  --color-green-700: #536907;
+  --color-green-800: #3D4C07;
+  --color-green-850: #313D07;
+  --color-green-900: #252D09;
+  --color-green-950: #1A1E0C;
 
-    /* Chart Colors */
-    --chart-1: 25 92% 72%;
-    --chart-2: 24 81% 61%;
-    --chart-3: 23 70% 51%;
-    --chart-4: 23 73% 46%;
-    --chart-5: 22 80% 41%;
-    --chart-6: 22 82% 34%;
-    --chart-7: 22 79% 25%;
-    --chart-8: 22 75% 20%;
-    --chart-9: 22 70% 15%;
-  }
+  --color-red-50: #FFE1D5;
+  --color-red-100: #FFCABB;
+  --color-red-150: #FDB2A2;
+  --color-red-200: #F89A8A;
+  --color-red-300: #E8705F;
+  --color-red-400: #D14D41;
+  --color-red-500: #C03E35;
+  --color-red-600: #AF3029;
+  --color-red-700: #942822;
+  --color-red-800: #6C201C;
+  --color-red-850: #551B18;
+  --color-red-900: #3E1715;
+  --color-red-950: #261312;
+
+  --color-orange-50: #FFE7CE;
+  --color-orange-100: #FED3AF;
+  --color-orange-150: #FCC192;
+  --color-orange-200: #F9AE77;
+  --color-orange-300: #EC8B49;
+  --color-orange-400: #DA702C;
+  --color-orange-500: #CB6120;
+  --color-orange-600: #BC5215;
+  --color-orange-700: #9D4310;
+  --color-orange-800: #71320D;
+  --color-orange-850: #59290D;
+  --color-orange-900: #40200D;
+  --color-orange-950: #27180E;
+
+  --color-purple-50: #F0EAEC;
+  --color-purple-100: #E2D9E9;
+  --color-purple-150: #D3CAE6;
+  --color-purple-200: #C4B9E0;
+  --color-purple-300: #A699D0;
+  --color-purple-400: #8B7EC8;
+  --color-purple-500: #735EB5;
+  --color-purple-600: #5E409D;
+  --color-purple-700: #4F3685;
+  --color-purple-800: #3C2A62;
+  --color-purple-850: #31234E;
+  --color-purple-900: #261C39;
+  --color-purple-950: #1A1623;
+
+  /* Custom sizes */
+  --spacing-sidebar: 220px;
+  --spacing-sidebar-collapsed: 70px;
+  --grid-template-columns-sidebar: 200px auto;
+  --grid-template-columns-sidebar-collapsed: 70px auto;
+}
+
+
+:root {
+  /* Base radius */
+  --radius: 0.625rem;
+
+  /* Flexoki Light Theme (HSL numeric components) */
+  --flexoki-bg: 48 100% 97%;
+  --flexoki-bg-2: 51 59% 95%;
+  --flexoki-ui: 51 21% 88%;
+  --flexoki-ui-2: 50 14% 83%;
+  --flexoki-ui-3: 55 10% 79%;
+  --flexoki-tx: 0 3% 6%;
+  --flexoki-tx-2: 50 3% 42%;
+  --flexoki-tx-3: 49 7% 70%;
+  --flexoki-re: 3 62% 42%;
+  --flexoki-gr: 73 84% 27%;
+  --flexoki-ye: 45 99% 34%;
+
+  /* Shadcn tokens as full HSL colors */
+  --background: hsl(var(--flexoki-bg));
+  --foreground: hsl(var(--flexoki-tx));
+  --card: hsl(var(--flexoki-bg-2));
+  --card-foreground: hsl(var(--flexoki-tx));
+  --popover: hsl(var(--flexoki-bg));
+  --popover-foreground: hsl(var(--flexoki-tx));
+  --primary: hsl(var(--flexoki-tx));
+  --primary-foreground: hsl(var(--flexoki-bg));
+  --secondary: hsl(var(--flexoki-ui-2));
+  --secondary-foreground: hsl(var(--flexoki-tx-2));
+  --muted: hsl(var(--flexoki-ui));
+  --muted-foreground: hsl(var(--flexoki-tx-2));
+  --accent: hsl(var(--flexoki-ui));
+  --accent-foreground: hsl(var(--flexoki-tx-2));
+  --destructive: hsl(var(--flexoki-re));
+  --destructive-foreground: hsl(var(--flexoki-bg));
+  --success: hsl(var(--flexoki-gr));
+  --success-foreground: hsl(var(--flexoki-bg));
+  --warning: hsl(var(--flexoki-ye));
+  --warning-foreground: hsl(var(--flexoki-bg));
+  --border: hsl(var(--flexoki-ui));
+  --input: hsl(var(--flexoki-ui-2));
+  --ring: hsl(var(--flexoki-ui-3));
+
+  /* Charts (full hsl colors) */
+  --chart-1: hsl(40 3% 20%);
+  --chart-2: hsl(45 2% 33%);
+  --chart-3: hsl(50 3% 42%);
+  --chart-4: hsl(43 3% 52%);
+  --chart-5: hsl(47 4% 61%);
+  --chart-6: hsl(49 7% 70%);
+  --chart-7: hsl(55 10% 79%);
+  --chart-8: hsl(50 14% 83%);
+  --chart-9: hsl(51 21% 88%);
+
+  /* Sidebar (full hsl colors) */
+  --sidebar: hsl(var(--flexoki-bg));
+  --sidebar-foreground: hsl(var(--flexoki-tx));
+  --sidebar-primary: hsl(var(--flexoki-tx));
+  --sidebar-primary-foreground: hsl(var(--flexoki-bg));
+  --sidebar-accent: hsl(var(--flexoki-ui));
+  --sidebar-accent-foreground: hsl(var(--flexoki-tx-2));
+  --sidebar-border: hsl(var(--flexoki-ui));
+  --sidebar-ring: hsl(var(--flexoki-ui-3));
+}
+
+.dark {
+  /* Flexoki Dark Theme (HSL numeric components) */
+  --flexoki-bg: 0 3% 6%;
+  --flexoki-bg-2: 30 4% 11%;
+  --flexoki-ui: 30 3% 15%;
+  --flexoki-ui-2: 40 3% 20%;
+  --flexoki-ui-3: 30 3% 24%;
+  --flexoki-tx: 55 10% 79%;
+  --flexoki-tx-2: 43 3% 52%;
+  --flexoki-tx-3: 45 2% 33%;
+  --flexoki-re: 5 61% 54%;
+  --flexoki-gr: 72 46% 41%;
+  --flexoki-ye: 45 82% 45%;
+
+  /* Dark chart palette (full hsl colors) */
+  --chart-1: hsl(25 92% 72%);
+  --chart-2: hsl(24 81% 61%);
+  --chart-3: hsl(23 70% 51%);
+  --chart-4: hsl(23 73% 46%);
+  --chart-5: hsl(22 80% 41%);
+  --chart-6: hsl(22 82% 34%);
+  --chart-7: hsl(22 79% 25%);
+  --chart-8: hsl(22 75% 20%);
+  --chart-9: hsl(22 70% 15%);
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
-  }
-  html, body, #root {
-    height: 100%;
-  }
-  html, body {
-    overflow: hidden;
   }
 }
 
@@ -210,11 +361,67 @@ number-flow-react::part(symbol) {
   padding: calc(var(--number-flow-mask-height, 0.25em) / 2) 0;
 }
 
-
 number-flow-react.muted-fraction::part(decimal),
 number-flow-react.muted-fraction::part(fraction) {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }
+
+/* v3 -> v4: ported custom animations (keyframes + utilities) */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes progress-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@utility animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+@utility animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
+}
+
+@utility animate-progress-border {
+  animation: progress-bar 1.5s ease-in-out infinite;
+}
+
+@utility animate-subtle-pulse {
+  animation: subtle-pulse 1.2s ease-in-out infinite;
+}
+
 
 /* app.css */
 html,

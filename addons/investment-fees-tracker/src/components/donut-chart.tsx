@@ -3,15 +3,15 @@ import { PieChart, Pie, Cell, Sector } from 'recharts';
 import { useBalancePrivacy } from '@wealthfolio/ui';
 
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-6))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-8))',
-  'hsl(var(--chart-9))',
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
+  'var(--chart-9)',
 ];
 
 const renderActiveShape = (props: any) => {
@@ -53,7 +53,7 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 35}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs font-medium"
@@ -65,7 +65,7 @@ const renderActiveShape = (props: any) => {
         x={cx}
         y={cy - 20}
         textAnchor="middle"
-        fill="hsl(var(--foreground))"
+        fill="var(--foreground)"
         dominantBaseline="central"
         className="text-xs font-bold "
       >
@@ -75,7 +75,7 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 5}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs"

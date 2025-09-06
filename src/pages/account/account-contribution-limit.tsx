@@ -128,7 +128,7 @@ function AccountContributionLimitItem({
             )}
           </div>
         </div>
-        <Progress value={progressPercentageNumber} className="w-full" showPercentage />
+        <Progress value={progressPercentageNumber} className="w-full" />
       </CardContent>
     </Card>
   );

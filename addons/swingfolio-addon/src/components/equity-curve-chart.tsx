@@ -68,12 +68,11 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
         config={{
           periodPL: {
             label: `${periodLabel} P/L`,
-            color: 'hsl(var(--chart-1))',
+            color: 'var(--chart-1)',
           },
           cumulativeRealizedPL: {
             label: 'Cumulative Equity',
-            color: 'hsl(var(--primary))',
-            lineStyle: 'solid',
+            color: 'var(--primary)',
           },
         }}
         className="h-full w-full"
@@ -131,14 +130,14 @@ export function EquityCurveChart({ data, currency, periodType = 'monthly' }: Equ
         <Bar
           yAxisId="left"
           dataKey="periodPL"
-          fill="hsl(var(--chart-1))"
+          fill="var(--chart-1)"
           radius={[4, 4, 0, 0]}
           barSize={20}
         >
           {chartData.map((entry, index) => (
             <Cell
               key={`cell-${index}`}
-              fill={entry.periodPL >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+              fill={entry.periodPL >= 0 ? 'var(--success)' : 'var(--destructive)'}
               fillOpacity={0.6}
             />
           ))}

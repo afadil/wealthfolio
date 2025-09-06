@@ -53,7 +53,10 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               <nav
                 data-tauri-drag-region="true"
                 aria-label="Sidebar"
-                className="flex flex-shrink-0 flex-col p-2"
+                className={cn(
+                  "flex flex-shrink-0 flex-col p-2",
+                  collapsed ? "gap-2" : "gap-1"
+                )}
               >
                 <div
                   data-tauri-drag-region="true"
@@ -61,9 +64,10 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                 >
                   <Link to="/">
                     <img
-                      className={`h-10 w-10 rounded-full bg-transparent shadow-lg duration-700 [transform-style:preserve-3d] hover:[transform:rotateY(-180deg)] ${
-                        collapsed ? '[transform:rotateY(180deg)]' : ''
-                      }`}
+                      className={cn(
+                        "h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out [transform-style:preserve-3d] hover:rotate-y-180",
+                        collapsed ? "rotate-y-180" : "rotate-y-0"
+                      )}
                       aria-hidden="true"
                       src="/logo.svg"
                     />
@@ -277,7 +281,11 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
         key={item.title}
         variant={location.pathname.includes(item.href) ? 'secondary' : 'ghost'}
         asChild
-        className={cn('h-12 justify-start text-foreground', className)}
+        className={cn(
+          'h-12 text-foreground transition-all duration-300',
+          collapsed ? 'justify-center' : 'justify-start',
+          className
+        )}
       >
         <Link key={item.title} to={item.href} title={item.title} {...props}>
           {item.icon ?? <Icons.ArrowRight className="h-6 w-6" aria-hidden="true" />}

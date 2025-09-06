@@ -50,12 +50,15 @@
     "lint": "tsc --noEmit",
     "prepack": "npm run build"
   },
-  "devDependencies": {
-    "tsup": "^8.5.0",
-    "typescript": "^5.8.3"
-  },
   "peerDependencies": {
-    "react": "^18.0.0"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.1",
+    "@types/react-dom": "^19.1.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=20.0.0"

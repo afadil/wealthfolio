@@ -192,11 +192,11 @@ export const Icons = {
   TrendingUp: TrendingUp,
   TrendingDown: TrendingDown,
 
-  Dashboard: ({ ...props }: LucideProps) => (
+  Dashboard: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -209,11 +209,11 @@ export const Icons = {
     </svg>
   ),
 
-  Performance: ({ ...props }: LucideProps) => (
+  Performance: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -223,11 +223,11 @@ export const Icons = {
     </svg>
   ),
 
-  Goals: ({ ...props }: LucideProps) => (
+  Goals: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -237,11 +237,11 @@ export const Icons = {
     </svg>
   ),
 
-  Database: ({ ...props }: LucideProps) => (
+  Database: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -254,7 +254,7 @@ export const Icons = {
     </svg>
   ),
 
-  FileCsv: ({ ...props }: LucideProps) => (
+  FileCsv: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="24"
@@ -277,7 +277,7 @@ export const Icons = {
     </svg>
   ),
 
-  FileJson: ({ ...props }: LucideProps) => (
+  FileJson: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="24"
@@ -298,11 +298,11 @@ export const Icons = {
     </svg>
   ),
 
-  Files: ({ ...props }: LucideProps) => (
+  Files: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -315,11 +315,11 @@ export const Icons = {
     </svg>
   ),
 
-  Holdings: ({ ...props }: LucideProps) => (
+  Holdings: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -332,11 +332,11 @@ export const Icons = {
     </svg>
   ),
 
-  Activity: ({ ...props }: LucideProps) => (
+  Activity: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -346,11 +346,11 @@ export const Icons = {
     </svg>
   ),
 
-  Settings: ({ ...props }: LucideProps) => (
+  Settings: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -363,11 +363,11 @@ export const Icons = {
     </svg>
   ),
 
-  Invoice: ({ ...props }: LucideProps) => (
+  Invoice: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -377,11 +377,11 @@ export const Icons = {
     </svg>
   ),
 
-  Income: ({ ...props }: LucideProps) => (
+  Income: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -394,7 +394,7 @@ export const Icons = {
     </svg>
   ),
 
-  Logo: ({ ...props }: LucideProps) => (
+  Logo: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="65"
@@ -418,11 +418,11 @@ export const Icons = {
     </svg>
   ),
 
-  ChartBar: ({ ...props }: LucideProps) => (
+  ChartBar: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
