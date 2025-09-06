@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
 import { Badge, Icons, AmountDisplay } from '@wealthfolio/ui';
-import type { FeeAnalytics } from '../hooks/use-fee-analytics';
+import type { FeeAnalytics } from '../lib/fee-calculation.service';
 
 // Simple EmptyPlaceholder component since it's not exported from UI package
 function EmptyPlaceholder({ 
@@ -61,7 +61,7 @@ export function TopFeeSources({ feeAnalytics, currency, isBalanceHidden }: TopFe
   }
 
   // Calculate total fees for percentage calculations
-  const totalFees = topFeeSources.reduce((sum, source) => sum + source.totalFees, 0);
+  const totalFees = topFeeSources.reduce((sum: number, source) => sum + source.totalFees, 0);
 
   return (
     <Card>
@@ -75,10 +75,10 @@ export function TopFeeSources({ feeAnalytics, currency, isBalanceHidden }: TopFe
             {(() => {
               const top5Sources = topFeeSources.slice(0, 5);
               const otherSources = topFeeSources.slice(5);
-              const otherTotal = otherSources.reduce((sum, source) => sum + source.totalFees, 0);
+              const otherTotal = otherSources.reduce((sum: number, source) => sum + source.totalFees, 0);
               
               const chartItems = [
-                ...top5Sources.map((source) => ({
+                ...top5Sources.map((source: FeeAnalytics['assetFeeAnalysis'][0]) => ({
                   symbol: source.assetSymbol,
                   name: source.assetName,
                   fees: source.totalFees,
@@ -93,12 +93,12 @@ export function TopFeeSources({ feeAnalytics, currency, isBalanceHidden }: TopFe
               ];
 
               const colors = [
-                'hsl(var(--chart-1))',
-                'hsl(var(--chart-2))',
-                'hsl(var(--chart-3))',
-                'hsl(var(--chart-4))',
-                'hsl(var(--chart-5))',
-                'hsl(var(--chart-6))',
+                'var(--chart-1)',
+                'var(--chart-2)',
+                'var(--chart-3)',
+                'var(--chart-4)',
+                'var(--chart-5)',
+                'var(--chart-6)',
               ];
 
               return chartItems.map((item, index) => {
@@ -136,7 +136,7 @@ export function TopFeeSources({ feeAnalytics, currency, isBalanceHidden }: TopFe
 
           {/* Detailed List */}
           <div className="space-y-3">
-            {topFeeSources.map((source, index) => (
+            {topFeeSources.map((source: FeeAnalytics['assetFeeAnalysis'][0], index: number) => (
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <Badge className="flex min-w-[60px] items-center justify-center rounded-sm bg-primary text-xs">

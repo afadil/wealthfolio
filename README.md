@@ -371,7 +371,8 @@ wealthfolio/
 ├── LICENSE                      # License file
 ├── README.md                    # Project documentation
 ├── ROADMAP.md                   # Future plans and roadmap
-├── components.json              # Component configuration
+│                                
+├── packages/ui/components.json  # Shadcn UI generator config (monorepo)
 ├── package.json                 # Node.js dependencies and scripts
 ├── pnpm-lock.yaml               # Lock file for pnpm
 ├── postcss.config.js            # PostCSS configuration

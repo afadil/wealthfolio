@@ -221,7 +221,7 @@ export default function IncomePage() {
                       (acc: Record<string, { label: string; color: string }>, item, index) => {
                         acc[item.currency] = {
                           label: item.currency,
-                          color: `hsl(var(--chart-${index}))`,
+                          color: `var(--chart-${index})`,
                         };
                         return acc;
                       },
@@ -233,7 +233,7 @@ export default function IncomePage() {
                       <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
                       <Pie data={currencyData} dataKey="amount" nameKey="currency" paddingAngle={4}>
                         {currencyData.map((_entry, index) => (
-                          <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${index + 2}))`} />
+                          <Cell key={`cell-${index}`} fill={`var(--chart-${index + 2})`} />
                         ))}
                       </Pie>
                     </PieChart>
@@ -358,12 +358,12 @@ export default function IncomePage() {
                       ];
 
                       const colors = [
-                        'hsl(var(--chart-1))',
-                        'hsl(var(--chart-2))',
-                        'hsl(var(--chart-3))',
-                        'hsl(var(--chart-4))',
-                        'hsl(var(--chart-5))',
-                        'hsl(var(--chart-6))',
+                        'var(--chart-1)',
+                        'var(--chart-2)',
+                        'var(--chart-3)',
+                        'var(--chart-4)',
+                        'var(--chart-5)',
+                        'var(--chart-6)',
                       ];
 
                       return chartItems.map((item, index) => {

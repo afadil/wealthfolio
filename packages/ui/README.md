@@ -207,22 +207,14 @@ When updating shared components:
 3. Test changes against example addons
 4. Document new components in README
 
-## Migration Strategy
+## Updating Components
+```bash
+cd packages/ui
+npx shadcn-ui@latest add [component]
+npx shadcn@latest add accordion alert-dialog alert avatar badge button calendar checkbox collapsible command  dialog dropdown-menu form hover-card  input label popover progress radio-group scroll-area select separator sheet skeleton switch table tabs textarea toggle-group toggle tooltip
+npm run build
+```
 
-### Phase 1: ✅ Package Creation
-- [x] Created `@wealthfolio/ui` package
-- [x] Copied all UI components
-- [x] Set up build system
-- [x] Added to workspace
 
-### Phase 2: Addon Integration
-- [x] Updated example addons to use UI package
-- [x] Added as dependency to addon templates
-- [x] Updated documentation
-
-### Phase 3: Main App Migration (Optional)
-- [ ] Gradually migrate main app to use `@wealthfolio/ui`
-- [ ] Remove duplicate components from main app
-- [ ] Centralize all UI in shared package
 
 This strategy ensures consistent UI/UX across the entire Wealthfolio ecosystem while maintaining developer efficiency and user experience.

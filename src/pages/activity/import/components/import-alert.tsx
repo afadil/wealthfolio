@@ -115,7 +115,7 @@ export function ImportAlert({
       scale: 1,
       transition: { 
         duration: 0.4,
-        ease: [0.22, 1, 0.36, 1] 
+        ease: [0.22, 1, 0.36, 1] as [number, number, number, number]
       }
     },
     exit: { 
@@ -124,10 +124,10 @@ export function ImportAlert({
       y: -10,
       transition: { 
         duration: 0.3,
-        ease: [0.22, 1, 0.36, 1]
+        ease: [0.22, 1, 0.36, 1] as [number, number, number, number]
       }
     }
-  }
+  } as const
 
   const iconVariants = {
     hidden: { scale: 0.8, opacity: 0 },
@@ -141,7 +141,7 @@ export function ImportAlert({
         stiffness: 200
       }
     }
-  }
+  } as const
 
   const contentVariants = {
     hidden: { opacity: 0, x: -5 },
@@ -153,7 +153,7 @@ export function ImportAlert({
         duration: 0.3
       }
     }
-  }
+  } as const
 
   const rightIconVariants = {
     hidden: { scale: 0.8, opacity: 0 },
@@ -167,12 +167,12 @@ export function ImportAlert({
         stiffness: 200
       }
     }
-  }
+  } as const
 
   const glowVariants = {
     hidden: { opacity: 0 },
     visible: {
-      opacity: [0.4, 1, 0.4],
+      opacity: [0.4, 1, 0.4] as number[],
       transition: {
         delay: 0.3,
         duration: 2,
@@ -255,4 +255,3 @@ export function ImportAlert({
     </AnimatePresence>
   )
 }
-

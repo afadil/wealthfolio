@@ -74,7 +74,7 @@ const iconContainerVariants = {
     opacity: 1,
     rotate: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 260,
       damping: 20,
       duration: 0.5
@@ -96,7 +96,7 @@ const iconVariants = {
     opacity: 1,
     transition: {
       delay: 0.1,
-      type: "spring",
+      type: "spring" as const,
       stiffness: 300
     }
   }

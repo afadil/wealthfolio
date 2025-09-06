@@ -81,17 +81,15 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
             config={{
               income: {
                 label: 'Monthly Income',
-                color: 'hsl(var(--chart-1))',
+                color: 'var(--chart-1)',
               },
               cumulative: {
                 label: 'Cumulative Income',
-                color: 'hsl(var(--chart-5))',
-                lineStyle: 'solid',
+                color: 'var(--chart-5)',
               },
               previousIncome: {
                 label: 'Previous Period Income',
-                color: 'hsl(var(--chart-5))',
-                lineStyle: 'dashed',
+                color: 'var(--chart-5)',
               },
             }}
           >
