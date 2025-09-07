@@ -43,7 +43,7 @@ function CalendarDot({
 
     const dotContent = isPartial ? (
     <div
-      className="h-4 w-4 flex-shrink-0 cursor-pointer rounded-full border-2 border-primary transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5"
+      className="h-4 w-4 shrink-0 cursor-pointer rounded-full border-2 border-primary transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5"
       style={{
         background: `conic-gradient(var(--primary) ${partialPercent * 3.6}deg, var(--muted) 0deg)`,
       }}
@@ -52,7 +52,7 @@ function CalendarDot({
     />
   ) : (
     <div
-      className={`h-4 w-4 flex-shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5 ${
+      className={`h-4 w-4 shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5 ${
         filled 
           ? 'scale-105 border-primary bg-primary' 
           : 'border-muted-foreground/30 bg-muted hover:bg-muted-foreground/10'

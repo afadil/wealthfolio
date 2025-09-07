@@ -89,7 +89,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 mb-2">
+      <div className="shrink-0 mb-2">
         <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} />
       </div>
       <div className={`rounded-md border flex-1 min-h-0 ${scrollable ? 'overflow-auto' : ''}`}>

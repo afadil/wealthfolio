@@ -28,7 +28,7 @@ export const OnboardingStep3: React.FC<OnboardingStep3Props> = ({ onNext, onBack
           <div className="space-y-4">
             {checklistItems.map((item, index) => (
               <div key={item.id} className="flex items-center space-x-3">
-                <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
                   <span className="text-xs text-background">{index + 1}</span>
                 </div>
                 <label

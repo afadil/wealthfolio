@@ -235,7 +235,7 @@ function ProviderSettings({
                     value={apiKeyValue ?? ''}
                     onChange={(e) => setApiKeyValue(e.target.value)}
                     placeholder={isSecretSet && !apiKeyValue ? 'API Key is Set' : 'Enter API Key'}
-                    className="flex-grow"
+                    className="grow"
                   />
                   <Button
                     variant="outline"

@@ -105,7 +105,7 @@ export function ProgressIndicator({
             {/* Beautiful gradient progress bar */}
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary/30">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500"
+                className="h-full rounded-full bg-linear-to-r from-red-500 via-orange-500 to-yellow-500"
                 initial={{ x: '-100%' }}
                 animate={{ x: '100%' }}
                 transition={{
