@@ -53,7 +53,7 @@ export function ActivityTypeSelector({
                       className={cn(
                         'relative flex items-center gap-2 rounded-lg border p-3 text-sm transition-colors hover:bg-muted',
                         layout === 'vertical' && 'flex-col items-center justify-center py-3',
-                        'min-h-[4rem] sm:min-h-[5rem]',
+                        'min-h-16 sm:min-h-20',
                         'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5',
                         'cursor-pointer',
                         fieldState.error && 'border-destructive text-destructive',

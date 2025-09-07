@@ -74,7 +74,7 @@ export default function SettingsLayout() {
         {isMainSettingsPage ? (
           // Mobile Settings List View (iOS style)
       <div className="w-full max-w-full overflow-x-hidden scan-hide-target">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b">
               <div className="flex items-center justify-center min-h-[60px] px-4">
                 <h1 className="text-lg font-semibold">Settings</h1>
               </div>
@@ -93,12 +93,12 @@ export default function SettingsLayout() {
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 text-muted-foreground">
+                    <div className="shrink-0 text-muted-foreground">
                       {item.icon}
                     </div>
                     <span className="font-medium text-left">{item.title}</span>
                   </div>
-                  <Icons.ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <Icons.ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </button>
               ))}
             </div>
@@ -106,7 +106,7 @@ export default function SettingsLayout() {
         ) : (
           // Mobile Settings Detail View
           <div className="w-full max-w-full overflow-x-hidden scan-hide-target">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b">
               <div className="flex items-center min-h-[60px] px-4">
                 <Button
                   variant="ghost"

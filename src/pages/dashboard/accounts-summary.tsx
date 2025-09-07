@@ -179,7 +179,7 @@ const AccountSummaryComponent = React.memo(
 );
 AccountSummaryComponent.displayName = 'AccountSummaryComponent';
 
-export const AccountsSummary = React.memo(({ className }: { className?: string }) => {
+export const AccountsSummary = React.memo(() => {
   const { accountsGrouped, setAccountsGrouped, settings } = useSettingsContext();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 

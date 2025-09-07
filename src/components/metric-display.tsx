@@ -73,7 +73,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
   return (
     <div
       className={cn(
-        'flex min-h-[4rem] flex-col items-center justify-center space-y-1 p-4 md:p-4',
+        'flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:p-4',
         className,
       )}
     >

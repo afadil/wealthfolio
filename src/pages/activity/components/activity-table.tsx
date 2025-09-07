@@ -419,7 +419,7 @@ export const ActivityTable = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center flex-shrink-0 mb-2">
+      <div className="flex justify-between items-center shrink-0 mb-2">
         <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
         <ToggleGroup
           type="single"
@@ -488,7 +488,7 @@ export const ActivityTable = ({
           </TableBody>
         </Table>
       </div>
-      <div className="flex pl-2 text-xs text-muted-foreground flex-shrink-0 mt-2">
+      <div className="flex pl-2 text-xs text-muted-foreground shrink-0 mt-2">
         {isFetching ? <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
         {totalFetched} / {totalDBRowCount} activities
       </div>

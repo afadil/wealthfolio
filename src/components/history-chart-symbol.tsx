@@ -39,7 +39,7 @@ export default function HistoryChart({
 }) {
   return (
     <div className="relative flex h-full flex-col">
-      <div className="flex-grow">
+      <div className="grow">
         <ResponsiveContainer width="100%" height={height}>
           <AreaChart
             data={data}

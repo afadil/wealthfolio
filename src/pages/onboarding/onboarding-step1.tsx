@@ -34,28 +34,28 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
           <CardContent className="flex-1">
             <ul className="ml-1 space-y-4 text-xs md:space-y-6 md:text-sm [&>li]:mt-1">
               <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
+                <Icons.Check className="mr-2 mt-1 h-4 w-4 shrink-0 text-green-600" />
                 <span>
                   Use <code className="font-semibold">Add Holding</code> to increase an asset's
                   position
                 </span>
               </li>
               <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
+                <Icons.Check className="mr-2 mt-1 h-4 w-4 shrink-0 text-green-600" />
                 <span>
                   Use <code className="font-semibold">Remove Holding</code> to reduce an asset's
                   position
                 </span>
               </li>
               <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
+                <Icons.Check className="mr-2 mt-1 h-4 w-4 shrink-0 text-green-600" />
                 <span>
                   Use <code className="font-semibold">Deposit/Withdrawal</code> to update your
                   account's cash balance
                 </span>
               </li>
               <li className="flex items-start">
-                <Icons.AlertCircle className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-warning" />
+                <Icons.AlertCircle className="mr-2 mt-1 h-4 w-4 shrink-0 text-warning" />
                 <span>Unlike Buy/Sell, Add/Remove holdings don't affect cash balance.</span>
               </li>
             </ul>
@@ -77,20 +77,20 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
           <CardContent className="flex-1">
             <ul className="ml-1 space-y-4 text-xs md:space-y-6 md:text-sm [&>li]:mt-1">
               <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
+                <Icons.Check className="mr-2 mt-1 h-4 w-4 shrink-0 text-green-600" />
                 <span>
                   Start with a <code className="font-semibold">Deposit</code> to fund your account.
                 </span>
               </li>
               <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
+                <Icons.Check className="mr-2 mt-1 h-4 w-4 shrink-0 text-green-600" />
                 <span>
                   Use <code className="font-semibold">Buy</code> /{' '}
                   <code className="font-semibold">Sell</code> actions for trades.
                 </span>
               </li>
               <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
+                <Icons.Check className="mr-2 mt-1 h-4 w-4 shrink-0 text-green-600" />
                 <span>
                   Use{' '}
                   <code className="font-semibold">
@@ -100,7 +100,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </span>
               </li>
               <li className="flex items-start">
-                <Icons.AlertCircle className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-warning" />
+                <Icons.AlertCircle className="mr-2 mt-1 h-4 w-4 shrink-0 text-warning" />
                 <span>Buy/Sell actions update cash balance; always record deposits first.</span>
               </li>
             </ul>

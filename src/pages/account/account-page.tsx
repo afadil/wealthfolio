@@ -175,7 +175,7 @@ const AccountPage = () => {
           <AccountMetrics
             valuation={currentValuation}
             performance={accountPerformance}
-            className="flex-grow"
+            className="grow"
             isLoading={isDetailsLoading || isPerformanceHistoryLoading}
           />
           <AccountContributionLimit accountId={id} />

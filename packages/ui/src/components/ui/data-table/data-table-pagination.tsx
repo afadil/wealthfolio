@@ -77,7 +77,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
               table.setPageSize(Number(value));
             }}
           >
-            <SelectTrigger className="h-8 w-[70px] transition-colors">
+            <SelectTrigger className="h-8 w-sidebar-collapsed transition-colors">
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">

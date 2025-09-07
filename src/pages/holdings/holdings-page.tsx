@@ -148,7 +148,7 @@ export const HoldingsPage = () => {
   return (
   <ApplicationShell className="p-6 h-full flex flex-col">
       <Tabs defaultValue={defaultTab} className="flex flex-col h-full w-full">
-        <div className="space-y-2 flex-shrink-0">
+        <div className="space-y-2 shrink-0">
           <ApplicationHeader heading="Holdings">
             <div className="flex items-center space-x-2">
               <AccountSelector

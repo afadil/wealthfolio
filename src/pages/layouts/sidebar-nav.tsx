@@ -39,8 +39,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
   const DesktopSidebar = () => (
     <div
       className={cn({
-        'light:bg-secondary/50 box-border border-r hidden h-screen pt-12 transition-[width] duration-300 ease-in-out md:flex':
-          true,
+        'light:bg-secondary/50 box-border border-r hidden h-screen pt-12 transition-[width] duration-300 ease-in-out md:flex': true,
         'md:w-sidebar': !collapsed,
         'md:w-sidebar-collapsed': collapsed,
       })}
@@ -53,10 +52,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               <nav
                 data-tauri-drag-region="true"
                 aria-label="Sidebar"
-                className={cn(
-                  "flex flex-shrink-0 flex-col p-2",
-                  collapsed ? "gap-2" : "gap-1"
-                )}
+                className={cn('flex shrink-0 flex-col p-2', collapsed ? 'gap-2' : 'gap-1')}
               >
                 <div
                   data-tauri-drag-region="true"
@@ -65,8 +61,8 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                   <Link to="/">
                     <img
                       className={cn(
-                        "h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out [transform-style:preserve-3d] hover:rotate-y-180",
-                        collapsed ? "rotate-y-180" : "rotate-y-0"
+                        'h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out transform-3d hover:rotate-y-180',
+                        collapsed ? 'rotate-y-180' : 'rotate-y-0',
                       )}
                       aria-hidden="true"
                       src="/logo.svg"
@@ -90,7 +86,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               </nav>
             </div>
 
-            <div className="flex flex-shrink-0 flex-col p-2">
+            <div className="flex shrink-0 flex-col p-2">
               {navigation?.secondary?.map((item) => NavItem({ item }))}
               <Separator className="mt-0" />
               <div className="flex justify-end">
@@ -120,14 +116,14 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     const primaryItems = navigation?.primary || [];
     const secondaryItems = navigation?.secondary || [];
     const allItems = [...primaryItems, ...secondaryItems];
-    
+
     // Show first 3 items directly, rest in "More" menu
     const directItems = allItems.slice(0, 3);
     const moreItems = allItems.slice(3);
     const hasMoreItems = moreItems.length > 0;
 
     return (
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden pb-safe">
+      <div className="bg-background/95 supports-backdrop-filter:bg-background/60 pb-safe fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur md:hidden">
         <nav className="flex h-16 items-center px-2">
           {/* Direct navigation items */}
           {directItems.map((item, index) => (
@@ -135,39 +131,43 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               key={item.title}
               to={item.href}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center py-2 px-1 mx-1 text-xs transition-all duration-200 min-h-[44px] active:scale-95',
+                'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center px-1 py-2 text-xs transition-all duration-200 active:scale-95',
                 location.pathname.includes(item.href)
                   ? 'text-foreground bg-success/10 scale-105'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105',
               )}
               style={{
-                animationDelay: `${index * 50}ms`
+                animationDelay: `${index * 50}ms`,
               }}
             >
-              <div className={cn(
-                "flex h-6 w-6 items-center justify-center transition-transform duration-200",
-                location.pathname.includes(item.href) && "scale-110"
-              )}>
+              <div
+                className={cn(
+                  'flex h-6 w-6 items-center justify-center transition-transform duration-200',
+                  location.pathname.includes(item.href) && 'scale-110',
+                )}
+              >
                 {item.icon ?? <Icons.ArrowRight className="h-5 w-5" aria-hidden="true" />}
               </div>
-              <span className={cn(
-                "mt-1 truncate text-[10px] font-medium transition-all duration-200",
-                location.pathname.includes(item.href) && "font-semibold"
-              )}>
+              <span
+                className={cn(
+                  'mt-1 truncate text-[10px] font-medium transition-all duration-200',
+                  location.pathname.includes(item.href) && 'font-semibold',
+                )}
+              >
                 {item.title}
               </span>
             </Link>
           ))}
-          
+
           {/* More menu */}
           {hasMoreItems && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <button
                   className={cn(
-                    'flex flex-1 flex-col items-center justify-center py-2 px-1 mx-1 text-xs transition-all duration-200 rounded-xl min-h-[44px] active:scale-95',
+                    'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-xs transition-all duration-200 active:scale-95',
                     'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105',
-                    mobileMenuOpen && 'text-foreground bg-muted scale-105'
+                    mobileMenuOpen && 'text-foreground bg-muted scale-105',
                   )}
                   aria-label="Open navigation menu"
                 >
@@ -178,14 +178,12 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                 </button>
               </SheetTrigger>
               <SheetContent side="bottom" className="h-auto max-h-[80vh] overflow-y-auto">
-                <SheetHeader className="text-left pb-4">
+                <SheetHeader className="pb-4 text-left">
                   <SheetTitle className="flex items-center gap-2">
                     <Icons.LayoutDashboard className="h-5 w-5" />
                     Navigation Menu
                   </SheetTitle>
-                  <SheetDescription>
-                    Access all available navigation options
-                  </SheetDescription>
+                  <SheetDescription>Access all available navigation options</SheetDescription>
                 </SheetHeader>
                 <div className="grid gap-2 pb-6">
                   {moreItems.map((item, index) => (
@@ -197,30 +195,34 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                         'flex items-center gap-4 rounded-xl px-4 py-4 text-sm transition-all duration-200 active:scale-95',
                         location.pathname.includes(item.href)
                           ? 'text-foreground bg-muted shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
                       )}
                       style={{
-                        animationDelay: `${index * 50}ms`
+                        animationDelay: `${index * 50}ms`,
                       }}
                     >
-                      <div className={cn(
-                        "flex h-6 w-6 items-center justify-center rounded-lg transition-all duration-200",
-                        location.pathname.includes(item.href) 
-                          ? "bg-primary/10 text-primary" 
-                          : "bg-muted/50"
-                      )}>
+                      <div
+                        className={cn(
+                          'flex h-6 w-6 items-center justify-center rounded-lg transition-all duration-200',
+                          location.pathname.includes(item.href)
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted/50',
+                        )}
+                      >
                         {item.icon ?? <Icons.ArrowRight className="h-4 w-4" aria-hidden="true" />}
                       </div>
                       <div className="flex-1">
-                        <span className={cn(
-                          "font-medium transition-all duration-200",
-                          location.pathname.includes(item.href) && "font-semibold"
-                        )}>
+                        <span
+                          className={cn(
+                            'font-medium transition-all duration-200',
+                            location.pathname.includes(item.href) && 'font-semibold',
+                          )}
+                        >
                           {item.title}
                         </span>
                       </div>
                       {location.pathname.includes(item.href) && (
-                        <div className="flex h-2 w-2 rounded-full bg-primary" />
+                        <div className="bg-primary flex h-2 w-2 rounded-full" />
                       )}
                     </Link>
                   ))}
@@ -228,29 +230,33 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               </SheetContent>
             </Sheet>
           )}
-          
+
           {/* If no more items, show 4th item directly */}
           {!hasMoreItems && allItems[3] && (
             <Link
               key={allItems[3].title}
               to={allItems[3].href}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center py-2 px-1 mx-1 text-xs transition-all duration-200 rounded-xl min-h-[44px] active:scale-95',
+                'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-xs transition-all duration-200 active:scale-95',
                 location.pathname.includes(allItems[3].href)
-                  ? 'text-foreground bg-muted shadow-sm scale-105'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105'
+                  ? 'text-foreground bg-muted scale-105 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105',
               )}
             >
-              <div className={cn(
-                "flex h-6 w-6 items-center justify-center transition-transform duration-200",
-                location.pathname.includes(allItems[3].href) && "scale-110"
-              )}>
+              <div
+                className={cn(
+                  'flex h-6 w-6 items-center justify-center transition-transform duration-200',
+                  location.pathname.includes(allItems[3].href) && 'scale-110',
+                )}
+              >
                 {allItems[3].icon ?? <Icons.ArrowRight className="h-5 w-5" aria-hidden="true" />}
               </div>
-              <span className={cn(
-                "mt-1 truncate text-[10px] font-medium transition-all duration-200",
-                location.pathname.includes(allItems[3].href) && "font-semibold"
-              )}>
+              <span
+                className={cn(
+                  'mt-1 truncate text-[10px] font-medium transition-all duration-200',
+                  location.pathname.includes(allItems[3].href) && 'font-semibold',
+                )}
+              >
                 {allItems[3].title}
               </span>
             </Link>
@@ -282,13 +288,13 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
         variant={location.pathname.includes(item.href) ? 'secondary' : 'ghost'}
         asChild
         className={cn(
-          'h-12 text-foreground transition-all duration-300',
+          'text-foreground h-12 transition-all duration-300 [&_svg]:!size-5',
           collapsed ? 'justify-center' : 'justify-start',
-          className
+          className,
         )}
       >
         <Link key={item.title} to={item.href} title={item.title} {...props}>
-          {item.icon ?? <Icons.ArrowRight className="h-6 w-6" aria-hidden="true" />}
+          {item.icon ?? <Icons.ArrowRight className="h-5 w-5" aria-hidden="true" />}
 
           <span
             className={cn({

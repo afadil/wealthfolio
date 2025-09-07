@@ -235,7 +235,7 @@ const ErrorCell = ({
           <div className="absolute inset-0 cursor-help bg-destructive/10">
             <div className="relative h-full w-full flex items-center justify-between px-4 py-2">
               <div className="flex-1 mr-2">{children}</div>
-              <Icons.AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+              <Icons.AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
             </div>
           </div>
         </TooltipTrigger>

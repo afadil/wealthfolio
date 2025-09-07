@@ -87,7 +87,7 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
 
             {/* Connector line */}
             {!isLast && (
-              <div className="relative mx-2 h-[2px] min-w-[2rem] flex-1 overflow-hidden bg-muted-foreground/30 md:min-w-[4rem]">
+              <div className="relative mx-2 h-[2px] min-w-8 flex-1 overflow-hidden bg-muted-foreground/30 md:min-w-16">
                 <motion.div
                   initial={{ width: '0%' }}
                   animate={{ width: isCompleted ? '100%' : '0%' }}

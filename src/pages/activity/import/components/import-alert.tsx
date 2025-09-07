@@ -204,7 +204,7 @@ export function ImportAlert({
           <div className={cn("flex items-start", sizeStyle.padding)}>
             {Icon && (
               <motion.div 
-                className={cn("flex-shrink-0 self-center", sizeStyle.marginRight)}
+                className={cn("shrink-0 self-center", sizeStyle.marginRight)}
                 variants={iconVariants}
               >
                 <div className={cn(
@@ -229,7 +229,7 @@ export function ImportAlert({
             </motion.div>
             {RightIcon && (
               <motion.div 
-                className="ml-4 flex-shrink-0 self-center"
+                className="ml-4 shrink-0 self-center"
                 variants={rightIconVariants}
               >
                 <div className={cn(

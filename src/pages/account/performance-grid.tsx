@@ -32,7 +32,7 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
               {[...Array(4)].map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-md border border-muted/30 bg-muted/30 flex min-h-[6rem] flex-col items-center justify-center space-y-2 p-4 md:p-6"
+                  className="rounded-md border border-muted/30 bg-muted/30 flex min-h-24 flex-col items-center justify-center space-y-2 p-4 md:p-6"
                 >
                   <Skeleton className="h-3 w-32" />
                   <Skeleton className="h-5 w-16" />

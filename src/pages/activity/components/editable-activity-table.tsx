@@ -1135,7 +1135,7 @@ const EditableActivityTable = ({
             if (isLastCell) {
               finalCellPresentation = (
                 <div className="flex h-full w-full items-center justify-between">
-                  <div className="h-full flex-grow">{cellContent}</div>
+                  <div className="h-full grow">{cellContent}</div>
                   <div
                     className={cn(
                       'mr-2 flex h-7 shrink-0 items-center space-x-1',
@@ -1443,7 +1443,7 @@ const EditableActivityTable = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between flex-shrink-0 mb-4">
+      <div className="flex items-center justify-between shrink-0 mb-4">
         <DataTableToolbar
           table={table}
           searchBy="assetSymbol"
@@ -1554,7 +1554,7 @@ const EditableActivityTable = ({
         )}
       </div>
       {localActivities.length > 0 && activitiesPage && activitiesPage.meta.totalRowCount > 0 && (
-        <div className="flex-shrink-0 mt-2">
+        <div className="shrink-0 mt-2">
           <DataTablePagination table={table} />
         </div>
       )}

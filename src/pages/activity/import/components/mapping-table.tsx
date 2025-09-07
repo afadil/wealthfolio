@@ -64,7 +64,7 @@ export function MappingTable({
           <Table>
             <TableHeader className="sticky top-0 z-20">
               <TableRow>
-                <TableHead className="sticky left-0 z-30 w-12 min-w-[3rem] border-r border-border">
+                <TableHead className="sticky left-0 z-30 w-12 min-w-12 border-r border-border">
                   <div className="flex items-center justify-center rounded-sm bg-muted/50 p-1">
                     <span className="text-xs font-semibold text-muted-foreground">#</span>
                   </div>

@@ -13,7 +13,7 @@ export function SettingsHeader({ heading, text, className, children }: SettingsH
         <h1 className="font-heading text-lg lg:text-xl font-bold break-words">{heading}</h1>
         {text && <p className="text-sm lg:text-md font-light text-muted-foreground break-words">{text}</p>}
       </div>
-      {children && <div className="flex-shrink-0">{children}</div>}
+      {children && <div className="shrink-0">{children}</div>}
     </div>
   );
 }

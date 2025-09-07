@@ -195,8 +195,8 @@ export const Icons = {
   Dashboard: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -212,8 +212,8 @@ export const Icons = {
   Performance: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -226,8 +226,8 @@ export const Icons = {
   Goals: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -240,8 +240,8 @@ export const Icons = {
   Database: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -301,8 +301,8 @@ export const Icons = {
   Files: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -318,8 +318,8 @@ export const Icons = {
   Holdings: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -335,8 +335,8 @@ export const Icons = {
   Activity: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -349,8 +349,8 @@ export const Icons = {
   Settings: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -366,8 +366,8 @@ export const Icons = {
   Invoice: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -380,8 +380,8 @@ export const Icons = {
   Income: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -421,14 +421,112 @@ export const Icons = {
   ChartBar: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || "32"}
-      height={size || "32"}
+      width={size || '32'}
+      height={size || '32'}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
     >
       <path d="M208,40V208H152V40Z" opacity="0.2"></path>
       <path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"></path>
+    </svg>
+  ),
+
+  ChartBar2: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <title>square-chart-line</title>
+      <g fill="none">
+        <path
+          d="M3 8.4C3 6.15979 3 5.03968 3.43597 4.18404C3.81947 3.43139 4.43139 2.81947 5.18404 2.43597C6.03968 2 7.15979 2 9.4 2H14.6C16.8402 2 17.9603 2 18.816 2.43597C19.5686 2.81947 20.1805 3.43139 20.564 4.18404C21 5.03968 21 6.15979 21 8.4V11.6C21 13.8402 21 14.9603 20.564 15.816C20.1805 16.5686 19.5686 17.1805 18.816 17.564C17.9603 18 16.8402 18 14.6 18H9.4C7.15979 18 6.03968 18 5.18404 17.564C4.43139 17.1805 3.81947 16.5686 3.43597 15.816C3 14.9603 3 13.8402 3 11.6V8.4Z"
+          fill="url(#1752500502804-9183447_square-chart-line_existing_0_ko3hky3pd)"
+          data-glass="origin"
+          mask="url(#1752500502804-9183447_square-chart-line_mask_66dhv0iub)"
+        ></path>
+        <path
+          d="M3 8.4C3 6.15979 3 5.03968 3.43597 4.18404C3.81947 3.43139 4.43139 2.81947 5.18404 2.43597C6.03968 2 7.15979 2 9.4 2H14.6C16.8402 2 17.9603 2 18.816 2.43597C19.5686 2.81947 20.1805 3.43139 20.564 4.18404C21 5.03968 21 6.15979 21 8.4V11.6C21 13.8402 21 14.9603 20.564 15.816C20.1805 16.5686 19.5686 17.1805 18.816 17.564C17.9603 18 16.8402 18 14.6 18H9.4C7.15979 18 6.03968 18 5.18404 17.564C4.43139 17.1805 3.81947 16.5686 3.43597 15.816C3 14.9603 3 13.8402 3 11.6V8.4Z"
+          fill="url(#1752500502804-9183447_square-chart-line_existing_0_ko3hky3pd)"
+          data-glass="clone"
+          filter="url(#1752500502804-9183447_square-chart-line_filter_kwhh3qkup)"
+          clip-path="url(#1752500502804-9183447_square-chart-line_clipPath_lvme5u893)"
+        ></path>
+        <path
+          d="M9.7666 9.87523C9.48873 9.39536 8.87716 9.21774 8.3916 9.48558L3.55455 12.1452C2.59573 12.6724 2 13.6798 2 14.774V16.5998V16.6031C2 18.8398 2 18.9605 2.43555 19.8157C2.81896 20.5681 3.43117 21.1802 4.18359 21.5637C5.03924 21.9997 6.16018 22.0002 8.40039 22.0002H15.5996C17.8398 22.0002 18.9608 21.9997 19.8164 21.5637C20.5688 21.1802 21.181 20.5681 21.5645 19.8157C22 18.9605 22 17.8408 22 15.6031V15.5998V10.6428C21.9999 9.89353 21.2089 9.41219 20.5488 9.76683C18.0694 11.099 14.7916 12.9434 13.2812 13.7971C12.8177 14.0591 12.2304 13.9141 11.9473 13.4631C11.3884 12.5728 10.4754 11.0997 9.7666 9.87523Z"
+          fill="url(#1752500502804-9183447_square-chart-line_existing_1_vl0j8v33y)"
+          data-glass="blur"
+        ></path>
+        <path
+          d="M15.5996 21.2502V22.0002H8.40039V21.2502H15.5996ZM21.25 15.6028V10.6428C21.2499 10.45 21.0543 10.3468 20.9033 10.428C18.4318 11.7559 15.1607 13.5968 13.6504 14.4504C12.8422 14.9072 11.8113 14.6562 11.3125 13.8616C10.7527 12.9697 9.83302 11.4877 9.11719 10.2512C9.03879 10.1159 8.87324 10.0762 8.75391 10.1418L8.75293 10.1428L3.91602 12.802C3.19701 13.1973 2.75013 13.9532 2.75 14.7737V15.6028C2.75 16.734 2.75039 17.5383 2.80176 18.1672C2.8524 18.7868 2.94873 19.1707 3.10352 19.4748C3.41499 20.0861 3.91297 20.5841 4.52441 20.8957C4.82888 21.0508 5.21342 21.1467 5.83398 21.1975C6.46353 21.249 7.26801 21.2502 8.40039 21.2502V22.0002L6.91699 21.9934C5.72503 21.9745 4.96098 21.9042 4.34766 21.6409L4.18359 21.5637C3.52521 21.2281 2.97417 20.7176 2.58984 20.091L2.43555 19.8157C2 18.9605 2 17.8404 2 15.6028V14.7737C2.00012 13.748 2.5235 12.7983 3.37891 12.2493L3.55469 12.1448L8.3916 9.48558C8.87716 9.21774 9.48873 9.39536 9.7666 9.87523C10.4754 11.0997 11.3884 12.5728 11.9473 13.4631C12.2128 13.8861 12.7457 14.0397 13.1934 13.841L13.2812 13.7971C14.4141 13.1568 16.5412 11.959 18.5801 10.8381L20.5488 9.76683C21.2089 9.41219 21.9999 9.89353 22 10.6428V15.6028C22 17.8404 22 18.9605 21.5645 19.8157L21.4102 20.091C21.0258 20.7176 20.4748 21.2281 19.8164 21.5637L19.6523 21.6409C18.816 22 17.6995 22.0002 15.5996 22.0002V21.2502C16.732 21.2502 17.5365 21.249 18.166 21.1975C18.7866 21.1467 19.1711 21.0508 19.4756 20.8957C20.087 20.5841 20.585 20.0861 20.8965 19.4748C21.0513 19.1707 21.1476 18.7868 21.1982 18.1672C21.2496 17.5383 21.25 16.734 21.25 15.6028Z"
+          fill="url(#1752500502804-9183447_square-chart-line_existing_2_o3c96osrf)"
+        ></path>
+        <defs>
+          <linearGradient
+            id="1752500502804-9183447_square-chart-line_existing_0_ko3hky3pd"
+            x1="12"
+            y1="2"
+            x2="12"
+            y2="18"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stop-color="#575757"></stop>
+            <stop offset="1" stop-color="#151515"></stop>
+          </linearGradient>
+          <linearGradient
+            id="1752500502804-9183447_square-chart-line_existing_1_vl0j8v33y"
+            x1="12"
+            y1="9.361"
+            x2="12"
+            y2="22"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stop-color="#E3E3E5" stop-opacity=".6"></stop>
+            <stop offset="1" stop-color="#BBBBC0" stop-opacity=".6"></stop>
+          </linearGradient>
+          <linearGradient
+            id="1752500502804-9183447_square-chart-line_existing_2_o3c96osrf"
+            x1="12"
+            y1="9.361"
+            x2="12"
+            y2="16.68"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stop-color="#fff"></stop>
+            <stop offset="1" stop-color="#fff" stop-opacity="0"></stop>
+          </linearGradient>
+          <filter
+            id="1752500502804-9183447_square-chart-line_filter_kwhh3qkup"
+            x="-100%"
+            y="-100%"
+            width="400%"
+            height="400%"
+            filterUnits="objectBoundingBox"
+            primitiveUnits="userSpaceOnUse"
+          >
+            <feGaussianBlur
+              stdDeviation="2"
+              x="0%"
+              y="0%"
+              width="100%"
+              height="100%"
+              in="SourceGraphic"
+              edgeMode="none"
+              result="blur"
+            ></feGaussianBlur>
+          </filter>
+          <clipPath id="1752500502804-9183447_square-chart-line_clipPath_lvme5u893">
+            <path
+              d="M9.7666 9.87523C9.48873 9.39536 8.87716 9.21774 8.3916 9.48558L3.55455 12.1452C2.59573 12.6724 2 13.6798 2 14.774V16.5998V16.6031C2 18.8398 2 18.9605 2.43555 19.8157C2.81896 20.5681 3.43117 21.1802 4.18359 21.5637C5.03924 21.9997 6.16018 22.0002 8.40039 22.0002H15.5996C17.8398 22.0002 18.9608 21.9997 19.8164 21.5637C20.5688 21.1802 21.181 20.5681 21.5645 19.8157C22 18.9605 22 17.8408 22 15.6031V15.5998V10.6428C21.9999 9.89353 21.2089 9.41219 20.5488 9.76683C18.0694 11.099 14.7916 12.9434 13.2812 13.7971C12.8177 14.0591 12.2304 13.9141 11.9473 13.4631C11.3884 12.5728 10.4754 11.0997 9.7666 9.87523Z"
+              fill="url(#1752500502804-9183447_square-chart-line_existing_1_vl0j8v33y)"
+            ></path>
+          </clipPath>
+          <mask id="1752500502804-9183447_square-chart-line_mask_66dhv0iub">
+            <rect width="100%" height="100%" fill="#FFF"></rect>
+            <path
+              d="M9.7666 9.87523C9.48873 9.39536 8.87716 9.21774 8.3916 9.48558L3.55455 12.1452C2.59573 12.6724 2 13.6798 2 14.774V16.5998V16.6031C2 18.8398 2 18.9605 2.43555 19.8157C2.81896 20.5681 3.43117 21.1802 4.18359 21.5637C5.03924 21.9997 6.16018 22.0002 8.40039 22.0002H15.5996C17.8398 22.0002 18.9608 21.9997 19.8164 21.5637C20.5688 21.1802 21.181 20.5681 21.5645 19.8157C22 18.9605 22 17.8408 22 15.6031V15.5998V10.6428C21.9999 9.89353 21.2089 9.41219 20.5488 9.76683C18.0694 11.099 14.7916 12.9434 13.2812 13.7971C12.8177 14.0591 12.2304 13.9141 11.9473 13.4631C11.3884 12.5728 10.4754 11.0997 9.7666 9.87523Z"
+              fill="#000"
+            ></path>
+          </mask>
+        </defs>
+      </g>
     </svg>
   ),
 };
