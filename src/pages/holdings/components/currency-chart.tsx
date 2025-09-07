@@ -131,12 +131,12 @@ export function HoldingCurrencyChart({
               >
                 <div className="flex min-w-0 items-center gap-2.5">
                   <div
-                    className="h-5 w-1.5 flex-shrink-0 rounded-full"
+                    className="h-5 w-1.5 shrink-0 rounded-full"
                     style={{ backgroundColor: INDICATOR_COLORS[index % INDICATOR_COLORS.length] }}
                   />
                   <span className="truncate text-sm font-medium">{currency.name}</span>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2 text-sm font-medium">
+                <div className="flex shrink-0 items-center gap-2 text-sm font-medium">
                     <AmountDisplay
                       value={currency.value}
                       currency={baseCurrency}
@@ -168,7 +168,7 @@ function LoadingState() {
       <CardContent className="p-6">
         <div className="space-y-6">
           <Skeleton className="h-5 w-[180px]" />
-          <Skeleton className="h-12 w-[220px]" />
+          <Skeleton className="h-12 w-sidebar" />
           <Skeleton className="h-8 w-full" />
           <div className="space-y-3">
             <Skeleton className="h-6 w-full" />
@@ -214,7 +214,7 @@ function ProgressBar({ data }: { data: CurrencyData[] }) {
   }, [data]);
 
   return (
-    <div className="flex h-6 w-full items-center justify-between gap-[1px]">
+    <div className="flex h-6 w-full items-center justify-between gap-px">
       {segments.map((segment, index) => (
         <motion.div
           key={segment.key}
