@@ -34,90 +34,11 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Desktop sidebar
-  const DesktopSidebar = () => (
-    <div
-      className={cn({
-        'light:bg-secondary/50 box-border border-r hidden h-screen pt-12 transition-[width] duration-300 ease-in-out md:flex': true,
-        'md:w-sidebar': !collapsed,
-        'md:w-sidebar-collapsed': collapsed,
-      })}
-      data-tauri-drag-region="true"
-    >
-      <div className="z-20 w-full rounded-xl md:flex">
-        <div className="flex w-full flex-col">
-          <div className="flex w-full flex-1 flex-col overflow-y-auto">
-            <div data-tauri-drag-region="true" className="flex-1">
-              <nav
-                data-tauri-drag-region="true"
-                aria-label="Sidebar"
-                className={cn('flex shrink-0 flex-col p-2', collapsed ? 'gap-2' : 'gap-1')}
-              >
-                <div
-                  data-tauri-drag-region="true"
-                  className="draggable flex items-center justify-center pb-12"
-                >
-                  <Link to="/">
-                    <img
-                      className={cn(
-                        'h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out transform-3d hover:rotate-y-180',
-                        collapsed ? 'rotate-y-180' : 'rotate-y-0',
-                      )}
-                      aria-hidden="true"
-                      src="/logo.svg"
-                    />
-                  </Link>
-
-                  <span
-                    className={cn(
-                      'text-md ml-2 font-bold transition-opacity delay-100 duration-300 ease-in-out',
-                      {
-                        'sr-only opacity-0': collapsed,
-                        'block opacity-100': !collapsed,
-                      },
-                    )}
-                  >
-                    Wealthfolio
-                  </span>
-                </div>
-
-                {navigation?.primary?.map((item) => NavItem({ item }))}
-              </nav>
-            </div>
-
-            <div className="flex shrink-0 flex-col p-2">
-              {navigation?.secondary?.map((item) => NavItem({ item }))}
-              <Separator className="mt-0" />
-              <div className="flex justify-end">
-                <Button
-                  title="Toggle Sidebar"
-                  variant="ghost"
-                  onClick={() => setCollapsed(!collapsed)}
-                  className="text-gray-400 hover:bg-transparent"
-                  aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-                >
-                  <Icons.PanelLeftOpen
-                    size={18}
-                    className={`h-5 w-5 duration-500 ${!collapsed && 'rotate-180'}`}
-                    aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-                  />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Mobile bottom bar
   const MobileBottomBar = () => {
     const primaryItems = navigation?.primary || [];
     const secondaryItems = navigation?.secondary || [];
     const allItems = [...primaryItems, ...secondaryItems];
 
-    // Show first 3 items directly, rest in "More" menu
     const directItems = allItems.slice(0, 3);
     const moreItems = allItems.slice(3);
     const hasMoreItems = moreItems.length > 0;
@@ -125,20 +46,16 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     return (
       <div className="bg-background/95 supports-backdrop-filter:bg-background/60 pb-safe fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur md:hidden">
         <nav className="flex h-16 items-center px-2">
-          {/* Direct navigation items */}
-          {directItems.map((item, index) => (
+          {directItems.map((item) => (
             <Link
               key={item.title}
               to={item.href}
               className={cn(
-                'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center px-1 py-2 text-xs transition-all duration-200 active:scale-95',
+                'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-xs transition-all duration-200 active:scale-95',
                 location.pathname.includes(item.href)
                   ? 'text-foreground bg-success/10 scale-105'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105',
               )}
-              style={{
-                animationDelay: `${index * 50}ms`,
-              }}
             >
               <div
                 className={cn(
@@ -159,7 +76,6 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
             </Link>
           ))}
 
-          {/* More menu */}
           {hasMoreItems && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -186,7 +102,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                   <SheetDescription>Access all available navigation options</SheetDescription>
                 </SheetHeader>
                 <div className="grid gap-2 pb-6">
-                  {moreItems.map((item, index) => (
+                  {moreItems.map((item) => (
                     <Link
                       key={item.title}
                       to={item.href}
@@ -197,9 +113,6 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                           ? 'text-foreground bg-muted shadow-sm'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
                       )}
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                      }}
                     >
                       <div
                         className={cn(
@@ -231,7 +144,6 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
             </Sheet>
           )}
 
-          {/* If no more items, show 4th item directly */}
           {!hasMoreItems && allItems[3] && (
             <Link
               key={allItems[3].title}
@@ -268,8 +180,78 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
 
   return (
     <>
-      <DesktopSidebar />
       <MobileBottomBar />
+      <div
+        className={cn({
+          'light:bg-secondary/50 hidden h-screen border-r pt-12 transition-[width] duration-300 ease-in-out md:flex': true,
+          'md:w-sidebar': !collapsed,
+          'md:w-sidebar-collapsed': collapsed,
+        })}
+        data-tauri-drag-region="true"
+      >
+        <div className="z-20 w-full rounded-xl md:flex">
+          <div className="flex w-full flex-col">
+            <div className="flex w-full flex-1 flex-col overflow-y-auto">
+              <div data-tauri-drag-region="true" className="flex-1">
+                <nav
+                  data-tauri-drag-region="true"
+                  aria-label="Sidebar"
+                  className="flex flex-shrink-0 flex-col p-2"
+                >
+                  <div
+                    data-tauri-drag-region="true"
+                    className="draggable flex items-center justify-center pb-12"
+                  >
+                    <Link to="/">
+                      <img
+                        className={`h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out [transform-style:preserve-3d] hover:[transform:rotateY(-180deg)] ${
+                          collapsed ? '[transform:rotateY(180deg)]' : ''
+                        }`}
+                        aria-hidden="true"
+                        src="/logo.png"
+                      />
+                    </Link>
+
+                    <span
+                      className={cn(
+                        'text-md ml-2 font-bold transition-opacity delay-100 duration-300 ease-in-out font-serif text-xl text-foreground/90',
+                        {
+                          'sr-only opacity-0': collapsed,
+                          'block opacity-100': !collapsed,
+                        },
+                      )}
+                    >
+                      Wealthfolio
+                    </span>
+                  </div>
+
+                  {navigation?.primary?.map((item) => NavItem({ item }))}
+                </nav>
+              </div>
+
+              <div className="flex shrink-0 flex-col p-2">
+                {navigation?.secondary?.map((item) => NavItem({ item }))}
+                <Separator className="mt-0" />
+                <div className="flex justify-end">
+                  <Button
+                    title="Toggle Sidebar"
+                    variant="ghost"
+                    onClick={() => setCollapsed(!collapsed)}
+                    className="text-muted-foreground cursor-pointer rounded-md hover:bg-transparent [&_svg]:!size-5"
+                    aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                  >
+                    <Icons.PanelLeftOpen
+                      size={18}
+                      className={`h-5 w-5 transition-transform duration-500 ease-in-out ${!collapsed ? 'rotate-180' : ''}`}
+                      aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                    />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 
@@ -288,7 +270,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
         variant={location.pathname.includes(item.href) ? 'secondary' : 'ghost'}
         asChild
         className={cn(
-          'text-foreground h-12 transition-all duration-300 [&_svg]:!size-5',
+          'mb-1 text-foreground h-12 rounded-md transition-all duration-300 [&_svg]:!size-5',
           collapsed ? 'justify-center' : 'justify-start',
           className,
         )}
