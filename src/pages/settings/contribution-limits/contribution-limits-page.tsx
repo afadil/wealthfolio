@@ -55,10 +55,20 @@ const SettingsContributionLimitPage = () => {
     <>
       <div className="space-y-6">
         <SettingsHeader heading="Contribution Limits" text="Manage your contribution limits.">
-          <Button onClick={() => handleAddLimit()}>
-            <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add limit
-          </Button>
+          <>
+            <Button
+              size="icon"
+              className="sm:hidden"
+              onClick={() => handleAddLimit()}
+              aria-label="Add contribution limit"
+            >
+              <Icons.Plus className="size-4" />
+            </Button>
+            <Button className="hidden sm:inline-flex" onClick={() => handleAddLimit()}>
+              <Icons.Plus className="mr-2 size-4" />
+              Add limit
+            </Button>
+          </>
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">

@@ -60,10 +60,20 @@ const SettingsGoalsPage = () => {
     <>
       <div className="space-y-6">
         <SettingsHeader heading="Goals" text=" Manage your investment and saving goals.">
-          <Button onClick={() => handleAddGoal()}>
-            <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add goal
-          </Button>
+          <>
+            <Button
+              size="icon"
+              className="sm:hidden"
+              onClick={() => handleAddGoal()}
+              aria-label="Add goal"
+            >
+              <Icons.Plus className="h-4 w-4" />
+            </Button>
+            <Button className="hidden sm:inline-flex" onClick={() => handleAddGoal()}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Add goal
+            </Button>
+          </>
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">
