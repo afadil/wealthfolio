@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'privacy-settings';
+const EVENT_NAME = 'wf:privacy-changed';
 
 export interface BalancePrivacyHook {
   isBalanceHidden: boolean;
@@ -56,14 +57,40 @@ export function useBalancePrivacy(): BalancePrivacyHook {
       }
     };
 
+    // Also listen for in-document changes (same window) via a custom event
+    const handleLocalEvent = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail as { isBalanceHidden?: boolean } | undefined;
+        if (detail && typeof detail.isBalanceHidden === 'boolean') {
+          setIsBalanceHidden(detail.isBalanceHidden);
+        }
+      } catch {
+        // no-op
+      }
+    };
+
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener(EVENT_NAME, handleLocalEvent as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener(EVENT_NAME, handleLocalEvent as EventListener);
+    };
   }, []);
 
   const toggleBalanceVisibility = () => {
     const newValue = !isBalanceHidden;
     setIsBalanceHidden(newValue);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newValue));
+
+    // Notify other hook instances in the same window immediately
+    try {
+      window.dispatchEvent(
+        new CustomEvent(EVENT_NAME, { detail: { isBalanceHidden: newValue } })
+      );
+    } catch {
+      // no-op
+    }
   };
 
   return {

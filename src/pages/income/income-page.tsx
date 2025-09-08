@@ -23,7 +23,7 @@ import { GainPercent } from '@wealthfolio/ui';
 import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
 import { Badge } from '@/components/ui/badge';
 import { PrivacyAmount } from '@wealthfolio/ui';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 import { AmountDisplay } from '@wealthfolio/ui';
 import { IncomeHistoryChart } from './income-history-chart';
 

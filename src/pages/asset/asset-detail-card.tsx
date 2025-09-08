@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { formatPercent } from '@wealthfolio/ui';
 import { AmountDisplay } from '@wealthfolio/ui';
 import { QuantityDisplay } from '@wealthfolio/ui';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 
 interface AssetDetail {
   numShares: number;

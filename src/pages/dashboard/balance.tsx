@@ -1,5 +1,5 @@
 import NumberFlow from '@number-flow/react';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface BalanceProps {

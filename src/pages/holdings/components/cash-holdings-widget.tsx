@@ -2,7 +2,7 @@ import { Holding } from '@/lib/types';
 import { Icons } from '@/components/ui/icons';
 import { AmountDisplay } from '@wealthfolio/ui';
 import { cn } from '@/lib/utils';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface CashHoldingsWidgetProps {

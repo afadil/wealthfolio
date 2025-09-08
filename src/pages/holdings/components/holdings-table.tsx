@@ -9,7 +9,7 @@ import { GainPercent } from '@wealthfolio/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Holding } from '@/lib/types';
 import { useNavigate } from 'react-router-dom';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 import { AmountDisplay } from '@wealthfolio/ui';
 import { QuantityDisplay } from '@wealthfolio/ui';
 import { useState } from 'react';
