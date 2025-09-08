@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
@@ -26,6 +26,7 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
           to={item.href}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
+            'rounded-md',
             location.pathname.includes(item.href)
               ? 'bg-muted hover:bg-muted'
               : 'hover:bg-transparent hover:underline',
