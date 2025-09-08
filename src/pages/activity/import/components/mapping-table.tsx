@@ -15,7 +15,7 @@ import {
   ImportRequiredField,
   Account,
 } from '@/lib/types';
-import { renderHeaderCell, renderCell } from './mapping-table-cells';
+import { MappingHeaderCell, MappingCell } from './mapping-table-cells';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
@@ -79,12 +79,12 @@ export function MappingTable({
                         : ""
                     )}
                   >
-                    {renderHeaderCell({
-                      field,
-                      mapping,
-                      headers,
-                      handleColumnMapping,
-                    })}
+                    <MappingHeaderCell
+                      field={field}
+                      mapping={mapping}
+                      headers={headers}
+                      handleColumnMapping={handleColumnMapping}
+                    />
                   </TableHead>
                 ))}
               </TableRow>
@@ -114,18 +114,18 @@ export function MappingTable({
                             "group-hover:bg-muted/50"
                           )}
                         >
-                          {renderCell({
-                            field,
-                            row,
-                            mapping,
-                            accounts,
-                            getMappedValue,
-                            handleActivityTypeMapping,
-                            handleSymbolMapping,
-                            handleAccountIdMapping,
-                            invalidSymbols,
-                            invalidAccounts
-                          })}
+                          <MappingCell
+                            field={field}
+                            row={row}
+                            mapping={mapping}
+                            accounts={accounts}
+                            getMappedValue={getMappedValue}
+                            handleActivityTypeMapping={handleActivityTypeMapping}
+                            handleSymbolMapping={handleSymbolMapping}
+                            handleAccountIdMapping={handleAccountIdMapping}
+                            invalidSymbols={invalidSymbols}
+                            invalidAccounts={invalidAccounts}
+                          />
                         </TableCell>
                       );
                     })}
