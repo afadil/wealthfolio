@@ -19,7 +19,7 @@ import { AccountSelector } from '@/components/account-selector';
 
 const SKIP_FIELD_VALUE = '__skip__';
 
-export function renderHeaderCell({
+export function MappingHeaderCell({
   field,
   mapping,
   headers,
@@ -304,7 +304,7 @@ function SymbolDisplayCell({
   );
 }
 
-export function renderCell({
+export function MappingCell({
   field,
   row,
   mapping,
