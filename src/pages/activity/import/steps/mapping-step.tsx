@@ -196,7 +196,7 @@ export const MappingStep = ({
   
   return (
     <div className="m-0 flex h-full flex-col p-0">
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Fields mapping status */}
         <ImportAlert
           variant={requiredFieldsMapped ? 'success' : 'destructive'}
@@ -204,6 +204,7 @@ export const MappingStep = ({
           title="Fields"
           description={`${mappedFieldsCount} of ${totalFields} mapped`}
           icon={Icons.ListChecks}
+          className="mb-0"
           rightIcon={requiredFieldsMapped ? Icons.CheckCircle : Icons.AlertCircle}
         />
 
@@ -214,6 +215,7 @@ export const MappingStep = ({
           title="Activities"
           description={`${distinctActivityTypes.length - activitiesToMapCount} of ${distinctActivityTypes.length} mapped`}
           icon={Icons.Activity as Icon}
+          className="mb-0"
           rightIcon={activitiesToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
         />
 
@@ -224,6 +226,7 @@ export const MappingStep = ({
           title="Symbols"
           description={`${distinctSymbols.length - symbolsToMapCount} of ${distinctSymbols.length} mapped`}
           icon={Icons.Tag as Icon}
+          className="mb-0"
           rightIcon={symbolsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
         />
         
@@ -239,6 +242,7 @@ export const MappingStep = ({
                 : "No unmapped account IDs found"
             }
             icon={Icons.Wallet as Icon}
+            className="mb-0"
             rightIcon={accountsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
           />
         )}
