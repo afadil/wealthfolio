@@ -13,6 +13,22 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 
+/* Tailwind v4 custom utilities for 3D rotation used in the sidebar logo */
+@utility transform-3d {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+@utility rotate-y-0 {
+  transform: rotateY(0deg);
+}
+
+@utility rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+
 @theme {
   /* Disable default colors to prevent their use; feel free to re-enable as needed. */
   --color-amber-*: initial;
