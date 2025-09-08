@@ -1,8 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '@wealthfolio/ui';
-import { downloadAddonForReview, installFromStaging, clearAddonStaging, submitAddonRating, getAddonRatings } from '@/commands/addon';
+import { downloadAddonForReview, installFromStaging, clearAddonStaging, submitAddonRating, getAddonRatings, fetchAddonStoreListings } from '@/commands/addon';
 import type { AddonStoreListing } from '@/lib/types';
 import type { ExtractedAddon } from '@/adapters/tauri';
 import { QueryKeys } from '@/lib/query-keys';
@@ -21,20 +20,22 @@ export function useAddonStore() {
     error: storeError,
   } = useQuery({
     queryKey: [QueryKeys.ADDON_STORE_LISTINGS],
-    queryFn: () => invoke<AddonStoreListing[]>('fetch_addon_store_listings'),
+    queryFn: () => fetchAddonStoreListings(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   });
 
   // Handle errors separately
-  if (storeError) {
-    console.error('Failed to fetch store listings:', storeError);
-    toast({
-      title: 'Failed to load addon store',
-      description: storeError instanceof Error ? storeError.message : 'Unknown error occurred',
-      variant: 'destructive',
-    });
-  }
+  useEffect(() => {
+    if (storeError) {
+      console.error('Failed to fetch store listings:', storeError);
+      toast({
+        title: 'Failed to load addon store',
+        description: storeError instanceof Error ? storeError.message : 'Unknown error occurred',
+        variant: 'destructive',
+      });
+    }
+  }, [storeError, toast]);
 
   const installFromStore = useCallback(async (
     listing: AddonStoreListing,

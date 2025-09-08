@@ -19,6 +19,7 @@ use wealthfolio_core::{
     goals::{GoalRepository, GoalService, GoalServiceTrait},
     limits::{ContributionLimitRepository, ContributionLimitService, ContributionLimitServiceTrait},
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
+    sync::store,
 };
 
 pub struct AppState {
@@ -36,6 +37,8 @@ pub struct AppState {
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
+    pub data_root: String,
+    pub instance_id: String,
 }
 
 pub fn init_tracing() {
@@ -61,6 +64,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let settings_service = Arc::new(SettingsService::new(settings_repo, fx_service.clone()));
     let settings = settings_service.get_settings()?;
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
+
+    // Ensure a device ID exists in the database for trigger stamping (origin/updated_version)
+    {
+        let mut conn = pool.get()?;
+        // Record the stable instance_id into sync_device so triggers can reference it
+        store::ensure_device_id(&mut conn, &settings.instance_id)?;
+    }
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
     let transaction_executor = pool.clone();
@@ -140,6 +150,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service.clone(),
     ));
 
+    // Determine data root directory (parent of DB path)
+    let data_root = std::path::Path::new(&db_path)
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .to_string_lossy()
+        .to_string();
+
     Ok(Arc::new(AppState {
         account_service,
         settings_service,
@@ -155,5 +172,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service: fx_service.clone(),
         activity_service,
         asset_service,
+        data_root,
+        instance_id: settings.instance_id,
     }))
 }

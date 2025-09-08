@@ -66,6 +66,21 @@ const COMMANDS: CommandMap = {
   set_secret: { method: 'POST', path: '/secrets' },
   get_secret: { method: 'GET', path: '/secrets' },
   delete_secret: { method: 'DELETE', path: '/secrets' },
+  // Addons
+  list_installed_addons: { method: 'GET', path: '/addons/installed' },
+  install_addon_zip: { method: 'POST', path: '/addons/install-zip' },
+  toggle_addon: { method: 'POST', path: '/addons/toggle' },
+  uninstall_addon: { method: 'DELETE', path: '/addons' },
+  load_addon_for_runtime: { method: 'GET', path: '/addons/runtime' },
+  get_enabled_addons_on_startup: { method: 'GET', path: '/addons/enabled-on-startup' },
+  extract_addon_zip: { method: 'POST', path: '/addons/extract' },
+  // Addon store + staging
+  fetch_addon_store_listings: { method: 'GET', path: '/addons/store/listings' },
+  submit_addon_rating: { method: 'POST', path: '/addons/store/ratings' },
+  get_addon_ratings: { method: 'GET', path: '/addons/store/ratings' },
+  download_addon_to_staging: { method: 'POST', path: '/addons/store/staging/download' },
+  install_addon_from_staging: { method: 'POST', path: '/addons/store/install-from-staging' },
+  clear_addon_staging: { method: 'DELETE', path: '/addons/store/staging' },
 };
 
 export const invokeWeb = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
@@ -298,6 +313,66 @@ export const invokeWeb = async <T>(command: string, payload?: Record<string, unk
       url += `?${params.toString()}`;
       break;
     }
+    // Addons
+    case 'install_addon_zip': {
+      const { zipData, enableAfterInstall } = payload as any;
+      // Send compact base64 payload to avoid gigantic JSON arrays of numbers
+      const zipDataB64 = toBase64(zipData as number[] | Uint8Array);
+      body = JSON.stringify({ zipDataB64, enableAfterInstall });
+      break;
+    }
+    case 'toggle_addon': {
+      const { addonId, enabled } = payload as any;
+      body = JSON.stringify({ addonId, enabled });
+      break;
+    }
+    case 'uninstall_addon': {
+      const { addonId } = payload as any;
+      url += `/${encodeURIComponent(addonId)}`;
+      break;
+    }
+    case 'load_addon_for_runtime': {
+      const { addonId } = payload as any;
+      url += `/${encodeURIComponent(addonId)}`;
+      break;
+    }
+    case 'extract_addon_zip': {
+      const { zipData } = payload as any;
+      const zipDataB64 = toBase64(zipData as number[] | Uint8Array);
+      body = JSON.stringify({ zipDataB64 });
+      break;
+    }
+    case 'download_addon_to_staging': {
+      const { addonId } = payload as any;
+      body = JSON.stringify({ addonId });
+      break;
+    }
+    case 'install_addon_from_staging': {
+      const { addonId, enableAfterInstall } = payload as any;
+      body = JSON.stringify({ addonId, enableAfterInstall });
+      break;
+    }
+    case 'clear_addon_staging': {
+      const { addonId } = (payload || {}) as any;
+      if (addonId) {
+        const params = new URLSearchParams();
+        params.set('addonId', addonId);
+        url += `?${params.toString()}`;
+      }
+      break;
+    }
+    case 'submit_addon_rating': {
+      const { addonId, rating, review } = payload as any;
+      body = JSON.stringify({ addonId, rating, review });
+      break;
+    }
+    case 'get_addon_ratings': {
+      const { addonId } = payload as any;
+      const params = new URLSearchParams();
+      params.set('addonId', addonId);
+      url += `?${params.toString()}`;
+      break;
+    }
   }
 
   const res = await fetch(url, {
@@ -326,3 +401,16 @@ export const logger = {
   debug: (...args: any[]) => console.debug(...args),
   trace: (...args: any[]) => console.trace(...args),
 };
+
+// Helpers
+function toBase64(data: Uint8Array | number[]): string {
+  const bytes = Array.isArray(data) ? new Uint8Array(data) : data;
+  // Fast base64 encoding without TextEncoder for binary
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  // btoa expects binary string
+  return btoa(binary);
+}

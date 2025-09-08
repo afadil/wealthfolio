@@ -4,6 +4,7 @@ use axum::{extract::{Path, State, Query, RawQuery}, routing::{get, post, put, de
 use tower_http::{cors::{Any, CorsLayer}, trace::TraceLayer, timeout::TimeoutLayer, request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer}};
 use utoipa::OpenApi;
 use crate::{error::ApiResult, models::{Account, NewAccount, AccountUpdate}, config::Config, main_lib::AppState};
+use crate::addons::{self, *};
 use axum::http::StatusCode;
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
@@ -248,25 +249,54 @@ async fn delete_exchange_rate(Path(id): Path<String>, State(state): State<Arc<Ap
 
 // Activities endpoints
 #[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum SortWrapper {
+    One(wealthfolio_core::activities::Sort),
+    Many(Vec<wealthfolio_core::activities::Sort>),
+}
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum StringOrVec {
+    One(String),
+    Many(Vec<String>),
+}
+
+#[derive(serde::Deserialize)]
 struct ActivitySearchBody {
     page: i64,
     #[serde(rename = "pageSize")] page_size: i64,
-    #[serde(rename = "accountIdFilter")] account_id_filter: Option<String>,
-    #[serde(rename = "activityTypeFilter")] activity_type_filter: Option<String>,
+    #[serde(rename = "accountIdFilter")] account_id_filter: Option<StringOrVec>,
+    #[serde(rename = "activityTypeFilter")] activity_type_filter: Option<StringOrVec>,
     #[serde(rename = "assetIdKeyword")] asset_id_keyword: Option<String>,
-    sort: Option<wealthfolio_core::activities::Sort>,
+    // Allow addons to pass either a single sort or an array (we pick the first)
+    sort: Option<SortWrapper>,
 }
 
 async fn search_activities(State(state): State<Arc<AppState>>, Json(body): Json<ActivitySearchBody>) -> ApiResult<Json<ActivitySearchResponse>> {
-    let account_ids = body.account_id_filter.map(|s| vec![s]);
-    let types = body.activity_type_filter.map(|s| vec![s]);
+    // Normalize sort to a single value if provided
+    let sort_normalized: Option<wealthfolio_core::activities::Sort> = match body.sort {
+        Some(SortWrapper::One(s)) => Some(s),
+        Some(SortWrapper::Many(mut v)) => v.into_iter().next(),
+        None => None,
+    };
+    let account_ids: Option<Vec<String>> = match body.account_id_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
+    let types: Option<Vec<String>> = match body.activity_type_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
     let resp = state.activity_service.search_activities(
         body.page,
         body.page_size,
         account_ids,
         types,
         body.asset_id_keyword,
-        body.sort,
+        sort_normalized,
     )?;
     Ok(Json(resp))
 }
@@ -514,7 +544,22 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/secrets", post(set_secret).get(get_secret).delete(delete_secret))
         .route("/goals/allocations", get(load_goals_allocations).post(update_goal_allocations))
         .route("/goals", get(get_goals).post(create_goal).put(update_goal))
-        .route("/goals/:id", delete(delete_goal));
+        .route("/goals/:id", delete(delete_goal))
+        // Addons (web mode)
+        .route("/addons/installed", get(list_installed_addons_web))
+        .route("/addons/install-zip", post(install_addon_zip_web))
+        .route("/addons/toggle", post(toggle_addon_web))
+        .route("/addons/:id", delete(uninstall_addon_web))
+        .route("/addons/runtime/:id", get(load_addon_for_runtime_web))
+        .route("/addons/enabled-on-startup", get(get_enabled_addons_on_startup_web))
+        .route("/addons/extract", post(extract_addon_zip_web));
+        // Store + staging
+        let api = api
+        .route("/addons/store/listings", get(fetch_addon_store_listings_web))
+        .route("/addons/store/ratings", post(submit_addon_rating_web).get(get_addon_ratings_web))
+        .route("/addons/store/staging/download", post(download_addon_to_staging_web))
+        .route("/addons/store/install-from-staging", post(install_addon_from_staging_web))
+        .route("/addons/store/staging", delete(clear_addon_staging_web));
 
     Router::new()
         .nest("/api/v1", api)
@@ -525,4 +570,210 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(TimeoutLayer::new(config.request_timeout))
         .layer(TraceLayer::new_for_http())
+}
+
+// ===================== Addons (Web) =====================
+
+#[derive(serde::Deserialize)]
+struct InstallZipBody {
+    #[serde(rename = "zipData")] zip_data: Option<Vec<u8>>,
+    #[serde(rename = "zipDataB64")] zip_data_b64: Option<String>,
+    #[serde(rename = "enableAfterInstall")] enable_after_install: Option<bool>
+}
+
+async fn install_addon_zip_web(State(state): State<Arc<AppState>>, Json(body): Json<InstallZipBody>) -> ApiResult<Json<AddonManifest>> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let zip_bytes: Vec<u8> = if let Some(b64) = body.zip_data_b64 {
+        base64::decode(b64).map_err(|e| anyhow::anyhow!("Invalid base64 zipDataB64: {}", e))?
+    } else if let Some(bytes) = body.zip_data {
+        bytes
+    } else {
+        return Err(anyhow::anyhow!("Missing zip data").into());
+    };
+    let extracted = addons::extract_addon_zip_internal(zip_bytes).map_err(|e| anyhow::anyhow!(e))?;
+    let addon_id = extracted.metadata.id.clone();
+    let addon_dir = addons::get_addon_path(data_root, &addon_id).map_err(|e| anyhow::anyhow!(e))?;
+    if addon_dir.exists() { std::fs::remove_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?; }
+    std::fs::create_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?;
+    for file in &extracted.files {
+        let file_path = addon_dir.join(&file.name);
+        if let Some(parent) = file_path.parent() { std::fs::create_dir_all(parent).map_err(|e| anyhow::anyhow!("{}", e))?; }
+        std::fs::write(&file_path, &file.content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    }
+    let metadata = extracted.metadata.to_installed(body.enable_after_install.unwrap_or(true)).map_err(|e| anyhow::anyhow!(e))?;
+    let manifest_path = addon_dir.join("manifest.json");
+    let manifest_json = serde_json::to_string_pretty(&metadata).map_err(|e| anyhow::anyhow!(e))?;
+    std::fs::write(&manifest_path, manifest_json).map_err(|e| anyhow::anyhow!(e))?;
+    Ok(Json(metadata))
+}
+
+async fn list_installed_addons_web(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<InstalledAddon>>> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let addons_dir = addons::ensure_addons_directory(data_root).map_err(|e| anyhow::anyhow!(e))?;
+    let mut installed = Vec::new();
+    if addons_dir.exists() {
+        for entry in std::fs::read_dir(&addons_dir).map_err(|e| anyhow::anyhow!("{}", e))? {
+            let entry = entry.map_err(|e| anyhow::anyhow!("{}", e))?;
+            let dir = entry.path();
+            if !dir.is_dir() { continue; }
+            let manifest_path = dir.join("manifest.json");
+            if !manifest_path.exists() { continue; }
+            let content = std::fs::read_to_string(&manifest_path).map_err(|e| anyhow::anyhow!("{}", e))?;
+            let metadata: AddonManifest = serde_json::from_str(&content).map_err(|e| anyhow::anyhow!("{}", e))?;
+            let files_count = std::fs::read_dir(&dir).map_err(|e| anyhow::anyhow!("{}", e))?.count();
+            let is_zip_addon = files_count > 2;
+            installed.push(InstalledAddon { metadata, file_path: dir.to_string_lossy().to_string(), is_zip_addon });
+        }
+    }
+    Ok(Json(installed))
+}
+
+#[derive(serde::Deserialize)]
+struct ToggleBody { #[serde(rename = "addonId")] addon_id: String, enabled: bool }
+
+async fn toggle_addon_web(State(state): State<Arc<AppState>>, Json(body): Json<ToggleBody>) -> ApiResult<StatusCode> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let addon_dir = addons::get_addon_path(data_root, &body.addon_id).map_err(|e| anyhow::anyhow!(e))?;
+    let manifest_path = addon_dir.join("manifest.json");
+    if !manifest_path.exists() { return Err(anyhow::anyhow!("Addon not found").into()); }
+    let content = std::fs::read_to_string(&manifest_path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut metadata: AddonManifest = serde_json::from_str(&content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    metadata.enabled = Some(body.enabled);
+    let manifest_json = serde_json::to_string_pretty(&metadata).map_err(|e| anyhow::anyhow!("{}", e))?;
+    std::fs::write(&manifest_path, manifest_json).map_err(|e| anyhow::anyhow!("{}", e))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn uninstall_addon_web(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<StatusCode> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let addon_dir = addons::get_addon_path(data_root, &id).map_err(|e| anyhow::anyhow!(e))?;
+    if !addon_dir.exists() { return Err(anyhow::anyhow!("Addon not found").into()); }
+    std::fs::remove_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn load_addon_for_runtime_web(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<Json<ExtractedAddon>> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let addon_dir = addons::get_addon_path(data_root, &id).map_err(|e| anyhow::anyhow!(e))?;
+    let manifest_path = addon_dir.join("manifest.json");
+    if !manifest_path.exists() { return Err(anyhow::anyhow!("Addon not found").into()); }
+    let manifest_content = std::fs::read_to_string(&manifest_path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let metadata: AddonManifest = serde_json::from_str(&manifest_content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    if !metadata.is_enabled() { return Err(anyhow::anyhow!("Addon is disabled").into()); }
+    let mut files = Vec::new();
+    addons::read_addon_files_recursive(&addon_dir, &addon_dir, &mut files).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let main_file = metadata.get_main().map_err(|e| anyhow::anyhow!(e))?;
+    for f in &mut files {
+        let normalized_name = f.name.replace('\\', "/");
+        let normalized_main = main_file.replace('\\', "/");
+        f.is_main = normalized_name == normalized_main || normalized_name.ends_with(&normalized_main) || (normalized_main.contains('/') && normalized_name == normalized_main);
+    }
+    if !files.iter().any(|f| f.is_main) {
+        return Err(anyhow::anyhow!("Main addon file not found").into());
+    }
+    Ok(Json(ExtractedAddon { metadata, files }))
+}
+
+async fn get_enabled_addons_on_startup_web(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<ExtractedAddon>>> {
+    let installed = list_installed_addons_web(State(state.clone())).await?.0;
+    let mut enabled = Vec::new();
+    for item in installed {
+        if item.metadata.is_enabled() {
+            if let Ok(Json(extracted)) = load_addon_for_runtime_web(Path(item.metadata.id.clone()), State(state.clone())).await {
+                enabled.push(extracted);
+            }
+        }
+    }
+    Ok(Json(enabled))
+}
+
+#[derive(serde::Deserialize)]
+struct ExtractBody {
+    #[serde(rename = "zipData")] zip_data: Option<Vec<u8>>,
+    #[serde(rename = "zipDataB64")] zip_data_b64: Option<String>,
+}
+
+async fn extract_addon_zip_web(Json(body): Json<ExtractBody>) -> ApiResult<Json<ExtractedAddon>> {
+    let zip_bytes: Vec<u8> = if let Some(b64) = body.zip_data_b64 {
+        base64::decode(b64).map_err(|e| anyhow::anyhow!("Invalid base64 zipDataB64: {}", e))?
+    } else if let Some(bytes) = body.zip_data {
+        bytes
+    } else {
+        return Err(anyhow::anyhow!("Missing zip data").into());
+    };
+    let extracted = addons::extract_addon_zip_internal(zip_bytes).map_err(|e| anyhow::anyhow!(e))?;
+    Ok(Json(extracted))
+}
+
+// ====== Store + staging ======
+
+async fn fetch_addon_store_listings_web(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let listings = addons::fetch_addon_store_listings(Some(state.instance_id.as_str())).await.map_err(|e| anyhow::anyhow!(e))?;
+    Ok(Json(listings))
+}
+
+#[derive(serde::Deserialize)]
+struct SubmitRatingBody { #[serde(rename = "addonId")] addon_id: String, rating: u8, review: Option<String> }
+
+async fn submit_addon_rating_web(State(state): State<Arc<AppState>>, Json(body): Json<SubmitRatingBody>) -> ApiResult<Json<serde_json::Value>> {
+    let resp = addons::submit_addon_rating(&body.addon_id, body.rating, body.review, Some(state.instance_id.as_str())).await.map_err(|e| anyhow::anyhow!(e))?;
+    Ok(Json(resp))
+}
+
+#[derive(serde::Deserialize)]
+struct RatingsQuery { #[serde(rename = "addonId")] addon_id: String }
+
+async fn get_addon_ratings_web(_q: Query<RatingsQuery>) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // Store ratings retrieval API not implemented yet; return empty list to avoid UI errors
+    Ok(Json(Vec::new()))
+}
+
+#[derive(serde::Deserialize)]
+struct StagingDownloadBody { #[serde(rename = "addonId")] addon_id: String }
+
+async fn download_addon_to_staging_web(State(state): State<Arc<AppState>>, Json(body): Json<StagingDownloadBody>) -> ApiResult<Json<ExtractedAddon>> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let zip = addons::download_addon_from_store(&body.addon_id, Some(state.instance_id.as_str()))
+        .await
+        .map_err(|e| {
+            tracing::error!(addon_id = %body.addon_id, "download from store failed: {}", e);
+            anyhow::anyhow!(format!("Download from store failed for '{}': {}", body.addon_id, e))
+        })?;
+    let _staged_path = addons::save_addon_to_staging(&body.addon_id, data_root, &zip)
+        .map_err(|e: String| anyhow::anyhow!(e))?;
+    let extracted = addons::extract_addon_zip_internal(zip).map_err(|e| anyhow::anyhow!(e))?;
+    Ok(Json(extracted))
+}
+
+#[derive(serde::Deserialize)]
+struct InstallFromStagingBody { #[serde(rename = "addonId")] addon_id: String, #[serde(rename = "enableAfterInstall")] enable_after_install: Option<bool> }
+
+async fn install_addon_from_staging_web(State(state): State<Arc<AppState>>, Json(body): Json<InstallFromStagingBody>) -> ApiResult<Json<AddonManifest>> {
+    let data_root = std::path::Path::new(&state.data_root);
+    let zip = addons::load_addon_from_staging(&body.addon_id, data_root)
+        .map_err(|e: String| anyhow::anyhow!(e))?;
+    let extracted = addons::extract_addon_zip_internal(zip).map_err(|e| anyhow::anyhow!(e))?;
+    let addon_id = extracted.metadata.id.clone();
+    let addon_dir = addons::get_addon_path(data_root, &addon_id).map_err(|e| anyhow::anyhow!(e))?;
+    if addon_dir.exists() { std::fs::remove_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?; }
+    std::fs::create_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?;
+    for file in &extracted.files {
+        let file_path = addon_dir.join(&file.name);
+        if let Some(parent) = file_path.parent() { std::fs::create_dir_all(parent).map_err(|e| anyhow::anyhow!("{}", e))?; }
+        std::fs::write(&file_path, &file.content).map_err(|e| anyhow::anyhow!("{}", e))?;
+    }
+    let metadata = extracted.metadata.to_installed(body.enable_after_install.unwrap_or(true)).map_err(|e| anyhow::anyhow!(e))?;
+    let manifest_path = addon_dir.join("manifest.json");
+    let manifest_json = serde_json::to_string_pretty(&metadata).map_err(|e| anyhow::anyhow!(e))?;
+    std::fs::write(&manifest_path, manifest_json).map_err(|e| anyhow::anyhow!(e))?;
+    // Clean staging file
+    let _ = addons::remove_addon_from_staging(&body.addon_id, data_root);
+    Ok(Json(metadata))
+}
+
+async fn clear_addon_staging_web(State(state): State<Arc<AppState>>, q: Option<Query<RatingsQuery>>) -> ApiResult<StatusCode> {
+    let data_root = std::path::Path::new(&state.data_root);
+    if let Some(Query(rq)) = q { addons::remove_addon_from_staging(&rq.addon_id, data_root).map_err(|e| anyhow::anyhow!(e))?; }
+    else { addons::clear_staging_directory(data_root).map_err(|e| anyhow::anyhow!(e))?; }
+    Ok(StatusCode::NO_CONTENT)
 }
