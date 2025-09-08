@@ -295,8 +295,11 @@ export default function PerformancePage() {
 
   return (
     <ApplicationShell className="p-6">
-      <ApplicationHeader heading="Portfolio Performance">
-        <div className="flex items-center space-x-2">
+      <ApplicationHeader
+        heading="Performance"
+        className="flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="w-full sm:w-auto">
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
         </div>
       </ApplicationHeader>

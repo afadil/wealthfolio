@@ -40,7 +40,7 @@ const staticNavigation: NavigationProps = {
     {
       icon: <Icons.Settings className="h-5 w-5" />,
       title: 'Settings',
-      href: '/settings/general',
+      href: '/settings',
     },
   ],
 };

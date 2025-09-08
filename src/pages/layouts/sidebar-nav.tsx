@@ -51,7 +51,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               key={item.title}
               to={item.href}
               className={cn(
-                'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-xs transition-all duration-200 active:scale-95',
+                'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center px-1 py-2.5 transition-all duration-200 active:scale-95',
                 location.pathname.includes(item.href)
                   ? 'text-foreground bg-success/10 scale-105'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105',
@@ -81,7 +81,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               <SheetTrigger asChild>
                 <button
                   className={cn(
-                    'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-xs transition-all duration-200 active:scale-95',
+                    'mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center px-1 py-2.5 text-xs transition-all duration-200 active:scale-95',
                     'text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105',
                     mobileMenuOpen && 'text-foreground bg-muted scale-105',
                   )}
