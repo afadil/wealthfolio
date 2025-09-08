@@ -347,7 +347,8 @@ export default function MarketDataSettingsPage() {
   return (
     <div className="space-y-6 text-foreground">
       <SettingsHeader heading="Market Data" text="Manage settings for your market data providers.">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Mobile icon-only actions */}
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
@@ -358,7 +359,47 @@ export default function MarketDataSettingsPage() {
             cancelButtonText="Cancel"
             confirmButtonVariant="destructive"
             button={
-              <Button variant="outline" size="sm" disabled={isRecalculating}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="sm:hidden"
+                disabled={isRecalculating}
+                aria-label="Refetch all"
+              >
+                {isRecalculating ? (
+                  <Icons.Spinner className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Icons.Clock className="h-4 w-4" />
+                )}
+              </Button>
+            }
+          />
+          <Button
+            size="icon"
+            className="sm:hidden"
+            disabled={isUpdating}
+            onClick={() => updatePortfolio()}
+            aria-label="Update"
+          >
+            {isUpdating ? (
+              <Icons.Spinner className="h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Refresh className="h-4 w-4" />
+            )}
+          </Button>
+
+          {/* Desktop buttons with labels */}
+          <ActionConfirm
+            handleConfirm={() => recalculatePortfolio()}
+            isPending={isRecalculating}
+            confirmTitle="Are you sure?"
+            confirmMessage="This will refetch all market data history and recalculate the portfolio."
+            confirmButtonText="Refetch"
+            pendingText="Refetching..."
+            cancelButtonText="Cancel"
+            confirmButtonVariant="destructive"
+            button={
+              <Button variant="outline" size="sm" className="hidden sm:inline-flex" disabled={isRecalculating}>
                 {isRecalculating ? (
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -368,7 +409,12 @@ export default function MarketDataSettingsPage() {
               </Button>
             }
           />
-          <Button size="sm" disabled={isUpdating} onClick={() => updatePortfolio()}>
+          <Button
+            size="sm"
+            className="hidden sm:inline-flex"
+            disabled={isUpdating}
+            onClick={() => updatePortfolio()}
+          >
             {isUpdating ? (
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
             ) : (

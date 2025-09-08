@@ -35,11 +35,12 @@ export function SettingsHeader({
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between',
+        // Grid keeps actions pinned top-right on mobile
+        'grid grid-cols-[1fr_auto] items-start gap-2',
         className,
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex min-w-0 items-start gap-2">
         {showBackOnMobile && (
           <Button
             type="button"
@@ -51,14 +52,14 @@ export function SettingsHeader({
             <Icons.ArrowLeft className="h-4 w-4" />
           </Button>
         )}
-        <div className="grid gap-1">
-          <h1 className="font-heading text-lg lg:text-xl font-bold break-words">{heading}</h1>
+        <div className="grid min-w-0 gap-1">
+          <h1 className="break-words font-heading text-lg font-bold lg:text-xl">{heading}</h1>
           {text && (
-            <p className="text-sm lg:text-md font-light text-muted-foreground break-words">{text}</p>
+            <p className="break-words text-sm font-light text-muted-foreground lg:text-md">{text}</p>
           )}
         </div>
       </div>
-      {children && <div className="shrink-0">{children}</div>}
+      {children && <div className="justify-self-end">{children}</div>}
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { SidebarNav } from './sidebar-nav';
@@ -32,7 +31,7 @@ const sidebarNavItems = [
   {
     title: 'Market Data',
     href: 'market-data',
-    subtitle: 'Providers and update schedule',
+    subtitle: 'Providers and data update',
     icon: <Icons.BarChart className="h-5 w-5" />,
   },
 
@@ -69,30 +68,11 @@ const sidebarNavItems = [
 export default function SettingsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [showTitle, setShowTitle] = useState(false);
 
-  // Determine the current settings page title for the mobile header
-  const currentItemTitle = (() => {
-    const slug = location.pathname.replace(/^\/settings\/?/, '').split('/')[0];
-    const match = sidebarNavItems.find((i) => slug && (i.href === slug || location.pathname.includes(`/settings/${i.href}`)));
-    return match?.title ?? '';
-  })();
 
-  // Show the title in the sticky header when scrolled a bit
-  useEffect(() => {
-    const isDetail = location.pathname.startsWith('/settings/') && location.pathname !== '/settings' && location.pathname !== '/settings/';
-    if (!isDetail) {
-      setShowTitle(false);
-      return;
-    }
-    const onScroll = () => setShowTitle(window.scrollY > 6);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [location.pathname]);
-  
   // Check if we're on the main settings page (mobile) or a specific setting page
-  const isMainSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
+  const isMainSettingsPage =
+    location.pathname === '/settings' || location.pathname === '/settings/';
 
   // Mobile-first: show list view on main page, detail view on specific pages
   return (
@@ -109,12 +89,12 @@ export default function SettingsLayout() {
             </div>
 
             <div className="p-3 lg:p-4">
-              <div className="divide-y divide-border overflow-hidden rounded-2xl border bg-card shadow-sm">
+              <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
                 {sidebarNavItems.map((item) => (
                   <button
                     key={item.href}
                     onClick={() => navigate(item.href)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90 hover:bg-muted/40"
+                    className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
                     aria-label={item.title}
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -124,7 +104,9 @@ export default function SettingsLayout() {
                           {item.title}
                         </div>
                         {item?.subtitle && (
-                          <div className="text-muted-foreground truncate text-sm">{item.subtitle}</div>
+                          <div className="text-muted-foreground truncate text-sm">
+                            {item.subtitle}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -135,32 +117,7 @@ export default function SettingsLayout() {
             </div>
           </div>
         ) : (
-          // Mobile Settings Detail View — sticky header with back; title appears on scroll
           <div className="scan-hide-target w-full max-w-full overflow-x-hidden">
-            <div className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-20 border-b backdrop-blur">
-              <div className="relative flex min-h-[54px] items-center px-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings')}
-                  className="text-foreground inline-flex h-10 items-center gap-1 rounded-md px-2 active:opacity-90"
-                  aria-label="Back to Settings"
-                >
-                  <Icons.ArrowLeft className="h-5 w-5" />
-                  <span className="sr-only">Back</span>
-                </button>
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <span
-                    className={
-                      showTitle
-                        ? 'text-sm font-semibold opacity-100 transition-opacity duration-200'
-                        : 'text-sm font-semibold opacity-0 transition-opacity duration-200'
-                    }
-                  >
-                    {currentItemTitle}
-                  </span>
-                </div>
-              </div>
-            </div>
             <div className="w-full max-w-full overflow-x-hidden scroll-smooth">
               <div className="p-2 lg:p-4">
                 <Outlet />
