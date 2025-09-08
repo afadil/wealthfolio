@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useQuery } from '@tanstack/react-query';
 import { formatPercent } from '@wealthfolio/ui';
 import { Icons } from '@/components/ui/icons';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 import { AmountDisplay } from '@wealthfolio/ui';
 import { useLatestValuations } from '@/hooks/use-latest-valuations';
 import { useAccounts } from '@/hooks/use-accounts';

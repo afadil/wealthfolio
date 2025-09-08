@@ -18,7 +18,7 @@ import {
 import HistoryChart from '@/components/history-chart-symbol';
 import { Quote, TimePeriod, DateRange } from '@/lib/types';
 import { useSyncMarketDataMutation } from '@/hooks/use-sync-market-data';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 
 interface AssetHistoryProps {
   marketPrice: number;
