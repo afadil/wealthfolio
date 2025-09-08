@@ -3,7 +3,7 @@ import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
 import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { formatDate } from '@/lib/utils';
 import { ChartConfig, ChartContainer } from '@/components/ui/chart';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
 import { AmountDisplay } from '@wealthfolio/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 

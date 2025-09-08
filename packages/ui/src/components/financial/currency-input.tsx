@@ -35,7 +35,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn('w-full justify-between', !value && 'text-muted-foreground', className)}
+            className={cn('w-full justify-between rounded-md', !value && 'text-muted-foreground', className)}
             {...props}
           >
             {value
