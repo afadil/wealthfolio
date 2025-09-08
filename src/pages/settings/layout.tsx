@@ -1,55 +1,63 @@
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
 import { SidebarNav } from './sidebar-nav';
 import { Icons } from '@/components/ui/icons';
-import { cn } from '@/lib/utils';
 
 const sidebarNavItems = [
   {
     title: 'General',
     href: 'general',
+    subtitle: 'Currency and general preferences',
     icon: <Icons.Settings className="h-5 w-5" />,
   },
   {
     title: 'Accounts',
     href: 'accounts',
+    subtitle: 'Investment and savings accounts',
     icon: <Icons.CreditCard className="h-5 w-5" />,
   },
   {
     title: 'Limits',
     href: 'contribution-limits',
+    subtitle: 'Contribution limits and rules',
     icon: <Icons.TrendingUp className="h-5 w-5" />,
   },
   {
     title: 'Goals',
     href: 'goals',
+    subtitle: 'Plan and track objectives',
     icon: <Icons.Goal className="h-5 w-5" />,
   },
   {
     title: 'Market Data',
     href: 'market-data',
+    subtitle: 'Providers and update schedule',
     icon: <Icons.BarChart className="h-5 w-5" />,
   },
 
   {
     title: 'Add-ons',
     href: 'addons',
+    subtitle: 'Extend Wealthfolio with features',
     icon: <Icons.Package className="h-5 w-5" />,
   },
   {
     title: 'Appearance',
     href: 'appearance',
+    subtitle: 'Theme, typography, and density',
     icon: <Icons.Monitor className="h-5 w-5" />,
   },
   {
     title: 'Sync',
     href: 'sync',
+    subtitle: 'Sync between devices',
     icon: <Icons.Smartphone className="h-5 w-5" />,
   },
   {
     title: 'Data Export',
     href: 'exports',
+    subtitle: 'Backup and export your data',
     icon: <Icons.Download className="h-5 w-5" />,
   },
   {
@@ -61,67 +69,98 @@ const sidebarNavItems = [
 export default function SettingsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [showTitle, setShowTitle] = useState(false);
+
+  // Determine the current settings page title for the mobile header
+  const currentItemTitle = (() => {
+    const slug = location.pathname.replace(/^\/settings\/?/, '').split('/')[0];
+    const match = sidebarNavItems.find((i) => slug && (i.href === slug || location.pathname.includes(`/settings/${i.href}`)));
+    return match?.title ?? '';
+  })();
+
+  // Show the title in the sticky header when scrolled a bit
+  useEffect(() => {
+    const isDetail = location.pathname.startsWith('/settings/') && location.pathname !== '/settings' && location.pathname !== '/settings/';
+    if (!isDetail) {
+      setShowTitle(false);
+      return;
+    }
+    const onScroll = () => setShowTitle(window.scrollY > 6);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [location.pathname]);
   
   // Check if we're on the main settings page (mobile) or a specific setting page
   const isMainSettingsPage = location.pathname === '/settings' || location.pathname === '/settings/';
-  const currentSetting = sidebarNavItems.find(item => location.pathname.includes(item.href));
 
   // Mobile-first: show list view on main page, detail view on specific pages
   return (
-  <div className="settings-root min-h-screen w-full max-w-full overflow-x-hidden">
+    <div className="settings-root min-h-screen w-full max-w-full overflow-x-hidden">
       {/* Mobile Layout */}
       <div className="lg:hidden">
         {isMainSettingsPage ? (
-          // Mobile Settings List View (iOS style)
-      <div className="w-full max-w-full overflow-x-hidden scan-hide-target">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b">
-              <div className="flex items-center justify-center min-h-[60px] px-4">
+          // Mobile Settings List View (carded list with dividers)
+          <div className="scan-hide-target w-full max-w-full overflow-x-hidden">
+            <div className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
+              <div className="flex min-h-[60px] items-center justify-center px-4">
                 <h1 className="text-lg font-semibold">Settings</h1>
               </div>
             </div>
-            
-            <div className="p-2 space-y-2 lg:p-4">
-              {sidebarNavItems.map((item) => (
-                <button
-                  key={item.href}
-                  onClick={() => navigate(item.href)}
-                  className={cn(
-                    "w-full flex items-center justify-between p-4 bg-card rounded-xl border",
-                    "active:scale-[0.98] active:opacity-70 transition-all duration-200",
-                    "min-h-[60px] touch-manipulation",
-                    "hover:bg-accent/50"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0 text-muted-foreground">
-                      {item.icon}
+
+            <div className="p-3 lg:p-4">
+              <div className="divide-y divide-border overflow-hidden rounded-2xl border bg-card shadow-sm">
+                {sidebarNavItems.map((item) => (
+                  <button
+                    key={item.href}
+                    onClick={() => navigate(item.href)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90 hover:bg-muted/40"
+                    aria-label={item.title}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="text-muted-foreground shrink-0">{item.icon}</div>
+                      <div className="min-w-0">
+                        <div className="text-foreground truncate text-base font-medium">
+                          {item.title}
+                        </div>
+                        {item?.subtitle && (
+                          <div className="text-muted-foreground truncate text-sm">{item.subtitle}</div>
+                        )}
+                      </div>
                     </div>
-                    <span className="font-medium text-left">{item.title}</span>
-                  </div>
-                  <Icons.ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </button>
-              ))}
+                    <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          // Mobile Settings Detail View
-          <div className="w-full max-w-full overflow-x-hidden scan-hide-target">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border-b">
-              <div className="flex items-center min-h-[60px] px-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
+          // Mobile Settings Detail View — sticky header with back; title appears on scroll
+          <div className="scan-hide-target w-full max-w-full overflow-x-hidden">
+            <div className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-20 border-b backdrop-blur">
+              <div className="relative flex min-h-[54px] items-center px-2">
+                <button
+                  type="button"
                   onClick={() => navigate('/settings')}
-                  className="mr-2 p-2 active:scale-95 transition-transform duration-200"
+                  className="text-foreground inline-flex h-10 items-center gap-1 rounded-md px-2 active:opacity-90"
+                  aria-label="Back to Settings"
                 >
-                  <Icons.ArrowLeft className="h-4 w-4" />
-                </Button>
-                <h1 className="text-lg font-semibold flex-1">
-                  {currentSetting?.title || 'Settings'}
-                </h1>
+                  <Icons.ArrowLeft className="h-5 w-5" />
+                  <span className="sr-only">Back</span>
+                </button>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <span
+                    className={
+                      showTitle
+                        ? 'text-sm font-semibold opacity-100 transition-opacity duration-200'
+                        : 'text-sm font-semibold opacity-0 transition-opacity duration-200'
+                    }
+                  >
+                    {currentItemTitle}
+                  </span>
+                </div>
               </div>
             </div>
-            
             <div className="w-full max-w-full overflow-x-hidden scroll-smooth">
               <div className="p-2 lg:p-4">
                 <Outlet />
@@ -132,16 +171,16 @@ export default function SettingsLayout() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:block p-6">
+      <div className="hidden p-6 lg:block">
         <div className="space-y-0.5">
           <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
         </div>
         <Separator className="my-6" />
         <div className="flex flex-col space-y-8 lg:grid lg:grid-cols-[220px_1fr] lg:gap-10 lg:space-y-0">
-          <aside className="lg:sticky lg:top-20 lg:self-start lg:w-[220px] lg:pr-4">
+          <aside className="lg:sticky lg:top-20 lg:w-[220px] lg:self-start lg:pr-4">
             <SidebarNav items={sidebarNavItems} />
           </aside>
-          <div className="flex-1 lg:max-w-4xl min-w-0">
+          <div className="min-w-0 flex-1 lg:max-w-4xl">
             <Outlet />
           </div>
         </div>

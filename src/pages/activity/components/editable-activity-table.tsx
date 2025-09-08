@@ -51,7 +51,6 @@ import {
   baseActivitySchema,
   NewActivityFormValues,
 } from './forms/schemas';
-import { ZodType } from 'zod';
 import { formatAmount } from '@wealthfolio/ui';
 import { formatDateTime, cn } from '@/lib/utils';
 
