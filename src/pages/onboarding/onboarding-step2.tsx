@@ -175,7 +175,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                   'space-y-2 rounded-sm p-2',
                                   themeOption.value === 'light'
                                     ? 'bg-[hsl(51_59%_95%)]'
-                                    : 'dark bg-(--flexoki-bg)',
+                                    : 'dark bg-[hsl(var(--flexoki-bg))]',
                                 )}
                               >
                                 <div
@@ -183,7 +183,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                     'space-y-2 rounded-md p-2 shadow-sm',
                                     themeOption.value === 'light'
                                       ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-(--flexoki-bg-2)',
+                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
                                   )}
                                 >
                                   <div
@@ -191,7 +191,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                       'h-2 w-[80px] rounded-lg',
                                       themeOption.value === 'light'
                                         ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-(--flexoki-ui-2)',
+                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
                                     )}
                                   />
                                   <div
@@ -199,7 +199,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                       'h-2 w-[100px] rounded-lg',
                                       themeOption.value === 'light'
                                         ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-(--flexoki-ui-2)',
+                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
                                     )}
                                   />
                                 </div>
@@ -208,7 +208,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                     'flex items-center space-x-2 rounded-md p-2 shadow-sm',
                                     themeOption.value === 'light'
                                       ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-(--flexoki-bg-2)',
+                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
                                   )}
                                 >
                                   <div
@@ -216,7 +216,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                       'h-4 w-4 rounded-full',
                                       themeOption.value === 'light'
                                         ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-(--flexoki-ui-2)',
+                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
                                     )}
                                   />
                                   <div
@@ -224,7 +224,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                                       'h-2 w-[100px] rounded-lg',
                                       themeOption.value === 'light'
                                         ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-(--flexoki-ui-2)',
+                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
                                     )}
                                   />
                                 </div>
