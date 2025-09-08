@@ -9,15 +9,155 @@
 @import "@fontsource/ibm-plex-mono/700.css";
 @import "@fontsource/ibm-plex-mono/400-italic.css";
 
-/* Enable class-based dark mode across the subtree */
-@custom-variant dark (&:is(.dark *));
+/* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+
+@theme {
+  /* Disable default colors to prevent their use; feel free to re-enable as needed. */
+  --color-amber-*: initial;
+  --color-lime-*: initial;
+  --color-emerald-*: initial;
+  --color-teal-*: initial;
+  --color-sky-*: initial;
+  --color-indigo-*: initial;
+  --color-violet-*: initial;
+  --color-fuchsia-*: initial;
+  --color-pink-*: initial;
+  --color-rose-*: initial;
+  --color-slate-*: initial;
+  --color-zinc-*: initial;
+  --color-neutral-*: initial;
+  --color-stone-*: initial;
+
+  /* Specify new default colors. */
+  --color-black: #100F0F;
+  --color-paper: #FFFCF0;
+  --color-base-50: #F2F0E5;
+  --color-base-100: #E6E4D9;
+  --color-base-150: #DAD8CE;
+  --color-base-200: #CECDC3;
+  --color-base-300: #B7B5AC;
+  --color-base-400: #9F9D96;
+  --color-base-500: #878580;
+  --color-base-600: #6F6E69;
+  --color-base-700: #575653;
+  --color-base-800: #403E3C;
+  --color-base-850: #343331;
+  --color-base-900: #282726;
+  --color-base-950: #1C1B1A;
+  --color-red-50: #FFE1D5;
+  --color-red-100: #FFCABB;
+  --color-red-150: #FDB2A2;
+  --color-red-200: #F89A8A;
+  --color-red-300: #E8705F;
+  --color-red-400: #D14D41;
+  --color-red-500: #C03E35;
+  --color-red-600: #AF3029;
+  --color-red-700: #942822;
+  --color-red-800: #6C201C;
+  --color-red-850: #551B18;
+  --color-red-900: #3E1715;
+  --color-red-950: #261312;
+  --color-orange-50: #FFE7CE;
+  --color-orange-100: #FED3AF;
+  --color-orange-150: #FCC192;
+  --color-orange-200: #F9AE77;
+  --color-orange-300: #EC8B49;
+  --color-orange-400: #DA702C;
+  --color-orange-500: #CB6120;
+  --color-orange-600: #BC5215;
+  --color-orange-700: #9D4310;
+  --color-orange-800: #71320D;
+  --color-orange-850: #59290D;
+  --color-orange-900: #40200D;
+  --color-orange-950: #27180E;
+  --color-yellow-50: #FAEEC6;
+  --color-yellow-100: #F6E2A0;
+  --color-yellow-150: #F1D67E;
+  --color-yellow-200: #ECCB60;
+  --color-yellow-300: #DFB431;
+  --color-yellow-400: #D0A215;
+  --color-yellow-500: #BE9207;
+  --color-yellow-600: #AD8301;
+  --color-yellow-700: #8E6B01;
+  --color-yellow-800: #664D01;
+  --color-yellow-850: #503D02;
+  --color-yellow-900: #3A2D04;
+  --color-yellow-950: #241E08;
+  --color-green-50: #EDEECF;
+  --color-green-100: #DDE2B2;
+  --color-green-150: #CDD597;
+  --color-green-200: #BEC97E;
+  --color-green-300: #A0AF54;
+  --color-green-400: #879A39;
+  --color-green-500: #768D21;
+  --color-green-600: #66800B;
+  --color-green-700: #536907;
+  --color-green-800: #3D4C07;
+  --color-green-850: #313D07;
+  --color-green-900: #252D09;
+  --color-green-950: #1A1E0C;
+  --color-cyan-50: #DDF1E4;
+  --color-cyan-100: #BFE8D9;
+  --color-cyan-150: #A2DECE;
+  --color-cyan-200: #87D3C3;
+  --color-cyan-300: #5ABDAC;
+  --color-cyan-400: #3AA99F;
+  --color-cyan-500: #2F968D;
+  --color-cyan-600: #24837B;
+  --color-cyan-700: #1C6C66;
+  --color-cyan-800: #164F4A;
+  --color-cyan-850: #143F3C;
+  --color-cyan-900: #122F2C;
+  --color-cyan-950: #101F1D;
+  --color-blue-50: #E1ECEB;
+  --color-blue-100: #C6DDE8;
+  --color-blue-150: #ABCFE2;
+  --color-blue-200: #92BFDB;
+  --color-blue-300: #66A0C8;
+  --color-blue-400: #4385BE;
+  --color-blue-500: #3171B2;
+  --color-blue-600: #205EA6;
+  --color-blue-700: #1A4F8C;
+  --color-blue-800: #163B66;
+  --color-blue-850: #133051;
+  --color-blue-900: #12253B;
+  --color-blue-950: #101A24;
+  --color-purple-50: #F0EAEC;
+  --color-purple-100: #E2D9E9;
+  --color-purple-150: #D3CAE6;
+  --color-purple-200: #C4B9E0;
+  --color-purple-300: #A699D0;
+  --color-purple-400: #8B7EC8;
+  --color-purple-500: #735EB5;
+  --color-purple-600: #5E409D;
+  --color-purple-700: #4F3685;
+  --color-purple-800: #3C2A62;
+  --color-purple-850: #31234E;
+  --color-purple-900: #261C39;
+  --color-purple-950: #1A1623;
+  --color-magenta-50: #FEE4E5;
+  --color-magenta-100: #FCCFDA;
+  --color-magenta-150: #F9B9CF;
+  --color-magenta-200: #F4A4C2;
+  --color-magenta-300: #E47DA8;
+  --color-magenta-400: #CE5D97;
+  --color-magenta-500: #B74583;
+  --color-magenta-600: #A02F6F;
+  --color-magenta-700: #87285E;
+  --color-magenta-800: #641F46;
+  --color-magenta-850: #4F1B39;
+  --color-magenta-900: #39172B;
+  --color-magenta-950: #24131D;
+}
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  
+
   /* Semantic colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -42,7 +182,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
+
   /* Chart colors */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -53,7 +193,7 @@
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
   --color-chart-9: var(--chart-9);
-  
+
   /* Sidebar colors */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
