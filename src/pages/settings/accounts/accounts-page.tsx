@@ -47,10 +47,21 @@ const SettingsAccountsPage = () => {
     <>
       <div className="space-y-6">
         <SettingsHeader heading="Accounts" text=" Manage your investment and saving accounts.">
-          <Button onClick={() => handleAddAccount()}>
-            <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add account
-          </Button>
+          {/* Mobile: icon button; Desktop: full button */}
+          <>
+            <Button
+              size="icon"
+              className="sm:hidden"
+              onClick={() => handleAddAccount()}
+              aria-label="Add account"
+            >
+              <Icons.Plus className="h-4 w-4" />
+            </Button>
+            <Button className="hidden sm:inline-flex" onClick={() => handleAddAccount()}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Add account
+            </Button>
+          </>
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">

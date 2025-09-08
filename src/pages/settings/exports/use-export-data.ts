@@ -31,7 +31,7 @@ export function useExportData() {
   });
   const { refetch: fetchActivities } = useQuery<ActivityDetails[], Error>({
     queryKey: [QueryKeys.ACTIVITIES],
-    queryFn: getActivities,
+    queryFn: () => getActivities(),
     enabled: false,
   });
   const { refetch: fetchGoals } = useQuery<Goal[], Error>({

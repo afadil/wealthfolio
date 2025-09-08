@@ -64,7 +64,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         listing.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (listing.tags && listing.tags.some(tag => 
+        (listing.tags && listing.tags.some((tag: string) => 
           tag.toLowerCase().includes(searchQuery.toLowerCase())
         ));
 
@@ -140,7 +140,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       .filter(isAddonDisplayable)
       .forEach(listing => {
         if (listing.tags) {
-          listing.tags.forEach(tag => {
+          listing.tags.forEach((tag: string) => {
             tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
           });
         }
