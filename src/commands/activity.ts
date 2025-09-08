@@ -13,9 +13,9 @@ interface Sort {
 }
 
 
-export const getActivities = async (): Promise<ActivityDetails[]> => {
+export const getActivities = async (accountId?: string): Promise<ActivityDetails[]> => {
   try {
-    const response = await searchActivities(0, Number.MAX_SAFE_INTEGER, {}, '', {
+    const response = await searchActivities(0, Number.MAX_SAFE_INTEGER, accountId ? { accountId } : {}, '', {
       id: 'date',
       desc: true,
     });

@@ -275,3 +275,19 @@ export const submitAddonRating = async (
     throw error;
   }
 };
+
+export const fetchAddonStoreListings = async (): Promise<any[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri('fetch_addon_store_listings');
+      case RUN_ENV.WEB:
+        return invokeWeb('fetch_addon_store_listings');
+      default:
+        throw new Error('Addon store is only supported on desktop/web');
+    }
+  } catch (error) {
+    logger.error('Error fetching addon store listings.');
+    throw error;
+  }
+};

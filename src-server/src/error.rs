@@ -10,7 +10,8 @@ pub enum ApiError {
     Core(#[from] CoreError),
     #[error("Not Found")]
     NotFound,
-    #[error("Internal server error")]
+    // Surface the underlying error message to help debugging during development
+    #[error("{0}")]
     Anyhow(#[from] anyhow::Error),
 }
 

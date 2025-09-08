@@ -21,6 +21,9 @@ utoipa-swagger-ui = { version = "4", features = ["axum"] }
 serde_with = "3"
 chrono = { version = "0.4", features = ["serde"] }
 serde_urlencoded = "0.7"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+reqwest = { version = "0.11", features = ["json"] }
+base64 = "0.21"
 
 # path dependency to core
 wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }

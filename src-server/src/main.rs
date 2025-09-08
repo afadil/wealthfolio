@@ -3,6 +3,7 @@ mod config;
 mod error;
 mod models;
 mod main_lib;
+mod addons;
 
 use api::app_router;
 use config::Config;
