@@ -36,10 +36,10 @@ const OnboardingPage = () => {
   };
 
   return (
-    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center px-4 py-8 md:py-16">
+    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center">
       <img
         alt="Wealthfolio Illustration"
-        className="align-self-end mx-auto mb-4 h-20 w-20 md:mb-8 md:h-32 md:w-32 lg:h-40 lg:w-40"
+        className="align-self-end mx-auto h-20 w-20 md:h-32 md:w-32 lg:h-40 lg:w-40"
         src="/illustration2.png"
         style={{
           aspectRatio: '1 / 1',
