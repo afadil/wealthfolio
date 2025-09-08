@@ -150,29 +150,32 @@ export const HoldingsPage = () => {
       <Tabs defaultValue={defaultTab} className="flex flex-col h-full w-full">
         <div className="space-y-2 shrink-0">
           <ApplicationHeader heading="Holdings">
-            <div className="flex items-center space-x-2">
-              <AccountSelector
-                selectedAccount={selectedAccount}
-                setSelectedAccount={handleAccountSelect}
-                variant="dropdown"
-                includePortfolio={true}
-              />
-              <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
-                <TabsTrigger
-                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
-                  value="overview"
-                >
-                  Analytics
-                </TabsTrigger>
-                <TabsTrigger
-                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
-                  value="holdings"
-                >
-                  Positions
-                </TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsList
+              aria-label="Holdings views"
+              className="max-w-full overflow-x-auto whitespace-nowrap rounded-full bg-secondary p-1"
+            >
+              <TabsTrigger
+                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                value="overview"
+              >
+                Analytics
+              </TabsTrigger>
+              <TabsTrigger
+                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                value="holdings"
+              >
+                Positions
+              </TabsTrigger>
+            </TabsList>
           </ApplicationHeader>
+          <div className="mt-1">
+            <AccountSelector
+              selectedAccount={selectedAccount}
+              setSelectedAccount={handleAccountSelect}
+              variant="dropdown"
+              includePortfolio={true}
+            />
+          </div>
           <CashHoldingsWidget cashHoldings={cashHoldings || []} isLoading={isLoading} />
         </div>
 
