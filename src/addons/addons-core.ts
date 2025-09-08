@@ -43,10 +43,10 @@ async function discoverAddons(): Promise<AddonFile[]> {
  * Validates if an addon is compatible with the current SDK version
  */
 function validateAddonCompatibility(manifest: AddonManifest): boolean {
-  // Simple version check - you might want to implement semver compatibility
+  // Be lenient in web mode: warn on mismatch but allow load.
+  // Future: implement proper semver compatibility if needed.
   if (manifest.sdkVersion && manifest.sdkVersion !== '1.0.0') {
-    logger.warn(`Addon ${manifest.id} requires SDK version ${manifest.sdkVersion}, current is 1.0.0`);
-    return false;
+    logger.warn(`Addon ${manifest.id} declares SDK ${manifest.sdkVersion}; host is 1.0.0. Proceeding with caution.`);
   }
   return true;
 }
