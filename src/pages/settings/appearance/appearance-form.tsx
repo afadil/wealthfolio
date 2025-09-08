@@ -4,7 +4,8 @@ import * as z from 'zod';
 
 import { cn } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import {
   Form,
   FormControl,
