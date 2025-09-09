@@ -40,7 +40,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>Camera access is required to scan QR codes for device pairing and synchronization.</string>
 </dict>
 </plist>
