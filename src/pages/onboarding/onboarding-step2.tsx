@@ -19,10 +19,10 @@ import { CurrencyInput } from '@wealthfolio/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
 
-// Simplified schema for onboarding - removed 'system' theme option for direct selection
+// Onboarding schema with system theme option
 const onboardingSettingsSchema = z.object({
   baseCurrency: z.string({ required_error: 'Please select a base currency.' }),
-  theme: z.enum(['light', 'dark'], { required_error: 'Please select a theme.' }),
+  theme: z.enum(['light', 'dark', 'system'], { required_error: 'Please select a theme.' }),
 });
 
 // Helper for locale detection (simple example)
@@ -149,6 +149,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                       {[
                         { value: 'light', labelText: 'Light' },
                         { value: 'dark', labelText: 'Dark' },
+                        { value: 'system', labelText: 'System' },
                       ].map((themeOption) => (
                         <FormItem key={themeOption.value}>
                           <FormLabel

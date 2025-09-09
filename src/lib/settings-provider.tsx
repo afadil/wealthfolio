@@ -52,6 +52,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }, [data]);
 
+  // Cleanup any lingering listeners when provider unmounts
+  useEffect(() => {
+    return () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        cleanupSystemThemeListeners();
+      } catch {
+        // noop
+      }
+    };
+  }, []);
+
   const contextValue: ExtendedSettingsContextType = {
     settings,
     isLoading,
@@ -73,23 +85,110 @@ export function useSettingsContext() {
   return context;
 }
 
-// Helper function to apply settings to the document
-const applySettingsToDocument = async (newSettings: Settings) => {
-  document.documentElement.classList.remove('light', 'dark');
-  document.documentElement.classList.add(newSettings.theme);
+// Keep references to system theme listeners so we can clean up when switching modes
+let tauriThemeUnlisten: (() => void) | null = null;
+let mediaQueryList: MediaQueryList | null = null;
+let mediaQueryUnsubscribe: (() => void) | null = null;
 
+// Apply the resolved theme (light or dark) to the DOM
+function applyResolvedTheme(resolved: 'light' | 'dark') {
+  document.documentElement.classList.remove('light', 'dark');
+  document.documentElement.classList.add(resolved);
+  document.documentElement.style.colorScheme = resolved;
+}
+
+// Cleanup any existing system listeners
+function cleanupSystemThemeListeners() {
+  if (tauriThemeUnlisten) {
+    try {
+      tauriThemeUnlisten();
+    } catch {
+      // noop
+    }
+    tauriThemeUnlisten = null;
+  }
+  if (mediaQueryUnsubscribe) {
+    try {
+      mediaQueryUnsubscribe();
+    } catch {
+      // noop
+    }
+    mediaQueryUnsubscribe = null;
+  }
+  mediaQueryList = null;
+}
+
+// Helper function to apply settings to the document
+const applySettingsToDocument = (newSettings: Settings) => {
+  // Font classes
   document.body.classList.remove('font-mono', 'font-sans', 'font-serif');
   document.body.classList.add(newSettings.font);
 
-  // Color scheme must be applied to document element (`<html>`)
-  document.documentElement.style.colorScheme = newSettings.theme;
-  // Only call Tauri window APIs when running the desktop app
-  if (getRunEnv() === RUN_ENV.DESKTOP) {
-    try {
-      const currentWindow = await getCurrentWindow();
-      currentWindow.setTheme(newSettings.theme as Theme);
-    } catch (_) {
-      // Ignore if Tauri internals are not available
+  // Always clean up previous listeners before applying a new theme mode
+  cleanupSystemThemeListeners();
+
+  // Handle theme mode
+  if (newSettings.theme === 'system') {
+    // Resolve initial theme from media query (immediate), fallback to light
+    let initial: 'light' | 'dark' = 'light';
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      mediaQueryList = window.matchMedia('(prefers-color-scheme: dark)');
+      initial = mediaQueryList.matches ? 'dark' : 'light';
+      const handler = (e: MediaQueryListEvent) => applyResolvedTheme(e.matches ? 'dark' : 'light');
+      if (mediaQueryList.addEventListener) {
+        mediaQueryList.addEventListener('change', handler);
+        mediaQueryUnsubscribe = () => mediaQueryList?.removeEventListener('change', handler);
+      } else {
+        // @ts-ignore legacy API support
+        mediaQueryList.addListener(handler);
+        mediaQueryUnsubscribe = () => {
+          try {
+            // @ts-ignore legacy API support
+            mediaQueryList?.removeListener(handler);
+          } catch {
+            // noop
+          }
+        };
+      }
     }
+
+    // On desktop, also sync with Tauri window theme + listen to OS changes
+    if (getRunEnv() === RUN_ENV.DESKTOP) {
+      (async () => {
+        try {
+          const currentWindow = await getCurrentWindow();
+          await currentWindow.setTheme(null);
+          const current = await currentWindow.theme();
+          if (current === 'dark' || current === 'light') {
+            applyResolvedTheme(current);
+          }
+          tauriThemeUnlisten = await currentWindow.onThemeChanged(({ payload }) => {
+            const next = payload === 'dark' ? 'dark' : 'light';
+            applyResolvedTheme(next);
+          });
+        } catch {
+          // noop; fall back to media query
+        }
+      })();
+    }
+
+    applyResolvedTheme(initial);
+    return;
+  }
+
+  // Explicit light/dark mode
+  const explicit = (newSettings.theme === 'dark' ? 'dark' : 'light') as 'light' | 'dark';
+  applyResolvedTheme(explicit);
+
+  // Only call Tauri window APIs when running the desktop app for explicit modes
+  if (getRunEnv() === RUN_ENV.DESKTOP) {
+    (async () => {
+      try {
+        const currentWindow = await getCurrentWindow();
+        await currentWindow.setTheme(explicit as Theme);
+      } catch {
+        // noop
+      }
+    })();
   }
 };
