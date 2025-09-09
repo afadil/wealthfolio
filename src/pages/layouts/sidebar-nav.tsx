@@ -3,14 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 import { cn } from '@/lib/utils';
 
@@ -93,50 +86,28 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                   <span className="mt-1 truncate text-[10px] font-medium">More</span>
                 </button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="h-auto max-h-[80vh] overflow-y-auto">
-                <SheetHeader className="pb-4 text-left">
-                  <SheetTitle className="flex items-center gap-2">
-                    <Icons.LayoutDashboard className="h-5 w-5" />
-                    Navigation Menu
-                  </SheetTitle>
-                  <SheetDescription>Access all available navigation options</SheetDescription>
-                </SheetHeader>
-                <div className="grid gap-2 pb-6">
+              {/* Bottom sheet with transparent background and vertical floating chips */}
+              <SheetContent
+                side="bottom"
+                className="h-auto max-h-[70vh] overflow-y-auto !bg-transparent !border-0 shadow-none !p-0 pb-6 [&>button]:hidden"
+              >
+                <div className="flex flex-col items-end gap-3 pr-4 pt-3">
                   {moreItems.map((item) => (
                     <Link
                       key={item.title}
                       to={item.href}
                       onClick={() => setMobileMenuOpen(false)}
                       className={cn(
-                        'flex items-center gap-4 rounded-xl px-4 py-4 text-sm transition-all duration-200 active:scale-95',
+                        'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-all duration-200 active:scale-95 shadow-md',
                         location.pathname.includes(item.href)
-                          ? 'text-foreground bg-muted shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted/60 text-foreground/80 hover:bg-muted',
                       )}
                     >
-                      <div
-                        className={cn(
-                          'flex h-6 w-6 items-center justify-center rounded-lg transition-all duration-200',
-                          location.pathname.includes(item.href)
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-muted/50',
-                        )}
-                      >
+                      <span className="flex h-5 w-5 items-center justify-center">
                         {item.icon ?? <Icons.ArrowRight className="h-4 w-4" aria-hidden="true" />}
-                      </div>
-                      <div className="flex-1">
-                        <span
-                          className={cn(
-                            'font-medium transition-all duration-200',
-                            location.pathname.includes(item.href) && 'font-semibold',
-                          )}
-                        >
-                          {item.title}
-                        </span>
-                      </div>
-                      {location.pathname.includes(item.href) && (
-                        <div className="bg-primary flex h-2 w-2 rounded-full" />
-                      )}
+                      </span>
+                      <span className="font-medium">{item.title}</span>
                     </Link>
                   ))}
                 </div>
