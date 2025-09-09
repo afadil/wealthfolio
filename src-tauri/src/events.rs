@@ -3,6 +3,9 @@ use tauri::Emitter;
 
 pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
 
+/// Event emitted when core context/services are ready to use.
+pub const APP_READY: &str = "app:ready";
+
 /// Event requesting a portfolio update, which may include market data sync and recalculation.
 pub const PORTFOLIO_TRIGGER_UPDATE: &str = "portfolio:trigger-update";
 
@@ -119,4 +122,11 @@ pub fn emit_portfolio_trigger_recalculate(
                 e
             )
         });
+}
+
+/// Emits the APP_READY event once the ServiceContext has been initialized.
+pub fn emit_app_ready(handle: &tauri::AppHandle) {
+    handle.emit(APP_READY, &()).unwrap_or_else(|e| {
+        log::error!("Failed to emit {} event: {}", APP_READY, e);
+    });
 }
