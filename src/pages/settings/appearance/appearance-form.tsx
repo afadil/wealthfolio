@@ -70,7 +70,7 @@ export function AppearanceForm() {
                   <select
                     className={cn(
                       buttonVariants({ variant: 'outline' }),
-                      'w-[200px] appearance-none bg-transparent font-normal rounded-md',
+                      'w-[200px] appearance-none rounded-md bg-transparent font-normal',
                     )}
                     {...field}
                   >
@@ -79,7 +79,7 @@ export function AppearanceForm() {
                     <option value="font-serif">Serif</option>
                   </select>
                 </FormControl>
-                <Icons.ChevronDown className="absolute right-3 top-2.5 h-4 w-4 opacity-50" />
+                <Icons.ChevronDown className="absolute top-2.5 right-3 h-4 w-4 opacity-50" />
               </div>
               <FormDescription>Set your preferred font family to use.</FormDescription>
               <FormMessage />
@@ -97,14 +97,14 @@ export function AppearanceForm() {
               <RadioGroup
                 onValueChange={field.onChange}
                 defaultValue={field.value}
-                className="grid max-w-md grid-cols-2 gap-8 pt-2"
+                className="grid max-w-2xl grid-cols-3 gap-8 pt-2"
               >
                 <FormItem>
                   <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
                     <FormControl>
                       <RadioGroupItem value="light" className="sr-only" />
                     </FormControl>
-                    <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
+                    <div className="border-muted hover:border-accent items-center rounded-md border-2 p-1">
                       <div className="space-y-2 rounded-sm bg-[hsl(51_59%_95%)] p-2">
                         <div className="space-y-2 rounded-md bg-[hsl(48_100%_97%)] p-2 shadow-sm">
                           <div className="h-2 w-[80px] rounded-lg bg-[hsl(50_14%_83%)]" />
@@ -128,7 +128,7 @@ export function AppearanceForm() {
                     <FormControl>
                       <RadioGroupItem value="dark" className="sr-only" />
                     </FormControl>
-                    <div className="dark items-center rounded-md border-2 border-muted bg-popover p-1 hover:bg-accent hover:text-accent-foreground">
+                    <div className="dark border-muted bg-popover hover:bg-accent hover:text-accent-foreground items-center rounded-md border-2 p-1">
                       <div className="space-y-2 rounded-sm bg-[hsl(var(--flexoki-bg))] p-2">
                         <div className="space-y-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
                           <div className="h-2 w-[80px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
@@ -145,6 +145,30 @@ export function AppearanceForm() {
                       </div>
                     </div>
                     <span className="block w-full p-2 text-center font-normal">Dark</span>
+                  </FormLabel>
+                </FormItem>
+                <FormItem>
+                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
+                    <FormControl>
+                      <RadioGroupItem value="system" className="sr-only" />
+                    </FormControl>
+                    <div className="border-muted hover:border-accent items-center rounded-md border-2 p-1">
+                      <div className="rounded-sm p-2">
+                        <div className="space-y-2 rounded-md bg-[hsl(48_100%_97%)] p-2 shadow-sm">
+                          <div className="h-2 w-[80px] rounded-lg bg-[hsl(50_14%_83%)]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(50_14%_83%)]" />
+                        </div>
+                        <div className="mt-2 space-y-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
+                          <div className="h-2 w-[80px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
+                        </div>
+                        <div className="dark flex items-center space-x-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-[hsl(var(--flexoki-ui-2))]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
+                        </div>
+                      </div>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">System</span>
                   </FormLabel>
                 </FormItem>
               </RadioGroup>
