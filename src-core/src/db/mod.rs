@@ -74,10 +74,20 @@ pub fn run_migrations(pool: &DbPool) -> Result<()> {
 }
 
 pub fn get_db_path(input: &str) -> String {
-    // 1) Prefer DATABASE_URL if provided
+    // On mobile (iOS/Android), always keep the database inside the app's sandbox
+    // to avoid permission issues. Ignore DATABASE_URL entirely.
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let p = Path::new(input);
+        return p.join("app.db").to_str().unwrap().to_string();
+    }
+
+    // Desktop/server behavior:
+    // 1) Prefer DATABASE_URL if provided (preserve legacy semantics, including relative paths)
     if let Ok(url) = std::env::var("DATABASE_URL") {
         return url;
     }
+
     // 2) If input looks like a file (has an extension), use it directly
     let p = Path::new(input);
     if p.extension().is_some() {

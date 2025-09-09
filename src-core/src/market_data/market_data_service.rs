@@ -434,7 +434,20 @@ impl MarketDataService {
         asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
     ) -> Result<Self> {
         let provider_settings = repository.get_all_providers()?;
-        let provider_registry = Arc::new(RwLock::new(ProviderRegistry::new(provider_settings).await?));
+        // Be resilient on platforms where certain providers cannot initialize (e.g., mobile TLS differences).
+        // Fall back to an empty registry (Manual provider only) instead of aborting app initialization.
+        let registry = match ProviderRegistry::new(provider_settings).await {
+            Ok(reg) => reg,
+            Err(e) => {
+                log::warn!(
+                    "Provider registry initialization failed: {}. Falling back to empty registry.",
+                    e
+                );
+                // Safe fallback: no external providers enabled
+                ProviderRegistry::new(Vec::new()).await?
+            }
+        };
+        let provider_registry = Arc::new(RwLock::new(registry));
 
         Ok(Self {
             provider_registry,
