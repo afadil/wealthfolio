@@ -13,7 +13,7 @@ mod menu;
 mod updater;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-use log::{error};
+use log::error;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use updater::check_for_update;
 
@@ -21,15 +21,14 @@ use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
 use uuid;
+use wealthfolio_core::secrets::SecretManager;
 
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use tauri::async_runtime::spawn;
 
 use tauri::AppHandle;
 use tauri::Manager;
 
 use context::ServiceContext;
-use events::{emit_portfolio_trigger_update, PortfolioRequestPayload};
+use events::{emit_portfolio_trigger_update, emit_app_ready, PortfolioRequestPayload};
 use wealthfolio_core::sync::engine::SyncEngine;
 
 #[derive(Clone)]
@@ -37,14 +36,99 @@ pub struct SyncHandles {
     pub engine: SyncEngine,
 }
 
+/// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
+fn spawn_background_tasks(
+    handle: AppHandle,
+    _context: Arc<ServiceContext>,
+    _instance_id: Arc<String>,
+) {
+    // Set up menu and updater (desktop only)
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let menu_handle = handle.clone();
+        let instance_id_menu = _instance_id.clone();
+        tauri::async_runtime::spawn(async move {
+            match menu::create_menu(&menu_handle) {
+                Ok(menu) => {
+                    if let Err(e) = menu_handle.set_menu(menu) {
+                        error!("Failed to set menu: {}", e);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to create menu: {}", e);
+                }
+            }
+            // Set up the menu event handler
+            menu_handle.on_menu_event(move |app, event| {
+                menu::handle_menu_event(app, &*instance_id_menu, event.id().as_ref());
+            });
+        });
+
+        // Check for updates on startup (if enabled)
+        let update_handle = handle.clone();
+        let instance_id_update = _instance_id.clone();
+        let update_context = _context.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Ok(is_enabled) = update_context
+                .settings_service()
+                .is_auto_update_check_enabled()
+            {
+                if is_enabled {
+                    check_for_update(update_handle, &*instance_id_update, false).await;
+                }
+            }
+        });
+    }
+
+    // Trigger initial portfolio update on startup
+    let initial_payload = PortfolioRequestPayload::builder()
+        .account_ids(None)
+        .refetch_all_market_data(false)
+        .build();
+    emit_portfolio_trigger_update(&handle, initial_payload);
+
+    // P2P sync (desktop and mobile)
+    let handle_clone = handle.clone();
+    let ctx_for_sync = _context.clone();
+    tauri::async_runtime::spawn(async move {
+        // 1) Get DB pool
+        let pool = ctx_for_sync.db_pool();
+
+        // 2) Stable device_id from OS keyring on all platforms
+        let device_id_str = get_or_create_device_id()
+            .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+        let device_id = uuid::Uuid::parse_str(&device_id_str)
+            .unwrap_or_else(|_| uuid::Uuid::new_v4());
+
+        // Mirror device_id into DB for triggers
+        {
+            use diesel::prelude::*;
+            let mut conn = pool.get().expect("db conn");
+            let _ = diesel::sql_query("PRAGMA foreign_keys = ON;").execute(&mut conn);
+            let _ = diesel::sql_query("INSERT OR REPLACE INTO sync_device(id) VALUES (?1)")
+                .bind::<diesel::sql_types::Text, _>(&device_id_str)
+                .execute(&mut conn);
+        }
+
+        // 3) Create and start the engine
+        let engine = SyncEngine::with_device_id(pool.clone(), device_id).expect("sync engine");
+        if let Err(_e) = engine.start().await {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            log::error!("sync start error: {_e}");
+            return;
+        }
+
+        // Keep engine reachable from commands
+        handle_clone.manage(SyncHandles { engine });
+    });
+}
+
 fn get_or_create_device_id() -> Result<String, Box<dyn std::error::Error>> {
-    use keyring::Entry;
-    let entry = Entry::new("wealthfolio", "device_id")?;
-    if let Ok(existing) = entry.get_password() {
+    if let Some(existing) = SecretManager::get_secret("device_id").ok().flatten() {
         return Ok(existing);
     }
     let id = uuid::Uuid::new_v4().to_string();
-    entry.set_password(&id)?;
+    SecretManager::set_secret("device_id", &id)?;
     Ok(id)
 }
 
@@ -81,47 +165,74 @@ pub fn run() {
 
             let handle = app.handle().clone();
 
-            // Block synchronously on the essential async setup
-            tauri::async_runtime::block_on(async {
-                let app_data_dir = handle
-                    .path()
-                    .app_data_dir()? // Use ? directly on the Result
-                    .to_str()
-                    .ok_or("Failed to convert app data dir path to string")?
-                    .to_string();
+            // Derive the app data directory path once (sync) and reuse in both branches.
+            let app_data_dir = handle
+                .path()
+                .app_data_dir()? // tauri::Result<PathBuf>
+                .to_string_lossy()
+                .to_string();
 
-                // Initialize context asynchronously
-                let context = match context::initialize_context(&app_data_dir).await {
-                    Ok(ctx) => Arc::new(ctx),
-                    Err(e) => {
-                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                        error!("Failed to initialize context: {}", e);
-                        // Propagate the original boxed error
-                        return Err(e);
+            // --- Setup event listeners early (does not require context to register) ---
+            listeners::setup_event_listeners(handle.clone());
+
+            // Desktop platforms: perform essential async setup synchronously
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                tauri::async_runtime::block_on(async {
+                    // Initialize context asynchronously
+                    let context = match context::initialize_context(&app_data_dir).await {
+                        Ok(ctx) => Arc::new(ctx),
+                        Err(e) => {
+                            error!("Failed to initialize context: {}", e);
+                            // Propagate the original boxed error
+                            return Err(e);
+                        }
+                    };
+
+                    // Make context available to all commands before setup returns
+                    handle.manage(context.clone());
+
+                    // Spawn background non-critical tasks
+                    let instance_id = context.instance_id.clone();
+                    spawn_background_tasks(handle.clone(), context.clone(), instance_id);
+
+                    // Optionally notify frontend that the app is ready
+                    emit_app_ready(&handle);
+
+                    Ok(())
+                })
+                .map_err(|e: Box<dyn std::error::Error>| {
+                    error!("Critical setup failed: {}", e);
+                    // Forward the original error
+                    e
+                })?;
+            }
+
+            // Mobile platforms (iOS/Android): do NOT block the main thread; spawn setup
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                let handle_clone = handle.clone();
+                let app_data_dir_clone = app_data_dir.clone();
+                tauri::async_runtime::spawn(async move {
+                    match context::initialize_context(&app_data_dir_clone).await {
+                        Ok(ctx) => {
+                            let ctx = Arc::new(ctx);
+                            handle_clone.manage(ctx.clone());
+                            // Spawn background non-critical tasks
+                            let instance_id = ctx.instance_id.clone();
+                            spawn_background_tasks(handle_clone.clone(), ctx.clone(), instance_id);
+                            // Signal readiness to the frontend
+                            emit_app_ready(&handle_clone);
+                        }
+                        Err(e) => {
+                            // Use fully-qualified log macro to avoid import issues on mobile
+                            log::error!("Failed to initialize context on mobile: {}", e);
+                            // Still emit a ready event so UI can show an error state if desired
+                            emit_app_ready(&handle_clone);
+                        }
                     }
-                };
-
-                // Make context available to all commands *before* setup returns
-                handle.manage(context.clone());
-
-                // Get instance_id after context is managed
-                let instance_id = context.instance_id.clone();
-
-                // --- Setup event listeners ---
-                listeners::setup_event_listeners(handle.clone());
-
-                // --- Spawn non-critical async tasks ---
-                spawn_background_tasks(handle.clone(), context.clone(), instance_id);
-
-                Ok(())
-            })
-            // Handle potential errors from the block_on section
-            .map_err(|e: Box<dyn std::error::Error>| {
-                #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                error!("Critical setup failed: {}", e);
-                // Convert the boxed error into Tauri's setup error type if needed, or handle otherwise
-                tauri::Error::Setup(e.into()) // Or Box::new(tauri::Error::Setup(e.into())) depending on signature needs
-            })?;
+                });
+            }
 
             Ok(())
         })
@@ -215,89 +326,4 @@ pub fn run() {
         .expect("error while running wealthfolio application");
 
     app.run(|_app_handle, _event| {});
-}
-
-/// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
-fn spawn_background_tasks(
-    handle: AppHandle,
-    _context: Arc<ServiceContext>,
-    _instance_id: Arc<String>,
-) {
-    // Set up menu (can happen after state is managed) - Desktop only
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        let menu_handle = handle.clone();
-        let instance_id_menu = _instance_id.clone();
-        tauri::async_runtime::spawn(async move {
-            match menu::create_menu(&menu_handle) {
-                Ok(menu) => {
-                    if let Err(e) = menu_handle.set_menu(menu) {
-                        error!("Failed to set menu: {}", e);
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to create menu: {}", e);
-                }
-            }
-            // Set up the menu event handler
-            menu_handle.on_menu_event(move |app, event| {
-                menu::handle_menu_event(app, &*instance_id_menu, event.id().as_ref());
-            });
-        });
-
-        // Check for updates on startup (if enabled) - Desktop only
-        let update_handle = handle.clone();
-        let instance_id_update = _instance_id.clone();
-        let update_context = _context.clone();
-        spawn(async move { 
-            // Check if auto-update is enabled before performing the check
-            if let Ok(is_enabled) = update_context.settings_service().is_auto_update_check_enabled() {
-                if is_enabled {
-                    check_for_update(update_handle, &*instance_id_update, false).await;
-                }
-            }
-        });
-    }
-
-    // Trigger initial portfolio update on startup
-    // Defaults: no specific accounts (all), sync market data (all symbols), incremental calculation
-    let initial_payload = PortfolioRequestPayload::builder()
-        .account_ids(None)
-        .refetch_all_market_data(false)
-        .build();
-    emit_portfolio_trigger_update(&handle, initial_payload);
-
-    // P2P sync (desktop and mobile)
-    let handle_clone = handle.clone();
-    let ctx_for_sync = _context.clone();
-    tauri::async_runtime::spawn(async move {
-        // 1) Get DB pool
-        let pool = ctx_for_sync.db_pool(); // new accessor
-
-        // 2) Stable device_id (keychain)
-        let device_id_str = get_or_create_device_id().unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-        let device_id = uuid::Uuid::parse_str(&device_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4());
-
-        // Mirror device_id into DB for triggers
-        {
-            use diesel::prelude::*;
-            let mut conn = pool.get().expect("db conn");
-            let _ = diesel::sql_query("PRAGMA foreign_keys = ON;").execute(&mut conn);
-            let _ = diesel::sql_query("INSERT OR REPLACE INTO sync_device(id) VALUES (?1)")
-                .bind::<diesel::sql_types::Text, _>(&device_id_str)
-                .execute(&mut conn);
-        }
-
-        // 3) Create and start the engine
-        let engine = SyncEngine::with_device_id(pool.clone(), device_id)
-            .expect("sync engine");
-        if let Err(_e) = engine.start().await {
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            log::error!("sync start error: {_e}");
-            return;
-        }
-
-    // Keep engine reachable from commands
-        handle_clone.manage(SyncHandles { engine });
-    });
 }
