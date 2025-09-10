@@ -1,12 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePlatform } from '@/hooks/use-platform';
 import { OnboardingStep1 } from './onboarding-step1';
 import { OnboardingStep2 } from './onboarding-step2';
 import { OnboardingStep3 } from './onboarding-step3';
+import { OnboardingSyncChoice } from './onboarding-sync-choice';
+import { OnboardingSyncStep } from './onboarding-sync-step';
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
+  const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
+  const [syncStage, setSyncStage] = useState<'prompt' | 'scan' | 'done'>(
+    isMobile ? 'prompt' : 'prompt',
+  );
   const MAX_STEPS = 3;
 
   const handleNext = () => {
@@ -22,6 +29,24 @@ const OnboardingPage = () => {
   };
 
   const renderCurrentStep = () => {
+    if (syncStage === 'prompt') {
+      return (
+        <OnboardingSyncChoice
+          onYes={() => setSyncStage('scan')}
+          onNo={() => setSyncStage('done')}
+        />
+      );
+    }
+
+    if (syncStage === 'scan') {
+      return (
+        <OnboardingSyncStep
+          onSuccess={() => setSyncStage('done')}
+          onBack={() => setSyncStage('prompt')}
+        />
+      );
+    }
+
     switch (currentStep) {
       case 1:
         return <OnboardingStep1 onNext={handleNext} />;

@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { motion } from 'framer-motion';
 import { useSettingsContext } from '@/lib/settings-provider';
-import { cn } from '@/lib/utils';
 import {
   Form,
   FormControl,
@@ -16,8 +15,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { CurrencyInput } from '@wealthfolio/ui';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
+import { ThemeSelector } from '@/components/theme-selector';
 
 // Onboarding schema with system theme option
 const onboardingSettingsSchema = z.object({
@@ -137,132 +136,16 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                 control={form.control}
                 name="theme"
                 render={({ field }) => (
-                  <FormItem className="space-y-1" id="theme-selection-label">
+                  <FormItem className="space-y-1">
                     <FormLabel>Select your preferred theme</FormLabel>
                     <FormMessage />
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      aria-labelledby="theme-selection-label"
-                      className="grid max-w-md grid-cols-1 gap-4 pt-2 sm:grid-cols-2 sm:gap-8"
-                    >
-                      {[
-                        { value: 'light', labelText: 'Light' },
-                        { value: 'dark', labelText: 'Dark' },
-                        { value: 'system', labelText: 'System' },
-                      ].map((themeOption) => (
-                        <FormItem key={themeOption.value}>
-                          <FormLabel
-                            className={cn(
-                              'block cursor-pointer rounded-md border-2 p-1',
-                              'min-h-[44px] min-w-[44px]',
-                              field.value === themeOption.value ? 'border-primary' : 'border-muted',
-                              'focus-within:border-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:border-accent',
-                              'motion-safe:transition-all motion-safe:duration-150 motion-safe:ease-out',
-                              field.value === themeOption.value && 'motion-safe:scale-105',
-                            )}
-                          >
-                            <FormControl>
-                              <RadioGroupItem value={themeOption.value} className="sr-only" />
-                            </FormControl>
-                            <div
-                              className={cn(
-                                'items-center rounded-md p-1',
-                                themeOption.value === 'dark' && 'dark bg-popover',
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  'space-y-2 rounded-sm p-2',
-                                  themeOption.value === 'light'
-                                    ? 'bg-[hsl(51_59%_95%)]'
-                                    : 'dark bg-[hsl(var(--flexoki-bg))]',
-                                )}
-                              >
-                                <div
-                                  className={cn(
-                                    'space-y-2 rounded-md p-2 shadow-sm',
-                                    themeOption.value === 'light'
-                                      ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[80px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[100px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                </div>
-                                <div
-                                  className={cn(
-                                    'flex items-center space-x-2 rounded-md p-2 shadow-sm',
-                                    themeOption.value === 'light'
-                                      ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      'h-4 w-4 rounded-full',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[100px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                </div>
-                                <div
-                                  className={cn(
-                                    'flex items-center space-x-2 rounded-md p-2 shadow-sm',
-                                    themeOption.value === 'light'
-                                      ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-(--flexoki-bg-2)',
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      'h-4 w-4 rounded-full',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-(--flexoki-ui-2)',
-                                    )}
-                                  />
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[100px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-(--flexoki-ui-2)',
-                                    )}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            <span className="block w-full p-2 text-center font-normal">
-                              {themeOption.labelText}
-                            </span>
-                          </FormLabel>
-                        </FormItem>
-                      ))}
-                    </RadioGroup>
+                    <FormControl>
+                      <ThemeSelector 
+                        value={field.value} 
+                        onChange={field.onChange}
+                        className="pt-2 max-w-md"
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />
