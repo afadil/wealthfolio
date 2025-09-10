@@ -1,0 +1,53 @@
+import { cn } from '@/lib/utils';
+
+interface FontSelectorProps {
+  value?: string;
+  onChange: (value: string) => void;
+  className?: string;
+}
+
+const fonts = [
+  {
+    value: 'font-sans',
+    label: 'Sans',
+    preview: 'Aa',
+  },
+  {
+    value: 'font-serif',
+    label: 'Serif',
+    preview: 'Aa',
+  },
+  {
+    value: 'font-mono',
+    label: 'Mono',
+    preview: 'Aa',
+  },
+];
+
+export function FontSelector({ value, onChange, className }: FontSelectorProps) {
+  return (
+    <div className={cn('grid grid-cols-3 gap-2 sm:gap-3', className)}>
+      {fonts.map((font) => (
+        <button
+          key={font.value}
+          type="button"
+          onClick={() => onChange(font.value)}
+          className={cn(
+            'hover:bg-accent/50 relative flex flex-col items-center justify-center rounded-lg border-2 p-3 sm:p-4 transition-all duration-200',
+            value === font.value
+              ? 'border-primary bg-accent/30'
+              : 'border-muted hover:border-accent',
+          )}
+        >
+          <div className={cn('mb-1 text-xl sm:text-2xl font-medium', font.value)}>
+            {font.preview}
+          </div>
+          <div className="text-xs sm:text-sm font-medium">{font.label}</div>
+          {value === font.value && (
+            <div className="bg-primary absolute top-2 right-2 h-1.5 w-1.5 rounded-full" />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}

@@ -2,10 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
-import { cn } from '@/lib/utils';
 import { useSettingsContext } from '@/lib/settings-provider';
 import { Button } from '@/components/ui/button';
-import { buttonVariants } from '@/components/ui/button-variants';
 import {
   Form,
   FormControl,
@@ -15,8 +13,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Icons } from '@/components/ui/icons';
+import { FontSelector } from '@/components/font-selector';
+import { ThemeSelector } from '@/components/theme-selector';
 import { Switch } from '@/components/ui/switch';
 
 const appearanceFormSchema = z.object({
@@ -58,30 +56,21 @@ export function AppearanceForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl">
         <FormField
           control={form.control}
           name="font"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Font</FormLabel>
-              <div className="relative w-max">
-                <FormControl>
-                  <select
-                    className={cn(
-                      buttonVariants({ variant: 'outline' }),
-                      'w-[200px] appearance-none rounded-md bg-transparent font-normal',
-                    )}
-                    {...field}
-                  >
-                    <option value="font-mono">Mono</option>
-                    <option value="font-sans">Sans-Serif</option>
-                    <option value="font-serif">Serif</option>
-                  </select>
-                </FormControl>
-                <Icons.ChevronDown className="absolute top-2.5 right-3 h-4 w-4 opacity-50" />
+            <FormItem className="space-y-3">
+              <div className="space-y-1">
+                <FormLabel className="text-base font-medium">Font Family</FormLabel>
+                <FormDescription className="text-sm">
+                  Choose the font family used throughout the interface.
+                </FormDescription>
               </div>
-              <FormDescription>Set your preferred font family to use.</FormDescription>
+              <FormControl>
+                <FontSelector value={field.value} onChange={field.onChange} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -90,88 +79,17 @@ export function AppearanceForm() {
           control={form.control}
           name="theme"
           render={({ field }) => (
-            <FormItem className="space-y-1">
-              <FormLabel>Theme</FormLabel>
-              <FormDescription>Select your preferred theme for the application.</FormDescription>
+            <FormItem className="space-y-3">
+              <div className="space-y-1">
+                <FormLabel className="text-base font-medium">Theme</FormLabel>
+                <FormDescription className="text-sm">
+                  Select your preferred theme for the application.
+                </FormDescription>
+              </div>
               <FormMessage />
-              <RadioGroup
-                onValueChange={field.onChange}
-                defaultValue={field.value}
-                className="grid max-w-2xl grid-cols-3 gap-8 pt-2"
-              >
-                <FormItem>
-                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
-                    <FormControl>
-                      <RadioGroupItem value="light" className="sr-only" />
-                    </FormControl>
-                    <div className="border-muted hover:border-accent items-center rounded-md border-2 p-1">
-                      <div className="space-y-2 rounded-sm bg-[hsl(51_59%_95%)] p-2">
-                        <div className="space-y-2 rounded-md bg-[hsl(48_100%_97%)] p-2 shadow-sm">
-                          <div className="h-2 w-[80px] rounded-lg bg-[hsl(50_14%_83%)]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(50_14%_83%)]" />
-                        </div>
-                        <div className="flex items-center space-x-2 rounded-md bg-[hsl(48_100%_97%)] p-2 shadow-sm">
-                          <div className="h-4 w-4 rounded-full bg-[hsl(50_14%_83%)]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(50_14%_83%)]" />
-                        </div>
-                        <div className="flex items-center space-x-2 rounded-md bg-[hsl(48_100%_97%)] p-2 shadow-sm">
-                          <div className="h-4 w-4 rounded-full bg-[hsl(50_14%_83%)]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(50_14%_83%)]" />
-                        </div>
-                      </div>
-                    </div>
-                    <span className="block w-full p-2 text-center font-normal">Light</span>
-                  </FormLabel>
-                </FormItem>
-                <FormItem>
-                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
-                    <FormControl>
-                      <RadioGroupItem value="dark" className="sr-only" />
-                    </FormControl>
-                    <div className="dark border-muted bg-popover hover:bg-accent hover:text-accent-foreground items-center rounded-md border-2 p-1">
-                      <div className="space-y-2 rounded-sm bg-[hsl(var(--flexoki-bg))] p-2">
-                        <div className="space-y-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
-                          <div className="h-2 w-[80px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                        </div>
-                        <div className="flex items-center space-x-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
-                          <div className="h-4 w-4 rounded-full bg-[hsl(var(--flexoki-ui-2))]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                        </div>
-                        <div className="flex items-center space-x-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
-                          <div className="h-4 w-4 rounded-full bg-[hsl(var(--flexoki-ui-2))]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                        </div>
-                      </div>
-                    </div>
-                    <span className="block w-full p-2 text-center font-normal">Dark</span>
-                  </FormLabel>
-                </FormItem>
-                <FormItem>
-                  <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
-                    <FormControl>
-                      <RadioGroupItem value="system" className="sr-only" />
-                    </FormControl>
-                    <div className="border-muted hover:border-accent items-center rounded-md border-2 p-1">
-                      <div className="rounded-sm p-2">
-                        <div className="space-y-2 rounded-md bg-[hsl(48_100%_97%)] p-2 shadow-sm">
-                          <div className="h-2 w-[80px] rounded-lg bg-[hsl(50_14%_83%)]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(50_14%_83%)]" />
-                        </div>
-                        <div className="mt-2 space-y-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
-                          <div className="h-2 w-[80px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                        </div>
-                        <div className="dark flex items-center space-x-2 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-2 shadow-sm">
-                          <div className="h-4 w-4 rounded-full bg-[hsl(var(--flexoki-ui-2))]" />
-                          <div className="h-2 w-[100px] rounded-lg bg-[hsl(var(--flexoki-ui-2))]" />
-                        </div>
-                      </div>
-                    </div>
-                    <span className="block w-full p-2 text-center font-normal">System</span>
-                  </FormLabel>
-                </FormItem>
-              </RadioGroup>
+              <FormControl>
+                <ThemeSelector value={field.value} onChange={field.onChange} className="pt-2" />
+              </FormControl>
             </FormItem>
           )}
         />
@@ -194,7 +112,9 @@ export function AppearanceForm() {
           )}
         />
 
-        <Button type="submit">Update preferences</Button>
+        <Button type="submit" className="w-full sm:w-auto">
+          Update preferences
+        </Button>
       </form>
     </Form>
   );
