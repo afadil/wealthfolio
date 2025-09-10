@@ -4,6 +4,7 @@ use serde::Serialize;
 use chrono::Utc;
 use uuid::Uuid;
 use wealthfolio_core::sync::peer_store;
+use std::time::Duration;
 
 #[derive(Serialize)]
 pub struct PeerInfo {
@@ -162,18 +163,38 @@ pub async fn sync_with_master(state: State<'_, SyncHandles>, payload: String) ->
     let test_url = format!("ws://{}/ws", peer.address);
     log::info!("Testing connection to {}", test_url);
     
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        wealthfolio_core::sync::transport::connect_to_peer(&test_url)
-    ).await {
+    // Try once; on failure, allow for local-network permission prompt and retry once
+    let attempt_connect = | | async {
+        tokio::time::timeout(Duration::from_secs(5), wealthfolio_core::sync::transport::connect_to_peer(&test_url)).await
+    };
+
+    let mut connected = false;
+    match attempt_connect().await {
         Ok(Ok(_ws)) => {
-            log::info!("Connection test successful");
+            log::info!("Connection test successful on first attempt");
+            connected = true;
         }
         Ok(Err(e)) => {
-            return Err(format!("Cannot connect to {}: {}", peer.address, e));
+            log::warn!("First connection attempt failed: {}. Retrying...", e);
         }
         Err(_) => {
-            return Err(format!("Connection timeout to {}", peer.address));
+            log::warn!("First connection attempt timed out. Retrying...");
+        }
+    }
+
+    if !connected {
+        // Small delay to allow iOS local network permission dialog resolution
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        match attempt_connect().await {
+            Ok(Ok(_ws)) => {
+                log::info!("Connection test successful on retry");
+            }
+            Ok(Err(e)) => {
+                return Err(format!("Cannot connect to {}: {}", peer.address, e));
+            }
+            Err(_) => {
+                return Err(format!("Connection timeout to {}", peer.address));
+            }
         }
     }
     
@@ -182,6 +203,23 @@ pub async fn sync_with_master(state: State<'_, SyncHandles>, payload: String) ->
     state.engine.sync_with_peer(peer.id).await.map_err(|e| format!("Sync failed: {}", e))?;
     
     Ok(format!("Successfully synced with {}", peer.name))
+}
+
+/// Attempt a short-lived TCP connection to trigger Local Network permission on iOS.
+/// Always returns Ok(()) regardless of outcome; this is a preflight.
+#[tauri::command]
+pub async fn probe_local_network_access(host: String, port: u16) -> Result<(), String> {
+    let addr = format!("{}:{}", host, port);
+    log::info!("Probing local network access to {}", addr);
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    {
+        let _ = tokio::time::timeout(Duration::from_secs(2), tokio::net::TcpStream::connect(&addr)).await;
+    }
+    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
+    {
+        let _ = tokio::time::timeout(Duration::from_secs(2), tokio::net::TcpStream::connect(&addr)).await;
+    }
+    Ok(())
 }
 
 #[tauri::command]

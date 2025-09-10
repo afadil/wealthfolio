@@ -3,7 +3,7 @@ import * as web from './web';
 
 export enum RUN_ENV {
   DESKTOP = 'desktop',
-  MOBILE = 'mobile',
+  MOBILE = 'desktop', // iOS and Android are treated as desktop for now
   WEB = 'web',
   UNSUPPORTED = 'unsupported',
 }
