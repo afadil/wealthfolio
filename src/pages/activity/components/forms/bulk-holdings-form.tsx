@@ -298,7 +298,6 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                       }}
                       variant="form"
                       filterActive={true}
-                      className="mt-2"
                     />
                   </FormControl>
                   <FormMessage />

@@ -5,6 +5,7 @@ pub mod asset;
 pub mod goal;
 pub mod limits;
 pub mod market_data;
+pub mod platform;
 pub mod portfolio;
 pub mod settings;
 pub mod utilities;
