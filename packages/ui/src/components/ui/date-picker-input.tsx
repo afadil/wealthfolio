@@ -136,7 +136,10 @@ export function DatePickerInput({
           disabled && "cursor-not-allowed opacity-50",
          )}
       >
-        <DateInput className="flex-1 bg-transparent p-0 outline-none ring-0 placeholder:text-muted-foreground border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0" />
+        <DateInput 
+          unstyled 
+          className="flex-1 bg-transparent outline-none border-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0" 
+        />
         <Button
           className={cn(
             "text-muted-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
