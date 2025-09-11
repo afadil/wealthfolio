@@ -181,7 +181,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <Button
             variant="outline"
             role="combobox"
-            className={cn('w-full rounded-md justify-between', open && 'ring-ring ring-2', className)}
+            className={cn('w-full rounded-md justify-between truncate', open && 'ring-ring ring-2', className)}
             ref={ref}
             aria-expanded={open}
             aria-haspopup="listbox"
