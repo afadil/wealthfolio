@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Icons } from '@/components/ui/icons';
+import { Switch } from '@/components/ui/switch';
 
 const appearanceFormSchema = z.object({
   theme: z.enum(['light', 'dark', 'system'], {
@@ -25,6 +26,7 @@ const appearanceFormSchema = z.object({
     invalid_type_error: 'Select a font',
     required_error: 'Please select a font.',
   }),
+  menuBarVisible: z.boolean().default(true),
 });
 
 type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
@@ -34,6 +36,7 @@ export function AppearanceForm() {
   const defaultValues: Partial<AppearanceFormValues> = {
     theme: settings?.theme as AppearanceFormValues['theme'],
     font: settings?.font as AppearanceFormValues['font'],
+    menuBarVisible: settings?.menuBarVisible ?? true,
   };
   const form = useForm<AppearanceFormValues>({
     resolver: zodResolver(appearanceFormSchema),
@@ -42,7 +45,11 @@ export function AppearanceForm() {
 
   async function onSubmit(data: AppearanceFormValues) {
     try {
-      await updateSettings({ theme: data.theme, font: data.font });
+      await updateSettings({
+        theme: data.theme,
+        font: data.font,
+        menuBarVisible: data.menuBarVisible,
+      });
     } catch (error) {
       console.error('Failed to update appearance settings:', error);
     }
@@ -140,6 +147,24 @@ export function AppearanceForm() {
                   </FormLabel>
                 </FormItem>
               </RadioGroup>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="menuBarVisible"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+              <div className="space-y-0.5">
+                <FormLabel>Show menu bar</FormLabel>
+                <FormDescription>
+                  Toggle to display the application menu bar (Windows only).
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
             </FormItem>
           )}
         />

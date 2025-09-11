@@ -53,6 +53,16 @@ pub async fn update_settings(
         .await
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
+    if let Some(menu_visible) = settings_update.menu_bar_visible {
+        if let Some(window) = handle.get_webview_window("main") {
+            let _ = if menu_visible {
+                window.show_menu()
+            } else {
+                window.hide_menu()
+            };
+        }
+    }
+
     // If the base currency was changed, update the state and emit the event
     if base_currency_changed {
         // new_base_currency_val is guaranteed to be Some(String) here because

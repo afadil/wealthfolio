@@ -180,11 +180,19 @@ fn spawn_background_tasks(
     // Set up menu (can happen after state is managed)
     let menu_handle = handle.clone();
     let instance_id_menu = instance_id.clone();
+    let context_menu = context.clone();
     tauri::async_runtime::spawn(async move {
         match menu::create_menu(&menu_handle) {
             Ok(menu) => {
                 if let Err(e) = menu_handle.set_menu(menu) {
                     error!("Failed to set menu: {}", e);
+                }
+                if let Ok(settings) = context_menu.settings_service().get_settings() {
+                    if !settings.menu_bar_visible {
+                        if let Some(window) = menu_handle.get_webview_window("main") {
+                            let _ = window.hide_menu();
+                        }
+                    }
                 }
             }
             Err(e) => {

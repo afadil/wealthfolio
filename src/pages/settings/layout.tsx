@@ -32,6 +32,10 @@ const sidebarNavItems = [
     href: 'appearance',
   },
   {
+    title: 'About',
+    href: 'about',
+  },
+  {
     title: 'Data Export',
     href: 'exports',
   },
