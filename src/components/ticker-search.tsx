@@ -30,61 +30,57 @@ interface SearchResultsProps {
 }
 
 // Memoize search results component
-const SearchResults = memo(({
-  results,
-  isLoading,
-  isError,
-  selectedResult,
-  onSelect,
-}: SearchResultsProps) => {
-  return (
-    <CommandList>
-      {isLoading ? (
-        <CommandPrimitive.Loading>
-          <div className="space-y-2 p-1">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        </CommandPrimitive.Loading>
-      ) : null}
-      {!isError && !isLoading && selectedResult && !results?.length && (
-        <div className="p-4 text-sm">No symbols found</div>
-      )}
-      {isError && <div className="p-4 text-sm text-destructive">Something went wrong</div>}
+const SearchResults = memo(
+  ({ results, isLoading, isError, selectedResult, onSelect }: SearchResultsProps) => {
+    return (
+      <CommandList>
+        {isLoading ? (
+          <CommandPrimitive.Loading>
+            <div className="space-y-2 p-1">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </CommandPrimitive.Loading>
+        ) : null}
+        {!isError && !isLoading && selectedResult && !results?.length && (
+          <div className="p-4 text-sm">No symbols found</div>
+        )}
+        {isError && <div className="text-destructive p-4 text-sm">Something went wrong</div>}
 
-      {results?.map((ticker) => {
-        return (
-          <CommandItem 
-            key={ticker.symbol} 
-            onSelect={() => onSelect(ticker)} 
-            value={ticker.symbol}
-          >
-            <Icons.Check
-              className={cn(
-                'mr-2 h-4 w-4',
-                selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
-              )}
-            />
-            {ticker.symbol} - {ticker.longName} ({ticker.exchange})
-          </CommandItem>
-        );
-      })}
-    </CommandList>
-  );
-});
+        {results?.map((ticker) => {
+          return (
+            <CommandItem
+              key={ticker.symbol}
+              onSelect={() => onSelect(ticker)}
+              value={ticker.symbol}
+            >
+              <Icons.Check
+                className={cn(
+                  'mr-2 h-4 w-4',
+                  selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              {ticker.symbol} - {ticker.longName} ({ticker.exchange})
+            </CommandItem>
+          );
+        })}
+      </CommandList>
+    );
+  },
+);
 
 SearchResults.displayName = 'SearchResults';
 
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
-    { 
-      selectedResult, 
-      defaultValue, 
-      value, 
-      placeholder = 'Select symbol...', 
-      onSelectResult, 
-      className 
+    {
+      selectedResult,
+      defaultValue,
+      value,
+      placeholder = 'Select symbol...',
+      onSelectResult,
+      className,
     },
     ref,
   ) => {
@@ -107,32 +103,42 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     // Create debounced search function
     const debouncedSearch = useMemo(
-      () => debounce((query: string) => {
-        setDebouncedQuery(query);
-      }, 300),
-      []
+      () =>
+        debounce((query: string) => {
+          setDebouncedQuery(query);
+        }, 300),
+      [],
     );
 
     // Handle search query changes
-    const handleSearchChange = useCallback((newQuery: string) => {
-      setSearchQuery(newQuery);
-      debouncedSearch(newQuery);
-    }, [debouncedSearch]);
+    const handleSearchChange = useCallback(
+      (newQuery: string) => {
+        setSearchQuery(newQuery);
+        debouncedSearch(newQuery);
+      },
+      [debouncedSearch],
+    );
 
-    const handleSelectResult = useCallback((ticker: QuoteSummary) => {
-      onSelectResult(ticker?.symbol);
-      const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
-      setSearchQuery(displayText);
-      setSelected(displayText);
-      setOpen(false);
-      debouncedSearch.cancel(); // Cancel pending debounced calls
-    }, [onSelectResult, debouncedSearch]);
+    const handleSelectResult = useCallback(
+      (ticker: QuoteSummary) => {
+        onSelectResult(ticker?.symbol);
+        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
+        setSearchQuery(displayText);
+        setSelected(displayText);
+        setOpen(false);
+        debouncedSearch.cancel(); // Cancel pending debounced calls
+      },
+      [onSelectResult, debouncedSearch],
+    );
 
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
       queryKey: ['ticker-search', debouncedQuery],
       queryFn: () => searchTicker(debouncedQuery),
-      enabled: debouncedQuery?.length > 1 && selected !== debouncedQuery && defaultValue !== debouncedQuery,
+      enabled:
+        debouncedQuery?.length > 1 &&
+        selected !== debouncedQuery &&
+        defaultValue !== debouncedQuery,
       staleTime: 60000, // Cache results for 1 minute
       gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
     });
@@ -146,12 +152,15 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const displayName = selected || placeholder;
 
     // Handle popover open
-    const handleOpenChange = useCallback((newOpen: boolean) => {
-      setOpen(newOpen);
-      if (!newOpen) {
-        debouncedSearch.cancel(); // Cancel pending searches when closing
-      }
-    }, [debouncedSearch]);
+    const handleOpenChange = useCallback(
+      (newOpen: boolean) => {
+        setOpen(newOpen);
+        if (!newOpen) {
+          debouncedSearch.cancel(); // Cancel pending searches when closing
+        }
+      },
+      [debouncedSearch],
+    );
 
     // Handle focus events
     const handleOpenAutoFocus = useCallback((e: Event) => {
@@ -172,9 +181,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <Button
             variant="outline"
             role="combobox"
-            className={cn('w-full justify-between', open && 'ring-2 ring-ring', className)}
+            className={cn('w-full rounded-md justify-between', open && 'ring-ring ring-2', className)}
             ref={ref}
-            onFocus={() => setOpen(true)}
             aria-expanded={open}
             aria-haspopup="listbox"
           >
@@ -186,7 +194,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         <PopoverContent
           side="bottom"
           align="start"
-          className="h-auto w-[--radix-popover-trigger-width] p-0"
+          className="h-auto w-[var(--radix-popover-trigger-width)] p-0"
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
