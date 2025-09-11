@@ -32,12 +32,12 @@ const sidebarNavItems = [
     href: 'appearance',
   },
   {
-    title: 'About',
-    href: 'about',
-  },
-  {
     title: 'Data Export',
     href: 'exports',
+  },
+  {
+    title: 'About',
+    href: 'about',
   },
 ];
 
