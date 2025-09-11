@@ -19,8 +19,8 @@ export const TickerAvatar = ({ symbol, className = "w-8 h-8" }: TickerAvatarProp
   const primaryLogoUrl = fullSymbol ? `/ticker-logos/${fullSymbol}.png` : '';
   const fallbackLogoUrl = baseSymbol ? `/ticker-logos/${baseSymbol}.png` : '';
   
-  const shouldShowPrimaryLogo = !fullSymbolError && fullSymbol && fullSymbol !== baseSymbol;
-  const shouldShowFallbackLogo = fullSymbolError && !baseSymbolError && baseSymbol;
+  const shouldShowPrimaryLogo = !fullSymbolError && fullSymbol;
+  const shouldShowFallbackLogo = fullSymbolError && !baseSymbolError && baseSymbol && fullSymbol !== baseSymbol;
 
   return (
     <Avatar className={cn(
