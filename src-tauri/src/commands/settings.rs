@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
-use tauri::{AppHandle, State, Manager};
+use tauri::{AppHandle, State};
 use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 
@@ -54,12 +54,23 @@ pub async fn update_settings(
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
     if let Some(menu_visible) = settings_update.menu_bar_visible {
-        if let Some(window) = handle.get_webview_window("main") {
-            let _ = if menu_visible {
-                window.show_menu()
-            } else {
-                window.hide_menu()
-            };
+        if menu_visible {
+            // Create and set the menu
+            match crate::menu::create_menu(&handle) {
+                Ok(menu) => {
+                    if let Err(e) = handle.set_menu(menu) {
+                        debug!("Failed to set menu: {}", e);
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to create menu: {}", e);
+                }
+            }
+        } else {
+            // Remove the menu entirely by setting it to None
+            if let Err(e) = handle.remove_menu() {
+                debug!("Failed to remove menu: {}", e);
+            }
         }
     }
 

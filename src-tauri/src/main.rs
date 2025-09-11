@@ -182,21 +182,33 @@ fn spawn_background_tasks(
     let instance_id_menu = instance_id.clone();
     let context_menu = context.clone();
     tauri::async_runtime::spawn(async move {
-        match menu::create_menu(&menu_handle) {
-            Ok(menu) => {
-                if let Err(e) = menu_handle.set_menu(menu) {
-                    error!("Failed to set menu: {}", e);
-                }
-                if let Ok(settings) = context_menu.settings_service().get_settings() {
-                    if !settings.menu_bar_visible {
-                        if let Some(window) = menu_handle.get_webview_window("main") {
-                            let _ = window.hide_menu();
+        // Check settings first to decide whether to create menu at all
+        if let Ok(settings) = context_menu.settings_service().get_settings() {
+            if settings.menu_bar_visible {
+                // Only create and set menu if it should be visible
+                match menu::create_menu(&menu_handle) {
+                    Ok(menu) => {
+                        if let Err(e) = menu_handle.set_menu(menu) {
+                            error!("Failed to set menu: {}", e);
                         }
+                    }
+                    Err(e) => {
+                        error!("Failed to create menu: {}", e);
                     }
                 }
             }
-            Err(e) => {
-                error!("Failed to create menu: {}", e);
+            // If menu_bar_visible is false, don't create or set any menu
+        } else {
+            // If we can't read settings, default to showing menu
+            match menu::create_menu(&menu_handle) {
+                Ok(menu) => {
+                    if let Err(e) = menu_handle.set_menu(menu) {
+                        error!("Failed to set menu: {}", e);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to create menu: {}", e);
+                }
             }
         }
         // Set up the menu event handler
