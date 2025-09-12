@@ -104,6 +104,8 @@ diesel::table! {
         total_value -> Text,
         cost_basis -> Text,
         net_contribution -> Text,
+        outstanding_loans -> Text,
+        portfolio_equity -> Text,
         calculated_at -> Text,
     }
 }
@@ -137,6 +139,8 @@ diesel::table! {
         cash_balances -> Text,
         cost_basis -> Text,
         net_contribution -> Text,
+        outstanding_loans -> Text,
+        outstanding_loans_base -> Text,
         calculated_at -> Text,
         net_contribution_base -> Text,
     }

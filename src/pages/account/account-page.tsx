@@ -31,6 +31,8 @@ interface HistoryChartData {
   date: string;
   totalValue: number;
   netContribution: number;
+  portfolioEquity?: number;
+  outstandingLoans?: number;
   currency: string;
 }
 
@@ -84,6 +86,8 @@ const AccountPage = () => {
       date: valuation.valuationDate,
       totalValue: valuation.totalValue,
       netContribution: valuation.netContribution,
+      portfolioEquity: valuation.portfolioEquity,
+      outstandingLoans: valuation.outstandingLoans,
       currency: valuation.accountCurrency,
     }));
   }, [valuationHistory]);

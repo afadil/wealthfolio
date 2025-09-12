@@ -631,6 +631,7 @@ impl SnapshotService {
         let mut aggregated_positions: HashMap<String, Position> = HashMap::new(); // Position struct from crate::portfolio::snapshot::Position
         let mut overall_cost_basis_base_ccy = Decimal::ZERO;
         let mut overall_net_contribution_base_ccy = Decimal::ZERO;
+        let mut overall_outstanding_loans_base_ccy = Decimal::ZERO;
 
         for (individual_acc_id, individual_snapshot) in individual_snapshots_on_date {
             // Ensure we are only processing individual accounts here, not an old TOTAL snapshot if it exists in the input map
@@ -650,7 +651,10 @@ impl SnapshotService {
             // 2. Aggregate Net Contribution (already frozen FX)
             overall_net_contribution_base_ccy += individual_snapshot.net_contribution_base;
 
-            // 3. Aggregate Positions & Calculate Overall Cost Basis for TOTAL (in base_portfolio_currency)
+            // 3. Aggregate Outstanding Loans (already frozen FX)
+            overall_outstanding_loans_base_ccy += individual_snapshot.outstanding_loans_base;
+
+            // 4. Aggregate Positions & Calculate Overall Cost Basis for TOTAL (in base_portfolio_currency)
             for (_pos_asset_id, pos) in &individual_snapshot.positions {
                 let agg_pos = aggregated_positions
                     .entry(pos.asset_id.clone())
@@ -727,6 +731,8 @@ impl SnapshotService {
             cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
             net_contribution: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
             net_contribution_base: overall_net_contribution_base_ccy.round_dp(DECIMAL_PRECISION),
+            outstanding_loans: overall_outstanding_loans_base_ccy.round_dp(DECIMAL_PRECISION),
+            outstanding_loans_base: overall_outstanding_loans_base_ccy.round_dp(DECIMAL_PRECISION),
             calculated_at: Utc::now().naive_utc(),
         })
     }
@@ -745,6 +751,8 @@ impl SnapshotService {
             cost_basis: Decimal::ZERO,
             net_contribution: Decimal::ZERO,
             net_contribution_base: Decimal::ZERO,
+            outstanding_loans: Decimal::ZERO,
+            outstanding_loans_base: Decimal::ZERO,
             calculated_at: Utc::now().naive_utc(),
         }
     }

@@ -44,6 +44,12 @@ pub const ACTIVITY_TYPE_ADD_HOLDING: &str = "ADD_HOLDING";
 /// Write-off, gift, or expire a position without recording a sale. Fee only, decreases quantity.
 pub const ACTIVITY_TYPE_REMOVE_HOLDING: &str = "REMOVE_HOLDING";
 
+/// Loan or credit taken from external source. Increases cash but not net contribution.
+pub const ACTIVITY_TYPE_LOAN_TAKEN: &str = "LOAN_TAKEN";
+
+/// Loan or credit repaid to external source. Decreases cash but not net contribution.
+pub const ACTIVITY_TYPE_LOAN_REPAID: &str = "LOAN_REPAID";
+
 /// Trading activity types
 pub const TRADING_ACTIVITY_TYPES: [&str; 5] = [
     ACTIVITY_TYPE_BUY,
