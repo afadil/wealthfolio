@@ -10,10 +10,12 @@ import { formatDateTime } from '@/lib/utils';
 interface PortfolioUpdateTriggerProps {
   lastCalculatedAt: string | undefined;
   children: ReactNode;
+  recalculatePortfolio: () => void;
+  isRecalculating: boolean;
 }
 
 // Rename function
-export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: PortfolioUpdateTriggerProps) {
+export function PortfolioUpdateTrigger({ lastCalculatedAt, children, recalculatePortfolio, isRecalculating }: PortfolioUpdateTriggerProps) {
 
   // Instantiate the mutation hook inside the component
   const updatePortfolioMutation = useUpdatePortfolioMutation();
@@ -51,6 +53,20 @@ export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: Portfolio
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
             {updatePortfolioMutation.isPending ? 'Updating portfolio...' : 'Update Portfolio'}
+          </Button>
+          <Button
+            onClick={recalculatePortfolio}
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            disabled={isRecalculating}
+          >
+            {isRecalculating ? (
+              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Refresh className="mr-2 h-4 w-4" />
+            )}
+            {isRecalculating ? 'Recalculating...' : 'Recalculate'}
           </Button>
         </div>
       </HoverCardContent>
