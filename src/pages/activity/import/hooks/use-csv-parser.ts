@@ -134,7 +134,8 @@ export function useCsvParser() {
                 type: 'FieldMismatch',
                 code: 'TooFewFields',
                 message: message,
-                row: lineNumber,
+                // Use zero-based index within rawCsvLines so UI highlights the correct row
+                row: i,
               });
               // Optionally skip this row or fill missing values
               // continue; // If skipping

@@ -94,11 +94,11 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
+  <div className="flex h-full flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
       <div className="flex px-4 py-2 md:px-6 lg:px-10">
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 pt-10">
             <div>
               <div className="flex items-center gap-3">
                 <Balance

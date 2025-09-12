@@ -146,7 +146,7 @@ export const HoldingsPage = () => {
   }, [holdings]);
 
   return (
-    <ApplicationShell className="p-6 h-screen flex flex-col">
+  <ApplicationShell className="p-6 h-full flex flex-col">
       <Tabs defaultValue={defaultTab} className="flex flex-col h-full w-full">
         <div className="space-y-2 flex-shrink-0">
           <ApplicationHeader heading="Holdings">

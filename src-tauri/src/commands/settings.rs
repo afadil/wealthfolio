@@ -53,6 +53,27 @@ pub async fn update_settings(
         .await
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
+    if let Some(menu_visible) = settings_update.menu_bar_visible {
+        if menu_visible {
+            // Create and set the menu
+            match crate::menu::create_menu(&handle) {
+                Ok(menu) => {
+                    if let Err(e) = handle.set_menu(menu) {
+                        debug!("Failed to set menu: {}", e);
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to create menu: {}", e);
+                }
+            }
+        } else {
+            // Remove the menu entirely by setting it to None
+            if let Err(e) = handle.remove_menu() {
+                debug!("Failed to remove menu: {}", e);
+            }
+        }
+    }
+
     // If the base currency was changed, update the state and emit the event
     if base_currency_changed {
         // new_base_currency_val is guaranteed to be Some(String) here because

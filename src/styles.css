@@ -98,6 +98,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  html, body, #root {
+    height: 100%;
+  }
+  html, body {
+    overflow: hidden;
+  }
 }
 
 
@@ -113,4 +119,20 @@ number-flow-react::part(symbol) {
 number-flow-react.muted-fraction::part(decimal),
 number-flow-react.muted-fraction::part(fraction) {
   color: hsl(var(--muted-foreground));
+}
+
+/* app.css */
+html,
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* allow selection in editable controls (native behavior) */
+input,
+textarea,
+[contenteditable="true"],
+.allow-select {
+  -webkit-user-select: text;
+  user-select: text;
 }
