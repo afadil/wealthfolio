@@ -1,9 +1,7 @@
-import type { EventCallback, UnlistenFn } from '@/adapters';
-import { listenNavigateToRouteTauri, getRunEnv, RUN_ENV, logger } from '@/adapters';
+import type { EventCallback, UnlistenFn } from "@/adapters";
+import { listenNavigateToRouteTauri, getRunEnv, RUN_ENV, logger } from "@/adapters";
 
-export async function listenNavigateToRoute<T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> {
+export async function listenNavigateToRoute<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -14,7 +12,7 @@ export async function listenNavigateToRoute<T>(
         return () => {};
     }
   } catch (error) {
-    logger.error('Error listen navigate-to-route event.');
+    logger.error("Error listen navigate-to-route event.");
     return () => {};
   }
 }

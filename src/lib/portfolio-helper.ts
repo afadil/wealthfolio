@@ -1,4 +1,4 @@
-import { Goal, GoalAllocation, GoalProgress, AccountValuation } from './types';
+import { Goal, GoalAllocation, GoalProgress, AccountValuation } from "./types";
 
 export function calculateGoalProgress(
   accountsValuations: AccountValuation[],
@@ -11,7 +11,7 @@ export function calculateGoalProgress(
   }
 
   // Determine base currency (assuming consistency across account valuations data)
-  const baseCurrency = accountsValuations[0].baseCurrency || 'USD'; // Use first account's base currency
+  const baseCurrency = accountsValuations[0].baseCurrency || "USD"; // Use first account's base currency
 
   // Create a map of accountId to totalValue in baseCurrency for quick lookup
   const accountValueMap = new Map<string, number>();
@@ -44,14 +44,14 @@ export function calculateGoalProgress(
     }, 0);
 
     // Calculate progress percentage (base currency vs base currency)
-    const progress = goal.targetAmount > 0 ? (totalAllocatedValue / goal.targetAmount) : 0;
+    const progress = goal.targetAmount > 0 ? totalAllocatedValue / goal.targetAmount : 0;
 
     // Ensure progress does not exceed 100% visually if needed, although mathematically it can
     // const cappedProgress = Math.min(progress, 100);
 
     return {
       // Use goal.title for name consistency if desired, or keep as is
-      name: goal.title, 
+      name: goal.title,
       targetValue: goal.targetAmount, // Base Currency
       currentValue: totalAllocatedValue, // Base Currency
       progress: progress, // Use 'progress' or 'cappedProgress'
@@ -59,4 +59,3 @@ export function calculateGoalProgress(
     };
   });
 }
-

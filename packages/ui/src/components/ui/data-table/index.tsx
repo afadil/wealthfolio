@@ -11,21 +11,14 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
-import * as React from 'react';
+} from "@tanstack/react-table";
+import * as React from "react";
 
-import { Icons } from '@/components/ui/icons';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Icons } from "@/components/ui/icons";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import type { DataTableFacetedFilterProps } from './data-table-faceted-filter';
-import { DataTableToolbar } from './data-table-toolbar';
+import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
+import { DataTableToolbar } from "./data-table-toolbar";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -51,9 +44,7 @@ export function DataTable<TData, TValue>({
   showColumnToggle = false,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
-    defaultColumnVisibility || {},
-  );
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(defaultColumnVisibility || {});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
 
@@ -88,11 +79,11 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="shrink-0 mb-2">
+    <div className="flex h-full flex-col">
+      <div className="mb-2 shrink-0">
         <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} />
       </div>
-      <div className={`rounded-md border flex-1 min-h-0 ${scrollable ? 'overflow-auto' : ''}`}>
+      <div className={`min-h-0 flex-1 rounded-md border ${scrollable ? "overflow-auto" : ""}`}>
         <Table>
           <TableHeader className="bg-muted/50 sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -100,9 +91,7 @@ export function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   );
                 })}
@@ -112,11 +101,9 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}
                 </TableRow>
               ))
@@ -124,8 +111,8 @@ export function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center">
-                    <Icons.FileText className="mb-2 h-10 w-10 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No results found.</p>
+                    <Icons.FileText className="text-muted-foreground mb-2 h-10 w-10" />
+                    <p className="text-muted-foreground text-sm">No results found.</p>
                   </div>
                 </TableCell>
               </TableRow>

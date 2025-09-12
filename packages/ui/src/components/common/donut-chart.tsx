@@ -1,34 +1,38 @@
-import type React from 'react';
-import { PieChart, Pie, Cell, Sector } from 'recharts';
-import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
-import { AmountDisplay } from '../financial/amount-display';
-import { useBalancePrivacy } from '../../hooks/use-balance-privacy';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../ui/chart';
-import { formatPercent } from '../../lib/utils';
+import type React from "react";
+import { PieChart, Pie, Cell, Sector } from "recharts";
+import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
+import { AmountDisplay } from "../financial/amount-display";
+import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../ui/chart";
+import { formatPercent } from "../../lib/utils";
 
 const COLORS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-  'var(--chart-6)',
-  'var(--chart-7)',
-  'var(--chart-8)',
-  'var(--chart-9)',
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
 ];
 
 const renderActiveShape = (props: any) => {
   const { isBalanceHidden } = useBalancePrivacy();
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } =
-    props;
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } = props;
 
   const amountToDisplay = isBalanceHidden
-    ? '••••••'
-    : value.toLocaleString('en-US', { style: 'currency', currency: payload.currency || 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    ? "••••••"
+    : value.toLocaleString("en-US", {
+        style: "currency",
+        currency: payload.currency || "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       {/* Main sector */}
       <Sector
         cx={cx}
@@ -71,9 +75,9 @@ const renderActiveShape = (props: any) => {
         textAnchor="middle"
         fill="var(--foreground)"
         dominantBaseline="central"
-        className="text-xs font-bold "
+        className="text-xs font-bold"
       >
-        {isBalanceHidden ? '••••••' : amountToDisplay}
+        {isBalanceHidden ? "••••••" : amountToDisplay}
       </text>
 
       <text
@@ -94,7 +98,7 @@ const renderInactiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       <Sector
         cx={cx}
         cy={cy}
@@ -132,14 +136,10 @@ export const DonutChart: React.FC<DonutChartProps> = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const tooltipFormatter = (
-    value: ValueType,
-    name: NameType,
-    entry: any,
-  ) => {
+  const tooltipFormatter = (value: ValueType, name: NameType, entry: any) => {
     return (
       <div className="flex flex-col">
-        <span className="text-[0.70rem] uppercase text-muted-foreground">{name}</span>
+        <span className="text-muted-foreground text-[0.70rem] uppercase">{name}</span>
         <span className="font-bold">
           <AmountDisplay value={Number(value)} currency={entry.payload.currency} isHidden={isBalanceHidden} />
         </span>
@@ -152,7 +152,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         {displayTooltip && (
           <ChartTooltip
-            cursor={{ fill: 'var(--muted)', opacity: 0.3 }}
+            cursor={{ fill: "var(--muted)", opacity: 0.3 }}
             content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
             position={{ y: 0 }}
           />

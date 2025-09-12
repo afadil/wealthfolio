@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom';
-import { cleanup } from '@testing-library/react';
-import { vi, afterEach } from 'vitest';
-import * as matchers from '@testing-library/jest-dom/matchers';
+import "@testing-library/jest-dom";
+import { cleanup } from "@testing-library/react";
+import { vi, afterEach } from "vitest";
+import * as matchers from "@testing-library/jest-dom/matchers";
 
 // Extend Vitest's expect method with methods from react-testing-library
 expect.extend(matchers);
@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 // Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
     matches: false,

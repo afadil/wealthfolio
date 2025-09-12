@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ApplicationHeader } from '@/components/header';
+import { useMemo, useState } from "react";
+import { ApplicationHeader } from "@/components/header";
 import {
   ApplicationShell,
   Card,
@@ -10,22 +10,22 @@ import {
   GainPercent,
   IntervalSelector,
   PrivacyAmount,
-} from '@wealthfolio/ui';
-import { HistoryChart } from '@/components/history-chart';
-import {} from '@/components/ui/card';
+} from "@wealthfolio/ui";
+import { HistoryChart } from "@/components/history-chart";
+import {} from "@/components/ui/card";
 
-import { useParams } from 'react-router-dom';
-import AccountMetrics from './account-metrics';
-import AccountHoldings from './account-holdings';
-import { AccountValuation, DateRange, TrackedItem, TimePeriod } from '@/lib/types';
-import { useAccounts } from '@/hooks/use-accounts';
-import { AccountContributionLimit } from './account-contribution-limit';
-import { PrivacyToggle } from '@/components/privacy-toggle';
-import { useValuationHistory } from '@/hooks/use-valuation-history';
-import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
-import { useCalculatePerformanceHistory } from '@/pages/performance/hooks/use-performance-data';
-import { subMonths } from 'date-fns';
-import { calculatePerformanceMetrics } from '@/lib/utils';
+import { useParams } from "react-router-dom";
+import AccountMetrics from "./account-metrics";
+import AccountHoldings from "./account-holdings";
+import { AccountValuation, DateRange, TrackedItem, TimePeriod } from "@/lib/types";
+import { useAccounts } from "@/hooks/use-accounts";
+import { AccountContributionLimit } from "./account-contribution-limit";
+import { PrivacyToggle } from "@/components/privacy-toggle";
+import { useValuationHistory } from "@/hooks/use-valuation-history";
+import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
+import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
+import { subMonths } from "date-fns";
+import { calculatePerformanceMetrics } from "@/lib/utils";
 
 interface HistoryChartData {
   date: string;
@@ -41,10 +41,10 @@ const getInitialDateRange = (): DateRange => ({
 });
 
 // Define the initial interval code (consistent with other pages)
-const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
+const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 const AccountPage = () => {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id = "" } = useParams<{ id: string }>();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalCode, setSelectedIntervalCode] =
     useState<TimePeriod>(INITIAL_INTERVAL_CODE);
@@ -54,7 +54,7 @@ const AccountPage = () => {
 
   const accountTrackedItem: TrackedItem | undefined = useMemo(() => {
     if (account) {
-      return { id: account.id, type: 'account', name: account.name };
+      return { id: account.id, type: "account", name: account.name };
     }
     return undefined;
   }, [account]);
@@ -104,7 +104,7 @@ const AccountPage = () => {
   };
 
   const percentageToDisplay = useMemo(() => {
-    if (selectedIntervalCode === 'ALL') {
+    if (selectedIntervalCode === "ALL") {
       return frontendSimpleReturn;
     }
     // For other intervals, if accountPerformance is available, use cumulativeMwr
@@ -117,7 +117,7 @@ const AccountPage = () => {
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader
-        heading={account?.name || 'Account'}
+        heading={account?.name || "Account"}
         headingPrefix={account?.group || account?.currency}
         displayBack={true}
       />
@@ -131,17 +131,17 @@ const AccountPage = () => {
                     <p className="pt-3 text-xl font-bold">
                       <PrivacyAmount
                         value={currentValuation?.totalValue || 0}
-                        currency={account?.currency || 'USD'}
+                        currency={account?.currency || "USD"}
                       />
                     </p>
                     <div className="flex space-x-3 text-sm">
                       <GainAmount
                         className="text-sm font-light"
                         value={frontendGainLossAmount}
-                        currency={account?.currency || 'USD'}
+                        currency={account?.currency || "USD"}
                         displayCurrency={false}
                       />
-                      <div className="my-1 border-r border-muted-foreground pr-2" />
+                      <div className="border-muted-foreground my-1 border-r pr-2" />
                       <GainPercent
                         className="text-sm font-light"
                         value={percentageToDisplay}
@@ -160,7 +160,7 @@ const AccountPage = () => {
                 <div className="h-[480px] w-full">
                   <HistoryChart data={chartData} isLoading={false} />
                   <IntervalSelector
-                    className="relative bottom-10 left-0 right-0 z-10"
+                    className="relative right-0 bottom-10 left-0 z-10"
                     onIntervalSelect={handleIntervalSelect}
                     isLoading={isValuationHistoryLoading}
                     initialSelection={INITIAL_INTERVAL_CODE}

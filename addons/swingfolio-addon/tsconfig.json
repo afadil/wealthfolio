@@ -1,21 +1,18 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+    // Addon-specific settings
     "noEmit": true,
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+
+    // Path mapping for addon
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@wealthfolio/addon-sdk": ["../../packages/addon-sdk/src"],
+      "@wealthfolio/ui": ["../../packages/ui/src"],
+      "@wealthfolio/ui/*": ["../../packages/ui/src/*"]
+    }
   },
   "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "../../packages/ui" }]
 }

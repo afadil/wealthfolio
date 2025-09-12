@@ -1,33 +1,21 @@
-import * as React from 'react';
-import { Input } from '../ui/input';
-import { cn } from '../../lib/utils';
+import * as React from "react";
+import { Input } from "../ui/input";
+import { cn } from "../../lib/utils";
 
-export interface QuantityInputProps
-  extends Omit<React.ComponentPropsWithoutRef<typeof Input>, 'type' | 'inputMode'> {
+export interface QuantityInputProps extends Omit<React.ComponentPropsWithoutRef<typeof Input>, "type" | "inputMode"> {
   maxDecimalPlaces?: number;
   allowNegative?: boolean;
 }
 
 const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
-  (
-    {
-      className,
-      maxDecimalPlaces = 8,
-      allowNegative = false,
-      value,
-      defaultValue,
-      onChange,
-      ...props
-    },
-    ref,
-  ) => {
+  ({ className, maxDecimalPlaces = 8, allowNegative = false, value, defaultValue, onChange, ...props }, ref) => {
     // Modify the sanitizedValue logic to consider defaultValue
     const sanitizedValue =
       value !== null && value !== undefined
         ? value
         : defaultValue !== null && defaultValue !== undefined
           ? defaultValue
-          : '';
+          : "";
 
     const handleChange = React.useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,12 +29,10 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
         }
 
         // Ensure only one decimal point
-        const decimalIndex = rawValue.indexOf('.');
+        const decimalIndex = rawValue.indexOf(".");
         let processedValue = rawValue;
         if (decimalIndex !== -1) {
-          processedValue =
-            rawValue.slice(0, decimalIndex + 1) +
-            rawValue.slice(decimalIndex + 1).replace(/\./g, '');
+          processedValue = rawValue.slice(0, decimalIndex + 1) + rawValue.slice(decimalIndex + 1).replace(/\./g, "");
         }
 
         // Limit decimal places
@@ -77,7 +63,7 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
         type="text"
         inputMode="decimal"
         placeholder="0.00"
-        className={cn('text-right', className)}
+        className={cn("text-right", className)}
         ref={ref}
         {...props}
         value={sanitizedValue}
@@ -87,6 +73,6 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
   },
 );
 
-QuantityInput.displayName = 'QuantityInput';
+QuantityInput.displayName = "QuantityInput";
 
 export { QuantityInput };

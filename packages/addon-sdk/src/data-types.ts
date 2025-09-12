@@ -222,7 +222,9 @@ export interface ImportValidationResult {
   };
 }
 
-export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
+export type ValidationResult =
+  | { status: 'success' }
+  | { status: 'error'; errors: string[] };
 
 // Holding types
 export interface Sector {
@@ -491,7 +493,10 @@ export interface ContributionLimit {
   updatedAt?: string;
 }
 
-export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewContributionLimit = Omit<
+  ContributionLimit,
+  'id' | 'createdAt' | 'updatedAt'
+>;
 
 export interface AccountDeposit {
   amount: number;

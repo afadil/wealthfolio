@@ -1,20 +1,20 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { useState } from 'react';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { useState } from "react";
 
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 
-import { worldCurrencies } from '@wealthfolio/ui';
-import { ExchangeRate } from '@/lib/types';
-import { Icons } from '@/components/ui/icons';
+import { worldCurrencies } from "@wealthfolio/ui";
+import { ExchangeRate } from "@/lib/types";
+import { Icons } from "@/components/ui/icons";
 import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -22,34 +22,34 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { ScrollArea } from '@/components/ui/scroll-area';
+} from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Command,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { MoneyInput } from '@wealthfolio/ui';
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { MoneyInput } from "@wealthfolio/ui";
 
 const exchangeRateSchema = z.object({
-  fromCurrency: z.string().min(1, 'From Currency is required'),
-  toCurrency: z.string().min(1, 'To Currency is required'),
+  fromCurrency: z.string().min(1, "From Currency is required"),
+  toCurrency: z.string().min(1, "To Currency is required"),
   rate: z.coerce
     .number({
-      required_error: 'Please enter a valid rate.',
-      invalid_type_error: 'Rate must be a valid positive number.',
+      required_error: "Please enter a valid rate.",
+      invalid_type_error: "Rate must be a valid positive number.",
     })
-    .min(0, { message: 'Rate must be a non-negative number.' }),
+    .min(0, { message: "Rate must be a non-negative number." }),
 });
 
 type ExchangeRateFormData = z.infer<typeof exchangeRateSchema>;
 
 interface AddExchangeRateFormProps {
-  onSubmit: (newRate: Omit<ExchangeRate, 'id'>) => void;
+  onSubmit: (newRate: Omit<ExchangeRate, "id">) => void;
   onCancel: () => void;
 }
 
@@ -57,8 +57,8 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
   const form = useForm<ExchangeRateFormData>({
     resolver: zodResolver(exchangeRateSchema),
     defaultValues: {
-      fromCurrency: '',
-      toCurrency: '',
+      fromCurrency: "",
+      toCurrency: "",
       rate: 0,
     },
   });
@@ -66,13 +66,13 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
   const handleSubmit = (data: ExchangeRateFormData) => {
     onSubmit({
       ...data,
-      source: 'MANUAL',
+      source: "MANUAL",
       timestamp: new Date().toISOString(),
     });
   };
 
-  const renderCurrencyField = (fieldName: 'fromCurrency' | 'toCurrency') => {
-    const [searchValue, setSearchValue] = useState('');
+  const renderCurrencyField = (fieldName: "fromCurrency" | "toCurrency") => {
+    const [searchValue, setSearchValue] = useState("");
 
     const handleSearchChange = (value: string) => {
       setSearchValue(value);
@@ -92,19 +92,19 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
         name={fieldName}
         render={({ field }) => (
           <FormItem className="flex flex-col">
-            <FormLabel>{fieldName === 'fromCurrency' ? 'From Currency' : 'To Currency'}</FormLabel>
+            <FormLabel>{fieldName === "fromCurrency" ? "From Currency" : "To Currency"}</FormLabel>
             <Popover modal={true}>
               <PopoverTrigger asChild>
                 <FormControl>
                   <Button
                     variant="outline"
                     role="combobox"
-                    className={cn('justify-between', !field.value && 'text-muted-foreground')}
+                    className={cn("justify-between", !field.value && "text-muted-foreground")}
                   >
                     {field.value
                       ? worldCurrencies.find((currency) => currency.value === field.value)?.label ||
                         field.value
-                      : 'Select currency'}
+                      : "Select currency"}
                     <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </FormControl>
@@ -128,8 +128,8 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                           >
                             <Icons.Plus
                               className={cn(
-                                'mr-2 h-4 w-4',
-                                searchValue === field.value ? 'opacity-100' : 'opacity-0',
+                                "mr-2 h-4 w-4",
+                                searchValue === field.value ? "opacity-100" : "opacity-0",
                               )}
                             />
                             <span className="font-semibold italic">Custom ({searchValue})</span>
@@ -152,8 +152,8 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                             >
                               <Icons.Check
                                 className={cn(
-                                  'mr-2 h-4 w-4',
-                                  currency.value === field.value ? 'opacity-100' : 'opacity-0',
+                                  "mr-2 h-4 w-4",
+                                  currency.value === field.value ? "opacity-100" : "opacity-0",
                                 )}
                               />
                               {currency.label}
@@ -181,8 +181,8 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
         </DialogHeader>
 
         <div className="grid gap-10 p-4">
-          {renderCurrencyField('fromCurrency')}
-          {renderCurrencyField('toCurrency')}
+          {renderCurrencyField("fromCurrency")}
+          {renderCurrencyField("toCurrency")}
 
           <FormField
             control={form.control}
@@ -191,10 +191,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
               <FormItem>
                 <FormLabel>Exchange Rate</FormLabel>
                 <FormControl>
-                  <MoneyInput
-                    placeholder="Enter exchange rate"
-                    {...field}
-                  />
+                  <MoneyInput placeholder="Enter exchange rate" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

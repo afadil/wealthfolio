@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
-import { Skeleton } from '@/components/ui/skeleton';
-import { AccountOperations } from './account-operations';
-import type { Account } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
+import { Link } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AccountOperations } from "./account-operations";
+import type { Account } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 
 export interface AccountItemProps {
   account: Account;
@@ -17,13 +17,13 @@ export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
         <Link
           to={`/accounts/${account.id}`}
           className={`font-semibold hover:underline ${
-            !account.isActive ? 'text-muted-foreground' : ''
+            !account.isActive ? "text-muted-foreground" : ""
           }`}
         >
           {account.name}
         </Link>
         <div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {account.currency}
             {account.group && <span className="text-muted-foreground"> - {account.group}</span>}
           </p>

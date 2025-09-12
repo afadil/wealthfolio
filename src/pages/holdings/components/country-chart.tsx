@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Holding, Country } from '@/lib/types';
-import { DonutChart, EmptyPlaceholder, Skeleton } from '@wealthfolio/ui';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState } from "react";
+import { Holding, Country } from "@/lib/types";
+import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CountryChartProps {
   holdings?: Holding[];
@@ -16,7 +16,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
     if (!holdings || holdings.length === 0) return [];
 
     // Assume baseCurrency is consistent across holdings or default to USD
-    const currency = holdings[0]?.baseCurrency || 'USD';
+    const currency = holdings[0]?.baseCurrency || "USD";
 
     const countryMap = new Map<string, number>();
     holdings.forEach((holding) => {
@@ -27,8 +27,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
         countries.forEach((country: Country) => {
           const currentValue = countryMap.get(country.name) || 0;
           const weight = Number(country.weight) || 0;
-          const weightedValue =
-            marketValue * (weight > 1 ? weight / 100 : weight);
+          const weightedValue = marketValue * (weight > 1 ? weight / 100 : weight);
           countryMap.set(country.name, currentValue + weightedValue);
         });
       }
@@ -61,13 +60,17 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
     setActiveIndex(index);
   };
 
-  const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
+  const handleInternalSectionClick = (sectionData: {
+    name: string;
+    value: number;
+    currency: string;
+  }) => {
     if (onCountrySectionClick) {
       onCountrySectionClick(sectionData.name);
     }
-    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    const clickedIndex = data.findIndex((d) => d.name === sectionData.name);
     if (clickedIndex !== -1) {
-        setActiveIndex(clickedIndex);
+      setActiveIndex(clickedIndex);
     }
   };
 
@@ -75,7 +78,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
             Country Allocation
           </CardTitle>
         </div>

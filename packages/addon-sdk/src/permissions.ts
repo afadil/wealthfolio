@@ -49,7 +49,6 @@ export interface PermissionCategory {
   riskLevel: RiskLevel;
 }
 
-
 /**
  * Predefined permission categories with their associated functions and risk levels
  */
@@ -97,44 +96,28 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     id: 'market-data',
     name: 'Market Data',
     description: 'Access to market prices, quotes, and financial data',
-    functions: [
-      'searchTicker',
-      'syncHistory',
-      'sync',
-      'getProviders',
-    ],
+    functions: ['searchTicker', 'syncHistory', 'sync', 'getProviders'],
     riskLevel: 'low',
   },
   {
     id: 'assets',
     name: 'Asset Management',
     description: 'Access to asset profiles and data sources',
-    functions: [
-      'getProfile',
-      'updateProfile',
-      'updateDataSource',
-    ],
+    functions: ['getProfile', 'updateProfile', 'updateDataSource'],
     riskLevel: 'medium',
   },
   {
     id: 'quotes',
     name: 'Quote Management',
     description: 'Access to price quotes and historical data',
-    functions: [
-      'update',
-      'getHistory',
-    ],
+    functions: ['update', 'getHistory'],
     riskLevel: 'low',
   },
   {
     id: 'performance',
     name: 'Performance Analytics',
     description: 'Access to performance calculations and metrics',
-    functions: [
-      'calculateHistory',
-      'calculateSummary',
-      'calculateAccountsSimple',
-    ],
+    functions: ['calculateHistory', 'calculateSummary', 'calculateAccountsSimple'],
     riskLevel: 'medium',
   },
   {
@@ -148,25 +131,14 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     id: 'goals',
     name: 'Goals Management',
     description: 'Access to financial goals and allocations',
-    functions: [
-      'getAll',
-      'create',
-      'update',
-      'updateAllocations',
-      'getAllocations',
-    ],
+    functions: ['getAll', 'create', 'update', 'updateAllocations', 'getAllocations'],
     riskLevel: 'medium',
   },
   {
     id: 'contribution-limits',
     name: 'Contribution Limits',
     description: 'Access to contribution limits and deposit calculations',
-    functions: [
-      'getAll',
-      'create',
-      'update',
-      'calculateDeposits',
-    ],
+    functions: ['getAll', 'create', 'update', 'calculateDeposits'],
     riskLevel: 'medium',
   },
   {
@@ -226,13 +198,13 @@ export function createFunctionPermission(
   name: string,
   isDeclared: boolean = false,
   isDetected: boolean = false,
-  detectedAt?: string
+  detectedAt?: string,
 ): FunctionPermission {
   return {
     name,
     isDeclared,
     isDetected,
-    detectedAt: isDetected ? (detectedAt || new Date().toISOString()) : undefined
+    detectedAt: isDetected ? detectedAt || new Date().toISOString() : undefined,
   };
 }
 
@@ -240,22 +212,24 @@ export function createFunctionPermission(
  * Get permission category by ID
  */
 export function getPermissionCategory(id: string): PermissionCategory | undefined {
-  return PERMISSION_CATEGORIES.find(category => category.id === id);
+  return PERMISSION_CATEGORIES.find((category) => category.id === id);
 }
 
 /**
  * Get permission categories by risk level
  */
-export function getPermissionCategoriesByRisk(riskLevel: RiskLevel): PermissionCategory[] {
-  return PERMISSION_CATEGORIES.filter(category => category.riskLevel === riskLevel);
+export function getPermissionCategoriesByRisk(
+  riskLevel: RiskLevel,
+): PermissionCategory[] {
+  return PERMISSION_CATEGORIES.filter((category) => category.riskLevel === riskLevel);
 }
 
 /**
  * Get the risk level for a specific function
  */
 export function getFunctionRiskLevel(functionName: string): RiskLevel | undefined {
-  const category = PERMISSION_CATEGORIES.find(cat => 
-    cat.functions.includes(functionName)
+  const category = PERMISSION_CATEGORIES.find((cat) =>
+    cat.functions.includes(functionName),
   );
   return category?.riskLevel;
 }
@@ -272,18 +246,14 @@ export function isPermissionRequired(functionName: string, categoryId: string): 
  * Get all declared functions from a permission
  */
 export function getDeclaredFunctions(permission: Permission): string[] {
-  return permission.functions
-    .filter(func => func.isDeclared)
-    .map(func => func.name);
+  return permission.functions.filter((func) => func.isDeclared).map((func) => func.name);
 }
 
 /**
  * Get all detected functions from a permission
  */
 export function getDetectedFunctions(permission: Permission): string[] {
-  return permission.functions
-    .filter(func => func.isDetected)
-    .map(func => func.name);
+  return permission.functions.filter((func) => func.isDetected).map((func) => func.name);
 }
 
 /**
@@ -291,41 +261,38 @@ export function getDetectedFunctions(permission: Permission): string[] {
  */
 export function getUndeclaredDetectedFunctions(permission: Permission): string[] {
   return permission.functions
-    .filter(func => func.isDetected && !func.isDeclared)
-    .map(func => func.name);
+    .filter((func) => func.isDetected && !func.isDeclared)
+    .map((func) => func.name);
 }
 
 /**
  * Check if a permission has any undeclared detected functions
  */
 export function hasUndeclaredDetectedFunctions(permission: Permission): boolean {
-  return permission.functions.some(func => func.isDetected && !func.isDeclared);
+  return permission.functions.some((func) => func.isDetected && !func.isDeclared);
 }
 
 /**
  * Add a detected function to a permission
  */
 export function addDetectedFunction(
-  permission: Permission, 
-  functionName: string, 
-  detectedAt?: string
+  permission: Permission,
+  functionName: string,
+  detectedAt?: string,
 ): Permission {
-  const existingFunc = permission.functions.find(f => f.name === functionName);
-  
+  const existingFunc = permission.functions.find((f) => f.name === functionName);
+
   if (existingFunc) {
     // Update existing function to mark as detected
     existingFunc.isDetected = true;
     existingFunc.detectedAt = detectedAt || new Date().toISOString();
   } else {
     // Add new detected function
-    permission.functions.push(createFunctionPermission(
-      functionName, 
-      false, 
-      true, 
-      detectedAt
-    ));
+    permission.functions.push(
+      createFunctionPermission(functionName, false, true, detectedAt),
+    );
   }
-  
+
   return permission;
 }
 
@@ -333,17 +300,17 @@ export function addDetectedFunction(
  * Mark a function as declared in a permission
  */
 export function markFunctionAsDeclared(
-  permission: Permission, 
-  functionName: string
+  permission: Permission,
+  functionName: string,
 ): Permission {
-  const existingFunc = permission.functions.find(f => f.name === functionName);
-  
+  const existingFunc = permission.functions.find((f) => f.name === functionName);
+
   if (existingFunc) {
     existingFunc.isDeclared = true;
   } else {
     // Add new declared function
     permission.functions.push(createFunctionPermission(functionName, true, false));
   }
-  
+
   return permission;
 }

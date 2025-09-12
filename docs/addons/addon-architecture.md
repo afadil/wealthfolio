@@ -4,7 +4,10 @@ A straightforward explanation of how Wealthfolio's addon system works.
 
 ## What Are Wealthfolio Addons?
 
-Addons are TypeScript modules that extend Wealthfolio's functionality. Each addon is a JavaScript function that receives an `AddonContext` object and can register UI components, add navigation items, and access financial data through APIs.
+Addons are TypeScript modules that extend Wealthfolio's functionality. Each
+addon is a JavaScript function that receives an `AddonContext` object and can
+register UI components, add navigation items, and access financial data through
+APIs.
 
 ## Basic Structure
 
@@ -33,8 +36,11 @@ Addons are TypeScript modules that extend Wealthfolio's functionality. Each addo
 ```
 
 The system has two main parts:
-- **Host Application**: Manages addon lifecycle, enforces permissions, provides APIs
-- **Addons**: JavaScript functions that receive context and register functionality
+
+- **Host Application**: Manages addon lifecycle, enforces permissions, provides
+  APIs
+- **Addons**: JavaScript functions that receive context and register
+  functionality
 
 ## Addon Lifecycle
 
@@ -77,8 +83,9 @@ interface AddonContext {
 ```
 
 The context provides:
+
 - **Sidebar**: Add navigation items
-- **Router**: Register new routes/pages  
+- **Router**: Register new routes/pages
 - **onDisable**: Register cleanup functions
 - **API**: Access to financial data and operations
 
@@ -95,8 +102,9 @@ const accounts = await ctx.api.accounts.getAll();
 ```
 
 The Rust backend scans for patterns like:
+
 - `ctx.api.accounts.getAll(`
-- `api.accounts.getAll(`  
+- `api.accounts.getAll(`
 - `.api.accounts.getAll(`
 
 ### Permission Flow
@@ -117,30 +125,31 @@ The Rust backend scans for patterns like:
 
 Based on the actual code, these are the permission categories:
 
-| Category | Functions | Risk Level |
-|----------|-----------|------------|
-| `accounts` | getAll, create | High |
-| `portfolio` | getHoldings, update, recalculate | High |
-| `activities` | getAll, search, create, update, import | High |
-| `market-data` | searchTicker, sync, getProviders | Low |
-| `assets` | getProfile, updateProfile, updateDataSource | Medium |
-| `quotes` | update, getHistory | Low |
-| `performance` | calculateHistory, calculateSummary | Medium |
-| `currency` | getAll, update, add | Low |
-| `goals` | getAll, create, update, updateAllocations | Medium |
-| `contribution-limits` | getAll, create, update, calculateDeposits | Medium |
-| `settings` | get, update, backupDatabase | Medium |
-| `files` | openCsvDialog, openSaveDialog | Medium |
-| `events` | onDrop, onUpdateComplete, onSyncStart | Low |
-| `ui` | sidebar.addItem, router.add | Low |
-| `secrets` | set, get, delete | High |
+| Category              | Functions                                   | Risk Level |
+| --------------------- | ------------------------------------------- | ---------- |
+| `accounts`            | getAll, create                              | High       |
+| `portfolio`           | getHoldings, update, recalculate            | High       |
+| `activities`          | getAll, search, create, update, import      | High       |
+| `market-data`         | searchTicker, sync, getProviders            | Low        |
+| `assets`              | getProfile, updateProfile, updateDataSource | Medium     |
+| `quotes`              | update, getHistory                          | Low        |
+| `performance`         | calculateHistory, calculateSummary          | Medium     |
+| `currency`            | getAll, update, add                         | Low        |
+| `goals`               | getAll, create, update, updateAllocations   | Medium     |
+| `contribution-limits` | getAll, create, update, calculateDeposits   | Medium     |
+| `settings`            | get, update, backupDatabase                 | Medium     |
+| `files`               | openCsvDialog, openSaveDialog               | Medium     |
+| `events`              | onDrop, onUpdateComplete, onSyncStart       | Low        |
+| `ui`                  | sidebar.addItem, router.add                 | Low        |
+| `secrets`             | set, get, delete                            | High       |
 
 ### Permission Enforcement
 
 The permission system works in three stages:
 
 1. **Static Analysis**: Code is scanned for API patterns during installation
-2. **Declaration Matching**: Detected usage is compared with manifest declarations
+2. **Declaration Matching**: Detected usage is compared with manifest
+   declarations
 3. **Runtime Validation**: API calls are checked against approved permissions
 
 ### Secrets Scoping
@@ -149,7 +158,7 @@ Each addon gets isolated secret storage:
 
 ```typescript
 // Addon "my-addon" accessing secrets
-await ctx.api.secrets.set('api-key', 'value');
+await ctx.api.secrets.set("api-key", "value");
 // Stored as: "addon_my-addon_api-key"
 ```
 
@@ -247,11 +256,12 @@ The system uses a type bridge to convert between internal types and SDK types:
 // Internal command function
 getHoldings(accountId: string): Promise<Holding[]>
 
-// SDK API method  
+// SDK API method
 api.portfolio.getHoldings(accountId: string): Promise<Holding[]>
 ```
 
-This allows the internal implementation to change without breaking addon compatibility.
+This allows the internal implementation to change without breaking addon
+compatibility.
 
 ## Development Architecture
 
@@ -287,12 +297,13 @@ Development addons run from local servers:
 ```
 Development Server (localhost:3001)
 ├─ /health          # Health check
-├─ /status          # Build status  
+├─ /status          # Build status
 ├─ /manifest.json   # Addon manifest
 └─ /addon.js        # Built addon code
 ```
 
-The host application discovers running dev servers by checking common ports (3001, 3002, 3003) for health endpoints.
+The host application discovers running dev servers by checking common ports
+(3001, 3002, 3003) for health endpoints.
 
 ### Build Process
 
@@ -305,7 +316,8 @@ The host application discovers running dev servers by checking common ports (300
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-The addon is bundled into a single JavaScript file that exports an enable function.
+The addon is bundled into a single JavaScript file that exports an enable
+function.
 
 ## Loading Process
 
@@ -376,6 +388,7 @@ The API is scoped to the addon ID for secret storage isolation.
 ### Addon Failures
 
 If an addon fails to load or crashes:
+
 1. Error is logged
 2. Host application continues normally
 3. Other addons are unaffected
@@ -384,6 +397,7 @@ If an addon fails to load or crashes:
 ### Permission Violations
 
 If an addon tries to call an unauthorized API:
+
 1. `PermissionError` is thrown
 2. API call is blocked
 3. Error is logged
@@ -433,8 +447,9 @@ If an addon tries to call an unauthorized API:
 ### Risk Assessment
 
 Permissions are categorized by risk:
+
 - **High**: Can modify financial data (accounts, activities)
-- **Medium**: Can read sensitive data (portfolio, goals)  
+- **Medium**: Can read sensitive data (portfolio, goals)
 - **Low**: Read-only market data and UI operations
 
 ## Implementation Details
@@ -447,22 +462,22 @@ Every addon exports an enable function:
 export default function enable(ctx: AddonContext) {
   // Register UI elements
   const sidebar = ctx.sidebar.addItem({
-    id: 'my-feature',
-    label: 'My Feature',
-    route: '/my-feature'
+    id: "my-feature",
+    label: "My Feature",
+    route: "/my-feature",
   });
-  
+
   // Register route
   ctx.router.add({
-    path: '/my-feature',
-    component: React.lazy(() => import('./MyComponent'))
+    path: "/my-feature",
+    component: React.lazy(() => import("./MyComponent")),
   });
-  
+
   // Return cleanup function
   return {
     disable() {
       sidebar.remove();
-    }
+    },
   };
 }
 ```
@@ -473,7 +488,7 @@ Addons are loaded dynamically using JavaScript's import() function:
 
 ```typescript
 // Create blob URL from addon code
-const blob = new Blob([addonCode], { type: 'text/javascript' });
+const blob = new Blob([addonCode], { type: "text/javascript" });
 const blobUrl = URL.createObjectURL(blob);
 
 // Dynamic import
@@ -487,6 +502,7 @@ const result = enableFunction(createAddonContext(addonId));
 ### Cleanup
 
 When addons are disabled:
+
 1. Their disable function is called
 2. UI elements are removed
 3. Event listeners are unregistered
@@ -512,12 +528,14 @@ Each addon includes a manifest.json file:
 ```
 
 Required fields:
+
 - `id`: Unique identifier
 - `name`: Display name
 - `version`: Semantic version
 - `main`: Entry point file
 
 Optional fields:
+
 - `description`: What the addon does
 - `author`: Creator information
 - `permissions`: Required API access

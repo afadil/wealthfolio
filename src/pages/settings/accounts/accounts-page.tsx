@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
-import { AccountItem } from './components/account-item';
-import { AccountEditModal } from './components/account-edit-modal';
-import type { Account } from '@/lib/types';
-import { SettingsHeader } from '../header';
-import { getAccounts } from '@/commands/account';
-import { useQuery } from '@tanstack/react-query';
-import { QueryKeys } from '@/lib/query-keys';
-import { useAccountMutations } from './components/use-account-mutations';
+import { useState } from "react";
+import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from "@wealthfolio/ui";
+import { AccountItem } from "./components/account-item";
+import { AccountEditModal } from "./components/account-edit-modal";
+import type { Account } from "@/lib/types";
+import { SettingsHeader } from "../header";
+import { getAccounts } from "@/commands/account";
+import { useQuery } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import { useAccountMutations } from "./components/use-account-mutations";
 
 const SettingsAccountsPage = () => {
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
@@ -66,7 +66,7 @@ const SettingsAccountsPage = () => {
         <Separator />
         <div className="mx-auto w-full pt-8">
           {accounts?.length ? (
-            <div className="divide-y divide-border rounded-md border">
+            <div className="divide-border divide-y rounded-md border">
               {accounts.map((account: Account) => (
                 <AccountItem
                   key={account.id}

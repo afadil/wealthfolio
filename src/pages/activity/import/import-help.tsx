@@ -1,7 +1,7 @@
-import { Icons } from '@/components/ui/icons';
+import { Icons } from "@/components/ui/icons";
 
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 export function ImportHelpPopover() {
   return (
@@ -17,15 +17,16 @@ export function ImportHelpPopover() {
         <div className="mt-4 grid grid-cols-2 gap-6">
           {/* Left Column - Instructions */}
           <div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Import your account activities from CSV files with automatic data normalization and flexible column mapping.
+            <p className="text-muted-foreground mt-2 text-sm">
+              Import your account activities from CSV files with automatic data normalization and
+              flexible column mapping.
             </p>
             <ol className="mt-3 list-inside list-decimal space-y-1 text-sm">
               <li>Ensure your CSV has headers with the required fields</li>
               <li>Select account and upload your CSV file</li>
               <li>
                 Map CSV columns to required fields:
-                <span className="ml-2 text-xs text-muted-foreground">
+                <span className="text-muted-foreground ml-2 text-xs">
                   date, symbol, quantity, activityType, unitPrice, currency, fee, amount
                 </span>
               </li>
@@ -35,19 +36,28 @@ export function ImportHelpPopover() {
             <div className="mt-4 space-y-3">
               <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
                 <p className="text-sm">
-                  <strong className="text-blue-700 dark:text-blue-300">💡 Tip:</strong> Column names and activity types don't need to match exactly - you can map them during import. Mappings are saved for future imports.
+                  <strong className="text-blue-700 dark:text-blue-300">💡 Tip:</strong> Column names
+                  and activity types don't need to match exactly - you can map them during import.
+                  Mappings are saved for future imports.
                 </p>
               </div>
-              
+
               <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
                 <p className="text-sm">
-                  <strong className="text-green-700 dark:text-green-300">💰 Amount field:</strong> For cash activities (DIVIDEND, DEPOSIT, WITHDRAWAL, TAX, FEE, INTEREST, TRANSFER_IN, TRANSFER_OUT), amount is preferred when provided, otherwise calculated from quantity × unitPrice.
+                  <strong className="text-green-700 dark:text-green-300">💰 Amount field:</strong>{" "}
+                  For cash activities (DIVIDEND, DEPOSIT, WITHDRAWAL, TAX, FEE, INTEREST,
+                  TRANSFER_IN, TRANSFER_OUT), amount is preferred when provided, otherwise
+                  calculated from quantity × unitPrice.
                 </p>
               </div>
 
               <div className="border-purple-500 bg-purple-50 p-3 dark:bg-purple-900/50">
                 <p className="text-sm">
-                  <strong className="text-purple-700 dark:text-purple-300">⚡ Auto-formatting:</strong> Negative values, currency symbols ($, £, €), commas, and parentheses are automatically handled. No manual data cleanup needed.
+                  <strong className="text-purple-700 dark:text-purple-300">
+                    ⚡ Auto-formatting:
+                  </strong>{" "}
+                  Negative values, currency symbols ($, £, €), commas, and parentheses are
+                  automatically handled. No manual data cleanup needed.
                 </p>
               </div>
             </div>
@@ -58,7 +68,7 @@ export function ImportHelpPopover() {
             <div className="space-y-4">
               <div>
                 <p className="font-semibold">Supported Activity Types:</p>
-                <pre className="mt-2 overflow-x-auto bg-muted p-4 text-xs">
+                <pre className="bg-muted mt-2 overflow-x-auto p-4 text-xs">
                   <ul className="list-inside list-disc space-y-1">
                     <li>BUY</li>
                     <li>SELL</li>
@@ -79,7 +89,7 @@ export function ImportHelpPopover() {
 
               <div>
                 <p className="font-semibold">Example CSV format:</p>
-                <pre className="mt-2 overflow-x-auto bg-muted p-3 text-xs leading-relaxed select-all">
+                <pre className="bg-muted mt-2 overflow-x-auto p-3 text-xs leading-relaxed select-all">
                   <span className="text-muted-foreground"># Standard format:</span>
                   <br />
                   date,symbol,quantity,activityType,unitPrice,currency,fee,amount
@@ -91,7 +101,9 @@ export function ImportHelpPopover() {
                   2023-08-11,$CASH-USD,1,DEPOSIT,1,USD,0,600.03
                   <br />
                   <br />
-                  <span className="text-muted-foreground"># With currency symbols (auto-parsed):</span>
+                  <span className="text-muted-foreground">
+                    # With currency symbols (auto-parsed):
+                  </span>
                   <br />
                   06/27/2025,AAPL,25,SELL,$48.95,USD,,$1223.63
                   <br />
@@ -99,7 +111,7 @@ export function ImportHelpPopover() {
                 </pre>
               </div>
               <p className="mt-2 text-xs">
-                For more details, see the{' '}
+                For more details, see the{" "}
                 <a
                   href="https://wealthfolio.app/docs/concepts/activity-types"
                   target="_blank"

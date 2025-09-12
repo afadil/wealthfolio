@@ -1,8 +1,8 @@
-import { Holding, HoldingType } from '@/lib/types';
-import { getHoldings } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
-import { useQuery } from '@tanstack/react-query';
-import { HoldingsTable } from '@/pages/holdings/components/holdings-table';
+import { Holding, HoldingType } from "@/lib/types";
+import { getHoldings } from "@/commands/portfolio";
+import { QueryKeys } from "@/lib/query-keys";
+import { useQuery } from "@tanstack/react-query";
+import { HoldingsTable } from "@/pages/holdings/components/holdings-table";
 
 const AccountHoldings = ({ accountId }: { accountId: string }) => {
   const { data: holdings, isLoading } = useQuery<Holding[], Error>({

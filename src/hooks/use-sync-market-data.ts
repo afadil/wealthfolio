@@ -1,7 +1,6 @@
-import { useMutation } from '@tanstack/react-query';
-import { syncMarketData } from '@/commands/market-data';
-import { useToast } from '@/components/ui/use-toast';
-
+import { useMutation } from "@tanstack/react-query";
+import { syncMarketData } from "@/commands/market-data";
+import { useToast } from "@/components/ui/use-toast";
 
 export function useSyncMarketDataMutation() {
   const { toast } = useToast();
@@ -12,9 +11,9 @@ export function useSyncMarketDataMutation() {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Failed to sync market data',
+        title: "Failed to sync market data",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     },
   });

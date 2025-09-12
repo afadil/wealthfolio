@@ -1,22 +1,18 @@
-import { useState } from 'react';
-import { useExchangeRates } from './use-exchange-rate';
-import { DataTable } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { ExchangeRate } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { RateCell } from './rate-cell';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { AddExchangeRateForm } from './add-exchange-rate-form';
-import { Icons } from '@/components/ui/icons';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from 'react-router-dom';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { formatDate } from '@/lib/utils';
+import { useState } from "react";
+import { useExchangeRates } from "./use-exchange-rate";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
+import { ExchangeRate } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { RateCell } from "./rate-cell";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { AddExchangeRateForm } from "./add-exchange-rate-form";
+import { Icons } from "@/components/ui/icons";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Link } from "react-router-dom";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDate } from "@/lib/utils";
 
 export function ExchangeRatesSettings() {
   const { exchangeRates, isLoadingRates, updateExchangeRate, addExchangeRate, deleteExchangeRate } =
@@ -25,54 +21,55 @@ export function ExchangeRatesSettings() {
 
   const columns: ColumnDef<ExchangeRate>[] = [
     {
-      accessorKey: 'fromCurrency',
-      header: 'From',
+      accessorKey: "fromCurrency",
+      header: "From",
       enableHiding: false,
       cell: ({ row }) => (
         <div>
           <div>{row.original.fromCurrency}</div>
-          <div className="text-xs text-muted-foreground">{row.original.fromCurrencyName}</div>
+          <div className="text-muted-foreground text-xs">{row.original.fromCurrencyName}</div>
         </div>
       ),
     },
     {
-      accessorKey: 'toCurrency',
-      header: 'To',
+      accessorKey: "toCurrency",
+      header: "To",
       enableHiding: false,
       cell: ({ row }) => (
         <div>
           <div>{row.original.toCurrency}</div>
-          <div className="text-xs text-muted-foreground">{row.original.toCurrencyName}</div>
+          <div className="text-muted-foreground text-xs">{row.original.toCurrencyName}</div>
         </div>
       ),
     },
     {
-      accessorKey: 'source',
-      header: 'Source',
+      accessorKey: "source",
+      header: "Source",
       enableHiding: false,
     },
     {
-      accessorKey: 'rate',
-      header: 'Rate',
+      accessorKey: "rate",
+      header: "Rate",
       enableHiding: false,
       cell: ({ row }) => <RateCell rate={row.original} onUpdate={updateExchangeRate} />,
       size: 180,
     },
     {
-      accessorKey: 'updatedAt',
-      header: 'Last Updated',
+      accessorKey: "updatedAt",
+      header: "Last Updated",
       enableHiding: false,
       cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {formatDate(row.original.timestamp)}
-        </div>
+        <div className="text-muted-foreground text-sm">{formatDate(row.original.timestamp)}</div>
       ),
     },
     {
-      id: 'history',
+      id: "history",
       enableHiding: false,
       cell: ({ row }) => (
-        <Link to={`/holdings/${encodeURIComponent(row.original.id)}`} className="flex items-center justify-center">
+        <Link
+          to={`/holdings/${encodeURIComponent(row.original.id)}`}
+          className="flex items-center justify-center"
+        >
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Icons.Clock className="h-4 w-4" />
             <span className="sr-only">View history</span>
@@ -81,11 +78,11 @@ export function ExchangeRatesSettings() {
       ),
     },
     {
-      id: 'actions',
+      id: "actions",
       enableHiding: false,
       cell: ({ row }) => {
         // Only show delete for Manual source
-        if (row.original.source !== 'MANUAL') {
+        if (row.original.source !== "MANUAL") {
           return null;
         }
 
@@ -99,8 +96,8 @@ export function ExchangeRatesSettings() {
             <PopoverContent className="w-80" align="end">
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Delete Exchange Rate</h4>
-                  <p className="text-sm text-muted-foreground">
+                  <h4 className="leading-none font-medium">Delete Exchange Rate</h4>
+                  <p className="text-muted-foreground text-sm">
                     Are you sure you want to delete this exchange rate?
                   </p>
                 </div>
@@ -158,10 +155,10 @@ export function ExchangeRatesSettings() {
             ))}
           </div>
         ) : exchangeRates && exchangeRates.length > 0 ? (
-          <DataTable columns={columns} data={exchangeRates}  />
+          <DataTable columns={columns} data={exchangeRates} />
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-center">
-            <Icons.DollarSign className="h-12 w-12 text-muted-foreground" />
+            <Icons.DollarSign className="text-muted-foreground h-12 w-12" />
             <h3 className="mt-4 text-lg font-semibold">No exchange rates defined yet</h3>
 
             <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>

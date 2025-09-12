@@ -1,18 +1,15 @@
-import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { getCurrentWindow, Theme } from '@tauri-apps/api/window';
-import { getRunEnv, RUN_ENV } from '@/adapters';
+import { getRunEnv, logger, RUN_ENV } from "@/adapters";
+import { getCurrentWindow, Theme } from "@tauri-apps/api/window";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
-import { Settings, SettingsContextType } from '@/lib/types';
-import { useSettings } from '@/hooks/use-settings';
-import { useSettingsMutation } from '@/hooks/use-settings-mutation';
+import { useSettings } from "@/hooks/use-settings";
+import { useSettingsMutation } from "@/hooks/use-settings-mutation";
+import { Settings, SettingsContextType } from "@/lib/types";
 
 interface ExtendedSettingsContextType extends SettingsContextType {
   updateSettings: (
     updates: Partial<
-      Pick<
-        Settings,
-        'theme' | 'font' | 'baseCurrency' | 'onboardingCompleted' | 'menuBarVisible'
-      >
+      Pick<Settings, "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible">
     >,
   ) => Promise<void>;
 }
@@ -26,22 +23,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument);
 
-
-  const updateBaseCurrency = async (baseCurrency: Settings['baseCurrency']) => {
-    if (!settings) throw new Error('Settings not loaded');
+  const updateBaseCurrency = async (baseCurrency: Settings["baseCurrency"]) => {
+    if (!settings) throw new Error("Settings not loaded");
     await updateMutation.mutateAsync({ ...settings, baseCurrency });
   };
 
   // Batch update function
   const updateSettings = async (
     updates: Partial<
-      Pick<
-        Settings,
-        'theme' | 'font' | 'baseCurrency' | 'onboardingCompleted' | 'menuBarVisible'
-      >
+      Pick<Settings, "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible">
     >,
   ) => {
-    if (!settings) throw new Error('Settings not loaded');
+    if (!settings) throw new Error("Settings not loaded");
     await updateMutation.mutateAsync({ ...settings, ...updates });
   };
 
@@ -56,7 +49,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
         cleanupSystemThemeListeners();
       } catch {
         // noop
@@ -80,19 +72,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 export function useSettingsContext() {
   const context = useContext(SettingsContext);
   if (!context) {
-    throw new Error('useSettingsContext must be used within a SettingsProvider');
+    throw new Error("useSettingsContext must be used within a SettingsProvider");
   }
   return context;
 }
-
 // Keep references to system theme listeners so we can clean up when switching modes
 let tauriThemeUnlisten: (() => void) | null = null;
 let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryUnsubscribe: (() => void) | null = null;
 
 // Apply the resolved theme (light or dark) to the DOM
-function applyResolvedTheme(resolved: 'light' | 'dark') {
-  document.documentElement.classList.remove('light', 'dark');
+function applyResolvedTheme(resolved: "light" | "dark") {
+  document.documentElement.classList.remove("light", "dark");
   document.documentElement.classList.add(resolved);
   document.documentElement.style.colorScheme = resolved;
 }
@@ -121,29 +112,28 @@ function cleanupSystemThemeListeners() {
 // Helper function to apply settings to the document
 const applySettingsToDocument = (newSettings: Settings) => {
   // Font classes
-  document.body.classList.remove('font-mono', 'font-sans', 'font-serif');
+  document.body.classList.remove("font-mono", "font-sans", "font-serif");
   document.body.classList.add(newSettings.font);
 
   // Always clean up previous listeners before applying a new theme mode
   cleanupSystemThemeListeners();
 
   // Handle theme mode
-  if (newSettings.theme === 'system') {
+  if (newSettings.theme === "system") {
     // Resolve initial theme from media query (immediate), fallback to light
-    let initial: 'light' | 'dark' = 'light';
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      mediaQueryList = window.matchMedia('(prefers-color-scheme: dark)');
-      initial = mediaQueryList.matches ? 'dark' : 'light';
-      const handler = (e: MediaQueryListEvent) => applyResolvedTheme(e.matches ? 'dark' : 'light');
+    let initial: "light" | "dark" = "light";
+    if (typeof window !== "undefined" && window.matchMedia) {
+      mediaQueryList = window.matchMedia("(prefers-color-scheme: dark)");
+      initial = mediaQueryList.matches ? "dark" : "light";
+      const handler = (e: MediaQueryListEvent) => applyResolvedTheme(e.matches ? "dark" : "light");
       if (mediaQueryList.addEventListener) {
-        mediaQueryList.addEventListener('change', handler);
-        mediaQueryUnsubscribe = () => mediaQueryList?.removeEventListener('change', handler);
+        mediaQueryList.addEventListener("change", handler);
+        mediaQueryUnsubscribe = () => mediaQueryList?.removeEventListener("change", handler);
       } else {
-        // @ts-ignore legacy API support
+        // Legacy API support - addListener is deprecated but needed for older browsers
         mediaQueryList.addListener(handler);
         mediaQueryUnsubscribe = () => {
           try {
-            // @ts-ignore legacy API support
             mediaQueryList?.removeListener(handler);
           } catch {
             // noop
@@ -156,18 +146,18 @@ const applySettingsToDocument = (newSettings: Settings) => {
     if (getRunEnv() === RUN_ENV.DESKTOP) {
       (async () => {
         try {
-          const currentWindow = await getCurrentWindow();
+          const currentWindow = getCurrentWindow();
           await currentWindow.setTheme(null);
           const current = await currentWindow.theme();
-          if (current === 'dark' || current === 'light') {
+          if (current === "dark" || current === "light") {
             applyResolvedTheme(current);
           }
           tauriThemeUnlisten = await currentWindow.onThemeChanged(({ payload }) => {
-            const next = payload === 'dark' ? 'dark' : 'light';
+            const next = payload === "dark" ? "dark" : "light";
             applyResolvedTheme(next);
           });
         } catch {
-          // noop; fall back to media query
+          logger.error("Error setting window theme.");
         }
       })();
     }
@@ -177,17 +167,17 @@ const applySettingsToDocument = (newSettings: Settings) => {
   }
 
   // Explicit light/dark mode
-  const explicit = (newSettings.theme === 'dark' ? 'dark' : 'light') as 'light' | 'dark';
+  const explicit = newSettings.theme === "dark" ? "dark" : "light";
   applyResolvedTheme(explicit);
 
   // Only call Tauri window APIs when running the desktop app for explicit modes
   if (getRunEnv() === RUN_ENV.DESKTOP) {
     (async () => {
       try {
-        const currentWindow = await getCurrentWindow();
+        const currentWindow = getCurrentWindow();
         await currentWindow.setTheme(explicit as Theme);
       } catch {
-        // noop
+        logger.error("Error setting window theme.");
       }
     })();
   }

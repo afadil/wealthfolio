@@ -1,9 +1,10 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-import { useSettingsContext } from '@/lib/settings-provider';
-import { Button } from '@/components/ui/button';
+import { FontSelector } from "@/components/font-selector";
+import { ThemeSelector } from "@/components/theme-selector";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,20 +13,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { FontSelector } from '@/components/font-selector';
-import { ThemeSelector } from '@/components/theme-selector';
-import { Switch } from '@/components/ui/switch';
+} from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 const appearanceFormSchema = z.object({
-  theme: z.enum(['light', 'dark', 'system'], {
-    required_error: 'Please select a theme.',
+  theme: z.enum(["light", "dark", "system"], {
+    required_error: "Please select a theme.",
   }),
-  font: z.enum(['font-mono', 'font-sans', 'font-serif'], {
-    invalid_type_error: 'Select a font',
-    required_error: 'Please select a font.',
+  font: z.enum(["font-mono", "font-sans", "font-serif"], {
+    invalid_type_error: "Select a font",
+    required_error: "Please select a font.",
   }),
-  menuBarVisible: z.boolean().default(true),
+  menuBarVisible: z.boolean(),
 });
 
 type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
@@ -33,8 +33,8 @@ type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
 export function AppearanceForm() {
   const { settings, updateSettings } = useSettingsContext();
   const defaultValues: Partial<AppearanceFormValues> = {
-    theme: settings?.theme as AppearanceFormValues['theme'],
-    font: settings?.font as AppearanceFormValues['font'],
+    theme: settings?.theme as AppearanceFormValues["theme"],
+    font: settings?.font as AppearanceFormValues["font"],
     menuBarVisible: settings?.menuBarVisible ?? true,
   };
   const form = useForm<AppearanceFormValues>({
@@ -42,21 +42,24 @@ export function AppearanceForm() {
     defaultValues,
   });
 
-  async function onSubmit(data: AppearanceFormValues) {
-    try {
-      await updateSettings({
-        theme: data.theme,
-        font: data.font,
-        menuBarVisible: data.menuBarVisible,
-      });
-    } catch (error) {
-      console.error('Failed to update appearance settings:', error);
-    }
+  function onSubmit(data: AppearanceFormValues) {
+    updateSettings({
+      theme: data.theme,
+      font: data.font,
+      menuBarVisible: data.menuBarVisible,
+    }).catch((error) => {
+      console.error("Failed to update appearance settings:", error);
+    });
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-4xl">
+      <form
+        onSubmit={(e) => {
+          form.handleSubmit(onSubmit)(e);
+        }}
+        className="max-w-4xl space-y-6"
+      >
         <FormField
           control={form.control}
           name="font"

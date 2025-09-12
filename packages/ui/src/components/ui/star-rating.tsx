@@ -1,11 +1,11 @@
-import React from 'react';
-import { Icons } from './icons';
-import { cn } from '../../lib/utils';
+import React from "react";
+import { Icons } from "./icons";
+import { cn } from "../../lib/utils";
 
 interface StarRatingProps {
   rating: number;
   maxRating?: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   interactive?: boolean;
   onRatingChange?: (rating: number) => void;
   className?: string;
@@ -14,7 +14,7 @@ interface StarRatingProps {
 export function StarRating({
   rating,
   maxRating = 5,
-  size = 'md',
+  size = "md",
   interactive = false,
   onRatingChange,
   className,
@@ -22,9 +22,9 @@ export function StarRating({
   const [hoveredRating, setHoveredRating] = React.useState<number | null>(null);
 
   const sizeClasses = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-    lg: 'h-5 w-5',
+    sm: "h-3 w-3",
+    md: "h-4 w-4",
+    lg: "h-5 w-5",
   };
 
   const getStarFillPercentage = (starIndex: number) => {
@@ -53,10 +53,7 @@ export function StarRating({
   };
 
   return (
-    <div
-      className={cn('flex items-center gap-0.5', className)}
-      onMouseLeave={handleMouseLeave}
-    >
+    <div className={cn("flex items-center gap-0.5", className)} onMouseLeave={handleMouseLeave}>
       {Array.from({ length: maxRating }, (_, index) => {
         const fillPercentage = getStarFillPercentage(index);
         const isFullStar = fillPercentage === 100;
@@ -65,33 +62,18 @@ export function StarRating({
         return (
           <div
             key={index}
-            className={cn(
-              'relative',
-              interactive && 'cursor-pointer transition-transform hover:scale-110'
-            )}
+            className={cn("relative", interactive && "cursor-pointer transition-transform hover:scale-110")}
             onClick={() => handleStarClick(index)}
             onMouseEnter={() => handleStarHover(index)}
           >
             {/* Background star (empty) */}
-            <Icons.Star
-              className={cn(
-                sizeClasses[size],
-                'text-muted-foreground/30'
-              )}
-              fill="currentColor"
-            />
-            
+            <Icons.Star className={cn(sizeClasses[size], "text-muted-foreground/30")} fill="currentColor" />
+
             {/* Foreground star (filled) */}
             {(isFullStar || isPartialStar) && (
-              <div
-                className="absolute inset-0 overflow-hidden"
-                style={{ width: `${fillPercentage}%` }}
-              >
+              <div className="absolute inset-0 overflow-hidden" style={{ width: `${fillPercentage}%` }}>
                 <Icons.Star
-                  className={cn(
-                    sizeClasses[size],
-                    hoveredRating ? 'text-yellow-400' : 'text-yellow-500'
-                  )}
+                  className={cn(sizeClasses[size], hoveredRating ? "text-yellow-400" : "text-yellow-500")}
                   fill="currentColor"
                 />
               </div>
@@ -106,7 +88,7 @@ export function StarRating({
 interface StarRatingDisplayProps {
   rating: number;
   reviewCount?: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   showText?: boolean;
   className?: string;
 }
@@ -114,25 +96,25 @@ interface StarRatingDisplayProps {
 export function StarRatingDisplay({
   rating,
   reviewCount,
-  size = 'md',
+  size = "md",
   showText = true,
   className,
 }: StarRatingDisplayProps) {
   const textSizes = {
-    sm: 'text-xs',
-    md: 'text-sm',
-    lg: 'text-base',
+    sm: "text-xs",
+    md: "text-sm",
+    lg: "text-base",
   };
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       <StarRating rating={rating} size={size} />
       {showText && (
-        <div className={cn('flex items-center gap-1', textSizes[size])}>
+        <div className={cn("flex items-center gap-1", textSizes[size])}>
           <span className="font-medium">{rating.toFixed(1)}</span>
           {reviewCount !== undefined && (
             <span className="text-muted-foreground">
-              ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+              ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
             </span>
           )}
         </div>

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useFormContext } from 'react-hook-form';
-import { useLatestValuations } from '@/hooks/use-latest-valuations';
-import { NewActivityFormValues } from '../components/forms/schemas';
+import { useEffect, useState } from "react";
+import { useFormContext } from "react-hook-form";
+import { useLatestValuations } from "@/hooks/use-latest-valuations";
+import { NewActivityFormValues } from "../components/forms/schemas";
 
 export interface CashBalanceValidationResult {
   isValid: boolean;
@@ -28,11 +28,11 @@ export function useCashBalanceValidation(): CashBalanceValidationResult {
   });
 
   // Watch form values that affect the calculation
-  const activityType = watch('activityType');
-  const accountId = watch('accountId');
-  const quantity = watch('quantity');
-  const unitPrice = watch('unitPrice');
-  const fee = watch('fee') || 0;
+  const activityType = watch("activityType");
+  const accountId = watch("accountId");
+  const quantity = watch("quantity");
+  const unitPrice = watch("unitPrice");
+  const fee = watch("fee") || 0;
 
   // Get account cash balance
   const { latestValuations, isLoading } = useLatestValuations(accountId ? [accountId] : []);
@@ -42,7 +42,7 @@ export function useCashBalanceValidation(): CashBalanceValidationResult {
     const hasValues = Boolean(quantity && unitPrice && quantity > 0 && unitPrice > 0);
 
     // Only validate for BUY activities
-    if (activityType !== 'BUY') {
+    if (activityType !== "BUY") {
       setValidationResult({
         isValid: true,
         currentBalance: 0,
@@ -82,8 +82,8 @@ export function useCashBalanceValidation(): CashBalanceValidationResult {
     }
 
     if (isLoading) {
-      setValidationResult(prev => ({ 
-        ...prev, 
+      setValidationResult((prev) => ({
+        ...prev,
         isLoading: true,
         hasAccount,
         hasValues,
@@ -91,7 +91,7 @@ export function useCashBalanceValidation(): CashBalanceValidationResult {
       return;
     }
 
-    const accountValuation = latestValuations?.find(val => val.accountId === accountId);
+    const accountValuation = latestValuations?.find((val) => val.accountId === accountId);
     if (!accountValuation) {
       setValidationResult({
         isValid: true,
@@ -109,19 +109,19 @@ export function useCashBalanceValidation(): CashBalanceValidationResult {
     const numQuantity = Number(quantity) || 0;
     const numUnitPrice = Number(unitPrice) || 0;
     const numFee = Number(fee) || 0;
-    const requiredAmount = (numQuantity * numUnitPrice) + numFee;
+    const requiredAmount = numQuantity * numUnitPrice + numFee;
     const shortfall = Math.max(0, requiredAmount - currentBalance);
     const isValid = shortfall === 0;
 
     let warning: string | undefined;
     if (!isValid) {
-      const formatter = new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
+      const formatter = new Intl.NumberFormat("en-US", {
+        style: "currency",
         currency: accountValuation.accountCurrency,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
-      
+
       warning = `Insufficient cash balance. Required: ${formatter.format(requiredAmount)}, Available: ${formatter.format(currentBalance)}, Shortfall: ${formatter.format(shortfall)}`;
     }
 

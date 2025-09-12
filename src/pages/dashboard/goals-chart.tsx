@@ -1,4 +1,4 @@
-import { Card } from '@/components/ui/card';
+import { Card } from "@/components/ui/card";
 // import { formatAmount, formatPercent } from '@wealthfolio/ui';
 
 import {
@@ -8,32 +8,32 @@ import {
   ResponsiveContainer,
   LabelList,
   // Tooltip,
-} from 'recharts';
+} from "recharts";
 
 const data = [
   {
-    name: 'Emergency Fund',
+    name: "Emergency Fund",
     uv: 26.69,
     pv: 4567,
-    fill: '#83a6ed',
+    fill: "#83a6ed",
   },
   {
-    name: 'House Down Payment',
+    name: "House Down Payment",
     uv: 15.69,
     pv: 1398,
-    fill: '#8dd1e1',
+    fill: "#8dd1e1",
   },
   {
-    name: 'Children Education',
+    name: "Children Education",
     uv: 8.22,
     pv: 9800,
-    fill: '#82ca9d',
+    fill: "#82ca9d",
   },
   {
-    name: 'Retirement',
+    name: "Retirement",
     uv: 10,
     pv: 200,
-    fill: '#000',
+    fill: "#000",
   },
 ];
 
@@ -98,7 +98,7 @@ export function GoalsProgressChart() {
             iconSize={10}
             layout="horizontal"
             align="left"
-            className="text-xs text-muted-foreground"
+            className="text-muted-foreground text-xs"
           />
         </RadialBarChart>
       </ResponsiveContainer>

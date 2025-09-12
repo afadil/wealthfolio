@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Account, ActivityImport, CsvRowData } from '@/lib/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CSVFileViewer } from '../components/csv-file-viewer';
-import { ImportPreviewTable } from '../import-preview-table';
-import { ImportAlert } from '../components/import-alert';
-import { useActivityImportMutations } from '../hooks/use-activity-import-mutations';
-import { Icons } from '@/components/ui/icons';
-import { ProgressIndicator } from '@/components/ui/progress-indicator';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Account, ActivityImport, CsvRowData } from "@/lib/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CSVFileViewer } from "../components/csv-file-viewer";
+import { ImportPreviewTable } from "../import-preview-table";
+import { ImportAlert } from "../components/import-alert";
+import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
+import { Icons } from "@/components/ui/icons";
+import { ProgressIndicator } from "@/components/ui/progress-indicator";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface DataPreviewStepProps {
   data: CsvRowData[] | null;
@@ -31,8 +31,8 @@ export const DataPreviewStep = ({
   onError,
 }: DataPreviewStepProps) => {
   const [importError, setImportError] = useState<string | null>(null);
-  const [confirmationState, setConfirmationState] = useState<'initial' | 'confirm' | 'processing'>(
-    'initial',
+  const [confirmationState, setConfirmationState] = useState<"initial" | "confirm" | "processing">(
+    "initial",
   );
 
   const { confirmImportMutation } = useActivityImportMutations({
@@ -42,10 +42,10 @@ export const DataPreviewStep = ({
     },
     onError: (error) => {
       setImportError(
-        typeof error === 'string' ? error : 'An error occurred while processing your import',
+        typeof error === "string" ? error : "An error occurred while processing your import",
       );
       onError && onError(); // Notify parent of the error
-      setConfirmationState('initial');
+      setConfirmationState("initial");
     },
   });
 
@@ -61,7 +61,7 @@ export const DataPreviewStep = ({
           onNext(confirmImportMutation.data || []);
         }
         confirmImportMutation.reset();
-        setConfirmationState('initial');
+        setConfirmationState("initial");
       }, 2000);
     }
 
@@ -129,21 +129,21 @@ export const DataPreviewStep = ({
     // Add header row
     {
       id: 0,
-      content: headers.join(','),
+      content: headers.join(","),
       isValid: true,
       errors: undefined,
     },
     // Add data rows
     ...data.map((row, index) => ({
       id: index + 1, // Add 1 to account for header row
-      content: headers.map((header) => row[header] || '').join(','),
+      content: headers.map((header) => row[header] || "").join(","),
       isValid: !csvErrors[index + 2], // Line numbers start at 2 for data rows (header is line 1)
       errors: csvErrors[index + 2], // Line numbers start at 2 for data rows
     })),
   ];
 
   const handleInitialClick = () => {
-    setConfirmationState('confirm');
+    setConfirmationState("confirm");
   };
 
   const handleConfirmClick = () => {
@@ -151,11 +151,11 @@ export const DataPreviewStep = ({
     const validActivities = activities.filter((activity) => activity.isValid);
 
     if (validActivities.length === 0) {
-      setImportError('No valid activities to import');
+      setImportError("No valid activities to import");
       return;
     }
 
-    setConfirmationState('processing');
+    setConfirmationState("processing");
 
     // Ensure we have a single transaction for data integrity
     confirmImportMutation.mutate({
@@ -164,7 +164,7 @@ export const DataPreviewStep = ({
   };
 
   const handleCancelConfirmation = () => {
-    setConfirmationState('initial');
+    setConfirmationState("initial");
   };
 
   // Button animation variants
@@ -181,7 +181,7 @@ export const DataPreviewStep = ({
       transition: {
         duration: 2,
         repeat: Infinity,
-        repeatType: 'loop' as const,
+        repeatType: "loop" as const,
         ease: [0.42, 0, 0.58, 1] as [number, number, number, number],
       },
     },
@@ -209,15 +209,15 @@ export const DataPreviewStep = ({
         <Card className="border-none shadow-none">
           <Tabs defaultValue="preview" className="w-full">
             <div className="relative mb-2">
-              <TabsList className="absolute right-0 top-3 z-50 flex space-x-1 rounded-full bg-secondary p-1">
+              <TabsList className="bg-secondary absolute top-3 right-0 z-50 flex space-x-1 rounded-full p-1">
                 <TabsTrigger
-                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="preview"
                 >
                   Activity Preview
                 </TabsTrigger>
                 <TabsTrigger
-                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="raw"
                 >
                   File Preview
@@ -251,10 +251,10 @@ export const DataPreviewStep = ({
         <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
           <Button
             variant="outline"
-            onClick={confirmationState === 'confirm' ? handleCancelConfirmation : onBack}
+            onClick={confirmationState === "confirm" ? handleCancelConfirmation : onBack}
             disabled={isProcessing}
           >
-            {confirmationState === 'confirm' ? (
+            {confirmationState === "confirm" ? (
               <>
                 <Icons.XCircle className="mr-2 h-4 w-4" />
                 Cancel
@@ -269,7 +269,7 @@ export const DataPreviewStep = ({
         </motion.div>
 
         <AnimatePresence mode="wait">
-          {confirmationState === 'initial' ? (
+          {confirmationState === "initial" ? (
             <motion.div
               key="initial"
               whileHover="hover"
@@ -286,13 +286,13 @@ export const DataPreviewStep = ({
               >
                 <div className="relative flex items-center">
                   {validActivitiesCount === activities.length
-                    ? 'Import Activities'
+                    ? "Import Activities"
                     : `Import ${validActivitiesCount} Valid Activities`}
                   <Icons.ArrowRight className="ml-2 h-4 w-4" />
                 </div>
               </Button>
             </motion.div>
-          ) : confirmationState === 'confirm' ? (
+          ) : confirmationState === "confirm" ? (
             <motion.div
               key="confirm"
               initial={{ opacity: 0, x: 10 }}
@@ -300,7 +300,7 @@ export const DataPreviewStep = ({
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.15 }}
               onMouseLeave={() => {
-                setConfirmationState('initial');
+                setConfirmationState("initial");
               }}
               onMouseEnter={() => {}}
             >

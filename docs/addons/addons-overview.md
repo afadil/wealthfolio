@@ -1,23 +1,25 @@
+Wealthfolio addons are TypeScript modules that extend the application's
+functionality. This guide covers how to build, test, and distribute addons.
 
-
-Wealthfolio addons are TypeScript modules that extend the application's functionality. This guide covers how to build, test, and distribute addons.
-
-
-**New to addon development?** Start with our [Quick Start Guide](/docs/addons/getting-started) to create your first addon.
-
+**New to addon development?** Start with our
+[Quick Start Guide](/docs/addons/getting-started) to create your first addon.
 
 ## What are Wealthfolio Addons?
 
-Addons are TypeScript/React-based extensions that provide access to Wealthfolio's financial data and UI system.
+Addons are TypeScript/React-based extensions that provide access to
+Wealthfolio's financial data and UI system.
 
 **Technical Foundation**  
-Each addon is a JavaScript function that receives an `AddonContext` object with access to APIs, UI components, and event system.
+Each addon is a JavaScript function that receives an `AddonContext` object with
+access to APIs, UI components, and event system.
 
 **Integration Capabilities**  
-Addons can register new navigation items, routes, and components that integrate directly into Wealthfolio's interface.
+Addons can register new navigation items, routes, and components that integrate
+directly into Wealthfolio's interface.
 
 **Development Environment**  
-Built with TypeScript, React, and modern web APIs. Includes hot-reload development server and comprehensive type definitions.
+Built with TypeScript, React, and modern web APIs. Includes hot-reload
+development server and comprehensive type definitions.
 
 ## Architecture Overview
 
@@ -56,7 +58,7 @@ import { Icons } from '@wealthfolio/ui';
 export default function enable(ctx: AddonContext) {
   // Access financial data
   const accounts = await ctx.api.accounts.getAll();
-  
+
   // Add navigation item
   const sidebarItem = ctx.sidebar.addItem({
     id: 'my-addon',
@@ -64,18 +66,18 @@ export default function enable(ctx: AddonContext) {
     label: 'My Tool',
     route: '/my-addon'
   });
-  
+
   // Register route
   ctx.router.add({
     path: '/my-addon',
     component: MyComponent
   });
-  
+
   // Listen to events
   const unlisten = ctx.api.events.portfolio.onUpdateComplete(() => {
     // Handle portfolio updates
   });
-  
+
   // Cleanup function
   return {
     disable() {
@@ -91,6 +93,7 @@ export default function enable(ctx: AddonContext) {
 Addons operate under a permission-based security model with three stages:
 
 #### 1. Static Analysis
+
 During installation, addon code is scanned for API usage patterns:
 
 ```typescript
@@ -101,23 +104,25 @@ const accounts = await ctx.api.accounts.getAll();
 
 #### 2. Permission Categories
 
-| Category | Risk Level | Functions |
-|----------|------------|-----------|
-| `accounts` | High | getAll, create |
-| `portfolio` | High | getHoldings, update, recalculate |
-| `activities` | High | getAll, search, create, update, import |
-| `market-data` | Low | searchTicker, sync, getProviders |
-| `assets` | Medium | getProfile, updateProfile, updateDataSource |
-| `quotes` | Low | update, getHistory |
-| `performance` | Medium | calculateHistory, calculateSummary |
-| `goals` | Medium | getAll, create, update, updateAllocations |
-| `settings` | Medium | get, update, backupDatabase |
-| `files` | Medium | openCsvDialog, openSaveDialog |
-| `events` | Low | onDrop, onUpdateComplete, onSyncStart |
-| `secrets` | High | set, get, delete |
+| Category      | Risk Level | Functions                                   |
+| ------------- | ---------- | ------------------------------------------- |
+| `accounts`    | High       | getAll, create                              |
+| `portfolio`   | High       | getHoldings, update, recalculate            |
+| `activities`  | High       | getAll, search, create, update, import      |
+| `market-data` | Low        | searchTicker, sync, getProviders            |
+| `assets`      | Medium     | getProfile, updateProfile, updateDataSource |
+| `quotes`      | Low        | update, getHistory                          |
+| `performance` | Medium     | calculateHistory, calculateSummary          |
+| `goals`       | Medium     | getAll, create, update, updateAllocations   |
+| `settings`    | Medium     | get, update, backupDatabase                 |
+| `files`       | Medium     | openCsvDialog, openSaveDialog               |
+| `events`      | Low        | onDrop, onUpdateComplete, onSyncStart       |
+| `secrets`     | High       | set, get, delete                            |
 
 #### 3. User Approval
-During installation, users see both declared and detected permissions, then approve or reject the addon installation.
+
+During installation, users see both declared and detected permissions, then
+approve or reject the addon installation.
 
 ## Available APIs
 
@@ -177,7 +182,7 @@ npm run dev:server
 ```
 Development Server Structure:
 ├─ /health          # Health check
-├─ /status          # Build status  
+├─ /status          # Build status
 ├─ /manifest.json   # Addon manifest
 └─ /addon.js        # Built addon code
 ```
@@ -248,7 +253,7 @@ Each addon receives an isolated context with scoped secret storage:
 
 ```typescript
 // Addon "my-addon" accessing secrets
-await ctx.api.secrets.set('api-key', 'value');
+await ctx.api.secrets.set("api-key", "value");
 // Stored as: "addon_my-addon_api-key"
 ```
 
@@ -268,7 +273,7 @@ function MyComponent() {
         <TrendingUp className="h-4 w-4" />
         <span>Portfolio Growth</span>
       </div>
-      
+
       <div className="mt-4">
         <AmountDisplay value={1234.56} currency="USD" />
         <GainAmount value={123.45} percentage={5.2} />
@@ -279,8 +284,10 @@ function MyComponent() {
 ```
 
 Available libraries:
+
 - All Radix UI components
-- **Financial components** (`components/financial`) for amounts, gains, and currency inputs
+- **Financial components** (`components/financial`) for amounts, gains, and
+  currency inputs
 - Lucide React icons
 - Tailwind CSS utilities
 - Recharts for data visualization
@@ -299,17 +306,17 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: 'src/addon.tsx',
-      fileName: () => 'addon.js',
-      formats: ['es'],
+      entry: "src/addon.tsx",
+      fileName: () => "addon.js",
+      formats: ["es"],
     },
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: ["react", "react-dom"],
       plugins: [
         externalGlobals({
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        })
+          react: "React",
+          "react-dom": "ReactDOM",
+        }),
       ],
     },
   },
@@ -336,11 +343,13 @@ export default defineConfig({
 ## Error Handling
 
 ### Addon Failures
+
 - Errors are logged but don't affect other addons
 - Host application continues normally
 - Users see error notifications
 
 ### Permission Violations
+
 - `PermissionError` thrown for unauthorized API calls
 - API calls are blocked
 - Errors are logged for debugging
@@ -355,7 +364,8 @@ export default defineConfig({
 
 ## Publishing
 
-Users can install addons directly from ZIP files. To publish your addon in the Wealthfolio Store, contact **wealthfolio@teymz.com**.
+Users can install addons directly from ZIP files. To publish your addon in the
+Wealthfolio Store, contact **wealthfolio@teymz.com**.
 
 ## Quick Start
 
@@ -384,4 +394,3 @@ Users can install addons directly from ZIP files. To publish your addon in the W
     <span class="text-primary">Visit Store →</span>
   </Card>
 </div>
-

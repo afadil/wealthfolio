@@ -1,5 +1,5 @@
-import { cn, formatAmount } from '../../lib/utils';
-import { useBalancePrivacy } from '../../hooks/use-balance-privacy';
+import { cn, formatAmount } from "../../lib/utils";
+import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
 
 interface PrivacyAmountProps extends React.HTMLAttributes<HTMLSpanElement> {
   value: number;
@@ -11,7 +11,7 @@ export function PrivacyAmount({ value, currency, className, ...props }: PrivacyA
 
   return (
     <span className={cn(className)} {...props}>
-      {isBalanceHidden ? '••••' : formatAmount(value, currency)}
+      {isBalanceHidden ? "••••" : formatAmount(value, currency)}
     </span>
   );
 }

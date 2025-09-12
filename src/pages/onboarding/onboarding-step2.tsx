@@ -1,11 +1,11 @@
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import React, { useEffect, useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { motion } from 'framer-motion';
-import { useSettingsContext } from '@/lib/settings-provider';
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
+import React, { useEffect, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { motion } from "framer-motion";
+import { useSettingsContext } from "@/lib/settings-provider";
 import {
   Form,
   FormControl,
@@ -13,53 +13,53 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { CurrencyInput } from '@wealthfolio/ui';
-import { Card, CardContent } from '@/components/ui/card';
-import { ThemeSelector } from '@/components/theme-selector';
+} from "@/components/ui/form";
+import { CurrencyInput } from "@wealthfolio/ui";
+import { Card, CardContent } from "@/components/ui/card";
+import { ThemeSelector } from "@/components/theme-selector";
 
 // Onboarding schema with system theme option
 const onboardingSettingsSchema = z.object({
-  baseCurrency: z.string({ required_error: 'Please select a base currency.' }),
-  theme: z.enum(['light', 'dark', 'system'], { required_error: 'Please select a theme.' }),
+  baseCurrency: z.string({ required_error: "Please select a base currency." }),
+  theme: z.enum(["light", "dark", "system"], { required_error: "Please select a theme." }),
 });
 
 // Helper for locale detection (simple example)
 function detectDefaultCurrency(): string {
-  if (typeof navigator === 'undefined') return 'USD'; // Default SSR/Node
+  if (typeof navigator === "undefined") return "USD"; // Default SSR/Node
   const lang = navigator.language || navigator.languages[0];
-  if (lang.startsWith('en-GB')) return 'GBP';
-  if (lang.startsWith('en-US')) return 'USD';
-  if (lang.startsWith('en-CA')) return 'CAD';
-  if (lang.startsWith('en-AU')) return 'AUD';
-  if (lang.startsWith('de')) return 'EUR'; // Simplified German -> EUR
-  if (lang.startsWith('fr')) return 'EUR'; // Simplified French -> EUR
-  if (lang.startsWith('es')) return 'EUR'; // Simplified Spanish -> EUR
-  if (lang.startsWith('it')) return 'EUR'; // Simplified Italian -> EUR
-  if (lang.startsWith('ja')) return 'JPY'; // Simplified Japanese -> JPY
-  if (lang.startsWith('zh')) return 'CNY'; // Simplified Chinese -> CNY
-  if (lang.startsWith('ko')) return 'KRW'; // Simplified Korean -> KRW
-  if (lang.startsWith('ru')) return 'RUB'; // Simplified Russian -> RUB
-  if (lang.startsWith('nl')) return 'EUR'; // Simplified Dutch -> EUR
-  if (lang.startsWith('pl')) return 'EUR'; // Simplified Polish -> EUR
-  if (lang.startsWith('pt')) return 'EUR'; // Simplified Portuguese -> EUR
-  if (lang.startsWith('sv')) return 'EUR'; // Simplified Swedish -> EUR
-  if (lang.startsWith('tr')) return 'EUR'; // Simplified Turkish -> EUR
-  if (lang.startsWith('ar')) return 'USD'; // Simplified Arabic -> USD
-  if (lang.startsWith('hi')) return 'INR'; // Simplified Hindi -> INR
-  return 'USD'; // Fallback
+  if (lang.startsWith("en-GB")) return "GBP";
+  if (lang.startsWith("en-US")) return "USD";
+  if (lang.startsWith("en-CA")) return "CAD";
+  if (lang.startsWith("en-AU")) return "AUD";
+  if (lang.startsWith("de")) return "EUR"; // Simplified German -> EUR
+  if (lang.startsWith("fr")) return "EUR"; // Simplified French -> EUR
+  if (lang.startsWith("es")) return "EUR"; // Simplified Spanish -> EUR
+  if (lang.startsWith("it")) return "EUR"; // Simplified Italian -> EUR
+  if (lang.startsWith("ja")) return "JPY"; // Simplified Japanese -> JPY
+  if (lang.startsWith("zh")) return "CNY"; // Simplified Chinese -> CNY
+  if (lang.startsWith("ko")) return "KRW"; // Simplified Korean -> KRW
+  if (lang.startsWith("ru")) return "RUB"; // Simplified Russian -> RUB
+  if (lang.startsWith("nl")) return "EUR"; // Simplified Dutch -> EUR
+  if (lang.startsWith("pl")) return "EUR"; // Simplified Polish -> EUR
+  if (lang.startsWith("pt")) return "EUR"; // Simplified Portuguese -> EUR
+  if (lang.startsWith("sv")) return "EUR"; // Simplified Swedish -> EUR
+  if (lang.startsWith("tr")) return "EUR"; // Simplified Turkish -> EUR
+  if (lang.startsWith("ar")) return "USD"; // Simplified Arabic -> USD
+  if (lang.startsWith("hi")) return "INR"; // Simplified Hindi -> INR
+  return "USD"; // Fallback
 }
 
 // Helper for OS theme detection
-function detectDefaultTheme(): 'light' | 'dark' {
+function detectDefaultTheme(): "light" | "dark" {
   if (
-    typeof window !== 'undefined' &&
+    typeof window !== "undefined" &&
     window.matchMedia &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
+    window.matchMedia("(prefers-color-scheme: dark)").matches
   ) {
-    return 'dark';
+    return "dark";
   }
-  return 'light';
+  return "light";
 }
 
 type OnboardingSettingsValues = z.infer<typeof onboardingSettingsSchema>;
@@ -83,7 +83,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
     if (!initialValuesSet) {
       form.reset({
         baseCurrency: settings?.baseCurrency || detectDefaultCurrency(),
-        theme: (settings?.theme as OnboardingSettingsValues['theme']) || detectDefaultTheme(),
+        theme: (settings?.theme as OnboardingSettingsValues["theme"]) || detectDefaultTheme(),
       });
       setInitialValuesSet(true);
     }
@@ -98,14 +98,14 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
       });
       onNext();
     } catch (error) {
-      console.error('Failed to save onboarding settings:', error);
+      console.error("Failed to save onboarding settings:", error);
     }
   }
 
   return (
     <div className="space-y-2 px-4 md:px-12 lg:px-16 xl:px-20">
       <h1 className="mb-2 text-2xl font-bold md:text-3xl">Settings</h1>
-      <p className="pb-4 text-sm text-muted-foreground md:pb-6 md:text-base">
+      <p className="text-muted-foreground pb-4 text-sm md:pb-6 md:text-base">
         Just a couple preferences to get you started
       </p>
       <Card>
@@ -120,11 +120,7 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                   <FormItem className="flex flex-col">
                     <FormLabel>Setup your base currency</FormLabel>
                     <FormControl className="mt-2 w-full max-w-[300px]">
-                      <CurrencyInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        autoFocus
-                      />
+                      <CurrencyInput value={field.value} onChange={field.onChange} autoFocus />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -140,10 +136,10 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
                     <FormLabel>Select your preferred theme</FormLabel>
                     <FormMessage />
                     <FormControl>
-                      <ThemeSelector 
-                        value={field.value} 
+                      <ThemeSelector
+                        value={field.value}
                         onChange={field.onChange}
-                        className="pt-2 max-w-md"
+                        className="max-w-md pt-2"
                       />
                     </FormControl>
                   </FormItem>

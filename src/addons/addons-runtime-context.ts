@@ -1,33 +1,25 @@
-import type { 
-  AddonContext, 
-  SidebarItemHandle,
-} from '@wealthfolio/addon-sdk';
-import { createSDKHostAPIBridge } from './type-bridge';
-import React from 'react';
-
+import type { AddonContext, SidebarItemHandle } from "@wealthfolio/addon-sdk";
+import { createSDKHostAPIBridge } from "./type-bridge";
+import React from "react";
 
 // Import all command functions
-import { getHoldings } from '@/commands/portfolio';
-import { getActivities } from '@/commands/activity';
-import { getAccounts } from '@/commands/account';
-import {
-  getExchangeRates,
-  updateExchangeRate,
-  addExchangeRate,
-} from '@/commands/exchange-rates';
+import { getHoldings } from "@/commands/portfolio";
+import { getActivities } from "@/commands/activity";
+import { getAccounts } from "@/commands/account";
+import { getExchangeRates, updateExchangeRate, addExchangeRate } from "@/commands/exchange-rates";
 import {
   getContributionLimit,
   createContributionLimit,
   updateContributionLimit,
   calculateDepositsForLimit,
-} from '@/commands/contribution-limits';
+} from "@/commands/contribution-limits";
 import {
   getGoals,
   createGoal,
   updateGoal,
   updateGoalsAllocations,
   getGoalsAllocation,
-} from '@/commands/goal';
+} from "@/commands/goal";
 import {
   searchTicker,
   syncHistoryQuotes,
@@ -38,7 +30,7 @@ import {
   syncMarketData,
   getQuoteHistory,
   getMarketDataProviders,
-} from '@/commands/market-data';
+} from "@/commands/market-data";
 import {
   updatePortfolio,
   recalculatePortfolio,
@@ -49,50 +41,36 @@ import {
   calculatePerformanceSummary,
   calculateAccountsSimplePerformance,
   getHolding,
-} from '@/commands/portfolio';
-import {
-  getSettings,
-  updateSettings,
-  backupDatabase,
-} from '@/commands/settings';
-import {
-  createAccount,
-  updateAccount,
-} from '@/commands/account';
+} from "@/commands/portfolio";
+import { getSettings, updateSettings, backupDatabase } from "@/commands/settings";
+import { createAccount, updateAccount } from "@/commands/account";
 import {
   searchActivities,
   createActivity,
   updateActivity,
   saveActivities,
-} from '@/commands/activity';
-import {
-  openCsvFileDialog,
-  openFileSaveDialog,
-} from '@/commands/file';
+} from "@/commands/activity";
+import { openCsvFileDialog, openFileSaveDialog } from "@/commands/file";
 import {
   listenImportFileDropHover,
   listenImportFileDrop,
   listenImportFileDropCancelled,
-} from '@/commands/import-listener';
+} from "@/commands/import-listener";
 import {
   listenPortfolioUpdateStart,
   listenPortfolioUpdateComplete,
   listenPortfolioUpdateError,
   listenMarketSyncStart,
   listenMarketSyncComplete,
-} from '@/commands/portfolio-listener';
+} from "@/commands/portfolio-listener";
 import {
   importActivities,
   checkActivitiesImport,
   getAccountImportMapping,
   saveAccountImportMapping,
-} from '@/commands/activity-import';
-import {
-  setSecret,
-  getSecret,
-  deleteSecret,
-} from '@/commands/secrets';
-import { logger } from '@/adapters';
+} from "@/commands/activity-import";
+import { setSecret, getSecret, deleteSecret } from "@/commands/secrets";
+import { logger } from "@/adapters";
 
 // Store for dynamically added navigation items
 const dynamicNavItems = new Map<string, any>();
@@ -106,7 +84,7 @@ const navigationUpdateListeners = new Set<() => void>();
 
 // Function to notify navigation update listeners
 function notifyNavigationUpdate() {
-  navigationUpdateListeners.forEach(listener => listener());
+  navigationUpdateListeners.forEach((listener) => listener());
 }
 
 // Public API for getting dynamic navigation items
@@ -118,7 +96,7 @@ export function getDynamicNavItems() {
 export function getDynamicRoutes() {
   return Array.from(dynamicRoutes.entries()).map(([path, component]) => ({
     path,
-    component
+    component,
   }));
 }
 
@@ -135,11 +113,11 @@ export function triggerNavigationUpdate() {
 
 // Public API for triggering all disable callbacks
 export function triggerAllDisableCallbacks() {
-  disableCallbacks.forEach(cb => {
+  disableCallbacks.forEach((cb) => {
     try {
       cb();
     } catch (error) {
-      console.error('Error in addon disable callback:', error);
+      console.error("Error in addon disable callback:", error);
     }
   });
   disableCallbacks.clear();
@@ -151,7 +129,7 @@ export function triggerAllDisableCallbacks() {
 // Create addon-scoped secret functions
 function createAddonScopedSecrets(addonId: string) {
   const addonPrefix = `addon_${addonId}_`;
-  
+
   return {
     set: async (key: string, value: string): Promise<void> => {
       const scopedKey = `${addonPrefix}${key}`;
@@ -184,7 +162,7 @@ export function createAddonContext(addonId: string): AddonContext {
         const navItem = {
           icon: cfg.icon || '<Icons.Circle className="h-5 w-5" />',
           title: cfg.label,
-          href: cfg.route || '#',
+          href: cfg.route || "#",
           onClick: cfg.onClick,
           order: cfg.order || 999,
           id: cfg.id,
@@ -220,134 +198,140 @@ export function createAddonContext(addonId: string): AddonContext {
       disableCallbacks.add(cb);
     },
     api: (() => {
-      const baseAPI = createSDKHostAPIBridge({
-        // Core data access
-        getHoldings: getHoldings,
-        getActivities: getActivities,
-        getAccounts: getAccounts,
+      const baseAPI = createSDKHostAPIBridge(
+        {
+          // Core data access
+          getHoldings: getHoldings,
+          getActivities: getActivities,
+          getAccounts: getAccounts,
 
-        // Exchange rates
-        getExchangeRates,
-        updateExchangeRate,
-        addExchangeRate,
+          // Exchange rates
+          getExchangeRates,
+          updateExchangeRate,
+          addExchangeRate,
 
-        // Contribution limits
-        getContributionLimit,
-        createContributionLimit,
-        updateContributionLimit,
-        calculateDepositsForLimit,
+          // Contribution limits
+          getContributionLimit,
+          createContributionLimit,
+          updateContributionLimit,
+          calculateDepositsForLimit,
 
-        // Goals
-        getGoals,
-        createGoal,
-        updateGoal,
-        updateGoalsAllocations,
-        getGoalsAllocation,
+          // Goals
+          getGoals,
+          createGoal,
+          updateGoal,
+          updateGoalsAllocations,
+          getGoalsAllocation,
 
-        // Market data
-        searchTicker,
-        syncHistoryQuotes,
-        getAssetProfile,
-        updateAssetProfile,
-        updateAssetDataSource,
-        updateQuote,
-        syncMarketData,
-        getQuoteHistory,
-        getMarketDataProviders,
+          // Market data
+          searchTicker,
+          syncHistoryQuotes,
+          getAssetProfile,
+          updateAssetProfile,
+          updateAssetDataSource,
+          updateQuote,
+          syncMarketData,
+          getQuoteHistory,
+          getMarketDataProviders,
 
-        // Portfolio
-        updatePortfolio,
-        recalculatePortfolio,
-        getIncomeSummary,
-        getHistoricalValuations,
-        getLatestValuations,
-        calculatePerformanceHistory,
-        calculatePerformanceSummary,
-        calculateAccountsSimplePerformance,
-        getHolding,
+          // Portfolio
+          updatePortfolio,
+          recalculatePortfolio,
+          getIncomeSummary,
+          getHistoricalValuations,
+          getLatestValuations,
+          calculatePerformanceHistory,
+          calculatePerformanceSummary,
+          calculateAccountsSimplePerformance,
+          getHolding,
 
-        // Settings
-        getSettings,
-        updateSettings,
-        backupDatabase,
+          // Settings
+          getSettings,
+          updateSettings,
+          backupDatabase,
 
-        // Account management
-        createAccount,
-        updateAccount,
+          // Account management
+          createAccount,
+          updateAccount,
 
-        // Activity management
-        searchActivities,
-        createActivity,
-        updateActivity,
-        saveActivities,
+          // Activity management
+          searchActivities,
+          createActivity,
+          updateActivity,
+          saveActivities,
 
-        // File operations
-        openCsvFileDialog,
-        openFileSaveDialog,
+          // File operations
+          openCsvFileDialog,
+          openFileSaveDialog,
 
-        // Event listeners - Import
-        listenImportFileDropHover,
-        listenImportFileDrop,
-        listenImportFileDropCancelled,
+          // Event listeners - Import
+          listenImportFileDropHover,
+          listenImportFileDrop,
+          listenImportFileDropCancelled,
 
-        // Event listeners - Portfolio
-        listenPortfolioUpdateStart,
-        listenPortfolioUpdateComplete,
-        listenPortfolioUpdateError,
-        listenMarketSyncStart,
-        listenMarketSyncComplete,
+          // Event listeners - Portfolio
+          listenPortfolioUpdateStart,
+          listenPortfolioUpdateComplete,
+          listenPortfolioUpdateError,
+          listenMarketSyncStart,
+          listenMarketSyncComplete,
 
-        // Activity import
-        importActivities,
-        checkActivitiesImport,
-        getAccountImportMapping,
-        saveAccountImportMapping,
+          // Activity import
+          importActivities,
+          checkActivitiesImport,
+          getAccountImportMapping,
+          saveAccountImportMapping,
 
-        // Logger functions
-        logError: logger.error,
-        logInfo: logger.info,
-        logWarn: logger.warn,
-        logTrace: logger.trace,
-        logDebug: logger.debug,
+          // Logger functions
+          logError: logger.error,
+          logInfo: logger.info,
+          logWarn: logger.warn,
+          logTrace: logger.trace,
+          logDebug: logger.debug,
 
-        // Navigation functions
-        navigateToRoute: async (route: string) => {
-          // Use the browser's navigation API through React Router
-          const navigate = (window as any).__wealthfolio_navigate__;
-          if (navigate) {
-            navigate(route);
-          } else {
-            // Fallback: change the URL directly
-            window.location.hash = route;
-          }
+          // Navigation functions
+          navigateToRoute: async (route: string) => {
+            // Use the browser's navigation API through React Router
+            const navigate = (window as any).__wealthfolio_navigate__;
+            if (navigate) {
+              navigate(route);
+            } else {
+              // Fallback: change the URL directly
+              window.location.hash = route;
+            }
+          },
+
+          // Query functions
+          getQueryClient: () => {
+            return (window as any).__wealthfolio_query_client__;
+          },
+          invalidateQueries: (queryKey: string | string[]) => {
+            const queryClient = (window as any).__wealthfolio_query_client__;
+            if (queryClient) {
+              queryClient.invalidateQueries({
+                queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+              });
+            }
+          },
+          refetchQueries: (queryKey: string | string[]) => {
+            const queryClient = (window as any).__wealthfolio_query_client__;
+            if (queryClient) {
+              queryClient.refetchQueries({
+                queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+              });
+            }
+          },
         },
+        addonId,
+      );
 
-        // Query functions
-        getQueryClient: () => {
-          return (window as any).__wealthfolio_query_client__;
-        },
-        invalidateQueries: (queryKey: string | string[]) => {
-          const queryClient = (window as any).__wealthfolio_query_client__;
-          if (queryClient) {
-            queryClient.invalidateQueries({ queryKey: Array.isArray(queryKey) ? queryKey : [queryKey] });
-          }
-        },
-        refetchQueries: (queryKey: string | string[]) => {
-          const queryClient = (window as any).__wealthfolio_query_client__;
-          if (queryClient) {
-            queryClient.refetchQueries({ queryKey: Array.isArray(queryKey) ? queryKey : [queryKey] });
-          }
-        },
-
-      }, addonId);
-      
       // Add the secrets API manually
       (baseAPI as any).secrets = createAddonScopedSecrets(addonId);
-      
+
       return baseAPI;
     })(),
   };
 }
 
 // Note: We intentionally do not set a global context to ensure proper secret isolation.
-// Each addon receives its own scoped context via the enable(ctx: AddonContext) function parameter. 
+// Each addon receives its own scoped context via the enable(ctx: AddonContext) function parameter.

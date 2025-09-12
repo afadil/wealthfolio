@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Toggle } from '@/components/ui/toggle';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import { Account, ContributionLimit, DepositsCalculation } from '@/lib/types';
-import { useContributionLimitMutations } from '../use-contribution-limit-mutations';
-import { formatAmount } from '@wealthfolio/ui';
+import { useState } from "react";
+import { Toggle } from "@/components/ui/toggle";
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
+import { Account, ContributionLimit, DepositsCalculation } from "@/lib/types";
+import { useContributionLimitMutations } from "../use-contribution-limit-mutations";
+import { formatAmount } from "@wealthfolio/ui";
 
 interface AccountSelectionProps {
   limit: ContributionLimit;
@@ -15,7 +15,7 @@ interface AccountSelectionProps {
 
 export function AccountSelection({ limit, accounts, deposits, isLoading }: AccountSelectionProps) {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>(
-    limit.accountIds ? limit.accountIds.split(',') : [],
+    limit.accountIds ? limit.accountIds.split(",") : [],
   );
   const { updateContributionLimitMutation } = useContributionLimitMutations();
 
@@ -30,7 +30,7 @@ export function AccountSelection({ limit, accounts, deposits, isLoading }: Accou
       id: limit.id,
       updatedLimit: {
         ...limit,
-        accountIds: selectedAccounts.join(','),
+        accountIds: selectedAccounts.join(","),
       },
     });
   };
@@ -54,7 +54,7 @@ export function AccountSelection({ limit, accounts, deposits, isLoading }: Accou
                 <div className="flex w-full items-center">
                   <div className="mr-2">
                     {selectedAccounts.includes(account.id) ? (
-                      <Icons.CheckCircle className="h-6 w-6 text-success" />
+                      <Icons.CheckCircle className="text-success h-6 w-6" />
                     ) : (
                       <Icons.Circle className="h-6 w-6" />
                     )}
@@ -62,10 +62,10 @@ export function AccountSelection({ limit, accounts, deposits, isLoading }: Accou
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{account.name}</span>
                     {isLoading ? (
-                      <span className="text-xs text-muted-foreground">Loading...</span>
+                      <span className="text-muted-foreground text-xs">Loading...</span>
                     ) : accountDeposit ? (
-                      <span className="text-xs font-light text-muted-foreground">
-                        {formatAmount(accountDeposit.convertedAmount, deposits.baseCurrency)}{' '}
+                      <span className="text-muted-foreground text-xs font-light">
+                        {formatAmount(accountDeposit.convertedAmount, deposits.baseCurrency)}{" "}
                         Contributed
                       </span>
                     ) : null}
@@ -80,7 +80,7 @@ export function AccountSelection({ limit, accounts, deposits, isLoading }: Accou
         className="mt-4"
         disabled={updateContributionLimitMutation.isPending}
       >
-        {updateContributionLimitMutation.isPending ? 'Saving...' : 'Save Selected Accounts'}
+        {updateContributionLimitMutation.isPending ? "Saving..." : "Save Selected Accounts"}
       </Button>
     </div>
   );

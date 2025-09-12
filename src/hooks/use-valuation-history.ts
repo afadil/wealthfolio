@@ -1,22 +1,23 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { AccountValuation, DateRange } from '@/lib/types';
-import { getHistoricalValuations } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
-import { format } from 'date-fns';
-import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { AccountValuation, DateRange } from "@/lib/types";
+import { getHistoricalValuations } from "@/commands/portfolio";
+import { QueryKeys } from "@/lib/query-keys";
+import { format } from "date-fns";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 
 export function useValuationHistory(
   dateRange: DateRange | undefined,
   accountId: string = PORTFOLIO_ACCOUNT_ID,
 ) {
-  const { data: valuationHistory, isLoading, isFetching } = useQuery<
-    AccountValuation[],
-    Error
-  >({
+  const {
+    data: valuationHistory,
+    isLoading,
+    isFetching,
+  } = useQuery<AccountValuation[], Error>({
     queryKey: [
       QueryKeys.valuationHistory(accountId),
-      dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
-      dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
+      dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null,
+      dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null,
     ],
     queryFn: () => {
       const fetchValuations = (id: string, start?: string, end?: string) =>
@@ -33,8 +34,8 @@ export function useValuationHistory(
 
       return fetchValuations(
         accountId,
-        format(dateRange.from, 'yyyy-MM-dd'),
-        format(dateRange.to, 'yyyy-MM-dd'),
+        format(dateRange.from, "yyyy-MM-dd"),
+        format(dateRange.to, "yyyy-MM-dd"),
       );
     },
     enabled: dateRange === undefined || (!!dateRange?.from && !!dateRange?.to),
@@ -45,4 +46,4 @@ export function useValuationHistory(
     valuationHistory,
     isLoading: isLoading || isFetching,
   };
-} 
+}

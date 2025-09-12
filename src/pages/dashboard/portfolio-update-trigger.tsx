@@ -1,10 +1,13 @@
-import { ReactNode } from 'react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Icons } from '@/components/ui/icons';
-import { useUpdatePortfolioMutation, useRecalculatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
-import { formatDateTime } from '@/lib/utils';
+import { ReactNode } from "react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Icons } from "@/components/ui/icons";
+import {
+  useUpdatePortfolioMutation,
+  useRecalculatePortfolioMutation,
+} from "@/hooks/use-calculate-portfolio";
+import { formatDateTime } from "@/lib/utils";
 
 // Rename interface
 interface PortfolioUpdateTriggerProps {
@@ -13,8 +16,10 @@ interface PortfolioUpdateTriggerProps {
 }
 
 // Rename function
-export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: PortfolioUpdateTriggerProps) {
-
+export function PortfolioUpdateTrigger({
+  lastCalculatedAt,
+  children,
+}: PortfolioUpdateTriggerProps) {
   // Instantiate the mutation hooks inside the component
   const updatePortfolioMutation = useUpdatePortfolioMutation();
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
@@ -36,10 +41,12 @@ export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: Portfolio
           <div className="space-y-2">
             <h4 className="flex text-sm font-light">
               <Icons.Calendar className="mr-2 h-4 w-4" />
-              As of:{' '}
+              As of:{" "}
               <Badge className="ml-1 font-medium" variant="secondary">
                 {/* Use lastCalculatedAt prop */}
-                {lastCalculatedAt ? `${formatDateTime(lastCalculatedAt).date} ${formatDateTime(lastCalculatedAt).time}` : '-'}
+                {lastCalculatedAt
+                  ? `${formatDateTime(lastCalculatedAt).date} ${formatDateTime(lastCalculatedAt).time}`
+                  : "-"}
               </Badge>
             </h4>
           </div>
@@ -55,7 +62,7 @@ export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: Portfolio
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
-            {updatePortfolioMutation.isPending ? 'Updating portfolio...' : 'Update Portfolio'}
+            {updatePortfolioMutation.isPending ? "Updating portfolio..." : "Update Portfolio"}
           </Button>
           <Button
             onClick={handleRecalculate}
@@ -69,10 +76,10 @@ export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: Portfolio
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
-            {recalculatePortfolioMutation.isPending ? 'Recalculating...' : 'Recalculate'}
+            {recalculatePortfolioMutation.isPending ? "Recalculating..." : "Recalculate"}
           </Button>
         </div>
       </HoverCardContent>
     </HoverCard>
   );
-} 
+}

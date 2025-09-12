@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Icons } from '@/components/ui/icons';
-import { subWeeks, subMonths, subYears, startOfYear } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Icons } from "@/components/ui/icons";
+import { subWeeks, subMonths, subYears, startOfYear } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 
-export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
+export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
 export type DateRange = {
   from: Date | undefined;
   to: Date | undefined;
@@ -18,61 +18,61 @@ interface IntervalData {
 }
 
 const intervalDescriptions: Record<TimePeriod, string> = {
-  '1D': 'past day',
-  '1W': 'past week',
-  '1M': 'past month',
-  '3M': 'past 3 months',
-  '6M': 'past 6 months',
-  YTD: 'year to date',
-  '1Y': 'past year',
-  '5Y': 'past 5 years',
-  ALL: 'All Time',
+  "1D": "past day",
+  "1W": "past week",
+  "1M": "past month",
+  "3M": "past 3 months",
+  "6M": "past 6 months",
+  YTD: "year to date",
+  "1Y": "past year",
+  "5Y": "past 5 years",
+  ALL: "All Time",
 };
 
 const intervals: IntervalData[] = [
   {
-    code: '1W',
-    description: intervalDescriptions['1W'],
+    code: "1W",
+    description: intervalDescriptions["1W"],
     calculateRange: () => ({ from: subWeeks(new Date(), 1), to: new Date() }),
   },
   {
-    code: '1M',
-    description: intervalDescriptions['1M'],
+    code: "1M",
+    description: intervalDescriptions["1M"],
     calculateRange: () => ({ from: subMonths(new Date(), 1), to: new Date() }),
   },
   {
-    code: '3M',
-    description: intervalDescriptions['3M'],
+    code: "3M",
+    description: intervalDescriptions["3M"],
     calculateRange: () => ({ from: subMonths(new Date(), 3), to: new Date() }),
   },
   {
-    code: '6M',
-    description: intervalDescriptions['6M'],
+    code: "6M",
+    description: intervalDescriptions["6M"],
     calculateRange: () => ({ from: subMonths(new Date(), 6), to: new Date() }),
   },
   {
-    code: 'YTD',
-    description: intervalDescriptions['YTD'],
+    code: "YTD",
+    description: intervalDescriptions["YTD"],
     calculateRange: () => ({ from: startOfYear(new Date()), to: new Date() }),
   },
   {
-    code: '1Y',
-    description: intervalDescriptions['1Y'],
+    code: "1Y",
+    description: intervalDescriptions["1Y"],
     calculateRange: () => ({ from: subYears(new Date(), 1), to: new Date() }),
   },
   {
-    code: '5Y',
-    description: intervalDescriptions['5Y'],
+    code: "5Y",
+    description: intervalDescriptions["5Y"],
     calculateRange: () => ({ from: subYears(new Date(), 5), to: new Date() }),
   },
   {
-    code: 'ALL',
+    code: "ALL",
     description: intervalDescriptions.ALL,
-    calculateRange: () => ({ from: new Date('1970-01-01'), to: new Date() }),
+    calculateRange: () => ({ from: new Date("1970-01-01"), to: new Date() }),
   },
 ];
 
-const DEFAULT_INTERVAL_CODE: TimePeriod = '3M';
+const DEFAULT_INTERVAL_CODE: TimePeriod = "3M";
 
 interface IntervalSelectorProps {
   onIntervalSelect: (code: TimePeriod, description: string, range: DateRange | undefined) => void;
@@ -110,9 +110,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
     const selectedIndex = intervals.findIndex((interval) => interval.code === selectedCode);
     const distanceFromSelected = Math.abs(index - selectedIndex);
     const maxDistance = Math.max(selectedIndex, intervals.length - 1 - selectedIndex);
-    const opacity = isSelected
-      ? 1
-      : Math.max(0.25, 1 - (distanceFromSelected / Math.max(maxDistance, 1)) * 0.75);
+    const opacity = isSelected ? 1 : Math.max(0.25, 1 - (distanceFromSelected / Math.max(maxDistance, 1)) * 0.75);
 
     return (
       <motion.div
@@ -123,12 +121,16 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           opacity: opacity,
           scale: 1,
         }}
-        whileHover={!isSelected ? {
-          opacity: 1,
-          transition: { duration: 0.15 }
-        } : {}}
+        whileHover={
+          !isSelected
+            ? {
+                opacity: 1,
+                transition: { duration: 0.15 },
+              }
+            : {}
+        }
         transition={{
-          type: 'spring',
+          type: "spring",
           stiffness: 400,
           damping: 25,
           opacity: { duration: 0.2 },
@@ -136,10 +138,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       >
         <Button
           className={cn(
-            'relative -m-1 h-7 overflow-hidden rounded-full px-4 py-0 transition-all duration-200',
+            "relative -m-1 h-7 overflow-hidden rounded-full px-4 py-0 transition-all duration-200",
             isSelected
-              ? 'bg-primary text-primary-foreground'
-              : 'border-0 bg-transparent text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground',
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground border-0 bg-transparent shadow-none hover:bg-transparent",
           )}
           variant="ghost"
           onClick={() => handleClick(code)}
@@ -156,10 +158,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
                   transition={{ duration: 0.3 }}
                 >
                   <Icons.Spinner
-                    className={cn(
-                      'h-4 w-4 animate-spin',
-                      isSelected ? 'text-primary-foreground' : 'text-current',
-                    )}
+                    className={cn("h-4 w-4 animate-spin", isSelected ? "text-primary-foreground" : "text-current")}
                   />
                 </motion.div>
               ) : (
@@ -169,7 +168,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  className={isSelected ? 'text-primary-foreground' : ''}
+                  className={isSelected ? "text-primary-foreground" : ""}
                 >
                   {code}
                 </motion.span>
@@ -178,9 +177,9 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           </div>
           {isSelected && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-primary"
+              className="bg-primary absolute inset-0 rounded-full"
               layoutId="selectedIndicator"
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
             />
           )}
         </Button>
@@ -189,10 +188,10 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   };
 
   return (
-    <div className={cn('relative flex justify-center space-x-2', className)}>
+    <div className={cn("relative flex justify-center space-x-2", className)}>
       {intervals.map((intervalData, index) => renderButton(intervalData, index))}
     </div>
   );
 };
 
-export  {IntervalSelector};
+export { IntervalSelector };

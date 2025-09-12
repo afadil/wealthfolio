@@ -1,9 +1,9 @@
-import { Holding } from '@/lib/types';
-import { Icons } from '@/components/ui/icons';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { cn } from '@/lib/utils';
-import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Holding } from "@/lib/types";
+import { Icons } from "@/components/ui/icons";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { cn } from "@/lib/utils";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CashHoldingsWidgetProps {
   cashHoldings: Holding[];
@@ -11,12 +11,16 @@ interface CashHoldingsWidgetProps {
   className?: string;
 }
 
-export const CashHoldingsWidget = ({ cashHoldings, isLoading, className }: CashHoldingsWidgetProps) => {
+export const CashHoldingsWidget = ({
+  cashHoldings,
+  isLoading,
+  className,
+}: CashHoldingsWidgetProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
   if (isLoading) {
     return (
-      <div className={cn('flex items-center gap-4 text-sm text-muted-foreground', className)}>
+      <div className={cn("text-muted-foreground flex items-center gap-4 text-sm", className)}>
         <div className="flex items-center gap-1.5">
           <Icons.Wallet className="h-3.5 w-3.5" />
           <span className="font-medium">Cash:</span>
@@ -35,7 +39,7 @@ export const CashHoldingsWidget = ({ cashHoldings, isLoading, className }: CashH
   }
 
   return (
-    <div className={cn('flex items-center gap-4 text-sm text-muted-foreground', className)}>
+    <div className={cn("text-muted-foreground flex items-center gap-4 text-sm", className)}>
       <div className="flex items-center gap-1.5">
         <Icons.Wallet className="h-3.5 w-3.5" />
         <span className="font-medium">Cash:</span>
@@ -44,7 +48,7 @@ export const CashHoldingsWidget = ({ cashHoldings, isLoading, className }: CashH
         {cashHoldings.map((holding) => (
           <div key={holding.id} className="flex items-center gap-1.5">
             <span>{holding.localCurrency}</span>
-            <span className="font-medium text-foreground">
+            <span className="text-foreground font-medium">
               <AmountDisplay
                 value={holding.marketValue?.local ?? 0}
                 currency={holding.localCurrency}

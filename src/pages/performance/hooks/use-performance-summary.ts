@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { PerformanceMetrics } from '@/lib/types';
-import { calculatePerformanceSummary } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { PerformanceMetrics } from "@/lib/types";
+import { calculatePerformanceSummary } from "@/commands/portfolio";
+import { QueryKeys } from "@/lib/query-keys";
 
 // Define the parameters the hook accepts
 interface UsePerformanceSummaryParams {
@@ -10,7 +10,6 @@ interface UsePerformanceSummaryParams {
   startDate?: Date | null; // Optional start date (YYYY-MM-DD)
   endDate?: Date | null; // Optional end date (YYYY-MM-DD)
 }
-
 
 /**
  * Custom hook to fetch performance summary data for a given account using TanStack Query.
@@ -35,14 +34,14 @@ export const usePerformanceSummary = ({
     queryFn: () =>
       calculatePerformanceSummary({
         itemId,
-        itemType: 'account',
-        startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-        endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+        itemType: "account",
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
       }),
 
     // Control whether the query should automatically run
     // Disable if 'enabled' prop is false or if itemId is missing
-    enabled:  !!itemId,
+    enabled: !!itemId,
 
     // Optional: Configuration for caching behavior
     // staleTime: 5 * 60 * 1000, // Data considered fresh for 5 minutes

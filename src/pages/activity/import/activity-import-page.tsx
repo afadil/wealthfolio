@@ -1,32 +1,31 @@
-import { AlertFeedback } from '@wealthfolio/ui';
-import { ApplicationHeader } from '@/components/header';
-import { Separator } from '@/components/ui/separator';
-import React, {useState } from 'react';
-import type { Account, ActivityImport, ImportMappingData } from '@/lib/types';
-import { ImportHelpPopover } from './import-help';
-import { StepIndicator } from './components/step-indicator';
-import { AnimatePresence, motion } from 'framer-motion';
-import { AccountSelectionStep } from './steps/account-selection-step';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { useCsvParser } from './hooks/use-csv-parser';
-import { validateActivityImport } from './utils/validation-utils';
-import { MappingStep } from './steps/mapping-step';
-import { DataPreviewStep } from './steps/preview-step';
-import { ResultStep } from './steps/result-step';
-import { logger } from '@/adapters';
-import { useNavigate } from 'react-router-dom';
-import { getAccounts } from '@/commands/account';
-import { QueryKeys } from '@/lib/query-keys';
-import { useQuery } from '@tanstack/react-query';
+import { logger } from "@/adapters";
+import { getAccounts } from "@/commands/account";
+import { ApplicationHeader } from "@/components/header";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { AlertFeedback } from "@wealthfolio/ui";
+import { AnimatePresence, motion } from "framer-motion";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { StepIndicator } from "./components/step-indicator";
+import { useCsvParser } from "./hooks/use-csv-parser";
+import { ImportHelpPopover } from "./import-help";
+import { AccountSelectionStep } from "./steps/account-selection-step";
+import { MappingStep } from "./steps/mapping-step";
+import { DataPreviewStep } from "./steps/preview-step";
+import { ResultStep } from "./steps/result-step";
+import { validateActivityImport } from "./utils/validation-utils";
 
 // Define the steps in the wizard
 const STEPS = [
-  { id: 1, title: 'Select Account & File' },
-  { id: 2, title: 'Configure Mappings' },
-  { id: 3, title: 'Preview & Import' },
-  { id: 4, title: 'Import Results' },
+  { id: 1, title: "Select Account & File" },
+  { id: 2, title: "Configure Mappings" },
+  { id: 3, title: "Preview & Import" },
+  { id: 4, title: "Import Results" },
 ];
-
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();
@@ -35,24 +34,22 @@ const ActivityImportPage = () => {
   const [activities, setActivities] = useState<ActivityImport[]>([]);
   const [processedActivities, setProcessedActivities] = useState<ActivityImport[]>([]);
 
-
   const { data: accountsData } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
   const accounts = accountsData || [];
 
-  
   // 1. CSV Parsing Hook - Focus on parsing and structure validation
-  const { 
-    headers, 
-    data, 
+  const {
+    headers,
+    data,
     rawData,
-    errors: parsingErrors, 
-    isParsing, 
-    selectedFile, 
-    parseCsvFile, 
-    resetParserStates 
+    errors: parsingErrors,
+    isParsing,
+    selectedFile,
+    parseCsvFile,
+    resetParserStates,
   } = useCsvParser();
 
   // Reset the entire import process
@@ -65,9 +62,8 @@ const ActivityImportPage = () => {
 
   // Cancel import and navigate to activities page
   const cancelImport = () => {
-    navigate('/activities');
+    navigate("/activities");
   };
-
 
   // Handle file selection
   const handleFileChange = (file: File | null) => {
@@ -94,13 +90,18 @@ const ActivityImportPage = () => {
   // Handle mapping completion from MappingStep
   const handleMappingComplete = async (mapping: ImportMappingData) => {
     if (!selectedAccount?.id || !data || data.length < 2) {
-      logger.error('Missing account ID or CSV data');
+      logger.error("Missing account ID or CSV data");
       return;
     }
 
     try {
       // Validate data and store results
-      const results = validateActivityImport(data, mapping, selectedAccount.id, selectedAccount.currency);
+      const results = validateActivityImport(
+        data,
+        mapping,
+        selectedAccount.id,
+        selectedAccount.currency,
+      );
 
       // Update state with validated activities
       setActivities(results.activities);
@@ -205,17 +206,17 @@ const ActivityImportPage = () => {
 };
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
-  state = { hasError: false, error: null };
+  override state = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     logger.error(`Caught error: ${error}, errorInfo: ${errorInfo}`);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return <AlertFeedback variant="error" title="Something went wrong." />;
     }

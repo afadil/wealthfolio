@@ -1,6 +1,6 @@
-import { logger } from '@/adapters';
-import { reloadAllAddons } from '@/addons/addons-core';
-import { createAddonContext } from './addons-runtime-context';
+import { logger } from "@/adapters";
+import { reloadAllAddons } from "@/addons/addons-core";
+import { createAddonContext } from "./addons-runtime-context";
 
 interface DevModeConfig {
   enabled: boolean;
@@ -14,7 +14,7 @@ interface AddonDevServer {
   name: string;
   url: string;
   port: number;
-  status: 'running' | 'stopped' | 'error';
+  status: "running" | "stopped" | "error";
   lastUpdated?: Date;
 }
 
@@ -31,7 +31,7 @@ class AddonDevManager {
       pollInterval: 1000,
       autoReload: true,
     };
-    
+
     // Note: Auto-discovery is now done lazily when enableDevMode() is called
     // This prevents side effects during module import
   }
@@ -41,33 +41,33 @@ class AddonDevManager {
    */
   private async discoverDevServers(): Promise<void> {
     const commonPorts = [3001];
-    
-    logger.info('🔍 Auto-discovering addon development servers...');
-    
+
+    logger.info("🔍 Auto-discovering addon development servers...");
+
     for (const port of commonPorts) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
-        
+
         const response = await fetch(`http://localhost:${port}/health`, {
-          signal: controller.signal
+          signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (response.ok) {
           // Try to get manifest to identify the addon
           try {
             const manifestResponse = await fetch(`http://localhost:${port}/manifest.json`);
             if (manifestResponse.ok) {
               const manifest = await manifestResponse.json();
-              
+
               this.registerDevServer({
                 id: manifest.id,
                 name: manifest.name,
-                port: port
+                port: port,
               });
-              
+
               logger.info(`✅ Discovered dev server: ${manifest.name} on port ${port}`);
             }
           } catch (manifestError) {
@@ -85,23 +85,23 @@ class AddonDevManager {
    */
   async enableDevMode(): Promise<void> {
     if (!this.config.enabled) {
-      logger.info('🔧 Enabling addon development mode...');
+      logger.info("🔧 Enabling addon development mode...");
       this.config.enabled = true;
     }
-    
+
     // Always re-discover servers when explicitly enabling
     await this.discoverDevServers();
-    
+
     // Start file watching
     this.startWatching();
-    
+
     // Setup hot reload endpoint
     this.setupHotReloadServer();
-    
+
     // Add dev tools to context
     this.injectDevTools();
-    
-    logger.info('✅ Addon development mode enabled');
+
+    logger.info("✅ Addon development mode enabled");
   }
 
   /**
@@ -109,32 +109,28 @@ class AddonDevManager {
    */
   disableDevMode(): void {
     if (this.config.enabled) {
-      logger.info('🔧 Disabling addon development mode...');
+      logger.info("🔧 Disabling addon development mode...");
       this.config.enabled = false;
-      
+
       this.stopWatching();
       this.cleanup();
-      
-      logger.info('✅ Addon development mode disabled');
+
+      logger.info("✅ Addon development mode disabled");
     }
   }
 
   /**
    * Register a development server for an addon
    */
-  registerDevServer(addon: {
-    id: string;
-    name: string;
-    port: number;
-  }): void {
+  registerDevServer(addon: { id: string; name: string; port: number }): void {
     const devServer: AddonDevServer = {
       id: addon.id,
       name: addon.name,
       url: `http://localhost:${addon.port}`,
       port: addon.port,
-      status: 'stopped',
+      status: "stopped",
     };
-    
+
     this.devServers.set(addon.id, devServer);
     logger.info(`📝 Registered dev server for ${addon.name} at port ${addon.port}`);
   }
@@ -163,21 +159,21 @@ class AddonDevManager {
       }
 
       const addonCode = await addonResponse.text();
-      
+
       // Load manifest
       const manifestResponse = await fetch(`${devServer.url}/manifest.json`);
       const manifest = manifestResponse.ok ? await manifestResponse.json() : null;
 
       // Execute addon code in development context
       await this.executeAddonCode(addonCode, manifest, addonId);
-      
-      devServer.status = 'running';
+
+      devServer.status = "running";
       devServer.lastUpdated = new Date();
-      
+
       logger.info(`🚀 Loaded addon ${devServer.name} from dev server`);
       return true;
     } catch (error) {
-      devServer.status = 'error';
+      devServer.status = "error";
       logger.error(`❌ Failed to load addon from dev server: ${error}`);
       return false;
     }
@@ -186,31 +182,29 @@ class AddonDevManager {
   /**
    * Execute addon code in a sandboxed environment
    */
-  private async executeAddonCode(
-    code: string, 
-    _manifest: any, 
-    addonId: string
-  ): Promise<void> {
+  private async executeAddonCode(code: string, _manifest: any, addonId: string): Promise<void> {
     try {
       // Runtime guard: Verify React singletons are available
-      if (typeof (globalThis as any).ReactDOM?.createPortal !== 'function') {
-        throw new Error('Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.');
+      if (typeof (globalThis as any).ReactDOM?.createPortal !== "function") {
+        throw new Error(
+          "Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.",
+        );
       }
 
       // Create a blob URL for the addon code
-      const blob = new Blob([code], { type: 'text/javascript' });
+      const blob = new Blob([code], { type: "text/javascript" });
       const blobUrl = URL.createObjectURL(blob);
 
       // Import and execute the addon
       const mod = await import(/* @vite-ignore */ blobUrl);
-      
-      if (typeof mod.default === 'function') {
+
+      if (typeof mod.default === "function") {
         // Create addon-specific context with scoped secrets
         const addonSpecificContext = createAddonContext(addonId);
         const addonInstance = mod.default(addonSpecificContext);
-        
+
         // Store for cleanup
-        if (addonInstance && typeof addonInstance.disable === 'function') {
+        if (addonInstance && typeof addonInstance.disable === "function") {
           (globalThis as any).__DEV_ADDONS__ = (globalThis as any).__DEV_ADDONS__ || new Map();
           (globalThis as any).__DEV_ADDONS__.set(addonId, addonInstance);
         }
@@ -218,7 +212,6 @@ class AddonDevManager {
 
       // Cleanup blob URL
       URL.revokeObjectURL(blobUrl);
-      
     } catch (error) {
       logger.error(`Failed to execute addon code for ${addonId}: ${error}`);
       throw error;
@@ -230,7 +223,7 @@ class AddonDevManager {
    */
   private startWatching(): void {
     if (this.watchInterval) return;
-    
+
     // Use polling for simplicity - could be enhanced with native file watchers
     this.watchInterval = window.setInterval(() => {
       this.checkForUpdates();
@@ -252,13 +245,13 @@ class AddonDevManager {
    */
   private async checkForUpdates(): Promise<void> {
     for (const [addonId, devServer] of this.devServers) {
-      if (devServer.status !== 'running') continue;
-      
+      if (devServer.status !== "running") continue;
+
       try {
         const response = await fetch(`${devServer.url}/status`);
         if (response.ok) {
           const status = await response.json();
-          
+
           if (status.lastModified && devServer.lastUpdated) {
             const lastModified = new Date(status.lastModified);
             if (lastModified > devServer.lastUpdated) {
@@ -290,22 +283,22 @@ class AddonDevManager {
       }
 
       // Also clean up from the main addon loader
-      const { unloadAddon } = await import('./addons-core');
+      const { unloadAddon } = await import("./addons-core");
       if (unloadAddon) {
         unloadAddon(addonId);
       }
 
       // Small delay to ensure cleanup is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Reload from dev server
       const success = await this.loadAddonFromDevServer(addonId);
-      
+
       if (success) {
         logger.info(`✅ Successfully hot-reloaded ${addonId}`);
-        
+
         // Trigger navigation update to refresh the UI
-        const { triggerNavigationUpdate } = await import('./addons-runtime-context');
+        const { triggerNavigationUpdate } = await import("./addons-runtime-context");
         if (triggerNavigationUpdate) {
           triggerNavigationUpdate();
         }
@@ -322,13 +315,13 @@ class AddonDevManager {
    */
   private setupHotReloadServer(): void {
     // Connect to hot reload server if available
-    if (typeof EventSource !== 'undefined') {
+    if (typeof EventSource !== "undefined") {
       try {
-        this.eventSource = new EventSource('http://localhost:3001/addon-updates');
-        
+        this.eventSource = new EventSource("http://localhost:3001/addon-updates");
+
         this.eventSource.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          if (data.type === 'addon-changed' && data.addonId) {
+          if (data.type === "addon-changed" && data.addonId) {
             this.reloadAddon(data.addonId);
           }
         };
@@ -347,12 +340,16 @@ class AddonDevManager {
    */
   private injectDevTools(): void {
     // Add development-specific APIs to a generic context
-    const devCtx = createAddonContext('dev-tools');
+    const devCtx = createAddonContext("dev-tools");
     (devCtx as any).dev = {
       reload: () => reloadAllAddons(),
       listServers: () => Array.from(this.devServers.values()),
-      enableAutoReload: () => { this.config.autoReload = true; },
-      disableAutoReload: () => { this.config.autoReload = false; },
+      enableAutoReload: () => {
+        this.config.autoReload = true;
+      },
+      disableAutoReload: () => {
+        this.config.autoReload = false;
+      },
     };
   }
 
@@ -419,7 +416,7 @@ class AddonDevManager {
    */
   forceDisable(): void {
     if (this.config.enabled) {
-      logger.info('🔧 Force disabling addon development mode...');
+      logger.info("🔧 Force disabling addon development mode...");
       this.disableDevMode();
     }
   }
@@ -429,7 +426,7 @@ class AddonDevManager {
    */
   forceEnable(): void {
     if (!this.config.enabled && import.meta.env.DEV) {
-      logger.info('🔧 Force enabling addon development mode...');
+      logger.info("🔧 Force enabling addon development mode...");
       this.enableDevMode();
     }
   }

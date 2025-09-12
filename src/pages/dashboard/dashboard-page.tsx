@@ -1,20 +1,19 @@
-import { GainAmount, GainPercent, IntervalSelector } from '@wealthfolio/ui';
-import { HistoryChart } from '@/components/history-chart';
-import Balance from './balance';
-import { Skeleton } from '@/components/ui/skeleton';
-import SavingGoals from './goals';
-import { useMemo, useState } from 'react';
-import { PrivacyToggle } from '@/components/privacy-toggle';
-import { AccountsSummary } from './accounts-summary';
-import { useSettingsContext } from '@/lib/settings-provider';
-import { useValuationHistory } from '@/hooks/use-valuation-history';
-import { PortfolioUpdateTrigger } from '@/pages/dashboard/portfolio-update-trigger';
-import { DateRange, TimePeriod } from '@/lib/types';
-import { subMonths } from 'date-fns';
-import { calculatePerformanceMetrics } from '@/lib/utils';
-import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
-import { useHoldings } from '@/hooks/use-holdings';
-
+import { GainAmount, GainPercent, IntervalSelector } from "@wealthfolio/ui";
+import { HistoryChart } from "@/components/history-chart";
+import Balance from "./balance";
+import { Skeleton } from "@/components/ui/skeleton";
+import SavingGoals from "./goals";
+import { useMemo, useState } from "react";
+import { PrivacyToggle } from "@/components/privacy-toggle";
+import { AccountsSummary } from "./accounts-summary";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { useValuationHistory } from "@/hooks/use-valuation-history";
+import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
+import { DateRange, TimePeriod } from "@/lib/types";
+import { subMonths } from "date-fns";
+import { calculatePerformanceMetrics } from "@/lib/utils";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { useHoldings } from "@/hooks/use-holdings";
 
 function DashboardSkeleton() {
   return (
@@ -37,12 +36,12 @@ const getInitialDateRange = (): DateRange => ({
   to: new Date(),
 });
 
-const INITIAL_INTERVAL_CODE: TimePeriod = '3M';
+const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalDescription, setSelectedIntervalDescription] =
-    useState<string>('Last 3 months');
+    useState<string>("Last 3 months");
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
@@ -54,7 +53,7 @@ export default function DashboardPage() {
   const { valuationHistory, isLoading: isValuationHistoryLoading } = useValuationHistory(dateRange);
 
   const { settings } = useSettingsContext();
-  const baseCurrency = settings?.baseCurrency || 'USD';
+  const baseCurrency = settings?.baseCurrency || "USD";
 
   // Calculate gainLossAmount and simpleReturn from valuationHistory
   const { gainLossAmount, simpleReturn } = useMemo(() => {
@@ -90,7 +89,7 @@ export default function DashboardPage() {
   ) => {
     setSelectedIntervalDescription(description);
     setDateRange(range);
-    setIsAllTime(code === 'ALL');
+    setIsAllTime(code === "ALL");
   };
 
   return (
@@ -116,14 +115,14 @@ export default function DashboardPage() {
                   currency={baseCurrency}
                   displayCurrency={false}
                 ></GainAmount>
-                <div className="my-1 border-r border-secondary pr-2" />
+                <div className="border-secondary my-1 border-r pr-2" />
                 <GainPercent
                   className="text-md font-light"
                   value={simpleReturn}
                   animated={true}
                 ></GainPercent>
                 {selectedIntervalDescription && (
-                  <span className="text-md ml-1 font-light text-muted-foreground">
+                  <span className="text-md text-muted-foreground ml-1 font-light">
                     {selectedIntervalDescription}
                   </span>
                 )}
@@ -138,7 +137,7 @@ export default function DashboardPage() {
           <>
             <HistoryChart data={chartData} />
             <IntervalSelector
-              className="relative bottom-0 left-0 right-0 z-10"
+              className="relative right-0 bottom-0 left-0 z-10"
               onIntervalSelect={handleIntervalSelect}
               isLoading={isValuationHistoryLoading}
               initialSelection={INITIAL_INTERVAL_CODE}
@@ -147,10 +146,10 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      <div className="grow bg-linear-to-t from-success/30 via-success/15 to-success/10 px-0 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+      <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-0 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
         <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2">
-            <AccountsSummary  />
+            <AccountsSummary />
           </div>
           <div className="sm:col-span-1">
             <SavingGoals />

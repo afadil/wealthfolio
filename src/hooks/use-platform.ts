@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { getRunEnv, RUN_ENV } from '@/adapters';
-import { invoke } from '@tauri-apps/api/core';
+import { useState, useEffect } from "react";
+import { getRunEnv, RUN_ENV } from "@/adapters";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface PlatformInfo {
   os: string;
@@ -38,17 +38,17 @@ export function usePlatform(): UsePlatformResult {
     }
 
     const runEnv = getRunEnv();
-    
+
     if (runEnv === RUN_ENV.DESKTOP) {
       // We're in Tauri, get actual platform info
-      invoke<PlatformInfo>('get_platform')
+      invoke<PlatformInfo>("get_platform")
         .then((info) => {
           cachedPlatform = info;
           setPlatform(info);
           setLoading(false);
         })
         .catch((error) => {
-          console.error('Failed to get platform info:', error);
+          console.error("Failed to get platform info:", error);
           // Fallback detection based on user agent
           const fallbackInfo = detectPlatformFromUserAgent();
           cachedPlatform = fallbackInfo;
@@ -72,11 +72,11 @@ export function usePlatform(): UsePlatformResult {
     platform,
     isMobile: platform?.is_mobile ?? false,
     isDesktop: platform?.is_desktop ?? true,
-    isIOS: platform?.os === 'ios',
-    isAndroid: platform?.os === 'android',
-    isMacOS: platform?.os === 'macos',
-    isWindows: platform?.os === 'windows',
-    isLinux: platform?.os === 'linux',
+    isIOS: platform?.os === "ios",
+    isAndroid: platform?.os === "android",
+    isMacOS: platform?.os === "macos",
+    isWindows: platform?.os === "windows",
+    isLinux: platform?.os === "linux",
     isWeb,
     isTauri,
     loading,
@@ -85,37 +85,39 @@ export function usePlatform(): UsePlatformResult {
 
 // Fallback detection using user agent (less reliable but works everywhere)
 function detectPlatformFromUserAgent(): PlatformInfo {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return {
-      os: 'unknown',
+      os: "unknown",
       is_mobile: false,
       is_desktop: true,
     };
   }
 
   const userAgent = window.navigator.userAgent.toLowerCase();
-  const platform = window.navigator.platform?.toLowerCase() || '';
-  
+  const platform = window.navigator.platform?.toLowerCase() || "";
+
   // Check for mobile devices
-  const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+  const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+    userAgent,
+  );
   const isTablet = /ipad|tablet|playbook|silk/i.test(userAgent);
-  
+
   // Detect OS
-  let os = 'unknown';
+  let os = "unknown";
   if (/iphone|ipad|ipod/.test(userAgent)) {
-    os = 'ios';
+    os = "ios";
   } else if (/android/.test(userAgent)) {
-    os = 'android';
+    os = "android";
   } else if (/mac|darwin/.test(platform) || /macintosh/.test(userAgent)) {
-    os = 'macos';
+    os = "macos";
   } else if (/win/.test(platform) || /windows/.test(userAgent)) {
-    os = 'windows';
+    os = "windows";
   } else if (/linux/.test(platform) || /linux/.test(userAgent)) {
-    os = 'linux';
+    os = "linux";
   }
 
   const is_mobile = isMobileUA || isTablet;
-  
+
   return {
     os,
     is_mobile,
@@ -130,14 +132,14 @@ export async function getPlatform(): Promise<PlatformInfo> {
   }
 
   const runEnv = getRunEnv();
-  
+
   if (runEnv === RUN_ENV.DESKTOP) {
     try {
-      const info = await invoke<PlatformInfo>('get_platform');
+      const info = await invoke<PlatformInfo>("get_platform");
       cachedPlatform = info;
       return info;
     } catch (error) {
-      console.error('Failed to get platform info:', error);
+      console.error("Failed to get platform info:", error);
     }
   }
 
@@ -163,9 +165,9 @@ export function useIsMobileViewport() {
     };
 
     checkViewport();
-    window.addEventListener('resize', checkViewport);
-    
-    return () => window.removeEventListener('resize', checkViewport);
+    window.addEventListener("resize", checkViewport);
+
+    return () => window.removeEventListener("resize", checkViewport);
   }, []);
 
   return isMobile;

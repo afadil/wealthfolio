@@ -1,6 +1,6 @@
-import NumberFlow from '@number-flow/react';
-import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
-import { Skeleton } from '@/components/ui/skeleton';
+import NumberFlow from "@number-flow/react";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BalanceProps {
   targetValue: number;
@@ -12,7 +12,7 @@ interface BalanceProps {
 
 const Balance: React.FC<BalanceProps> = ({
   targetValue,
-  currency = 'USD',
+  currency = "USD",
   displayCurrency = false,
   displayDecimal = true,
   isLoading = false,
@@ -24,10 +24,10 @@ const Balance: React.FC<BalanceProps> = ({
   }
 
   return (
-    <h1 className="font-heading font-bold text-3xl tracking-tight">
+    <h1 className="font-heading text-3xl font-bold tracking-tight">
       {isBalanceHidden ? (
         <span>
-          {displayCurrency ? `${currency}` : ''}
+          {displayCurrency ? `${currency}` : ""}
           ••••••
         </span>
       ) : (
@@ -37,8 +37,8 @@ const Balance: React.FC<BalanceProps> = ({
           isolate={false}
           format={{
             currency: currency,
-            style: displayCurrency ? 'currency' : 'decimal',
-            currencyDisplay: 'narrowSymbol',
+            style: displayCurrency ? "currency" : "decimal",
+            currencyDisplay: "narrowSymbol",
             minimumFractionDigits: displayDecimal ? 2 : 0,
             maximumFractionDigits: displayDecimal ? 2 : 0,
           }}

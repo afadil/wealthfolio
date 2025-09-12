@@ -1,27 +1,23 @@
-import { getGoals, getGoalsAllocation } from '@/commands/goal';
-import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { calculateGoalProgress } from '@/lib/portfolio-helper';
-import { Goal, GoalAllocation } from '@/lib/types';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useQuery } from '@tanstack/react-query';
-import { formatPercent } from '@wealthfolio/ui';
-import { Icons } from '@/components/ui/icons';
-import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { useLatestValuations } from '@/hooks/use-latest-valuations';
-import { useAccounts } from '@/hooks/use-accounts';
-import { useMemo } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { calculateGoalProgress } from "@/lib/portfolio-helper";
+import { Goal, GoalAllocation } from "@/lib/types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQuery } from "@tanstack/react-query";
+import { formatPercent } from "@wealthfolio/ui";
+import { Icons } from "@/components/ui/icons";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { useLatestValuations } from "@/hooks/use-latest-valuations";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useMemo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const {
-    accounts,
-    isLoading: isLoadingAccounts,
-    isError: isErrorAccounts,
-  } = useAccounts();
+  const { accounts, isLoading: isLoadingAccounts, isError: isErrorAccounts } = useAccounts();
 
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
 
@@ -36,7 +32,7 @@ export function SavingGoals() {
     isLoading: isLoadingGoals,
     isError: isErrorGoals,
   } = useQuery<Goal[], Error>({
-    queryKey: ['goals'],
+    queryKey: ["goals"],
     queryFn: getGoals,
   });
 
@@ -45,7 +41,7 @@ export function SavingGoals() {
     isLoading: isLoadingAllocations,
     isError: isErrorAllocations,
   } = useQuery<GoalAllocation[], Error>({
-    queryKey: ['goals_allocations'],
+    queryKey: ["goals_allocations"],
     queryFn: getGoalsAllocation,
   });
 
@@ -56,14 +52,15 @@ export function SavingGoals() {
     return calculateGoalProgress(latestValuations, goals, allocations);
   }, [latestValuations, goals, allocations]);
 
-  const isLoading = isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
+  const isLoading =
+    isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
   const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
 
-  console.log('goals errors',  isErrorGoals);
+  console.log("goals errors", isErrorGoals);
 
-  console.log('goals errorValuations', errorValuations);
-  console.log('isErrorAllocations', isErrorAllocations);
-  console.log('isErrorAccounts', isErrorAccounts);
+  console.log("goals errorValuations", errorValuations);
+  console.log("isErrorAllocations", isErrorAllocations);
+  console.log("isErrorAccounts", isErrorAccounts);
   if (isLoading) {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">
@@ -95,7 +92,7 @@ export function SavingGoals() {
         <CardContent>
           <Card className="w-full border-none shadow-sm">
             <CardContent className="pt-6">
-              <div className="flex flex-col items-center justify-center py-6 text-center text-destructive">
+              <div className="text-destructive flex flex-col items-center justify-center py-6 text-center">
                 <Icons.AlertCircle className="mb-2 h-12 w-12" />
                 <p className="text-sm">Could not load saving goals data.</p>
                 <p className="text-xs">Please try again later.</p>
@@ -118,14 +115,14 @@ export function SavingGoals() {
             <CardContent className="pt-6">
               {goals && goals.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <Icons.Goal className="mb-2 h-12 w-12 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No saving goals set</p>
-                  <p className="text-xs text-muted-foreground">
+                  <Icons.Goal className="text-muted-foreground mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground text-sm">No saving goals set</p>
+                  <p className="text-muted-foreground text-xs">
                     Create a goal to start tracking your progress
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
+                <div className="text-muted-foreground flex flex-col items-center justify-center py-6 text-center">
                   <p className="text-sm">Goal data not yet available.</p>
                 </div>
               )}
@@ -150,37 +147,40 @@ export function SavingGoals() {
                   [...goals]
                     .sort((a, b) => a.targetAmount - b.targetAmount)
                     .map((goal) => {
-                      const progressData = goalsProgress.find(p => p.name === goal.title);
+                      const progressData = goalsProgress.find((p) => p.name === goal.title);
 
                       const currentProgress = progressData?.progress ?? 0;
                       const currentValue = progressData?.currentValue ?? 0;
-                      const currency = progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? 'USD';
+                      const currency =
+                        progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? "USD";
 
                       return (
                         <Tooltip key={goal.id}>
                           <TooltipTrigger asChild>
                             <div className="mb-4 cursor-help items-center">
-                              <CardDescription className="mb-2 flex items-center text-sm font-light text-muted-foreground">
+                              <CardDescription className="text-muted-foreground mb-2 flex items-center text-sm font-light">
                                 {goal.title}
                                 {currentProgress >= 100 ? (
-                                  <Icons.CheckCircle className="ml-1 h-4 w-4 text-success" />
+                                  <Icons.CheckCircle className="text-success ml-1 h-4 w-4" />
                                 ) : null}
                               </CardDescription>
 
                               <Progress
                                 value={currentProgress * 100}
-                                className="h-2.5 w-full [&>div]:bg-success"
+                                className="[&>div]:bg-success h-2.5 w-full"
                               />
                             </div>
                           </TooltipTrigger>
                           <TooltipContent className="space-y-2">
-                            <h3 className="text-md font-bold text-muted-foreground">{goal.title}</h3>
+                            <h3 className="text-md text-muted-foreground font-bold">
+                              {goal.title}
+                            </h3>
                             <ul className="list-inside list-disc text-xs">
                               <li>
                                 Progress: <b>{formatPercent(currentProgress)}</b>
                               </li>
                               <li>
-                                Current Value:{' '}
+                                Current Value:{" "}
                                 <b>
                                   <AmountDisplay
                                     value={currentValue}
@@ -190,7 +190,7 @@ export function SavingGoals() {
                                 </b>
                               </li>
                               <li>
-                                Target Value:{' '}
+                                Target Value:{" "}
                                 <b>
                                   <AmountDisplay
                                     value={goal.targetAmount}
@@ -201,7 +201,9 @@ export function SavingGoals() {
                               </li>
                             </ul>
                             {!progressData && (
-                               <p className="text-xs text-muted-foreground italic">Progress calculation pending or not applicable.</p>
+                              <p className="text-muted-foreground text-xs italic">
+                                Progress calculation pending or not applicable.
+                              </p>
                             )}
                           </TooltipContent>
                         </Tooltip>
@@ -209,9 +211,9 @@ export function SavingGoals() {
                     })
                 ) : (
                   <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <Icons.Goal className="mb-2 h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No saving goals set</p>
-                    <p className="text-xs text-muted-foreground">
+                    <Icons.Goal className="text-muted-foreground mb-2 h-12 w-12" />
+                    <p className="text-muted-foreground text-sm">No saving goals set</p>
+                    <p className="text-muted-foreground text-xs">
                       Create a goal to start tracking your progress
                     </p>
                   </div>

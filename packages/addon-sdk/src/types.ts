@@ -91,4 +91,6 @@ export interface AddonContext {
 /**
  * Addon enable function signature
  */
-export type AddonEnableFunction = (context: AddonContext) => void | { disable?: () => void };
+export type AddonEnableFunction = (
+  context: AddonContext,
+) => void | { disable?: () => void };

@@ -1,11 +1,22 @@
-import { z } from 'zod';
-import { Card, CardContent, FormField, FormItem, FormLabel, FormControl, FormMessage, MoneyInput } from '@wealthfolio/ui';
-import { useFormContext } from 'react-hook-form';
-import { AccountSelectOption } from '../activity-form';
-import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from '../activity-type-selector';
-import { ConfigurationCheckbox, CommonFields } from './common';
-import { cashActivitySchema } from './schemas';
-
+import { z } from "zod";
+import {
+  Card,
+  CardContent,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  MoneyInput,
+} from "@wealthfolio/ui";
+import { useFormContext } from "react-hook-form";
+import { AccountSelectOption } from "../activity-form";
+import {
+  ActivityTypeSelector,
+  type ActivityType as ActivityTypeUI,
+} from "../activity-type-selector";
+import { ConfigurationCheckbox, CommonFields } from "./common";
+import { cashActivitySchema } from "./schemas";
 
 export type CashFormValues = z.infer<typeof cashActivitySchema>;
 
@@ -13,10 +24,32 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control } = useFormContext();
 
   const cashTypes: ActivityTypeUI[] = [
-    { value: 'DEPOSIT', label: 'Deposit', icon: 'ArrowDown', description: 'Increase your account balance by adding funds.' },
-    { value: 'WITHDRAWAL', label: 'Withdrawal', icon: 'ArrowUp', description: 'Decrease your account balance by taking out funds.' },
-    { value: 'TRANSFER_IN', label: 'Transfer In', icon: 'ArrowDown', description: 'Move funds into this account from another of your existing accounts. Note: This type of transfer typically doesn\'t count towards contribution limits.' },
-    { value: 'TRANSFER_OUT', label: 'Transfer Out', icon: 'ArrowUp', description: 'Move funds from this account to another of your existing accounts. Note: This type of transfer typically doesn\'t count towards contribution limits.' },
+    {
+      value: "DEPOSIT",
+      label: "Deposit",
+      icon: "ArrowDown",
+      description: "Increase your account balance by adding funds.",
+    },
+    {
+      value: "WITHDRAWAL",
+      label: "Withdrawal",
+      icon: "ArrowUp",
+      description: "Decrease your account balance by taking out funds.",
+    },
+    {
+      value: "TRANSFER_IN",
+      label: "Transfer In",
+      icon: "ArrowDown",
+      description:
+        "Move funds into this account from another of your existing accounts. Note: This type of transfer typically doesn't count towards contribution limits.",
+    },
+    {
+      value: "TRANSFER_OUT",
+      label: "Transfer Out",
+      icon: "ArrowUp",
+      description:
+        "Move funds from this account to another of your existing accounts. Note: This type of transfer typically doesn't count towards contribution limits.",
+    },
   ];
 
   return (
@@ -64,4 +97,4 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
       </Card>
     </div>
   );
-}; 
+};

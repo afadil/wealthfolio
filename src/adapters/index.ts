@@ -1,11 +1,11 @@
-import * as tauri from './tauri';
-import * as web from './web';
+import * as tauri from "./tauri";
+import * as web from "./web";
 
 export enum RUN_ENV {
-  DESKTOP = 'desktop',
-  MOBILE = 'desktop', // iOS and Android are treated as desktop for now
-  WEB = 'web',
-  UNSUPPORTED = 'unsupported',
+  DESKTOP = "desktop",
+  MOBILE = "desktop", // iOS and Android are treated as desktop for now
+  WEB = "web",
+  UNSUPPORTED = "unsupported",
 }
 
 declare global {
@@ -15,10 +15,10 @@ declare global {
 }
 
 export const getRunEnv = (): RUN_ENV => {
-  if (typeof window !== 'undefined' && window.__TAURI__) {
+  if (typeof window !== "undefined" && window.__TAURI__) {
     return RUN_ENV.DESKTOP;
   }
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     return RUN_ENV.WEB;
   }
   return RUN_ENV.UNSUPPORTED;
@@ -29,7 +29,7 @@ export const invokeWeb = web.invokeWeb;
 
 export const logger = getRunEnv() === RUN_ENV.DESKTOP ? tauri.logger : web.logger;
 
-export type { EventCallback, UnlistenFn } from './tauri';
+export type { EventCallback, UnlistenFn } from "./tauri";
 
 export {
   openCsvFileDialogTauri,
@@ -46,6 +46,6 @@ export {
   listenMarketSyncCompleteTauri,
   listenMarketSyncStartTauri,
   listenNavigateToRouteTauri,
-} from './tauri';
+} from "./tauri";
 
-export * from './web';
+export * from "./web";

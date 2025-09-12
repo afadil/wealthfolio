@@ -1,41 +1,36 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { SettingsHeader } from './header';
-import { Icons } from '@/components/ui/icons';
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { SettingsHeader } from "./header";
+import { Icons } from "@/components/ui/icons";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   useMarketDataProviderSettings,
   useUpdateMarketDataProviderSettings,
   useSetApiKey,
   useDeleteApiKey,
-} from './use-market-data-settings';
-import { MarketDataProviderSetting } from '@/commands/market-data';
-import { cn } from '@/lib/utils';
+} from "./use-market-data-settings";
+import { MarketDataProviderSetting } from "@/commands/market-data";
+import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getSecret } from "@/commands/secrets";
+import { QueryKeys } from "@/lib/query-keys";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { Badge } from '@/components/ui/badge';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { getSecret } from '@/commands/secrets';
-import { QueryKeys } from '@/lib/query-keys';
-import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
-import { ActionConfirm } from '@wealthfolio/ui';
+  useRecalculatePortfolioMutation,
+  useUpdatePortfolioMutation,
+} from "@/hooks/use-calculate-portfolio";
+import { ActionConfirm } from "@wealthfolio/ui";
 
 const useApiKeyStatus = (providerId: string) => {
   const queryClient = useQueryClient();
-  const needsApiKey = providerId !== 'YAHOO' && providerId !== 'MANUAL';
+  const needsApiKey = providerId !== "YAHOO" && providerId !== "MANUAL";
 
   const { data: apiKey, isLoading } = useQuery({
     queryKey: QueryKeys.secrets.apiKey(providerId),
@@ -74,7 +69,7 @@ function ProviderSettings({
   const { mutate: setApiKey } = useSetApiKey();
   const { mutate: deleteApiKey } = useDeleteApiKey();
 
-  const [apiKeyValue, setApiKeyValue] = useState('');
+  const [apiKeyValue, setApiKeyValue] = useState("");
 
   useEffect(() => {
     if (apiKey) {
@@ -83,7 +78,7 @@ function ProviderSettings({
   }, [apiKey]);
 
   const handleSaveApiKey = () => {
-    if (apiKeyValue && apiKeyValue.trim() !== '') {
+    if (apiKeyValue && apiKeyValue.trim() !== "") {
       setApiKey(
         { providerId: provider.id, apiKey: apiKeyValue },
         {
@@ -106,10 +101,10 @@ function ProviderSettings({
     <Card
       key={provider.id}
       className={cn(
-        'group rounded-lg border transition-all duration-200',
+        "group rounded-lg border transition-all duration-200",
         provider.enabled
-          ? 'bg-card hover:bg-accent/30 hover:shadow-md'
-          : 'bg-muted/30 border-dashed opacity-75 hover:opacity-90'
+          ? "bg-card hover:bg-accent/30 hover:shadow-md"
+          : "bg-muted/30 border-dashed opacity-75 hover:opacity-90",
       )}
     >
       <CardHeader>
@@ -119,7 +114,7 @@ function ProviderSettings({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 {provider.logoFilename && (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                  <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-xl">
                     <img
                       src={`/market-data/${provider.logoFilename}`}
                       alt={`${provider.name} logo`}
@@ -127,14 +122,19 @@ function ProviderSettings({
                     />
                   </div>
                 )}
-                <CardTitle className={`truncate text-lg font-semibold ${
-                  provider.enabled ? '' : 'text-muted-foreground'
-                }`}>
+                <CardTitle
+                  className={`truncate text-lg font-semibold ${
+                    provider.enabled ? "" : "text-muted-foreground"
+                  }`}
+                >
                   {provider.name}
                 </CardTitle>
               </div>
               {!provider.enabled && (
-                <Badge variant="secondary" className="shrink-0 text-xs bg-warning/10 text-warning border-warning/20">
+                <Badge
+                  variant="secondary"
+                  className="bg-warning/10 text-warning border-warning/20 shrink-0 text-xs"
+                >
                   <Icons.AlertCircle className="mr-1 h-3 w-3" />
                   Disabled
                 </Badge>
@@ -153,12 +153,13 @@ function ProviderSettings({
                   <PopoverContent className="w-80">
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <h4 className="font-medium flex items-center gap-2">
+                        <h4 className="flex items-center gap-2 font-medium">
                           <Icons.AlertTriangle className="h-4 w-4 text-amber-500" />
                           Configuration Required
                         </h4>
-                        <p className="text-sm text-muted-foreground">
-                          This provider requires an API key to function properly. Configure the API key in the settings below to start fetching market data.
+                        <p className="text-muted-foreground text-sm">
+                          This provider requires an API key to function properly. Configure the API
+                          key in the settings below to start fetching market data.
                         </p>
                       </div>
                     </div>
@@ -169,9 +170,11 @@ function ProviderSettings({
 
             {/* Description */}
             {provider.description && (
-              <CardDescription className={`text-sm leading-relaxed ${
-                provider.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
-              }`}>
+              <CardDescription
+                className={`text-sm leading-relaxed ${
+                  provider.enabled ? "text-muted-foreground" : "text-muted-foreground/70"
+                }`}
+              >
                 {provider.description}
                 {provider.url && (
                   <div className="mt-1">
@@ -207,13 +210,13 @@ function ProviderSettings({
           <Button
             variant="ghost"
             className={cn(
-              'h-auto w-full justify-between rounded-none border-t p-4',
-              !provider.enabled && 'opacity-50',
+              "h-auto w-full justify-between rounded-none border-t p-4",
+              !provider.enabled && "opacity-50",
             )}
             disabled={!provider.enabled}
           >
             <span className="text-sm font-medium">
-              {provider.enabled ? 'Configure Settings' : 'Enable provider to configure'}
+              {provider.enabled ? "Configure Settings" : "Enable provider to configure"}
             </span>
             {provider.enabled &&
               (isOpen ? (
@@ -224,24 +227,24 @@ function ProviderSettings({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="space-y-6 bg-muted/20 pb-6 pt-6">
+          <CardContent className="bg-muted/20 space-y-6 pt-6 pb-6">
             {needsApiKey && (
               <div className="space-y-2">
                 <Label htmlFor={`apikey-${provider.id}`}>API Key</Label>
                 <div className="flex items-center space-x-2">
                   <Input
                     id={`apikey-${provider.id}`}
-                    type={showApiKey ? 'text' : 'password'}
-                    value={apiKeyValue ?? ''}
+                    type={showApiKey ? "text" : "password"}
+                    value={apiKeyValue ?? ""}
                     onChange={(e) => setApiKeyValue(e.target.value)}
-                    placeholder={isSecretSet && !apiKeyValue ? 'API Key is Set' : 'Enter API Key'}
+                    placeholder={isSecretSet && !apiKeyValue ? "API Key is Set" : "Enter API Key"}
                     className="grow"
                   />
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => setShowApiKey(!showApiKey)}
-                    aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
                   >
                     {showApiKey ? (
                       <Icons.EyeOff className="h-4 w-4" />
@@ -254,13 +257,13 @@ function ProviderSettings({
                   </Button>
                 </div>
                 {isSecretSet && !apiKeyValue && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     An API key is set. Enter a new key to update, or leave blank and save to clear
                     the key.
                   </p>
                 )}
                 {!isSecretSet && !apiKeyValue && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     No API key set. Enter a key and save.
                   </p>
                 )}
@@ -280,7 +283,7 @@ function ProviderSettings({
                   className="w-32"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Lower number means higher priority (e.g., 1 is higher than 10).
               </p>
             </div>
@@ -295,7 +298,8 @@ export default function MarketDataSettingsPage() {
   const { data: providers, isLoading, error } = useMarketDataProviderSettings();
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
   const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
-  const { mutate: recalculatePortfolio, isPending: isRecalculating } = useRecalculatePortfolioMutation();
+  const { mutate: recalculatePortfolio, isPending: isRecalculating } =
+    useRecalculatePortfolioMutation();
 
   const [priorityInputs, setPriorityInputs] = useState<{ [providerId: string]: number }>({});
 
@@ -340,7 +344,7 @@ export default function MarketDataSettingsPage() {
   if (error) return <p className="text-destructive">Error loading settings: {error.message}</p>;
 
   return (
-    <div className="space-y-6 text-foreground">
+    <div className="text-foreground space-y-6">
       <SettingsHeader heading="Market Data" text="Manage settings for your market data providers.">
         <div className="flex items-center gap-2">
           {/* Mobile icon-only actions */}
@@ -394,7 +398,12 @@ export default function MarketDataSettingsPage() {
             cancelButtonText="Cancel"
             confirmButtonVariant="destructive"
             button={
-              <Button variant="outline" size="sm" className="hidden sm:inline-flex" disabled={isRecalculating}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:inline-flex"
+                disabled={isRecalculating}
+              >
                 {isRecalculating ? (
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : (

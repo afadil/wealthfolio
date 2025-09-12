@@ -1,4 +1,3 @@
-
 import {
   ApplicationShell,
   Card,
@@ -14,33 +13,32 @@ import {
   Checkbox,
   Label,
   Icons,
-} from "@wealthfolio/ui"
-import type { AddonContext } from "@wealthfolio/addon-sdk"
-import { useSwingPreferences } from "../hooks/use-swing-preferences"
+} from '@wealthfolio/ui';
+import type { AddonContext } from '@wealthfolio/addon-sdk';
+import { useSwingPreferences } from '../hooks/use-swing-preferences';
 
 interface SettingsPageProps {
-  ctx: AddonContext
+  ctx: AddonContext;
 }
 
 export default function SettingsPage({ ctx }: SettingsPageProps) {
-  const { preferences, updatePreferences, isUpdating } = useSwingPreferences(ctx)
+  const { preferences, updatePreferences, isUpdating } = useSwingPreferences(ctx);
 
-  const handleLotMethodChange = (method: "FIFO" | "LIFO" | "AVERAGE") => {
-    updatePreferences({ lotMatchingMethod: method })
-  }
+  const handleLotMethodChange = (method: 'FIFO' | 'LIFO' | 'AVERAGE') => {
+    updatePreferences({ lotMatchingMethod: method });
+  };
 
   const handleDefaultDateRangeChange = (range: any) => {
-    updatePreferences({ defaultDateRange: range })
-  }
+    updatePreferences({ defaultDateRange: range });
+  };
 
   const handleIncludeFeesChange = (checked: boolean) => {
-    updatePreferences({ includeFees: checked })
-  }
+    updatePreferences({ includeFees: checked });
+  };
 
   const handleIncludeDividendsChange = (checked: boolean) => {
-    updatePreferences({ includeDividends: checked })
-  }
-
+    updatePreferences({ includeDividends: checked });
+  };
 
   return (
     <ApplicationShell className="p-6">
@@ -50,13 +48,13 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
           <h1 className="text-2xl font-bold tracking-tight">Swingfolio Settings</h1>
           <p className="text-muted-foreground">Configure your swing trading analysis preferences</p>
         </div>
-        <Button variant="outline" onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}>
-          <Icons.ArrowLeft className="h-4 w-4 mr-2" />
+        <Button variant="outline" onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
+          <Icons.ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>
       </div>
 
-      <div className="space-y-6 max-w-2xl">
+      <div className="max-w-2xl space-y-6">
         {/* Trade Matching Settings */}
         <Card>
           <CardHeader>
@@ -75,14 +73,13 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
                   <SelectItem value="AVERAGE">Average Cost</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-muted-foreground mt-1 text-xs">
                 Method used to match buy and sell orders for P/L calculation:
                 <br />
                 • FIFO: Matches oldest purchases first
                 <br />
-                • LIFO: Matches newest purchases first  
-                <br />
-                • Average Cost: Uses weighted average price of all purchases
+                • LIFO: Matches newest purchases first
+                <br />• Average Cost: Uses weighted average price of all purchases
               </p>
             </div>
           </CardContent>
@@ -96,7 +93,10 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="default-range">Default Date Range</Label>
-              <Select value={preferences.defaultDateRange} onValueChange={handleDefaultDateRangeChange}>
+              <Select
+                value={preferences.defaultDateRange}
+                onValueChange={handleDefaultDateRangeChange}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -109,7 +109,9 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
                   <SelectItem value="ALL">All Time</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">Default time period when opening the dashboard</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Default time period when opening the dashboard
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -121,10 +123,14 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Checkbox id="include-fees" checked={preferences.includeFees} onCheckedChange={handleIncludeFeesChange} />
+              <Checkbox
+                id="include-fees"
+                checked={preferences.includeFees}
+                onCheckedChange={handleIncludeFeesChange}
+              />
               <Label htmlFor="include-fees">Include fees in P/L calculations</Label>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               When enabled, trading fees will be subtracted from realized P/L
             </p>
 
@@ -136,19 +142,19 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
               />
               <Label htmlFor="include-dividends">Include dividends in performance</Label>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               When enabled, dividend payments will be included in total returns
             </p>
           </CardContent>
         </Card>
         {/* Save Status */}
         {isUpdating && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <Icons.Spinner className="h-4 w-4 animate-spin" />
             Saving settings...
           </div>
         )}
       </div>
     </ApplicationShell>
-  )
+  );
 }

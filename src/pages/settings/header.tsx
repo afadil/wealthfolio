@@ -1,7 +1,7 @@
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import { useNavigate } from 'react-router-dom';
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
+import { useNavigate } from "react-router-dom";
 
 interface SettingsHeaderProps {
   heading: string;
@@ -19,7 +19,7 @@ export function SettingsHeader({
   className,
   children,
   showBackOnMobile = true,
-  backTo = '/settings',
+  backTo = "/settings",
   onBack,
 }: SettingsHeaderProps) {
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ export function SettingsHeader({
     <div
       className={cn(
         // Grid keeps actions pinned top-right on mobile
-        'grid grid-cols-[1fr_auto] items-start gap-2',
+        "grid grid-cols-[1fr_auto] items-start gap-2",
         className,
       )}
     >
@@ -53,9 +53,11 @@ export function SettingsHeader({
           </Button>
         )}
         <div className="grid min-w-0 gap-1">
-          <h1 className="break-words font-heading text-lg font-bold lg:text-xl">{heading}</h1>
+          <h1 className="font-heading text-lg font-bold break-words lg:text-xl">{heading}</h1>
           {text && (
-            <p className="break-words text-sm font-light text-muted-foreground lg:text-md">{text}</p>
+            <p className="text-muted-foreground lg:text-md text-sm font-light break-words">
+              {text}
+            </p>
           )}
         </div>
       </div>

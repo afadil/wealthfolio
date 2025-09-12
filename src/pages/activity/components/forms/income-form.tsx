@@ -1,20 +1,35 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { AccountSelectOption } from '../activity-form';
-import { ActivityTypeSelector, type ActivityType as ActivityTypeUI } from '../activity-type-selector';
-import { useFormContext } from 'react-hook-form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { MoneyInput } from '@wealthfolio/ui';
-import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from './common';
+import { Card, CardContent } from "@/components/ui/card";
+import { AccountSelectOption } from "../activity-form";
+import {
+  ActivityTypeSelector,
+  type ActivityType as ActivityTypeUI,
+} from "../activity-type-selector";
+import { useFormContext } from "react-hook-form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { MoneyInput } from "@wealthfolio/ui";
+import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
 
 export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
-  const activityType = watch('activityType');
-  const isManualAsset = watch('assetDataSource') === 'MANUAL';
-  const shouldShowSymbolLookup = activityType === 'DIVIDEND';
+  const activityType = watch("activityType");
+  const isManualAsset = watch("assetDataSource") === "MANUAL";
+  const shouldShowSymbolLookup = activityType === "DIVIDEND";
 
   const incomeTypes: ActivityTypeUI[] = [
-    { value: 'DIVIDEND', label: 'Dividend', icon: 'Income', description: 'Income received from owning shares in a company or units in a fund. This typically represents a distribution of profits.' },
-    { value: 'INTEREST', label: 'Interest', icon: 'Percent', description: 'Income earned from cash deposits, bonds, or lending money. This is a payment for the use of your money.' },
+    {
+      value: "DIVIDEND",
+      label: "Dividend",
+      icon: "Income",
+      description:
+        "Income received from owning shares in a company or units in a fund. This typically represents a distribution of profits.",
+    },
+    {
+      value: "INTEREST",
+      label: "Interest",
+      icon: "Percent",
+      description:
+        "Income earned from cash deposits, bonds, or lending money. This is a payment for the use of your money.",
+    },
   ];
 
   return (
@@ -39,7 +54,7 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
               )}
             />
             <div
-              className={`grid ${activityType === 'INTEREST' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}
+              className={`grid ${activityType === "INTEREST" ? "grid-cols-2" : "grid-cols-1"} gap-4`}
             >
               <FormField
                 control={control}
@@ -47,14 +62,14 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      {activityType === 'DIVIDEND' ? 'Dividend Amount' : 'Interest Amount'}
+                      {activityType === "DIVIDEND" ? "Dividend Amount" : "Interest Amount"}
                     </FormLabel>
                     <FormControl>
                       <MoneyInput
                         placeholder={
-                          activityType === 'DIVIDEND'
-                            ? 'Enter dividend amount'
-                            : 'Enter interest amount'
+                          activityType === "DIVIDEND"
+                            ? "Enter dividend amount"
+                            : "Enter interest amount"
                         }
                         {...field}
                       />
@@ -63,7 +78,7 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                   </FormItem>
                 )}
               />
-              {activityType === 'INTEREST' && (
+              {activityType === "INTEREST" && (
                 <FormField
                   control={control}
                   name="fee"
@@ -85,4 +100,4 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
       </Card>
     </div>
   );
-}; 
+};

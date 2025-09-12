@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import { getMarketDataProviders } from '@/commands/market-data';
-import { QueryKeys } from '@/lib/query-keys';
-import { MarketDataProviderInfo } from '@/lib/types';
-import { logger } from '@/adapters';
+import { useQuery } from "@tanstack/react-query";
+import { getMarketDataProviders } from "@/commands/market-data";
+import { QueryKeys } from "@/lib/query-keys";
+import { MarketDataProviderInfo } from "@/lib/types";
+import { logger } from "@/adapters";
 
 export function useMarketDataProviders() {
   return useQuery<MarketDataProviderInfo[], Error>({
@@ -16,9 +16,11 @@ export function useMarketDataProviders() {
         if (error instanceof Error) {
           errorMessage = error.message;
         }
-        logger.error(`Error fetching market data providers in useMarketDataProviders: ${errorMessage}`);
-        throw new Error(errorMessage); 
+        logger.error(
+          `Error fetching market data providers in useMarketDataProviders: ${errorMessage}`,
+        );
+        throw new Error(errorMessage);
       }
     },
   });
-} 
+}

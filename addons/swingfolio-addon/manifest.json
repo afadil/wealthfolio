@@ -10,60 +10,27 @@
   "permissions": [
     {
       "category": "activities",
-      "functions": [
-        "search"
-      ],
-      "functions": [
-        "search"
-      ],
+      "functions": ["search"],
       "purpose": "Access and manage trading activities for swing trading analysis"
     },
     {
       "category": "portfolio",
-      "functions": [
-        "getHoldings"
-      ],
-      "functions": [
-        "getHoldings"
-      ],
+      "functions": ["getHoldings"],
       "purpose": "Access portfolio holdings to calculate unrealized P/L for open positions"
     },
     {
       "category": "currency",
-      "functions": [
-        "getAll"
-      ],
+      "functions": ["getAll"],
       "purpose": "Access to exchange rates and currency data"
     },
     {
       "category": "settings",
-      "functions": [
-        "get"
-      ],
-      "purpose": "Access to application settings to get the base currency"
-      "category": "currency",
-      "functions": [
-        "getAll"
-      ],
-      "purpose": "Access to exchange rates and currency data"
-    },
-    {
-      "category": "settings",
-      "functions": [
-        "get"
-      ],
+      "functions": ["get"],
       "purpose": "Access to application settings to get the base currency"
     },
     {
       "category": "ui",
-      "functions": [
-        "sidebar.addItem",
-        "router.add"
-      ],
-      "functions": [
-        "sidebar.addItem",
-        "router.add"
-      ],
+      "functions": ["sidebar.addItem", "router.add"],
       "purpose": "Add navigation and routing for swing trading interface"
     }
   ]

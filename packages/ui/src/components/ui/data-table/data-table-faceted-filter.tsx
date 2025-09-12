@@ -1,7 +1,7 @@
-import * as React from 'react';
-import type { Column } from '@tanstack/react-table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import * as React from "react";
+import type { Column } from "@tanstack/react-table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -10,12 +10,12 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 
-import { Icons } from '@/components/ui/icons';
-import { cn } from '@/lib/utils';
+import { Icons } from "@/components/ui/icons";
+import { cn } from "@/lib/utils";
 
 export interface DataTableFacetedFilterProps<TData, TValue> {
   id: string;
@@ -43,8 +43,8 @@ export function DataTableFacetedFilter<TData, TValue>({
           variant="outline"
           size="sm"
           className={cn(
-            'hover:bg-muted/80" h-8 gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium',
-            selectedValues?.size > 0 ? 'bg-muted/40' : 'shadow-inner-xs bg-muted/90',
+            'hover:bg-muted/80" bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium',
+            selectedValues?.size > 0 ? "bg-muted/40" : "shadow-inner-xs bg-muted/90",
           )}
         >
           <Icons.PlusCircle className="mr-2 h-4 w-4" />
@@ -57,10 +57,7 @@ export function DataTableFacetedFilter<TData, TValue>({
               </Badge>
               <div className="hidden space-x-1 lg:flex">
                 {selectedValues.size > 2 ? (
-                  <Badge
-                    variant="secondary"
-                    className="rounded-sm px-1 font-normal text-foreground"
-                  >
+                  <Badge variant="secondary" className="text-foreground rounded-sm px-1 font-normal">
                     {selectedValues.size} selected
                   </Badge>
                 ) : (
@@ -70,7 +67,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                       <Badge
                         variant="secondary"
                         key={option.value}
-                        className="rounded-sm px-1 font-normal text-foreground"
+                        className="text-foreground rounded-sm px-1 font-normal"
                       >
                         {option.label}
                       </Badge>
@@ -104,15 +101,13 @@ export function DataTableFacetedFilter<TData, TValue>({
                   >
                     <div
                       className={cn(
-                        'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
-                        isSelected
-                          ? 'bg-primary text-primary-foreground'
-                          : 'opacity-50 [&_svg]:invisible',
+                        "border-primary mr-2 flex h-4 w-4 items-center justify-center rounded-sm border",
+                        isSelected ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible",
                       )}
                     >
-                      <Icons.Check className={cn('h-4 w-4')} />
+                      <Icons.Check className={cn("h-4 w-4")} />
                     </div>
-                    {option.icon && <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+                    {option.icon && <option.icon className="text-muted-foreground mr-2 h-4 w-4" />}
                     <span>{option.label}</span>
                     {facets?.get(option.value) && (
                       <span className="ml-auto flex h-4 w-4 items-center justify-center font-mono text-xs">
@@ -129,7 +124,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                 <CommandGroup>
                   <CommandItem
                     onSelect={() => column?.setFilterValue(undefined)}
-                    className="justify-center text-center text-sm text-destructive hover:bg-destructive/10"
+                    className="text-destructive hover:bg-destructive/10 justify-center text-center text-sm"
                   >
                     Clear filters
                   </CommandItem>

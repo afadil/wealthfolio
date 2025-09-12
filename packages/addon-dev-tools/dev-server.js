@@ -3,18 +3,18 @@
 
 /**
  * Addon Development Server
- * 
+ *
  * A simple development server for hot reloading addons during development.
  * This server watches for file changes and provides a hot reload endpoint.
  */
 
-const express = require('express');
-const cors = require('cors');
-const chokidar = require('chokidar');
-const path = require('path');
-const fs = require('fs');
-const { exec } = require('child_process');
-const { promisify } = require('util');
+const express = require("express");
+const cors = require("cors");
+const chokidar = require("chokidar");
+const path = require("path");
+const fs = require("fs");
+const { exec } = require("child_process");
+const { promisify } = require("util");
 
 const execAsync = promisify(exec);
 
@@ -25,7 +25,7 @@ class AddonDevServer {
     this.lastModified = new Date();
     this.buildInProgress = false;
     this.viteWatcher = null;
-    
+
     this.setupMiddleware();
     this.setupRoutes();
     this.setupFileWatcher();
@@ -33,76 +33,80 @@ class AddonDevServer {
   }
 
   setupMiddleware() {
-    this.app.use(cors({
-      origin: ['http://localhost:1420', 'http://localhost:3000'],
-      credentials: true
-    }));
+    this.app.use(
+      cors({
+        origin: ["http://localhost:1420", "http://localhost:3000"],
+        credentials: true,
+      }),
+    );
     this.app.use(express.static(this.config.addonPath));
   }
 
   setupRoutes() {
     // Health check endpoint
-    this.app.get('/health', (req, res) => {
+    this.app.get("/health", (req, res) => {
       res.json({
-        status: 'ok',
+        status: "ok",
         timestamp: new Date().toISOString(),
-        addonPath: this.config.addonPath
+        addonPath: this.config.addonPath,
       });
     });
 
     // Addon status endpoint
-    this.app.get('/status', (req, res) => {
+    this.app.get("/status", (req, res) => {
       res.json({
         lastModified: this.lastModified.toISOString(),
         buildInProgress: this.buildInProgress,
-        files: this.getFileList()
+        files: this.getFileList(),
       });
     });
 
     // Serve addon manifest
-    this.app.get('/manifest.json', (req, res) => {
+    this.app.get("/manifest.json", (req, res) => {
       try {
         const manifestPath = path.resolve(this.config.manifestPath);
         if (fs.existsSync(manifestPath)) {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
           res.json(manifest);
         } else {
-          res.status(404).json({ error: 'Manifest not found' });
+          res.status(404).json({ error: "Manifest not found" });
         }
       } catch (error) {
-        res.status(500).json({ error: 'Failed to read manifest' });
+        res.status(500).json({ error: "Failed to read manifest" });
       }
     });
 
     // Serve addon code
-    this.app.get('/addon.js', async (req, res) => {
+    this.app.get("/addon.js", async (req, res) => {
       try {
-        const addonFile = path.resolve(this.config.addonPath, 'dist/addon.js');
+        const addonFile = path.resolve(this.config.addonPath, "dist/addon.js");
         console.log(`📦 Serving addon.js from: ${addonFile}`);
-        
+
         // Wait for file to exist (with timeout)
         const fileExists = await this.waitForFile(addonFile, 3000);
-        
+
         if (fileExists) {
-          const code = fs.readFileSync(addonFile, 'utf-8');
-          res.type('application/javascript').send(code);
+          const code = fs.readFileSync(addonFile, "utf-8");
+          res.type("application/javascript").send(code);
         } else {
           console.error(`❌ Addon file not found at: ${addonFile}`);
-          res.status(404).json({ error: 'Addon file not found. Run build first.', path: addonFile });
+          res
+            .status(404)
+            .json({ error: "Addon file not found. Run build first.", path: addonFile });
         }
       } catch (error) {
         console.error(`❌ Error serving addon.js:`, error);
-        res.status(500).json({ error: 'Failed to read addon file', details: error.message });
+        res.status(500).json({ error: "Failed to read addon file", details: error.message });
       }
     });
 
     // Hot reload endpoint
-    this.app.get('/reload', (req, res) => {
+    this.app.get("/reload", (req, res) => {
       res.json({
-        message: 'Reload triggered',
-        timestamp: new Date().toISOString()
+        message: "Reload triggered",
+        timestamp: new Date().toISOString(),
       });
-      
+
       // Trigger rebuild if configured
       if (this.config.buildCommand) {
         this.triggerBuild();
@@ -110,26 +114,26 @@ class AddonDevServer {
     });
 
     // File listing for debugging
-    this.app.get('/files', (req, res) => {
+    this.app.get("/files", (req, res) => {
       res.json({
         files: this.getFileList(),
-        watchPaths: this.config.watchPaths
+        watchPaths: this.config.watchPaths,
       });
     });
 
     // Test endpoint for connectivity
-    this.app.get('/test', (req, res) => {
+    this.app.get("/test", (req, res) => {
       res.json({
-        message: 'Addon development server is working!',
+        message: "Addon development server is working!",
         addonPath: this.config.addonPath,
         timestamp: new Date().toISOString(),
-        manifest: this.getManifestInfo()
+        manifest: this.getManifestInfo(),
       });
     });
 
     // Debug endpoint for troubleshooting
-    this.app.get('/debug', (req, res) => {
-      const addonFile = path.resolve(this.config.addonPath, 'dist/addon.js');
+    this.app.get("/debug", (req, res) => {
+      const addonFile = path.resolve(this.config.addonPath, "dist/addon.js");
       res.json({
         lastModified: this.lastModified.toISOString(),
         buildInProgress: this.buildInProgress,
@@ -139,18 +143,18 @@ class AddonDevServer {
         addonFile: {
           path: addonFile,
           exists: fs.existsSync(addonFile),
-          size: fs.existsSync(addonFile) ? fs.statSync(addonFile).size : 0
+          size: fs.existsSync(addonFile) ? fs.statSync(addonFile).size : 0,
         },
         config: {
           port: this.config.port,
-          buildCommand: this.config.buildCommand
-        }
+          buildCommand: this.config.buildCommand,
+        },
       });
     });
 
     // Simple ping endpoint
-    this.app.get('/ping', (req, res) => {
-      res.json({ message: 'pong', timestamp: new Date().toISOString() });
+    this.app.get("/ping", (req, res) => {
+      res.json({ message: "pong", timestamp: new Date().toISOString() });
     });
   }
 
@@ -158,44 +162,44 @@ class AddonDevServer {
     const watcher = chokidar.watch(this.config.watchPaths, {
       ignored: /node_modules|\.git/,
       persistent: true,
-      ignoreInitial: true
+      ignoreInitial: true,
     });
 
-    watcher.on('change', (filePath) => {
+    watcher.on("change", (filePath) => {
       console.log(`📝 File changed: ${filePath}`);
       // Don't trigger manual build since Vite is already watching
       // Just update the timestamp for status endpoint
       this.lastModified = new Date();
     });
 
-    watcher.on('add', (filePath) => {
+    watcher.on("add", (filePath) => {
       console.log(`➕ File added: ${filePath}`);
       this.lastModified = new Date();
     });
 
-    watcher.on('unlink', (filePath) => {
+    watcher.on("unlink", (filePath) => {
       console.log(`➖ File removed: ${filePath}`);
       this.lastModified = new Date();
     });
 
-    console.log(`👀 Watching files: ${this.config.watchPaths.join(', ')}`);
+    console.log(`👀 Watching files: ${this.config.watchPaths.join(", ")}`);
   }
 
   async triggerBuild() {
     if (this.buildInProgress || !this.config.buildCommand) return;
-    
+
     this.buildInProgress = true;
     console.log(`🔨 Building addon with: ${this.config.buildCommand}`);
-    
+
     try {
       await execAsync(this.config.buildCommand, {
-        cwd: this.config.addonPath
+        cwd: this.config.addonPath,
       });
-      
-      console.log('✅ Build completed successfully');
+
+      console.log("✅ Build completed successfully");
       this.lastModified = new Date();
     } catch (error) {
-      console.error('❌ Build failed:', error);
+      console.error("❌ Build failed:", error);
     } finally {
       this.buildInProgress = false;
     }
@@ -203,9 +207,9 @@ class AddonDevServer {
 
   getFileList() {
     try {
-      const distPath = path.resolve(this.config.addonPath, 'dist');
+      const distPath = path.resolve(this.config.addonPath, "dist");
       if (fs.existsSync(distPath)) {
-        return fs.readdirSync(distPath).map(file => `dist/${file}`);
+        return fs.readdirSync(distPath).map((file) => `dist/${file}`);
       }
       return [];
     } catch (error) {
@@ -217,7 +221,7 @@ class AddonDevServer {
     try {
       const manifestPath = path.resolve(this.config.manifestPath);
       if (fs.existsSync(manifestPath)) {
-        return JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        return JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
       }
       return null;
     } catch (error) {
@@ -231,7 +235,7 @@ class AddonDevServer {
   async waitForFile(filePath, timeout = 3000) {
     const startTime = Date.now();
     const checkInterval = 100;
-    
+
     while (Date.now() - startTime < timeout) {
       if (fs.existsSync(filePath)) {
         // Additional check to ensure file is fully written
@@ -244,50 +248,50 @@ class AddonDevServer {
           // File might be in the process of being written
         }
       }
-      
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
+
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
     }
-    
+
     return false;
   }
 
   startViteWatcher() {
     if (!this.config.buildCommand) return;
-    
-    console.log('🔨 Starting Vite in watch mode...');
-    
+
+    console.log("🔨 Starting Vite in watch mode...");
+
     // Start vite build in watch mode
-    const { spawn } = require('child_process');
-    this.viteWatcher = spawn('npm', ['run', 'dev'], {
+    const { spawn } = require("child_process");
+    this.viteWatcher = spawn("npm", ["run", "dev"], {
       cwd: this.config.addonPath,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    
-    this.viteWatcher.stdout.on('data', (data) => {
+
+    this.viteWatcher.stdout.on("data", (data) => {
       const output = data.toString();
       console.log(`Vite output: ${output.trim()}`);
-      
-      if (output.includes('build started')) {
+
+      if (output.includes("build started")) {
         this.buildInProgress = true;
       }
-      
-      if (output.includes('built in')) {
+
+      if (output.includes("built in")) {
         console.log(`✅ Vite rebuild completed`);
         this.lastModified = new Date();
         this.buildInProgress = false;
       }
-      
-      if (output.includes('watching for file changes')) {
+
+      if (output.includes("watching for file changes")) {
         console.log(`✅ Vite watcher ready`);
         this.buildInProgress = false;
       }
     });
-    
-    this.viteWatcher.stderr.on('data', (data) => {
+
+    this.viteWatcher.stderr.on("data", (data) => {
       console.error(`Vite error: ${data}`);
     });
-    
-    this.viteWatcher.on('close', (code) => {
+
+    this.viteWatcher.on("close", (code) => {
       if (code !== 0) {
         console.error(`Vite watcher exited with code ${code}`);
       }
@@ -299,30 +303,30 @@ class AddonDevServer {
       console.log(`🚀 Addon dev server running on http://localhost:${this.config.port}`);
       console.log(`📁 Serving from: ${this.config.addonPath}`);
       console.log(`📋 Manifest: ${this.config.manifestPath}`);
-      console.log(`👀 Watching files: ${this.config.watchPaths.join(', ')}`);
-      
+      console.log(`👀 Watching files: ${this.config.watchPaths.join(", ")}`);
+
       if (this.config.buildCommand) {
         console.log(`🔨 Build command: ${this.config.buildCommand}`);
       }
     });
 
     // Handle graceful shutdown
-    process.on('SIGINT', () => {
+    process.on("SIGINT", () => {
       this.stop();
       process.exit(0);
     });
 
-    process.on('SIGTERM', () => {
+    process.on("SIGTERM", () => {
       this.stop();
       process.exit(0);
     });
   }
 
   stop() {
-    console.log('🛑 Shutting down dev server...');
-    
+    console.log("🛑 Shutting down dev server...");
+
     if (this.viteWatcher) {
-      this.viteWatcher.kill('SIGTERM');
+      this.viteWatcher.kill("SIGTERM");
       this.viteWatcher = null;
     }
   }
@@ -333,16 +337,13 @@ function main() {
   const args = process.argv.slice(2);
   const addonPath = args[0] || process.cwd();
   const port = parseInt(args[1]) || 3001;
-  
+
   const config = {
     port,
     addonPath: path.resolve(addonPath),
-    manifestPath: path.resolve(addonPath, 'manifest.json'),
-    buildCommand: 'npm run build',
-    watchPaths: [
-      path.resolve(addonPath, 'src'),
-      path.resolve(addonPath, 'manifest.json')
-    ]
+    manifestPath: path.resolve(addonPath, "manifest.json"),
+    buildCommand: "npm run build",
+    watchPaths: [path.resolve(addonPath, "src"), path.resolve(addonPath, "manifest.json")],
   };
 
   // Check if addon directory exists

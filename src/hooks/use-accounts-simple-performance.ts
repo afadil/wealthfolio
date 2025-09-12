@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import { calculateAccountsSimplePerformance } from '@/commands/portfolio';
-import { Account, SimplePerformanceMetrics } from '@/lib/types';
-import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { calculateAccountsSimplePerformance } from "@/commands/portfolio";
+import { Account, SimplePerformanceMetrics } from "@/lib/types";
+import { QueryKeys } from "@/lib/query-keys";
 
 export const useAccountsSimplePerformance = (accounts: Account[] | undefined) => {
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
@@ -10,14 +10,12 @@ export const useAccountsSimplePerformance = (accounts: Account[] | undefined) =>
   const { data, isLoading, isFetching, isError, error } = useQuery<
     SimplePerformanceMetrics[],
     Error
-  >(
-    {
-      queryKey: QueryKeys.accountsSimplePerformance(accountIds),
-      queryFn: () => {
-        return calculateAccountsSimplePerformance(accountIds);
-      },
-    }
-  );
+  >({
+    queryKey: QueryKeys.accountsSimplePerformance(accountIds),
+    queryFn: () => {
+      return calculateAccountsSimplePerformance(accountIds);
+    },
+  });
 
   return {
     data,
@@ -26,4 +24,4 @@ export const useAccountsSimplePerformance = (accounts: Account[] | undefined) =>
     isError,
     error,
   };
-}; 
+};

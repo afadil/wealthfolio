@@ -1,22 +1,22 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import {
-  ExportDataType,
-  ExportedFileFormat,
-  Account,
-  ActivityDetails,
-  Goal,
-  AccountValuation,
-} from '@/lib/types';
 import { logger } from '@/adapters';
-import { toast } from '@/components/ui/use-toast';
-import { openFileSaveDialog, openFolderDialog } from '@/commands/file';
-import { formatData } from '@/lib/export-utils';
-import { QueryKeys } from '@/lib/query-keys';
 import { getAccounts } from '@/commands/account';
 import { getActivities } from '@/commands/activity';
+import { openFileSaveDialog, openFolderDialog } from '@/commands/file';
 import { getGoals } from '@/commands/goal';
 import { getHistoricalValuations } from '@/commands/portfolio';
 import { backupDatabaseToPath } from '@/commands/settings';
+import { toast } from '@/components/ui/use-toast';
+import { formatData } from '@/lib/export-utils';
+import { QueryKeys } from '@/lib/query-keys';
+import {
+  Account,
+  AccountValuation,
+  ActivityDetails,
+  ExportDataType,
+  ExportedFileFormat,
+  Goal,
+} from '@/lib/types';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -41,7 +41,7 @@ export function useExportData() {
   });
   const { refetch: fetchPortfolioHistory } = useQuery<AccountValuation[], Error>({
     queryKey: [QueryKeys.HISTORY_VALUATION],
-    queryFn: () => getHistoricalValuations("TOTAL"),
+    queryFn: () => getHistoricalValuations('TOTAL'),
     enabled: false,
   });
 
@@ -55,7 +55,7 @@ export function useExportData() {
       if (format === 'SQLite') {
         // Open folder dialog to let user choose backup location
         const selectedDir = await openFolderDialog();
-        
+
         if (!selectedDir) {
           // User cancelled the dialog, return null to indicate cancellation
           return null;

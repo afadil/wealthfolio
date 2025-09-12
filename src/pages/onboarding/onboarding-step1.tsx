@@ -1,13 +1,7 @@
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import React from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
+import React from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface OnboardingStep1Props {
   onNext: () => void;
@@ -18,17 +12,18 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
     <div className="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Hero Section */}
       <div className="text-center">
-        <p className="mx-auto max-w-2xl text-lg text-muted-foreground sm:text-xl">
-          First, let's explore the different ways you can track your assets and manage your portfolio.
+        <p className="text-muted-foreground mx-auto max-w-2xl text-lg sm:text-xl">
+          First, let's explore the different ways you can track your assets and manage your
+          portfolio.
         </p>
       </div>
 
       {/* Tracking Options */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         {/* Simple Tracking Card */}
-        <Card className="group relative overflow-hidden border-2 border-border/50 bg-gradient-to-br from-card to-card/80 transition-all duration-300 hover:border-primary/50 hover:shadow-lg">
+        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-gradient-to-br transition-all duration-300 hover:shadow-lg">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          
+
           <CardHeader className="relative pb-4">
             <div className="mb-3 flex items-center gap-3">
               <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
@@ -37,7 +32,8 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
               <CardTitle className="text-xl font-semibold">Simple Tracking</CardTitle>
             </div>
             <CardDescription className="text-base leading-relaxed">
-              Perfect for getting started quickly. Focus on your current holdings without worrying about transaction history.
+              Perfect for getting started quickly. Focus on your current holdings without worrying
+              about transaction history.
             </CardDescription>
           </CardHeader>
 
@@ -49,7 +45,9 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </div>
                 <div>
                   <p className="font-medium">Add Holdings</p>
-                  <p className="text-sm text-muted-foreground">Quickly increase your asset positions</p>
+                  <p className="text-muted-foreground text-sm">
+                    Quickly increase your asset positions
+                  </p>
                 </div>
               </div>
 
@@ -59,7 +57,9 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </div>
                 <div>
                   <p className="font-medium">Remove Holdings</p>
-                  <p className="text-sm text-muted-foreground">Reduce positions when you sell assets</p>
+                  <p className="text-muted-foreground text-sm">
+                    Reduce positions when you sell assets
+                  </p>
                 </div>
               </div>
 
@@ -69,7 +69,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </div>
                 <div>
                   <p className="font-medium">Cash Management</p>
-                  <p className="text-sm text-muted-foreground">Simple deposits and withdrawals</p>
+                  <p className="text-muted-foreground text-sm">Simple deposits and withdrawals</p>
                 </div>
               </div>
             </div>
@@ -83,8 +83,8 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
               </div>
             </div>
 
-            <div className="rounded-lg bg-muted/50 p-3">
-              <p className="text-sm font-medium text-muted-foreground">
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="text-muted-foreground text-sm font-medium">
                 <Icons.Star className="mr-1.5 inline h-4 w-4 text-amber-500" />
                 Best for: Quick setup, portfolio overview, beginners
               </p>
@@ -93,9 +93,9 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
         </Card>
 
         {/* Full Tracking Card */}
-        <Card className="group relative overflow-hidden border-2 border-border/50 bg-gradient-to-br from-card to-card/80 transition-all duration-300 hover:border-primary/50 hover:shadow-lg">
+        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-gradient-to-br transition-all duration-300 hover:shadow-lg">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          
+
           <CardHeader className="relative pb-4">
             <div className="mb-3 flex items-center gap-3">
               <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
@@ -104,7 +104,8 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
               <CardTitle className="text-xl font-semibold">Complete Tracking</CardTitle>
             </div>
             <CardDescription className="text-base leading-relaxed">
-              Comprehensive portfolio management with detailed transaction history and precise performance analytics.
+              Comprehensive portfolio management with detailed transaction history and precise
+              performance analytics.
             </CardDescription>
           </CardHeader>
 
@@ -116,7 +117,9 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </div>
                 <div>
                   <p className="font-medium">Fund Your Account</p>
-                  <p className="text-sm text-muted-foreground">Start with deposits to track cash flow</p>
+                  <p className="text-muted-foreground text-sm">
+                    Start with deposits to track cash flow
+                  </p>
                 </div>
               </div>
 
@@ -126,7 +129,9 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </div>
                 <div>
                   <p className="font-medium">Trade Execution</p>
-                  <p className="text-sm text-muted-foreground">Record every buy and sell transaction</p>
+                  <p className="text-muted-foreground text-sm">
+                    Record every buy and sell transaction
+                  </p>
                 </div>
               </div>
 
@@ -136,7 +141,9 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
                 </div>
                 <div>
                   <p className="font-medium">Cash Flow Tracking</p>
-                  <p className="text-sm text-muted-foreground">Deposits, withdrawals, and transfers</p>
+                  <p className="text-muted-foreground text-sm">
+                    Deposits, withdrawals, and transfers
+                  </p>
                 </div>
               </div>
             </div>
@@ -150,8 +157,8 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
               </div>
             </div>
 
-            <div className="rounded-lg bg-muted/50 p-3">
-              <p className="text-sm font-medium text-muted-foreground">
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="text-muted-foreground text-sm font-medium">
                 <Icons.TrendingUp className="mr-1.5 inline h-4 w-4 text-green-500" />
                 Best for: Detailed analysis, tax reporting, performance tracking
               </p>
@@ -165,7 +172,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
         <Button
           onClick={onNext}
           size="lg"
-          className="group min-w-[200px] bg-gradient-to-r from-primary to-primary/90 shadow-lg transition-all duration-300 hover:shadow-xl"
+          className="group from-primary to-primary/90 min-w-[200px] bg-gradient-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
         >
           Got it, Next: Set Preferences
           <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
@@ -174,13 +181,13 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
 
       {/* Guide Link - Footnote */}
       <div className="text-center">
-        <p className="text-sm text-muted-foreground">
-          You can mix both transaction types whenever you need them. For more details,{' '}
+        <p className="text-muted-foreground text-sm">
+          You can mix both transaction types whenever you need them. For more details,{" "}
           <a
             href="https://wealthfolio.app/docs/concepts/activity-types"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-foreground transition-colors"
+            className="hover:text-foreground underline transition-colors"
           >
             → View quick guide
           </a>

@@ -1,7 +1,7 @@
-import { useMutation } from '@tanstack/react-query';
-import { logger } from '@/adapters';
-import { importActivities } from '@/commands/activity-import';
-import { toast } from '@/components/ui/use-toast';
+import { useMutation } from "@tanstack/react-query";
+import { logger } from "@/adapters";
+import { importActivities } from "@/commands/activity-import";
+import { toast } from "@/components/ui/use-toast";
 
 export function useActivityImportMutations({
   onSuccess,
@@ -10,7 +10,6 @@ export function useActivityImportMutations({
   onSuccess?: (activities: any[]) => void;
   onError?: (error: string) => void;
 } = {}) {
-
   const confirmImportMutation = useMutation({
     mutationFn: importActivities,
     onSuccess: async (result: any) => {
@@ -20,8 +19,8 @@ export function useActivityImportMutations({
         const activities = Array.isArray(result) ? result : [result];
         onSuccess(activities);
         toast({
-          title: 'Import successful',
-          description: 'Activities have been imported successfully.',
+          title: "Import successful",
+          description: "Activities have been imported successfully.",
         });
       }
     },
@@ -30,12 +29,12 @@ export function useActivityImportMutations({
 
       // Call the provided onError callback if it exists
       if (onError) {
-        onError(error.message || 'An error occurred during import');
+        onError(error.message || "An error occurred during import");
       } else {
         toast({
-          title: 'Uh oh! Something went wrong.',
-          description: 'Please try again or report an issue if the problem persists.',
-          variant: 'destructive',
+          title: "Uh oh! Something went wrong.",
+          description: "Please try again or report an issue if the problem persists.",
+          variant: "destructive",
         });
       }
     },

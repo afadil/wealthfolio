@@ -1,28 +1,28 @@
-import { useState, useMemo, useEffect } from 'react';
-import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@wealthfolio/ui';
-import { Badge } from '@/components/ui/badge';
-import { useLocation, useParams, Link } from 'react-router-dom';
-import AssetHistoryCard from './asset-history-card';
-import { Holding, Quote, Sector, Country, Asset } from '@/lib/types';
-import { DataSource, PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
-import { useQuery } from '@tanstack/react-query';
-import { Separator } from '@/components/ui/separator';
-import { InputTags } from '@/components/ui/tag-input';
-import { Button } from '@/components/ui/button';
-import { useAssetProfileMutations } from './use-asset-profile-mutations';
-import { useQuoteMutations } from './use-quote-mutations';
-import { Icons } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { getHolding } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
-import { TickerAvatar } from '@/components/ticker-avatar';
-import { useQuoteHistory } from '@/hooks/use-quote-history';
-import AssetDetailCard from './asset-detail-card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import QuoteHistoryTable from './quote-history-table';
-import AssetLotsTable from './asset-lots-table';
-import { getAssetProfile } from '@/commands/market-data';
+import { useState, useMemo, useEffect } from "react";
+import { ApplicationHeader } from "@/components/header";
+import { ApplicationShell } from "@wealthfolio/ui";
+import { Badge } from "@/components/ui/badge";
+import { useLocation, useParams, Link } from "react-router-dom";
+import AssetHistoryCard from "./asset-history-card";
+import { Holding, Quote, Sector, Country, Asset } from "@/lib/types";
+import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import { Separator } from "@/components/ui/separator";
+import { InputTags } from "@/components/ui/tag-input";
+import { Button } from "@/components/ui/button";
+import { useAssetProfileMutations } from "./use-asset-profile-mutations";
+import { useQuoteMutations } from "./use-quote-mutations";
+import { Icons } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
+import { getHolding } from "@/commands/portfolio";
+import { QueryKeys } from "@/lib/query-keys";
+import { TickerAvatar } from "@/components/ticker-avatar";
+import { useQuoteHistory } from "@/hooks/use-quote-history";
+import AssetDetailCard from "./asset-detail-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import QuoteHistoryTable from "./quote-history-table";
+import AssetLotsTable from "./asset-lots-table";
+import { getAssetProfile } from "@/commands/market-data";
 
 interface AssetProfileFormData {
   name: string;
@@ -56,33 +56,32 @@ interface AssetDetailData {
 }
 
 export const AssetProfilePage = () => {
-  const { symbol: encodedSymbol = '' } = useParams<{ symbol: string }>();
+  const { symbol: encodedSymbol = "" } = useParams<{ symbol: string }>();
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = queryParams.get('tab') || 'overview';
+  const defaultTab = queryParams.get("tab") || "overview";
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [formData, setFormData] = useState<AssetProfileFormData>({
-    name: '',
+    name: "",
     sectors: [],
     countries: [],
-    assetClass: '',
-    assetSubClass: '',
-    notes: '',
+    assetClass: "",
+    assetSubClass: "",
+    notes: "",
     dataSource: DataSource.MANUAL,
   });
 
-
-   const {
-     data: assetProfile,
-     isLoading: isAssetProfileLoading,
-     isError: isAssetProfileError,
-   } = useQuery<Asset | null, Error>({
-     queryKey: [QueryKeys.ASSET_DATA, symbol],
-     queryFn: () => getAssetProfile(symbol),
-     enabled: !!symbol,
-   });
+  const {
+    data: assetProfile,
+    isLoading: isAssetProfileLoading,
+    isError: isAssetProfileError,
+  } = useQuery<Asset | null, Error>({
+    queryKey: [QueryKeys.ASSET_DATA, symbol],
+    queryFn: () => getAssetProfile(symbol),
+    enabled: !!symbol,
+  });
 
   const {
     data: holding,
@@ -112,12 +111,12 @@ export const AssetProfilePage = () => {
 
   useEffect(() => {
     setFormData({
-      name: holding?.instrument?.name || '',
+      name: holding?.instrument?.name || "",
       sectors: holding?.instrument?.sectors || [],
       countries: holding?.instrument?.countries || [],
-      assetSubClass: holding?.instrument?.assetSubclass || '',
-      assetClass: holding?.instrument?.assetClass || '',
-      notes: holding?.instrument?.notes || '',
+      assetSubClass: holding?.instrument?.assetSubclass || "",
+      assetClass: holding?.instrument?.assetClass || "",
+      notes: holding?.instrument?.notes || "",
       dataSource: (holding?.instrument?.dataSource as DataSource) || DataSource.YAHOO,
     });
   }, [holding]);
@@ -125,12 +124,12 @@ export const AssetProfilePage = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setFormData({
-      name: holding?.instrument?.name || '',
+      name: holding?.instrument?.name || "",
       sectors: holding?.instrument?.sectors || [],
       countries: holding?.instrument?.countries || [],
-      assetSubClass: holding?.instrument?.assetSubclass || '',
-      assetClass: holding?.instrument?.assetClass || '',
-      notes: holding?.instrument?.notes || '',
+      assetSubClass: holding?.instrument?.assetSubclass || "",
+      assetClass: holding?.instrument?.assetClass || "",
+      notes: holding?.instrument?.notes || "",
       dataSource: (holding?.instrument?.dataSource as DataSource) || DataSource.YAHOO,
     });
   };
@@ -144,12 +143,12 @@ export const AssetProfilePage = () => {
     return {
       id: holding.instrument.id,
       symbol: holding.instrument.symbol,
-      name: holding.instrument.name || '-',
+      name: holding.instrument.name || "-",
       isin: null,
       assetType: null,
       symbolMapping: null,
-      assetClass: holding.instrument.assetClass || '',
-      assetSubClass: holding.instrument.assetSubclass || '',
+      assetClass: holding.instrument.assetClass || "",
+      assetSubClass: holding.instrument.assetSubclass || "",
       notes: holding.instrument.notes || null,
       countries: JSON.stringify(holding.instrument.countries || []),
       categories: null,
@@ -157,7 +156,7 @@ export const AssetProfilePage = () => {
       attributes: null,
       createdAt: holding.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
-      currency: holding.instrument.currency || 'USD',
+      currency: holding.instrument.currency || "USD",
       dataSource: (holding.instrument.dataSource as DataSource) || DataSource.YAHOO,
       sectors: JSON.stringify(holding.instrument.sectors || []),
       url: null,
@@ -201,7 +200,7 @@ export const AssetProfilePage = () => {
       todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
       totalReturn: Number(holding.totalGain?.local ?? 0),
       totalReturnPercent: Number(holding.totalGainPct ?? 0),
-      currency: holding.localCurrency || holding.instrument?.currency || 'USD',
+      currency: holding.localCurrency || holding.instrument?.currency || "USD",
       quote: quoteData?.quote ?? null,
     };
   }, [holding, quote]);
@@ -235,7 +234,6 @@ export const AssetProfilePage = () => {
 
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
 
-
   if (isLoading)
     return (
       <ApplicationShell className="flex items-center justify-center p-6">
@@ -244,14 +242,14 @@ export const AssetProfilePage = () => {
     ); // Show loading spinner
 
   // Simplified view for quote-only symbols (like FX rates)
-  if (assetProfile?.assetType === 'FOREX') {
+  if (assetProfile?.assetType === "FOREX") {
     return (
       <ApplicationShell className="p-6">
         <ApplicationHeader
           heading="Quote History"
           headingPrefix={symbol}
           displayBack={true}
-          backUrl={location.state?.from || '/holdings?tab=holdings'} // Use from state or default back
+          backUrl={location.state?.from || "/holdings?tab=holdings"} // Use from state or default back
         />
         <QuoteHistoryTable
           data={quoteHistory ?? []}
@@ -264,12 +262,12 @@ export const AssetProfilePage = () => {
               const datePart = new Date(updatedQuote.timestamp)
                 .toISOString()
                 .slice(0, 10)
-                .replace(/-/g, '');
+                .replace(/-/g, "");
               updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
             }
             // Set currency if missing
             if (!updatedQuote.currency) {
-              updatedQuote.currency = profile?.currency || 'USD';
+              updatedQuote.currency = profile?.currency || "USD";
             }
             saveQuoteMutation.mutate(updatedQuote);
           }}
@@ -296,7 +294,7 @@ export const AssetProfilePage = () => {
         <ApplicationHeader
           heading={`Error loading data for ${symbol}`}
           displayBack={true}
-          backUrl={location.state?.from || '/holdings?tab=holdings'} // Use from state or default back
+          backUrl={location.state?.from || "/holdings?tab=holdings"} // Use from state or default back
         />
         <p>
           Could not load necessary information for this symbol. Please check the symbol or try again
@@ -315,49 +313,50 @@ export const AssetProfilePage = () => {
       <Tabs defaultValue={defaultTab} className="space-y-4">
         {/* Custom Header with Editable Title */}
         <div className="flex w-full items-center justify-between">
-          <div className="flex items-center gap-2 flex-1">
-            <Link to={location.state?.from || '/holdings?tab=holdings'}>
+          <div className="flex flex-1 items-center gap-2">
+            <Link to={location.state?.from || "/holdings?tab=holdings"}>
               <Button variant="ghost" size="icon">
                 <Icons.ArrowLeft />
               </Button>
             </Link>
-            <div data-tauri-drag-region="true" className="draggable flex items-center space-x-4 flex-1">
+            <div
+              data-tauri-drag-region="true"
+              className="draggable flex flex-1 items-center space-x-4"
+            >
               {(profile?.symbol || holding?.instrument?.symbol) && (
                 <>
-                  <TickerAvatar 
-                    symbol={profile?.symbol || holding?.instrument?.symbol || symbol} 
-                    className="w-8 h-8"
+                  <TickerAvatar
+                    symbol={profile?.symbol || holding?.instrument?.symbol || symbol}
+                    className="h-8 w-8"
                   />
-                  <h1 className="font-heading text-xl font-bold tracking-tight text-muted-foreground">
+                  <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight">
                     {profile?.symbol || holding?.instrument?.symbol}
                   </h1>
                   <span className="h-6 border-l-2"></span>
                 </>
               )}
-              <div className="group relative flex items-center flex-1">
+              <div className="group relative flex flex-1 items-center">
                 {isEditingTitle ? (
                   <Input
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, name: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter asset name"
-                    className="font-heading text-xl font-bold tracking-tight w-full max-w-md"
+                    className="font-heading w-full max-w-md text-xl font-bold tracking-tight"
                     onBlur={() => {
                       setIsEditingTitle(false);
                       handleSaveTitle();
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         setIsEditingTitle(false);
                         handleSaveTitle();
                       }
-                      if (e.key === 'Escape') {
+                      if (e.key === "Escape") {
                         setIsEditingTitle(false);
                         // Reset the name to original value
                         setFormData((prev) => ({
                           ...prev,
-                          name: holding?.instrument?.name || '',
+                          name: holding?.instrument?.name || "",
                         }));
                       }
                     }}
@@ -366,7 +365,7 @@ export const AssetProfilePage = () => {
                 ) : (
                   <>
                     <h1 className="font-heading text-xl font-bold tracking-tight">
-                      {formData.name || holding?.instrument?.symbol || symbol || '-'}
+                      {formData.name || holding?.instrument?.symbol || symbol || "-"}
                     </h1>
                     <Button
                       variant="ghost"
@@ -382,11 +381,11 @@ export const AssetProfilePage = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
+            <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
               {/* Overview Tab: Requires profile */}
               {profile && (
                 <TabsTrigger
-                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="overview"
                 >
                   Overview
@@ -395,7 +394,7 @@ export const AssetProfilePage = () => {
               {/* Lots Tab: Requires holding with lots */}
               {holding?.lots && holding.lots.length > 0 && (
                 <TabsTrigger
-                  className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="lots"
                 >
                   Lots
@@ -403,7 +402,7 @@ export const AssetProfilePage = () => {
               )}
               {/* History/Quotes Tab: Requires quoteHistory */}
               <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="history"
               >
                 Quotes
@@ -417,13 +416,13 @@ export const AssetProfilePage = () => {
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
               <AssetHistoryCard
-                symbol={profile.symbol || ''}
-                currency={profile.currency || 'USD'}
+                symbol={profile.symbol || ""}
+                currency={profile.currency || "USD"}
                 marketPrice={profile.marketPrice}
                 totalGainAmount={profile.totalGainAmount}
                 totalGainPercent={profile.totalGainPercent}
                 quoteHistory={quoteHistory ?? []}
-                className={`col-span-1 ${holding ? 'md:col-span-2' : 'md:col-span-3'}`}
+                className={`col-span-1 ${holding ? "md:col-span-2" : "md:col-span-3"}`}
               />
               {symbolHolding && (
                 <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
@@ -478,7 +477,7 @@ export const AssetProfilePage = () => {
                       setFormData((prev) => ({
                         ...prev,
                         sectors: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(':');
+                          const [name, weightStr] = value.split(":");
                           // Keep original weight parsing logic, assuming input like 'Sector:75'
                           return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
                         }),
@@ -491,7 +490,7 @@ export const AssetProfilePage = () => {
                       <Badge
                         variant="secondary"
                         key={sector.name}
-                        className="m-1 cursor-help bg-indigo-100 uppercase dark:text-primary-foreground"
+                        className="dark:text-primary-foreground m-1 cursor-help bg-indigo-100 uppercase"
                         title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
                       >
                         {sector.name}
@@ -512,7 +511,7 @@ export const AssetProfilePage = () => {
                       setFormData((prev) => ({
                         ...prev,
                         countries: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(':');
+                          const [name, weightStr] = value.split(":");
                           // Keep original weight parsing logic
                           return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
                         }),
@@ -525,7 +524,7 @@ export const AssetProfilePage = () => {
                       <Badge
                         variant="secondary"
                         key={country.name}
-                        className="m-1 bg-purple-100 uppercase dark:text-primary-foreground"
+                        className="dark:text-primary-foreground m-1 bg-purple-100 uppercase"
                         title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
                       >
                         {country.name}
@@ -571,8 +570,8 @@ export const AssetProfilePage = () => {
                     onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                   />
                 ) : (
-                  <p className="text-sm font-light text-muted-foreground">
-                    {formData.notes || 'No description available.'}
+                  <p className="text-muted-foreground text-sm font-light">
+                    {formData.notes || "No description available."}
                   </p>
                 )}
               </div>
@@ -585,49 +584,49 @@ export const AssetProfilePage = () => {
           <TabsContent value="lots" className="pt-6">
             <AssetLotsTable
               lots={holding.lots}
-              currency={profile.currency || 'USD'}
+              currency={profile.currency || "USD"}
               marketPrice={profile.marketPrice}
             />
           </TabsContent>
         )}
 
         {/* History/Quotes Content: Requires quoteHistory */}
-          <TabsContent value="history" className="space-y-16 pt-6">
-            <QuoteHistoryTable
-              data={quoteHistory ?? []}
-              isManualDataSource={formData.dataSource === DataSource.MANUAL}
-              onSaveQuote={(quote: Quote) => {
-                let updatedQuote = { ...quote };
-                // Generate id if missing
-                if (!updatedQuote.id) {
-                  const datePart = new Date(updatedQuote.timestamp)
-                    .toISOString()
-                    .slice(0, 10)
-                    .replace(/-/g, '');
-                  updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-                }
-                // Set currency if missing
-                if (!updatedQuote.currency) {
-                  updatedQuote.currency = profile?.currency || 'USD';
-                }
-                saveQuoteMutation.mutate(updatedQuote);
-              }}
-              onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-              onChangeDataSource={(isManual) => {
-                // Only allow changing data source if there's a profile/holding to update
-                if (profile) {
-                  updateAssetDataSourceMutation.mutate({
-                    symbol,
-                    dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                  });
-                  setFormData((prev) => ({
-                    ...prev,
-                    dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                  }));
-                }
-              }}
-            />
-          </TabsContent>
+        <TabsContent value="history" className="space-y-16 pt-6">
+          <QuoteHistoryTable
+            data={quoteHistory ?? []}
+            isManualDataSource={formData.dataSource === DataSource.MANUAL}
+            onSaveQuote={(quote: Quote) => {
+              let updatedQuote = { ...quote };
+              // Generate id if missing
+              if (!updatedQuote.id) {
+                const datePart = new Date(updatedQuote.timestamp)
+                  .toISOString()
+                  .slice(0, 10)
+                  .replace(/-/g, "");
+                updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
+              }
+              // Set currency if missing
+              if (!updatedQuote.currency) {
+                updatedQuote.currency = profile?.currency || "USD";
+              }
+              saveQuoteMutation.mutate(updatedQuote);
+            }}
+            onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+            onChangeDataSource={(isManual) => {
+              // Only allow changing data source if there's a profile/holding to update
+              if (profile) {
+                updateAssetDataSourceMutation.mutate({
+                  symbol,
+                  dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+                });
+                setFormData((prev) => ({
+                  ...prev,
+                  dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+                }));
+              }
+            }}
+          />
+        </TabsContent>
       </Tabs>
     </ApplicationShell>
   );

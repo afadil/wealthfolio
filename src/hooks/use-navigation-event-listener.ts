@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { listenNavigateToRoute } from '@/commands/navigation-listener';
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { listenNavigateToRoute } from "@/commands/navigation-listener";
 
 const useNavigationEventListener = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const useNavigationEventListener = () => {
         cleanup = unlistenFn;
       })
       .catch((error) => {
-        console.error('Failed to setup navigation event listener:', error);
+        console.error("Failed to setup navigation event listener:", error);
       });
 
     return () => {

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@wealthfolio/ui';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMemo, useState } from "react";
+import { ApplicationHeader } from "@/components/header";
+import { ApplicationShell } from "@wealthfolio/ui";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -10,41 +10,41 @@ import {
   SheetDescription,
   SheetFooter,
   SheetClose,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { ClassesChart } from './components/classes-chart';
-import { HoldingsTable } from './components/holdings-table';
-import { PortfolioComposition } from './components/composition-chart';
-import { SectorsChart } from './components/sectors-chart';
-import { useHoldings } from '@/hooks/use-holdings';
-import { Account, Holding, HoldingType, Instrument } from '@/lib/types';
-import { useSettingsContext } from '@/lib/settings-provider';
-import { useLocation } from 'react-router-dom';
-import { CountryChart } from './components/country-chart';
-import { CashHoldingsWidget } from './components/cash-holdings-widget';
-import { AccountSelector } from '@/components/account-selector';
-import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
-import { HoldingCurrencyChart } from './components/currency-chart';
-import { AccountAllocationChart } from './components/account-allocation-chart';
-import { Badge } from '@/components/ui/badge';
+import { ClassesChart } from "./components/classes-chart";
+import { HoldingsTable } from "./components/holdings-table";
+import { PortfolioComposition } from "./components/composition-chart";
+import { SectorsChart } from "./components/sectors-chart";
+import { useHoldings } from "@/hooks/use-holdings";
+import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { useLocation } from "react-router-dom";
+import { CountryChart } from "./components/country-chart";
+import { CashHoldingsWidget } from "./components/cash-holdings-widget";
+import { AccountSelector } from "@/components/account-selector";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { HoldingCurrencyChart } from "./components/currency-chart";
+import { AccountAllocationChart } from "./components/account-allocation-chart";
+import { Badge } from "@/components/ui/badge";
 
 // Define a type for the filter criteria
-type SheetFilterType = 'class' | 'sector' | 'country' | 'currency' | 'account' | 'composition';
+type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
 
 export const HoldingsPage = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = queryParams.get('tab') || 'overview';
+  const defaultTab = queryParams.get("tab") || "overview";
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
-    name: 'All Portfolio',
-    accountType: 'PORTFOLIO' as any,
+    name: "All Portfolio",
+    accountType: "PORTFOLIO" as any,
     balance: 0,
-    currency: 'USD',
+    currency: "USD",
     isDefault: false,
     isActive: true,
     createdAt: new Date(),
@@ -56,28 +56,30 @@ export const HoldingsPage = () => {
   const { holdings, isLoading } = useHoldings(selectedAccount?.id || PORTFOLIO_ACCOUNT_ID);
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [sheetTitle, setSheetTitle] = useState('');
+  const [sheetTitle, setSheetTitle] = useState("");
   const [sheetFilterType, setSheetFilterType] = useState<SheetFilterType | null>(null);
   const [sheetFilterName, setSheetFilterName] = useState<string | null>(null);
-  const [sheetCompositionFilter, setSheetCompositionFilter] = useState<Instrument['id'] | null>(null);
+  const [sheetCompositionFilter, setSheetCompositionFilter] = useState<Instrument["id"] | null>(
+    null,
+  );
   const [sheetAccountIdsFilter, setSheetAccountIdsFilter] = useState<string[] | null>(null);
 
   const handleChartSectionClick = (
     type: SheetFilterType,
     name: string,
     title?: string,
-    compositionId?: Instrument['id'],
-    accountIdsForFilter?: string[]
+    compositionId?: Instrument["id"],
+    accountIdsForFilter?: string[],
   ) => {
     setSheetFilterType(type);
     setSheetFilterName(name);
     setSheetTitle(title || `Details for ${name}`);
-    if (type === 'composition' && compositionId) {
+    if (type === "composition" && compositionId) {
       setSheetCompositionFilter(compositionId);
     } else {
       setSheetCompositionFilter(null);
     }
-    if (type === 'account' && accountIdsForFilter) {
+    if (type === "account" && accountIdsForFilter) {
       setSheetAccountIdsFilter(accountIdsForFilter);
     } else {
       setSheetAccountIdsFilter(null);
@@ -93,34 +95,34 @@ export const HoldingsPage = () => {
     let filteredHoldings: Holding[] = [];
 
     switch (sheetFilterType) {
-      case 'class':
+      case "class":
         filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          const assetSubClass = isCash ? 'Cash' : h.instrument?.assetSubclass || 'Other';
+          const assetSubClass = isCash ? "Cash" : h.instrument?.assetSubclass || "Other";
           return assetSubClass === sheetFilterName;
         });
         break;
-      case 'sector':
-        filteredHoldings = holdings.filter(
-          (h) => h.instrument?.sectors?.some((s) => s.name === sheetFilterName)
+      case "sector":
+        filteredHoldings = holdings.filter((h) =>
+          h.instrument?.sectors?.some((s) => s.name === sheetFilterName),
         );
         break;
-      case 'country':
-        filteredHoldings = holdings.filter(
-          (h) => h.instrument?.countries?.some((c) => c.name === sheetFilterName)
+      case "country":
+        filteredHoldings = holdings.filter((h) =>
+          h.instrument?.countries?.some((c) => c.name === sheetFilterName),
         );
         break;
-      case 'currency':
+      case "currency":
         filteredHoldings = holdings.filter((h) => h.localCurrency === sheetFilterName);
         break;
-      case 'composition':
+      case "composition":
         if (sheetCompositionFilter) {
           filteredHoldings = holdings.filter((h) => h.instrument?.id === sheetCompositionFilter);
         } else if (sheetFilterName) {
           filteredHoldings = holdings.filter(
             (h) =>
               h.instrument?.assetSubclass === sheetFilterName ||
-              h.instrument?.assetClass === sheetFilterName
+              h.instrument?.assetClass === sheetFilterName,
           );
         }
         break;
@@ -129,7 +131,7 @@ export const HoldingsPage = () => {
     }
 
     return filteredHoldings.sort(
-      (a, b) => (Number(b.marketValue?.base) || 0) - (Number(a.marketValue?.base) || 0)
+      (a, b) => (Number(b.marketValue?.base) || 0) - (Number(a.marketValue?.base) || 0),
     );
   }, [holdings, sheetFilterType, sheetFilterName, sheetCompositionFilter, sheetAccountIdsFilter]);
 
@@ -146,22 +148,22 @@ export const HoldingsPage = () => {
   }, [holdings]);
 
   return (
-  <ApplicationShell className="p-6 h-full flex flex-col">
-      <Tabs defaultValue={defaultTab} className="flex flex-col h-full w-full">
-        <div className="space-y-2 shrink-0">
+    <ApplicationShell className="flex h-full flex-col p-6">
+      <Tabs defaultValue={defaultTab} className="flex h-full w-full flex-col">
+        <div className="shrink-0 space-y-2">
           <ApplicationHeader heading="Holdings">
             <TabsList
               aria-label="Holdings views"
-              className="max-w-full overflow-x-auto whitespace-nowrap rounded-full bg-secondary p-1"
+              className="bg-secondary max-w-full overflow-x-auto rounded-full p-1 whitespace-nowrap"
             >
               <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="overview"
               >
                 Analytics
               </TabsTrigger>
               <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="holdings"
               >
                 Positions
@@ -179,7 +181,7 @@ export const HoldingsPage = () => {
           <CashHoldingsWidget cashHoldings={cashHoldings || []} isLoading={isLoading} />
         </div>
 
-        <TabsContent value="holdings" className="flex-1 min-h-0 py-2">
+        <TabsContent value="holdings" className="min-h-0 flex-1 py-2">
           <HoldingsTable holdings={nonCashHoldings || []} isLoading={isLoading} />
         </TabsContent>
 
@@ -188,10 +190,10 @@ export const HoldingsPage = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <HoldingCurrencyChart
               holdings={holdings || []}
-              baseCurrency={settings?.baseCurrency || 'USD'}
+              baseCurrency={settings?.baseCurrency || "USD"}
               isLoading={isLoading}
               onCurrencySectionClick={(currencyName) =>
-                handleChartSectionClick('currency', currencyName, `Holdings in ${currencyName}`)
+                handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
               }
             />
 
@@ -201,7 +203,7 @@ export const HoldingsPage = () => {
               holdings={holdings}
               isLoading={isLoading}
               onClassSectionClick={(className) =>
-                handleChartSectionClick('class', className, `Asset Class: ${className}`)
+                handleChartSectionClick("class", className, `Asset Class: ${className}`)
               }
             />
 
@@ -209,7 +211,7 @@ export const HoldingsPage = () => {
               holdings={nonCashHoldings}
               isLoading={isLoading}
               onCountrySectionClick={(countryName) =>
-                handleChartSectionClick('country', countryName, `Holdings in ${countryName}`)
+                handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
               }
             />
           </div>
@@ -226,7 +228,7 @@ export const HoldingsPage = () => {
                 holdings={nonCashHoldings}
                 isLoading={isLoading}
                 onSectorSectionClick={(sectorName) =>
-                  handleChartSectionClick('sector', sectorName, `Holdings in Sector: ${sectorName}`)
+                  handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
                 }
               />
             </div>
@@ -246,17 +248,17 @@ export const HoldingsPage = () => {
             {holdingsForSheet.length > 0 ? (
               <ul className="space-y-2">
                 {holdingsForSheet.map((holding) => {
-                  let displayName = 'N/A';
-                  let symbol = '-';
+                  let displayName = "N/A";
+                  let symbol = "-";
                   if (holding.holdingType === HoldingType.CASH) {
                     displayName = holding.localCurrency
                       ? `Cash (${holding.localCurrency})`
-                      : 'Cash';
+                      : "Cash";
                     symbol = `$CASH-${holding.localCurrency}`;
                   } else if (holding.instrument) {
                     displayName =
-                      holding.instrument.name || holding.instrument.symbol || 'Unnamed Security';
-                    symbol = holding.instrument.symbol || '-';
+                      holding.instrument.name || holding.instrument.symbol || "Unnamed Security";
+                    symbol = holding.instrument.symbol || "-";
                   }
 
                   return (

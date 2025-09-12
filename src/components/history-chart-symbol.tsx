@@ -1,7 +1,7 @@
-import { TimePeriod } from '@/lib/types';
-import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
-import { formatAmount } from '@wealthfolio/ui';
-import { formatDate } from '@/lib/utils';
+import { TimePeriod } from "@/lib/types";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
+import { formatAmount } from "@wealthfolio/ui";
+import { formatDate } from "@/lib/utils";
 
 type CustomTooltipProps = {
   active: boolean;
@@ -59,8 +59,8 @@ export default function HistoryChart({
             </defs>
             {/* @ts-ignore */}
             <Tooltip content={<CustomTooltip />} />
-            {interval !== 'ALL' && interval !== '1Y' ? (
-              <YAxis hide={true} type="number" domain={['auto', 'auto']} />
+            {interval !== "ALL" && interval !== "1Y" ? (
+              <YAxis hide={true} type="number" domain={["auto", "auto"]} />
             ) : null}
             <Area
               isAnimationActive={true}

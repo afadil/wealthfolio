@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { AccountValuation } from '@/lib/types';
-import { getLatestValuations } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from "@tanstack/react-query";
+import { AccountValuation } from "@/lib/types";
+import { getLatestValuations } from "@/commands/portfolio";
+import { QueryKeys } from "@/lib/query-keys";
 
 export function useLatestValuations(accountIds: string[]) {
   const {
@@ -20,4 +20,4 @@ export function useLatestValuations(accountIds: string[]) {
     isLoading: isLoading || isFetching,
     error,
   };
-} 
+}

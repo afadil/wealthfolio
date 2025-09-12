@@ -1,5 +1,5 @@
 // src/lockdown.ts
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
@@ -8,7 +8,7 @@ const isEditable = (el: EventTarget | null) =>
 export function installLockdown() {
   // Disable context menu except in editables (capture early to beat other listeners)
   window.addEventListener(
-    'contextmenu',
+    "contextmenu",
     (e) => {
       if (!isEditable(e.target)) e.preventDefault();
     },
@@ -16,35 +16,33 @@ export function installLockdown() {
   );
 
   // Disable copy/cut/select-all/print/etc. outside editables
-  window.addEventListener('keydown', async (e) => {
+  window.addEventListener("keydown", async (e) => {
     if (isEditable(e.target)) return;
-    
+
     const k = e.key.toLowerCase();
-    
+
     // Handle F11 for fullscreen toggle
-    if (k === 'f11') {
+    if (k === "f11") {
       e.preventDefault();
       try {
         const appWindow = getCurrentWindow();
         const isFullscreen = await appWindow.isFullscreen();
         await appWindow.setFullscreen(!isFullscreen);
       } catch (error) {
-        console.error('Failed to toggle fullscreen:', error);
+        console.error("Failed to toggle fullscreen:", error);
       }
       return;
     }
-    
-    if ((e.metaKey || e.ctrlKey) && ['a', 'x', 's', 'p'].includes(k)) {
+
+    if ((e.metaKey || e.ctrlKey) && ["a", "x", "s", "p"].includes(k)) {
       e.preventDefault();
     }
     // Block keyboard context menu: ContextMenu key and Shift+F10
-    if (k === 'contextmenu' || (e.shiftKey && k === 'f10')) {
+    if (k === "contextmenu" || (e.shiftKey && k === "f10")) {
       e.preventDefault();
     }
   });
 
-
   // Stop drag-to-highlight/drag image
-  window.addEventListener('dragstart', (e) => e.preventDefault());
+  window.addEventListener("dragstart", (e) => e.preventDefault());
 }
-

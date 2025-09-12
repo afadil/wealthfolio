@@ -1,2 +1,2 @@
-export * from './holdings-table';
-export * from './composition-chart';
+export * from "./holdings-table";
+export * from "./composition-chart";

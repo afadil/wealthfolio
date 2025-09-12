@@ -1,6 +1,6 @@
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import externalGlobals from "rollup-plugin-external-globals"
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import externalGlobals from "rollup-plugin-external-globals";
 
 export default defineConfig({
   plugins: [react()],
@@ -34,4 +34,4 @@ export default defineConfig({
     minify: false, // Keep readable for debugging
     sourcemap: true,
   },
-})
+});

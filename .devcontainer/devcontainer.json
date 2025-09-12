@@ -1,179 +1,178 @@
 {
-    /**
-     * ============================================================================
-     * Wealthflolio Dev Environment - Development Container Configuration
-     * ============================================================================
-     * For format details, see https://aka.ms/devcontainer.json.
-     *
-     * This configuration defines the setup for a development container used to 
-     * run Wealthflolio application development in an isolated, reproducible 
-     * environment. It includes all the necessary components to work with 
-     * the Tauri framework, Rust, X11, and VNC server for GUI applications.
-     *
-     * =======================================================================
-     * Key Components:
-     * =======================================================================
-     * 1. **Base Image**: The container uses the "ivangabriele/tauri:debian-bookworm-22" 
-     *    Docker image, which comes with the necessary dependencies for Tauri apps.
-     * 
-     * 2. **X11 Virtual Display**: The container includes Xvfb (X virtual framebuffer) 
-     *    to simulate a display environment, enabling GUI applications to run without 
-     *    requiring physical display hardware. X11VNC is configured to provide 
-     *    remote access to this virtual display.
-     *
-     * 3. **Package Installation**: The container is configured to install key 
-     *    packages such as `xvfb`, `x11vnc`, `net-tools`, and others required 
-     *    for running/developing the Wealthflolio app and managing GUI display output.
-     *
-     * 4. **VS Code Setup**: Preconfigured VS Code extensions for Rust, Tauri, 
-     *    Docker, ESLint, Prettier, and Git integration, making it a seamless 
-     *    environment for development and debugging.
-     *
-     * 5. **Volumes**: Docker volumes are used to persist app data and build caches 
-     *    (e.g., for Rust's Cargo package manager), improving container reuse and 
-     *    reducing build times.
-     *
-     * =======================================================================
-     * Customization:
-     * =======================================================================
-     * - The development environment can be customized with various extensions and 
-     *   pre-configured settings to suit the needs of Wealthflolio developers.
-     * - It supports GPU usage with the `--gpus=all` flag in Docker for GPU-accelerated 
-     *   tasks.
-     * - Ports `1420`, `1421`, and `5900` are forwarded for application access 
-     *   and VNC server use.
-     * - Display can be set  to `host.docker.internal:0` to forward to a host display
-     *   such as VcXsrv or Xming.
-     *
-     * ============================================================================
-     * Example Usage:
-     * ============================================================================
-     * To start the container, ensure Docker is installed and run the following:
-     * 
-     * 1. Build the container: `devcontainer build`
-     * 2. Open the container in VS Code: `devcontainer open`
-     *
-     * You can then access the app's GUI through VNC, set up in `X11VNC_PASSWORD`, 
-     * or interact with the terminal directly via the VS Code terminal.
-     * ============================================================================
-     */
-  
-      // Dev container name for identification
-      "name": "Wealthflolio Dev Environment",
-      
-      // Base Docker image used for the development container
-      // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-      "image": "ivangabriele/tauri:debian-bookworm-22",
-    
-      // Environment variables to be set inside the container
-      "containerEnv": {
-        "DISPLAY": ":99",                         // Virtual X display for GUI apps (e.g., Xvfb)
-        "XVFB": "/usr/bin/Xvfb",                  // Path to Xvfb (X virtual framebuffer)
-        "XVFBARGS": "-ac +extension RANDR",       // Arguments for Xvfb (screen resolution and extensions)
-        "X11VNC": "/usr/bin/x11vnc",              // Path to X11VNC (for VNC server)
-        "X11VNCARGS": "-forever -rfbport 5900",   // Arguments for X11VNC (keep the server running, set VNC port)        
-        
-        // Locale settings to address some GTK/X11 Warnings/Errors (Optional)
-        "LC_ALL": "en_US.UTF-8",              // Set locale to UTF-8 for compatibility
-        "LANG": "en_US.UTF-8",                // Set default language to English (US)
-        "LANGUAGE": "en_US.UTF-8",            // Set preferred language for the environment
-        "WEBKIT_DISABLE_DMABUF_RENDERER": "1" // Disable WebKit's DMABuf renderer to fix certain graphical issues
-      },
-    
-      // Remote environment variables (uncomment as needed)
-      "remoteEnv": {
-          // "DISPLAY": "host.docker.internal:0"  // Forward display from host for GUI apps (Disables X11VNC/XVFB)
-          // "X11VNC_PASSWORD": "secretpassword",   // Set a password for X11VNC access
-      },
-    
-      // Docker run arguments for container configuration
-      "runArgs": [
-        "--gpus=all",                    // Allow GPU access for the container (useful for apps needing GPU acceleration)
-        "--name=wealthflolio-dev",       // Set container name
-        "--hostname=wealthflolio-dev",   // Set container hostname
-        "--net=host"                     // Share network namespace with host machine (needed because of websocket)
-      ],
-    
-      // Mount local workspace folder to container workspace folder
-      "workspaceMount": "source=${localWorkspaceFolder},target=/app/dev/workspace/${localWorkspaceFolderBasename},type=bind",
-      "workspaceFolder": "/app/dev/workspace/${localWorkspaceFolderBasename}",
-    
-      // Mounts to persist data within container
-      "mounts": [
-        {
-          // Use Docker volume to persist cargo cache for faster builds
-          "source": "devcontainer-cargo-cache-${devcontainerId}",
-          "target": "/usr/local/cargo",  // Mount cargo cache directory
-          "type": "volume"  
-        },
-        // Use Docker Volume to persist Wealtholio app data
-        {
-          "source": "devcontainer-appdata-${devcontainerId}", 
-          "target": "/root/.local/share", // Persist app data in the container
-          "type": "volume"
-        }
-      ],
-    
-      // Features to add to the dev container. More info: https://containers.dev/features.
-      "features": {
-        "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}, // Shell history persistence
-        "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": { 
-          // Install required packages
-          "packages": [
-              "xvfb",           // Install Xvfb for virtual display
-              "x11vnc",         // Install X11VNC for VNC server
-              "net-tools",      // Install network tools like ifconfig
-              "locales",        // Install locales package for localization support
-              "locales-all"     // Install all available locales for wider language support
-          ]       
-        }
-      },
-    
-      // Override feature installation order
-      "overrideFeatureInstallOrder": [
-        "ghcr.io/rocker-org/devcontainer-features/apt-packages" // Ensure apt-packages is installed before other features
-      ],
-    
-      // Use 'forwardPorts' to make a list of ports inside the container available locally.
-      "forwardPorts": [1420, 1421, 5900],  // Forward ports for app and VNC access
-    
-      // Use 'postCreateCommand' to run commands after the container is created.
-      "postCreateCommand": {
-          "DEPENDENCIES": "yes|pnpm install"  // Install project dependencies using pnpm after the container setup
-      },
-      
-      // Use 'postStartCommand' to run commands after the container is started.
-      "postStartCommand": {
-          // Start the Xvfb virtual display in the background
-          "startXVFB": "/sbin/start-stop-daemon --start --quiet --background --exec $XVFB -- $DISPLAY $XVFBARGS",
-          
-          // Start X11VNC VNC server in the background with a wait time to ensure X display is ready
-          "startX11VNC": "/sbin/start-stop-daemon --start --quiet --background --exec ${X11VNC} -- -display ${DISPLAY} ${X11VNC_PASSWORD:+-passwd $X11VNC_PASSWORD} $X11VNCARGS -wait 10"
-      }, 
-  
-      // Customization for VS Code settings and extensions
-      "customizations": {
-        "settings": {
-          "terminal.integrated.shell.linux": "/bin/bash"  // Set bash as the default shell for the integrated terminal
-        },
-        "vscode": {
-          "extensions": [
-            "rust-lang.rust-analyzer",         // Rust language server for Rust development
-            "tauri-apps.tauri-vscode",         // Tauri framework support for building desktop apps
-            "ms-azuretools.vscode-docker",     // Docker integration for VS Code
-            "esbenp.prettier-vscode",          // Prettier integration for code formatting
-            "rvest.vs-code-prettier-eslint",   // Prettier + ESLint integration for code quality
-            "dbaeumer.vscode-eslint",          // ESLint integration for JavaScript/TypeScript
-            "tamasfe.even-better-toml",        // TOML syntax highlighting support
-            "mhutchie.git-graph",              // Git graph visualization to track repository changes
-            "codezombiech.gitignore",          // Gitignore file support
-            "eamodio.gitlens",                 // Git insights and history
-            "donjayamanne.githistory"          // Git history viewer for better version control insights
-          ]
-        }
-      },
-    
-      // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-      "remoteUser": "root"
-  }
-  
+  /**
+   * ============================================================================
+   * Wealthflolio Dev Environment - Development Container Configuration
+   * ============================================================================
+   * For format details, see https://aka.ms/devcontainer.json.
+   *
+   * This configuration defines the setup for a development container used to
+   * run Wealthflolio application development in an isolated, reproducible
+   * environment. It includes all the necessary components to work with
+   * the Tauri framework, Rust, X11, and VNC server for GUI applications.
+   *
+   * =======================================================================
+   * Key Components:
+   * =======================================================================
+   * 1. **Base Image**: The container uses the "ivangabriele/tauri:debian-bookworm-22"
+   *    Docker image, which comes with the necessary dependencies for Tauri apps.
+   *
+   * 2. **X11 Virtual Display**: The container includes Xvfb (X virtual framebuffer)
+   *    to simulate a display environment, enabling GUI applications to run without
+   *    requiring physical display hardware. X11VNC is configured to provide
+   *    remote access to this virtual display.
+   *
+   * 3. **Package Installation**: The container is configured to install key
+   *    packages such as `xvfb`, `x11vnc`, `net-tools`, and others required
+   *    for running/developing the Wealthflolio app and managing GUI display output.
+   *
+   * 4. **VS Code Setup**: Preconfigured VS Code extensions for Rust, Tauri,
+   *    Docker, ESLint, Prettier, and Git integration, making it a seamless
+   *    environment for development and debugging.
+   *
+   * 5. **Volumes**: Docker volumes are used to persist app data and build caches
+   *    (e.g., for Rust's Cargo package manager), improving container reuse and
+   *    reducing build times.
+   *
+   * =======================================================================
+   * Customization:
+   * =======================================================================
+   * - The development environment can be customized with various extensions and
+   *   pre-configured settings to suit the needs of Wealthflolio developers.
+   * - It supports GPU usage with the `--gpus=all` flag in Docker for GPU-accelerated
+   *   tasks.
+   * - Ports `1420`, `1421`, and `5900` are forwarded for application access
+   *   and VNC server use.
+   * - Display can be set  to `host.docker.internal:0` to forward to a host display
+   *   such as VcXsrv or Xming.
+   *
+   * ============================================================================
+   * Example Usage:
+   * ============================================================================
+   * To start the container, ensure Docker is installed and run the following:
+   *
+   * 1. Build the container: `devcontainer build`
+   * 2. Open the container in VS Code: `devcontainer open`
+   *
+   * You can then access the app's GUI through VNC, set up in `X11VNC_PASSWORD`,
+   * or interact with the terminal directly via the VS Code terminal.
+   * ============================================================================
+   */
+
+  // Dev container name for identification
+  "name": "Wealthflolio Dev Environment",
+
+  // Base Docker image used for the development container
+  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "image": "ivangabriele/tauri:debian-bookworm-22",
+
+  // Environment variables to be set inside the container
+  "containerEnv": {
+    "DISPLAY": ":99", // Virtual X display for GUI apps (e.g., Xvfb)
+    "XVFB": "/usr/bin/Xvfb", // Path to Xvfb (X virtual framebuffer)
+    "XVFBARGS": "-ac +extension RANDR", // Arguments for Xvfb (screen resolution and extensions)
+    "X11VNC": "/usr/bin/x11vnc", // Path to X11VNC (for VNC server)
+    "X11VNCARGS": "-forever -rfbport 5900", // Arguments for X11VNC (keep the server running, set VNC port)
+
+    // Locale settings to address some GTK/X11 Warnings/Errors (Optional)
+    "LC_ALL": "en_US.UTF-8", // Set locale to UTF-8 for compatibility
+    "LANG": "en_US.UTF-8", // Set default language to English (US)
+    "LANGUAGE": "en_US.UTF-8", // Set preferred language for the environment
+    "WEBKIT_DISABLE_DMABUF_RENDERER": "1" // Disable WebKit's DMABuf renderer to fix certain graphical issues
+  },
+
+  // Remote environment variables (uncomment as needed)
+  "remoteEnv": {
+    // "DISPLAY": "host.docker.internal:0"  // Forward display from host for GUI apps (Disables X11VNC/XVFB)
+    // "X11VNC_PASSWORD": "secretpassword",   // Set a password for X11VNC access
+  },
+
+  // Docker run arguments for container configuration
+  "runArgs": [
+    "--gpus=all", // Allow GPU access for the container (useful for apps needing GPU acceleration)
+    "--name=wealthflolio-dev", // Set container name
+    "--hostname=wealthflolio-dev", // Set container hostname
+    "--net=host" // Share network namespace with host machine (needed because of websocket)
+  ],
+
+  // Mount local workspace folder to container workspace folder
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app/dev/workspace/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/app/dev/workspace/${localWorkspaceFolderBasename}",
+
+  // Mounts to persist data within container
+  "mounts": [
+    {
+      // Use Docker volume to persist cargo cache for faster builds
+      "source": "devcontainer-cargo-cache-${devcontainerId}",
+      "target": "/usr/local/cargo", // Mount cargo cache directory
+      "type": "volume"
+    },
+    // Use Docker Volume to persist Wealtholio app data
+    {
+      "source": "devcontainer-appdata-${devcontainerId}",
+      "target": "/root/.local/share", // Persist app data in the container
+      "type": "volume"
+    }
+  ],
+
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}, // Shell history persistence
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+      // Install required packages
+      "packages": [
+        "xvfb", // Install Xvfb for virtual display
+        "x11vnc", // Install X11VNC for VNC server
+        "net-tools", // Install network tools like ifconfig
+        "locales", // Install locales package for localization support
+        "locales-all" // Install all available locales for wider language support
+      ]
+    }
+  },
+
+  // Override feature installation order
+  "overrideFeatureInstallOrder": [
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages" // Ensure apt-packages is installed before other features
+  ],
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": [1420, 1421, 5900], // Forward ports for app and VNC access
+
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": {
+    "DEPENDENCIES": "yes|pnpm install" // Install project dependencies using pnpm after the container setup
+  },
+
+  // Use 'postStartCommand' to run commands after the container is started.
+  "postStartCommand": {
+    // Start the Xvfb virtual display in the background
+    "startXVFB": "/sbin/start-stop-daemon --start --quiet --background --exec $XVFB -- $DISPLAY $XVFBARGS",
+
+    // Start X11VNC VNC server in the background with a wait time to ensure X display is ready
+    "startX11VNC": "/sbin/start-stop-daemon --start --quiet --background --exec ${X11VNC} -- -display ${DISPLAY} ${X11VNC_PASSWORD:+-passwd $X11VNC_PASSWORD} $X11VNCARGS -wait 10"
+  },
+
+  // Customization for VS Code settings and extensions
+  "customizations": {
+    "settings": {
+      "terminal.integrated.shell.linux": "/bin/bash" // Set bash as the default shell for the integrated terminal
+    },
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer", // Rust language server for Rust development
+        "tauri-apps.tauri-vscode", // Tauri framework support for building desktop apps
+        "ms-azuretools.vscode-docker", // Docker integration for VS Code
+        "esbenp.prettier-vscode", // Prettier integration for code formatting
+        "rvest.vs-code-prettier-eslint", // Prettier + ESLint integration for code quality
+        "dbaeumer.vscode-eslint", // ESLint integration for JavaScript/TypeScript
+        "tamasfe.even-better-toml", // TOML syntax highlighting support
+        "mhutchie.git-graph", // Git graph visualization to track repository changes
+        "codezombiech.gitignore", // Gitignore file support
+        "eamodio.gitlens", // Git insights and history
+        "donjayamanne.githistory" // Git history viewer for better version control insights
+      ]
+    }
+  },
+
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  "remoteUser": "root"
+}
