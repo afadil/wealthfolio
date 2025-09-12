@@ -28,6 +28,8 @@
       ]
     },
     "core:window:allow-start-dragging",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
     "shell:allow-open",
     "dialog:allow-open",
     "dialog:allow-save",

@@ -26,7 +26,11 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
         .build()?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
-        .item(&MenuItemBuilder::with_id("toggle_fullscreen", "Toggle Fullscreen").build(app)?)
+        .item(
+            &MenuItemBuilder::with_id("toggle_fullscreen", "Toggle Fullscreen")
+                .accelerator("F11")
+                .build(app)?
+        )
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, "Help")

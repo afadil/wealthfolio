@@ -1,4 +1,6 @@
 // src/lockdown.ts
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
 const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   !!el.closest('input, textarea, [contenteditable="true"], .allow-select, .select-all');
@@ -14,9 +16,24 @@ export function installLockdown() {
   );
 
   // Disable copy/cut/select-all/print/etc. outside editables
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', async (e) => {
     if (isEditable(e.target)) return;
+    
     const k = e.key.toLowerCase();
+    
+    // Handle F11 for fullscreen toggle
+    if (k === 'f11') {
+      e.preventDefault();
+      try {
+        const appWindow = getCurrentWindow();
+        const isFullscreen = await appWindow.isFullscreen();
+        await appWindow.setFullscreen(!isFullscreen);
+      } catch (error) {
+        console.error('Failed to toggle fullscreen:', error);
+      }
+      return;
+    }
+    
     if ((e.metaKey || e.ctrlKey) && ['a', 'x', 's', 'p'].includes(k)) {
       e.preventDefault();
     }
