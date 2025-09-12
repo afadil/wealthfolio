@@ -14,6 +14,7 @@ import { subMonths } from 'date-fns';
 import { calculatePerformanceMetrics } from '@/lib/utils';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 import { useHoldings } from '@/hooks/use-holdings';
+import { useRecalculatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
 
 
 function DashboardSkeleton() {
@@ -46,6 +47,7 @@ export default function DashboardPage() {
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+  const { mutate: recalculatePortfolio, isPending: isRecalculating } = useRecalculatePortfolioMutation();
 
   const totalValue = useMemo(() => {
     return holdings?.reduce((acc, holding) => acc + (holding.marketValue?.base || 0), 0) ?? 0;
@@ -97,8 +99,12 @@ export default function DashboardPage() {
   <div className="flex h-full flex-col">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
       <div className="flex px-4 py-2 md:px-6 lg:px-10">
-        <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-          <div className="flex items-start gap-2">
+        <PortfolioUpdateTrigger 
+          lastCalculatedAt={currentValuation?.calculatedAt}
+          recalculatePortfolio={recalculatePortfolio}
+          isRecalculating={isRecalculating}
+        >
+          <div className="flex items-start gap-2 pt-10">
             <div>
               <div className="flex items-center gap-3">
                 <Balance
