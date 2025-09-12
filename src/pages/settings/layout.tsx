@@ -1,67 +1,67 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Separator } from '@/components/ui/separator';
-import { SidebarNav } from './sidebar-nav';
-import { Icons } from '@/components/ui/icons';
+import { Icons } from "@/components/ui/icons";
+import { Separator } from "@/components/ui/separator";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { SidebarNav } from "./sidebar-nav";
 
 const sidebarNavItems = [
   {
-    title: 'General',
-    href: 'general',
-    subtitle: 'Currency and general preferences',
+    title: "General",
+    href: "general",
+    subtitle: "Currency and general preferences",
     icon: <Icons.Settings className="h-5 w-5" />,
   },
   {
-    title: 'Accounts',
-    href: 'accounts',
-    subtitle: 'Investment and savings accounts',
+    title: "Accounts",
+    href: "accounts",
+    subtitle: "Investment and savings accounts",
     icon: <Icons.CreditCard className="h-5 w-5" />,
   },
   {
-    title: 'Limits',
-    href: 'contribution-limits',
-    subtitle: 'Contribution limits and rules',
+    title: "Limits",
+    href: "contribution-limits",
+    subtitle: "Contribution limits and rules",
     icon: <Icons.TrendingUp className="h-5 w-5" />,
   },
   {
-    title: 'Goals',
-    href: 'goals',
-    subtitle: 'Plan and track objectives',
+    title: "Goals",
+    href: "goals",
+    subtitle: "Plan and track objectives",
     icon: <Icons.Goal className="h-5 w-5" />,
   },
   {
-    title: 'Market Data',
-    href: 'market-data',
-    subtitle: 'Providers and data update',
+    title: "Market Data",
+    href: "market-data",
+    subtitle: "Providers and data update",
     icon: <Icons.BarChart className="h-5 w-5" />,
   },
 
   {
-    title: 'Add-ons',
-    href: 'addons',
-    subtitle: 'Extend Wealthfolio with features',
+    title: "Add-ons",
+    href: "addons",
+    subtitle: "Extend Wealthfolio with features",
     icon: <Icons.Package className="h-5 w-5" />,
   },
   {
-    title: 'Appearance',
-    href: 'appearance',
-    subtitle: 'Theme, typography, and density',
+    title: "Appearance",
+    href: "appearance",
+    subtitle: "Theme, typography, and density",
     icon: <Icons.Monitor className="h-5 w-5" />,
   },
   {
-    title: 'Sync',
-    href: 'sync',
-    subtitle: 'Sync between devices',
+    title: "Sync",
+    href: "sync",
+    subtitle: "Sync between devices",
     icon: <Icons.Smartphone className="h-5 w-5" />,
   },
   {
-    title: 'Data Export',
-    href: 'exports',
-    subtitle: 'Backup and export your data',
+    title: "Data Export",
+    href: "exports",
+    subtitle: "Backup and export your data",
     icon: <Icons.Download className="h-5 w-5" />,
   },
   {
-    title: 'About',
-    href: 'about',
+    title: "About",
+    href: "about",
   },
 ];
 
@@ -69,10 +69,9 @@ export default function SettingsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-
   // Check if we're on the main settings page (mobile) or a specific setting page
   const isMainSettingsPage =
-    location.pathname === '/settings' || location.pathname === '/settings/';
+    location.pathname === "/settings" || location.pathname === "/settings/";
 
   // Mobile-first: show list view on main page, detail view on specific pages
   return (
@@ -128,7 +127,7 @@ export default function SettingsLayout() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden p-6 lg:block">
+      <div className="mx-2 hidden lg:block">
         <div className="space-y-0.5">
           <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
         </div>
@@ -137,7 +136,7 @@ export default function SettingsLayout() {
           <aside className="lg:sticky lg:top-20 lg:w-[220px] lg:self-start lg:pr-4">
             <SidebarNav items={sidebarNavItems} />
           </aside>
-          <div className="min-w-0 flex-1 lg:max-w-4xl">
+          <div className="mx-12 min-w-0 flex-1 lg:max-w-4xl">
             <Outlet />
           </div>
         </div>

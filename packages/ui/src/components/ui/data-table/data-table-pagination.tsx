@@ -1,22 +1,16 @@
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import type { Table } from '@tanstack/react-table';
-import { Icons } from '@/components/ui/icons';
-import { useState, KeyboardEvent } from 'react';
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import type { Table } from "@tanstack/react-table";
+import { Icons } from "@/components/ui/icons";
+import { useState, KeyboardEvent } from "react";
 
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
 }
 
 export function DataTablePagination<TData>({ table }: DataTablePaginationProps<TData>) {
-  const [pageInput, setPageInput] = useState<string>('');
+  const [pageInput, setPageInput] = useState<string>("");
 
   const totalRows = table.getFilteredRowModel().rows.length;
   const currentPage = table.getState().pagination.pageIndex + 1;
@@ -29,15 +23,15 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
     const page = parseInt(inputValue);
     if (!isNaN(page) && page >= 1 && page <= totalPages) {
       table.setPageIndex(page - 1);
-      setPageInput(''); // Only clear after successful navigation
+      setPageInput(""); // Only clear after successful navigation
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleJumpToPage(pageInput);
-    } else if (e.key === 'Escape') {
-      setPageInput('');
+    } else if (e.key === "Escape") {
+      setPageInput("");
     }
   };
 
@@ -49,18 +43,18 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
 
   return (
     <div className="flex flex-col gap-4 px-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="text-sm text-muted-foreground">
+      <div className="text-muted-foreground text-sm">
         <p className="flex items-center gap-1">
           {totalRows === 0 ? (
             <span>No results</span>
           ) : (
             <>
               Showing
-              <span className="font-medium text-foreground">{startRow}</span>
+              <span className="text-foreground font-medium">{startRow}</span>
               to
-              <span className="font-medium text-foreground">{endRow}</span>
+              <span className="text-foreground font-medium">{endRow}</span>
               of
-              <span className="font-medium text-foreground">{totalRows}</span>
+              <span className="text-foreground font-medium">{totalRows}</span>
               results
             </>
           )}
@@ -77,7 +71,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
               table.setPageSize(Number(value));
             }}
           >
-            <SelectTrigger className="h-8 w-sidebar-collapsed transition-colors">
+            <SelectTrigger className="w-sidebar-collapsed h-8 transition-colors">
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">
@@ -104,9 +98,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             className="h-8 w-[60px]"
             title={`Enter a page number between 1 and ${totalPages}`}
           />
-          <span className="text-sm text-muted-foreground">
-            of {totalPages}
-          </span>
+          <span className="text-muted-foreground text-sm">of {totalPages}</span>
         </div>
 
         {/* Navigation buttons */}
@@ -114,7 +106,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 transition-colors hover:bg-muted"
+            className="hover:bg-muted h-8 w-8 transition-colors"
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
             title="Go to first page"
@@ -125,7 +117,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 transition-colors hover:bg-muted"
+            className="hover:bg-muted h-8 w-8 transition-colors"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
             title="Previous page"
@@ -136,7 +128,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 transition-colors hover:bg-muted"
+            className="hover:bg-muted h-8 w-8 transition-colors"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
             title="Next page"
@@ -147,7 +139,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 transition-colors hover:bg-muted"
+            className="hover:bg-muted h-8 w-8 transition-colors"
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
             disabled={!table.getCanNextPage()}
             title="Go to last page"

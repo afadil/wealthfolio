@@ -1,4 +1,4 @@
-import type { EventCallback, UnlistenFn } from '@/adapters';
+import type { EventCallback, UnlistenFn } from "@/adapters";
 import {
   getRunEnv,
   RUN_ENV,
@@ -6,7 +6,7 @@ import {
   listenFileDropHoverTauri,
   listenFileDropTauri,
   logger,
-} from '@/adapters';
+} from "@/adapters";
 
 // listenImportFileDropHover
 export const listenImportFileDropHover = async <T>(
@@ -22,7 +22,7 @@ export const listenImportFileDropHover = async <T>(
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen tauri://file-drop-hover.');
+    logger.error("Error listen tauri://file-drop-hover.");
     throw error;
   }
 };
@@ -39,7 +39,7 @@ export const listenImportFileDrop = async <T>(handler: EventCallback<T>): Promis
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen tauri://file-drop.');
+    logger.error("Error listen tauri://file-drop.");
     throw error;
   }
 };
@@ -58,7 +58,7 @@ export const listenImportFileDropCancelled = async <T>(
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen tauri://file-drop-cancelled.');
+    logger.error("Error listen tauri://file-drop-cancelled.");
     throw error;
   }
 };

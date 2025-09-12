@@ -1,4 +1,4 @@
-import { Goal, GoalAllocation, AccountValuation } from '@wealthfolio/addon-sdk';
+import { Goal, GoalAllocation, AccountValuation } from "@wealthfolio/addon-sdk";
 
 export interface GoalProgress {
   name: string;
@@ -23,7 +23,7 @@ export function calculateGoalProgress(
   }
 
   // Determine base currency (assuming consistency across account valuations data)
-  const baseCurrency = accountsValuations[0].baseCurrency || 'USD';
+  const baseCurrency = accountsValuations[0].baseCurrency || "USD";
 
   // Create a map of accountId to totalValue in baseCurrency for quick lookup
   const accountValueMap = new Map<string, number>();
@@ -56,10 +56,10 @@ export function calculateGoalProgress(
     }, 0);
 
     // Calculate progress percentage (base currency vs base currency)
-    const progress = goal.targetAmount > 0 ? (totalAllocatedValue / goal.targetAmount) : 0;
+    const progress = goal.targetAmount > 0 ? totalAllocatedValue / goal.targetAmount : 0;
 
     return {
-      name: goal.title, 
+      name: goal.title,
       targetValue: goal.targetAmount, // Base Currency
       currentValue: totalAllocatedValue, // Base Currency
       progress: progress,

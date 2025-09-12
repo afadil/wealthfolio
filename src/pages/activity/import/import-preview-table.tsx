@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -13,9 +13,9 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
+} from "@tanstack/react-table";
 
-import { Icons } from '@/components/ui/icons';
+import { Icons } from "@/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -23,17 +23,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
-import { DataTableFacetedFilterProps } from '@/components/ui/data-table/data-table-faceted-filter';
-import type { Account, ActivityImport } from '@/lib/types';
-import { formatAmount } from '@wealthfolio/ui';
-import { formatDateTime, toPascalCase, cn } from '@/lib/utils';
-import { DataTablePagination } from '@/components/ui/data-table/data-table-pagination';
-import { Badge } from '@/components/ui/badge';
-import { motion } from 'framer-motion';
+} from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
+import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
+import type { Account, ActivityImport } from "@/lib/types";
+import { formatAmount } from "@wealthfolio/ui";
+import { formatDateTime, toPascalCase, cn } from "@/lib/utils";
+import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 
 // Helper function to check if a field has errors
 const hasFieldError = (activity: ActivityImport, fieldName: string): boolean => {
@@ -51,7 +51,7 @@ const getFieldErrorMessage = (activity: ActivityImport, fieldName: string): stri
 // Helper function to safely format numbers, handling NaN/null/undefined values
 const safeFormatAmount = (value: number | null | undefined, currency: string): string => {
   if (value === null || value === undefined || isNaN(value)) {
-    return '-';
+    return "-";
   }
   return formatAmount(value, currency);
 };
@@ -59,25 +59,31 @@ const safeFormatAmount = (value: number | null | undefined, currency: string): s
 // Helper function to safely display number values
 const safeDisplayNumber = (value: number | null | undefined): string => {
   if (value === null || value === undefined || isNaN(value)) {
-    return '-';
+    return "-";
   }
   return value.toString();
 };
 
-export const ImportPreviewTable = ({ activities, accounts }: { activities: ActivityImport[], accounts: Account[] }) => {
+export const ImportPreviewTable = ({
+  activities,
+  accounts,
+}: {
+  activities: ActivityImport[];
+  accounts: Account[];
+}) => {
   const [sorting, setSorting] = useState<SortingState>([
     {
-      id: 'lineNumber',
+      id: "lineNumber",
       desc: false,
     },
   ]);
-  
+
   // Determine initial column filters based on whether activities have errors
   const initialColumnFilters = useMemo<ColumnFiltersState>(() => {
-    const hasActivitiesWithErrors = activities.some(activity => !activity.isValid);
-    return hasActivitiesWithErrors ? [{ id: 'isValid', value: ['false'] }] : [];
+    const hasActivitiesWithErrors = activities.some((activity) => !activity.isValid);
+    return hasActivitiesWithErrors ? [{ id: "isValid", value: ["false"] }] : [];
   }, [activities]);
-  
+
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(initialColumnFilters);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     symbolName: false,
@@ -108,16 +114,16 @@ export const ImportPreviewTable = ({ activities, accounts }: { activities: Activ
 
   const filters = [
     {
-      id: 'isValid',
-      title: 'Status',
+      id: "isValid",
+      title: "Status",
       options: [
-        { label: 'Error', value: 'false' },
-        { label: 'Valid', value: 'true' },
+        { label: "Error", value: "false" },
+        { label: "Valid", value: "true" },
       ],
     },
     {
-      id: 'activityType',
-      title: 'Type',
+      id: "activityType",
+      title: "Type",
       options: activitiesType,
     },
   ] satisfies DataTableFacetedFilterProps<ActivityImport, string>[];
@@ -171,22 +177,22 @@ export const ImportPreviewTable = ({ activities, accounts }: { activities: Activ
                     transition={{ duration: 0.2, delay: index * 0.03 }}
                     key={row.id}
                     className={cn(
-                      'group transition-colors hover:bg-muted/50 dark:hover:bg-muted/10',
-                      row.getValue('isValid')
+                      "group hover:bg-muted/50 dark:hover:bg-muted/10 transition-colors",
+                      row.getValue("isValid")
                         ? index % 2 === 0
-                          ? 'bg-background'
-                          : 'bg-muted/20'
-                        : 'bg-destructive/5 dark:bg-destructive/10',
+                          ? "bg-background"
+                          : "bg-muted/20"
+                        : "bg-destructive/5 dark:bg-destructive/10",
                     )}
-                    data-state={row.getValue('isValid') ? 'valid' : 'invalid'}
+                    data-state={row.getValue("isValid") ? "valid" : "invalid"}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
                         className={cn(
-                          'relative py-2 px-4',
-                          cell.column.id === 'isValid' &&
-                            'sticky left-0 z-20 border-r border-border bg-muted/30 p-2 w-[60px]',
+                          "relative px-4 py-2",
+                          cell.column.id === "isValid" &&
+                            "border-border bg-muted/30 sticky left-0 z-20 w-[60px] border-r p-2",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -198,8 +204,8 @@ export const ImportPreviewTable = ({ activities, accounts }: { activities: Activ
                 <TableRow>
                   <TableCell colSpan={table.getAllColumns().length} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center space-y-2 py-8">
-                      <Icons.FileText className="h-10 w-10 text-muted-foreground opacity-40" />
-                      <p className="text-sm text-muted-foreground">No activities found</p>
+                      <Icons.FileText className="text-muted-foreground h-10 w-10 opacity-40" />
+                      <p className="text-muted-foreground text-sm">No activities found</p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -232,16 +238,14 @@ const ErrorCell = ({
     <TooltipProvider>
       <Tooltip delayDuration={30}>
         <TooltipTrigger asChild>
-          <div className="absolute inset-0 cursor-help bg-destructive/10">
-            <div className="relative h-full w-full flex items-center justify-between px-4 py-2">
-              <div className="flex-1 mr-2">{children}</div>
-              <Icons.AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+          <div className="bg-destructive/10 absolute inset-0 cursor-help">
+            <div className="relative flex h-full w-full items-center justify-between px-4 py-2">
+              <div className="mr-2 flex-1">{children}</div>
+              <Icons.AlertCircle className="text-destructive h-3.5 w-3.5 shrink-0" />
             </div>
           </div>
         </TooltipTrigger>
-        <TooltipContent
-          className="max-w-[400px] space-y-2 border-none bg-destructive p-3 text-destructive-foreground shadow-lg dark:border-destructive"
-        >
+        <TooltipContent className="bg-destructive text-destructive-foreground dark:border-destructive max-w-[400px] space-y-2 border-none p-3 shadow-lg">
           <ul className="list-disc space-y-1 pl-5 text-sm">
             {errorMessages.map((error, index) => (
               <li key={index}>{error}</li>
@@ -253,19 +257,18 @@ const ErrorCell = ({
   );
 };
 
-
 function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
   return [
     {
-      id: 'lineNumber',
-      accessorKey: 'lineNumber',
+      id: "lineNumber",
+      accessorKey: "lineNumber",
     },
     {
-      id: 'isValid',
-      accessorKey: 'isValid',
+      id: "isValid",
+      accessorKey: "isValid",
       header: () => <span className="sr-only">Status</span>,
       cell: ({ row }) => {
-        const isValid = row.getValue('isValid') as boolean;
+        const isValid = row.getValue("isValid") as boolean;
         const errors = row.original.errors || {};
         const lineNumber = row.original.lineNumber;
 
@@ -275,27 +278,31 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         );
 
         return isValid ? (
-          <div className="flex items-center gap-1 text-xs w-[60px]">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-success/20 text-success">
+          <div className="flex w-[60px] items-center gap-1 text-xs">
+            <div className="bg-success/20 text-success flex h-5 w-5 items-center justify-center rounded-full">
               <Icons.CheckCircle className="h-3.5 w-3.5" />
             </div>
-            <span className="text-xs text-muted-foreground">{String(lineNumber).padStart(2, '0')}</span>
+            <span className="text-muted-foreground text-xs">
+              {String(lineNumber).padStart(2, "0")}
+            </span>
           </div>
         ) : (
           <TooltipProvider>
             <Tooltip delayDuration={30}>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 text-xs w-[60px] cursor-help">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                <div className="flex w-[60px] cursor-help items-center gap-1 text-xs">
+                  <div className="bg-destructive/20 text-destructive flex h-5 w-5 items-center justify-center rounded-full">
                     <Icons.XCircle className="h-3.5 w-3.5" />
                   </div>
-                  <span className="text-xs text-muted-foreground">{String(lineNumber).padStart(2, '0')}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {String(lineNumber).padStart(2, "0")}
+                  </span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent 
+              <TooltipContent
                 side="right"
                 sideOffset={10}
-                className="max-w-xs border-none bg-destructive p-3 text-destructive-foreground"
+                className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
               >
                 <h4 className="mb-2 font-medium">Validation Errors</h4>
                 <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
@@ -312,7 +319,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       },
       filterFn: (row, id, filterValue: string[]) => {
         const isValid = row.getValue(id) as boolean;
-        const filterBoolean = filterValue[0] === 'true';
+        const filterBoolean = filterValue[0] === "true";
         return isValid === filterBoolean;
       },
       sortingFn: (rowA, rowB, id) => {
@@ -322,51 +329,51 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       },
     },
     {
-      id: 'account',
-      accessorKey: 'account',
+      id: "account",
+      accessorKey: "account",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
       cell: ({ row }) => {
         const accountId = row.original.accountId as string;
-        const hasError = hasFieldError(row.original, 'accountId');
-        const errorMessages = getFieldErrorMessage(row.original, 'accountId');
+        const hasError = hasFieldError(row.original, "accountId");
+        const errorMessages = getFieldErrorMessage(row.original, "accountId");
         const account = accounts.find((acc) => acc.id === accountId);
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <Badge variant="outline" className="font-medium">
-              {account?.name || '-'}
+              {account?.name || "-"}
             </Badge>
           </ErrorCell>
         );
       },
     },
     {
-      id: 'date',
-      accessorKey: 'date',
+      id: "date",
+      accessorKey: "date",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
       cell: ({ row }) => {
-        const formattedDate = formatDateTime(row.getValue('date'));
-        const hasError = hasFieldError(row.original, 'date');
-        const errorMessages = getFieldErrorMessage(row.original, 'date');
+        const formattedDate = formatDateTime(row.getValue("date"));
+        const hasError = hasFieldError(row.original, "date");
+        const errorMessages = getFieldErrorMessage(row.original, "date");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="flex flex-col">
               <span className="text-xs">{formattedDate.date}</span>
-              <span className="text-xs text-muted-foreground">{formattedDate.time}</span>
+              <span className="text-muted-foreground text-xs">{formattedDate.time}</span>
             </div>
           </ErrorCell>
         );
       },
     },
     {
-      id: 'activityType',
-      accessorKey: 'activityType',
+      id: "activityType",
+      accessorKey: "activityType",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
       cell: ({ row }) => {
-        const type = row.getValue('activityType') as string;
-        const hasError = hasFieldError(row.original, 'activityType');
-        const errorMessages = getFieldErrorMessage(row.original, 'activityType');
+        const type = row.getValue("activityType") as string;
+        const hasError = hasFieldError(row.original, "activityType");
+        const errorMessages = getFieldErrorMessage(row.original, "activityType");
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <Badge variant="outline">{type}</Badge>
@@ -378,13 +385,13 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       },
     },
     {
-      id: 'symbol',
-      accessorKey: 'symbol',
+      id: "symbol",
+      accessorKey: "symbol",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
       cell: ({ row }) => {
-        const hasError = hasFieldError(row.original, 'symbol');
-        const errorMessages = getFieldErrorMessage(row.original, 'symbol');
-        const symbol = row.getValue('symbol') as String;
+        const hasError = hasFieldError(row.original, "symbol");
+        const errorMessages = getFieldErrorMessage(row.original, "symbol");
+        const symbol = row.getValue("symbol") as String;
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
@@ -393,7 +400,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
                 {symbol}
               </Badge>
             ) : (
-              '-'
+              "-"
             )}
           </ErrorCell>
         );
@@ -406,47 +413,47 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       enableHiding: false,
     },
     {
-      id: 'quantity',
-      accessorKey: 'quantity',
+      id: "quantity",
+      accessorKey: "quantity",
       enableHiding: false,
       header: ({ column }) => (
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue('activityType') as string;
-        const quantity = row.getValue('quantity') as number;
-        const hasError = hasFieldError(row.original, 'quantity');
-        const errorMessages = getFieldErrorMessage(row.original, 'quantity');
+        const activityType = row.getValue("activityType") as string;
+        const quantity = row.getValue("quantity") as number;
+        const hasError = hasFieldError(row.original, "quantity");
+        const errorMessages = getFieldErrorMessage(row.original, "quantity");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === 'SPLIT' ? '-' : safeDisplayNumber(quantity)}
+              {activityType === "SPLIT" ? "-" : safeDisplayNumber(quantity)}
             </div>
           </ErrorCell>
         );
       },
     },
     {
-      id: 'unitPrice',
-      accessorKey: 'unitPrice',
+      id: "unitPrice",
+      accessorKey: "unitPrice",
       enableHiding: false,
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Price" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue('activityType') as string;
-        const unitPrice = row.getValue('unitPrice') as number;
-        const currency = (row.getValue('currency') as string) || 'USD';
-        const hasError = hasFieldError(row.original, 'unitPrice');
-        const errorMessages = getFieldErrorMessage(row.original, 'unitPrice');
+        const activityType = row.getValue("activityType") as string;
+        const unitPrice = row.getValue("unitPrice") as number;
+        const currency = (row.getValue("currency") as string) || "USD";
+        const hasError = hasFieldError(row.original, "unitPrice");
+        const errorMessages = getFieldErrorMessage(row.original, "unitPrice");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === 'SPLIT'
-                ? (isNaN(unitPrice) ? '-' : unitPrice.toFixed(0)) + ' : 1'
+              {activityType === "SPLIT"
+                ? (isNaN(unitPrice) ? "-" : unitPrice.toFixed(0)) + " : 1"
                 : safeFormatAmount(unitPrice, currency)}
             </div>
           </ErrorCell>
@@ -454,50 +461,48 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       },
     },
     {
-      id: 'amount',
-      accessorKey: 'amount',
+      id: "amount",
+      accessorKey: "amount",
       header: ({ column }) => (
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue('activityType') as string;
-        const amount = row.getValue('amount') as number;
-        const currency = (row.getValue('currency') as string) || 'USD';
+        const activityType = row.getValue("activityType") as string;
+        const amount = row.getValue("amount") as number;
+        const currency = (row.getValue("currency") as string) || "USD";
 
         // Check if amount field has errors directly
-        const hasError = hasFieldError(row.original, 'amount');
-        const errorMessages = getFieldErrorMessage(row.original, 'amount');
+        const hasError = hasFieldError(row.original, "amount");
+        const errorMessages = getFieldErrorMessage(row.original, "amount");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === 'SPLIT'
-                ? '-'
-                : safeFormatAmount(amount, currency)}
+              {activityType === "SPLIT" ? "-" : safeFormatAmount(amount, currency)}
             </div>
           </ErrorCell>
         );
       },
     },
     {
-      id: 'fee',
-      accessorKey: 'fee',
+      id: "fee",
+      accessorKey: "fee",
       enableHiding: false,
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue('activityType') as string;
-        const fee = row.getValue('fee') as number;
-        const currency = (row.getValue('currency') as string) || 'USD';
-        const hasError = hasFieldError(row.original, 'fee');
-        const errorMessages = getFieldErrorMessage(row.original, 'fee');
+        const activityType = row.getValue("activityType") as string;
+        const fee = row.getValue("fee") as number;
+        const currency = (row.getValue("currency") as string) || "USD";
+        const hasError = hasFieldError(row.original, "fee");
+        const errorMessages = getFieldErrorMessage(row.original, "fee");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <div className="text-right tabular-nums text-muted-foreground">
-              {activityType === 'SPLIT' ? '-' : safeFormatAmount(fee, currency)}
+            <div className="text-muted-foreground text-right tabular-nums">
+              {activityType === "SPLIT" ? "-" : safeFormatAmount(fee, currency)}
             </div>
           </ErrorCell>
         );
@@ -505,13 +510,13 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     },
 
     {
-      id: 'currency',
-      accessorKey: 'currency',
+      id: "currency",
+      accessorKey: "currency",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
       cell: ({ row }) => {
-        const hasError = hasFieldError(row.original, 'currency');
-        const errorMessages = getFieldErrorMessage(row.original, 'currency');
-        const currency = (row.getValue('currency') as string) || '-';
+        const hasError = hasFieldError(row.original, "currency");
+        const errorMessages = getFieldErrorMessage(row.original, "currency");
+        const currency = (row.getValue("currency") as string) || "-";
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>

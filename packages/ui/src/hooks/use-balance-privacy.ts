@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
-const STORAGE_KEY = 'privacy-settings';
-const EVENT_NAME = 'wf:privacy-changed';
+const STORAGE_KEY = "privacy-settings";
+const EVENT_NAME = "wf:privacy-changed";
 
 export interface BalancePrivacyHook {
   isBalanceHidden: boolean;
@@ -10,20 +10,20 @@ export interface BalancePrivacyHook {
 
 /**
  * Custom hook for managing balance privacy across the Wealthfolio ecosystem.
- * 
+ *
  * This hook provides a consistent way to handle balance privacy in both the main app
  * and addons by using localStorage as the source of truth. It automatically syncs
  * across different contexts when privacy settings change.
- * 
+ *
  * @returns Object containing isBalanceHidden state and toggleBalanceVisibility function
- * 
+ *
  * @example
  * ```tsx
  * import { useBalancePrivacy } from '@wealthfolio/ui';
- * 
+ *
  * function MyComponent() {
  *   const { isBalanceHidden, toggleBalanceVisibility } = useBalancePrivacy();
- *   
+ *
  *   return (
  *     <div>
  *       <span>{isBalanceHidden ? '••••' : '$1,234.56'}</span>
@@ -61,7 +61,7 @@ export function useBalancePrivacy(): BalancePrivacyHook {
     const handleLocalEvent = (e: Event) => {
       try {
         const detail = (e as CustomEvent).detail as { isBalanceHidden?: boolean } | undefined;
-        if (detail && typeof detail.isBalanceHidden === 'boolean') {
+        if (detail && typeof detail.isBalanceHidden === "boolean") {
           setIsBalanceHidden(detail.isBalanceHidden);
         }
       } catch {
@@ -69,11 +69,11 @@ export function useBalancePrivacy(): BalancePrivacyHook {
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
     window.addEventListener(EVENT_NAME, handleLocalEvent as EventListener);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener(EVENT_NAME, handleLocalEvent as EventListener);
     };
   }, []);
@@ -85,9 +85,7 @@ export function useBalancePrivacy(): BalancePrivacyHook {
 
     // Notify other hook instances in the same window immediately
     try {
-      window.dispatchEvent(
-        new CustomEvent(EVENT_NAME, { detail: { isBalanceHidden: newValue } })
-      );
+      window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { isBalanceHidden: newValue } }));
     } catch {
       // no-op
     }

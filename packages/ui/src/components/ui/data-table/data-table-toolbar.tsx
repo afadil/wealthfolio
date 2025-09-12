@@ -1,17 +1,17 @@
-import { Table } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Icons } from '@/components/ui/icons';
+import { Table } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Icons } from "@/components/ui/icons";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 
-import { DataTableFacetedFilter } from './data-table-faceted-filter';
-import type { DataTableFacetedFilterProps } from './data-table-faceted-filter';
-import { useEffect, useState } from 'react';
+import { DataTableFacetedFilter } from "./data-table-faceted-filter";
+import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
+import { useEffect, useState } from "react";
 
 interface ColumnMeta {
   label?: string;
@@ -39,9 +39,9 @@ export function DataTableToolbar<TData>({
         {searchBy && (
           <SearchInput
             placeholder="Search ..."
-            value={table.getState().globalFilter ?? ''}
+            value={table.getState().globalFilter ?? ""}
             onChange={(value) => table.setGlobalFilter(value)}
-            className="h-8 w-[150px] lg:w-[250px] shadow-[inset_0_0.5px_0.5px_rgba(0,0,0,0.06)] bg-muted/40 border-border/50"
+            className="bg-muted/40 border-border/50 h-8 w-[150px] shadow-[inset_0_0.5px_0.5px_rgba(0,0,0,0.06)] lg:w-[250px]"
           />
         )}
         {filters?.map((filter) => (
@@ -70,7 +70,11 @@ export function DataTableToolbar<TData>({
       {showColumnToggle && hideableColumns.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="ml-auto gap-1.5 rounded-md border-[1.5px] border-none bg-secondary/30 px-3 py-1 text-sm font-medium hover:bg-muted/80">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
+            >
               Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -104,7 +108,7 @@ function SearchInput({
   value: string | number;
   onChange: (value: string | number) => void;
   debounceTime?: number;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'>) {
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange">) {
   const [value, setValue] = useState(initialValue);
 
   useEffect(() => {
@@ -112,7 +116,7 @@ function SearchInput({
   }, [initialValue]);
 
   const handleKeyDown = (e: any) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       onChange(value); // Invoke onChange with the current value
     }
   };

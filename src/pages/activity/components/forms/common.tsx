@@ -1,22 +1,22 @@
-import { useFormContext } from 'react-hook-form';
-import { AccountSelectOption } from '../activity-form';
-import { FormField } from '@wealthfolio/ui';
-import { FormItem } from '@wealthfolio/ui';
-import { FormLabel } from '@wealthfolio/ui';
-import { FormControl } from '@wealthfolio/ui';
-import { FormMessage } from '@wealthfolio/ui';
-import { Select } from '@wealthfolio/ui';
-import { SelectContent } from '@wealthfolio/ui';
-import { SelectItem } from '@wealthfolio/ui';
-import { SelectTrigger } from '@wealthfolio/ui';
-import { SelectValue } from '@wealthfolio/ui';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { CurrencyInput } from '@wealthfolio/ui';
-import { DatePickerInput } from '@wealthfolio/ui';
-import { Textarea } from '@/components/ui/textarea';
-import TickerSearchInput from '@/components/ticker-search';
-import { DataSource } from '@/lib/constants';
+import { useFormContext } from "react-hook-form";
+import { AccountSelectOption } from "../activity-form";
+import { FormField } from "@wealthfolio/ui";
+import { FormItem } from "@wealthfolio/ui";
+import { FormLabel } from "@wealthfolio/ui";
+import { FormControl } from "@wealthfolio/ui";
+import { FormMessage } from "@wealthfolio/ui";
+import { Select } from "@wealthfolio/ui";
+import { SelectContent } from "@wealthfolio/ui";
+import { SelectItem } from "@wealthfolio/ui";
+import { SelectTrigger } from "@wealthfolio/ui";
+import { SelectValue } from "@wealthfolio/ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@wealthfolio/ui";
+import { DatePickerInput } from "@wealthfolio/ui";
+import { Textarea } from "@/components/ui/textarea";
+import TickerSearchInput from "@/components/ticker-search";
+import { DataSource } from "@/lib/constants";
 
 export interface ConfigurationCheckboxProps {
   showCurrencyOption?: boolean;
@@ -41,7 +41,7 @@ export const ConfigurationCheckbox = ({
                 <div className="flex items-center space-x-2">
                   <label
                     htmlFor="use-lookup-checkbox"
-                    className="cursor-pointer text-sm text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground cursor-pointer text-sm"
                   >
                     Skip Symbol Lookup
                   </label>
@@ -70,7 +70,7 @@ export const ConfigurationCheckbox = ({
                 <div className="flex items-center space-x-2">
                   <label
                     htmlFor="use-different-currency-checkbox"
-                    className="cursor-pointer text-sm text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground cursor-pointer text-sm"
                   >
                     Use Different Currency
                   </label>
@@ -92,7 +92,7 @@ export const ConfigurationCheckbox = ({
 
 export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
-  const showCurrency = watch('showCurrencySelect');
+  const showCurrency = watch("showCurrencySelect");
 
   return (
     <>
@@ -111,7 +111,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
                   {accounts.map((account) => (
                     <SelectItem value={account.value} key={account.value}>
                       {account.label}
-                      <span className="font-light text-muted-foreground">({account.currency})</span>
+                      <span className="text-muted-foreground font-light">({account.currency})</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -160,12 +160,12 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
           <FormItem>
             <FormLabel>Description</FormLabel>
             <FormControl>
-              <Textarea 
+              <Textarea
                 placeholder="Add an optional description or comment for this transaction..."
                 className="resize-none"
                 rows={3}
                 {...field}
-                value={field.value || ''}
+                value={field.value || ""}
               />
             </FormControl>
             <FormMessage />
@@ -195,4 +195,4 @@ export function AssetSymbolInput({ field, isManualAsset }: { field: any; isManua
       <FormMessage className="text-xs" />
     </FormItem>
   );
-} 
+}

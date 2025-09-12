@@ -35,8 +35,6 @@
   --color-ring: var(--ring);
 }
 
-
-
 @layer base {
   :root {
     --sidebar-background: 0 0% 98%;
@@ -60,8 +58,6 @@
   }
 }
 
-
-
 @layer base {
   * {
     @apply border-border;
@@ -70,4 +66,3 @@
     @apply bg-background text-foreground;
   }
 }
-

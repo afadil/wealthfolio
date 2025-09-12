@@ -1,12 +1,33 @@
 import React, { useMemo } from 'react';
 
-import { debounce } from 'lodash';
-import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { formatAmount } from '@wealthfolio/ui';
-import { formatDateTime } from '@/lib/utils';
+import { searchActivities } from '@/commands/activity';
+import { TickerAvatar } from '@/components/ticker-avatar';
 import { Badge } from '@/components/ui/badge';
+import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
+import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
+import { Icons } from '@/components/ui/icons';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  calculateActivityValue,
+  isCashActivity,
+  isCashTransfer,
+  isFeeActivity,
+  isIncomeActivity,
+  isSplitActivity,
+} from '@/lib/activity-utils';
+import { ActivityType, ActivityTypeNames } from '@/lib/constants';
+import { QueryKeys } from '@/lib/query-keys';
 import { Account, ActivityDetails, ActivitySearchResponse } from '@/lib/types';
-import { ActivityOperations } from './activity-operations';
+import { formatDateTime } from '@/lib/utils';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -16,25 +37,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { searchActivities } from '@/commands/activity';
-import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Icons } from '@/components/ui/icons';
+import { formatAmount } from '@wealthfolio/ui';
+import { debounce } from 'lodash';
 import { Link } from 'react-router-dom';
-import { QueryKeys } from '@/lib/query-keys';
-import { isCashActivity, isCashTransfer, calculateActivityValue, isIncomeActivity, isFeeActivity, isSplitActivity } from '@/lib/activity-utils';
-import { ActivityType, ActivityTypeNames } from '@/lib/constants';
 import { useActivityMutations } from '../hooks/use-activity-mutations';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { TickerAvatar } from '@/components/ticker-avatar';
+import { ActivityOperations } from './activity-operations';
 
 const fetchSize = 25;
 
@@ -42,7 +49,6 @@ const activityTypeOptions = Object.entries(ActivityTypeNames).map(([value, label
   label,
   value: value as ActivityType,
 }));
-
 
 export const ActivityTable = ({
   accounts,
@@ -69,7 +75,7 @@ export const ActivityTable = ({
 
   const columns: ColumnDef<ActivityDetails>[] = useMemo(
     () => [
-       {
+      {
         id: 'assetSymbol',
         accessorKey: 'assetSymbol',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
@@ -82,7 +88,7 @@ export const ActivityTable = ({
           const isCash = symbol.startsWith('$CASH');
           const content = (
             <div className="flex items-center">
-              <TickerAvatar symbol={avatarSymbol} className="w-8 h-8 mr-2" />
+              <TickerAvatar symbol={avatarSymbol} className="mr-2 h-8 w-8" />
               <div className="flex flex-col">
                 <span className="font-medium">{displaySymbol}</span>
                 <span className="text-xs text-muted-foreground">
@@ -97,10 +103,7 @@ export const ActivityTable = ({
           }
 
           return (
-            <Link 
-              to={`/holdings/${encodeURIComponent(symbol)}`} 
-              className="block p-1 -m-1"
-            >
+            <Link to={`/holdings/${encodeURIComponent(symbol)}`} className="-m-1 block p-1">
               {content}
             </Link>
           );
@@ -143,7 +146,7 @@ export const ActivityTable = ({
                 : 'destructive';
           return (
             <div className="flex items-center text-sm">
-              <Badge className="text-xs font-normal whitespace-nowrap" variant={badgeVariant}>
+              <Badge className="whitespace-nowrap text-xs font-normal" variant={badgeVariant}>
                 {ActivityTypeNames[activityType as ActivityType]}
               </Badge>
             </div>
@@ -205,11 +208,15 @@ export const ActivityTable = ({
           if (activityType === 'SPLIT') {
             return <div className="text-right">{Number(amount).toFixed(0)} : 1</div>;
           }
-          if (isCashActivity(activityType) || isCashTransfer(activityType, assetSymbol) || isIncomeActivity(activityType)) {
+          if (
+            isCashActivity(activityType) ||
+            isCashTransfer(activityType, assetSymbol) ||
+            isIncomeActivity(activityType)
+          ) {
             return <div className="text-right">{formatAmount(amount, currency)}</div>;
           }
 
-            return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
+          return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },
       {
@@ -297,7 +304,14 @@ export const ActivityTable = ({
       {
         id: 'actions',
         cell: ({ row }) => {
-          return <ActivityOperations row={row} onEdit={handleEdit} onDelete={handleDelete} onDuplicate={handleDuplicate} />;
+          return (
+            <ActivityOperations
+              row={row}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+            />
+          );
         },
         enableHiding: false,
       },
@@ -306,11 +320,13 @@ export const ActivityTable = ({
   );
 
   const accountOptions =
-    accounts?.filter(account => account.isActive).map((account) => ({
-      label: account.name + '-(' + account.currency + ')',
-      value: account.id,
-      currency: account.currency,
-    })) || [];
+    accounts
+      ?.filter((account) => account.isActive)
+      .map((account) => ({
+        label: account.name + '-(' + account.currency + ')',
+        value: account.id,
+        currency: account.currency,
+      })) || [];
 
   const filtersOptions = [
     {
@@ -400,7 +416,7 @@ export const ActivityTable = ({
         accountCurrency: false,
         assetName: false,
         currency: false,
-      }
+      },
     },
     state: {
       sorting,
@@ -418,38 +434,46 @@ export const ActivityTable = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center shrink-0 mb-2">
+    <div className="flex h-full flex-col">
+      <div className="mb-2 flex shrink-0 items-center justify-between">
         <DataTableToolbar table={table} searchBy="assetSymbol" filters={filtersOptions} />
         <ToggleGroup
           type="single"
           size="sm"
-          value={isEditable ? "edit" : "view"}
+          value={isEditable ? 'edit' : 'view'}
           onValueChange={(value: string) => {
-            if (value === "edit") {
+            if (value === 'edit') {
               onToggleEditable(true);
-            } else if (value === "view") {
+            } else if (value === 'view') {
               onToggleEditable(false);
             }
           }}
           aria-label="Table view mode"
           className="rounded-md bg-muted p-0.5"
         >
-          <ToggleGroupItem value="view" aria-label="View mode" className="rounded-md px-2.5 py-1.5 text-xs data-[state=on]:bg-background data-[state=on]:text-accent-foreground data-[state=off]:text-muted-foreground data-[state=off]:bg-transparent hover:bg-muted/50 hover:text-accent-foreground transition-colors">
+          <ToggleGroupItem
+            value="view"
+            aria-label="View mode"
+            className="rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50 hover:text-accent-foreground data-[state=off]:bg-transparent data-[state=on]:bg-background data-[state=off]:text-muted-foreground data-[state=on]:text-accent-foreground"
+          >
             <Icons.Rows3 className="h-4 w-4" />
           </ToggleGroupItem>
-          <ToggleGroupItem value="edit" aria-label="Edit mode" className="rounded-md px-2.5 py-1.5 text-xs data-[state=on]:bg-background data-[state=on]:text-accent-foreground data-[state=off]:text-muted-foreground data-[state=off]:bg-transparent hover:bg-muted/50 hover:text-accent-foreground transition-colors">
+          <ToggleGroupItem
+            value="edit"
+            aria-label="Edit mode"
+            className="rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50 hover:text-accent-foreground data-[state=off]:bg-transparent data-[state=on]:bg-background data-[state=off]:text-muted-foreground data-[state=on]:text-accent-foreground"
+          >
             <Icons.Grid3x3 className="h-4 w-4" />
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
 
       <div
-        className="flex-1 min-h-0 overflow-auto rounded-md border"
+        className="min-h-0 flex-1 overflow-auto rounded-md border"
         onScroll={(e) => fetchMoreOnBottomReachedDebounced(e.target as HTMLDivElement)}
       >
         <Table>
-          <TableHeader className="bg-muted-foreground/5 sticky top-0 z-10">
+          <TableHeader className="sticky top-0 z-10 bg-muted-foreground/5">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -488,7 +512,7 @@ export const ActivityTable = ({
           </TableBody>
         </Table>
       </div>
-      <div className="flex pl-2 text-xs text-muted-foreground shrink-0 mt-2">
+      <div className="mt-2 flex shrink-0 pl-2 text-xs text-muted-foreground">
         {isFetching ? <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
         {totalFetched} / {totalDBRowCount} activities
       </div>

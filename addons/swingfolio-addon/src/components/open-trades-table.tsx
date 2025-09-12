@@ -1,6 +1,6 @@
-import { 
-  GainAmount, 
-  GainPercent, 
+import {
+  GainAmount,
+  GainPercent,
   Badge,
   Table,
   TableBody,
@@ -9,13 +9,13 @@ import {
   TableHeader,
   TableRow,
   Icons,
-  EmptyPlaceholder
-} from "@wealthfolio/ui"
-import { TickerAvatar } from "./ticker-avatar"
-import type { OpenPosition } from "../types"
+  EmptyPlaceholder,
+} from '@wealthfolio/ui';
+import { TickerAvatar } from './ticker-avatar';
+import type { OpenPosition } from '../types';
 
 interface OpenTradesTableProps {
-  positions: OpenPosition[]
+  positions: OpenPosition[];
 }
 
 export function OpenTradesTable({ positions }: OpenTradesTableProps) {
@@ -29,7 +29,7 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
           description="You don't have any open swing trading positions at the moment. Closed trades will appear in your performance metrics."
         />
       </div>
-    )
+    );
   }
 
   return (
@@ -52,30 +52,31 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
             {positions.map((position) => (
               <TableRow key={position.id}>
                 <TableCell>
-                  <TickerAvatar symbol={position.symbol} className="w-8 h-8" />
+                  <TickerAvatar symbol={position.symbol} className="h-8 w-8" />
                 </TableCell>
                 <TableCell>
                   <div>
                     <div className="font-medium">{position.symbol}</div>
                     {position.assetName && (
-                      <div className="text-xs text-muted-foreground truncate max-w-[120px]" title={position.assetName}>
+                      <div
+                        className="text-muted-foreground max-w-[120px] truncate text-xs"
+                        title={position.assetName}
+                      >
                         {position.assetName}
                       </div>
                     )}
                   </div>
                 </TableCell>
+                <TableCell className="text-right">{position.quantity.toLocaleString()}</TableCell>
                 <TableCell className="text-right">
-                  {position.quantity.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  {position.averageCost.toLocaleString("en-US", {
-                    style: "currency",
+                  {position.averageCost.toLocaleString('en-US', {
+                    style: 'currency',
                     currency: position.currency,
                   })}
                 </TableCell>
                 <TableCell className="text-right">
-                  {position.currentPrice.toLocaleString("en-US", {
-                    style: "currency",
+                  {position.currentPrice.toLocaleString('en-US', {
+                    style: 'currency',
                     currency: position.currency,
                   })}
                 </TableCell>
@@ -96,5 +97,5 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
         </Table>
       </div>
     </div>
-  )
+  );
 }

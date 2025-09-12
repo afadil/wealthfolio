@@ -93,7 +93,7 @@ import {
   Camera,
   Wifi,
   Smartphone,
-} from 'lucide-react';
+} from "lucide-react";
 
 export type Icon = LucideIcon;
 
@@ -195,8 +195,8 @@ export const Icons = {
   Dashboard: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -212,8 +212,8 @@ export const Icons = {
   Performance: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -226,8 +226,8 @@ export const Icons = {
   Goals: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -240,16 +240,13 @@ export const Icons = {
   Database: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
     >
-      <path
-        d="M216,80c0,26.51-39.4,48-88,48S40,106.51,40,80s39.4-48,88-48S216,53.49,216,80Z"
-        opacity="0.2"
-      ></path>
+      <path d="M216,80c0,26.51-39.4,48-88,48S40,106.51,40,80s39.4-48,88-48S216,53.49,216,80Z" opacity="0.2"></path>
       <path d="M128,24C74.17,24,32,48.6,32,80v96c0,31.4,42.17,56,96,56s96-24.6,96-56V80C224,48.6,181.83,24,128,24Zm80,104c0,9.62-7.88,19.43-21.61,26.92C170.93,163.35,150.19,168,128,168s-42.93-4.65-58.39-13.08C55.88,147.43,48,137.62,48,128V111.36c17.06,15,46.23,24.64,80,24.64s62.94-9.68,80-24.64ZM69.61,53.08C85.07,44.65,105.81,40,128,40s42.93,4.65,58.39,13.08C200.12,60.57,208,70.38,208,80s-7.88,19.43-21.61,26.92C170.93,115.35,150.19,120,128,120s-42.93-4.65-58.39-13.08C55.88,99.43,48,89.62,48,80S55.88,60.57,69.61,53.08ZM186.39,202.92C170.93,211.35,150.19,216,128,216s-42.93-4.65-58.39-13.08C55.88,195.43,48,185.62,48,176V159.36c17.06,15,46.23,24.64,80,24.64s62.94-9.68,80-24.64V176C208,185.62,200.12,195.43,186.39,202.92Z"></path>
     </svg>
   ),
@@ -301,16 +298,13 @@ export const Icons = {
   Files: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
     >
-      <path
-        d="M208,72V184a8,8,0,0,1-8,8H176V104L136,64H80V40a8,8,0,0,1,8-8h80Z"
-        opacity="0.2"
-      ></path>
+      <path d="M208,72V184a8,8,0,0,1-8,8H176V104L136,64H80V40a8,8,0,0,1,8-8h80Z" opacity="0.2"></path>
       <path d="M213.66,66.34l-40-40A8,8,0,0,0,168,24H88A16,16,0,0,0,72,40V56H56A16,16,0,0,0,40,72V216a16,16,0,0,0,16,16H168a16,16,0,0,0,16-16V200h16a16,16,0,0,0,16-16V72A8,8,0,0,0,213.66,66.34ZM168,216H56V72h76.69L168,107.31v84.53c0,.06,0,.11,0,.16s0,.1,0,.16V216Zm32-32H184V104a8,8,0,0,0-2.34-5.66l-40-40A8,8,0,0,0,136,56H88V40h76.69L200,75.31Zm-56-32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,152Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,184Z"></path>
     </svg>
   ),
@@ -318,8 +312,8 @@ export const Icons = {
   Holdings: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -335,8 +329,8 @@ export const Icons = {
   Activity: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -349,8 +343,8 @@ export const Icons = {
   Settings: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -366,8 +360,8 @@ export const Icons = {
   Invoice: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -380,8 +374,8 @@ export const Icons = {
   Income: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -395,14 +389,7 @@ export const Icons = {
   ),
 
   Logo: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="65"
-      height="65"
-      fill="none"
-      viewBox="0 0 65 65"
-      {...props}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="65" height="65" fill="none" viewBox="0 0 65 65" {...props}>
       <path
         fill="orange"
         d="M37 5c0 2.21-2.015 4-4.5 4S28 7.21 28 5s2.015-4 4.5-4S37 2.79 37 5zM56 13c0 2.21-2.015 4-4.5 4S47 15.21 47 13s2.015-4 4.5-4 4.5 1.79 4.5 4zM64 32.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM56 51.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM37 59.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18 52a5 5 0 11-10 0 5 5 0 0110 0zM10 32.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM17 13a4 4 0 11-8 0 4 4 0 018 0z"
@@ -421,8 +408,8 @@ export const Icons = {
   ChartBar: ({ size, absoluteStrokeWidth, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width={size || '32'}
-      height={size || '32'}
+      width={size || "32"}
+      height={size || "32"}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}

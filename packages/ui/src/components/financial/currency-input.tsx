@@ -1,26 +1,19 @@
-import { forwardRef, useState } from 'react';
-import { ChevronsUpDown, Check } from 'lucide-react';
-import type { ButtonProps } from '../ui/button';
-import { Button } from '../ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '../ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { ScrollArea } from '../ui/scroll-area';
-import { cn } from '../../lib/utils';
-import { worldCurrencies } from '../../lib/currencies';
+import { forwardRef, useState } from "react";
+import { ChevronsUpDown, Check } from "lucide-react";
+import type { ButtonProps } from "../ui/button";
+import { Button } from "../ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { ScrollArea } from "../ui/scroll-area";
+import { cn } from "../../lib/utils";
+import { worldCurrencies } from "../../lib/currencies";
 
 interface CurrencyInputCustomProps {
   value?: string;
   onChange: (value: string) => void;
 }
 
-type CurrencyInputProps = CurrencyInputCustomProps & Omit<ButtonProps, 'onChange' | 'value'>;
+type CurrencyInputProps = CurrencyInputCustomProps & Omit<ButtonProps, "onChange" | "value">;
 
 export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
   ({ value, onChange, className, ...props }, ref) => {
@@ -35,12 +28,10 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn('w-full justify-between rounded-md', !value && 'text-muted-foreground', className)}
+            className={cn("w-full justify-between rounded-md", !value && "text-muted-foreground", className)}
             {...props}
           >
-            {value
-              ? worldCurrencies.find((currency) => currency.value === value)?.label
-              : 'Select account currency'}
+            {value ? worldCurrencies.find((currency) => currency.value === value)?.label : "Select account currency"}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -62,10 +53,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                     >
                       {currency.label}
                       <Check
-                        className={cn(
-                          'ml-auto h-4 w-4',
-                          currency.value === value ? 'opacity-100' : 'opacity-0',
-                        )}
+                        className={cn("ml-auto h-4 w-4", currency.value === value ? "opacity-100" : "opacity-0")}
                       />
                     </CommandItem>
                   ))}
@@ -79,4 +67,4 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
   },
 );
 
-CurrencyInput.displayName = 'CurrencyInput';
+CurrencyInput.displayName = "CurrencyInput";

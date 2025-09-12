@@ -1,8 +1,13 @@
-import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
-import { ReactVersion } from '@wealthfolio/addon-sdk';
-import { createAddonContext, getDynamicNavItems, getDynamicRoutes, triggerAllDisableCallbacks } from '@/addons/addons-runtime-context';
-import { logger } from '@/adapters';
-import { getInstalledAddons, loadAddon as loadAddonRuntime } from '@/commands/addon';
+import type { AddonContext, AddonManifest } from "@wealthfolio/addon-sdk";
+import { ReactVersion } from "@wealthfolio/addon-sdk";
+import {
+  createAddonContext,
+  getDynamicNavItems,
+  getDynamicRoutes,
+  triggerAllDisableCallbacks,
+} from "@/addons/addons-runtime-context";
+import { logger } from "@/adapters";
+import { getInstalledAddons, loadAddon as loadAddonRuntime } from "@/commands/addon";
 
 interface AddonFile {
   path: string;
@@ -28,7 +33,7 @@ async function discoverAddons(): Promise<AddonFile[]> {
       addonFiles.push({
         path: `${addon.filePath}/${addon.metadata.main}`, // Construct the main file path
         manifestPath: `${addon.filePath}/manifest.json`, // Construct manifest path
-        manifest: addon.metadata
+        manifest: addon.metadata,
       });
     }
 
@@ -45,8 +50,10 @@ async function discoverAddons(): Promise<AddonFile[]> {
 function validateAddonCompatibility(manifest: AddonManifest): boolean {
   // Be lenient in web mode: warn on mismatch but allow load.
   // Future: implement proper semver compatibility if needed.
-  if (manifest.sdkVersion && manifest.sdkVersion !== '1.0.0') {
-    logger.warn(`Addon ${manifest.id} declares SDK ${manifest.sdkVersion}; host is 1.0.0. Proceeding with caution.`);
+  if (manifest.sdkVersion && manifest.sdkVersion !== "1.0.0") {
+    logger.warn(
+      `Addon ${manifest.id} declares SDK ${manifest.sdkVersion}; host is 1.0.0. Proceeding with caution.`,
+    );
   }
   return true;
 }
@@ -59,9 +66,11 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
   try {
     // Check if this addon ID has already been loaded in the current session
     if (loadedAddonIds.has(addonFile.manifest.id)) {
-      logger.warn(`Addon "${addonFile.manifest.name}" (ID: ${addonFile.manifest.id}) already loaded in this session. Skipping duplicate load.`);
+      logger.warn(
+        `Addon "${addonFile.manifest.name}" (ID: ${addonFile.manifest.id}) already loaded in this session. Skipping duplicate load.`,
+      );
       // Optionally, you might want to return true if already loaded implies success for the caller
-      return true; 
+      return true;
     }
 
     // Validate compatibility
@@ -71,13 +80,15 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     }
 
     // Load addon using Tauri command instead of direct file access
-        // Load addon for runtime execution using Tauri command
+    // Load addon for runtime execution using Tauri command
     const extractedAddon = await loadAddonRuntime(addonFile.manifest.id);
-    
+
     // Find the main file from the extracted addon files
-    const mainFile = extractedAddon.files.find(file => file.isMain);
+    const mainFile = extractedAddon.files.find((file) => file.isMain);
     if (!mainFile) {
-      logger.error(`Main file not found for addon ${addonFile.manifest.id}. Available files: ${extractedAddon.files.map(f => f.name).join(', ')}`);
+      logger.error(
+        `Main file not found for addon ${addonFile.manifest.id}. Available files: ${extractedAddon.files.map((f) => f.name).join(", ")}`,
+      );
       return false;
     }
 
@@ -85,63 +96,65 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
 
     // Extract permission data directly from manifest (already processed by Rust backend)
     const permissions = extractedAddon.metadata.permissions || [];
-    const detectedFunctions = permissions.flatMap(p => 
-      p.functions.filter((f: any) => f.isDetected).map((f: any) => f.name)
+    const detectedFunctions = permissions.flatMap((p) =>
+      p.functions.filter((f: any) => f.isDetected).map((f: any) => f.name),
     );
-    const detectedCategories = [...new Set(permissions.map(p => p.category))];
-    
-    logger.info(`Permissions for addon ${extractedAddon.metadata.id}: functions=[${detectedFunctions.join(',')}], categories=[${detectedCategories.join(',')}]`);
-    
+    const detectedCategories = [...new Set(permissions.map((p) => p.category))];
+
+    logger.info(
+      `Permissions for addon ${extractedAddon.metadata.id}: functions=[${detectedFunctions.join(",")}], categories=[${detectedCategories.join(",")}]`,
+    );
+
     // Runtime guards: Verify React singletons are available before addon execution
     if ((globalThis as any).React?.version && (globalThis as any).React.version !== ReactVersion) {
-      logger.warn(`⚠️ React version mismatch: host=${(globalThis as any).React.version} sdk=${ReactVersion}`);
+      logger.warn(
+        `⚠️ React version mismatch: host=${(globalThis as any).React.version} sdk=${ReactVersion}`,
+      );
     }
 
-    if (typeof (globalThis as any).ReactDOM?.createPortal !== 'function') {
-      throw new Error('Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.');
+    if (typeof (globalThis as any).ReactDOM?.createPortal !== "function") {
+      throw new Error(
+        "Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.",
+      );
     }
 
     // Create a Blob and an object URL
-    const blob = new Blob([addonCode], { type: 'text/javascript' });
+    const blob = new Blob([addonCode], { type: "text/javascript" });
     blobUrl = URL.createObjectURL(blob);
 
     // Dynamic import using the Blob URL
-    // The /* @vite-ignore */ comment might not be strictly necessary for blob URLs 
+    // The /* @vite-ignore */ comment might not be strictly necessary for blob URLs
     // but can be kept if vite shows warnings during build.
     const mod = await import(/* @vite-ignore */ blobUrl);
-    
-    
+
     // Robustly resolve the addon's enable() regardless of bundle style
     let enableFunction: any =
       // 1. ES‑module default export IS the enable function
-      (typeof mod.default === 'function' && mod.default) ||
-
+      (typeof mod.default === "function" && mod.default) ||
       // 2. ES‑module default export is an object exposing enable
-      (mod.default && typeof mod.default.enable === 'function' && mod.default.enable) ||
-
+      (mod.default && typeof mod.default.enable === "function" && mod.default.enable) ||
       // 3. Named (or CommonJS) export called enable
-      (typeof mod.enable === 'function' && mod.enable) ||
-
+      (typeof mod.enable === "function" && mod.enable) ||
       // 4. UMD/global where the constructor's name matches addon name
-      (typeof mod.PortfolioTrackerAddon === 'function' && mod.PortfolioTrackerAddon) ||
-
+      (typeof mod.PortfolioTrackerAddon === "function" && mod.PortfolioTrackerAddon) ||
       // 5. Module itself is callable
-      (typeof mod === 'function' && mod) ||
-
+      (typeof mod === "function" && mod) ||
       null;
 
     if (!enableFunction) {
-      logger.error(`❌ Addon ${extractedAddon.metadata.id} does not export a valid enable function. Available exports: ${Object.keys(mod).join(', ')}`);
+      logger.error(
+        `❌ Addon ${extractedAddon.metadata.id} does not export a valid enable function. Available exports: ${Object.keys(mod).join(", ")}`,
+      );
       return false;
     }
 
     // Create addon-specific context with scoped secrets
     const addonSpecificContext = createAddonContext(extractedAddon.metadata.id);
     const result = await enableFunction(addonSpecificContext);
-    
+
     // Store addon reference for potential cleanup
     loadedAddons.set(extractedAddon.metadata.id, {
-      disable: typeof result?.disable === 'function' ? result.disable : undefined
+      disable: typeof result?.disable === "function" ? result.disable : undefined,
     });
     loadedAddonIds.add(extractedAddon.metadata.id); // Add to set after successful load and enablement
 
@@ -164,15 +177,15 @@ export async function loadInstalledAddons(): Promise<void> {
   const addonFiles = await discoverAddons();
 
   if (addonFiles.length === 0) {
-    logger.info('⚠️  No addons found to load - check AppData/addons directory');
+    logger.info("⚠️  No addons found to load - check AppData/addons directory");
     return;
   }
 
   // Filter only enabled addons
-  const enabledAddonFiles = addonFiles.filter(addonFile => addonFile.manifest.enabled !== false);
+  const enabledAddonFiles = addonFiles.filter((addonFile) => addonFile.manifest.enabled !== false);
 
   if (enabledAddonFiles.length === 0) {
-    logger.info('📦 No enabled addons found to load');
+    logger.info("📦 No enabled addons found to load");
     return;
   }
 
@@ -188,9 +201,11 @@ export async function loadInstalledAddons(): Promise<void> {
 
   // Load all enabled addons concurrently
   await Promise.all(loadPromises);
-  
-  logger.info(`🎉 Successfully loaded ${loadedCount} out of ${enabledAddonFiles.length} enabled addons`);
-  
+
+  logger.info(
+    `🎉 Successfully loaded ${loadedCount} out of ${enabledAddonFiles.length} enabled addons`,
+  );
+
   // Debug: Show current navigation state
 }
 
@@ -217,7 +232,6 @@ export function unloadAddon(addonId: string): void {
  * Unloads all addons and cleans up resources
  */
 export function unloadAllAddons(): void {
-  
   loadedAddons.forEach((addon, id) => {
     try {
       if (addon.disable) {
@@ -227,10 +241,10 @@ export function unloadAllAddons(): void {
       logger.error(`Error unloading addon ${id}: ${String(error)}`);
     }
   });
-  
+
   loadedAddons.clear();
   loadedAddonIds.clear(); // Clear the set when unloading all
-  
+
   // Clear navigation items and routes from runtime context
   triggerAllDisableCallbacks();
 }
@@ -246,7 +260,7 @@ export function getLoadedAddons(): string[] {
  * Debug function to check current addon state
  */
 export function debugAddonState(): void {
-  logger.info('🐛 Addon Debug Info:');
+  logger.info("🐛 Addon Debug Info:");
   logger.info(`- Dynamic nav items: ${JSON.stringify(getDynamicNavItems())}`);
   logger.info(`- Dynamic routes: ${JSON.stringify(getDynamicRoutes())}`);
   logger.info(`- Loaded addons: ${JSON.stringify(getLoadedAddons())}`);
@@ -258,8 +272,8 @@ export function debugAddonState(): void {
  */
 export async function reloadAllAddons(): Promise<void> {
   unloadAllAddons();
-  
+
   // Dynamically import the full plugin loader to avoid importing dev mode
-  const { loadAllAddons } = await import('./addons-loader');
+  const { loadAllAddons } = await import("./addons-loader");
   await loadAllAddons();
 }

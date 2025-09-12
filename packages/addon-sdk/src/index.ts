@@ -1,9 +1,9 @@
 /**
  * @wealthfolio/addon-sdk
- * 
+ *
  * TypeScript SDK for building Wealthfolio addons with enhanced functionality,
  * type safety, and comprehensive permission management.
- * 
+ *
  * @version 1.0.0
  * @author Wealthfolio Team
  * @license MIT
@@ -47,9 +47,7 @@ export type {
   AddonUpdateCheckResult,
 } from './manifest';
 
-export {
-  isInstalledManifest,
-} from './manifest';
+export { isInstalledManifest } from './manifest';
 
 // Permission system
 export type {
@@ -89,17 +87,17 @@ export const ReactVersion = '18.3.1';
 /**
  * Addons receive their context as a parameter to the enable() function.
  * Each addon gets its own isolated context with scoped secret storage.
- * 
+ *
  * Example:
  * export default function enable(ctx: AddonContext) {
  *   // Use ctx.api.secrets.set/get/delete for secure storage
  *   // Use ctx.sidebar.addItem() to add navigation
  *   // Use ctx.router.add() to register routes
  * }
- */ 
+ */
 
 export const React = (window as any).React as typeof import('react');
-export const ReactDOM = (window as any).ReactDOM as typeof import('react-dom'); 
+export const ReactDOM = (window as any).ReactDOM as typeof import('react-dom');
 
 // Version
 export { SDK_VERSION } from './version';

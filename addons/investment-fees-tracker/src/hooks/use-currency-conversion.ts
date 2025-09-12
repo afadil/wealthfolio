@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import type { AddonContext, ExchangeRate, Settings } from '@wealthfolio/addon-sdk';
-
+import { useQuery } from "@tanstack/react-query";
+import type { AddonContext, ExchangeRate, Settings } from "@wealthfolio/addon-sdk";
 
 interface UseCurrencyConversionOptions {
   ctx: AddonContext;
@@ -8,11 +7,15 @@ interface UseCurrencyConversionOptions {
 }
 
 export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConversionOptions) {
-  const { data: settings, isLoading: settingsLoading, error: settingsError } = useQuery({
-    queryKey: ['settings'],
+  const {
+    data: settings,
+    isLoading: settingsLoading,
+    error: settingsError,
+  } = useQuery({
+    queryKey: ["settings"],
     queryFn: async (): Promise<Settings> => {
       if (!ctx?.api) {
-        throw new Error('Addon context not available');
+        throw new Error("Addon context not available");
       }
       return ctx.api.settings.get();
     },
@@ -21,11 +24,15 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
     gcTime: 30 * 60 * 1000, // 30 minutes
   });
 
-  const { data: exchangeRates, isLoading: ratesLoading, error: ratesError } = useQuery({
-    queryKey: ['exchange-rates'],
+  const {
+    data: exchangeRates,
+    isLoading: ratesLoading,
+    error: ratesError,
+  } = useQuery({
+    queryKey: ["exchange-rates"],
     queryFn: async (): Promise<ExchangeRate[]> => {
       if (!ctx?.api) {
-        throw new Error('Addon context not available');
+        throw new Error("Addon context not available");
       }
       return ctx.api.exchangeRates.getAll();
     },
@@ -34,7 +41,7 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
     gcTime: 15 * 60 * 1000, // 15 minutes
   });
 
-  const baseCurrency = settings?.baseCurrency || 'USD';
+  const baseCurrency = settings?.baseCurrency || "USD";
 
   // Create a currency conversion function
   const convertToBaseCurrency = (amount: number, fromCurrency: string, _date?: string): number => {
@@ -44,8 +51,7 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
 
     // Find the exchange rate for the currency pair
     const rate = exchangeRates.find(
-      (rate) =>
-        rate.fromCurrency === fromCurrency && rate.toCurrency === baseCurrency
+      (rate) => rate.fromCurrency === fromCurrency && rate.toCurrency === baseCurrency,
     );
 
     if (rate) {
@@ -54,8 +60,7 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
 
     // Try reverse rate (toCurrency -> fromCurrency)
     const reverseRate = exchangeRates.find(
-      (rate) =>
-        rate.fromCurrency === baseCurrency && rate.toCurrency === fromCurrency
+      (rate) => rate.fromCurrency === baseCurrency && rate.toCurrency === fromCurrency,
     );
 
     if (reverseRate) {

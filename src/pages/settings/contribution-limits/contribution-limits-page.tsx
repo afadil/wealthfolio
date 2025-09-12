@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
-import type { ContributionLimit } from '@/lib/types';
-import { SettingsHeader } from '../header';
-import { getContributionLimit } from '@/commands/contribution-limits';
-import { useQuery } from '@tanstack/react-query';
-import { QueryKeys } from '@/lib/query-keys';
-import { useContributionLimitMutations } from './use-contribution-limit-mutations';
-import { ContributionLimitItem } from './components/contribution-limit-item';
-import { ContributionLimitEditModal } from './components/contribution-limit-edit-modal';
-import { useAccounts } from '@/hooks/use-accounts';
+import { useState } from "react";
+import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from "@wealthfolio/ui";
+import type { ContributionLimit } from "@/lib/types";
+import { SettingsHeader } from "../header";
+import { getContributionLimit } from "@/commands/contribution-limits";
+import { useQuery } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import { useContributionLimitMutations } from "./use-contribution-limit-mutations";
+import { ContributionLimitItem } from "./components/contribution-limit-item";
+import { ContributionLimitEditModal } from "./components/contribution-limit-edit-modal";
+import { useAccounts } from "@/hooks/use-accounts";
 
 const SettingsContributionLimitPage = () => {
   const [visibleModal, setVisibleModal] = useState(false);
@@ -72,7 +72,7 @@ const SettingsContributionLimitPage = () => {
         </SettingsHeader>
         <Separator />
         <div className="mx-auto w-full pt-8">
-          <h2 className="text-md mb-3 font-semibold text-muted-foreground">
+          <h2 className="text-md text-muted-foreground mb-3 font-semibold">
             Current Year ({currentYear})
           </h2>
           {currentYearLimits.length ? (
@@ -113,14 +113,14 @@ const SettingsContributionLimitPage = () => {
                   className="mx-4 rounded-full"
                   onClick={() => setShowPreviousYears(!showPreviousYears)}
                 >
-                  {showPreviousYears ? 'Hide' : 'Show'} Previous Years
+                  {showPreviousYears ? "Hide" : "Show"} Previous Years
                 </Button>
                 <Separator className="w-1/3" />
               </div>
 
               {showPreviousYears && (
                 <div className="mt-8">
-                  <h2 className="text-md mb-3 text-muted-foreground">Previous Years</h2>
+                  <h2 className="text-md text-muted-foreground mb-3">Previous Years</h2>
                   {previousYearsLimits.map((limit: ContributionLimit) => (
                     <ContributionLimitItem
                       key={limit.id}

@@ -1,18 +1,18 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 
-import { Icons } from '@/components/ui/icons';
+import { Icons } from "@/components/ui/icons";
 import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -20,26 +20,26 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
-import { useAccountMutations } from './use-account-mutations';
+import { useAccountMutations } from "./use-account-mutations";
 
 const accountTypes = [
-  { label: 'Securities', value: 'SECURITIES' },
-  { label: 'Cash', value: 'CASH' },
-  { label: 'Crypto', value: 'CRYPTOCURRENCY' },
+  { label: "Securities", value: "SECURITIES" },
+  { label: "Cash", value: "CASH" },
+  { label: "Crypto", value: "CRYPTOCURRENCY" },
 ] as const;
 
-import { newAccountSchema } from '@/lib/schemas';
-import { CurrencyInput } from '@wealthfolio/ui';
+import { newAccountSchema } from "@/lib/schemas";
+import { CurrencyInput } from "@wealthfolio/ui";
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -68,11 +68,11 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle> {defaultValues?.id ? 'Update Account' : 'Add Account'}</DialogTitle>
+          <DialogTitle> {defaultValues?.id ? "Update Account" : "Add Account"}</DialogTitle>
           <DialogDescription>
             {defaultValues?.id
-              ? 'Update account information'
-              : ' Add an investment account to track.'}
+              ? "Update account information"
+              : " Add an investment account to track."}
           </DialogDescription>
         </DialogHeader>
 
@@ -186,7 +186,7 @@ export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountForm
               <Icons.Plus className="h-4 w-4" />
             )}
             <span className="hidden sm:ml-2 sm:inline">
-              {defaultValues?.id ? 'Update Account' : 'Add Account'}
+              {defaultValues?.id ? "Update Account" : "Add Account"}
             </span>
           </Button>
         </DialogFooter>

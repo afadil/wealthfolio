@@ -1,4 +1,12 @@
-import { Button, Card, CardContent, CardHeader, CardTitle, CardDescription, Icons } from '@wealthfolio/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  Icons,
+} from "@wealthfolio/ui";
 
 interface OnboardingSyncChoiceProps {
   onYes: () => void;

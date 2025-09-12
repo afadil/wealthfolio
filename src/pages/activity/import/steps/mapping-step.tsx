@@ -1,12 +1,12 @@
-import { Button } from '@/components/ui/button';
-import { CsvMappingEditor } from '../components/mapping-editor';
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from '@/lib/types';
-import { useMemo } from 'react';
-import { validateTickerSymbol } from '../utils/validation-utils';
-import { useImportMapping } from '../hooks/use-import-mapping';
-import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
-import { ImportAlert } from '../components/import-alert';
-import { Icons, Icon } from '@/components/ui/icons';
+import { Button } from "@/components/ui/button";
+import { CsvMappingEditor } from "../components/mapping-editor";
+import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from "@/lib/types";
+import { useMemo } from "react";
+import { validateTickerSymbol } from "../utils/validation-utils";
+import { useImportMapping } from "../hooks/use-import-mapping";
+import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
+import { ImportAlert } from "../components/import-alert";
+import { Icons, Icon } from "@/components/ui/icons";
 
 interface MappingStepProps {
   headers: string[];
@@ -30,18 +30,18 @@ export const MappingStep = ({
     handleColumnMapping,
     handleActivityTypeMapping,
     handleSymbolMapping,
-    handleAccountIdMapping, 
+    handleAccountIdMapping,
     saveMapping,
     saveMappingMutation,
   } = useImportMapping({
     headers,
     accountId,
     defaultMapping: {
-      accountId: accountId || '',
+      accountId: accountId || "",
       fieldMappings: {},
       activityMappings: {},
       symbolMappings: {},
-      accountMappings: {}, 
+      accountMappings: {},
     },
     onSaveSuccess: (savedMapping) => {
       onNext(savedMapping);
@@ -50,39 +50,38 @@ export const MappingStep = ({
 
   if (!data) {
     return (
-      <ImportAlert variant="destructive"
-      title="No CSV data available"
-      description="Please go back and upload a valid file."
-      icon={Icons.AlertCircle}
+      <ImportAlert
+        variant="destructive"
+        title="No CSV data available"
+        description="Please go back and upload a valid file."
+        icon={Icons.AlertCircle}
       />
     );
   }
 
   // Check if all required fields are mapped
   const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
-    (field) =>
-      mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
+    (field) => mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
   );
 
   // Count how many fields are mapped
-  const mappedFieldsCount = Object.entries(mapping.fieldMappings)
-    .filter(([_, headerName]) => headerName && headers.includes(headerName))
-    .length;
+  const mappedFieldsCount = Object.entries(mapping.fieldMappings).filter(
+    ([_, headerName]) => headerName && headers.includes(headerName),
+  ).length;
   const totalFields = Object.values(ImportFormat).length;
-  
-  
+
   // For direct CsvRowData access
   const getMappedValue = (row: CsvRowData, field: ImportFormat): string => {
-    const headerName = mapping.fieldMappings[field] || '';
-    if (!headerName) return '';
-    return row[headerName] || '';
+    const headerName = mapping.fieldMappings[field] || "";
+    if (!headerName) return "";
+    return row[headerName] || "";
   };
 
   // Symbols validation
   const distinctSymbols = useMemo(() => {
-    return Array.from(
-      new Set(data.map((row) => getMappedValue(row, ImportFormat.SYMBOL))),
-    ).filter(Boolean);
+    return Array.from(new Set(data.map((row) => getMappedValue(row, ImportFormat.SYMBOL)))).filter(
+      Boolean,
+    );
   }, [data, mapping.fieldMappings]);
 
   const invalidSymbols = useMemo(() => {
@@ -92,9 +91,9 @@ export const MappingStep = ({
   // Account ID mappings
   const distinctAccountIds = useMemo(() => {
     if (!mapping.fieldMappings[ImportFormat.ACCOUNT]) return [];
-     return Array.from(
-      new Set(data.map((row) => getMappedValue(row, ImportFormat.ACCOUNT))),
-    ).filter(Boolean);
+    return Array.from(new Set(data.map((row) => getMappedValue(row, ImportFormat.ACCOUNT)))).filter(
+      Boolean,
+    );
   }, [data, mapping.fieldMappings]);
 
   // Activity type mappings
@@ -107,7 +106,7 @@ export const MappingStep = ({
 
       // Normalize the csvType when storing
       const normalizedCsvType = csvType.trim();
-      
+
       if (!activityTypeMap.has(normalizedCsvType)) {
         activityTypeMap.set(normalizedCsvType, {
           row,
@@ -131,7 +130,6 @@ export const MappingStep = ({
       })),
     };
   }, [data, mapping.activityMappings, mapping.fieldMappings]);
-
 
   function findAppTypeForCsvType(
     csvType: string,
@@ -160,7 +158,7 @@ export const MappingStep = ({
   //  Count unmapped accounts
   const accountsToMapCount = useMemo(() => {
     if (!mapping.fieldMappings[ImportFormat.ACCOUNT]) return 0;
-    
+
     const unmappedIds = new Set<string>();
     data.forEach((row) => {
       const accountId = getMappedValue(row, ImportFormat.ACCOUNT);
@@ -177,7 +175,7 @@ export const MappingStep = ({
       // Check if any key in symbolMappings matches this symbol (case-insensitive)
       const normalizedSymbol = symbol.trim();
       return !Object.keys(mapping.symbolMappings).some(
-                (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol
+        (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol,
       );
     }).length;
     return symbolsNeedingMapping;
@@ -185,21 +183,21 @@ export const MappingStep = ({
 
   // Check if all mappings are complete
   const allMappingsComplete =
-    requiredFieldsMapped && 
-    activitiesToMapCount === 0 && 
+    requiredFieldsMapped &&
+    activitiesToMapCount === 0 &&
     symbolsToMapCount === 0 &&
     (accountsToMapCount === 0 || !mapping.fieldMappings[ImportFormat.ACCOUNT]);
 
   const handleNextClick = () => {
     saveMapping();
   };
-  
+
   return (
     <div className="m-0 flex h-full flex-col p-0">
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Fields mapping status */}
         <ImportAlert
-          variant={requiredFieldsMapped ? 'success' : 'destructive'}
+          variant={requiredFieldsMapped ? "success" : "destructive"}
           size="sm"
           title="Fields"
           description={`${mappedFieldsCount} of ${totalFields} mapped`}
@@ -210,7 +208,7 @@ export const MappingStep = ({
 
         {/* Activities mapping status */}
         <ImportAlert
-          variant={activitiesToMapCount === 0 ? 'success' : 'destructive'}
+          variant={activitiesToMapCount === 0 ? "success" : "destructive"}
           size="sm"
           title="Activities"
           description={`${distinctActivityTypes.length - activitiesToMapCount} of ${distinctActivityTypes.length} mapped`}
@@ -221,7 +219,7 @@ export const MappingStep = ({
 
         {/* Symbols mapping status */}
         <ImportAlert
-          variant={symbolsToMapCount === 0 ? 'success' : 'destructive'}
+          variant={symbolsToMapCount === 0 ? "success" : "destructive"}
           size="sm"
           title="Symbols"
           description={`${distinctSymbols.length - symbolsToMapCount} of ${distinctSymbols.length} mapped`}
@@ -229,15 +227,15 @@ export const MappingStep = ({
           className="mb-0"
           rightIcon={symbolsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
         />
-        
+
         {/* Account ID mapping status */}
         {mapping.fieldMappings[ImportFormat.ACCOUNT] && (
           <ImportAlert
-            variant={accountsToMapCount === 0 ? 'success' : 'destructive'}
+            variant={accountsToMapCount === 0 ? "success" : "destructive"}
             size="sm"
             title="Accounts"
             description={
-              distinctAccountIds.length > 0 
+              distinctAccountIds.length > 0
                 ? `${distinctAccountIds.length - accountsToMapCount} of ${distinctAccountIds.length} mapped`
                 : "No unmapped account IDs found"
             }
@@ -274,7 +272,7 @@ export const MappingStep = ({
           disabled={!allMappingsComplete || saveMappingMutation.isPending}
           className="min-w-[120px]"
         >
-          {saveMappingMutation.isPending ? 'Saving...' : 'Next'}
+          {saveMappingMutation.isPending ? "Saving..." : "Next"}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

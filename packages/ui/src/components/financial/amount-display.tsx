@@ -1,4 +1,4 @@
-import { cn, formatAmount } from '../../lib/utils';
+import { cn, formatAmount } from "../../lib/utils";
 
 interface AmountDisplayProps {
   value: number;
@@ -8,19 +8,9 @@ interface AmountDisplayProps {
   className?: string;
 }
 
-export function AmountDisplay({
-  value,
-  currency = 'USD',
-  isHidden,
-  colorFormat,
-  className,
-}: AmountDisplayProps) {
+export function AmountDisplay({ value, currency = "USD", isHidden, colorFormat, className }: AmountDisplayProps) {
   const formattedAmount = formatAmount(value, currency);
-  const colorClass = colorFormat ? (value >= 0 ? 'text-success' : 'text-destructive') : '';
+  const colorClass = colorFormat ? (value >= 0 ? "text-success" : "text-destructive") : "";
 
-  return (
-    <span className={cn(colorClass, className)}>
-      {isHidden ? '••••' : formattedAmount}
-    </span>
-  );
+  return <span className={cn(colorClass, className)}>{isHidden ? "••••" : formattedAmount}</span>;
 }

@@ -1,7 +1,7 @@
-import { Icons } from '@/components/ui/icons';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Link, useNavigate } from 'react-router-dom';
+import { Icons } from "@/components/ui/icons";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Link, useNavigate } from "react-router-dom";
 
 interface ApplicationHeaderProps {
   heading: string;
@@ -24,7 +24,7 @@ export function ApplicationHeader({
 }: ApplicationHeaderProps) {
   const navigate = useNavigate();
   return (
-    <div className={cn('flex w-full items-center justify-between', className)}>
+    <div className={cn("flex w-full items-center justify-between", className)}>
       <div className="flex items-center gap-2">
         {displayBack ? (
           backUrl ? (
@@ -42,7 +42,7 @@ export function ApplicationHeader({
         <div data-tauri-drag-region="true" className="draggable flex items-center space-x-4">
           {headingPrefix && (
             <>
-              <h1 className="font-heading text-xl font-bold tracking-tight text-muted-foreground">
+              <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight">
                 {headingPrefix}
               </h1>
               <span className="h-6 border-l-2"></span>
@@ -50,7 +50,7 @@ export function ApplicationHeader({
           )}
 
           <h1 className="font-heading text-xl font-bold tracking-tight">{heading}</h1>
-          {text && <p className="ml-4 text-lg font-light text-muted-foreground">{text}</p>}
+          {text && <p className="text-muted-foreground ml-4 text-lg font-light">{text}</p>}
         </div>
       </div>
       {children}

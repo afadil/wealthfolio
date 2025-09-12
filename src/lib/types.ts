@@ -1,11 +1,6 @@
-import * as z from 'zod';
-import { importActivitySchema, importMappingSchema } from '@/lib/schemas';
-import {
-  ActivityType,
-  DataSource,
-  AccountType,
-  HoldingType,
-} from './constants';
+import * as z from "zod";
+import { importActivitySchema, importMappingSchema } from "@/lib/schemas";
+import { ActivityType, DataSource, AccountType, HoldingType } from "./constants";
 
 export {
   ActivityType,
@@ -15,9 +10,9 @@ export {
   ExportDataType,
   ExportedFileFormat,
   HoldingType,
-} from './constants';
+} from "./constants";
 
-export type { ImportRequiredField } from './constants';
+export type { ImportRequiredField } from "./constants";
 
 export type Account = {
   id: string;
@@ -91,7 +86,7 @@ export type ActivityCreate = {
   fee?: number;
   isDraft: boolean;
   comment?: string | null;
-}
+};
 
 export type ActivityUpdate = ActivityCreate & { id: string };
 export type ActivityImport = z.infer<typeof importActivitySchema>;
@@ -161,7 +156,7 @@ export interface MarketData {
   date: Date;
   id: string;
   marketPrice: number;
-  state: 'CLOSE'; // assuming state can only be 'CLOSE', expand this as needed
+  state: "CLOSE"; // assuming state can only be 'CLOSE', expand this as needed
   symbol: string;
   symbolProfileId: string;
 }
@@ -181,7 +176,7 @@ export interface ImportValidationResult {
   };
 }
 
-export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
+export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };
 
 // Holding types based on Rust HoldingView model
 
@@ -332,7 +327,7 @@ export interface SettingsContextType {
   settings: Settings | null;
   isLoading: boolean;
   isError: boolean;
-  updateBaseCurrency: (currency: Settings['baseCurrency']) => Promise<void>;
+  updateBaseCurrency: (currency: Settings["baseCurrency"]) => Promise<void>;
   accountsGrouped: boolean;
   setAccountsGrouped: (value: boolean) => void;
 }
@@ -379,8 +374,7 @@ export type DateRange = {
   to: Date | undefined;
 };
 
-export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
-
+export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
 
 export interface AccountValuation {
   id: string;
@@ -455,7 +449,7 @@ export interface ContributionLimit {
   updatedAt?: string;
 }
 
-export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewContributionLimit = Omit<ContributionLimit, "id" | "createdAt" | "updatedAt">;
 
 export interface AccountDeposit {
   amount: number;
@@ -508,7 +502,7 @@ export interface UpdateAssetProfile {
 // Rename ComparisonItem to TrackedItem
 export type TrackedItem = {
   id: string;
-  type: 'account' | 'symbol';
+  type: "account" | "symbol";
   name: string;
 };
 
@@ -523,7 +517,7 @@ export interface AddonStoreListing {
   downloads: number;
   rating: number;
   reviewCount: number;
-  status?: 'active' | 'inactive' | 'deprecated' | 'coming-soon';
+  status?: "active" | "inactive" | "deprecated" | "coming-soon";
   lastUpdated: string;
   releaseNotes: string;
   changelogUrl: string;
@@ -531,4 +525,3 @@ export interface AddonStoreListing {
   /** Classification tags for filtering */
   tags?: string[];
 }
-

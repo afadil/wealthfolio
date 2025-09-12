@@ -6,7 +6,9 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/node/v/@wealthfolio/addon-sdk?style=flat-square)](https://nodejs.org/)
 
-A comprehensive TypeScript SDK for building secure, feature-rich addons for Wealthfolio. Extend your portfolio management experience with custom analytics, integrations, and visualizations.
+A comprehensive TypeScript SDK for building secure, feature-rich addons for
+Wealthfolio. Extend your portfolio management experience with custom analytics,
+integrations, and visualizations.
 
 ## 📚 Table of Contents
 
@@ -30,8 +32,9 @@ A comprehensive TypeScript SDK for building secure, feature-rich addons for Weal
 
 ## 🚀 Features
 
-- **Type-Safe Development**: Full TypeScript support with comprehensive type definitions
-- **Security-First**: Built-in permission system with granular risk assessment  
+- **Type-Safe Development**: Full TypeScript support with comprehensive type
+  definitions
+- **Security-First**: Built-in permission system with granular risk assessment
 - **Modular Architecture**: Clean separation of concerns with well-defined APIs
 - **React Integration**: Seamless integration with React components and hooks
 - **Hot Reloading**: Development-friendly with automatic reload capabilities
@@ -75,13 +78,13 @@ export default function enable(context: AddonContext) {
     id: 'my-addon',
     label: 'My Addon',
     icon: 'chart-line',
-    route: '/addons/my-addon'
+    route: '/addons/my-addon',
   });
 
   // Register route
   context.router.add({
     path: '/addons/my-addon',
-    component: () => import('./MyComponent')
+    component: () => import('./MyComponent'),
   });
 
   // Log activation
@@ -202,32 +205,33 @@ Create a `manifest.json` file in your addon root:
 
 ### Required Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Unique identifier (lowercase, hyphens allowed) |
-| `name` | `string` | Human-readable addon name |
-| `version` | `string` | Semantic version (e.g., "1.0.0") |
+| Field     | Type     | Description                                    |
+| --------- | -------- | ---------------------------------------------- |
+| `id`      | `string` | Unique identifier (lowercase, hyphens allowed) |
+| `name`    | `string` | Human-readable addon name                      |
+| `version` | `string` | Semantic version (e.g., "1.0.0")               |
 
 ### Optional Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | `string` | Brief description of functionality |
-| `author` | `string` | Author name or organization |
-| `homepage` | `string` | Project homepage URL |
-| `license` | `string` | License identifier |
-| `main` | `string` | Entry point file (default: "addon.js") |
-| `sdkVersion` | `string` | Compatible SDK version |
-| `permissions` | `Permission[]` | Security permissions required |
-| `minWealthfolioVersion` | `string` | Minimum Wealthfolio version required |
-| `keywords` | `string[]` | Keywords for discoverability |
-| `icon` | `string` | Addon icon (base64 or relative path) |
+| Field                   | Type           | Description                            |
+| ----------------------- | -------------- | -------------------------------------- |
+| `description`           | `string`       | Brief description of functionality     |
+| `author`                | `string`       | Author name or organization            |
+| `homepage`              | `string`       | Project homepage URL                   |
+| `license`               | `string`       | License identifier                     |
+| `main`                  | `string`       | Entry point file (default: "addon.js") |
+| `sdkVersion`            | `string`       | Compatible SDK version                 |
+| `permissions`           | `Permission[]` | Security permissions required          |
+| `minWealthfolioVersion` | `string`       | Minimum Wealthfolio version required   |
+| `keywords`              | `string[]`     | Keywords for discoverability           |
+| `icon`                  | `string`       | Addon icon (base64 or relative path)   |
 
 ## 🔨 Development Guide
 
 ### Modern Addon Example
 
-Based on the current SDK architecture, here's a complete real-world addon example:
+Based on the current SDK architecture, here's a complete real-world addon
+example:
 
 ```typescript
 // src/addon.tsx
@@ -263,7 +267,7 @@ const enable: AddonEnableFunction = (context) => {
       order: 200
     });
     addedItems.push(sidebarItem);
-    
+
     context.api.logger.debug('Sidebar navigation item added successfully');
 
     // Create wrapper component with shared QueryClient
@@ -279,11 +283,11 @@ const enable: AddonEnableFunction = (context) => {
     // Register route with lazy loading
     context.router.add({
       path: '/addons/investment-fees-tracker',
-      component: React.lazy(() => Promise.resolve({ 
-        default: InvestmentFeesTrackerWrapper 
+      component: React.lazy(() => Promise.resolve({
+        default: InvestmentFeesTrackerWrapper
       }))
     });
-    
+
     context.api.logger.debug('Route registered successfully');
     context.api.logger.info('Investment Fees Tracker addon enabled successfully');
 
@@ -295,7 +299,7 @@ const enable: AddonEnableFunction = (context) => {
   // Register cleanup callback
   context.onDisable(() => {
     context.api.logger.info('🛑 Investment Fees Tracker addon is being disabled');
-    
+
     // Remove all sidebar items
     addedItems.forEach(item => {
       try {
@@ -304,7 +308,7 @@ const enable: AddonEnableFunction = (context) => {
         context.api.logger.error('Error removing sidebar item: ' + (error as Error).message);
       }
     });
-    
+
     context.api.logger.info('Investment Fees Tracker addon disabled successfully');
   });
 };
@@ -315,13 +319,15 @@ export default enable;
 
 ### Key Features Demonstrated
 
-1. **Shared Query Client**: Uses `context.api.query.getClient()` for consistent data fetching
+1. **Shared Query Client**: Uses `context.api.query.getClient()` for consistent
+   data fetching
 2. **UI Icons**: Leverages `@wealthfolio/ui` for consistent iconography
 3. **Error Handling**: Comprehensive error handling with logging
 4. **Resource Management**: Proper cleanup of sidebar items and event listeners
 5. **TypeScript**: Full type safety with proper imports
 6. **Lazy Loading**: Efficient component loading with React.lazy
-```
+
+````
 
 ### Advanced Component Example
 
@@ -366,7 +372,7 @@ export function FeesPage({ ctx }: FeesPageProps) {
   // Calculate total fees from activities
   const totalFees = React.useMemo(() => {
     if (!activities?.data) return 0;
-    
+
     return activities.data.reduce((total, activity) => {
       // Look for fee-related activities or transaction costs
       const fee = activity.fee || 0;
@@ -376,11 +382,11 @@ export function FeesPage({ ctx }: FeesPageProps) {
 
   useEffect(() => {
     if (!isLoading) {
-      ctx.api.logger.info('Fees data loaded successfully', { 
+      ctx.api.logger.info('Fees data loaded successfully', {
         accountsCount: accounts?.length,
         holdingsCount: holdings?.length,
         activitiesCount: activities?.data?.length,
-        totalFees 
+        totalFees
       });
     }
   }, [isLoading, accounts, holdings, activities, totalFees, ctx.api.logger]);
@@ -402,7 +408,7 @@ export function FeesPage({ ctx }: FeesPageProps) {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Investment Fees Tracker</h1>
         <p className="text-gray-600">Track and analyze fees across your investment portfolio</p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow border">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Fees Paid</h3>
@@ -478,7 +484,7 @@ export default FeesPage;
 }
 
 export default AnalyticsDashboard;
-```
+````
 
 ### Using Hooks and State Management
 
@@ -490,7 +496,9 @@ import type { Holding, PerformanceMetrics } from '@wealthfolio/addon-sdk/types';
 
 export function usePortfolioData(accountId?: string) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [performance, setPerformance] = useState<PerformanceMetrics | null>(null);
+  const [performance, setPerformance] = useState<PerformanceMetrics | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -501,15 +509,18 @@ export function usePortfolioData(accountId?: string) {
         setError(null);
 
         const ctx = getAddonContext();
-        
-        const holdingsData = await ctx.api.portfolio.getHoldings(accountId || '');
+
+        const holdingsData = await ctx.api.portfolio.getHoldings(
+          accountId || '',
+        );
         setHoldings(holdingsData);
 
         if (accountId) {
-          const performanceData = await ctx.api.portfolio.calculatePerformanceSummary({
-            itemType: 'account',
-            itemId: accountId
-          });
+          const performanceData =
+            await ctx.api.portfolio.calculatePerformanceSummary({
+              itemType: 'account',
+              itemId: accountId,
+            });
           setPerformance(performanceData);
         }
       } catch (err) {
@@ -530,18 +541,18 @@ export function usePortfolioData(accountId?: string) {
 
 ### Permission Categories
 
-| Category | Risk Level | Description |
-|----------|------------|-------------|
-| `ui` | Low | Add navigation items and routes |
-| `market-data` | Low | Access market prices and quotes |
-| `events` | Low | Listen to application events |
-| `currency` | Low | Access exchange rates |
-| `portfolio` | Medium | Access holdings and valuations |
-| `files` | Medium | File dialog operations |
-| `financial-planning` | Medium | Goals and contribution limits |
-| `activities` | High | Transaction history access |
-| `accounts` | High | Account management |
-| `settings` | High | Application configuration |
+| Category             | Risk Level | Description                     |
+| -------------------- | ---------- | ------------------------------- |
+| `ui`                 | Low        | Add navigation items and routes |
+| `market-data`        | Low        | Access market prices and quotes |
+| `events`             | Low        | Listen to application events    |
+| `currency`           | Low        | Access exchange rates           |
+| `portfolio`          | Medium     | Access holdings and valuations  |
+| `files`              | Medium     | File dialog operations          |
+| `financial-planning` | Medium     | Goals and contribution limits   |
+| `activities`         | High       | Transaction history access      |
+| `accounts`           | High       | Account management              |
+| `settings`           | High       | Application configuration       |
 
 ### Declaring Permissions
 
@@ -585,26 +596,26 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'MyPortfolioAddon',
       fileName: 'addon',
-      formats: ['es']
+      formats: ['es'],
     },
     rollupOptions: {
       external: ['react', 'react-dom'],
       output: {
         globals: {
           react: 'React',
-          'react-dom': 'ReactDOM'
-        }
-      }
+          'react-dom': 'ReactDOM',
+        },
+      },
     },
     outDir: 'dist',
     minify: 'terser',
-    sourcemap: true
+    sourcemap: true,
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
-    }
-  }
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 });
 ```
 
@@ -666,6 +677,7 @@ zip -r my-portfolio-addon.zip \
 ### Package Structure
 
 Your final package should contain:
+
 - `manifest.json` - Addon metadata
 - `dist/addon.js` - Compiled addon code
 - `assets/` - Static assets (optional)
@@ -702,6 +714,7 @@ npm run dev
 Add an item to the application sidebar.
 
 **Parameters:**
+
 - `config.id` (string): Unique identifier
 - `config.label` (string): Display text
 - `config.icon` (string | ReactNode): Icon name or component
@@ -716,6 +729,7 @@ Add an item to the application sidebar.
 Register a new route in the application.
 
 **Parameters:**
+
 - `route.path` (string): Route path pattern
 - `route.component` (LazyExoticComponent): Lazy-loaded component
 
@@ -724,6 +738,7 @@ Register a new route in the application.
 Register cleanup callback for addon disable.
 
 **Parameters:**
+
 - `callback` (function): Cleanup function
 
 ### Data Access APIs
@@ -737,7 +752,7 @@ const ctx = getAddonContext();
 const holdings = await ctx.api.portfolio.getHoldings(accountId);
 const accounts = await ctx.api.accounts.getAll();
 
-// Market data  
+// Market data
 const quotes = await ctx.api.marketData.getQuoteHistory(symbol);
 const profile = await ctx.api.marketData.getAssetProfile(assetId);
 
@@ -756,22 +771,22 @@ ctx.api.logger.debug('Debug info:', debugData);
 
 ### Available API Methods
 
-| Method | Description | Permission Required |
-|--------|-------------|-------------------|
-| `portfolio.getHoldings(accountId)` | Get portfolio holdings for account | `portfolio` |
-| `portfolio.getHolding(accountId, assetId)` | Get specific holding | `portfolio` |
-| `portfolio.calculatePerformanceSummary(params)` | Calculate performance metrics | `portfolio` |
-| `portfolio.getIncomeSummary()` | Get income summary data | `portfolio` |
-| `accounts.getAll()` | Get all account information | `accounts` |
-| `accounts.create(account)` | Create new account | `accounts` |
-| `activities.getAll(params)` | Get activity history | `activities` |
-| `activities.create(activity)` | Create new activity | `activities` |
-| `marketData.getQuoteHistory(symbol)` | Get historical quotes | `market-data` |
-| `marketData.getAssetProfile(assetId)` | Get asset profile | `market-data` |
-| `marketData.searchTicker(query)` | Search for tickers | `market-data` |
-| `goals.getAll()` | Get financial goals | `financial-planning` |
-| `settings.get()` | Get app settings | `settings` |
-| `query.getClient()` | Get shared QueryClient instance | None |
+| Method                                          | Description                        | Permission Required  |
+| ----------------------------------------------- | ---------------------------------- | -------------------- |
+| `portfolio.getHoldings(accountId)`              | Get portfolio holdings for account | `portfolio`          |
+| `portfolio.getHolding(accountId, assetId)`      | Get specific holding               | `portfolio`          |
+| `portfolio.calculatePerformanceSummary(params)` | Calculate performance metrics      | `portfolio`          |
+| `portfolio.getIncomeSummary()`                  | Get income summary data            | `portfolio`          |
+| `accounts.getAll()`                             | Get all account information        | `accounts`           |
+| `accounts.create(account)`                      | Create new account                 | `accounts`           |
+| `activities.getAll(params)`                     | Get activity history               | `activities`         |
+| `activities.create(activity)`                   | Create new activity                | `activities`         |
+| `marketData.getQuoteHistory(symbol)`            | Get historical quotes              | `market-data`        |
+| `marketData.getAssetProfile(assetId)`           | Get asset profile                  | `market-data`        |
+| `marketData.searchTicker(query)`                | Search for tickers                 | `market-data`        |
+| `goals.getAll()`                                | Get financial goals                | `financial-planning` |
+| `settings.get()`                                | Get app settings                   | `settings`           |
+| `query.getClient()`                             | Get shared QueryClient instance    | None                 |
 
 ### Logger API
 
@@ -797,7 +812,8 @@ if (ctx.api.logger.isLevelEnabled('debug')) {
 
 ### Shared QueryClient Integration
 
-The SDK provides access to Wealthfolio's shared React Query client for consistent data fetching and caching:
+The SDK provides access to Wealthfolio's shared React Query client for
+consistent data fetching and caching:
 
 ```typescript
 // Access the shared QueryClient instance
@@ -830,6 +846,7 @@ function MyAddonComponent() {
 ```
 
 **Benefits of Shared QueryClient:**
+
 - **Consistent Caching**: Share cache with the main application
 - **Performance**: Avoid duplicate API calls across addons
 - **Synchronization**: Real-time updates when data changes
@@ -840,6 +857,7 @@ function MyAddonComponent() {
 ### From v1.0.0 to v1.1.0
 
 #### Context Access
+
 ```typescript
 // Before
 import ctx from '@wealthfolio/addon-sdk';
@@ -850,6 +868,7 @@ const ctx = getAddonContext();
 ```
 
 #### Type Imports
+
 ```typescript
 // Before
 import type { AddonContext, AddonManifest } from '@wealthfolio/addon-sdk';
@@ -887,6 +906,7 @@ npm install --save-dev @types/react-dom
 Create the essential configuration files:
 
 **tsconfig.json**
+
 ```json
 {
   "compilerOptions": {
@@ -916,6 +936,7 @@ Create the essential configuration files:
 ```
 
 **vite.config.ts**
+
 ```typescript
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -928,30 +949,31 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'MyPortfolioAddon',
       fileName: 'addon',
-      formats: ['es']
+      formats: ['es'],
     },
     rollupOptions: {
       external: ['react', 'react-dom'],
       output: {
         globals: {
           react: 'React',
-          'react-dom': 'ReactDOM'
-        }
-      }
+          'react-dom': 'ReactDOM',
+        },
+      },
     },
     outDir: 'dist',
     minify: 'terser',
-    sourcemap: true
+    sourcemap: true,
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
-    }
-  }
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 });
 ```
 
 **package.json scripts**
+
 ```json
 {
   "scripts": {
@@ -1013,10 +1035,10 @@ export default defineConfig({
     permissions: 'src/permissions.ts',
   },
   format: ['esm'],
-  dts: true,        // Generate TypeScript declarations
-  clean: true,      // Clean dist folder before build
-  sourcemap: true,  // Generate source maps
-  minify: false,    // Keep code readable for debugging
+  dts: true, // Generate TypeScript declarations
+  clean: true, // Clean dist folder before build
+  sourcemap: true, // Generate source maps
+  minify: false, // Keep code readable for debugging
   target: 'es2020',
   external: ['react'], // Don't bundle React
 });
@@ -1071,6 +1093,7 @@ ctx.api.logger.debug('Debug information:', data);
 #### 2. Development Console
 
 Access the browser's developer console for debugging:
+
 - Open Wealthfolio
 - Press F12 or right-click → Inspect
 - Check Console tab for addon logs
@@ -1099,24 +1122,24 @@ import { getAddonContext } from '@wealthfolio/addon-sdk';
 
 async function fetchPortfolioData() {
   const ctx = getAddonContext();
-  
+
   try {
     // Get all accounts first, then holdings for each
     const accounts = await ctx.api.accounts.getAll();
     const holdings = await Promise.all(
-      accounts.map(account => ctx.api.portfolio.getHoldings(account.id))
-    ).then(results => results.flat());
+      accounts.map((account) => ctx.api.portfolio.getHoldings(account.id)),
+    ).then((results) => results.flat());
     return holdings;
   } catch (error) {
     ctx.api.logger.error('Failed to fetch holdings:', error);
-    
+
     // Handle different error types
     if (error.code === 'PERMISSION_DENIED') {
       // Show permission error to user
     } else if (error.code === 'NETWORK_ERROR') {
       // Handle network issues
     }
-    
+
     throw error;
   }
 }
@@ -1127,14 +1150,14 @@ async function fetchPortfolioData() {
 ```typescript
 export default function enable(context: AddonContext) {
   const subscriptions: (() => void)[] = [];
-  
+
   // Add event listeners
   const unsubscribe = context.events.subscribe('portfolio.updated', handler);
   subscriptions.push(unsubscribe);
-  
+
   // Cleanup on disable
   context.onDisable(() => {
-    subscriptions.forEach(unsub => unsub());
+    subscriptions.forEach((unsub) => unsub());
     context.api.logger.info('Addon cleaned up successfully');
   });
 }
@@ -1152,7 +1175,7 @@ const AddonStateContext = createContext<AddonState | null>(null);
 
 export function AddonProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AddonState>(initialState);
-  
+
   return (
     <AddonStateContext.Provider value={{ state, setState }}>
       {children}
@@ -1188,7 +1211,7 @@ function usePortfolioData(accountId: string) {
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
       cacheTime: 10 * 60 * 1000, // 10 minutes
-    }
+    },
   );
 }
 ```
@@ -1204,10 +1227,10 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           charts: ['chart.js', 'd3'],
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -1218,33 +1241,37 @@ We welcome contributions to improve the addon SDK!
 ### Development Setup
 
 1. **Fork and Clone**
+
    ```bash
    git clone https://github.com/yourusername/wealthfolio.git
    cd wealthfolio/packages/addon-sdk
    ```
 
 2. **Install Dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Make Changes**
+
    ```bash
    # Start development mode
    pnpm dev
-   
+
    # Run type checking
    pnpm lint
-   
+
    # Build for testing
    pnpm build
    ```
 
 4. **Testing Your Changes**
+
    ```bash
    # Link the SDK locally for testing
    npm link
-   
+
    # In your test addon project
    npm link @wealthfolio/addon-sdk
    ```
@@ -1267,13 +1294,13 @@ We welcome contributions to improve the addon SDK!
 
 ### Package Details
 
-| Field | Value |
-|-------|--------|
-| **Package Name** | `@wealthfolio/addon-sdk` |
-| **Scope** | `@wealthfolio` |
-| **Registry** | [npmjs.com](https://www.npmjs.com/package/@wealthfolio/addon-sdk) |
-| **License** | MIT |
-| **Repository** | [GitHub](https://github.com/afadil/wealthfolio) |
+| Field            | Value                                                             |
+| ---------------- | ----------------------------------------------------------------- |
+| **Package Name** | `@wealthfolio/addon-sdk`                                          |
+| **Scope**        | `@wealthfolio`                                                    |
+| **Registry**     | [npmjs.com](https://www.npmjs.com/package/@wealthfolio/addon-sdk) |
+| **License**      | MIT                                                               |
+| **Repository**   | [GitHub](https://github.com/afadil/wealthfolio)                   |
 
 ### Version History
 
@@ -1285,14 +1312,15 @@ We follow [Semantic Versioning](https://semver.org/) (SemVer):
 
 #### Version Compatibility
 
-| SDK Version | Wealthfolio Version | Node.js | React |
-|-------------|---------------------|---------|-------|
-| 1.0.x | >= 1.0.0 | >= 18.0.0 | ^18.0.0 |
-| 0.9.x | >= 0.9.0 | >= 16.0.0 | ^17.0.0 |
+| SDK Version | Wealthfolio Version | Node.js   | React   |
+| ----------- | ------------------- | --------- | ------- |
+| 1.0.x       | >= 1.0.0            | >= 18.0.0 | ^18.0.0 |
+| 0.9.x       | >= 0.9.0            | >= 16.0.0 | ^17.0.0 |
 
 ### Installation from Registry
 
 #### Stable Release
+
 ```bash
 # Latest stable version
 npm install @wealthfolio/addon-sdk
@@ -1305,6 +1333,7 @@ npm install @wealthfolio/addon-sdk@^1.0.0
 ```
 
 #### Beta/Preview Releases
+
 ```bash
 # Latest beta version
 npm install @wealthfolio/addon-sdk@beta
@@ -1314,6 +1343,7 @@ npm install @wealthfolio/addon-sdk@1.1.0-beta.1
 ```
 
 #### Development Version
+
 ```bash
 # Install directly from GitHub
 npm install github:afadil/wealthfolio#main
@@ -1344,6 +1374,7 @@ npm outdated @wealthfolio/addon-sdk
 ### Publishing Information (For Maintainers)
 
 #### Prerequisites
+
 ```bash
 # Login to npm (maintainers only)
 npm login
@@ -1356,6 +1387,7 @@ npm access list packages @wealthfolio
 ```
 
 #### Release Process
+
 ```bash
 # 1. Update version
 npm version patch  # or minor/major
@@ -1380,23 +1412,28 @@ git push --tags
 
 #### Distribution Tags
 
-| Tag | Purpose | Command |
-|-----|---------|---------|
-| `latest` | Stable releases | `npm publish` |
-| `beta` | Beta releases | `npm publish --tag beta` |
-| `alpha` | Alpha releases | `npm publish --tag alpha` |
-| `next` | Next major version | `npm publish --tag next` |
+| Tag      | Purpose            | Command                   |
+| -------- | ------------------ | ------------------------- |
+| `latest` | Stable releases    | `npm publish`             |
+| `beta`   | Beta releases      | `npm publish --tag beta`  |
+| `alpha`  | Alpha releases     | `npm publish --tag alpha` |
+| `next`   | Next major version | `npm publish --tag next`  |
 
 #### Package Metrics
 
 View package statistics:
-- **Downloads**: [npm-stat.com](https://npm-stat.com/charts.html?package=@wealthfolio/addon-sdk)
-- **Bundle Size**: [bundlephobia.com](https://bundlephobia.com/package/@wealthfolio/addon-sdk)
-- **Dependencies**: [npm.anvaka.com](https://npm.anvaka.com/#/view/2d/@wealthfolio/addon-sdk)
+
+- **Downloads**:
+  [npm-stat.com](https://npm-stat.com/charts.html?package=@wealthfolio/addon-sdk)
+- **Bundle Size**:
+  [bundlephobia.com](https://bundlephobia.com/package/@wealthfolio/addon-sdk)
+- **Dependencies**:
+  [npm.anvaka.com](https://npm.anvaka.com/#/view/2d/@wealthfolio/addon-sdk)
 
 ### Security
 
 #### Vulnerability Scanning
+
 ```bash
 # Check for vulnerabilities
 npm audit
@@ -1409,6 +1446,7 @@ npm audit --audit-level=moderate
 ```
 
 #### Package Integrity
+
 ```bash
 # Verify package integrity
 npm pack --dry-run
@@ -1422,7 +1460,8 @@ npm pack && tar -tf *.tgz
 #### Package Support Policy
 
 - **Latest Major Version**: Full support with new features and bug fixes
-- **Previous Major Version**: Security fixes and critical bug fixes for 12 months
+- **Previous Major Version**: Security fixes and critical bug fixes for 12
+  months
 - **Older Versions**: Community support only
 
 #### Maintenance Schedule
@@ -1433,9 +1472,11 @@ npm pack && tar -tf *.tgz
 
 #### Getting Help
 
-1. **Documentation**: Check this README and [docs](https://docs.wealthfolio.app/addons)
+1. **Documentation**: Check this README and
+   [docs](https://docs.wealthfolio.app/addons)
 2. **Issues**: [GitHub Issues](https://github.com/afadil/wealthfolio/issues)
-3. **Discussions**: [GitHub Discussions](https://github.com/afadil/wealthfolio/discussions)
+3. **Discussions**:
+   [GitHub Discussions](https://github.com/afadil/wealthfolio/discussions)
 4. **Discord**: [Community Discord](https://discord.gg/wealthfolio)
 5. **Email**: [support@wealthfolio.app](mailto:support@wealthfolio.app)
 
@@ -1466,6 +1507,7 @@ MIT - see [LICENSE](LICENSE) for details.
 **Error**: `Cannot resolve module '@wealthfolio/addon-sdk'`
 
 **Solutions**:
+
 ```bash
 # Clear npm cache
 npm cache clean --force
@@ -1483,6 +1525,7 @@ node --version
 **Error**: `Cannot find type definitions`
 
 **Solutions**:
+
 ```typescript
 // Ensure proper TypeScript configuration
 {
@@ -1502,6 +1545,7 @@ import type { AddonContext } from '@wealthfolio/addon-sdk';
 **Error**: `React version mismatch`
 
 **Solutions**:
+
 ```bash
 # Install correct React version
 npm install react@^18.0.0 react-dom@^18.0.0
@@ -1515,14 +1559,15 @@ npm list react react-dom
 **Error**: `Vite build fails with external dependencies`
 
 **Solutions**:
+
 ```typescript
 // vite.config.ts
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: ['react', 'react-dom', '@wealthfolio/addon-sdk']
-    }
-  }
+      external: ['react', 'react-dom', '@wealthfolio/addon-sdk'],
+    },
+  },
 });
 ```
 
@@ -1531,6 +1576,7 @@ export default defineConfig({
 **Error**: `Permission denied for API call`
 
 **Solutions**:
+
 ```json
 // Add required permissions to manifest.json
 {
@@ -1549,6 +1595,7 @@ export default defineConfig({
 **Error**: `getAddonContext() returns undefined`
 
 **Solutions**:
+
 ```typescript
 // Ensure you're calling it within addon context
 function MyComponent() {
@@ -1578,6 +1625,7 @@ ls -la dist/  # Should update when you save files
 #### 2. Addon Not Loading in Wealthfolio
 
 1. Check the addon package structure:
+
    ```
    addon.zip
    ├── manifest.json ✓
@@ -1587,6 +1635,7 @@ ls -la dist/  # Should update when you save files
    ```
 
 2. Validate manifest.json:
+
    ```bash
    # Check JSON syntax
    cat manifest.json | jq .
@@ -1606,10 +1655,10 @@ try {
   const data = await ctx.api.portfolio.getHoldings(accounts[0]?.id);
   ctx.api.logger.info('Data loaded successfully', { count: data.length });
 } catch (error) {
-  ctx.api.logger.error('API call failed', { 
+  ctx.api.logger.error('API call failed', {
     error: error.message,
     stack: error.stack,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 }
 ```
@@ -1630,11 +1679,11 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          utils: ['lodash', 'date-fns']
-        }
-      }
-    }
-  }
+          utils: ['lodash', 'date-fns'],
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -1644,7 +1693,7 @@ export default defineConfig({
 // Proper cleanup in useEffect
 useEffect(() => {
   const subscription = ctx.events.subscribe('update', handler);
-  
+
   return () => {
     subscription.unsubscribe(); // ✓ Clean up
   };
@@ -1663,6 +1712,7 @@ context.onDisable(() => {
 If you're still experiencing issues:
 
 1. **Check Version Compatibility**:
+
    ```bash
    npm list @wealthfolio/addon-sdk
    ```
@@ -1680,4 +1730,4 @@ If you're still experiencing issues:
    - Node.js version
    - Operating system
    - Error messages with stack traces
-   - Minimal reproduction steps 
+   - Minimal reproduction steps

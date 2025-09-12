@@ -1,26 +1,26 @@
-import { type AddonContext, type Goal } from '@wealthfolio/addon-sdk';
-import { Icons, EmptyPlaceholder, Button } from '@wealthfolio/ui';
-import React, { useState, useEffect } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { InvestmentCalendar, GoalSelector, HelpPopover } from './components';
-import { useGoalProgress } from './hooks';
-import { useBalancePrivacy } from '@wealthfolio/ui';
+import { type AddonContext, type Goal } from "@wealthfolio/addon-sdk";
+import { Icons, EmptyPlaceholder, Button } from "@wealthfolio/ui";
+import React, { useState, useEffect } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { InvestmentCalendar, GoalSelector, HelpPopover } from "./components";
+import { useGoalProgress } from "./hooks";
+import { useBalancePrivacy } from "@wealthfolio/ui";
 
 // Main Investment Target Tracker component
 function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   const [targetAmount, setTargetAmount] = useState(100000);
   const [stepSize, setStepSize] = useState(10000);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  
+
   // Load goals and their progress using proper allocation calculation
   const { goals, goalsProgress, isLoading, error } = useGoalProgress({ ctx });
-  
+
   // Get balance privacy state
   const { isBalanceHidden } = useBalancePrivacy();
 
   // Calculate metrics for the selected goal
-  const selectedGoalProgress = selectedGoal 
-    ? goalsProgress?.find(progress => progress.name === selectedGoal.title)
+  const selectedGoalProgress = selectedGoal
+    ? goalsProgress?.find((progress) => progress.name === selectedGoal.title)
     : null;
 
   const currentAmount = selectedGoalProgress?.currentValue || 0;
@@ -43,15 +43,13 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
       setSelectedGoal(goals[0]);
     }
   }, [goals, selectedGoal]);
-  
+
   if (isLoading) {
     return (
-  <div className="p-6 h-full flex items-center justify-center bg-background">
+      <div className="bg-background flex h-full items-center justify-center p-6">
         <div className="text-center">
-          <Icons.Loader className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground text-sm">
-            Loading data...
-          </p>
+          <Icons.Loader className="text-primary mx-auto h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground mt-4 text-sm">Loading data...</p>
         </div>
       </div>
     );
@@ -59,14 +57,10 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
 
   if (error) {
     return (
-  <div className="p-6 h-full flex items-center justify-center bg-background">
-        <div className="p-6 text-center bg-red-50 dark:bg-red-950 text-destructive rounded-xl border border-red-200 dark:border-red-800 max-w-md">
-          <h3 className="mb-2 text-base font-semibold">
-            Error Loading Data
-          </h3>
-          <p className="text-sm">
-            {error?.message}
-          </p>
+      <div className="bg-background flex h-full items-center justify-center p-6">
+        <div className="text-destructive max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950">
+          <h3 className="mb-2 text-base font-semibold">Error Loading Data</h3>
+          <p className="text-sm">{error?.message}</p>
         </div>
       </div>
     );
@@ -75,16 +69,16 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   // Show empty placeholder if no goals exist
   if (!goals || goals.length === 0) {
     return (
-  <div className="bg-background h-full">
+      <div className="bg-background h-full">
         {/* Header */}
-        <header className="w-full p-3 sm:p-6 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
+        <header className="border-border mb-4 w-full border-b p-3 pb-3 sm:mb-6 sm:p-6 sm:pb-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
+            <h1 className="text-foreground text-xl font-semibold sm:text-2xl">
               Goal Progress Tracker
             </h1>
             <HelpPopover />
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm">
             Track your investment progress towards your financial goals
           </p>
         </header>
@@ -96,9 +90,10 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
               <EmptyPlaceholder.Icon name="Goals" />
               <EmptyPlaceholder.Title>No Goals Found</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You haven't created any investment goals yet. Create your first goal to start tracking your progress.
+                You haven't created any investment goals yet. Create your first goal to start
+                tracking your progress.
               </EmptyPlaceholder.Description>
-              <Button onClick={() => ctx.api.navigation.navigate('/settings/goals')}>
+              <Button onClick={() => ctx.api.navigation.navigate("/settings/goals")}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
                 Create Your First Goal
               </Button>
@@ -110,26 +105,25 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   }
 
   return (
-  <div className="bg-background flex flex-col h-full">
+    <div className="bg-background flex h-full flex-col">
       {/* Header - Full Width */}
-      <header className="w-full p-3 sm:p-6 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+      <header className="border-border mb-4 w-full border-b p-3 pb-3 sm:mb-6 sm:p-6 sm:pb-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
+            <div className="mb-1 flex items-center gap-2">
+              <h1 className="text-foreground text-xl font-semibold sm:text-2xl">
                 Goal Progress Tracker
               </h1>
               <HelpPopover />
             </div>
-            <p className="text-sm text-muted-foreground">
-              {selectedGoal 
+            <p className="text-muted-foreground text-sm">
+              {selectedGoal
                 ? `Tracking progress for: ${selectedGoal.title}`
-                : "Select a goal to track your investment progress"
-              }
+                : "Select a goal to track your investment progress"}
             </p>
           </div>
-          
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <GoalSelector
               goals={goals}
               selectedGoal={selectedGoal}
@@ -164,7 +158,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
 
 /**
  * Investment Target Tracker Addon
- * 
+ *
  * Features:
  * - Visual calendar representation of investment progress
  * - Integration with main app goals via searchable dropdown
@@ -173,7 +167,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
  * - Interactive milestone tracking
  */
 export default function enable(ctx: AddonContext) {
-  ctx.api.logger.info('🎯 Investment Target Tracker addon is being enabled!');
+  ctx.api.logger.info("🎯 Investment Target Tracker addon is being enabled!");
 
   // Store references to items for cleanup
   const addedItems: Array<{ remove: () => void }> = [];
@@ -181,15 +175,15 @@ export default function enable(ctx: AddonContext) {
   try {
     // Add sidebar navigation item
     const sidebarItem = ctx.sidebar.addItem({
-      id: 'investment-target-tracker',
-      label: 'Target Tracker',
+      id: "investment-target-tracker",
+      label: "Target Tracker",
       icon: <Icons.Goals className="h-5 w-5" />,
-      route: '/addon/investment-target-tracker',
-      order: 200
+      route: "/addon/investment-target-tracker",
+      order: 200,
     });
     addedItems.push(sidebarItem);
-    
-    ctx.api.logger.debug('Sidebar navigation item added successfully');
+
+    ctx.api.logger.debug("Sidebar navigation item added successfully");
 
     // Create wrapper component with QueryClientProvider using shared client
     const InvestmentTargetTrackerWrapper = () => {
@@ -203,34 +197,35 @@ export default function enable(ctx: AddonContext) {
 
     // Register route
     ctx.router.add({
-      path: '/addon/investment-target-tracker',
-      component: React.lazy(() => Promise.resolve({ 
-        default: InvestmentTargetTrackerWrapper 
-      }))
+      path: "/addon/investment-target-tracker",
+      component: React.lazy(() =>
+        Promise.resolve({
+          default: InvestmentTargetTrackerWrapper,
+        }),
+      ),
     });
-    
-    ctx.api.logger.debug('Route registered successfully');
-    ctx.api.logger.info('Investment Target Tracker addon enabled successfully');
 
+    ctx.api.logger.debug("Route registered successfully");
+    ctx.api.logger.info("Investment Target Tracker addon enabled successfully");
   } catch (error) {
-    ctx.api.logger.error('Failed to initialize addon: ' + (error as Error).message);
+    ctx.api.logger.error("Failed to initialize addon: " + (error as Error).message);
     // Re-throw the error so the addon system can handle it
     throw error;
   }
 
   // Register cleanup callback
   ctx.onDisable(() => {
-    ctx.api.logger.info('🛑 Investment Target Tracker addon is being disabled');
-    
+    ctx.api.logger.info("🛑 Investment Target Tracker addon is being disabled");
+
     // Remove all sidebar items
-    addedItems.forEach(item => {
+    addedItems.forEach((item) => {
       try {
         item.remove();
       } catch (error) {
-        ctx.api.logger.error('Error removing sidebar item: ' + (error as Error).message);
+        ctx.api.logger.error("Error removing sidebar item: " + (error as Error).message);
       }
     });
-    
-    ctx.api.logger.info('Investment Target Tracker addon disabled successfully');
+
+    ctx.api.logger.info("Investment Target Tracker addon disabled successfully");
   });
 }

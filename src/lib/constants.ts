@@ -1,19 +1,18 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-
-export const PORTFOLIO_ACCOUNT_ID = 'TOTAL';
+export const PORTFOLIO_ACCOUNT_ID = "TOTAL";
 
 export const HoldingType = {
-  CASH: 'cash',
-  SECURITY: 'security',
+  CASH: "cash",
+  SECURITY: "security",
 } as const;
 
 export type HoldingType = (typeof HoldingType)[keyof typeof HoldingType];
 
 export const AccountType = {
-  SECURITIES: 'SECURITIES',
-  CASH: 'CASH',
-  CRYPTOCURRENCY: 'CRYPTOCURRENCY',
+  SECURITIES: "SECURITIES",
+  CASH: "CASH",
+  CRYPTOCURRENCY: "CRYPTOCURRENCY",
 } as const;
 
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
@@ -25,29 +24,26 @@ export const accountTypeSchema = z.enum([
 ]);
 
 export const DataSource = {
-  YAHOO: 'YAHOO',
-  MANUAL: 'MANUAL',
+  YAHOO: "YAHOO",
+  MANUAL: "MANUAL",
 } as const;
 
 export type DataSource = (typeof DataSource)[keyof typeof DataSource];
 
 // Zod schema for data source validation
-export const dataSourceSchema = z.enum([
-  DataSource.YAHOO,
-  DataSource.MANUAL,
-]);
+export const dataSourceSchema = z.enum([DataSource.YAHOO, DataSource.MANUAL]);
 
 export const ImportFormat = {
-  DATE: 'date',
-  ACTIVITY_TYPE: 'activityType',
-  SYMBOL: 'symbol',
-  QUANTITY: 'quantity',
-  UNIT_PRICE: 'unitPrice',
-  AMOUNT: 'amount',
-  CURRENCY: 'currency',
-  FEE: 'fee',
-  ACCOUNT: 'account',
-  COMMENT: 'comment',
+  DATE: "date",
+  ACTIVITY_TYPE: "activityType",
+  SYMBOL: "symbol",
+  QUANTITY: "quantity",
+  UNIT_PRICE: "unitPrice",
+  AMOUNT: "amount",
+  CURRENCY: "currency",
+  FEE: "fee",
+  ACCOUNT: "account",
+  COMMENT: "comment",
 } as const;
 
 export type ImportFormat = (typeof ImportFormat)[keyof typeof ImportFormat];
@@ -74,13 +70,13 @@ export const IMPORT_REQUIRED_FIELDS = [
   ImportFormat.AMOUNT,
 ] as const;
 
-export type ImportRequiredField = typeof IMPORT_REQUIRED_FIELDS[number];
+export type ImportRequiredField = (typeof IMPORT_REQUIRED_FIELDS)[number];
 
 export const ExportDataType = {
-  ACCOUNTS: 'accounts',
-  ACTIVITIES: 'activities',
-  GOALS: 'goals',
-  PORTFOLIO_HISTORY: 'portfolio-history',
+  ACCOUNTS: "accounts",
+  ACTIVITIES: "activities",
+  GOALS: "goals",
+  PORTFOLIO_HISTORY: "portfolio-history",
 } as const;
 
 export type ExportDataType = (typeof ExportDataType)[keyof typeof ExportDataType];
@@ -93,9 +89,9 @@ export const exportDataTypeSchema = z.enum([
 ]);
 
 export const ExportedFileFormat = {
-  CSV: 'CSV',
-  JSON: 'JSON',
-  SQLITE: 'SQLite',
+  CSV: "CSV",
+  JSON: "JSON",
+  SQLITE: "SQLite",
 } as const;
 
 export type ExportedFileFormat = (typeof ExportedFileFormat)[keyof typeof ExportedFileFormat];
@@ -107,19 +103,19 @@ export const exportedFileFormatSchema = z.enum([
 ]);
 
 export const ActivityType = {
-  BUY: 'BUY',
-  SELL: 'SELL',
-  DIVIDEND: 'DIVIDEND',
-  INTEREST: 'INTEREST',
-  DEPOSIT: 'DEPOSIT',
-  WITHDRAWAL: 'WITHDRAWAL',
-  ADD_HOLDING: 'ADD_HOLDING',
-  REMOVE_HOLDING: 'REMOVE_HOLDING',
-  TRANSFER_IN: 'TRANSFER_IN',
-  TRANSFER_OUT: 'TRANSFER_OUT',
-  FEE: 'FEE',
-  TAX: 'TAX',
-  SPLIT: 'SPLIT',
+  BUY: "BUY",
+  SELL: "SELL",
+  DIVIDEND: "DIVIDEND",
+  INTEREST: "INTEREST",
+  DEPOSIT: "DEPOSIT",
+  WITHDRAWAL: "WITHDRAWAL",
+  ADD_HOLDING: "ADD_HOLDING",
+  REMOVE_HOLDING: "REMOVE_HOLDING",
+  TRANSFER_IN: "TRANSFER_IN",
+  TRANSFER_OUT: "TRANSFER_OUT",
+  FEE: "FEE",
+  TAX: "TAX",
+  SPLIT: "SPLIT",
 } as const;
 
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
@@ -142,10 +138,7 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.FEE,
 ] as const;
 
-export const INCOME_ACTIVITY_TYPES = [
-  ActivityType.DIVIDEND,
-  ActivityType.INTEREST,
-] as const;
+export const INCOME_ACTIVITY_TYPES = [ActivityType.DIVIDEND, ActivityType.INTEREST] as const;
 
 // Zod schema for activity type validation
 export const activityTypeSchema = z.enum([
@@ -165,17 +158,17 @@ export const activityTypeSchema = z.enum([
 ]);
 
 export const ActivityTypeNames: Record<ActivityType, string> = {
-  [ActivityType.BUY]: 'Buy',
-  [ActivityType.SELL]: 'Sell',
-  [ActivityType.DIVIDEND]: 'Dividend',
-  [ActivityType.INTEREST]: 'Interest',
-  [ActivityType.DEPOSIT]: 'Deposit',
-  [ActivityType.WITHDRAWAL]: 'Withdrawal',
-  [ActivityType.ADD_HOLDING]: 'Add Holding',
-  [ActivityType.REMOVE_HOLDING]: 'Remove Holding',
-  [ActivityType.TRANSFER_IN]: 'Transfer In',
-  [ActivityType.TRANSFER_OUT]: 'Transfer Out',
-  [ActivityType.FEE]: 'Fee',
-  [ActivityType.TAX]: 'Tax',
-  [ActivityType.SPLIT]: 'Split',
-}; 
+  [ActivityType.BUY]: "Buy",
+  [ActivityType.SELL]: "Sell",
+  [ActivityType.DIVIDEND]: "Dividend",
+  [ActivityType.INTEREST]: "Interest",
+  [ActivityType.DEPOSIT]: "Deposit",
+  [ActivityType.WITHDRAWAL]: "Withdrawal",
+  [ActivityType.ADD_HOLDING]: "Add Holding",
+  [ActivityType.REMOVE_HOLDING]: "Remove Holding",
+  [ActivityType.TRANSFER_IN]: "Transfer In",
+  [ActivityType.TRANSFER_OUT]: "Transfer Out",
+  [ActivityType.FEE]: "Fee",
+  [ActivityType.TAX]: "Tax",
+  [ActivityType.SPLIT]: "Split",
+};

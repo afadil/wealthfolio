@@ -1,7 +1,6 @@
-import { ActivityImport, ImportMappingData } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from '@/adapters';
-import { logger } from '@/adapters';
-
+import { ActivityImport, ImportMappingData } from "@/lib/types";
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from "@/adapters";
+import { logger } from "@/adapters";
 
 export const importActivities = async ({
   activities,
@@ -11,12 +10,12 @@ export const importActivities = async ({
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('import_activities', {
+        return invokeTauri("import_activities", {
           accountId: activities[0].accountId,
           activities: activities,
         });
       case RUN_ENV.WEB:
-        return invokeWeb('import_activities', {
+        return invokeWeb("import_activities", {
           accountId: activities[0].accountId,
           activities,
         });
@@ -24,7 +23,7 @@ export const importActivities = async ({
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error checking activities import.');
+    logger.error("Error checking activities import.");
     throw error;
   }
 };
@@ -39,12 +38,12 @@ export const checkActivitiesImport = async ({
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('check_activities_import', {
+        return invokeTauri("check_activities_import", {
           accountId: account_id,
           activities: activities,
         });
       case RUN_ENV.WEB:
-        return invokeWeb('check_activities_import', {
+        return invokeWeb("check_activities_import", {
           accountId: account_id,
           activities,
         });
@@ -52,7 +51,7 @@ export const checkActivitiesImport = async ({
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error checking activities import.');
+    logger.error("Error checking activities import.");
     throw error;
   }
 };
@@ -61,14 +60,14 @@ export const getAccountImportMapping = async (accountId: string): Promise<Import
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_account_import_mapping', { accountId });
+        return invokeTauri("get_account_import_mapping", { accountId });
       case RUN_ENV.WEB:
-        return invokeWeb('get_account_import_mapping', { accountId });
+        return invokeWeb("get_account_import_mapping", { accountId });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error fetching mapping.');
+    logger.error("Error fetching mapping.");
     throw error;
   }
 };
@@ -79,16 +78,16 @@ export const saveAccountImportMapping = async (
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('save_account_import_mapping', {
+        return invokeTauri("save_account_import_mapping", {
           mapping,
         });
       case RUN_ENV.WEB:
-        return invokeWeb('save_account_import_mapping', { mapping });
+        return invokeWeb("save_account_import_mapping", { mapping });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error saving mapping.');
+    logger.error("Error saving mapping.");
     throw error;
   }
 };

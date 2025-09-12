@@ -6,7 +6,7 @@ import {
   openFileSaveDialogTauri,
   RUN_ENV,
   logger,
-} from '@/adapters';
+} from "@/adapters";
 
 // openCsvFileDialog
 export const openCsvFileDialog = async (): Promise<null | string | string[]> => {
@@ -20,7 +20,7 @@ export const openCsvFileDialog = async (): Promise<null | string | string[]> => 
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error open csv file.');
+    logger.error("Error open csv file.");
     throw error;
   }
 };
@@ -37,7 +37,7 @@ export const openFolderDialog = async (): Promise<string | null> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error opening folder dialog.');
+    logger.error("Error opening folder dialog.");
     throw error;
   }
 };
@@ -54,7 +54,7 @@ export const openDatabaseFileDialog = async (): Promise<string | null> => {
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error opening database file dialog.');
+    logger.error("Error opening database file dialog.");
     throw error;
   }
 };

@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
-import { GoalItem } from './components/goal-item';
-import { GoalEditModal } from './components/goal-edit-modal';
-import type { Goal, GoalAllocation } from '@/lib/types';
-import { SettingsHeader } from '../header';
-import { getGoals, getGoalsAllocation } from '@/commands/goal';
-import { useQuery } from '@tanstack/react-query';
-import GoalsAllocations from './components/goal-allocations';
-import { useAccounts } from '@/hooks/use-accounts';
-import { QueryKeys } from '@/lib/query-keys';
-import { useGoalMutations } from './use-goal-mutations';
+import { useState } from "react";
+import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from "@wealthfolio/ui";
+import { GoalItem } from "./components/goal-item";
+import { GoalEditModal } from "./components/goal-edit-modal";
+import type { Goal, GoalAllocation } from "@/lib/types";
+import { SettingsHeader } from "../header";
+import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { useQuery } from "@tanstack/react-query";
+import GoalsAllocations from "./components/goal-allocations";
+import { useAccounts } from "@/hooks/use-accounts";
+import { QueryKeys } from "@/lib/query-keys";
+import { useGoalMutations } from "./use-goal-mutations";
 
 const SettingsGoalsPage = () => {
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
@@ -81,7 +81,7 @@ const SettingsGoalsPage = () => {
             <>
               <h3 className="p-2 text-xl font-bold">Goals</h3>
 
-              <div className="divide-y divide-border rounded-md border">
+              <div className="divide-border divide-y rounded-md border">
                 {goals.map((goal: Goal) => (
                   <GoalItem
                     key={goal.id}
@@ -92,7 +92,7 @@ const SettingsGoalsPage = () => {
                 ))}
               </div>
               <h3 className="p-2 pt-12 text-xl font-bold">Allocations</h3>
-              <h5 className="p-2 pb-4 pt-0 text-sm font-light text-muted-foreground">
+              <h5 className="text-muted-foreground p-2 pt-0 pb-4 text-sm font-light">
                 Click on a cell to specify the percentage of each account's allocation to your
                 goals.
               </h5>

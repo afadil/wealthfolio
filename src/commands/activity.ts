@@ -1,5 +1,11 @@
-import { Activity, ActivityCreate, ActivityDetails, ActivitySearchResponse, ActivityUpdate } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from '@/adapters';
+import {
+  Activity,
+  ActivityCreate,
+  ActivityDetails,
+  ActivitySearchResponse,
+  ActivityUpdate,
+} from "@/lib/types";
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 interface Filters {
   accountId?: string;
@@ -12,16 +18,21 @@ interface Sort {
   desc: boolean;
 }
 
-
 export const getActivities = async (accountId?: string): Promise<ActivityDetails[]> => {
   try {
-    const response = await searchActivities(0, Number.MAX_SAFE_INTEGER, accountId ? { accountId } : {}, '', {
-      id: 'date',
-      desc: true,
-    });
+    const response = await searchActivities(
+      0,
+      Number.MAX_SAFE_INTEGER,
+      accountId ? { accountId } : {},
+      "",
+      {
+        id: "date",
+        desc: true,
+      },
+    );
     return response.data;
   } catch (error) {
-    logger.error('Error fetching all activities.');
+    logger.error("Error fetching all activities.");
     throw error;
   }
 };
@@ -36,7 +47,7 @@ export const searchActivities = async (
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('search_activities', {
+        return invokeTauri("search_activities", {
           page,
           pageSize,
           accountIdFilter: filters?.accountId,
@@ -45,7 +56,7 @@ export const searchActivities = async (
           sort,
         });
       case RUN_ENV.WEB:
-        return invokeWeb('search_activities', {
+        return invokeWeb("search_activities", {
           page,
           pageSize,
           accountIdFilter: filters?.accountId,
@@ -57,7 +68,7 @@ export const searchActivities = async (
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error fetching activities.');
+    logger.error("Error fetching activities.");
     throw error;
   }
 };
@@ -66,14 +77,14 @@ export const createActivity = async (activity: ActivityCreate): Promise<Activity
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('create_activity', { activity: activity });
+        return invokeTauri("create_activity", { activity: activity });
       case RUN_ENV.WEB:
-        return invokeWeb('create_activity', { activity });
+        return invokeWeb("create_activity", { activity });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error creating activity.');
+    logger.error("Error creating activity.");
     throw error;
   }
 };
@@ -82,14 +93,14 @@ export const updateActivity = async (activity: ActivityUpdate): Promise<Activity
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('update_activity', { activity: activity });
+        return invokeTauri("update_activity", { activity: activity });
       case RUN_ENV.WEB:
-        return invokeWeb('update_activity', { activity });
+        return invokeWeb("update_activity", { activity });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error updating activity.');
+    logger.error("Error updating activity.");
     throw error;
   }
 };
@@ -98,14 +109,14 @@ export const saveActivities = async (activities: ActivityUpdate[]): Promise<Acti
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('save_activities', { activities: activities });
+        return invokeTauri("save_activities", { activities: activities });
       case RUN_ENV.WEB:
-        return invokeWeb('save_activities', { activities });
+        return invokeWeb("save_activities", { activities });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error saving activities.');
+    logger.error("Error saving activities.");
     throw error;
   }
 };
@@ -114,14 +125,14 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('delete_activity', { activityId });
+        return invokeTauri("delete_activity", { activityId });
       case RUN_ENV.WEB:
-        return invokeWeb('delete_activity', { activityId });
+        return invokeWeb("delete_activity", { activityId });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error deleting activity.');
+    logger.error("Error deleting activity.");
     throw error;
   }
 };

@@ -1,8 +1,8 @@
-import z from 'zod';
-import { Goal, GoalAllocation } from '@/lib/types';
-import { newGoalSchema } from '@/lib/schemas';
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from '@/adapters';
-import { logger } from '@/adapters';
+import z from "zod";
+import { Goal, GoalAllocation } from "@/lib/types";
+import { newGoalSchema } from "@/lib/schemas";
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from "@/adapters";
+import { logger } from "@/adapters";
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
@@ -10,14 +10,14 @@ export const getGoals = async (): Promise<Goal[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_goals');
+        return invokeTauri("get_goals");
       case RUN_ENV.WEB:
-        return invokeWeb('get_goals');
+        return invokeWeb("get_goals");
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error fetching goals.');
+    logger.error("Error fetching goals.");
     throw error;
   }
 };
@@ -26,20 +26,20 @@ export const createGoal = async (goal: NewGoal): Promise<Goal> => {
   const newGoal = {
     ...goal,
     yearlyContribution: 0,
-    goalType: 'NEEDS',
+    goalType: "NEEDS",
     isAchieved: false,
   };
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('create_goal', { goal: newGoal });
+        return invokeTauri("create_goal", { goal: newGoal });
       case RUN_ENV.WEB:
-        return invokeWeb('create_goal', { goal: newGoal });
+        return invokeWeb("create_goal", { goal: newGoal });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error creating goal.');
+    logger.error("Error creating goal.");
     throw error;
   }
 };
@@ -48,14 +48,14 @@ export const updateGoal = async (goal: Goal): Promise<Goal> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('update_goal', { goal });
+        return invokeTauri("update_goal", { goal });
       case RUN_ENV.WEB:
-        return invokeWeb('update_goal', { goal });
+        return invokeWeb("update_goal", { goal });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error updating goal.');
+    logger.error("Error updating goal.");
     throw error;
   }
 };
@@ -64,16 +64,16 @@ export const deleteGoal = async (goalId: string): Promise<void> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        await invokeTauri('delete_goal', { goalId });
+        await invokeTauri("delete_goal", { goalId });
         return;
       case RUN_ENV.WEB:
-        await invokeWeb('delete_goal', { goalId });
+        await invokeWeb("delete_goal", { goalId });
         return;
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error deleting goal.');
+    logger.error("Error deleting goal.");
     throw error;
   }
 };
@@ -82,16 +82,16 @@ export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Pro
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        await invokeTauri('update_goal_allocations', { allocations });
+        await invokeTauri("update_goal_allocations", { allocations });
         return;
       case RUN_ENV.WEB:
-        await invokeWeb('update_goal_allocations', { allocations });
+        await invokeWeb("update_goal_allocations", { allocations });
         return;
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error saving goals allocations.');
+    logger.error("Error saving goals allocations.");
     throw error;
   }
 };
@@ -100,14 +100,14 @@ export const getGoalsAllocation = async (): Promise<GoalAllocation[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('load_goals_allocations');
+        return invokeTauri("load_goals_allocations");
       case RUN_ENV.WEB:
-        return invokeWeb('load_goals_allocations');
+        return invokeWeb("load_goals_allocations");
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error fetching goals allocations.');
+    logger.error("Error fetching goals allocations.");
     throw error;
   }
 };

@@ -1,36 +1,36 @@
-import { useMemo } from 'react';
-import { subMonths } from 'date-fns';
-import { PerformanceChart } from '@/components/performance-chart';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import { DateRangeSelector } from '@wealthfolio/ui';
-import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@wealthfolio/ui';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { useCalculatePerformanceHistory } from './hooks/use-performance-data';
-import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
-import { AlertFeedback } from '@wealthfolio/ui';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { TrackedItem, PerformanceMetrics, ReturnData, DateRange } from '@/lib/types';
-import { GainPercent } from '@wealthfolio/ui';
-import NumberFlow from '@number-flow/react';
-import { AccountSelector } from '../../components/account-selector';
-import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
+import { useMemo } from "react";
+import { subMonths } from "date-fns";
+import { PerformanceChart } from "@/components/performance-chart";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
+import { DateRangeSelector } from "@wealthfolio/ui";
+import { ApplicationHeader } from "@/components/header";
+import { ApplicationShell } from "@wealthfolio/ui";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
+import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
+import { AlertFeedback } from "@wealthfolio/ui";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { TrackedItem, PerformanceMetrics, ReturnData, DateRange } from "@/lib/types";
+import { GainPercent } from "@wealthfolio/ui";
+import NumberFlow from "@number-flow/react";
+import { AccountSelector } from "../../components/account-selector";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import {
   MetricLabelWithInfo,
   TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
   ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
   VOLATILITY_INFO as volatilityInfo,
-  MAX_DRAWDOWN_INFO as maxDrawdownInfo
-} from '@/components/metric-display';
-import { usePersistentState } from '@/hooks/use-persistent-state';
+  MAX_DRAWDOWN_INFO as maxDrawdownInfo,
+} from "@/components/metric-display";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 const PORTFOLIO_TOTAL: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
-  type: 'account',
-  name: 'All Portfolio',
+  type: "account",
+  name: "All Portfolio",
 };
 
 // Define the type expected by the chart
@@ -43,7 +43,7 @@ interface ChartDataItem {
 // Define the actual structure returned by the hook (assuming it includes name/type)
 interface PerformanceDataFromHook extends PerformanceMetrics {
   name: string;
-  type: 'account' | 'symbol';
+  type: "account" | "symbol";
 }
 
 function PerformanceContent({
@@ -78,12 +78,12 @@ function PerformanceContent({
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
-            <div className="animate-progress-border absolute left-0 top-0 h-[2px] bg-primary"></div>
+            <div className="animate-progress-border bg-primary absolute top-0 left-0 h-[2px]"></div>
           </div>
-          <div className="absolute bottom-4 right-4">
-            <div className="rounded-md border bg-background/80 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-              <p className="flex items-center text-xs font-medium text-muted-foreground">
-                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-primary"></span>
+          <div className="absolute right-4 bottom-4">
+            <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
+              <p className="text-muted-foreground flex items-center text-xs font-medium">
+                <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
                 Calculating...
               </p>
             </div>
@@ -119,28 +119,29 @@ function PerformanceContent({
   );
 }
 
-const SelectedItemBadge = ({ 
-  item, 
-  isSelected, 
-  onSelect, 
-  onDelete 
-}: { 
-  item: TrackedItem; 
+const SelectedItemBadge = ({
+  item,
+  isSelected,
+  onSelect,
+  onDelete,
+}: {
+  item: TrackedItem;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
 }) => {
   return (
     <div className="my-2 flex items-center">
-      <Badge className={`rounded-md  px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
-        isSelected ? 'ring-2 ring-primary' : ''
-      }`}
+      <Badge
+        className={`rounded-md px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
+          isSelected ? "ring-primary ring-2" : ""
+        }`}
         onClick={onSelect}
         role="button"
         variant="secondary"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onSelect();
           }
@@ -150,15 +151,15 @@ const SelectedItemBadge = ({
         <div className="flex items-center space-x-3">
           <div
             className={`h-4 w-1 rounded-full ${
-              item.type === 'account'
-                ? 'bg-zinc-500 dark:bg-zinc-400'
-                : 'bg-orange-500 dark:bg-orange-400'
+              item.type === "account"
+                ? "bg-zinc-500 dark:bg-zinc-400"
+                : "bg-orange-500 dark:bg-orange-400"
             }`}
           ></div>
           <span className="text-sm font-medium">{item.name}</span>
         </div>
-        <button 
-          className="ml-3 text-gray-500 dark:text-zinc-400 transition-all duration-150 hover:scale-110 hover:text-gray-800 hover:dark:text-zinc-100"
+        <button
+          className="ml-3 text-gray-500 transition-all duration-150 hover:scale-110 hover:text-gray-800 dark:text-zinc-400 hover:dark:text-zinc-100"
           onClick={onDelete}
           aria-label={`Remove ${item.name}`}
         >
@@ -171,15 +172,15 @@ const SelectedItemBadge = ({
 
 export default function PerformancePage() {
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
-    'performance:selectedItems',
+    "performance:selectedItems",
     [PORTFOLIO_TOTAL],
   );
   const [selectedItemId, setSelectedItemId] = usePersistentState<string | null>(
-    'performance:selectedItemId',
+    "performance:selectedItemId",
     null,
   );
   const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
-    'performance:dateRange',
+    "performance:dateRange",
     {
       from: subMonths(new Date(), 12),
       to: new Date(),
@@ -191,7 +192,7 @@ export default function PerformancePage() {
     return [...items].sort((a, b) => {
       // Sort by type first (accounts before symbols)
       if (a.type !== b.type) {
-        return a.type === 'account' ? -1 : 1;
+        return a.type === "account" ? -1 : 1;
       }
       // If same type, maintain original order
       return 0;
@@ -204,36 +205,41 @@ export default function PerformancePage() {
     isLoading: isLoadingPerformance,
     hasErrors,
     errorMessages,
-    displayDateRange
+    displayDateRange,
   } = useCalculatePerformanceHistory({
     selectedItems,
-    dateRange
+    dateRange,
   });
 
   // Calculate derived chart data
   const chartData = useMemo(() => {
     if (!performanceData || !selectedItems) return [];
 
-    return performanceData
-      // Update type predicate to use the more accurate type
-      .filter((item): item is PerformanceDataFromHook => 
-        item !== null && typeof item.id === 'string' && Array.isArray(item.returns)
-      )
-      .map((perfItem): ChartDataItem => ({
-        id: perfItem.id,
-        name: perfItem.name, // Can now safely access name from perfItem
-        returns: perfItem.returns,
-      }));
+    return (
+      performanceData
+        // Update type predicate to use the more accurate type
+        .filter(
+          (item): item is PerformanceDataFromHook =>
+            item !== null && typeof item.id === "string" && Array.isArray(item.returns),
+        )
+        .map(
+          (perfItem): ChartDataItem => ({
+            id: perfItem.id,
+            name: perfItem.name, // Can now safely access name from perfItem
+            returns: perfItem.returns,
+          }),
+        )
+    );
   }, [performanceData, selectedItems]);
 
   // Calculate selected item data
   const selectedItemData = useMemo(() => {
     if (!performanceData?.length || !selectedItems) return null;
-    const targetId = selectedItemId || performanceData.find(item => item !== null)?.id; // Find first non-null item ID if none selected
+    const targetId = selectedItemId || performanceData.find((item) => item !== null)?.id; // Find first non-null item ID if none selected
     if (!targetId) return null;
     const found = performanceData.find((item) => item?.id === targetId);
     if (!found) return null;
-    const name = selectedItems.find(item => item.id === found.id)?.name || 'Unknown';
+    const name = selectedItems.find((item) => item.id === found.id)?.name || "Unknown";
     return {
       id: found.id,
       name: name,
@@ -254,7 +260,7 @@ export default function PerformancePage() {
       // Create a proper ComparisonItem
       const newItem: TrackedItem = {
         id: account.id,
-        type: 'account',
+        type: "account",
         name: account.name,
       };
 
@@ -269,7 +275,7 @@ export default function PerformancePage() {
 
       const newSymbol: TrackedItem = {
         id: symbol.id,
-        type: 'symbol',
+        type: "symbol",
         name: symbol.name,
       };
 
@@ -283,7 +289,7 @@ export default function PerformancePage() {
 
   const handleBadgeDelete = (e: React.MouseEvent, item: TrackedItem) => {
     e.stopPropagation();
-    if (item.type === 'account') {
+    if (item.type === "account") {
       handleAccountSelect({ id: item.id, name: item.name });
     } else {
       setSelectedItems((prev) => sortComparisonItems(prev.filter((i) => i.id !== item.id)));
@@ -338,33 +344,40 @@ export default function PerformancePage() {
                   <div className="grid grid-cols-2 gap-6 rounded-lg p-2 backdrop-blur-sm md:grid-cols-4">
                     <div className="flex flex-col items-center space-y-1">
                       <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
-                      <div className="flex justify-center items-baseline">
+                      <div className="flex items-baseline justify-center">
                         <span
                           className={`text-lg ${
                             selectedItemData && selectedItemData.totalReturn >= 0
-                              ? 'text-success'
-                              : 'text-destructive'
+                              ? "text-success"
+                              : "text-destructive"
                           }`}
                         >
-                          <GainPercent value={selectedItemData?.totalReturn || 0} animated={true} className='text-lg'/>
+                          <GainPercent
+                            value={selectedItemData?.totalReturn || 0}
+                            animated={true}
+                            className="text-lg"
+                          />
                         </span>
                       </div>
                     </div>
 
                     <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Annualized Return" infoText={annualizedReturnInfo} />
-                      <div className="flex justify-center items-baseline">
+                      <MetricLabelWithInfo
+                        label="Annualized Return"
+                        infoText={annualizedReturnInfo}
+                      />
+                      <div className="flex items-baseline justify-center">
                         <span
                           className={`text-lg ${
                             selectedItemData && selectedItemData.annualizedReturn >= 0
-                              ? 'text-success'
-                              : 'text-destructive'
+                              ? "text-success"
+                              : "text-destructive"
                           }`}
                         >
                           <GainPercent
                             value={selectedItemData?.annualizedReturn || 0}
                             animated={true}
-                            className='text-lg'
+                            className="text-lg"
                           />
                         </span>
                       </div>
@@ -372,13 +385,13 @@ export default function PerformancePage() {
 
                     <div className="flex flex-col items-center space-y-1">
                       <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
-                      <div className="flex justify-center items-baseline">
-                        <span className="text-lg text-foreground">
+                      <div className="flex items-baseline justify-center">
+                        <span className="text-foreground text-lg">
                           <NumberFlow
-                            value={(selectedItemData?.volatility || 0)}
+                            value={selectedItemData?.volatility || 0}
                             animated={true}
                             format={{
-                              style: 'percent',
+                              style: "percent",
                               maximumFractionDigits: 2,
                             }}
                           />
@@ -388,13 +401,13 @@ export default function PerformancePage() {
 
                     <div className="flex flex-col items-center space-y-1">
                       <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
-                      <div className="flex justify-center items-baseline">
-                        <span className="text-lg text-destructive">
+                      <div className="flex items-baseline justify-center">
+                        <span className="text-destructive text-lg">
                           <NumberFlow
                             value={(selectedItemData?.maxDrawdown || 0) * -1}
                             animated={true}
                             format={{
-                              style: 'percent',
+                              style: "percent",
                               maximumFractionDigits: 2,
                             }}
                           />

@@ -1,29 +1,22 @@
-import React from 'react';
-import { format, parseISO } from 'date-fns';
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import React from "react";
+import { format, parseISO } from "date-fns";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-} from '@/components/ui/chart';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/ui/icons';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { formatAmount } from '@wealthfolio/ui';
+} from "@/components/ui/chart";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { Icons } from "@/components/ui/icons";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { formatAmount } from "@wealthfolio/ui";
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
   previousMonthlyIncomeData: [string, number][];
-  selectedPeriod: 'TOTAL' | 'YTD' | 'LAST_YEAR';
+  selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   currency: string;
   isBalanceHidden: boolean;
 }
@@ -35,14 +28,11 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   currency,
   isBalanceHidden,
 }) => {
-
   const chartData = monthlyIncomeData.map(([month, income], index) => {
-    const cumulative = monthlyIncomeData
-      .slice(0, index + 1)
-      .reduce((sum, [, value]) => {
-        const numericValue = Number(value) || 0;
-        return sum + numericValue;
-      }, 0);
+    const cumulative = monthlyIncomeData.slice(0, index + 1).reduce((sum, [, value]) => {
+      const numericValue = Number(value) || 0;
+      return sum + numericValue;
+    }, 0);
 
     const dataPoint = {
       month,
@@ -50,17 +40,16 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
       cumulative: cumulative,
       previousIncome: Number(previousMonthlyIncomeData[index]?.[1]) || 0,
     };
-    
+
     return dataPoint;
   });
 
-
   const periodDescription =
-    selectedPeriod === 'TOTAL'
-      ? 'All Time'
-      : selectedPeriod === 'YTD'
-        ? 'Year to Date'
-        : 'Last Year';
+    selectedPeriod === "TOTAL"
+      ? "All Time"
+      : selectedPeriod === "YTD"
+        ? "Year to Date"
+        : "Last Year";
 
   return (
     <Card className="col-span-2">
@@ -80,16 +69,16 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
           <ChartContainer
             config={{
               income: {
-                label: 'Monthly Income',
-                color: 'var(--chart-1)',
+                label: "Monthly Income",
+                color: "var(--chart-1)",
               },
               cumulative: {
-                label: 'Cumulative Income',
-                color: 'var(--chart-5)',
+                label: "Cumulative Income",
+                color: "var(--chart-5)",
               },
               previousIncome: {
-                label: 'Previous Period Income',
-                color: 'var(--chart-5)',
+                label: "Previous Period Income",
+                color: "var(--chart-5)",
               },
             }}
           >
@@ -100,7 +89,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 tickLine={false}
                 tickMargin={10}
                 axisLine={false}
-                tickFormatter={(value) => format(parseISO(`${value}-01`), 'MMM yy')}
+                tickFormatter={(value) => format(parseISO(`${value}-01`), "MMM yy")}
               />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
@@ -109,30 +98,30 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                   <ChartTooltipContent
                     formatter={(value, name, entry) => {
                       const formattedValue = isBalanceHidden
-                        ? '••••'
+                        ? "••••"
                         : formatAmount(Number(value), currency);
                       return (
                         <>
                           <div
-                            className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-border bg-(--color-bg)"
+                            className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
                             style={
                               {
-                                '--color-bg': entry.color,
-                                '--color-border': entry.color,
+                                "--color-bg": entry.color,
+                                "--color-border": entry.color,
                               } as React.CSSProperties
                             }
                           />
                           <div className="flex flex-1 items-center justify-between">
                             <span className="text-muted-foreground">
-                              {name === 'income'
-                                ? 'Monthly Income'
-                                : name === 'previousIncome'
-                                  ? 'Previous Period'
-                                  : name === 'cumulative'
-                                    ? 'Cumulative Income'
+                              {name === "income"
+                                ? "Monthly Income"
+                                : name === "previousIncome"
+                                  ? "Previous Period"
+                                  : name === "cumulative"
+                                    ? "Cumulative Income"
                                     : name}
                             </span>
-                            <span className="ml-2 font-mono font-medium tabular-nums text-foreground">
+                            <span className="text-foreground ml-2 font-mono font-medium tabular-nums">
                               {formattedValue}
                             </span>
                           </div>
@@ -140,7 +129,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                       );
                     }}
                     labelFormatter={(label) => {
-                      return format(parseISO(`${label}-01`), 'MMMM yyyy');
+                      return format(parseISO(`${label}-01`), "MMMM yyyy");
                     }}
                   />
                 }
@@ -176,4 +165,4 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
       </CardContent>
     </Card>
   );
-}; 
+};

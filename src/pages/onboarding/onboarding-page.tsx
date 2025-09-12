@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { usePlatform } from '@/hooks/use-platform';
-import { OnboardingStep1 } from './onboarding-step1';
-import { OnboardingStep2 } from './onboarding-step2';
-import { OnboardingStep3 } from './onboarding-step3';
-import { OnboardingSyncChoice } from './onboarding-sync-choice';
-import { OnboardingSyncStep } from './onboarding-sync-step';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { usePlatform } from "@/hooks/use-platform";
+import { OnboardingStep1 } from "./onboarding-step1";
+import { OnboardingStep2 } from "./onboarding-step2";
+import { OnboardingStep3 } from "./onboarding-step3";
+import { OnboardingSyncChoice } from "./onboarding-sync-choice";
+import { OnboardingSyncStep } from "./onboarding-sync-step";
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
-  const [syncStage, setSyncStage] = useState<'prompt' | 'scan' | 'done'>(
-    isMobile ? 'prompt' : 'prompt',
+  const [syncStage, setSyncStage] = useState<"prompt" | "scan" | "done">(
+    isMobile ? "prompt" : "prompt",
   );
   const MAX_STEPS = 3;
 
@@ -25,24 +25,24 @@ const OnboardingPage = () => {
   };
 
   const handleFinish = async () => {
-    navigate('/settings/accounts');
+    navigate("/settings/accounts");
   };
 
   const renderCurrentStep = () => {
-    if (syncStage === 'prompt') {
+    if (syncStage === "prompt") {
       return (
         <OnboardingSyncChoice
-          onYes={() => setSyncStage('scan')}
-          onNo={() => setSyncStage('done')}
+          onYes={() => setSyncStage("scan")}
+          onNo={() => setSyncStage("done")}
         />
       );
     }
 
-    if (syncStage === 'scan') {
+    if (syncStage === "scan") {
       return (
         <OnboardingSyncStep
-          onSuccess={() => setSyncStage('done')}
-          onBack={() => setSyncStage('prompt')}
+          onSuccess={() => setSyncStage("done")}
+          onBack={() => setSyncStage("prompt")}
         />
       );
     }
@@ -67,8 +67,8 @@ const OnboardingPage = () => {
         className="align-self-end mx-auto h-20 w-20 md:h-32 md:w-32 lg:h-40 lg:w-40"
         src="/illustration2.png"
         style={{
-          aspectRatio: '1 / 1',
-          objectFit: 'cover',
+          aspectRatio: "1 / 1",
+          objectFit: "cover",
         }}
       />
       <div className="align-self-start w-full max-w-7xl">

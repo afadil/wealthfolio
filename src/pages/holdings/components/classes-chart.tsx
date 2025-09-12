@@ -1,18 +1,24 @@
-import { Holding, HoldingType } from '@/lib/types';
-import { useMemo, useState } from 'react';
-import { DonutChart, EmptyPlaceholder, Skeleton, Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
+import { Holding, HoldingType } from "@/lib/types";
+import { useMemo, useState } from "react";
+import {
+  DonutChart,
+  EmptyPlaceholder,
+  Skeleton,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@wealthfolio/ui";
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
 
-  const currency = holdings[0]?.baseCurrency || 'USD';
+  const currency = holdings[0]?.baseCurrency || "USD";
 
   const classes = holdings.reduce(
     (acc, holding) => {
       const isCash = holding.holdingType === HoldingType.CASH;
-      const assetSubClass = isCash
-        ? 'Cash'
-        : holding.instrument?.assetSubclass || 'Other';
+      const assetSubClass = isCash ? "Cash" : holding.instrument?.assetSubclass || "Other";
 
       const current = acc[assetSubClass] || 0;
       const value = Number(holding.marketValue?.base) || 0;
@@ -24,7 +30,7 @@ function getClassData(holdings: Holding[]) {
 
   return Object.entries(classes)
     .filter(([_, value]) => value > 0)
-    .sort(([, a], [, b]) => b - a) 
+    .sort(([, a], [, b]) => b - a)
     .map(([name, value]) => ({ name, value, currency }));
 }
 
@@ -39,13 +45,17 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
 
   const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
 
-  const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
+  const handleInternalSectionClick = (sectionData: {
+    name: string;
+    value: number;
+    currency: string;
+  }) => {
     if (onClassSectionClick) {
       onClassSectionClick(sectionData.name);
     }
-    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    const clickedIndex = data.findIndex((d) => d.name === sectionData.name);
     if (clickedIndex !== -1) {
-        setActiveIndex(clickedIndex);
+      setActiveIndex(clickedIndex);
     }
   };
 
@@ -75,7 +85,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
             Asset Allocation
           </CardTitle>
         </div>

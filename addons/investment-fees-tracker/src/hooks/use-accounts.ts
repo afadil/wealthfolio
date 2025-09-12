@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { type AddonContext, type Account } from '@wealthfolio/addon-sdk';
+import { useQuery } from "@tanstack/react-query";
+import { type AddonContext, type Account } from "@wealthfolio/addon-sdk";
 
 interface UseAccountsOptions {
   ctx: AddonContext;
@@ -8,12 +8,12 @@ interface UseAccountsOptions {
 
 export function useAccounts({ ctx, enabled = true }: UseAccountsOptions) {
   return useQuery<Account[]>({
-    queryKey: ['accounts'],
+    queryKey: ["accounts"],
     queryFn: async () => {
       if (!ctx.api) {
-        throw new Error('API context is required');
+        throw new Error("API context is required");
       }
-      
+
       const data = await ctx.api.accounts.getAll();
       return data || [];
     },

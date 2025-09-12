@@ -1,4 +1,3 @@
-
 ## Prerequisites
 
 ```bash
@@ -15,13 +14,15 @@ npm install -g pnpm
 Requirements:
 
 - Node.js 20+ and pnpm
-- Wealthfolio desktop app (optional but recommended: running in development mode for live reload and testing)
+- Wealthfolio desktop app (optional but recommended: running in development mode
+  for live reload and testing)
 - Basic TypeScript and React knowledge
 - Code editor (VS Code recommended)
 
 ## Start Wealthfolio (Recommended)
 
-For the best development experience with live reload and testing, start Wealthfolio in development mode:
+For the best development experience with live reload and testing, start
+Wealthfolio in development mode:
 
 ```bash
 # Clone Wealthfolio repository (if not already done)
@@ -36,6 +37,7 @@ pnpm tauri dev
 ```
 
 This enables:
+
 - Live addon reload when files change
 - Better error messages and debugging
 - Automatic addon discovery
@@ -86,9 +88,9 @@ hello-world-addon/
   "description": "My first Wealthfolio addon",
   "author": "Your Name",
   "permissions": {
-      "category": "ui",
-      "functions": ["sidebar.addItem", "router.add"],
-      "purpose": "Add navigation items and routes"
+    "category": "ui",
+    "functions": ["sidebar.addItem", "router.add"],
+    "purpose": "Add navigation items and routes"
   }
 }
 ```
@@ -189,7 +191,8 @@ Verify in Wealthfolio:
 
 ## Add Data Access
 
-For data access, it's recommended to use [TanStack Query](https://tanstack.com/query/latest).
+For data access, it's recommended to use
+[TanStack Query](https://tanstack.com/query/latest).
 
 First, install TanStack Query in your addon:
 
@@ -364,8 +367,8 @@ Access full debugging capabilities:
 
 ```typescript
 // Use console for debugging
-ctx.api.logger.info('Debug message');
-ctx.api.logger.error('Error message');
+ctx.api.logger.info("Debug message");
+ctx.api.logger.error("Error message");
 
 // Access React DevTools
 // Components will show up in React DevTools extension
@@ -378,7 +381,7 @@ export default function enable(ctx: AddonContext) {
   try {
     // Your addon code
   } catch (error) {
-    ctx.api.logger.error('Addon error:', error);
+    ctx.api.logger.error("Addon error:", error);
     // Handle gracefully
   }
 }
@@ -482,23 +485,23 @@ pnpm format
 ### Vite Build Configuration
 
 ```typescript
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: 'src/addon.tsx',
-      formats: ['es'],
-      fileName: () => 'addon.js',
+      entry: "src/addon.tsx",
+      formats: ["es"],
+      fileName: () => "addon.js",
     },
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: ["react", "react-dom"],
       output: {
         globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM',
+          react: "React",
+          "react-dom": "ReactDOM",
         },
       },
     },
@@ -519,4 +522,5 @@ You now understand:
 Continue with:
 
 - [API Reference](/docs/addons/api-reference) - All available APIs
-- [Examples](https://github.com/afadil/wealthfolio/tree/main/addons/) - Real addon implementations
+- [Examples](https://github.com/afadil/wealthfolio/tree/main/addons/) - Real
+  addon implementations

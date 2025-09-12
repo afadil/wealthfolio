@@ -1,55 +1,61 @@
-import { useState } from 'react';
-import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
-import { formatDate } from '@/lib/utils';
-import { ChartConfig, ChartContainer } from '@/components/ui/chart';
-import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState } from "react";
+import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from "recharts";
+import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { formatDate } from "@/lib/utils";
+import { ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
   isBalanceHidden: boolean;
 };
 
-const CustomTooltip = ({ active, payload, isBalanceHidden, isChartHovered }: CustomTooltipProps & { isChartHovered: boolean }) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  isBalanceHidden,
+  isChartHovered,
+}: CustomTooltipProps & { isChartHovered: boolean }) => {
   if (active && payload && payload.length > 0) {
-    const totalValueData = payload.find(p => p.dataKey === 'totalValue');
-    const netContributionData = payload.find(p => p.dataKey === 'netContribution');
+    const totalValueData = payload.find((p) => p.dataKey === "totalValue");
+    const netContributionData = payload.find((p) => p.dataKey === "netContribution");
 
     if (totalValueData?.payload) {
       return (
-          <div className="grid grid-cols-1 gap-1.5 rounded-md border bg-popover p-2 shadow-md">
-            <p className="text-xs text-muted-foreground">
-              {formatDate(totalValueData.payload.date)}
-            </p>
-            
+        <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
+          <p className="text-muted-foreground text-xs">{formatDate(totalValueData.payload.date)}</p>
+
+          <div className="flex items-center justify-between space-x-2">
+            <div className="flex items-center space-x-1.5">
+              <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
+              <span className="text-muted-foreground text-xs">Total Value:</span>
+            </div>
+            <AmountDisplay
+              value={totalValueData.payload.totalValue}
+              currency={totalValueData.payload.currency}
+              isHidden={isBalanceHidden}
+              className="text-xs font-semibold"
+            />
+          </div>
+          {isChartHovered && netContributionData?.payload && (
             <div className="flex items-center justify-between space-x-2">
               <div className="flex items-center space-x-1.5">
-                <span className="block h-0.5 w-3" style={{ backgroundColor: 'var(--success)' }} />
-                <span className="text-xs text-muted-foreground">Total Value:</span>
+                <span
+                  className="block h-0 w-3 border-b-2 border-dashed"
+                  style={{ borderColor: "var(--muted-foreground)" }}
+                />
+                <span className="text-muted-foreground text-xs">Net Deposit:</span>
               </div>
               <AmountDisplay
-                value={totalValueData.payload.totalValue}
-                currency={totalValueData.payload.currency}
+                value={netContributionData.payload.netContribution}
+                currency={netContributionData.payload.currency}
                 isHidden={isBalanceHidden}
                 className="text-xs font-semibold"
               />
             </div>
-            {isChartHovered && netContributionData?.payload && (
-              <div className="flex items-center justify-between space-x-2">
-                 <div className="flex items-center space-x-1.5">
-                  <span className="block h-0 w-3 border-b-2 border-dashed" style={{ borderColor: 'var(--muted-foreground)' }} />
-                  <span className="text-xs text-muted-foreground">Net Deposit:</span>
-                </div>
-                <AmountDisplay
-                  value={netContributionData.payload.netContribution}
-                  currency={netContributionData.payload.currency}
-                  isHidden={isBalanceHidden}
-                  className="text-xs font-semibold"
-                />
-              </div>
-            )}
-          </div>
+          )}
+        </div>
       );
     }
   }
@@ -73,21 +79,19 @@ export function HistoryChart({
 }) {
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
-  
+
   const chartConfig = {
     totalValue: {
-      label: 'Total Value',
+      label: "Total Value",
     },
     netContribution: {
-      label: 'Net Contribution',
+      label: "Net Contribution",
     },
   } satisfies ChartConfig;
 
   // Conditional rendering for loading state
   if (isLoading && data.length === 0) {
-    return (
-      <Skeleton className="h-full w-full" />
-    );
+    return <Skeleton className="h-full w-full" />;
   }
 
   return (
@@ -112,10 +116,16 @@ export function HistoryChart({
         </defs>
         <Tooltip
           position={{ y: -20 }}
-          content={(props) => <CustomTooltip {...props} isBalanceHidden={isBalanceHidden} isChartHovered={isChartHovered} />}
+          content={(props) => (
+            <CustomTooltip
+              {...props}
+              isBalanceHidden={isBalanceHidden}
+              isChartHovered={isChartHovered}
+            />
+          )}
         />
         {/* <YAxis hide type="number" domain={[minValue, maxValue]} /> */}
-          <YAxis hide type="number" domain={['auto', 'auto']} />
+        <YAxis hide type="number" domain={["auto", "auto"]} />
         <Area
           isAnimationActive={true}
           animationDuration={300}

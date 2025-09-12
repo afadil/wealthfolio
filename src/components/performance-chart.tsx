@@ -1,7 +1,7 @@
-import { ReturnData } from '@/lib/types';
-import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
-import { formatPercent } from '@wealthfolio/ui';
+import { ReturnData } from "@/lib/types";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { format, parseISO, differenceInMonths, differenceInDays } from "date-fns";
+import { formatPercent } from "@wealthfolio/ui";
 import {
   ChartConfig,
   ChartContainer,
@@ -9,8 +9,8 @@ import {
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
-} from '@/components/ui/chart';
-import { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
+} from "@/components/ui/chart";
+import { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 
 interface PerformanceChartProps {
   data: {
@@ -52,7 +52,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
 
   // Format date based on range
   const formatXAxis = (dateStr: string) => {
-    if (!formattedData?.length) return '';
+    if (!formattedData?.length) return "";
 
     const date = parseISO(dateStr);
     const firstDate = parseISO(formattedData[0].date);
@@ -61,24 +61,24 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     const daysDiff = differenceInDays(lastDate, firstDate);
 
     if (daysDiff <= 31) {
-      return format(date, 'MMM d'); // e.g., "Sep 15"
+      return format(date, "MMM d"); // e.g., "Sep 15"
     }
     if (monthsDiff <= 36) {
-      return format(date, 'MMM yyyy'); // e.g., "Sep 2023"
+      return format(date, "MMM yyyy"); // e.g., "Sep 2023"
     }
-    return format(date, 'yyyy'); // e.g., "2023"
+    return format(date, "yyyy"); // e.g., "2023"
   };
 
   // Add back the custom colors
   const CHART_COLORS = [
-    '#4385BE', // blue-400
-    '#CE5D97', // magenta-400
-    '#3AA99F', // cyan-400
-    '#8B7EC8', // purple-400
-    '#879A39', // green-400
-    '#D0A215', // yellow-500
-    '#DA702C', // orange-400
-    '#D14D41', // red-400
+    "#4385BE", // blue-400
+    "#CE5D97", // magenta-400
+    "#3AA99F", // cyan-400
+    "#8B7EC8", // purple-400
+    "#879A39", // green-400
+    "#D0A215", // yellow-500
+    "#DA702C", // orange-400
+    "#D14D41", // red-400
   ];
 
   // Update the chartConfig and Line components to use CHART_COLORS
@@ -95,19 +95,16 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     name,
   ) => {
     const formattedValue = formatPercent(Number(value));
-    return [formattedValue + ' - ', name.toString()];
+    return [formattedValue + " - ", name.toString()];
   };
 
-  const tooltipLabelFormatter = (label: string) => format(parseISO(label), 'PPP');
+  const tooltipLabelFormatter = (label: string) => format(parseISO(label), "PPP");
 
   return (
-    <div className="w-full h-full">
-      <ChartContainer config={chartConfig} className="w-full h-full">
+    <div className="h-full w-full">
+      <ChartContainer config={chartConfig} className="h-full w-full">
         <ResponsiveContainer width="100%" height="100%" aspect={undefined}>
-          <LineChart
-            data={formattedData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-          >
+          <LineChart data={formattedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"

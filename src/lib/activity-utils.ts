@@ -1,5 +1,5 @@
-import { ActivityType, CASH_ACTIVITY_TYPES, INCOME_ACTIVITY_TYPES } from './constants';
-import { ActivityDetails } from './types';
+import { ActivityType, CASH_ACTIVITY_TYPES, INCOME_ACTIVITY_TYPES } from "./constants";
+import { ActivityDetails } from "./types";
 
 /**
  * Determines if an activity is a cash activity based on its type
@@ -7,9 +7,8 @@ import { ActivityDetails } from './types';
  * @returns True if the activity is a cash activity
  */
 export const isCashActivity = (activityType: string): boolean => {
-  return (CASH_ACTIVITY_TYPES as readonly string[]).includes(activityType) ;
+  return (CASH_ACTIVITY_TYPES as readonly string[]).includes(activityType);
 };
-
 
 /**
  * Determines if an activity is an income activity based on its type
@@ -27,15 +26,16 @@ export const isIncomeActivity = (activityType: string): boolean => {
  * @returns True if the activity is a cash transfer
  */
 export const isCashTransfer = (activityType: string, assetSymbol: string): boolean => {
-  return (activityType === ActivityType.TRANSFER_IN || 
-          activityType === ActivityType.TRANSFER_OUT) && 
-         assetSymbol.startsWith('$CASH');
+  return (
+    (activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT) &&
+    assetSymbol.startsWith("$CASH")
+  );
 };
 
 // Helper to check if activity is a trade type
 export const isTradeActivity = (type: string): boolean => {
   return type === ActivityType.BUY || type === ActivityType.SELL;
-}
+};
 
 // Helper to check if activity is a fee type
 export const isFeeActivity = (activityType: string): boolean => {
@@ -95,45 +95,48 @@ export const getUnitPrice = (activity: ActivityDetails): number => {
  */
 export const calculateActivityValue = (activity: ActivityDetails): number => {
   const { activityType, assetSymbol } = activity;
-  
+
   // Handle special cases first
   if (activityType === ActivityType.SPLIT) {
     return 0; // Split activities don't have a monetary value
   }
-  
+
   if (activityType === ActivityType.FEE || activityType === ActivityType.TAX) {
     return Number(getFee(activity));
   }
-  
+
   // Handle cash activities
-  if (isCashActivity(activityType) || isCashTransfer(activityType, assetSymbol) || isIncomeActivity(activityType)) {
+  if (
+    isCashActivity(activityType) ||
+    isCashTransfer(activityType, assetSymbol) ||
+    isIncomeActivity(activityType)
+  ) {
     const amount = getAmount(activity);
     const fee = getFee(activity);
-    
+
     // For outgoing cash activities, subtract fee from amount
-    if (activityType === ActivityType.WITHDRAWAL || 
-        activityType === ActivityType.TRANSFER_OUT) {
+    if (activityType === ActivityType.WITHDRAWAL || activityType === ActivityType.TRANSFER_OUT) {
       return Number(amount) + Number(fee);
     }
-    
+
     // For incoming cash activities, subtract fee from amount
     return Number(amount) - Number(fee);
   }
-  
+
   // Handle trading activities
   const quantity = getQuantity(activity);
   const unitPrice = getUnitPrice(activity);
   const fee = getFee(activity);
   const activityAmount = Number(quantity) * Number(unitPrice);
-  
+
   if (activityType === ActivityType.BUY) {
     return Number(activityAmount) + Number(fee); // Total cost including fees
   }
-  
+
   if (activityType === ActivityType.SELL) {
     return Number(activityAmount) - Number(fee); // Net proceeds after fees
   }
-  
+
   // Default case - just return the activity amount
   return Number(activityAmount);
 };
@@ -144,9 +147,11 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
  * @returns True if the value should be displayed as negative
  */
 export const isNegativeValueActivity = (activityType: string): boolean => {
-  return activityType === ActivityType.BUY || 
-         activityType === ActivityType.WITHDRAWAL || 
-         activityType === ActivityType.TRANSFER_OUT || 
-         activityType === ActivityType.FEE || 
-         activityType === ActivityType.TAX;
+  return (
+    activityType === ActivityType.BUY ||
+    activityType === ActivityType.WITHDRAWAL ||
+    activityType === ActivityType.TRANSFER_OUT ||
+    activityType === ActivityType.FEE ||
+    activityType === ActivityType.TAX
+  );
 };

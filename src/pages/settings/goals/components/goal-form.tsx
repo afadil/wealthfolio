@@ -1,11 +1,11 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 
-import { Icons } from '@/components/ui/icons';
+import { Icons } from "@/components/ui/icons";
 
 import {
   DialogDescription,
@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -21,12 +21,12 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
-import { newGoalSchema } from '@/lib/schemas';
-import { useGoalMutations } from '@/pages/settings/goals/use-goal-mutations';
-import { MoneyInput } from '@wealthfolio/ui';
+import { newGoalSchema } from "@/lib/schemas";
+import { useGoalMutations } from "@/pages/settings/goals/use-goal-mutations";
+import { MoneyInput } from "@wealthfolio/ui";
 
 type NewGoal = z.infer<typeof newGoalSchema>;
 
@@ -55,9 +55,9 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle> {defaultValues?.id ? 'Update Goal' : 'Add Goal'}</DialogTitle>
+          <DialogTitle> {defaultValues?.id ? "Update Goal" : "Add Goal"}</DialogTitle>
           <DialogDescription>
-            {defaultValues?.id ? 'Update goal information' : ' Add an investment goal to track.'}
+            {defaultValues?.id ? "Update goal information" : " Add an investment goal to track."}
           </DialogDescription>
         </DialogHeader>
 
@@ -127,7 +127,7 @@ export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps
           <Button type="submit">
             <Icons.Plus className="h-4 w-4" />
             <span className="hidden sm:ml-2 sm:inline">
-              {defaultValues?.id ? 'Update Goal' : 'Add Goal'}
+              {defaultValues?.id ? "Update Goal" : "Add Goal"}
             </span>
           </Button>
         </DialogFooter>

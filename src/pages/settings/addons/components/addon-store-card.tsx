@@ -1,4 +1,3 @@
-
 import {
   Button,
   Badge,
@@ -15,10 +14,10 @@ import {
   DialogTitle,
   DialogTrigger,
   StarRatingDisplay,
-} from '@wealthfolio/ui';
-import { RatingDialog } from './rating-dialog';
-import type { AddonStoreListing } from '@/lib/types';
-import React from 'react';
+} from "@wealthfolio/ui";
+import { RatingDialog } from "./rating-dialog";
+import type { AddonStoreListing } from "@/lib/types";
+import React from "react";
 
 interface AddonStoreCardProps {
   listing: AddonStoreListing;
@@ -30,8 +29,8 @@ interface AddonStoreCardProps {
   isRatingSubmitting?: boolean;
 }
 
-export function AddonStoreCard({ 
-  listing, 
+export function AddonStoreCard({
+  listing,
   isInstalled = false,
   isInstalling = false,
   onInstall,
@@ -51,17 +50,15 @@ export function AddonStoreCard({
   };
 
   return (
-    <Card className="group relative h-full overflow-hidden transition-all duration-200 hover:shadow-lg hover:shadow-primary/10">
+    <Card className="group hover:shadow-primary/10 relative h-full overflow-hidden transition-all duration-200 hover:shadow-lg">
       <CardHeader className="pb-2">
         <CardTitle className="line-clamp-1 text-base">{listing.name}</CardTitle>
-        <CardDescription className="line-clamp-2 text-sm">
-          {listing.description}
-        </CardDescription>
+        <CardDescription className="line-clamp-2 text-sm">{listing.description}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-3">
         {/* Author & Stats */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="text-muted-foreground flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <Icons.Users className="h-3 w-3" />
             <span>By {listing.author}</span>
@@ -77,8 +74,8 @@ export function AddonStoreCard({
 
         {/* Rating Display */}
         {listing.rating > 0 && (
-          <StarRatingDisplay 
-            rating={listing.rating} 
+          <StarRatingDisplay
+            rating={listing.rating}
             reviewCount={listing.reviewCount}
             size="sm"
             className="mt-1"
@@ -101,13 +98,10 @@ export function AddonStoreCard({
               <DialogTitle className="flex items-center gap-2">
                 {listing.name}
                 <Badge variant="outline">v{listing.version}</Badge>
-
               </DialogTitle>
-              <DialogDescription className="text-base">
-                {listing.description}
-              </DialogDescription>
+              <DialogDescription className="text-base">{listing.description}</DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-6">
               {/* Screenshots */}
               {listing.images && listing.images.length > 0 && (
@@ -130,23 +124,23 @@ export function AddonStoreCard({
               {/* Release Notes */}
               <div className="space-y-3">
                 <h4 className="font-medium">Latest Release Notes</h4>
-                <p className="text-sm text-muted-foreground">
-                  {listing.releaseNotes}
-                </p>
+                <p className="text-muted-foreground text-sm">{listing.releaseNotes}</p>
               </div>
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Downloads</p>
-                  <p className="text-2xl font-bold text-primary">{formatDownloads(listing.downloads)}</p>
+                  <p className="text-primary text-2xl font-bold">
+                    {formatDownloads(listing.downloads)}
+                  </p>
                 </div>
 
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Rating</p>
                   <div className="flex flex-col gap-1">
-                    <StarRatingDisplay 
-                      rating={listing.rating || 0} 
+                    <StarRatingDisplay
+                      rating={listing.rating || 0}
                       reviewCount={listing.reviewCount || 0}
                       size="sm"
                       showText={true}
@@ -155,7 +149,7 @@ export function AddonStoreCard({
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Author</p>
-                  <p className="text-sm text-muted-foreground">{listing.author}</p>
+                  <p className="text-muted-foreground text-sm">{listing.author}</p>
                 </div>
               </div>
 
@@ -173,7 +167,7 @@ export function AddonStoreCard({
                       <Icons.Star className="h-4 w-4" />
                       Write a Review
                     </Button>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Share your experience with other users
                     </p>
                   </div>
@@ -189,7 +183,7 @@ export function AddonStoreCard({
                       <Badge
                         key={tag}
                         variant="outline"
-                        className={`capitalize ${onTagClick ? 'cursor-pointer hover:bg-primary hover:text-primary-foreground' : ''}`}
+                        className={`capitalize ${onTagClick ? "hover:bg-primary hover:text-primary-foreground cursor-pointer" : ""}`}
                         onClick={() => onTagClick?.(tag)}
                       >
                         <Icons.Tag className="mr-1 h-3 w-3" />
@@ -224,7 +218,7 @@ export function AddonStoreCard({
                     </>
                   )}
                 </Button>
-                
+
                 {listing.changelogUrl && (
                   <Button variant="outline" asChild>
                     <a href={listing.changelogUrl} target="_blank" rel="noopener noreferrer">
@@ -240,9 +234,9 @@ export function AddonStoreCard({
 
         {/* Rate Button - Show only for installed addons */}
         {isInstalled && (
-          <Button 
-            variant="secondary" 
-            size="sm" 
+          <Button
+            variant="secondary"
+            size="sm"
             className="bg-white/90 text-black hover:bg-white"
             onClick={() => setRatingDialogOpen(true)}
           >
@@ -255,7 +249,7 @@ export function AddonStoreCard({
         {!isInstalled && (
           <Button
             onClick={() => onInstall?.(listing)}
-            disabled={isInstalling || listing.status !== 'active'}
+            disabled={isInstalling || listing.status !== "active"}
             size="sm"
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
@@ -264,8 +258,8 @@ export function AddonStoreCard({
                 <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
                 Installing...
               </>
-            ) : listing.status !== 'active' ? (
-              listing.status === 'coming-soon' ? (
+            ) : listing.status !== "active" ? (
+              listing.status === "coming-soon" ? (
                 <>
                   <Icons.Clock className="mr-2 h-4 w-4" />
                   Coming Soon
@@ -273,7 +267,7 @@ export function AddonStoreCard({
               ) : (
                 <>
                   <Icons.Close className="mr-2 h-4 w-4" />
-                  {listing.status === 'deprecated' ? 'Deprecated' : 'Unavailable'}
+                  {listing.status === "deprecated" ? "Deprecated" : "Unavailable"}
                 </>
               )
             ) : (
@@ -285,30 +279,36 @@ export function AddonStoreCard({
           </Button>
         )}
       </div>
-      
+
       {/* Status Indicators */}
-      <div className="absolute right-2 top-2 opacity-90 flex flex-col gap-1">
+      <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-90">
         {isInstalled && (
-          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+          <Badge
+            variant="secondary"
+            className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+          >
             <Icons.Check className="mr-1 h-3 w-3" />
             Installed
           </Badge>
         )}
-        {listing.status && listing.status !== 'active' && (
-          listing.status === 'coming-soon' ? (
-            <Badge variant="default" className="text-xs capitalize bg-primary text-primary-foreground">
+        {listing.status &&
+          listing.status !== "active" &&
+          (listing.status === "coming-soon" ? (
+            <Badge
+              variant="default"
+              className="bg-primary text-primary-foreground text-xs capitalize"
+            >
               <Icons.Clock className="mr-1 h-3 w-3" />
               Coming Soon
             </Badge>
           ) : (
-            <Badge 
-              variant={listing.status === 'deprecated' ? 'destructive' : 'outline'}
+            <Badge
+              variant={listing.status === "deprecated" ? "destructive" : "outline"}
               className="text-xs capitalize"
             >
               {listing.status}
             </Badge>
-          )
-        )}
+          ))}
       </div>
 
       {/* Rating Dialog */}

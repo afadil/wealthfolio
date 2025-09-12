@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { SettingsHeader } from '../header';
+import { useState } from "react";
+import { SettingsHeader } from "../header";
 import {
   DeleteConfirm,
   Button,
@@ -15,16 +15,16 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@wealthfolio/ui';
-import { PermissionDialog } from '@/pages/settings/addons/components/addon-permission-dialog';
-import { AddonUpdateCard } from '@/pages/settings/addons/components/addon-update-card';
-import { AddonStoreBrowser } from '@/pages/settings/addons/components/addon-store-browser';
-import { RatingDialog } from '@/pages/settings/addons/components/rating-dialog';
-import { useAddonActions } from './hooks/use-addon-actions';
-import { useAddonUpdates } from './hooks/use-addon-updates';
+} from "@wealthfolio/ui";
+import { PermissionDialog } from "@/pages/settings/addons/components/addon-permission-dialog";
+import { AddonUpdateCard } from "@/pages/settings/addons/components/addon-update-card";
+import { AddonStoreBrowser } from "@/pages/settings/addons/components/addon-store-browser";
+import { RatingDialog } from "@/pages/settings/addons/components/rating-dialog";
+import { useAddonActions } from "./hooks/use-addon-actions";
+import { useAddonUpdates } from "./hooks/use-addon-updates";
 
 export default function AddonSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'installed' | 'store'>('installed');
+  const [activeTab, setActiveTab] = useState<"installed" | "store">("installed");
   const [ratingDialog, setRatingDialog] = useState<{
     open: boolean;
     addonId?: string;
@@ -77,18 +77,18 @@ export default function AddonSettingsPage() {
   };
 
   const handleRateAddon = (addonId: string, addonName: string) => {
-    setRatingDialog({ 
-      open: true, 
-      addonId, 
-      addonName 
+    setRatingDialog({
+      open: true,
+      addonId,
+      addonName,
     });
   };
 
   const handleRatingSubmitted = () => {
     // Could refresh addon data here if needed in the future
     toast({
-      title: 'Thank you!',
-      description: 'Your rating has been submitted successfully.',
+      title: "Thank you!",
+      description: "Your rating has been submitted successfully.",
     });
   };
 
@@ -113,7 +113,7 @@ export default function AddonSettingsPage() {
               <div className="space-y-3">
                 <div className="space-y-2">
                   <h4 className="font-medium">🔌 Add-ons & Extensions</h4>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     Add-ons let you extend Wealthfolio with new features, custom analytics, and
                     additional functionality to enhance your financial management experience.
                   </p>
@@ -121,7 +121,7 @@ export default function AddonSettingsPage() {
                 <div className="border-t pt-2">
                   <div className="flex items-start gap-2">
                     <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       <span className="font-medium text-amber-600">Security Notice:</span> Only
                       install add-ons from trusted sources. Add-ons have access to your application
                       data.
@@ -156,17 +156,17 @@ export default function AddonSettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-medium">Installed Add-ons</h3>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-4 text-sm">
                   <span>
-                    {installedAddons.length} add-on{installedAddons.length !== 1 ? 's' : ''}{' '}
+                    {installedAddons.length} add-on{installedAddons.length !== 1 ? "s" : ""}{" "}
                     installed
                   </span>
                   {hasUpdates() && (
                     <Badge
-                      variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
+                      variant={getCriticalUpdateCount() > 0 ? "destructive" : "default"}
                       className="text-xs"
                     >
-                      {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
+                      {getUpdateCount()} update{getUpdateCount() !== 1 ? "s" : ""} available
                       {getCriticalUpdateCount() > 0 && ` (${getCriticalUpdateCount()} critical)`}
                     </Badge>
                   )}
@@ -184,7 +184,7 @@ export default function AddonSettingsPage() {
                         size="icon"
                         onClick={handleCheckUpdates}
                         disabled={isCheckingUpdates || installedAddons.length === 0}
-                        className="relative hover:bg-muted/50"
+                        className="hover:bg-muted/50 relative"
                         title="Check for Updates"
                       >
                         {isCheckingUpdates ? (
@@ -193,7 +193,7 @@ export default function AddonSettingsPage() {
                           <Icons.Refresh className="h-4 w-4" />
                         )}
                         {hasUpdates() && (
-                          <div className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+                          <div className="bg-destructive absolute -top-1 -right-1 h-2 w-2 rounded-full" />
                         )}
                       </Button>
                     </div>
@@ -204,16 +204,16 @@ export default function AddonSettingsPage() {
                         <Icons.Refresh className="h-4 w-4" />
                         <span className="font-medium">Check for Updates</span>
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         Check all installed add-ons for available updates from their sources.
                       </p>
                       {hasUpdates() && (
                         <div className="border-t pt-2">
                           <Badge
-                            variant={getCriticalUpdateCount() > 0 ? 'destructive' : 'default'}
+                            variant={getCriticalUpdateCount() > 0 ? "destructive" : "default"}
                             className="text-xs"
                           >
-                            {getUpdateCount()} update{getUpdateCount() !== 1 ? 's' : ''} available
+                            {getUpdateCount()} update{getUpdateCount() !== 1 ? "s" : ""} available
                           </Badge>
                         </div>
                       )}
@@ -247,7 +247,7 @@ export default function AddonSettingsPage() {
                         <Icons.Plus className="h-4 w-4" />
                         <span className="font-medium">Install from File</span>
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         Install an add-on from a local ZIP file. Only install add-ons from trusted
                         sources.
                       </p>
@@ -258,7 +258,7 @@ export default function AddonSettingsPage() {
                 {/* Browse Addons */}
                 <Button
                   variant="outline"
-                  onClick={() => setActiveTab('store')}
+                  onClick={() => setActiveTab("store")}
                   className="flex items-center gap-1"
                 >
                   <Icons.Store className="h-4 w-4" />
@@ -269,8 +269,8 @@ export default function AddonSettingsPage() {
 
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
-                <Icons.Loader className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading add-ons...</span>
+                <Icons.Loader className="text-muted-foreground h-8 w-8 animate-spin" />
+                <span className="text-muted-foreground ml-2">Loading add-ons...</span>
               </div>
             ) : installedAddons.length === 0 ? (
               <EmptyPlaceholder>
@@ -280,7 +280,7 @@ export default function AddonSettingsPage() {
                   Get started by installing your first add-on to extend Wealthfolio's functionality.
                 </EmptyPlaceholder.Description>
                 <div className="flex items-center gap-3">
-                  <Button onClick={() => setActiveTab('store')}>
+                  <Button onClick={() => setActiveTab("store")}>
                     <Icons.Store className="mr-2 h-4 w-4" />
                     Browse Add-ons
                   </Button>
@@ -297,8 +297,8 @@ export default function AddonSettingsPage() {
                     key={addon.metadata.id}
                     className={`group rounded-lg border p-6 transition-all duration-200 ${
                       addon.metadata.enabled
-                        ? 'bg-card hover:bg-accent/30 hover:shadow-md'
-                        : 'bg-muted/30 border-dashed opacity-75 hover:opacity-90'
+                        ? "bg-card hover:bg-accent/30 hover:shadow-md"
+                        : "bg-muted/30 border-dashed opacity-75 hover:opacity-90"
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -307,22 +307,27 @@ export default function AddonSettingsPage() {
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
                             {!addon.metadata.enabled && (
-                              <Icons.PauseCircle className="h-5 w-5 text-muted-foreground/60" />
+                              <Icons.PauseCircle className="text-muted-foreground/60 h-5 w-5" />
                             )}
-                            <h4 className={`truncate text-lg font-semibold ${
-                              addon.metadata.enabled ? '' : 'text-muted-foreground'
-                            }`}>
+                            <h4
+                              className={`truncate text-lg font-semibold ${
+                                addon.metadata.enabled ? "" : "text-muted-foreground"
+                              }`}
+                            >
                               {addon.metadata.name}
                             </h4>
                           </div>
                           <Badge
                             variant="outline"
-                            className="shrink-0 text-xs text-muted-foreground"
+                            className="text-muted-foreground shrink-0 text-xs"
                           >
                             v{addon.metadata.version}
                           </Badge>
                           {!addon.metadata.enabled && (
-                            <Badge variant="secondary" className="shrink-0 text-xs bg-warning/10 text-warning border-warning/20">
+                            <Badge
+                              variant="secondary"
+                              className="bg-warning/10 text-warning border-warning/20 shrink-0 text-xs"
+                            >
                               <Icons.AlertCircle className="mr-1 h-3 w-3" />
                               Disabled
                             </Badge>
@@ -331,18 +336,26 @@ export default function AddonSettingsPage() {
 
                         {/* Description */}
                         {addon.metadata.description && (
-                          <p className={`text-sm leading-relaxed ${
-                            addon.metadata.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
-                          }`}>
+                          <p
+                            className={`text-sm leading-relaxed ${
+                              addon.metadata.enabled
+                                ? "text-muted-foreground"
+                                : "text-muted-foreground/70"
+                            }`}
+                          >
                             {addon.metadata.description}
                           </p>
                         )}
 
                         {/* Author info */}
                         {addon.metadata.author && (
-                          <div className={`flex items-center gap-2 text-sm ${
-                            addon.metadata.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
-                          }`}>
+                          <div
+                            className={`flex items-center gap-2 text-sm ${
+                              addon.metadata.enabled
+                                ? "text-muted-foreground"
+                                : "text-muted-foreground/70"
+                            }`}
+                          >
                             <Icons.Users className="h-4 w-4" />
                             <span>By {addon.metadata.author}</span>
                           </div>
@@ -356,7 +369,7 @@ export default function AddonSettingsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewPermissions(addon)}
-                          className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                          className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <Icons.Eye className="h-4 w-4" />
                           <span className="sr-only">View permissions</span>
@@ -367,7 +380,7 @@ export default function AddonSettingsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleRateAddon(addon.metadata.id, addon.metadata.name)}
-                          className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                          className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <Icons.Star className="h-4 w-4" />
                           <span className="sr-only">Rate addon</span>
@@ -379,10 +392,10 @@ export default function AddonSettingsPage() {
                           deleteConfirmMessage={
                             <div className="space-y-2">
                               <p>
-                                Are you sure you want to remove{' '}
+                                Are you sure you want to remove{" "}
                                 <strong>{addon.metadata.name}</strong>?
                               </p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-muted-foreground text-sm">
                                 This action cannot be undone. The addon will be completely removed
                                 from your system.
                               </p>
@@ -394,7 +407,7 @@ export default function AddonSettingsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-9 w-9 p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-9 w-9 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                             >
                               <Icons.Trash className="h-4 w-4" />
                               <span className="sr-only">Remove addon</span>
@@ -453,7 +466,7 @@ export default function AddonSettingsPage() {
         onOpenChange={(open) => setPermissionDialog({ ...permissionDialog, open })}
         manifest={permissionDialog.manifest}
         declaredPermissions={permissionDialog.permissions || []}
-        riskLevel={permissionDialog.riskLevel || 'low'}
+        riskLevel={permissionDialog.riskLevel || "low"}
         onApprove={() => {
           if (permissionDialog.onApprove) {
             permissionDialog.onApprove();
@@ -462,8 +475,8 @@ export default function AddonSettingsPage() {
         onDeny={() => {
           setPermissionDialog({ open: false });
           toast({
-            title: 'Installation cancelled',
-            description: 'Addon installation was cancelled by user.',
+            title: "Installation cancelled",
+            description: "Addon installation was cancelled by user.",
           });
         }}
       />
@@ -475,7 +488,7 @@ export default function AddonSettingsPage() {
           onOpenChange={(open) => setViewPermissionDialog({ ...viewPermissionDialog, open })}
           manifest={viewPermissionDialog.addon.metadata}
           declaredPermissions={viewPermissionDialog.permissions || []}
-          riskLevel={viewPermissionDialog.riskLevel || 'low'}
+          riskLevel={viewPermissionDialog.riskLevel || "low"}
           onApprove={() => {
             setViewPermissionDialog({ open: false });
           }}
@@ -490,8 +503,8 @@ export default function AddonSettingsPage() {
       <RatingDialog
         open={ratingDialog.open}
         onOpenChange={(open) => setRatingDialog({ ...ratingDialog, open })}
-        addonId={ratingDialog.addonId || ''}
-        addonName={ratingDialog.addonName || ''}
+        addonId={ratingDialog.addonId || ""}
+        addonName={ratingDialog.addonName || ""}
         onRatingSubmitted={handleRatingSubmitted}
       />
     </div>

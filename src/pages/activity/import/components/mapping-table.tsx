@@ -5,8 +5,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { TooltipProvider } from '@/components/ui/tooltip';
+} from "@/components/ui/table";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ImportFormat,
   ActivityType,
@@ -14,11 +14,11 @@ import {
   CsvRowData,
   ImportRequiredField,
   Account,
-} from '@/lib/types';
-import { MappingHeaderCell, MappingCell } from './mapping-table-cells';
-import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
-import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
+} from "@/lib/types";
+import { MappingHeaderCell, MappingCell } from "./mapping-table-cells";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 
 interface MappingTableProps {
   mapping: ImportMappingData;
@@ -54,29 +54,36 @@ export function MappingTable({
   // Check if a field is mapped
   const isFieldMapped = (field: ImportFormat) => {
     const mappedHeader = mapping.fieldMappings[field];
-    return typeof mappedHeader === 'string' && headers.includes(mappedHeader);
+    return typeof mappedHeader === "string" && headers.includes(mappedHeader);
   };
 
   return (
-    <div className={cn("h-full w-full overflow-auto rounded-md border border-border bg-card shadow-sm", className)}>
+    <div
+      className={cn(
+        "border-border bg-card h-full w-full overflow-auto rounded-md border shadow-sm",
+        className,
+      )}
+    >
       <div className="min-w-fit">
         <TooltipProvider>
           <Table>
             <TableHeader className="sticky top-0 z-20">
               <TableRow>
-                <TableHead className="sticky left-0 z-30 w-12 min-w-12 border-r border-border">
-                  <div className="flex items-center justify-center rounded-sm bg-muted/50 p-1">
-                    <span className="text-xs font-semibold text-muted-foreground">#</span>
+                <TableHead className="border-border sticky left-0 z-30 w-12 min-w-12 border-r">
+                  <div className="bg-muted/50 flex items-center justify-center rounded-sm p-1">
+                    <span className="text-muted-foreground text-xs font-semibold">#</span>
                   </div>
                 </TableHead>
                 {importFormatFields.map((field) => (
-                  <TableHead 
-                    key={field} 
+                  <TableHead
+                    key={field}
                     className={cn(
                       "p-2 whitespace-nowrap transition-colors",
-                      IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField) 
-                        ? !isFieldMapped(field) ? "bg-amber-50 dark:bg-amber-950/20" : ""
-                        : ""
+                      IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField)
+                        ? !isFieldMapped(field)
+                          ? "bg-amber-50 dark:bg-amber-950/20"
+                          : ""
+                        : "",
                     )}
                   >
                     <MappingHeaderCell
@@ -98,21 +105,18 @@ export function MappingTable({
                     transition={{ duration: 0.2, delay: index * 0.03 }}
                     key={`row-${row.lineNumber}`}
                     className={cn(
-                      "group transition-colors hover:bg-muted/50",
-                      index % 2 === 0 ? "bg-background" : "bg-muted/20"
+                      "group hover:bg-muted/50 transition-colors",
+                      index % 2 === 0 ? "bg-background" : "bg-muted/20",
                     )}
                   >
-                    <TableCell className="sticky left-0 z-20 w-12 border-r border-border bg-muted/30 font-mono text-xs font-medium text-muted-foreground">
+                    <TableCell className="border-border bg-muted/30 text-muted-foreground sticky left-0 z-20 w-12 border-r font-mono text-xs font-medium">
                       {row.lineNumber}
                     </TableCell>
-                    {importFormatFields.map((field) => { 
+                    {importFormatFields.map((field) => {
                       return (
-                        <TableCell 
-                          key={field} 
-                          className={cn(
-                            "p-2 transition-colors text-xs",
-                            "group-hover:bg-muted/50"
-                          )}
+                        <TableCell
+                          key={field}
+                          className={cn("p-2 text-xs transition-colors", "group-hover:bg-muted/50")}
                         >
                           <MappingCell
                             field={field}

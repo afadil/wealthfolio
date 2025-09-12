@@ -1,17 +1,12 @@
-import { Holding, Sector } from '@/lib/types';
-import { useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { PrivacyAmount } from '@wealthfolio/ui';
-import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/ui/icons';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { formatPercent } from '@wealthfolio/ui';
+import { Holding, Sector } from "@/lib/types";
+import { useMemo } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { PrivacyAmount } from "@wealthfolio/ui";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { Icons } from "@/components/ui/icons";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatPercent } from "@wealthfolio/ui";
 
 function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
@@ -20,18 +15,15 @@ function getSectorsData(holdings: Holding[]) {
       const assetSectors = holding.instrument?.sectors;
       const marketValue = Number(holding.marketValue?.base) || 0;
 
-      const sectorsToProcess = assetSectors && assetSectors.length > 0
-          ? assetSectors
-          : [{ name: 'Others', weight: 1 }];
+      const sectorsToProcess =
+        assetSectors && assetSectors.length > 0 ? assetSectors : [{ name: "Others", weight: 1 }];
 
       if (isNaN(marketValue)) return acc;
 
       sectorsToProcess.forEach((sector: Sector) => {
         const current = acc[sector.name] || 0;
         const weight = Number(sector.weight) || 0;
-        acc[sector.name] =
-          current +
-          marketValue * (weight > 1 ? weight / 100 : weight);
+        acc[sector.name] = current + marketValue * (weight > 1 ? weight / 100 : weight);
       });
       return acc;
     },
@@ -59,12 +51,12 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
             Sector Allocation
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="h-full w-full relative">
+      <CardContent className="relative h-full w-full">
         <TooltipProvider>
           {isLoading ? (
             <div className="space-y-2">
@@ -86,26 +78,26 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
           ) : (
             <div className="space-y-4 pt-2">
               {sectors.map((sector) => {
-                const percent = total > 0 ? (sector.value / total) : 0;
+                const percent = total > 0 ? sector.value / total : 0;
                 return (
                   <Tooltip key={sector.name} delayDuration={100}>
                     <TooltipTrigger asChild>
                       <div
-                        className="flex cursor-pointer items-center gap-0 rounded-md py-1 hover:bg-muted"
+                        className="hover:bg-muted flex cursor-pointer items-center gap-0 rounded-md py-1"
                         onClick={() => onSectorSectionClick && onSectorSectionClick(sector.name)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
+                          if (e.key === "Enter" || e.key === " ") {
                             onSectorSectionClick && onSectorSectionClick(sector.name);
                           }
                         }}
                       >
                         {/* Container for Progress bar, Percentage, and Name */}
-                        <div className="relative h-5 flex-1 overflow-hidden rounded bg-secondary">
+                        <div className="bg-secondary relative h-5 flex-1 overflow-hidden rounded">
                           {/* Actual Progress Fill */}
                           <div
-                            className="bg-chart-2 absolute left-0 top-0 h-full rounded"
+                            className="bg-chart-2 absolute top-0 left-0 h-full rounded"
                             style={{
                               width: `${percent * 100}%`,
                             }}
@@ -115,17 +107,17 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                             <>
                               {/* Percentage INSIDE the fill, right-aligned, white text */}
                               <div
-                                className="absolute left-0 top-0 flex h-full items-center justify-end pr-1 text-xs font-medium text-background"
+                                className="text-background absolute top-0 left-0 flex h-full items-center justify-end pr-1 text-xs font-medium"
                                 style={{ width: `${percent * 100}%` }}
                               >
                                 <span className="whitespace-nowrap">{formatPercent(percent)}</span>
                               </div>
                               {/* Name OUTSIDE the fill, right-aligned, standard text color */}
                               <div
-                                className="absolute top-0 flex h-full items-center justify-end pl-1 pr-1 text-xs font-medium text-foreground"
+                                className="text-foreground absolute top-0 flex h-full items-center justify-end pr-1 pl-1 text-xs font-medium"
                                 style={{
                                   left: `${percent * 100}%`,
-                                  right: '0',
+                                  right: "0",
                                 }}
                               >
                                 <span className="truncate" title={sector.name}>
@@ -136,16 +128,16 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                           ) : (
                             // Percentage and Name both OUTSIDE the fill, standard text colors
                             <div
-                              className="absolute top-0 flex h-full items-center justify-between text-xs font-medium text-foreground/70 dark:text-foreground/90"
+                              className="text-foreground/70 dark:text-foreground/90 absolute top-0 flex h-full items-center justify-between text-xs font-medium"
                               style={{
                                 left: `${percent * 100}%`,
-                                right: '0',
+                                right: "0",
                               }}
                             >
-                              <span className="whitespace-nowrap pl-1">
+                              <span className="pl-1 whitespace-nowrap">
                                 {formatPercent(percent)}
                               </span>
-                              <span className="truncate pl-1 pr-1" title={sector.name}>
+                              <span className="truncate pr-1 pl-1" title={sector.name}>
                                 {sector.name}
                               </span>
                             </div>
@@ -154,7 +146,7 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">
-                      <span className="text-[0.70rem] uppercase text-muted-foreground">
+                      <span className="text-muted-foreground text-[0.70rem] uppercase">
                         {sector.name}
                       </span>
                       <div>

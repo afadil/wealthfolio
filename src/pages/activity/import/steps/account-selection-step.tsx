@@ -1,12 +1,12 @@
-import { FileDropzone } from '../components/file-dropzone';
-import { HelpTooltip } from '../components/help-tooltip';
-import { Button } from '@/components/ui/button';
-import { Account, CsvRowError } from '@/lib/types';
-import { CSVFileViewer } from '../components/csv-file-viewer';
-import { AccountSelector } from '../../../../components/account-selector';
-import { ProgressIndicator } from '@/components/ui/progress-indicator';
-import { Icons } from '@/components/ui/icons';
-import { ImportAlert } from '../components/import-alert';
+import { FileDropzone } from "../components/file-dropzone";
+import { HelpTooltip } from "../components/help-tooltip";
+import { Button } from "@/components/ui/button";
+import { Account, CsvRowError } from "@/lib/types";
+import { CSVFileViewer } from "../components/csv-file-viewer";
+import { AccountSelector } from "../../../../components/account-selector";
+import { ProgressIndicator } from "@/components/ui/progress-indicator";
+import { Icons } from "@/components/ui/icons";
+import { ImportAlert } from "../components/import-alert";
 
 interface AccountSelectionStepProps {
   selectedAccount: Account | null;
@@ -35,7 +35,7 @@ export const AccountSelectionStep = ({
   const hasErrors =
     errors &&
     ((Array.isArray(errors) && errors.length > 0) ||
-      (typeof errors === 'object' && Object.keys(errors).length > 0));
+      (typeof errors === "object" && Object.keys(errors).length > 0));
 
   // Determine critical errors (rows 0-1)
   const criticalError =
@@ -52,12 +52,12 @@ export const AccountSelectionStep = ({
 
   // Simplified file validation status
   const fileValidationStatus = !csvFile
-    ? 'idle'
+    ? "idle"
     : hasErrors
-      ? 'invalid'
+      ? "invalid"
       : isParsing
-        ? 'loading'
-        : 'valid';
+        ? "loading"
+        : "valid";
 
   const handleFileChange = (file: File | null) => {
     setCsvFile(file);
@@ -74,15 +74,15 @@ export const AccountSelectionStep = ({
       isValid = !errors.some((error) => error && error.row === index);
       rowErrors = errors
         .filter((error) => error && error.row === index)
-        .map((error) => error.message || '');
-    } else if (errors && typeof errors === 'object') {
+        .map((error) => error.message || "");
+    } else if (errors && typeof errors === "object") {
       isValid = !errors[index] || errors[index].length === 0;
       rowErrors = errors[index] || [];
     }
 
     return {
       id: index,
-      content: row.join(','),
+      content: row.join(","),
       isValid,
       errors: rowErrors,
     };
@@ -93,7 +93,7 @@ export const AccountSelectionStep = ({
     ? (() => {
         const messages: string[] = [];
         if (Array.isArray(errors)) {
-          return errors.map((err) => err.message || '').filter(Boolean);
+          return errors.map((err) => err.message || "").filter(Boolean);
         }
         Object.values(errors).forEach((errArray) => {
           if (Array.isArray(errArray)) {
@@ -109,7 +109,7 @@ export const AccountSelectionStep = ({
     criticalError ||
     (errorMessages.length > 0
       ? errorMessages[0] +
-        (errorMessages.length > 1 ? ` (and ${errorMessages.length - 1} more errors)` : '')
+        (errorMessages.length > 1 ? ` (and ${errorMessages.length - 1} more errors)` : "")
       : null);
 
   return (
@@ -140,8 +140,8 @@ export const AccountSelectionStep = ({
               onFileChange={handleFileChange}
               isLoading={isParsing}
               accept=".csv"
-              isValid={fileValidationStatus === 'valid'}
-              error={hasErrors ? 'File contains errors' : null}
+              isValid={fileValidationStatus === "valid"}
+              error={hasErrors ? "File contains errors" : null}
             />
           </div>
         </div>
@@ -155,11 +155,11 @@ export const AccountSelectionStep = ({
         )}
 
         {/* Show error alert when there's an error but no parsable data */}
-        {fileValidationStatus === 'invalid' && formattedData.length === 0 && (
+        {fileValidationStatus === "invalid" && formattedData.length === 0 && (
           <ImportAlert
             variant="destructive"
             title="Invalid CSV Format"
-            description={displayError || 'Unknown error'}
+            description={displayError || "Unknown error"}
             icon={Icons.FileX}
           />
         )}
@@ -171,7 +171,7 @@ export const AccountSelectionStep = ({
           Cancel
         </Button>
         <Button onClick={onNext} disabled={!canProceed}>
-          {isParsing ? 'Validating...' : 'Next'}
+          {isParsing ? "Validating..." : "Next"}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

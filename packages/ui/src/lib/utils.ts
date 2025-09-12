@@ -1,5 +1,5 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -10,16 +10,16 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
   // Handle pence (GBp) specially
-  if (currency === 'GBp' || currency === 'GBX') {
+  if (currency === "GBp" || currency === "GBX") {
     if (!displayCurrency) {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(amount);
     }
 
     // For pence, format as "123.45p" or "1,234.56p"
-    const formattedNumber = new Intl.NumberFormat('en-US', {
+    const formattedNumber = new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
@@ -27,8 +27,8 @@ export function formatAmount(amount: number, currency: string, displayCurrency =
     return `${formattedNumber}p`;
   }
 
-  return new Intl.NumberFormat('en-US', {
-    style: displayCurrency ? 'currency' : undefined,
+  return new Intl.NumberFormat("en-US", {
+    style: displayCurrency ? "currency" : undefined,
     currency: currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -39,11 +39,11 @@ export function formatAmount(amount: number, currency: string, displayCurrency =
  * Format percentage values with proper formatting
  */
 export function formatPercent(value: number | null | undefined) {
-  if (value == null) return '-';
+  if (value == null) return "-";
   try {
     // Use Intl.NumberFormat for correct percentage formatting (handles x100 and % sign)
-    return new Intl.NumberFormat('en-US', {
-      style: 'percent',
+    return new Intl.NumberFormat("en-US", {
+      style: "percent",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);

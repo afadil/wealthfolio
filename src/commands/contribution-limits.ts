@@ -1,18 +1,18 @@
-import { ContributionLimit, NewContributionLimit, DepositsCalculation } from '@/lib/types';
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from '@/adapters';
+import { ContributionLimit, NewContributionLimit, DepositsCalculation } from "@/lib/types";
+import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 export const getContributionLimit = async (): Promise<ContributionLimit[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('get_contribution_limits');
+        return invokeTauri("get_contribution_limits");
       case RUN_ENV.WEB:
-        return invokeWeb('get_contribution_limits');
+        return invokeWeb("get_contribution_limits");
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error fetching contribution limits.');
+    logger.error("Error fetching contribution limits.");
     throw error;
   }
 };
@@ -23,14 +23,14 @@ export const createContributionLimit = async (
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('create_contribution_limit', { newLimit });
+        return invokeTauri("create_contribution_limit", { newLimit });
       case RUN_ENV.WEB:
-        return invokeWeb('create_contribution_limit', { newLimit });
+        return invokeWeb("create_contribution_limit", { newLimit });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error creating contribution limit.');
+    logger.error("Error creating contribution limit.");
     throw error;
   }
 };
@@ -42,14 +42,14 @@ export const updateContributionLimit = async (
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('update_contribution_limit', { id, updatedLimit });
+        return invokeTauri("update_contribution_limit", { id, updatedLimit });
       case RUN_ENV.WEB:
-        return invokeWeb('update_contribution_limit', { id, updatedLimit });
+        return invokeWeb("update_contribution_limit", { id, updatedLimit });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error updating contribution limit.');
+    logger.error("Error updating contribution limit.");
     throw error;
   }
 };
@@ -58,33 +58,30 @@ export const deleteContributionLimit = async (id: string): Promise<void> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('delete_contribution_limit', { id });
+        return invokeTauri("delete_contribution_limit", { id });
       case RUN_ENV.WEB:
-        return invokeWeb('delete_contribution_limit', { id });
+        return invokeWeb("delete_contribution_limit", { id });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error deleting contribution limit.');
+    logger.error("Error deleting contribution limit.");
     throw error;
   }
 };
 
-export const calculateDepositsForLimit = async (
-  limitId: string,
-): Promise<DepositsCalculation> => {
+export const calculateDepositsForLimit = async (limitId: string): Promise<DepositsCalculation> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri('calculate_deposits_for_contribution_limit', { limitId });
+        return invokeTauri("calculate_deposits_for_contribution_limit", { limitId });
       case RUN_ENV.WEB:
-        return invokeWeb('calculate_deposits_for_contribution_limit', { limitId });
+        return invokeWeb("calculate_deposits_for_contribution_limit", { limitId });
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error calculating deposits for contribution limit.');
+    logger.error("Error calculating deposits for contribution limit.");
     throw error;
   }
 };
-
