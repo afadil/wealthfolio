@@ -135,7 +135,7 @@ export default function SettingsLayout() {
         </div>
         <Separator className="my-6" />
         <div className="flex flex-col space-y-8 lg:grid lg:grid-cols-[220px_1fr] lg:gap-10 lg:space-y-0">
-          <aside className="lg:sticky lg:top-20 lg:w-[220px] lg:self-start lg:pr-4">
+          <aside className="lg:sticky lg:top-20 lg:w-sidebar lg:self-start lg:pr-4">
             <SidebarNav items={sidebarNavItems} />
           </aside>
           <div className="mx-12 min-w-0 flex-1 lg:max-w-4xl">

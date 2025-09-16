@@ -92,7 +92,7 @@ export function EquityCurveChart({
                   return (
                     <>
                       <div
-                        className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]"
+                        className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-border bg-(--color-bg)"
                         style={
                           {
                             '--color-bg': entry.color,

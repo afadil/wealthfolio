@@ -50,7 +50,7 @@ const PeriodSelector: React.FC<{
         <Button
           key={code}
           size="sm"
-          className="h-7 flex-shrink-0 rounded-full px-2 text-xs whitespace-nowrap sm:h-8 sm:px-3"
+          className="h-7 shrink-0 rounded-full px-2 text-xs whitespace-nowrap sm:h-8 sm:px-3"
           variant={selectedPeriod === code ? 'default' : 'ghost'}
           onClick={() => onPeriodSelect(code)}
         >
@@ -310,7 +310,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
         <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {/* Equity Curve */}
           <Card className="flex flex-col">
-            <CardHeader className="flex-shrink-0 pb-3">
+            <CardHeader className="shrink-0 pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-base sm:text-lg">

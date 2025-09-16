@@ -198,7 +198,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         <PopoverContent
           side="bottom"
           align="start"
-          className="h-auto w-[var(--radix-popover-trigger-width)] p-0"
+          className="h-auto w-(--radix-popover-trigger-width) p-0"
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
