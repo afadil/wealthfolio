@@ -18,6 +18,8 @@ export default [
       "**/recharts/**",
       "**/react-qr-code/**",
       "src-tauri/gen/**",
+      // Local data and embedded addon bundles
+      "db/**",
       // Let workspaces handle their own linting
       "addons/**",
       "packages/**",
