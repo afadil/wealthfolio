@@ -41,7 +41,7 @@ export function useExportData() {
   });
   const { refetch: fetchPortfolioHistory } = useQuery<AccountValuation[], Error>({
     queryKey: [QueryKeys.HISTORY_VALUATION],
-    queryFn: () => getHistoricalValuations(),
+    queryFn: () => getHistoricalValuations("TOTAL"),
     enabled: false,
   });
 
@@ -67,38 +67,52 @@ export function useExportData() {
       } else {
         let exportedData: string | undefined;
         let fileName: string;
+        let datasetLabel: string | null = null;
 
         const currentDate = new Date().toISOString().split('T')[0];
         switch (desiredData) {
           case 'accounts':
             exportedData = await fetchAndFormatData(fetchAccounts, format);
             fileName = `accounts_${currentDate}.${format.toLowerCase()}`;
+            datasetLabel = 'accounts';
             break;
           case 'activities':
             exportedData = await fetchAndFormatData(fetchActivities, format);
             fileName = `activities_${currentDate}.${format.toLowerCase()}`;
+            datasetLabel = 'activities';
             break;
           case 'goals':
             exportedData = await fetchAndFormatData(fetchGoals, format);
             fileName = `goals_${currentDate}.${format.toLowerCase()}`;
+            datasetLabel = 'goals';
             break;
           case 'portfolio-history':
             exportedData = await fetchAndFormatData(fetchPortfolioHistory, format);
             fileName = `portfolio-history_${currentDate}.${format.toLowerCase()}`;
+            datasetLabel = 'portfolio history records';
             break;
         }
 
         if (exportedData) {
           return openFileSaveDialog(exportedData, fileName);
         }
+
+        if (datasetLabel) {
+          toast({
+            title: 'Nothing to export.',
+            description: `No ${datasetLabel} available to export right now.`,
+          });
+        }
+
+        return null;
       }
     },
     onSuccess: (result) => {
-      if (result === null) {
+      if (!result) {
         // User cancelled the operation, don't show any message
         return;
       }
-      
+
       if (result && typeof result === 'object' && 'path' in result) {
         // SQLite backup success
         toast({

@@ -287,7 +287,7 @@ impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for Connec
 
 /// Determine if an IO error on Windows is a sharing/lock violation.
 #[inline]
-fn is_sharing_violation(e: &io::Error) -> bool {
+fn is_sharing_violation(_e: &io::Error) -> bool {
     #[cfg(target_os = "windows")]
     {
         matches!(e.raw_os_error(), Some(32) | Some(33))
