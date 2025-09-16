@@ -89,7 +89,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               {/* Bottom sheet with transparent background and vertical floating chips */}
               <SheetContent
                 side="bottom"
-                className="h-auto max-h-[70vh] overflow-y-auto !border-0 !bg-transparent !p-0 pb-6 shadow-none [&>button]:hidden"
+                className="h-auto max-h-[70vh] overflow-y-auto border-0! bg-transparent! p-0! pb-6 shadow-none [&>button]:hidden"
               >
                 <div className="flex flex-col items-end gap-3 pt-3 pr-4">
                   {moreItems.map((item) => (
@@ -167,7 +167,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                 <nav
                   data-tauri-drag-region="true"
                   aria-label="Sidebar"
-                  className="flex flex-shrink-0 flex-col p-2"
+                  className="flex shrink-0 flex-col p-2"
                 >
                   <div
                     data-tauri-drag-region="true"
@@ -208,7 +208,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                     title="Toggle Sidebar"
                     variant="ghost"
                     onClick={() => setCollapsed(!collapsed)}
-                    className="text-muted-foreground cursor-pointer rounded-md hover:bg-transparent [&_svg]:!size-5"
+                    className="text-muted-foreground cursor-pointer rounded-md hover:bg-transparent [&_svg]:size-5!"
                     aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                   >
                     <Icons.PanelLeftOpen
@@ -241,7 +241,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
         variant={location.pathname.includes(item.href) ? "secondary" : "ghost"}
         asChild
         className={cn(
-          "text-foreground mb-1 h-12 rounded-md transition-all duration-300 [&_svg]:!size-5",
+          "text-foreground mb-1 h-12 rounded-md transition-all duration-300 [&_svg]:size-5!",
           collapsed ? "justify-center" : "justify-start",
           className,
         )}

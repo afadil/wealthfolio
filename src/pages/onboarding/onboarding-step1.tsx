@@ -21,8 +21,8 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
       {/* Tracking Options */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         {/* Simple Tracking Card */}
-        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-gradient-to-br transition-all duration-300 hover:shadow-lg">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-linear-to-br transition-all duration-300 hover:shadow-lg">
+          <div className="absolute inset-0 bg-linear-to-br from-green-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
           <CardHeader className="relative pb-4">
             <div className="mb-3 flex items-center gap-3">
@@ -93,8 +93,8 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
         </Card>
 
         {/* Full Tracking Card */}
-        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-gradient-to-br transition-all duration-300 hover:shadow-lg">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-linear-to-br transition-all duration-300 hover:shadow-lg">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
           <CardHeader className="relative pb-4">
             <div className="mb-3 flex items-center gap-3">
@@ -172,7 +172,7 @@ export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
         <Button
           onClick={onNext}
           size="lg"
-          className="group from-primary to-primary/90 min-w-[200px] bg-gradient-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
+          className="group from-primary to-primary/90 min-w-[200px] bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
         >
           Got it, Next: Set Preferences
           <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
