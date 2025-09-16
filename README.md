@@ -154,7 +154,8 @@ Ensure you have the following installed on your machine:
    cp .env.example .env
    ```
 
-   Update the `.env` file with your database path and other configuration as needed:
+   Update the `.env` file with your database path and other configuration as
+   needed:
 
    ```bash
    # Database location
