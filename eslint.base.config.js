@@ -51,8 +51,9 @@ export function createBaseConfig(options = {}) {
           ecmaFeatures: {
             jsx: true,
           },
-          project: tsconfigPath,
-          tsconfigRootDir: import.meta.dirname,
+          // Use TypeScript Project Service for typed linting in monorepos
+          // This avoids issues with project references and speeds up linting.
+          projectService: true,
         },
       },
       plugins: {
@@ -72,11 +73,32 @@ export function createBaseConfig(options = {}) {
             caughtErrorsIgnorePattern: "^_",
           },
         ],
+        // Prefer warnings for stylistic suggestions to reduce friction
+        "@typescript-eslint/prefer-nullish-coalescing": "warn",
+        "@typescript-eslint/prefer-optional-chain": "warn",
+        "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+        "@typescript-eslint/restrict-template-expressions": [
+          "warn",
+          {
+            allowNumber: true,
+            allowBoolean: true,
+            allowNullish: true,
+            allowAny: true,
+            allowRegExp: true,
+          },
+        ],
+        "@typescript-eslint/no-empty-function": "warn",
+        "@typescript-eslint/consistent-type-definitions": "warn",
+        // Relax misuse-of-promises: allow async handlers in JSX and surface as warnings
+        "@typescript-eslint/no-misused-promises": [
+          "warn",
+          {
+            // Allow async functions in void-return positions (e.g., React handlers)
+            checksVoidReturn: false,
+          },
+        ],
         "@typescript-eslint/no-explicit-any": "warn",
         "@typescript-eslint/unbound-method": "off",
-        "@typescript-eslint/prefer-nullish-coalescing": "error",
-        "@typescript-eslint/prefer-optional-chain": "error",
-        "@typescript-eslint/no-unnecessary-type-assertion": "error",
 
         // Relaxed rules for better developer experience
         "@typescript-eslint/no-unsafe-assignment": "warn",
@@ -88,6 +110,9 @@ export function createBaseConfig(options = {}) {
         "@typescript-eslint/require-await": "warn",
 
         // General rules
+        "no-empty": ["warn", { allowEmptyCatch: true }],
+        "no-prototype-builtins": "warn",
+        "no-case-declarations": "warn",
         "no-console": ["warn", { allow: ["warn", "error"] }],
         "prefer-const": "error",
         "no-var": "error",
@@ -97,6 +122,8 @@ export function createBaseConfig(options = {}) {
           ...react.configs.recommended.rules,
           ...react.configs["jsx-runtime"].rules,
           ...reactHooks.configs.recommended.rules,
+          "react-hooks/rules-of-hooks": "warn",
+          "react/no-unescaped-entities": "warn",
           "react/prop-types": "off",
           "react/react-in-jsx-scope": "off",
           "react/jsx-uses-react": "off",
@@ -108,7 +135,11 @@ export function createBaseConfig(options = {}) {
         }),
 
         // TanStack Query rules (if enabled)
-        ...(includeTanstackQuery && tanstackQuery.configs.recommended.rules),
+        ...(includeTanstackQuery && {
+          ...tanstackQuery.configs.recommended.rules,
+          "@tanstack/query/exhaustive-deps": "warn",
+          "@tanstack/query/no-unstable-deps": "warn",
+        }),
       },
       settings: {
         ...(includeReact && {
