@@ -94,11 +94,11 @@ export function useExportData() {
       }
     },
     onSuccess: (result) => {
-      if (result === null) {
+      if (!result) {
         // User cancelled the operation, don't show any message
         return;
       }
-      
+
       if (result && typeof result === 'object' && 'path' in result) {
         // SQLite backup success
         toast({
