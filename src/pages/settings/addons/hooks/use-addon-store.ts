@@ -47,7 +47,7 @@ export function useAddonStore() {
   const installFromStore = useCallback(
     async (
       listing: AddonStoreListing,
-      enableAfterInstall: boolean = true,
+      enableAfterInstall = true,
       onShowPermissionDialog?: (
         extractedAddon: ExtractedAddon,
         onApprove: () => Promise<void>,

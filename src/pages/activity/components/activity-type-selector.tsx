@@ -44,7 +44,7 @@ export function ActivityTypeSelector({
             >
               {types.map((type) => {
                 const Icon = Icons[type.icon];
-                const InfoIcon = Icons["Info"];
+                const InfoIcon = Icons.Info;
                 return (
                   <div key={type.value}>
                     <RadioGroupItem value={type.value} id={type.value} className="peer sr-only" />

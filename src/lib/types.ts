@@ -14,7 +14,7 @@ export {
 
 export type { ImportRequiredField } from "./constants";
 
-export type Account = {
+export interface Account {
   id: string;
   name: string;
   accountType: AccountType;
@@ -26,9 +26,9 @@ export type Account = {
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional
-};
+}
 
-export type Activity = {
+export interface Activity {
   id: string;
   type: ActivityType;
   date: Date | string;
@@ -42,7 +42,7 @@ export type Activity = {
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
-};
+}
 
 export interface ActivityDetails {
   id: string;
@@ -67,14 +67,14 @@ export interface ActivityDetails {
   subRows?: ActivityDetails[];
 }
 
-export type ActivitySearchResponse = {
+export interface ActivitySearchResponse {
   data: ActivityDetails[];
   meta: {
     totalRowCount: number;
   };
-};
+}
 
-export type ActivityCreate = {
+export interface ActivityCreate {
   accountId: string;
   activityType: string;
   activityDate: string | Date;
@@ -86,7 +86,7 @@ export type ActivityCreate = {
   fee?: number;
   isDraft: boolean;
   comment?: string | null;
-};
+}
 
 export type ActivityUpdate = ActivityCreate & { id: string };
 export type ActivityImport = z.infer<typeof importActivitySchema>;
@@ -369,10 +369,10 @@ export interface IncomeSummary {
 }
 
 // Define custom DateRange type matching react-day-picker's
-export type DateRange = {
+export interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-};
+}
 
 export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
 
@@ -500,11 +500,11 @@ export interface UpdateAssetProfile {
 }
 
 // Rename ComparisonItem to TrackedItem
-export type TrackedItem = {
+export interface TrackedItem {
   id: string;
   type: "account" | "symbol";
   name: string;
-};
+}
 
 // Addon Store Types
 export interface AddonStoreListing {

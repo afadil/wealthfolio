@@ -93,8 +93,8 @@ export default function IncomePage() {
   }
 
   const { totalIncome, currency, monthlyAverage, byType, byCurrency } = periodSummary;
-  const dividendIncome = byType["DIVIDEND"] || 0;
-  const interestIncome = byType["INTEREST"] || 0;
+  const dividendIncome = byType.DIVIDEND || 0;
+  const interestIncome = byType.INTEREST || 0;
   const dividendPercentage = totalIncome > 0 ? (dividendIncome / totalIncome) * 100 : 0;
   const interestPercentage = totalIncome > 0 ? (interestIncome / totalIncome) * 100 : 0;
 
@@ -110,8 +110,8 @@ export default function IncomePage() {
 
   const getPreviousPeriodData = (currentMonth: string): number => {
     const [year, month] = currentMonth.split("-");
-    let previousYear = parseInt(year) - 1;
-    let previousMonth = month;
+    const previousYear = parseInt(year) - 1;
+    const previousMonth = month;
 
     if (selectedPeriod === "YTD") {
       return totalSummary.byMonth[`${previousYear}-${month}`] || 0;
@@ -336,7 +336,7 @@ export default function IncomePage() {
 
                       const chartItems = [
                         ...top5Stocks.map(([symbol, income]) => ({
-                          symbol: symbol.match(/\[(.*?)\]/)?.[1] || symbol,
+                          symbol: (/\[(.*?)\]/.exec(symbol))?.[1] || symbol,
                           companyName: symbol.replace(/\[.*?\]-/, "").trim(),
                           income,
                           isOther: false,
@@ -402,7 +402,7 @@ export default function IncomePage() {
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center">
                         <Badge className="bg-primary mr-2 flex min-w-[55px] items-center justify-center rounded-sm text-xs">
-                          {symbol.match(/\[(.*?)\]/)?.[1] || symbol}
+                          {(/\[(.*?)\]/.exec(symbol))?.[1] || symbol}
                         </Badge>
                         <span className="text-muted-foreground mr-16 text-xs">
                           {symbol.replace(/\[.*?\]-/, "").trim()}

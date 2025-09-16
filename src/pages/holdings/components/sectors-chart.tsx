@@ -84,12 +84,12 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
                     <TooltipTrigger asChild>
                       <div
                         className="hover:bg-muted flex cursor-pointer items-center gap-0 rounded-md py-1"
-                        onClick={() => onSectorSectionClick && onSectorSectionClick(sector.name)}
+                        onClick={() => onSectorSectionClick?.(sector.name)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
-                            onSectorSectionClick && onSectorSectionClick(sector.name);
+                            onSectorSectionClick?.(sector.name);
                           }
                         }}
                       >

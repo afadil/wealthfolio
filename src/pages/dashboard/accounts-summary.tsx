@@ -15,7 +15,7 @@ import { calculatePerformanceMetrics } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 
 // Define a unified type for displaying both individual accounts and groups
-type AccountSummaryDisplayData = {
+interface AccountSummaryDisplayData {
   // Common fields
   accountName: string; // Account name or Group name
   baseCurrency: string; // Mandatory
@@ -41,7 +41,7 @@ type AccountSummaryDisplayData = {
   isGroup?: boolean;
   accountCount?: number;
   accounts?: AccountSummaryDisplayData[];
-};
+}
 
 // Skeleton component for loading state within AccountSummaryComponent
 const AccountSummarySkeleton = () => (

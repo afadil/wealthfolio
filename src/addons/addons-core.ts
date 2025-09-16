@@ -128,7 +128,7 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     const mod = await import(/* @vite-ignore */ blobUrl);
 
     // Robustly resolve the addon's enable() regardless of bundle style
-    let enableFunction: any =
+    const enableFunction: any =
       // 1. ES‑module default export IS the enable function
       (typeof mod.default === "function" && mod.default) ||
       // 2. ES‑module default export is an object exposing enable

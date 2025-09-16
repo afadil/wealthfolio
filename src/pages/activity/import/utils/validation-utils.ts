@@ -416,7 +416,7 @@ export function validateActivityImport(
         const schemaValidation = importActivitySchema.safeParse(transformedActivity);
 
         if (schemaValidation.success) {
-          const activity = schemaValidation.data as ActivityImport;
+          const activity = schemaValidation.data;
           activity.accountId = transformedActivity.accountId ?? accountId;
           activity.isValid = true;
           allActivities.push(activity);

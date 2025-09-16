@@ -20,7 +20,7 @@ interface AddonDevServer {
 
 class AddonDevManager {
   private config: DevModeConfig;
-  private devServers: Map<string, AddonDevServer> = new Map();
+  private devServers = new Map<string, AddonDevServer>();
   private watchInterval: number | null = null;
   private eventSource: EventSource | null = null;
 
@@ -273,7 +273,7 @@ class AddonDevManager {
     try {
       // Clean up existing instance
       const devAddons = (globalThis as any).__DEV_ADDONS__;
-      if (devAddons && devAddons.has(addonId)) {
+      if (devAddons?.has(addonId)) {
         const instance = devAddons.get(addonId);
         if (instance.disable) {
           logger.info(`🧹 Cleaning up old instance of ${addonId}`);

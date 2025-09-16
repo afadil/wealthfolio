@@ -302,11 +302,11 @@ export default function MarketDataSettingsPage() {
   const { mutate: recalculatePortfolio, isPending: isRecalculating } =
     useRecalculatePortfolioMutation();
 
-  const [priorityInputs, setPriorityInputs] = useState<{ [providerId: string]: number }>({});
+  const [priorityInputs, setPriorityInputs] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (providers) {
-      const initialPriorityInputs: { [key: string]: number } = {};
+      const initialPriorityInputs: Record<string, number> = {};
       providers.forEach((p: MarketDataProviderSetting) => {
         initialPriorityInputs[p.id] = p.priority;
       });

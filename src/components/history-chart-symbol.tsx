@@ -3,10 +3,10 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { formatAmount } from "@wealthfolio/ui";
 import { formatDate } from "@/lib/utils";
 
-type CustomTooltipProps = {
+interface CustomTooltipProps {
   active: boolean;
   payload: { value: number; payload: any }[];
-};
+}
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {

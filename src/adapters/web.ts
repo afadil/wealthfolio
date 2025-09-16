@@ -1,8 +1,6 @@
 const API_PREFIX = "/api/v1";
 
-type CommandMap = {
-  [command: string]: { method: string; path: string };
-};
+type CommandMap = Record<string, { method: string; path: string }>;
 
 const COMMANDS: CommandMap = {
   get_accounts: { method: "GET", path: "/accounts" },

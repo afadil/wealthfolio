@@ -21,7 +21,7 @@ export type ExtendedColumnDef<TData extends object, TValue = unknown> = ColumnDe
       | "moneyInput"
       | "accountSelect"
       | "currencySelect";
-    options?: Array<{ label: string; value: any }>;
+    options?: { label: string; value: any }[];
   };
 };
 

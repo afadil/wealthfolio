@@ -7,7 +7,7 @@ import { Icons } from "@/components/ui/icons";
 interface ValidationAlertProps {
   success: boolean;
   warnings: number;
-  error: String | null;
+  error: string | null;
   isConfirming: boolean;
   onConfirm: () => void;
   onCancel: () => void;

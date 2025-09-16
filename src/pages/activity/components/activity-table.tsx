@@ -80,7 +80,7 @@ export const ActivityTable = ({
         accessorKey: 'assetSymbol',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
         cell: ({ row }) => {
-          let symbol = row.getValue('assetSymbol') as string;
+          const symbol = row.getValue('assetSymbol');
           const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
           // For TickerAvatar, use $CASH for all cash symbols to get the proper icon
           const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
@@ -132,7 +132,7 @@ export const ActivityTable = ({
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType') as string;
+          const activityType = row.getValue('activityType');
           const badgeVariant =
             activityType === 'BUY' ||
             activityType === 'DEPOSIT' ||
@@ -169,8 +169,8 @@ export const ActivityTable = ({
           />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType') as string;
-          const quantity = row.getValue('quantity') as number;
+          const activityType = row.getValue('activityType');
+          const quantity = row.getValue('quantity');
 
           if (
             isCashActivity(activityType) ||
@@ -196,11 +196,11 @@ export const ActivityTable = ({
           />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType') as string;
-          const unitPrice = row.getValue('unitPrice') as number;
-          const amount = row.original.amount as number;
-          const currency = (row.getValue('currency') as string) || 'USD';
-          const assetSymbol = row.getValue('assetSymbol') as string;
+          const activityType = row.getValue('activityType');
+          const unitPrice = row.getValue('unitPrice');
+          const amount = row.original.amount;
+          const currency = row.getValue('currency') || 'USD';
+          const assetSymbol = row.getValue('assetSymbol');
 
           if (activityType === 'FEE') {
             return <div className="pr-4 text-right">-</div>;
@@ -228,9 +228,9 @@ export const ActivityTable = ({
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType') as string;
-          const fee = row.getValue('fee') as number;
-          const currency = (row.getValue('currency') as string) || 'USD';
+          const activityType = row.getValue('activityType');
+          const fee = row.getValue('fee');
+          const currency = row.getValue('currency') || 'USD';
 
           return (
             <div className="text-right">

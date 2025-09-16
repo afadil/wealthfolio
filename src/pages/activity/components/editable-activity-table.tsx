@@ -212,7 +212,7 @@ const EditableActivityTable = ({
     queryFn: () => {
       const columnFiltersObj = columnFilters.reduce((acc, curr) => {
         acc[curr.id] = curr.value;
-        return acc as any;
+        return acc;
       }, {} as any);
       const sortingObj = sorting.length > 0 ? sorting[0] : undefined;
       return searchActivities(
@@ -481,7 +481,7 @@ const EditableActivityTable = ({
               className="flex justify-center text-xs font-normal text-nowrap"
               variant={badgeVariant}
             >
-              {ActivityTypeNames[activityType as ActivityType]}
+              {ActivityTypeNames[activityType]}
             </Badge>
           );
         },
@@ -623,7 +623,7 @@ const EditableActivityTable = ({
         accessorKey: "currency",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
         cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => (
-          <div>{String((row.getValue("currency") as string | undefined) || "N/A")}</div>
+          <div>{String((row.getValue("currency")) || "N/A")}</div>
         ),
         meta: { type: "currencySelect" },
         validationSchema: baseActivitySchema.shape.currency,
@@ -633,7 +633,7 @@ const EditableActivityTable = ({
         accessorKey: "notes",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Comment" />,
         cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => {
-          return <div>{String((row.original.comment as string | undefined) || "")}</div>;
+          return <div>{String((row.original.comment) || "")}</div>;
         },
         meta: { type: "string" },
         validationSchema: baseActivitySchema.shape.comment,
@@ -816,7 +816,7 @@ const EditableActivityTable = ({
             const activityType = rowData.activityType;
             const assetSymbol = rowData.assetSymbol; // Needed for isCashTransfer
 
-            let isProgrammaticallyBlockedFromEditing = isCellProgrammaticallyBlocked(
+            const isProgrammaticallyBlockedFromEditing = isCellProgrammaticallyBlocked(
               colKey,
               activityType,
               assetSymbol,
@@ -1139,11 +1139,11 @@ const EditableActivityTable = ({
                     e.preventDefault();
 
                     const allRows = table.getRowModel().flatRows;
-                    const editableCellsFlat: Array<{
+                    const editableCellsFlat: {
                       rowId: string;
                       columnId: string;
                       isDirectEditType: boolean;
-                    }> = [];
+                    }[] = [];
 
                     allRows.forEach((r) => {
                       const currentRowOriginalData = r.original;
