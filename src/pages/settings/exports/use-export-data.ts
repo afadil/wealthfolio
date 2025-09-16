@@ -1,13 +1,13 @@
-import { logger } from '@/adapters';
-import { getAccounts } from '@/commands/account';
-import { getActivities } from '@/commands/activity';
-import { openFileSaveDialog, openFolderDialog } from '@/commands/file';
-import { getGoals } from '@/commands/goal';
-import { getHistoricalValuations } from '@/commands/portfolio';
-import { backupDatabaseToPath } from '@/commands/settings';
-import { toast } from '@/components/ui/use-toast';
-import { formatData } from '@/lib/export-utils';
-import { QueryKeys } from '@/lib/query-keys';
+import { logger } from "@/adapters";
+import { getAccounts } from "@/commands/account";
+import { getActivities } from "@/commands/activity";
+import { openFileSaveDialog, openFolderDialog } from "@/commands/file";
+import { getGoals } from "@/commands/goal";
+import { getHistoricalValuations } from "@/commands/portfolio";
+import { backupDatabaseToPath } from "@/commands/settings";
+import { toast } from "@/components/ui/use-toast";
+import { formatData } from "@/lib/export-utils";
+import { QueryKeys } from "@/lib/query-keys";
 import {
   Account,
   AccountValuation,
@@ -15,8 +15,8 @@ import {
   ExportDataType,
   ExportedFileFormat,
   Goal,
-} from '@/lib/types';
-import { QueryObserverResult, useMutation, useQuery } from '@tanstack/react-query';
+} from "@/lib/types";
+import { QueryObserverResult, useMutation, useQuery } from "@tanstack/react-query";
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -41,7 +41,7 @@ export function useExportData() {
   });
   const { refetch: fetchPortfolioHistory } = useQuery<AccountValuation[], Error>({
     queryKey: [QueryKeys.HISTORY_VALUATION],
-    queryFn: () => getHistoricalValuations('TOTAL'),
+    queryFn: () => getHistoricalValuations("TOTAL"),
     enabled: false,
   });
 
@@ -52,7 +52,7 @@ export function useExportData() {
   } = useMutation({
     mutationFn: async (params: ExportParams) => {
       const { format, data: desiredData } = params;
-      if (format === 'SQLite') {
+      if (format === "SQLite") {
         // Open folder dialog to let user choose backup location
         const selectedDir = await openFolderDialog();
 
@@ -69,27 +69,27 @@ export function useExportData() {
         let fileName: string;
         let datasetLabel: string | null = null;
 
-        const currentDate = new Date().toISOString().split('T')[0];
+        const currentDate = new Date().toISOString().split("T")[0];
         switch (desiredData) {
-          case 'accounts':
+          case "accounts":
             exportedData = await fetchAndFormatData(fetchAccounts, format);
             fileName = `accounts_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'accounts';
+            datasetLabel = "accounts";
             break;
-          case 'activities':
+          case "activities":
             exportedData = await fetchAndFormatData(fetchActivities, format);
             fileName = `activities_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'activities';
+            datasetLabel = "activities";
             break;
-          case 'goals':
+          case "goals":
             exportedData = await fetchAndFormatData(fetchGoals, format);
             fileName = `goals_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'goals';
+            datasetLabel = "goals";
             break;
-          case 'portfolio-history':
+          case "portfolio-history":
             exportedData = await fetchAndFormatData(fetchPortfolioHistory, format);
             fileName = `portfolio-history_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'portfolio history records';
+            datasetLabel = "portfolio history records";
             break;
         }
 
@@ -99,7 +99,7 @@ export function useExportData() {
 
         if (datasetLabel) {
           toast({
-            title: 'Nothing to export.',
+            title: "Nothing to export.",
             description: `No ${datasetLabel} available to export right now.`,
           });
         }
@@ -113,27 +113,27 @@ export function useExportData() {
         return;
       }
 
-      if (result && typeof result === 'object' && 'path' in result) {
+      if (result && typeof result === "object" && "path" in result) {
         // SQLite backup success
         toast({
-          title: 'Database backup completed successfully.',
+          title: "Database backup completed successfully.",
           description: `Backup saved to: ${result.path}`,
-          variant: 'success',
+          variant: "success",
         });
       } else {
         // Regular export success
         toast({
-          title: 'Export completed',
-          description: 'File saved successfully. Check your download location.',
-          variant: 'success',
+          title: "Export completed",
+          description: "File saved successfully. Check your download location.",
+          variant: "success",
         });
       }
     },
     onError: (e) => {
       logger.error(`Error while exporting: ${String(e)}`);
       toast({
-        title: 'Something went wrong.',
-        variant: 'destructive',
+        title: "Something went wrong.",
+        variant: "destructive",
       });
     },
   });

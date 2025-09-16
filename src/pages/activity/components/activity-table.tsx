@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo } from "react";
 
-import { searchActivities } from '@/commands/activity';
-import { TickerAvatar } from '@/components/ticker-avatar';
-import { Badge } from '@/components/ui/badge';
-import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
-import { Icons } from '@/components/ui/icons';
+import { searchActivities } from "@/commands/activity";
+import { TickerAvatar } from "@/components/ticker-avatar";
+import { Badge } from "@/components/ui/badge";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
+import { Icons } from "@/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -13,8 +13,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+} from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   calculateActivityValue,
   isCashActivity,
@@ -22,12 +22,12 @@ import {
   isFeeActivity,
   isIncomeActivity,
   isSplitActivity,
-} from '@/lib/activity-utils';
-import { ActivityType, ActivityTypeNames } from '@/lib/constants';
-import { QueryKeys } from '@/lib/query-keys';
-import { Account, ActivityDetails, ActivitySearchResponse } from '@/lib/types';
-import { formatDateTime } from '@/lib/utils';
-import { useInfiniteQuery } from '@tanstack/react-query';
+} from "@/lib/activity-utils";
+import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { QueryKeys } from "@/lib/query-keys";
+import { Account, ActivityDetails, ActivitySearchResponse } from "@/lib/types";
+import { formatDateTime } from "@/lib/utils";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -36,12 +36,12 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
-import { formatAmount } from '@wealthfolio/ui';
-import { debounce } from 'lodash';
-import { Link } from 'react-router-dom';
-import { useActivityMutations } from '../hooks/use-activity-mutations';
-import { ActivityOperations } from './activity-operations';
+} from "@tanstack/react-table";
+import { formatAmount } from "@wealthfolio/ui";
+import { debounce } from "lodash";
+import { Link } from "react-router-dom";
+import { useActivityMutations } from "../hooks/use-activity-mutations";
+import { ActivityOperations } from "./activity-operations";
 
 const fetchSize = 25;
 
@@ -64,7 +64,7 @@ export const ActivityTable = ({
   onToggleEditable: (value: boolean) => void;
 }) => {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const { duplicateActivityMutation } = useActivityMutations();
@@ -77,23 +77,23 @@ export const ActivityTable = ({
   const columns: ColumnDef<ActivityDetails>[] = useMemo(
     () => [
       {
-        id: 'assetSymbol',
-        accessorKey: 'assetSymbol',
+        id: "assetSymbol",
+        accessorKey: "assetSymbol",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
         cell: ({ row }) => {
-          const symbol = String(row.getValue('assetSymbol'));
-          const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+          const symbol = String(row.getValue("assetSymbol"));
+          const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
           // For TickerAvatar, use $CASH for all cash symbols to get the proper icon
-          const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
+          const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
 
-          const isCash = symbol.startsWith('$CASH');
+          const isCash = symbol.startsWith("$CASH");
           const content = (
             <div className="flex items-center">
               <TickerAvatar symbol={avatarSymbol} className="mr-2 h-8 w-8" />
               <div className="flex flex-col">
                 <span className="font-medium">{displaySymbol}</span>
-                <span className="text-xs text-muted-foreground">
-                  {isCash ? row.getValue('currency') : row.getValue('assetName')}
+                <span className="text-muted-foreground text-xs">
+                  {isCash ? row.getValue("currency") : row.getValue("assetName")}
                 </span>
               </div>
             </div>
@@ -112,15 +112,15 @@ export const ActivityTable = ({
         enableHiding: false,
       },
       {
-        id: 'date',
-        accessorKey: 'date',
+        id: "date",
+        accessorKey: "date",
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
         cell: ({ row }) => {
           const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const dateVal = row.getValue('date');
+          const dateVal = row.getValue("date");
           const formattedDate =
-            typeof dateVal === 'string' || dateVal instanceof Date
+            typeof dateVal === "string" || dateVal instanceof Date
               ? formatDateTime(dateVal, userTimezone)
               : formatDateTime(String(dateVal), userTimezone);
           return (
@@ -132,26 +132,26 @@ export const ActivityTable = ({
         },
       },
       {
-        id: 'activityType',
-        accessorKey: 'activityType',
+        id: "activityType",
+        accessorKey: "activityType",
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
         cell: ({ row }) => {
-          const activityType = String(row.getValue('activityType'));
+          const activityType = String(row.getValue("activityType"));
           const badgeVariant =
-            activityType === 'BUY' ||
-            activityType === 'DEPOSIT' ||
-            activityType === 'DIVIDEND' ||
-            activityType === 'INTEREST' ||
-            activityType === 'TRANSFER_IN' ||
-            activityType === 'ADD_HOLDING'
-              ? 'success'
-              : activityType === 'SPLIT'
-                ? 'secondary'
-                : 'destructive';
+            activityType === "BUY" ||
+            activityType === "DEPOSIT" ||
+            activityType === "DIVIDEND" ||
+            activityType === "INTEREST" ||
+            activityType === "TRANSFER_IN" ||
+            activityType === "ADD_HOLDING"
+              ? "success"
+              : activityType === "SPLIT"
+                ? "secondary"
+                : "destructive";
           return (
             <div className="flex items-center text-sm">
-              <Badge className="whitespace-nowrap text-xs font-normal" variant={badgeVariant}>
+              <Badge className="text-xs font-normal whitespace-nowrap" variant={badgeVariant}>
                 {ActivityTypeNames[activityType as ActivityType]}
               </Badge>
             </div>
@@ -167,8 +167,8 @@ export const ActivityTable = ({
         },
       },
       {
-        id: 'quantity',
-        accessorKey: 'quantity',
+        id: "quantity",
+        accessorKey: "quantity",
         enableHiding: false,
         enableSorting: false,
         header: ({ column }) => (
@@ -179,8 +179,8 @@ export const ActivityTable = ({
           />
         ),
         cell: ({ row }) => {
-          const activityType = String(row.getValue('activityType'));
-          const quantity = row.getValue('quantity');
+          const activityType = String(row.getValue("activityType"));
+          const quantity = row.getValue("quantity");
 
           if (
             isCashActivity(activityType) ||
@@ -195,8 +195,8 @@ export const ActivityTable = ({
         },
       },
       {
-        id: 'unitPrice',
-        accessorKey: 'unitPrice',
+        id: "unitPrice",
+        accessorKey: "unitPrice",
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader
@@ -206,17 +206,17 @@ export const ActivityTable = ({
           />
         ),
         cell: ({ row }) => {
-          const activityType = String(row.getValue('activityType'));
-          const unitPrice = Number(row.getValue('unitPrice'));
+          const activityType = String(row.getValue("activityType"));
+          const unitPrice = Number(row.getValue("unitPrice"));
           const amount = row.original.amount;
-          const currencyVal = row.getValue('currency');
-          const currency = typeof currencyVal === 'string' ? currencyVal : 'USD';
-          const assetSymbol = String(row.getValue('assetSymbol'));
+          const currencyVal = row.getValue("currency");
+          const currency = typeof currencyVal === "string" ? currencyVal : "USD";
+          const assetSymbol = String(row.getValue("assetSymbol"));
 
-          if (activityType === 'FEE') {
+          if (activityType === "FEE") {
             return <div className="pr-4 text-right">-</div>;
           }
-          if (activityType === 'SPLIT') {
+          if (activityType === "SPLIT") {
             return <div className="text-right">{Number(amount).toFixed(0)} : 1</div>;
           }
           if (
@@ -231,29 +231,29 @@ export const ActivityTable = ({
         },
       },
       {
-        id: 'fee',
-        accessorKey: 'fee',
+        id: "fee",
+        accessorKey: "fee",
         enableHiding: true,
         enableSorting: false,
         header: ({ column }) => (
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
         ),
         cell: ({ row }) => {
-          const activityType = String(row.getValue('activityType'));
-          const fee = Number(row.getValue('fee'));
-          const currencyVal = row.getValue('currency');
-          const currency = typeof currencyVal === 'string' ? currencyVal : 'USD';
+          const activityType = String(row.getValue("activityType"));
+          const fee = Number(row.getValue("fee"));
+          const currencyVal = row.getValue("currency");
+          const currency = typeof currencyVal === "string" ? currencyVal : "USD";
 
           return (
             <div className="text-right">
-              {activityType === 'SPLIT' ? '-' : formatAmount(fee, currency)}
+              {activityType === "SPLIT" ? "-" : formatAmount(fee, currency)}
             </div>
           );
         },
       },
       {
-        id: 'value',
-        accessorKey: 'value',
+        id: "value",
+        accessorKey: "value",
         enableSorting: false,
         enableHiding: true,
         header: ({ column }) => (
@@ -262,9 +262,9 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activity = row.original;
           const activityType = activity.activityType;
-          const currency = activity.currency || 'USD';
+          const currency = activity.currency || "USD";
 
-          if (activityType === 'SPLIT') {
+          if (activityType === "SPLIT") {
             return <div className="pr-4 text-right">-</div>;
           }
 
@@ -273,41 +273,41 @@ export const ActivityTable = ({
         },
       },
       {
-        id: 'currency',
-        accessorKey: 'currency',
+        id: "currency",
+        accessorKey: "currency",
         enableSorting: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
-        cell: ({ row }) => <div>{row.getValue('currency')}</div>,
+        cell: ({ row }) => <div>{row.getValue("currency")}</div>,
         enableHiding: false,
       },
       {
-        id: 'account',
-        accessorKey: 'accountName',
+        id: "account",
+        accessorKey: "accountName",
         enableSorting: false,
         enableHiding: true,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
         cell: ({ row }) => {
           return (
             <div className="ml-2 flex min-w-[150px] flex-col">
-              <span>{row.getValue('account')}</span>
-              <span className="text-xs font-light">{row.getValue('accountCurrency')}</span>
+              <span>{row.getValue("account")}</span>
+              <span className="text-xs font-light">{row.getValue("accountCurrency")}</span>
             </div>
           );
         },
       },
       {
-        id: 'assetName',
-        accessorKey: 'assetName',
+        id: "assetName",
+        accessorKey: "assetName",
         enableHiding: false,
       },
       {
-        id: 'accountCurrency',
-        accessorKey: 'accountCurrency',
+        id: "accountCurrency",
+        accessorKey: "accountCurrency",
         enableHiding: false,
       },
       {
-        id: 'accountId',
-        accessorKey: 'accountId',
+        id: "accountId",
+        accessorKey: "accountId",
         filterFn: (row, id, value: string) => {
           const cellValue = row.getValue(id) as string | undefined;
           if (!cellValue) {
@@ -319,7 +319,7 @@ export const ActivityTable = ({
         enableHiding: false,
       },
       {
-        id: 'actions',
+        id: "actions",
         cell: ({ row }) => {
           return (
             <ActivityOperations
@@ -340,20 +340,20 @@ export const ActivityTable = ({
     accounts
       ?.filter((account) => account.isActive)
       .map((account) => ({
-        label: account.name + '-(' + account.currency + ')',
+        label: account.name + "-(" + account.currency + ")",
         value: account.id,
         currency: account.currency,
       })) || [];
 
   const filtersOptions = [
     {
-      id: 'accountId',
-      title: 'Account',
+      id: "accountId",
+      title: "Account",
       options: accountOptions,
     },
     {
-      id: 'activityType',
-      title: 'Activity Type',
+      id: "activityType",
+      title: "Activity Type",
       options: activityTypeOptions,
     },
   ];
@@ -468,28 +468,28 @@ export const ActivityTable = ({
         <ToggleGroup
           type="single"
           size="sm"
-          value={isEditable ? 'edit' : 'view'}
+          value={isEditable ? "edit" : "view"}
           onValueChange={(value: string) => {
-            if (value === 'edit') {
+            if (value === "edit") {
               onToggleEditable(true);
-            } else if (value === 'view') {
+            } else if (value === "view") {
               onToggleEditable(false);
             }
           }}
           aria-label="Table view mode"
-          className="rounded-md bg-muted p-0.5"
+          className="bg-muted rounded-md p-0.5"
         >
           <ToggleGroupItem
             value="view"
             aria-label="View mode"
-            className="rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50 hover:text-accent-foreground data-[state=off]:bg-transparent data-[state=on]:bg-background data-[state=off]:text-muted-foreground data-[state=on]:text-accent-foreground"
+            className="hover:bg-muted/50 hover:text-accent-foreground data-[state=on]:bg-background data-[state=off]:text-muted-foreground data-[state=on]:text-accent-foreground rounded-md px-2.5 py-1.5 text-xs transition-colors data-[state=off]:bg-transparent"
           >
             <Icons.Rows3 className="h-4 w-4" />
           </ToggleGroupItem>
           <ToggleGroupItem
             value="edit"
             aria-label="Edit mode"
-            className="rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/50 hover:text-accent-foreground data-[state=off]:bg-transparent data-[state=on]:bg-background data-[state=off]:text-muted-foreground data-[state=on]:text-accent-foreground"
+            className="hover:bg-muted/50 hover:text-accent-foreground data-[state=on]:bg-background data-[state=off]:text-muted-foreground data-[state=on]:text-accent-foreground rounded-md px-2.5 py-1.5 text-xs transition-colors data-[state=off]:bg-transparent"
           >
             <Icons.Grid3x3 className="h-4 w-4" />
           </ToggleGroupItem>
@@ -501,7 +501,7 @@ export const ActivityTable = ({
         onScroll={(e) => fetchMoreOnBottomReachedDebounced(e.target as HTMLDivElement)}
       >
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-muted-foreground/5">
+          <TableHeader className="bg-muted-foreground/5 sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -540,7 +540,7 @@ export const ActivityTable = ({
           </TableBody>
         </Table>
       </div>
-      <div className="mt-2 flex shrink-0 pl-2 text-xs text-muted-foreground">
+      <div className="text-muted-foreground mt-2 flex shrink-0 pl-2 text-xs">
         {isFetching ? <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
         {totalFetched} / {totalDBRowCount} activities
       </div>
