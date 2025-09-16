@@ -172,11 +172,11 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                 onCheckedChange={handleToggleSwingTag}
               />
               <label htmlFor="swing-tag" className="text-sm font-medium">
-                Automatically include activities tagged with "Swing"
+                Automatically include activities tagged with &quot;Swing&quot;
               </label>
             </div>
             <p className="text-muted-foreground mt-2 text-xs">
-              Activities with "swing" in their comment will be automatically included
+              Activities with &quot;swing&quot; in their comment will be automatically included
             </p>
           </CardContent>
         </Card>

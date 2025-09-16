@@ -16,11 +16,11 @@ if (import.meta.env.DEV) {
 
 // Expose React and ReactDOM globally for addons
 // ReactDOM/client only has createRoot/hydrateRoot, but addons need createPortal from react-dom
-(window as any).React = React;
-(window as any).ReactDOM = ReactDOMLegacy;
+window.React = React;
+window.ReactDOM = ReactDOMLegacy;
 
 // Make debug function available globally for debugging
-(globalThis as any).debugAddons = debugAddonState;
+globalThis.debugAddons = debugAddonState;
 
 // Load addons after context is injected
 loadAllAddons();

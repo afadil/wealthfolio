@@ -135,7 +135,7 @@ export function AddonUpdateCard({
                   <DialogTitle>
                     Release Notes - {addonName} v{updateInfo.latestVersion}
                   </DialogTitle>
-                  <DialogDescription>What's new in this version</DialogDescription>
+                  <DialogDescription>What&apos;s new in this version</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-96">
                   <div className="space-y-4">

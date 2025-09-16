@@ -1,11 +1,11 @@
 {
   "id": "goal-progress-tracker-addon",
   "name": "Goal Progress Tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A simple addon to track your investment progress towards target amounts with a visual representation",
   "author": "Wealthfolio",
   "main": "dist/addon.js",
-  "sdkVersion": "1.0.0",
+  "sdkVersion": "2.0.0",
   "enabled": true,
   "permissions": [
     {

@@ -9,7 +9,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatAmount, formatPercent } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { useMemo, type FC } from "react";
 import { Link } from "react-router-dom";
 import { Tooltip as ChartTooltip, ResponsiveContainer, Treemap } from "recharts";
 
@@ -110,8 +110,33 @@ function truncateText(text: string, maxWidth: number, fontSize: number): string 
   return text.substring(0, truncatedLength) + "...";
 }
 
-const CustomizedContent = (props: any) => {
-  const { depth, x, y, width, height, symbol, name, gain, maxGain, minGain, displayMode } = props;
+interface CustomizedContentProps {
+  depth?: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  symbol?: string;
+  name?: string;
+  gain?: number;
+  maxGain?: number;
+  minGain?: number;
+  displayMode?: DisplayMode;
+}
+
+const CustomizedContent: FC<CustomizedContentProps> = ({
+  depth = 0,
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  symbol,
+  name,
+  gain = 0,
+  maxGain = 0,
+  minGain = 0,
+  displayMode = "symbol",
+}) => {
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
   const colorScale = getColorScale(gain, maxGain, minGain);
@@ -119,7 +144,7 @@ const CustomizedContent = (props: any) => {
   // Determine what text to display based on mode
   const displayText = displayMode === "name" && name ? name : symbol;
   // Truncate text to fit within the available width (with some padding)
-  const truncatedText = truncateText(displayText, width - 16, fontSize + 1);
+  const truncatedText = truncateText(displayText || "", width - 16, fontSize + 1);
 
   return (
     <g style={{ cursor: "pointer" }}>
@@ -141,7 +166,7 @@ const CustomizedContent = (props: any) => {
       />
       {depth === 1 ? (
         <>
-          <Link to={`/holdings/${encodeURIComponent(symbol)}`}>
+          <Link to={`/holdings/${encodeURIComponent(symbol || "")}`}>
             <text
               x={x + width / 2}
               y={y + height / 2}
@@ -378,9 +403,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             data={data}
             dataKey="marketValueConverted"
             animationDuration={100}
-            content={
-              <CustomizedContent theme={settings?.theme ?? "light"} displayMode={displayMode} />
-            }
+            content={<CustomizedContent displayMode={displayMode} />}
           >
             <ChartTooltip content={<CompositionTooltip settings={settings ?? undefined} />} />
           </Treemap>

@@ -17,14 +17,21 @@ const CustomTooltip = ({
   isBalanceHidden,
   isChartHovered,
 }: CustomTooltipProps & { isChartHovered: boolean }) => {
-  if (active && payload && payload.length > 0) {
+  if (active && payload?.length) {
     const totalValueData = payload.find((p) => p.dataKey === "totalValue");
     const netContributionData = payload.find((p) => p.dataKey === "netContribution");
 
-    if (totalValueData?.payload) {
+    const tvPayload = totalValueData?.payload as
+      | { date: string; totalValue: number; currency: string }
+      | undefined;
+    const ncPayload = netContributionData?.payload as
+      | { netContribution: number; currency: string }
+      | undefined;
+
+    if (tvPayload) {
       return (
         <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
-          <p className="text-muted-foreground text-xs">{formatDate(totalValueData.payload.date)}</p>
+          <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
 
           <div className="flex items-center justify-between space-x-2">
             <div className="flex items-center space-x-1.5">
@@ -32,13 +39,13 @@ const CustomTooltip = ({
               <span className="text-muted-foreground text-xs">Total Value:</span>
             </div>
             <AmountDisplay
-              value={totalValueData.payload.totalValue}
-              currency={totalValueData.payload.currency}
+              value={tvPayload.totalValue}
+              currency={tvPayload.currency}
               isHidden={isBalanceHidden}
               className="text-xs font-semibold"
             />
           </div>
-          {isChartHovered && netContributionData?.payload && (
+          {isChartHovered && ncPayload && (
             <div className="flex items-center justify-between space-x-2">
               <div className="flex items-center space-x-1.5">
                 <span
@@ -48,8 +55,8 @@ const CustomTooltip = ({
                 <span className="text-muted-foreground text-xs">Net Deposit:</span>
               </div>
               <AmountDisplay
-                value={netContributionData.payload.netContribution}
-                currency={netContributionData.payload.currency}
+                value={ncPayload.netContribution}
+                currency={ncPayload.currency}
                 isHidden={isBalanceHidden}
                 className="text-xs font-semibold"
               />

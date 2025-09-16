@@ -67,7 +67,7 @@ export const importActivitySchema = z
     symbol: z
       .string()
       .min(1, { message: "Symbol is required" })
-      .refine((val) => /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([\.-][A-Z0-9]+){0,2})$/.test(val.trim()), {
+      .refine((val) => /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/.test(val.trim()), {
         message: "Invalid symbol format",
       }),
     amount: z.coerce

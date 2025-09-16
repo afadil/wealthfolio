@@ -43,7 +43,10 @@ function spawnNamed(name, cmd, args, opts = {}) {
       if (c.pid && n !== name) {
         try {
           process.kill(c.pid, "SIGTERM");
-        } catch {}
+        } catch (e) {
+          // ignore process kill errors during shutdown
+          void e;
+        }
       }
     }
     // Give them a moment to exit, then force kill
@@ -52,7 +55,10 @@ function spawnNamed(name, cmd, args, opts = {}) {
         if (c.pid && n !== name) {
           try {
             process.kill(c.pid, "SIGKILL");
-          } catch {}
+          } catch (e) {
+            // ignore force kill errors
+            void e;
+          }
         }
       }
       process.exit(code === null ? (signal ? 128 : 1) : code);
@@ -68,7 +74,10 @@ function shutdownAndExit(code = 0) {
     if (c.pid) {
       try {
         process.kill(c.pid, "SIGTERM");
-      } catch {}
+      } catch (e) {
+        // ignore process kill errors during shutdown
+        void e;
+      }
     }
   }
   setTimeout(() => {
@@ -76,7 +85,10 @@ function shutdownAndExit(code = 0) {
       if (c.pid) {
         try {
           process.kill(c.pid, "SIGKILL");
-        } catch {}
+        } catch (e) {
+          // ignore force kill errors
+          void e;
+        }
       }
     }
     process.exit(code);

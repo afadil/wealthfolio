@@ -11,12 +11,12 @@ interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 function AnimatedNumber({ value }: { value: number }) {
-  const [NumberFlow, setNumberFlow] = React.useState<any>(null);
+  const [NumberFlow, setNumberFlow] = React.useState<React.ComponentType<any> | null>(null);
 
   const absValue = Math.abs(value * 100);
   React.useEffect(() => {
     import("@number-flow/react").then((module) => {
-      setNumberFlow(() => module.default);
+      setNumberFlow(module.default);
     });
   }, []);
 
@@ -24,9 +24,8 @@ function AnimatedNumber({ value }: { value: number }) {
     return <span>{formatPercent(absValue)}</span>;
   }
 
-  const Component = NumberFlow;
   return (
-    <Component
+    <NumberFlow
       value={absValue}
       animated={true}
       format={{

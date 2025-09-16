@@ -196,8 +196,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
  */
 export function createFunctionPermission(
   name: string,
-  isDeclared: boolean = false,
-  isDetected: boolean = false,
+  isDeclared = false,
+  isDetected = false,
   detectedAt?: string,
 ): FunctionPermission {
   return {

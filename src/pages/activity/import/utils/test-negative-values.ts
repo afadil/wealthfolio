@@ -48,25 +48,25 @@ const mapping = {
 };
 
 // Test the validation function
-console.log("Testing CSV import with negative values...");
+console.warn("Testing CSV import with negative values...");
 
 const result = validateActivityImport(testData, mapping, "test-account", "USD");
 
-console.log("Validation Results:");
+console.warn("Validation Results:");
 result.activities.forEach((activity, index) => {
-  console.log(`Activity ${index + 1}:`);
-  console.log(`  Quantity: ${activity.quantity} (should be positive)`);
-  console.log(`  Unit Price: ${activity.unitPrice} (should be positive)`);
-  console.log(`  Amount: ${activity.amount} (should be positive)`);
-  console.log(`  Fee: ${activity.fee} (should be positive)`);
-  console.log(`  Is Valid: ${activity.isValid}`);
-  console.log("");
+  console.warn(`Activity ${index + 1}:`);
+  console.warn(`  Quantity: ${activity.quantity} (should be positive)`);
+  console.warn(`  Unit Price: ${activity.unitPrice} (should be positive)`);
+  console.warn(`  Amount: ${activity.amount} (should be positive)`);
+  console.warn(`  Fee: ${activity.fee} (should be positive)`);
+  console.warn(`  Is Valid: ${activity.isValid}`);
+  console.warn("");
 });
 
 // Test the calculateCashActivityAmount function
-console.log("Testing calculateCashActivityAmount with negative values:");
+console.warn("Testing calculateCashActivityAmount with negative values:");
 const testAmount1 = calculateCashActivityAmount(-100, -2.5);
-console.log(`calculateCashActivityAmount(-100, -2.50) = ${testAmount1} (should be 250)`);
+console.warn(`calculateCashActivityAmount(-100, -2.50) = ${testAmount1} (should be 250)`);
 
 const testAmount2 = calculateCashActivityAmount(undefined, -500);
-console.log(`calculateCashActivityAmount(undefined, -500) = ${testAmount2} (should be 500)`);
+console.warn(`calculateCashActivityAmount(undefined, -500) = ${testAmount2} (should be 500)`);

@@ -7,7 +7,7 @@ interface UseAccountMutationsProps {
   onSuccess?: () => void;
 }
 
-export function useAccountMutations({ onSuccess = () => {} }: UseAccountMutationsProps) {
+export function useAccountMutations({ onSuccess = () => undefined }: UseAccountMutationsProps) {
   const queryClient = useQueryClient();
 
   const handleSuccess = (message?: string) => {

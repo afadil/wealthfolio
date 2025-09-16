@@ -51,7 +51,7 @@ export function useActivityMutations(
           variant: "success",
         });
       } catch (error) {
-        logger.error(`Error saving quote from activity: ${error}`);
+        logger.error(`Error saving quote from activity: ${String(error)}`);
         toast({
           title: "Uh oh! Something went wrong.",
           description: `There was a problem saving the quote from the activity.`,
@@ -67,10 +67,12 @@ export function useActivityMutations(
       if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {
-      logger.error(`Error ${action} activity: ${error}`);
+      logger.error(`Error ${action} activity: ${String(error)}`);
       toast({
         title: `Uh oh! Something went wrong ${action} this activity.`,
-        description: `Please try again or report an issue if the problem persists. Error: ${error}`,
+        description: `Please try again or report an issue if the problem persists. Error: ${String(
+          error,
+        )}`,
         variant: "destructive",
       });
     },
@@ -101,7 +103,14 @@ export function useActivityMutations(
   });
 
   const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
-    const { id, createdAt, updatedAt, date, comment, ...restOfActivityData } = activityToDuplicate;
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      comment: _comment,
+      date,
+      ...restOfActivityData
+    } = activityToDuplicate;
 
     const newActivityData: NewActivityFormValues = {
       ...restOfActivityData,

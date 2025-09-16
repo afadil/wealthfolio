@@ -33,8 +33,6 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
 
-  Array.isArray(options) ? options : [];
-
   const selectedOption = options?.find((option) => option.value === value);
 
   return (

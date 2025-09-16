@@ -1,13 +1,13 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useBalancePrivacy } from '@/hooks/use-balance-privacy';
-import type { Holding } from '@/lib/types';
-import { AmountDisplay, formatPercent } from '@wealthfolio/ui';
-import { motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import type { Holding } from "@/lib/types";
+import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
+import { motion } from "framer-motion";
+import { useMemo } from "react";
 
 // Using theme chart colors
-const INDICATOR_COLORS = ['var(--chart-1)', 'var(--chart-5)', 'var(--chart-7)', 'var(--chart-9)'];
+const INDICATOR_COLORS = ["var(--chart-1)", "var(--chart-5)", "var(--chart-7)", "var(--chart-9)"];
 
 interface CurrencyData {
   name: string;
@@ -78,7 +78,7 @@ interface HoldingCurrencyChartProps {
 
 export function HoldingCurrencyChart({
   holdings = [],
-  baseCurrency = 'USD',
+  baseCurrency = "USD",
   isLoading = false,
   onCurrencySectionClick,
 }: HoldingCurrencyChartProps) {
@@ -122,7 +122,7 @@ export function HoldingCurrencyChart({
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === "Enter" || e.key === " ") {
                     onCurrencySectionClick?.(currency.name);
                   }
                 }}
@@ -218,7 +218,7 @@ function ProgressBar({ data }: { data: CurrencyData[] }) {
       {segments.map((segment, index) => (
         <motion.div
           key={segment.key}
-          className={`h-full w-1 origin-left rounded-full ${segment.isEmpty ? 'bg-muted' : ''}`}
+          className={`h-full w-1 origin-left rounded-full ${segment.isEmpty ? "bg-muted" : ""}`}
           style={segment.color ? { backgroundColor: segment.color } : undefined}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}

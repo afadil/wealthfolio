@@ -92,33 +92,33 @@ export const invokeWeb = async <T>(
 
   switch (command) {
     case "update_account": {
-      const data = payload as any;
+      const data = payload as { accountUpdate: { id: string } & Record<string, unknown> };
       url += `/${data.accountUpdate.id}`;
       body = JSON.stringify(data.accountUpdate);
       break;
     }
     case "delete_account": {
-      const data = payload as any;
+      const data = payload as { accountId: string };
       url += `/${data.accountId}`;
       break;
     }
     case "create_account": {
-      const data = payload as any;
+      const data = payload as { account: Record<string, unknown> };
       body = JSON.stringify(data.account);
       break;
     }
     case "update_settings": {
-      const data = payload as any;
+      const data = payload as { settingsUpdate: Record<string, unknown> };
       body = JSON.stringify(data.settingsUpdate);
       break;
     }
     case "get_holdings": {
-      const p = payload as any;
+      const p = payload as { accountId: string };
       url += `?accountId=${encodeURIComponent(p.accountId)}`;
       break;
     }
     case "get_historical_valuations": {
-      const p = payload as any;
+      const p = payload as { accountId?: string; startDate?: string; endDate?: string };
       const params = new URLSearchParams();
       if (p?.accountId) params.set("accountId", p.accountId);
       if (p?.startDate) params.set("startDate", p.startDate);
@@ -128,7 +128,7 @@ export const invokeWeb = async <T>(
       break;
     }
     case "get_latest_valuations": {
-      const p = payload as any;
+      const p = payload as { accountIds?: string[] };
       const params = new URLSearchParams();
       if (Array.isArray(p?.accountIds)) {
         for (const id of p.accountIds) params.append("accountIds[]", id);
@@ -140,49 +140,59 @@ export const invokeWeb = async <T>(
     case "get_accounts":
       break;
     case "calculate_performance_history": {
-      const { itemType, itemId, startDate, endDate } = payload as any;
+      const { itemType, itemId, startDate, endDate } = payload as {
+        itemType: string;
+        itemId: string;
+        startDate?: string;
+        endDate?: string;
+      };
       body = JSON.stringify({ itemType, itemId, startDate, endDate });
       break;
     }
     case "calculate_performance_summary": {
-      const { itemType, itemId, startDate, endDate } = payload as any;
+      const { itemType, itemId, startDate, endDate } = payload as {
+        itemType: string;
+        itemId: string;
+        startDate?: string;
+        endDate?: string;
+      };
       body = JSON.stringify({ itemType, itemId, startDate, endDate });
       break;
     }
     case "get_income_summary":
       break;
     case "delete_goal": {
-      const { goalId } = payload as any;
+      const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;
       break;
     }
     case "create_goal": {
-      const { goal } = payload as any;
+      const { goal } = payload as { goal: Record<string, unknown> };
       body = JSON.stringify(goal);
       break;
     }
     case "update_goal": {
-      const { goal } = payload as any;
+      const { goal } = payload as { goal: Record<string, unknown> };
       body = JSON.stringify(goal);
       break;
     }
     case "update_goal_allocations": {
-      const { allocations } = payload as any;
+      const { allocations } = payload as { allocations: Record<string, unknown> };
       body = JSON.stringify(allocations);
       break;
     }
     case "update_exchange_rate": {
-      const { rate } = payload as any;
+      const { rate } = payload as { rate: Record<string, unknown> };
       body = JSON.stringify(rate);
       break;
     }
     case "add_exchange_rate": {
-      const { newRate } = payload as any;
+      const { newRate } = payload as { newRate: Record<string, unknown> };
       body = JSON.stringify(newRate);
       break;
     }
     case "delete_exchange_rate": {
-      const { rateId } = payload as any;
+      const { rateId } = payload as { rateId: string };
       url += `/${encodeURIComponent(rateId)}`;
       break;
     }
@@ -191,17 +201,17 @@ export const invokeWeb = async <T>(
       break;
     }
     case "create_activity": {
-      const { activity } = payload as any;
+      const { activity } = payload as { activity: Record<string, unknown> };
       body = JSON.stringify(activity);
       break;
     }
     case "update_activity": {
-      const { activity } = payload as any;
+      const { activity } = payload as { activity: Record<string, unknown> };
       body = JSON.stringify(activity);
       break;
     }
     case "delete_activity": {
-      const { activityId } = payload as any;
+      const { activityId } = payload as { activityId: string };
       url += `/${encodeURIComponent(activityId)}`;
       break;
     }
@@ -211,14 +221,14 @@ export const invokeWeb = async <T>(
       break;
     }
     case "get_account_import_mapping": {
-      const { accountId } = payload as any;
+      const { accountId } = payload as { accountId: string };
       const params = new URLSearchParams();
       params.set("accountId", accountId);
       url += `?${params.toString()}`;
       break;
     }
     case "save_account_import_mapping": {
-      const { mapping } = payload as any;
+      const { mapping } = payload as { mapping: Record<string, unknown> };
       body = JSON.stringify({ mapping });
       break;
     }
@@ -227,67 +237,70 @@ export const invokeWeb = async <T>(
       break;
     }
     case "create_contribution_limit": {
-      const { newLimit } = payload as any;
+      const { newLimit } = payload as { newLimit: Record<string, unknown> };
       body = JSON.stringify(newLimit);
       break;
     }
     case "update_contribution_limit": {
-      const { id, updatedLimit } = payload as any;
+      const { id, updatedLimit } = payload as { id: string; updatedLimit: Record<string, unknown> };
       url += `/${encodeURIComponent(id)}`;
       body = JSON.stringify(updatedLimit);
       break;
     }
     case "delete_contribution_limit": {
-      const { id } = payload as any;
+      const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
       break;
     }
     case "calculate_deposits_for_contribution_limit": {
-      const { limitId } = payload as any;
+      const { limitId } = payload as { limitId: string };
       url += `/${encodeURIComponent(limitId)}/deposits`;
       break;
     }
     case "get_asset_profile": {
-      const { assetId } = payload as any;
+      const { assetId } = payload as { assetId: string };
       const params = new URLSearchParams();
       params.set("assetId", assetId);
       url += `?${params.toString()}`;
       break;
     }
     case "update_asset_profile": {
-      const { id, payload: bodyPayload } = payload as any;
+      const { id, payload: bodyPayload } = payload as {
+        id: string;
+        payload: Record<string, unknown>;
+      };
       url += `/${encodeURIComponent(id)}`;
       body = JSON.stringify(bodyPayload);
       break;
     }
     case "update_asset_data_source": {
-      const { id, dataSource } = payload as any;
+      const { id, dataSource } = payload as { id: string; dataSource: string };
       url += `/${encodeURIComponent(id)}`;
       body = JSON.stringify({ dataSource });
       break;
     }
     case "search_symbol": {
-      const { query } = payload as any;
+      const { query } = payload as { query: string };
       const params = new URLSearchParams();
       params.set("query", query);
       url += `?${params.toString()}`;
       break;
     }
     case "get_quote_history": {
-      const { symbol } = payload as any;
+      const { symbol } = payload as { symbol: string };
       const params = new URLSearchParams();
       params.set("symbol", symbol);
       url += `?${params.toString()}`;
       break;
     }
     case "update_quote": {
-      const { symbol, quote } = payload as any;
+      const { symbol, quote } = payload as { symbol: string; quote: Record<string, unknown> };
       url += `/${encodeURIComponent(symbol)}`;
       body = JSON.stringify(quote);
       break;
     }
     case "delete_quote": {
-      const { id } = payload as any;
+      const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
       break;
     }
@@ -296,19 +309,19 @@ export const invokeWeb = async <T>(
       break;
     }
     case "set_secret": {
-      const { providerId, secret } = payload as any;
+      const { providerId, secret } = payload as { providerId: string; secret: string };
       body = JSON.stringify({ providerId, secret });
       break;
     }
     case "get_secret": {
-      const { providerId } = payload as any;
+      const { providerId } = payload as { providerId: string };
       const params = new URLSearchParams();
       params.set("providerId", providerId);
       url += `?${params.toString()}`;
       break;
     }
     case "delete_secret": {
-      const { providerId } = payload as any;
+      const { providerId } = payload as { providerId: string };
       const params = new URLSearchParams();
       params.set("providerId", providerId);
       url += `?${params.toString()}`;
@@ -316,45 +329,51 @@ export const invokeWeb = async <T>(
     }
     // Addons
     case "install_addon_zip": {
-      const { zipData, enableAfterInstall } = payload as any;
+      const { zipData, enableAfterInstall } = payload as {
+        zipData: Uint8Array | number[];
+        enableAfterInstall?: boolean;
+      };
       // Send compact base64 payload to avoid gigantic JSON arrays of numbers
-      const zipDataB64 = toBase64(zipData as number[] | Uint8Array);
+      const zipDataB64 = toBase64(zipData);
       body = JSON.stringify({ zipDataB64, enableAfterInstall });
       break;
     }
     case "toggle_addon": {
-      const { addonId, enabled } = payload as any;
+      const { addonId, enabled } = payload as { addonId: string; enabled: boolean };
       body = JSON.stringify({ addonId, enabled });
       break;
     }
     case "uninstall_addon": {
-      const { addonId } = payload as any;
+      const { addonId } = payload as { addonId: string };
       url += `/${encodeURIComponent(addonId)}`;
       break;
     }
     case "load_addon_for_runtime": {
-      const { addonId } = payload as any;
+      const { addonId } = payload as { addonId: string };
       url += `/${encodeURIComponent(addonId)}`;
       break;
     }
     case "extract_addon_zip": {
-      const { zipData } = payload as any;
-      const zipDataB64 = toBase64(zipData as number[] | Uint8Array);
+      const { zipData } = payload as { zipData: Uint8Array | number[] };
+      const zipDataB64 = toBase64(zipData);
       body = JSON.stringify({ zipDataB64 });
       break;
     }
     case "download_addon_to_staging": {
-      const { addonId } = payload as any;
+      const { addonId } = payload as { addonId: string };
       body = JSON.stringify({ addonId });
       break;
     }
     case "install_addon_from_staging": {
-      const { addonId, enableAfterInstall } = payload as any;
+      const { addonId, enableAfterInstall } = payload as {
+        addonId: string;
+        enableAfterInstall?: boolean;
+      };
       body = JSON.stringify({ addonId, enableAfterInstall });
       break;
     }
     case "clear_addon_staging": {
-      const { addonId } = (payload || {}) as any;
+      const { addonId } = (payload ?? {}) as { addonId?: string };
       if (addonId) {
         const params = new URLSearchParams();
         params.set("addonId", addonId);
@@ -363,12 +382,16 @@ export const invokeWeb = async <T>(
       break;
     }
     case "submit_addon_rating": {
-      const { addonId, rating, review } = payload as any;
+      const { addonId, rating, review } = payload as {
+        addonId: string;
+        rating: number;
+        review?: string;
+      };
       body = JSON.stringify({ addonId, rating, review });
       break;
     }
     case "get_addon_ratings": {
-      const { addonId } = payload as any;
+      const { addonId } = payload as { addonId: string };
       const params = new URLSearchParams();
       params.set("addonId", addonId);
       url += `?${params.toString()}`;
@@ -385,8 +408,11 @@ export const invokeWeb = async <T>(
     let msg = res.statusText;
     try {
       const err = await res.json();
-      msg = err.message || msg;
-    } catch (_) {}
+      msg = (err?.message ?? msg) as string;
+    } catch (_e) {
+      // ignore JSON parse error from non-JSON error bodies
+      void 0;
+    }
     throw new Error(msg);
   }
   if (res.status === 204) {
@@ -396,11 +422,11 @@ export const invokeWeb = async <T>(
 };
 
 export const logger = {
-  error: (...args: any[]) => console.error(...args),
-  warn: (...args: any[]) => console.warn(...args),
-  info: (...args: any[]) => console.info(...args),
-  debug: (...args: any[]) => console.debug(...args),
-  trace: (...args: any[]) => console.trace(...args),
+  error: (...args: unknown[]) => console.error(...args),
+  warn: (...args: unknown[]) => console.warn(...args),
+  info: (...args: unknown[]) => console.warn(...args),
+  debug: (...args: unknown[]) => console.warn(...args),
+  trace: (...args: unknown[]) => console.warn(...args),
 };
 
 // Helpers

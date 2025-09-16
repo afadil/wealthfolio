@@ -65,7 +65,9 @@ const useGlobalEventListener = () => {
   };
 
   useEffect(() => {
-    let actualCleanup = () => {};
+    let actualCleanup = () => {
+      return;
+    };
 
     const setupListeners = async () => {
       const unlistenPortfolioSyncStart = await listenPortfolioUpdateStart(
@@ -100,7 +102,7 @@ const useGlobalEventListener = () => {
     return () => {
       actualCleanup();
     };
-  }, []);
+  }, [handlePortfolioUpdateComplete]);
 
   return null;
 };

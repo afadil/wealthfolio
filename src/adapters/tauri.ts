@@ -109,7 +109,7 @@ export const openDatabaseFileDialogTauri = async (): Promise<string | null> => {
   const result = await open({
     filters: [{ name: "Database", extensions: ["db", "sqlite"] }],
   });
-  return Array.isArray(result) ? result[0] || null : result;
+  return Array.isArray(result) ? (result[0] ?? null) : result;
 };
 
 export const listenFileDropHoverTauri = async <T>(

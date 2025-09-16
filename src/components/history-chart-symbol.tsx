@@ -3,13 +3,13 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { formatAmount } from "@wealthfolio/ui";
 import { formatDate } from "@/lib/utils";
 
-interface CustomTooltipProps {
+interface CustomTooltipProps<TPayload = { timestamp: string; currency: string }> {
   active: boolean;
-  payload: { value: number; payload: any }[];
+  payload: { value: number; payload: TPayload }[];
 }
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
-  if (active && payload && payload.length) {
+  if (active && payload?.length) {
     const data = payload[0].payload;
     return (
       <div className="center-items">
@@ -57,7 +57,7 @@ export default function HistoryChart({
                 <stop offset="95%" stopColor="var(--success)" stopOpacity={0.1} />
               </linearGradient>
             </defs>
-            {/* @ts-ignore */}
+            {/* @ts-expect-error - Recharts Tooltip content typing mismatch */}
             <Tooltip content={<CustomTooltip />} />
             {interval !== "ALL" && interval !== "1Y" ? (
               <YAxis hide={true} type="number" domain={["auto", "auto"]} />

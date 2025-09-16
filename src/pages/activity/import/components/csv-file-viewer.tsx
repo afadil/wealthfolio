@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
+import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
+import { Icons } from "@/components/ui/icons";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -13,15 +20,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Icons } from "@/components/ui/icons";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
-import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
 
 export interface CSVLine {
   id: number; // Line number
@@ -133,7 +133,9 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
 
         return (
           <div className={cn("font-mono text-xs whitespace-nowrap", isHeader && "font-semibold")}>
-            {content || <span className="text-muted-foreground italic">empty line</span>}
+            {(content as React.ReactNode) || (
+              <span className="text-muted-foreground italic">empty line</span>
+            )}
           </div>
         );
       },

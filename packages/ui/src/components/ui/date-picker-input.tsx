@@ -44,7 +44,7 @@ function toDateValue(
       if (hasTimeGranularity) {
         try {
           return parseDateTime(value);
-        } catch (e) {
+        } catch (_e) {
           const datePart = parseDate(value);
           return new CalendarDateTime(datePart.year, datePart.month, datePart.day, 0, 0, 0, 0);
         }

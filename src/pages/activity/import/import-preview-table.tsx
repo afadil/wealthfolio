@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -14,7 +13,13 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
+import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
 import { Icons } from "@/components/ui/icons";
 import {
   Table,
@@ -25,14 +30,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
-import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
 import type { Account, ActivityImport } from "@/lib/types";
+import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
-import { formatDateTime, toPascalCase, cn } from "@/lib/utils";
-import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
-import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 
 // Helper function to check if a field has errors
@@ -376,7 +376,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         const errorMessages = getFieldErrorMessage(row.original, "activityType");
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <Badge variant="outline">{type}</Badge>
+            <Badge variant="outline">{String(type)}</Badge>
           </ErrorCell>
         );
       },
@@ -395,7 +395,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            {symbol && symbol.length > 0 ? (
+            {symbol && typeof symbol === "string" && symbol.length > 0 ? (
               <Badge variant="secondary" className="min-w-[50px] rounded-sm text-xs font-medium">
                 {symbol}
               </Badge>
@@ -406,8 +406,8 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         );
       },
       sortingFn: (rowA, rowB, id) => {
-        const profileA = rowA.getValue(id);
-        const profileB = rowB.getValue(id);
+        const profileA = String(rowA.getValue(id));
+        const profileB = String(rowB.getValue(id));
         return profileA.localeCompare(profileB);
       },
       enableHiding: false,
@@ -428,7 +428,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === "SPLIT" ? "-" : safeDisplayNumber(quantity)}
+              {activityType === "SPLIT" ? "-" : safeDisplayNumber(Number(quantity))}
             </div>
           </ErrorCell>
         );
@@ -445,7 +445,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
         const unitPrice = row.getValue("unitPrice");
-        const currency = (row.getValue("currency")) || "USD";
+        const currency = row.getValue("currency") || "USD";
         const hasError = hasFieldError(row.original, "unitPrice");
         const errorMessages = getFieldErrorMessage(row.original, "unitPrice");
 
@@ -453,8 +453,11 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
               {activityType === "SPLIT"
-                ? (isNaN(unitPrice) ? "-" : unitPrice.toFixed(0)) + " : 1"
-                : safeFormatAmount(unitPrice, currency)}
+                ? (isNaN(Number(unitPrice)) ? "-" : Number(unitPrice).toFixed(0)) + " : 1"
+                : safeFormatAmount(
+                    Number(unitPrice),
+                    typeof currency === "string" ? currency : "USD",
+                  )}
             </div>
           </ErrorCell>
         );
@@ -469,7 +472,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
         const amount = row.getValue("amount");
-        const currency = (row.getValue("currency")) || "USD";
+        const currency = row.getValue("currency") || "USD";
 
         // Check if amount field has errors directly
         const hasError = hasFieldError(row.original, "amount");
@@ -478,7 +481,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === "SPLIT" ? "-" : safeFormatAmount(amount, currency)}
+              {activityType === "SPLIT"
+                ? "-"
+                : safeFormatAmount(Number(amount), typeof currency === "string" ? currency : "USD")}
             </div>
           </ErrorCell>
         );
@@ -495,14 +500,16 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
         const fee = row.getValue("fee");
-        const currency = (row.getValue("currency")) || "USD";
+        const currency = row.getValue("currency") || "USD";
         const hasError = hasFieldError(row.original, "fee");
         const errorMessages = getFieldErrorMessage(row.original, "fee");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-muted-foreground text-right tabular-nums">
-              {activityType === "SPLIT" ? "-" : safeFormatAmount(fee, currency)}
+              {activityType === "SPLIT"
+                ? "-"
+                : safeFormatAmount(Number(fee), typeof currency === "string" ? currency : "USD")}
             </div>
           </ErrorCell>
         );
@@ -516,12 +523,12 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const hasError = hasFieldError(row.original, "currency");
         const errorMessages = getFieldErrorMessage(row.original, "currency");
-        const currency = (row.getValue("currency")) || "-";
+        const currency = row.getValue("currency") || "-";
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <Badge variant="outline" className="font-medium">
-              {currency}
+              {typeof currency === "string" ? currency : "-"}
             </Badge>
           </ErrorCell>
         );

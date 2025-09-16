@@ -1,4 +1,3 @@
-import React from "react";
 import { Button } from "@wealthfolio/ui";
 
 const periods: { code: "TOTAL" | "YTD" | "LAST_YEAR"; label: string }[] = [

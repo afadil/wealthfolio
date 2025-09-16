@@ -1,13 +1,13 @@
-import type { AddonContext, AddonManifest } from "@wealthfolio/addon-sdk";
-import { ReactVersion } from "@wealthfolio/addon-sdk";
+import { logger } from "@/adapters";
 import {
   createAddonContext,
   getDynamicNavItems,
   getDynamicRoutes,
   triggerAllDisableCallbacks,
 } from "@/addons/addons-runtime-context";
-import { logger } from "@/adapters";
 import { getInstalledAddons, loadAddon as loadAddonRuntime } from "@/commands/addon";
+import type { AddonContext, AddonManifest } from "@wealthfolio/addon-sdk";
+import { ReactVersion } from "@wealthfolio/addon-sdk";
 
 interface AddonFile {
   path: string;
@@ -95,9 +95,9 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     const addonCode = mainFile.content;
 
     // Extract permission data directly from manifest (already processed by Rust backend)
-    const permissions = extractedAddon.metadata.permissions || [];
+    const permissions = extractedAddon.metadata.permissions ?? [];
     const detectedFunctions = permissions.flatMap((p) =>
-      p.functions.filter((f: any) => f.isDetected).map((f: any) => f.name),
+      p.functions.filter((f) => f.isDetected).map((f) => f.name),
     );
     const detectedCategories = [...new Set(permissions.map((p) => p.category))];
 
@@ -106,13 +106,15 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     );
 
     // Runtime guards: Verify React singletons are available before addon execution
-    if ((globalThis as any).React?.version && (globalThis as any).React.version !== ReactVersion) {
-      logger.warn(
-        `⚠️ React version mismatch: host=${(globalThis as any).React.version} sdk=${ReactVersion}`,
-      );
+    const g = globalThis as unknown as {
+      React?: { version?: string };
+      ReactDOM?: { createPortal?: unknown };
+    };
+    if (g.React?.version && g.React.version !== ReactVersion) {
+      logger.warn(`⚠️ React version mismatch: host=${g.React.version} sdk=${ReactVersion}`);
     }
 
-    if (typeof (globalThis as any).ReactDOM?.createPortal !== "function") {
+    if (typeof g.ReactDOM?.createPortal !== "function") {
       throw new Error(
         "Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.",
       );
@@ -128,18 +130,30 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     const mod = await import(/* @vite-ignore */ blobUrl);
 
     // Robustly resolve the addon's enable() regardless of bundle style
-    const enableFunction: any =
-      // 1. ES‑module default export IS the enable function
-      (typeof mod.default === "function" && mod.default) ||
-      // 2. ES‑module default export is an object exposing enable
-      (mod.default && typeof mod.default.enable === "function" && mod.default.enable) ||
-      // 3. Named (or CommonJS) export called enable
-      (typeof mod.enable === "function" && mod.enable) ||
-      // 4. UMD/global where the constructor's name matches addon name
-      (typeof mod.PortfolioTrackerAddon === "function" && mod.PortfolioTrackerAddon) ||
-      // 5. Module itself is callable
-      (typeof mod === "function" && mod) ||
-      null;
+    type EnableFn = ((ctx: AddonContext) => unknown) | null;
+    const asRecord = mod as unknown as Record<string, unknown> & {
+      default?: unknown;
+    };
+    const defaultObj = asRecord.default as
+      | ((ctx: AddonContext) => unknown)
+      | { enable?: (ctx: AddonContext) => unknown }
+      | undefined;
+    const enableFunction: EnableFn =
+      (typeof defaultObj === "function" ? defaultObj : null) ??
+      (defaultObj &&
+      typeof (defaultObj as { enable?: (ctx: AddonContext) => unknown }).enable === "function"
+        ? (defaultObj as { enable: (ctx: AddonContext) => unknown }).enable
+        : null) ??
+      (typeof asRecord.enable === "function"
+        ? (asRecord.enable as (ctx: AddonContext) => unknown)
+        : null) ??
+      (typeof (asRecord as Record<string, unknown>).PortfolioTrackerAddon === "function"
+        ? (asRecord as { PortfolioTrackerAddon: (ctx: AddonContext) => unknown })
+            .PortfolioTrackerAddon
+        : null) ??
+      (typeof (mod as unknown) === "function"
+        ? (mod as unknown as (ctx: AddonContext) => unknown)
+        : null);
 
     if (!enableFunction) {
       logger.error(
@@ -153,8 +167,9 @@ async function loadAddon(addonFile: AddonFile, _context: AddonContext): Promise<
     const result = await enableFunction(addonSpecificContext);
 
     // Store addon reference for potential cleanup
+    const typedResult = result as { disable?: () => void } | undefined;
     loadedAddons.set(extractedAddon.metadata.id, {
-      disable: typeof result?.disable === "function" ? result.disable : undefined,
+      disable: typeof typedResult?.disable === "function" ? typedResult.disable : undefined,
     });
     loadedAddonIds.add(extractedAddon.metadata.id); // Add to set after successful load and enablement
 
@@ -196,6 +211,7 @@ export async function loadInstalledAddons(): Promise<void> {
     if (success) {
       loadedCount++;
     } else {
+      void 0;
     }
   });
 

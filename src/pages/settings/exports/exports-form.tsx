@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/ui/icons";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ExportDataType, ExportedFileFormat } from "@/lib/types";
+import { useState } from "react";
 import { useExportData } from "./use-export-data";
 
 const dataFormats = [
@@ -152,11 +152,16 @@ export const ExportForm = () => {
                   {isExporting &&
                   exportingFormat === selectedFormat &&
                   exportingData === item.key ? (
-                    <Icons.Spinner className="h-4 w-4 animate-spin" />
+                    <>
+                      <Icons.Spinner className="h-4 w-4 animate-spin" />
+                      <span className="sr-only">Exporting {item.name}...</span>
+                    </>
                   ) : (
-                    <Icons.Download className="h-4 w-4" />
+                    <>
+                      <Icons.Download className="h-4 w-4" />
+                      <span className="sr-only">Export {item.name}</span>
+                    </>
                   )}
-                  <span className="sr-only">Export {item.name}</span>
                 </Button>
               </CardContent>
             </Card>

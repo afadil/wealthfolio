@@ -43,9 +43,10 @@ export const createAccount = async (account: NewAccount): Promise<Account> => {
 export const updateAccount = async (account: NewAccount): Promise<Account> => {
   try {
     switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        const { currency, ...updatedAccountData } = account;
+      case RUN_ENV.DESKTOP: {
+        const { currency: _currency, ...updatedAccountData } = account;
         return invokeTauri("update_account", { accountUpdate: updatedAccountData });
+      }
       case RUN_ENV.WEB:
         return invokeWeb("update_account", { accountUpdate: account });
       default:

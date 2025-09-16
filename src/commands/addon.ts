@@ -1,6 +1,7 @@
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 import type { InstalledAddon, ExtractedAddon } from "@/adapters/tauri";
 import type { AddonManifest, AddonUpdateCheckResult } from "@wealthfolio/addon-sdk";
+import type { AddonStoreListing } from "@/lib/types";
 
 export const getInstalledAddons = async (): Promise<InstalledAddon[]> => {
   try {
@@ -228,7 +229,7 @@ export const clearAddonStaging = async (addonId?: string): Promise<void> => {
   }
 };
 
-export const getAddonRatings = async (addonId: string): Promise<any[]> => {
+export const getAddonRatings = async (addonId: string): Promise<unknown[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
@@ -248,7 +249,7 @@ export const submitAddonRating = async (
   addonId: string,
   rating: number,
   review?: string,
-): Promise<any> => {
+): Promise<unknown> => {
   try {
     if (rating < 1 || rating > 5) {
       throw new Error("Rating must be between 1 and 5");
@@ -276,7 +277,7 @@ export const submitAddonRating = async (
   }
 };
 
-export const fetchAddonStoreListings = async (): Promise<any[]> => {
+export const fetchAddonStoreListings = async (): Promise<AddonStoreListing[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

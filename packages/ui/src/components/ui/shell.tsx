@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-interface ApplicationShellProps extends React.HTMLAttributes<HTMLDivElement> {}
+type ApplicationShellProps = React.HTMLAttributes<HTMLDivElement>;
 
 export function ApplicationShell({ children, className, ...props }: ApplicationShellProps) {
   return (

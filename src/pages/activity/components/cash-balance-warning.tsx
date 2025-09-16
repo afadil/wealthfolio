@@ -38,8 +38,8 @@ export function CashBalanceWarning() {
         <AlertDescription className="text-sm">
           <strong>Insufficient Funds:</strong> {warning}
           <p>
-            Record cash deposits to cover the shortfall, or use "Add Holding" (bypasses cash
-            tracking).
+            Record cash deposits to cover the shortfall, or use &quot;Add Holding&quot; (bypasses
+            cash tracking).
           </p>
         </AlertDescription>
       </Alert>

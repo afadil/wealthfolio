@@ -307,7 +307,7 @@ export function useAddonActions() {
     }
   };
 
-  const handleViewPermissions = async (addon: InstalledAddon) => {
+  const handleViewPermissions = (addon: InstalledAddon) => {
     try {
       // Use the stored permissions from the addon metadata
       const storedPermissions = addon.metadata.permissions || [];

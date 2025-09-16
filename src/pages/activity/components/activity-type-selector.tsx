@@ -1,4 +1,4 @@
-import { Control } from "react-hook-form";
+import { Control, type FieldValues } from "react-hook-form";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { FormControl, FormField, FormItem } from "@/components/ui/form";
@@ -13,7 +13,7 @@ export interface ActivityType {
 }
 
 interface ActivityTypeSelectorProps {
-  control: Control<any>;
+  control: Control<FieldValues>;
   types: ActivityType[];
   columns?: number;
   layout?: "horizontal" | "vertical";
@@ -34,7 +34,7 @@ export function ActivityTypeSelector({
           <FormControl>
             <RadioGroup
               onValueChange={field.onChange}
-              defaultValue={field.value}
+              defaultValue={field.value as string}
               className={cn(
                 "grid gap-2",
                 columns === 2 && "grid-cols-1 sm:grid-cols-2",

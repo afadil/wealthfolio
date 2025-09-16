@@ -20,7 +20,7 @@ function App() {
   );
 
   // Make QueryClient available globally for addons
-  (window as any).__wealthfolio_query_client__ = queryClient;
+  window.__wealthfolio_query_client__ = queryClient;
 
   return (
     <QueryClientProvider client={queryClient}>

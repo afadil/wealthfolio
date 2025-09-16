@@ -1,16 +1,16 @@
-import { ReturnData } from "@/lib/types";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from "recharts";
-import { format, parseISO, differenceInMonths, differenceInDays } from "date-fns";
-import { formatPercent } from "@wealthfolio/ui";
 import {
   ChartConfig,
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
 } from "@/components/ui/chart";
-import { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
+import { ReturnData } from "@/lib/types";
+import { formatPercent } from "@wealthfolio/ui";
+import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 interface PerformanceChartProps {
   data: {
@@ -22,7 +22,7 @@ interface PerformanceChartProps {
 
 export function PerformanceChart({ data }: PerformanceChartProps) {
   const formattedData = data[0]?.returns?.map((item) => {
-    const dataPoint: Record<string, any> = { date: item.date };
+    const dataPoint: Record<string, number | string> = { date: item.date };
     data.forEach((series) => {
       const matchingPoint = series.returns?.find((p) => p.date === item.date);
       if (matchingPoint) {
@@ -36,8 +36,8 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
   const getTickInterval = () => {
     if (!formattedData?.length) return 30;
 
-    const firstDate = parseISO(formattedData[0].date);
-    const lastDate = parseISO(formattedData[formattedData.length - 1].date);
+    const firstDate = parseISO(String(formattedData[0].date));
+    const lastDate = parseISO(String(formattedData[formattedData.length - 1].date));
     const monthsDiff = differenceInMonths(lastDate, firstDate);
     const daysDiff = differenceInDays(lastDate, firstDate);
 
@@ -55,8 +55,8 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     if (!formattedData?.length) return "";
 
     const date = parseISO(dateStr);
-    const firstDate = parseISO(formattedData[0].date);
-    const lastDate = parseISO(formattedData[formattedData.length - 1].date);
+    const firstDate = parseISO(String(formattedData[0].date));
+    const lastDate = parseISO(String(formattedData[formattedData.length - 1].date));
     const monthsDiff = differenceInMonths(lastDate, firstDate);
     const daysDiff = differenceInDays(lastDate, firstDate);
 
@@ -115,7 +115,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
               interval={getTickInterval()}
             />
             <YAxis
-              tickFormatter={(value) => formatPercent(value)}
+              tickFormatter={(value: number) => formatPercent(value)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

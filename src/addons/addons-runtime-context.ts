@@ -1,83 +1,90 @@
 import type { AddonContext, SidebarItemHandle } from "@wealthfolio/addon-sdk";
-import { createSDKHostAPIBridge } from "./type-bridge";
 import React from "react";
+import { createSDKHostAPIBridge } from "./type-bridge";
 
 // Import all command functions
-import { getHoldings } from "@/commands/portfolio";
-import { getActivities } from "@/commands/activity";
-import { getAccounts } from "@/commands/account";
-import { getExchangeRates, updateExchangeRate, addExchangeRate } from "@/commands/exchange-rates";
+import { logger } from "@/adapters";
+import { createAccount, getAccounts, updateAccount } from "@/commands/account";
 import {
-  getContributionLimit,
-  createContributionLimit,
-  updateContributionLimit,
-  calculateDepositsForLimit,
-} from "@/commands/contribution-limits";
-import {
-  getGoals,
-  createGoal,
-  updateGoal,
-  updateGoalsAllocations,
-  getGoalsAllocation,
-} from "@/commands/goal";
-import {
-  searchTicker,
-  syncHistoryQuotes,
-  getAssetProfile,
-  updateAssetProfile,
-  updateAssetDataSource,
-  updateQuote,
-  syncMarketData,
-  getQuoteHistory,
-  getMarketDataProviders,
-} from "@/commands/market-data";
-import {
-  updatePortfolio,
-  recalculatePortfolio,
-  getIncomeSummary,
-  getHistoricalValuations,
-  getLatestValuations,
-  calculatePerformanceHistory,
-  calculatePerformanceSummary,
-  calculateAccountsSimplePerformance,
-  getHolding,
-} from "@/commands/portfolio";
-import { getSettings, updateSettings, backupDatabase } from "@/commands/settings";
-import { createAccount, updateAccount } from "@/commands/account";
-import {
-  searchActivities,
   createActivity,
-  updateActivity,
+  getActivities,
   saveActivities,
+  searchActivities,
+  updateActivity,
 } from "@/commands/activity";
-import { openCsvFileDialog, openFileSaveDialog } from "@/commands/file";
 import {
-  listenImportFileDropHover,
-  listenImportFileDrop,
-  listenImportFileDropCancelled,
-} from "@/commands/import-listener";
-import {
-  listenPortfolioUpdateStart,
-  listenPortfolioUpdateComplete,
-  listenPortfolioUpdateError,
-  listenMarketSyncStart,
-  listenMarketSyncComplete,
-} from "@/commands/portfolio-listener";
-import {
-  importActivities,
   checkActivitiesImport,
   getAccountImportMapping,
+  importActivities,
   saveAccountImportMapping,
 } from "@/commands/activity-import";
-import { setSecret, getSecret, deleteSecret } from "@/commands/secrets";
-import { logger } from "@/adapters";
+import {
+  calculateDepositsForLimit,
+  createContributionLimit,
+  getContributionLimit,
+  updateContributionLimit,
+} from "@/commands/contribution-limits";
+import { addExchangeRate, getExchangeRates, updateExchangeRate } from "@/commands/exchange-rates";
+import { openCsvFileDialog, openFileSaveDialog } from "@/commands/file";
+import {
+  createGoal,
+  getGoals,
+  getGoalsAllocation,
+  updateGoal,
+  updateGoalsAllocations,
+} from "@/commands/goal";
+import {
+  listenImportFileDrop,
+  listenImportFileDropCancelled,
+  listenImportFileDropHover,
+} from "@/commands/import-listener";
+import {
+  getAssetProfile,
+  getMarketDataProviders,
+  getQuoteHistory,
+  searchTicker,
+  syncHistoryQuotes,
+  syncMarketData,
+  updateAssetDataSource,
+  updateAssetProfile,
+  updateQuote,
+} from "@/commands/market-data";
+import {
+  calculateAccountsSimplePerformance,
+  calculatePerformanceHistory,
+  calculatePerformanceSummary,
+  getHistoricalValuations,
+  getHolding,
+  getHoldings,
+  getIncomeSummary,
+  getLatestValuations,
+  recalculatePortfolio,
+  updatePortfolio,
+} from "@/commands/portfolio";
+import {
+  listenMarketSyncComplete,
+  listenMarketSyncStart,
+  listenPortfolioUpdateComplete,
+  listenPortfolioUpdateError,
+  listenPortfolioUpdateStart,
+} from "@/commands/portfolio-listener";
+import { deleteSecret, getSecret, setSecret } from "@/commands/secrets";
+import { backupDatabase, getSettings, updateSettings } from "@/commands/settings";
 
 // Store for dynamically added navigation items
-const dynamicNavItems = new Map<string, any>();
+interface NavItem {
+  icon: React.ReactNode | string;
+  title: string;
+  href: string;
+  onClick?: () => void;
+  order: number;
+  id: string;
+}
+const dynamicNavItems = new Map<string, NavItem>();
 const disableCallbacks = new Set<() => void>();
 
 // Store for dynamically added routes
-const dynamicRoutes = new Map<string, React.LazyExoticComponent<React.ComponentType<any>>>();
+const dynamicRoutes = new Map<string, React.LazyExoticComponent<React.ComponentType<unknown>>>();
 
 // Navigation update listeners
 const navigationUpdateListeners = new Set<() => void>();
@@ -160,11 +167,11 @@ export function createAddonContext(addonId: string): AddonContext {
       }): SidebarItemHandle => {
         // Create navigation item
         const navItem = {
-          icon: cfg.icon || '<Icons.Circle className="h-5 w-5" />',
+          icon: cfg.icon ?? '<Icons.Circle className="h-5 w-5" />',
           title: cfg.label,
-          href: cfg.route || "#",
+          href: cfg.route ?? "#",
           onClick: cfg.onClick,
-          order: cfg.order || 999,
+          order: cfg.order ?? 999,
           id: cfg.id,
         };
 
@@ -185,7 +192,7 @@ export function createAddonContext(addonId: string): AddonContext {
     router: {
       add: (r: {
         path: string;
-        component: React.LazyExoticComponent<React.ComponentType<any>>;
+        component: React.LazyExoticComponent<React.ComponentType<unknown>>;
       }): void => {
         // Store the route component
         dynamicRoutes.set(r.path, r.component);
@@ -292,7 +299,9 @@ export function createAddonContext(addonId: string): AddonContext {
           // Navigation functions
           navigateToRoute: async (route: string) => {
             // Use the browser's navigation API through React Router
-            const navigate = (window as any).__wealthfolio_navigate__;
+            const navigate = (
+              window as unknown as { __wealthfolio_navigate__?: (r: string) => void }
+            ).__wealthfolio_navigate__;
             if (navigate) {
               navigate(route);
             } else {
@@ -303,10 +312,20 @@ export function createAddonContext(addonId: string): AddonContext {
 
           // Query functions
           getQueryClient: () => {
-            return (window as any).__wealthfolio_query_client__;
+            interface QueryClientLike {
+              invalidateQueries: (opts: { queryKey: string[] }) => unknown;
+              refetchQueries: (opts: { queryKey: string[] }) => unknown;
+            }
+            return (window as unknown as { __wealthfolio_query_client__?: QueryClientLike })
+              .__wealthfolio_query_client__;
           },
           invalidateQueries: (queryKey: string | string[]) => {
-            const queryClient = (window as any).__wealthfolio_query_client__;
+            interface QueryClientLike {
+              invalidateQueries: (opts: { queryKey: string[] }) => unknown;
+            }
+            const queryClient = (
+              window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
+            ).__wealthfolio_query_client__;
             if (queryClient) {
               queryClient.invalidateQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
@@ -314,7 +333,12 @@ export function createAddonContext(addonId: string): AddonContext {
             }
           },
           refetchQueries: (queryKey: string | string[]) => {
-            const queryClient = (window as any).__wealthfolio_query_client__;
+            interface QueryClientLike {
+              refetchQueries: (opts: { queryKey: string[] }) => unknown;
+            }
+            const queryClient = (
+              window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
+            ).__wealthfolio_query_client__;
             if (queryClient) {
               queryClient.refetchQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
@@ -325,10 +349,13 @@ export function createAddonContext(addonId: string): AddonContext {
         addonId,
       );
 
-      // Add the secrets API manually
-      (baseAPI as any).secrets = createAddonScopedSecrets(addonId);
+      // Add the secrets API manually (without `any`)
+      const apiWithSecrets = {
+        ...baseAPI,
+        secrets: createAddonScopedSecrets(addonId),
+      };
 
-      return baseAPI;
+      return apiWithSecrets;
     })(),
   };
 }

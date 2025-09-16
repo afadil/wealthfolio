@@ -1,26 +1,26 @@
-import { useState, useMemo } from "react";
+import type { AddonStoreListing } from "@/lib/types";
 import {
+  Badge,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
+  EmptyPlaceholder,
+  Icons,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Badge,
-  Icons,
-  EmptyPlaceholder,
   Separator,
   Skeleton,
-  Card,
-  CardContent,
-  CardHeader,
 } from "@wealthfolio/ui";
-import { AddonStoreCard } from "./addon-store-card";
-import { PermissionDialog } from "./addon-permission-dialog";
-import { useAddonStore } from "../hooks/use-addon-store";
+import { useMemo, useState } from "react";
 import { useAddonActions } from "../hooks/use-addon-actions";
-import type { AddonStoreListing } from "@/lib/types";
+import { useAddonStore } from "../hooks/use-addon-store";
+import { PermissionDialog } from "./addon-permission-dialog";
+import { AddonStoreCard } from "./addon-store-card";
 
 interface AddonStoreBrowserProps {
   installedAddonIds: string[];
@@ -65,14 +65,12 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         listing.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (listing.tags?.some((tag: string) =>
-            tag.toLowerCase().includes(searchQuery.toLowerCase()),
-          ));
+        listing.tags?.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (!matchesSearch) return false;
 
       // Tag filter
-      if (selectedTag && (!listing.tags?.includes(selectedTag))) {
+      if (selectedTag && !listing.tags?.includes(selectedTag)) {
         return false;
       }
 
@@ -117,7 +115,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
     try {
       await installFromStore(listing, true, addonActions.handleShowPermissionDialog);
       onInstallSuccess?.();
-    } catch (error) {
+    } catch (_error) {
       // Error handling is done in the hook
     }
   };
@@ -221,7 +219,12 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         </div>
 
         {/* Sort */}
-        <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+        <Select
+          value={sortBy}
+          onValueChange={(value: string) =>
+            setSortBy(value as "popular" | "rating" | "recent" | "name")
+          }
+        >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
@@ -234,7 +237,10 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         </Select>
 
         {/* Filter */}
-        <Select value={filterBy} onValueChange={(value: any) => setFilterBy(value)}>
+        <Select
+          value={filterBy}
+          onValueChange={(value: string) => setFilterBy(value as "all" | "uninstalled")}
+        >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Filter by..." />
           </SelectTrigger>
@@ -368,7 +374,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         manifest={permissionDialog.manifest}
         declaredPermissions={permissionDialog.permissions || []}
         riskLevel={permissionDialog.riskLevel || "low"}
-        onApprove={permissionDialog.onApprove || (() => {})}
+        onApprove={permissionDialog.onApprove || (() => undefined)}
         onDeny={() => setPermissionDialog({ open: false })}
       />
     </div>

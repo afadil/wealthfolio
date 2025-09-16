@@ -1,25 +1,25 @@
-import { useState } from "react";
-import { SettingsHeader } from "../header";
+import { PermissionDialog } from "@/pages/settings/addons/components/addon-permission-dialog";
+import { AddonStoreBrowser } from "@/pages/settings/addons/components/addon-store-browser";
+import { AddonUpdateCard } from "@/pages/settings/addons/components/addon-update-card";
+import { RatingDialog } from "@/pages/settings/addons/components/rating-dialog";
 import {
-  DeleteConfirm,
-  Button,
-  EmptyPlaceholder,
   Badge,
-  Switch,
+  Button,
+  DeleteConfirm,
+  EmptyPlaceholder,
+  Icons,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Icons,
-  useToast,
+  Switch,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
+  useToast,
 } from "@wealthfolio/ui";
-import { PermissionDialog } from "@/pages/settings/addons/components/addon-permission-dialog";
-import { AddonUpdateCard } from "@/pages/settings/addons/components/addon-update-card";
-import { AddonStoreBrowser } from "@/pages/settings/addons/components/addon-store-browser";
-import { RatingDialog } from "@/pages/settings/addons/components/rating-dialog";
+import { useState } from "react";
+import { SettingsHeader } from "../header";
 import { useAddonActions } from "./hooks/use-addon-actions";
 import { useAddonUpdates } from "./hooks/use-addon-updates";
 
@@ -65,7 +65,7 @@ export default function AddonSettingsPage() {
   const handleCheckUpdates = async () => {
     try {
       await checkAllUpdates();
-    } catch (error) {
+    } catch (_error) {
       // Error handling is done in the hook
     }
   };
@@ -134,7 +134,10 @@ export default function AddonSettingsPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value: string) => setActiveTab(value as "installed" | "store")}
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="installed" className="flex items-center gap-2">
             <Icons.Package className="h-4 w-4" />

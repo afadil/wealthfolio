@@ -96,8 +96,13 @@ export const ReactVersion = '18.3.1';
  * }
  */
 
-export const React = (window as any).React as typeof import('react');
-export const ReactDOM = (window as any).ReactDOM as typeof import('react-dom');
+interface HostGlobals {
+  React: typeof import('react');
+  ReactDOM: typeof import('react-dom');
+}
+const hostGlobals = window as unknown as Partial<HostGlobals>;
+export const React = hostGlobals.React!;
+export const ReactDOM = hostGlobals.ReactDOM!;
 
 // Version
 export { SDK_VERSION } from './version';

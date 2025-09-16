@@ -59,7 +59,7 @@ export interface InternalHostAPI {
 
   // Goals
   getGoals(): Promise<Goal[]>;
-  createGoal(goal: any): Promise<Goal>;
+  createGoal(goal: unknown): Promise<Goal>;
   updateGoal(goal: Goal): Promise<Goal>;
   updateGoalsAllocations(allocations: GoalAllocation[]): Promise<void>;
   getGoalsAllocation(): Promise<GoalAllocation[]>;
@@ -106,16 +106,16 @@ export interface InternalHostAPI {
   backupDatabase(): Promise<{ filename: string; data: Uint8Array }>;
 
   // Account management
-  createAccount(account: any): Promise<Account>;
-  updateAccount(account: any): Promise<Account>;
+  createAccount(account: unknown): Promise<Account>;
+  updateAccount(account: unknown): Promise<Account>;
 
   // Activity management
   searchActivities(
     page: number,
     pageSize: number,
-    filters: any,
+    filters: { accountId?: string; activityType?: string; symbol?: string },
     searchKeyword: string,
-    sort: any,
+    sort: { id: string; desc: boolean },
   ): Promise<ActivitySearchResponse>;
   createActivity(activity: ActivityCreate): Promise<Activity>;
   updateActivity(activity: ActivityUpdate): Promise<Activity>;
@@ -123,7 +123,7 @@ export interface InternalHostAPI {
 
   // File operations
   openCsvFileDialog(): Promise<null | string | string[]>;
-  openFileSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>;
+  openFileSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<unknown>;
 
   // Event listeners - Import
   listenImportFileDropHover<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
@@ -157,7 +157,7 @@ export interface InternalHostAPI {
   navigateToRoute(route: string): Promise<void>;
 
   // Query functions
-  getQueryClient(): any;
+  getQueryClient(): unknown;
   invalidateQueries(queryKey: string | string[]): void;
   refetchQueries(queryKey: string | string[]): void;
 }
@@ -251,7 +251,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
 
-    logger: createAddonLogger(addonId || "unknown-addon"),
+    logger: createAddonLogger(addonId ?? "unknown-addon"),
 
     events: {
       import: {
@@ -279,7 +279,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       invalidateQueries: internalAPI.invalidateQueries,
       refetchQueries: internalAPI.refetchQueries,
     },
-  } as any as SDKHostAPI;
+  } as unknown as SDKHostAPI;
 }
 
 /**

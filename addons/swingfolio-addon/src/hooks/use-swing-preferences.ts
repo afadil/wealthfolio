@@ -48,7 +48,7 @@ export function useSwingPreferences(ctx: AddonContext) {
       ctx.api.logger.debug('Swing preferences updated successfully');
     },
     onError: (error) => {
-      ctx.api.logger.error('Failed to save preferences: ' + (error as Error).message);
+      ctx.api.logger.error('Failed to save preferences: ' + error.message);
     },
   });
 

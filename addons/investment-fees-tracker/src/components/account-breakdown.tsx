@@ -65,8 +65,7 @@ export function AccountBreakdown({
     );
   }
 
-  // Calculate total fees for percentage calculations
-  const totalFees = topAccounts.reduce((sum, account) => sum + account.totalFees, 0);
+  // total fees for percentage are calculated per-section where needed
 
   return (
     <Card>

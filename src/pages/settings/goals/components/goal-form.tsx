@@ -35,7 +35,7 @@ interface GoalFormlProps {
   onSuccess?: () => void;
 }
 
-export function GoalForm({ defaultValues, onSuccess = () => {} }: GoalFormlProps) {
+export function GoalForm({ defaultValues, onSuccess = () => undefined }: GoalFormlProps) {
   const { addGoalMutation, updateGoalMutation } = useGoalMutations();
 
   const form = useForm<NewGoal>({

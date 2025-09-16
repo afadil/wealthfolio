@@ -60,7 +60,10 @@ class AddonDevManager {
           try {
             const manifestResponse = await fetch(`http://localhost:${port}/manifest.json`);
             if (manifestResponse.ok) {
-              const manifest = await manifestResponse.json();
+              const manifest = (await manifestResponse.json()) as {
+                id: string;
+                name: string;
+              };
 
               this.registerDevServer({
                 id: manifest.id,
@@ -70,11 +73,11 @@ class AddonDevManager {
 
               logger.info(`✅ Discovered dev server: ${manifest.name} on port ${port}`);
             }
-          } catch (manifestError) {
+          } catch (_manifestError) {
             // No manifest, might not be an addon server
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Server not running on this port, continue
       }
     }
@@ -182,10 +185,11 @@ class AddonDevManager {
   /**
    * Execute addon code in a sandboxed environment
    */
-  private async executeAddonCode(code: string, _manifest: any, addonId: string): Promise<void> {
+  private async executeAddonCode(code: string, _manifest: unknown, addonId: string): Promise<void> {
     try {
       // Runtime guard: Verify React singletons are available
-      if (typeof (globalThis as any).ReactDOM?.createPortal !== "function") {
+      const g = globalThis as unknown as { ReactDOM?: { createPortal?: unknown } };
+      if (typeof g.ReactDOM?.createPortal !== "function") {
         throw new Error(
           "Host did not expose ReactDOM.createPortal. Portal-based UI components will not work.",
         );
@@ -205,8 +209,11 @@ class AddonDevManager {
 
         // Store for cleanup
         if (addonInstance && typeof addonInstance.disable === "function") {
-          (globalThis as any).__DEV_ADDONS__ = (globalThis as any).__DEV_ADDONS__ || new Map();
-          (globalThis as any).__DEV_ADDONS__.set(addonId, addonInstance);
+          const g2 = globalThis as unknown as {
+            __DEV_ADDONS__?: Map<string, { disable?: () => void }>;
+          };
+          g2.__DEV_ADDONS__ = g2.__DEV_ADDONS__ ?? new Map();
+          g2.__DEV_ADDONS__.set(addonId, addonInstance);
         }
       }
 
@@ -260,7 +267,7 @@ class AddonDevManager {
             }
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Silent fail for polling - dev server might be down
       }
     }
@@ -272,10 +279,14 @@ class AddonDevManager {
   private async reloadAddon(addonId: string): Promise<void> {
     try {
       // Clean up existing instance
-      const devAddons = (globalThis as any).__DEV_ADDONS__;
+      const devAddons = (
+        globalThis as unknown as {
+          __DEV_ADDONS__?: Map<string, { disable?: () => void }>;
+        }
+      ).__DEV_ADDONS__;
       if (devAddons?.has(addonId)) {
         const instance = devAddons.get(addonId);
-        if (instance.disable) {
+        if (instance?.disable) {
           logger.info(`🧹 Cleaning up old instance of ${addonId}`);
           instance.disable();
         }
@@ -320,7 +331,7 @@ class AddonDevManager {
         this.eventSource = new EventSource("http://localhost:3001/addon-updates");
 
         this.eventSource.onmessage = (event) => {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event.data) as { type?: string; addonId?: string };
           if (data.type === "addon-changed" && data.addonId) {
             this.reloadAddon(data.addonId);
           }
@@ -329,7 +340,7 @@ class AddonDevManager {
         this.eventSource.onerror = () => {
           // Hot reload server not available - that's fine
         };
-      } catch (error) {
+      } catch (_error) {
         // EventSource not available or failed
       }
     }
@@ -341,7 +352,16 @@ class AddonDevManager {
   private injectDevTools(): void {
     // Add development-specific APIs to a generic context
     const devCtx = createAddonContext("dev-tools");
-    (devCtx as any).dev = {
+    (
+      devCtx as unknown as {
+        dev?: {
+          reload: () => Promise<void> | void;
+          listServers: () => unknown[];
+          enableAutoReload: () => void;
+          disableAutoReload: () => void;
+        };
+      }
+    ).dev = {
       reload: () => reloadAllAddons(),
       listServers: () => Array.from(this.devServers.values()),
       enableAutoReload: () => {
@@ -363,7 +383,11 @@ class AddonDevManager {
     }
 
     // Clean up dev addon instances
-    const devAddons = (globalThis as any).__DEV_ADDONS__;
+    const devAddons = (
+      globalThis as unknown as {
+        __DEV_ADDONS__?: Map<string, { disable?: () => void }>;
+      }
+    ).__DEV_ADDONS__;
     if (devAddons) {
       for (const [, instance] of devAddons) {
         if (instance.disable) {
@@ -441,9 +465,10 @@ export const addonDevManager = new AddonDevManager();
 // Make debugging tools available globally in development mode
 if (import.meta.env.DEV) {
   // Make available globally for debugging (dev only)
-  (globalThis as any).__ADDON_DEV__ = addonDevManager;
+  (globalThis as unknown as { __ADDON_DEV__?: unknown }).__ADDON_DEV__ = addonDevManager;
 
   // Add global helper functions (dev only)
-  (globalThis as any).discoverAddons = () => addonDevManager.discoverAndRegister();
-  (globalThis as any).reloadAddons = () => reloadAllAddons();
+  (globalThis as unknown as { discoverAddons?: () => void }).discoverAddons = () =>
+    addonDevManager.discoverAndRegister();
+  (globalThis as unknown as { reloadAddons?: () => void }).reloadAddons = () => reloadAllAddons();
 }

@@ -12,10 +12,10 @@ import cors from 'cors';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+// import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Current module filename (unused, removed to satisfy lint)
+// const __filename = fileURLToPath(import.meta.url);
 
 // DevServerConfig type (JSDoc)
 /**
@@ -77,7 +77,7 @@ class AddonDevServer {
         } else {
           res.status(404).json({ error: 'Manifest not found' });
         }
-      } catch (error) {
+      } catch {
         res.status(500).json({ error: 'Failed to read manifest' });
       }
     });
@@ -92,7 +92,7 @@ class AddonDevServer {
         } else {
           res.status(404).json({ error: 'Addon file not found. Run build first.' });
         }
-      } catch (error) {
+      } catch {
         res.status(500).json({ error: 'Failed to read addon file' });
       }
     });
@@ -127,7 +127,7 @@ class AddonDevServer {
     });
 
     watcher.on('change', (filePath) => {
-      console.log(`📝 File changed: ${filePath}`);
+      console.warn(`📝 File changed: ${filePath}`);
       this.lastModified = new Date();
 
       // Trigger rebuild if configured
@@ -137,23 +137,23 @@ class AddonDevServer {
     });
 
     watcher.on('add', (filePath) => {
-      console.log(`➕ File added: ${filePath}`);
+      console.warn(`➕ File added: ${filePath}`);
       this.lastModified = new Date();
     });
 
     watcher.on('unlink', (filePath) => {
-      console.log(`➖ File removed: ${filePath}`);
+      console.warn(`➖ File removed: ${filePath}`);
       this.lastModified = new Date();
     });
 
-    console.log(`👀 Watching files: ${this.config.watchPaths.join(', ')}`);
+    console.warn(`👀 Watching files: ${this.config.watchPaths.join(', ')}`);
   }
 
   async triggerBuild() {
     if (this.buildInProgress || !this.config.buildCommand) return;
 
     this.buildInProgress = true;
-    console.log(`🔨 Building addon with: ${this.config.buildCommand}`);
+    console.warn(`🔨 Building addon with: ${this.config.buildCommand}`);
 
     try {
       const { exec } = await import('child_process');
@@ -164,7 +164,7 @@ class AddonDevServer {
         cwd: this.config.addonPath,
       });
 
-      console.log('✅ Build completed successfully');
+      console.warn('✅ Build completed successfully');
       this.lastModified = new Date();
     } catch (error) {
       console.error('❌ Build failed:', error);
@@ -180,19 +180,19 @@ class AddonDevServer {
         return fs.readdirSync(distPath).map((file) => `dist/${file}`);
       }
       return [];
-    } catch (error) {
+    } catch {
       return [];
     }
   }
 
   start() {
     this.app.listen(this.config.port, () => {
-      console.log(`🚀 Addon dev server running on http://localhost:${this.config.port}`);
-      console.log(`📁 Serving from: ${this.config.addonPath}`);
-      console.log(`📋 Manifest: ${this.config.manifestPath}`);
+      console.warn(`🚀 Addon dev server running on http://localhost:${this.config.port}`);
+      console.warn(`📁 Serving from: ${this.config.addonPath}`);
+      console.warn(`📋 Manifest: ${this.config.manifestPath}`);
 
       if (this.config.buildCommand) {
-        console.log(`🔨 Build command: ${this.config.buildCommand}`);
+        console.warn(`🔨 Build command: ${this.config.buildCommand}`);
       }
     });
   }

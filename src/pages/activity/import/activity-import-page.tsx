@@ -88,7 +88,7 @@ const ActivityImportPage = () => {
   };
 
   // Handle mapping completion from MappingStep
-  const handleMappingComplete = async (mapping: ImportMappingData) => {
+  const handleMappingComplete = (mapping: ImportMappingData) => {
     if (!selectedAccount?.id || !data || data.length < 2) {
       logger.error("Missing account ID or CSV data");
       return;
@@ -213,7 +213,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   }
 
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    logger.error(`Caught error: ${error}, errorInfo: ${errorInfo}`);
+    logger.error(`Caught error: ${error}, info: ${errorInfo.componentStack}`);
   }
 
   override render() {

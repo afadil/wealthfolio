@@ -135,12 +135,30 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   // Define columns using ColumnHelper
   const columnHelper = createColumnHelper<Quote>();
 
-  const columns = useMemo<ColumnDef<Quote, any>[]>(
+  interface QuoteTableMeta {
+    editingId: string | null;
+    editedValues: Record<string, unknown> & {
+      timestamp?: string | Date;
+      open?: number | string;
+      high?: number | string;
+      low?: number | string;
+      close?: number | string;
+      volume?: number | string;
+    };
+    handleInputChange: (key: keyof Quote | "timestamp", value: unknown, isNewRow?: boolean) => void;
+    handleEdit: (quote: Quote) => void;
+    handleSave: () => void;
+    handleCancel: () => void;
+    handleDelete: (quoteId: string) => void;
+  }
+
+  const columns = useMemo<ColumnDef<Quote, unknown>[]>(
     () => [
       columnHelper.accessor("timestamp", {
         header: "Date",
         cell: (info) => {
-          const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
           const value = info.getValue();
           return editingId === info.row.original.id ? (
             <DatePickerInput
@@ -156,7 +174,8 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
       columnHelper.accessor("open", {
         header: "Open",
         cell: (info) => {
-          const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
           const value = info.getValue();
           return editingId === info.row.original.id ? (
             <MoneyInput
@@ -172,7 +191,8 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
       columnHelper.accessor("high", {
         header: "High",
         cell: (info) => {
-          const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
           const value = info.getValue();
           return editingId === info.row.original.id ? (
             <MoneyInput
@@ -189,7 +209,8 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
       columnHelper.accessor("low", {
         header: "Low",
         cell: (info) => {
-          const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
           const value = info.getValue();
           return editingId === info.row.original.id ? (
             <MoneyInput
@@ -205,7 +226,8 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
       columnHelper.accessor("close", {
         header: "Close",
         cell: (info) => {
-          const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
           const value = info.getValue();
           return editingId === info.row.original.id ? (
             <MoneyInput
@@ -221,7 +243,8 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
       columnHelper.accessor("volume", {
         header: "Volume",
         cell: (info) => {
-          const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
           const value = info.getValue();
           return editingId === info.row.original.id ? (
             <MoneyInput
@@ -241,7 +264,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
               header: "Actions",
               cell: (info) => {
                 const { editingId, handleEdit, handleSave, handleCancel, handleDelete } = info.table
-                  .options.meta as any;
+                  .options.meta as QuoteTableMeta;
                 const quote = info.row.original;
                 return editingId === quote.id ? (
                   <div className="flex space-x-2">

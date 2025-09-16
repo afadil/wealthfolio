@@ -11,7 +11,7 @@ export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
       default:
         throw new Error("Unsupported environment");
     }
-  } catch (error) {
+  } catch (_error) {
     logger.error("Error fetching exchange rates.");
     return [];
   }

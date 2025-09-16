@@ -176,7 +176,13 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
   );
 };
 
-export function AssetSymbolInput({ field, isManualAsset }: { field: any; isManualAsset: boolean }) {
+export function AssetSymbolInput({
+  field,
+  isManualAsset,
+}: {
+  field: { value?: string; onChange: (v: string) => void } & Record<string, unknown>;
+  isManualAsset: boolean;
+}) {
   return (
     <FormItem className="-mt-2">
       <FormLabel>Symbol</FormLabel>

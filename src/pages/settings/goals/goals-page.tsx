@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from "@wealthfolio/ui";
-import { GoalItem } from "./components/goal-item";
-import { GoalEditModal } from "./components/goal-edit-modal";
-import type { Goal, GoalAllocation } from "@/lib/types";
-import { SettingsHeader } from "../header";
 import { getGoals, getGoalsAllocation } from "@/commands/goal";
-import { useQuery } from "@tanstack/react-query";
-import GoalsAllocations from "./components/goal-allocations";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
+import type { Goal, GoalAllocation } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import { useState } from "react";
+import { SettingsHeader } from "../header";
+import GoalsAllocations from "./components/goal-allocations";
+import { GoalEditModal } from "./components/goal-edit-modal";
+import { GoalItem } from "./components/goal-item";
 import { useGoalMutations } from "./use-goal-mutations";
 
 const SettingsGoalsPage = () => {
@@ -25,7 +25,7 @@ const SettingsGoalsPage = () => {
   const { accounts } = useAccounts();
 
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState<any>(null);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 
   const { deleteGoalMutation, saveAllocationsMutation } = useGoalMutations();
 
@@ -119,7 +119,7 @@ const SettingsGoalsPage = () => {
         </div>
       </div>
       <GoalEditModal
-        goal={selectedGoal}
+        goal={selectedGoal || undefined}
         open={visibleModal}
         onClose={() => setVisibleModal(false)}
       />

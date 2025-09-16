@@ -1,10 +1,10 @@
 import type React from "react";
-import { PieChart, Pie, Cell, Sector } from "recharts";
-import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
-import { AmountDisplay } from "../financial/amount-display";
+import { Cell, Pie, PieChart, Sector } from "recharts";
+import type { NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../ui/chart";
 import { formatPercent } from "../../lib/utils";
+import { AmountDisplay } from "../financial/amount-display";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../ui/chart";
 
 const COLORS = [
   "var(--chart-1)",
@@ -18,9 +18,33 @@ const COLORS = [
   "var(--chart-9)",
 ];
 
-const renderActiveShape = (props: any) => {
+interface ActiveShapeProps {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+  fill: string;
+  payload: { name: string; currency?: string };
+  value: number;
+  percent: number;
+}
+
+type InactiveShapeProps = {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+  fill: string;
+};
+
+const renderActiveShape = (props: unknown): React.JSX.Element => {
+  const typedProps = props as ActiveShapeProps;
   const { isBalanceHidden } = useBalancePrivacy();
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } = props;
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } = typedProps;
 
   const amountToDisplay = isBalanceHidden
     ? "••••••"
@@ -94,8 +118,9 @@ const renderActiveShape = (props: any) => {
   );
 };
 
-const renderInactiveShape = (props: any) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+const renderInactiveShape = (props: unknown): React.JSX.Element => {
+  const typedProps = props as InactiveShapeProps;
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = typedProps;
 
   return (
     <g style={{ cursor: "pointer" }}>
@@ -136,12 +161,13 @@ export const DonutChart: React.FC<DonutChartProps> = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const tooltipFormatter = (value: ValueType, name: NameType, entry: any) => {
+  const tooltipFormatter = (value: ValueType, name: NameType, entry: Payload<ValueType, NameType>) => {
+    const payload = entry.payload as { currency: string };
     return (
       <div className="flex flex-col">
         <span className="text-muted-foreground text-[0.70rem] uppercase">{name}</span>
         <span className="font-bold">
-          <AmountDisplay value={Number(value)} currency={entry.payload.currency} isHidden={isBalanceHidden} />
+          <AmountDisplay value={Number(value)} currency={payload.currency} isHidden={isBalanceHidden} />
         </span>
       </div>
     );

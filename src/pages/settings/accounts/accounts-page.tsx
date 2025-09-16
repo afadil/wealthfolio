@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from "@wealthfolio/ui";
-import { AccountItem } from "./components/account-item";
-import { AccountEditModal } from "./components/account-edit-modal";
-import type { Account } from "@/lib/types";
-import { SettingsHeader } from "../header";
 import { getAccounts } from "@/commands/account";
-import { useQuery } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
+import type { Account } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import { useState } from "react";
+import { SettingsHeader } from "../header";
+import { AccountEditModal } from "./components/account-edit-modal";
+import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
 
 const SettingsAccountsPage = () => {
@@ -16,7 +16,7 @@ const SettingsAccountsPage = () => {
   });
 
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   const handleAddAccount = () => {
     setSelectedAccount(null);
@@ -92,7 +92,7 @@ const SettingsAccountsPage = () => {
         </div>
       </div>
       <AccountEditModal
-        account={selectedAccount}
+        account={selectedAccount || undefined}
         open={visibleModal}
         onClose={() => setVisibleModal(false)}
       />

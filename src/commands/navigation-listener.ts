@@ -7,12 +7,18 @@ export async function listenNavigateToRoute<T>(handler: EventCallback<T>): Promi
       case RUN_ENV.DESKTOP:
         return listenNavigateToRouteTauri<T>(handler);
       case RUN_ENV.WEB:
-        return () => {};
+        return () => {
+          return;
+        };
       default:
-        return () => {};
+        return () => {
+          return;
+        };
     }
-  } catch (error) {
+  } catch (_error) {
     logger.error("Error listen navigate-to-route event.");
-    return () => {};
+    return () => {
+      return;
+    };
   }
 }

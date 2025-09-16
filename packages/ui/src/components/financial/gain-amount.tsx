@@ -1,6 +1,6 @@
 import * as React from "react";
-import { cn } from "../../lib/utils";
 import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
+import { cn } from "../../lib/utils";
 
 interface GainAmountProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
@@ -26,7 +26,7 @@ export function GainAmount({
 
   React.useEffect(() => {
     import("@number-flow/react").then((module) => {
-      setNumberFlow(() => module.default);
+      setNumberFlow(module.default);
     });
   }, []);
 

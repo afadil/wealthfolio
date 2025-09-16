@@ -449,7 +449,7 @@ impl SnapshotService {
                     overall_min_calc_date = effective_start_date;
                 }
             } else {
-                debug!("Skipping account {} for calculation: effective_start_date {} is after calculation_end_date {}.", 
+                debug!("Skipping account {} for calculation: effective_start_date {} is after calculation_end_date {}.",
                        acc_id, effective_start_date, calculation_end_date);
             }
         }
@@ -584,10 +584,6 @@ impl SnapshotService {
                 let is_keyframe = is_first_day || has_activities;
 
                 if is_keyframe {
-                    debug!(
-                        "Keyframe identified for account {} on {} (Holdings Only) (First day: {}, Has activities: {})",
-                        account_id, current_date, is_first_day, has_activities
-                    );
                     // Create the keyframe based on the final state for today
                     let mut keyframe_snapshot = current_holdings_snapshot.clone();
                     // Ensure account_id and id are correctly set for the keyframe
@@ -622,11 +618,6 @@ impl SnapshotService {
         individual_snapshots_on_date: &HashMap<String, AccountStateSnapshot>,
         base_portfolio_currency: &str,
     ) -> Result<AccountStateSnapshot> {
-        debug!(
-            "Generating aggregated TOTAL portfolio snapshot for date: {}",
-            target_date
-        );
-
         let mut aggregated_cash_balances: HashMap<String, Decimal> = HashMap::new();
         let mut aggregated_positions: HashMap<String, Position> = HashMap::new(); // Position struct from crate::portfolio::snapshot::Position
         let mut overall_cost_basis_base_ccy = Decimal::ZERO;

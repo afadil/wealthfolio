@@ -6,10 +6,12 @@ const useNavigationEventListener = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    let cleanup = () => {};
+    let cleanup = () => {
+      return;
+    };
 
     // Make navigate function available globally for addons
-    (window as any).__wealthfolio_navigate__ = navigate;
+    window.__wealthfolio_navigate__ = navigate;
 
     const setupNavigationListener = async () => {
       const handleNavigateToRoute = (event: { payload: { route: string } }) => {
@@ -31,7 +33,7 @@ const useNavigationEventListener = () => {
 
     return () => {
       // Clean up global reference
-      delete (window as any).__wealthfolio_navigate__;
+      delete window.__wealthfolio_navigate__;
       cleanup();
     };
   }, [navigate]);

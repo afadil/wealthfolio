@@ -6,10 +6,10 @@ import { subWeeks, subMonths, subYears, startOfYear } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 
 export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
-export type DateRange = {
+export interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-};
+}
 
 interface IntervalData {
   code: TimePeriod;
@@ -52,7 +52,7 @@ const intervals: IntervalData[] = [
   },
   {
     code: "YTD",
-    description: intervalDescriptions["YTD"],
+    description: intervalDescriptions.YTD,
     calculateRange: () => ({ from: startOfYear(new Date()), to: new Date() }),
   },
   {
