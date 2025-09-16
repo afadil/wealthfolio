@@ -12,7 +12,7 @@ import {
   EmptyPlaceholder,
   Icons,
 } from '@wealthfolio/ui';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts';
 import type { TradeDistribution } from '../types';
 
 interface DistributionChartsProps {
@@ -32,25 +32,25 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
     .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl))
     .slice(0, 10); // Top 10
 
-  const weekdayData = Object.entries(distribution.byWeekday)
-    .map(([weekday, data]) => ({
-      name: weekday,
-      pl: data.pl,
-      count: data.count,
-      returnPercent: data.returnPercent,
-    }))
-    .sort((a, b) => {
-      const weekdayOrder = [
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-        'Sunday',
-      ];
-      return weekdayOrder.indexOf(a.name) - weekdayOrder.indexOf(b.name);
-    });
+  // const weekdayData = Object.entries(distribution.byWeekday)
+  //   .map(([weekday, data]) => ({
+  //     name: weekday,
+  //     pl: data.pl,
+  //     count: data.count,
+  //     returnPercent: data.returnPercent,
+  //   }))
+  //   .sort((a, b) => {
+  //     const weekdayOrder = [
+  //       'Monday',
+  //       'Tuesday',
+  //       'Wednesday',
+  //       'Thursday',
+  //       'Friday',
+  //       'Saturday',
+  //       'Sunday',
+  //     ];
+  //     return weekdayOrder.indexOf(a.name) - weekdayOrder.indexOf(b.name);
+  //   });
 
   const holdingPeriodData = Object.entries(distribution.byHoldingPeriod)
     .map(([period, data]) => ({
@@ -76,7 +76,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
     },
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  // const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
   // Check if there's data for charts
   const hasSymbolData = symbolData.length > 0;

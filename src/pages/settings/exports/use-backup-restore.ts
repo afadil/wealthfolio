@@ -62,7 +62,7 @@ export function useBackupRestore() {
       });
     },
     onError: (error) => {
-      logger.error(`Error during backup: ${error}`);
+      logger.error(`Error during backup: ${String(error)}`);
       toast({
         title: "Backup failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
@@ -98,7 +98,7 @@ export function useBackupRestore() {
       });
     },
     onError: (error) => {
-      logger.error(`Error during restore: ${error}`);
+      logger.error(`Error during restore: ${String(error)}`);
       toast({
         title: "Restore failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
@@ -111,7 +111,7 @@ export function useBackupRestore() {
     try {
       await backupWithDirectorySelection();
     } catch (error) {
-      logger.error(`Backup error: ${error}`);
+      logger.error(`Backup error: ${String(error)}`);
     }
   };
 
@@ -119,7 +119,7 @@ export function useBackupRestore() {
     try {
       await restoreFromBackup();
     } catch (error) {
-      logger.error(`Restore error: ${error}`);
+      logger.error(`Restore error: ${String(error)}`);
     }
   };
 

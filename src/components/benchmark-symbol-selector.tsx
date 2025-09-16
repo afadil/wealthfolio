@@ -91,7 +91,7 @@ export function BenchmarkSymbolSelector({ onSelect }: BenchmarkSymbolSelectorPro
   });
 
   // Sort search results by score if available
-  const sortedSearchResults = searchResults?.sort((a, b) => b.score - a.score) || [];
+  const sortedSearchResults = searchResults?.sort((a, b) => b.score - a.score) ?? [];
 
   // Filter out search results that are already in predefined benchmarks
   const existingSymbols = BENCHMARKS.flatMap((group) => group.items.map((item) => item.symbol));

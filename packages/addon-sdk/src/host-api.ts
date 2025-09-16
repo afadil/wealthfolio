@@ -47,7 +47,7 @@ export interface AccountsAPI {
    * @param account New account data
    * @returns Promise resolving to created account
    */
-  create(account: any): Promise<Account>;
+  create(account: unknown): Promise<Account>;
 }
 
 /**
@@ -131,9 +131,9 @@ export interface ActivitiesAPI {
   search(
     page: number,
     pageSize: number,
-    filters: any,
+    filters: unknown,
     searchKeyword: string,
-    sort: any,
+    sort: unknown,
   ): Promise<ActivitySearchResponse>;
 
   /**
@@ -378,7 +378,7 @@ export interface GoalsAPI {
    * @param goal New goal data
    * @returns Promise resolving to created goal
    */
-  create(goal: any): Promise<Goal>;
+  create(goal: unknown): Promise<Goal>;
 
   /**
    * Update an existing goal
@@ -441,7 +441,10 @@ export interface FilesAPI {
    * @param fileName Default file name
    * @returns Promise resolving to save result
    */
-  openSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>;
+  openSaveDialog(
+    fileContent: Uint8Array | Blob | string,
+    fileName: string,
+  ): Promise<unknown>;
 }
 
 /**
@@ -606,7 +609,7 @@ export interface QueryAPI {
    * Get the shared QueryClient instance from the main application
    * @returns The shared QueryClient instance
    */
-  getClient(): any; // QueryClient from @tanstack/react-query
+  getClient(): unknown; // QueryClient from @tanstack/react-query
 
   /**
    * Invalidate queries by key

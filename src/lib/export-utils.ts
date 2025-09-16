@@ -1,16 +1,16 @@
 import { ExportedFileFormat } from "@/lib/types";
 
-export function formatData(data: any, format: ExportedFileFormat): string {
+export function formatData(data: unknown[], format: ExportedFileFormat): string {
   if (!data || data.length === 0) return "";
   if (format === "CSV") {
-    return convertToCSV(data);
+    return convertToCSV(data as Record<string, unknown>[]);
   } else if (format === "JSON") {
     return JSON.stringify(data, null, 2);
   }
   return "";
 }
 
-export function convertToCSV(data: any) {
+export function convertToCSV<T extends Record<string, unknown>>(data: T[]): string {
   if (!data || data.length === 0) return "";
   const headers = Object.keys(data[0]);
   // Check if 'assetID' is present and replace it with 'symbol'
@@ -18,10 +18,11 @@ export function convertToCSV(data: any) {
   if (assetIDIndex !== -1) {
     headers[assetIDIndex] = "symbol";
   }
-  const array = [headers].concat(data);
+  const dataRows = data.map((row) => Object.values(row).map(String));
+  const array = [headers].concat(dataRows);
   return array
     .map((row) => {
-      return Object.values(row)
+      return row
         .map((value) => {
           return typeof value === "string" ? JSON.stringify(value) : value;
         })

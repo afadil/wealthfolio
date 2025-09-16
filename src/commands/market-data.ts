@@ -105,7 +105,7 @@ export const updateAssetDataSource = async (symbol: string, dataSource: string):
 
 export const updateQuote = async (symbol: string, quote: Quote): Promise<void> => {
   try {
-    const runEnv = await getRunEnv();
+    const runEnv = getRunEnv();
     if (runEnv === RUN_ENV.DESKTOP) {
       return invokeTauri("update_quote", { symbol, quote: quote });
     }
@@ -131,14 +131,14 @@ export const syncMarketData = async (symbols: string[], refetchAll: boolean): Pr
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error(`Error refreshing quotes for symbols: ${error}`);
+    logger.error(`Error refreshing quotes for symbols: ${String(error)}`);
     throw error;
   }
 };
 
 export const deleteQuote = async (id: string): Promise<void> => {
   try {
-    const runEnv = await getRunEnv();
+    const runEnv = getRunEnv();
     if (runEnv === RUN_ENV.DESKTOP) {
       return invokeTauri("delete_quote", { id });
     }

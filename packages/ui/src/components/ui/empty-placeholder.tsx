@@ -40,7 +40,7 @@ EmptyPlaceholder.Icon = function EmptyPlaceHolderIcon({ name, className, ...prop
   }
 
   // Filter out problematic props that might cause type issues
-  const { children, dominantBaseline, ...validProps } = props;
+  const { children: _children, dominantBaseline: _dominantBaseline, ...validProps } = props;
 
   return (
     <div className="bg-muted flex h-20 w-20 items-center justify-center rounded-full">
@@ -49,13 +49,13 @@ EmptyPlaceholder.Icon = function EmptyPlaceHolderIcon({ name, className, ...prop
   );
 };
 
-interface EmptyPlacholderTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {}
+type EmptyPlacholderTitleProps = React.HTMLAttributes<HTMLHeadingElement>;
 
 EmptyPlaceholder.Title = function EmptyPlaceholderTitle({ className, ...props }: EmptyPlacholderTitleProps) {
   return <h2 className={cn("mt-6 text-xl font-semibold", className)} {...props} />;
 };
 
-interface EmptyPlacholderDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {}
+type EmptyPlacholderDescriptionProps = React.HTMLAttributes<HTMLParagraphElement>;
 
 EmptyPlaceholder.Description = function EmptyPlaceholderDescription({
   className,

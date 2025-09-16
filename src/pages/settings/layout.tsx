@@ -61,6 +61,8 @@ const sidebarNavItems = [
   {
     title: "About",
     href: "about",
+    subtitle: "About Wealthfolio",
+    icon: <Icons.InfoCircle className="h-5 w-5" />,
   },
 ];
 

@@ -24,7 +24,7 @@ const OnboardingPage = () => {
     setCurrentStep((prevStep) => Math.max(prevStep - 1, 1));
   };
 
-  const handleFinish = async () => {
+  const handleFinish = () => {
     navigate("/settings/accounts");
   };
 

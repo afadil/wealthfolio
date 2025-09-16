@@ -48,7 +48,7 @@ const staticNavigation: NavigationProps = {
 const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
-  const [dynamicItems, setDynamicItems] = useState<any[]>([]);
+  const [dynamicItems, setDynamicItems] = useState<NavigationProps["primary"]>([]);
 
   // Setup navigation event listener for menu navigation
   useNavigationEventListener();

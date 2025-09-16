@@ -1,6 +1,6 @@
 import type { ActivityDetails } from '@wealthfolio/addon-sdk';
-import type { ClosedTrade, OpenPosition, TradeMatchResult } from '../types';
 import { differenceInDays } from 'date-fns';
+import type { ClosedTrade, OpenPosition, TradeMatchResult } from '../types';
 
 interface Lot {
   activity: ActivityDetails;
@@ -376,12 +376,7 @@ export class TradeMatcher {
     const totalFees = buyFeeAllocation + sellFeeAllocation;
 
     // Calculate dividends for this trade
-    const totalDividends = this.calculateTradeDividends(
-      entryDate,
-      exitDate,
-      quantity,
-      averageLot.dividends,
-    );
+    const totalDividends = this.calculateTradeDividends(entryDate, exitDate, averageLot.dividends);
 
     // Calculate P/L using average cost
     const costBasis = averageLot.averagePrice * quantity;
@@ -481,7 +476,7 @@ export class TradeMatcher {
     const totalFees = buyFeeAllocation + sellFeeAllocation;
 
     // Calculate dividends for this trade
-    const totalDividends = this.calculateTradeDividends(entryDate, exitDate, quantity, dividends);
+    const totalDividends = this.calculateTradeDividends(entryDate, exitDate, dividends);
 
     // Calculate P/L
     const costBasis = buyActivity.unitPrice * quantity;
@@ -556,7 +551,6 @@ export class TradeMatcher {
   private calculateTradeDividends(
     entryDate: Date,
     exitDate: Date,
-    quantity: number,
     dividends: ActivityDetails[],
   ): number {
     if (!this.includeDividends || dividends.length === 0) return 0;

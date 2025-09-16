@@ -117,8 +117,8 @@ const AccountPage = () => {
   return (
     <ApplicationShell className="p-6">
       <ApplicationHeader
-        heading={account?.name || "Account"}
-        headingPrefix={account?.group || account?.currency}
+        heading={account?.name ?? "Account"}
+        headingPrefix={account?.group ?? account?.currency}
         displayBack={true}
       />
       <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
@@ -130,15 +130,15 @@ const AccountPage = () => {
                   <div>
                     <p className="pt-3 text-xl font-bold">
                       <PrivacyAmount
-                        value={currentValuation?.totalValue || 0}
-                        currency={account?.currency || "USD"}
+                        value={currentValuation?.totalValue ?? 0}
+                        currency={account?.currency ?? "USD"}
                       />
                     </p>
                     <div className="flex space-x-3 text-sm">
                       <GainAmount
                         className="text-sm font-light"
                         value={frontendGainLossAmount}
-                        currency={account?.currency || "USD"}
+                        currency={account?.currency ?? "USD"}
                         displayCurrency={false}
                       />
                       <div className="border-muted-foreground my-1 border-r pr-2" />

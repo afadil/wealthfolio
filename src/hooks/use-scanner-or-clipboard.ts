@@ -15,13 +15,13 @@ export function useScannerOrClipboard(onScanResult: (text: string) => void) {
       const error = sessionStorage.getItem("qr_scan_error");
 
       if (result) {
-        console.log("Hook: Found scan result:", result);
+        console.warn("Hook: Found scan result:", result);
         sessionStorage.removeItem("qr_scan_result");
         onScanResult(result);
       }
 
       if (error) {
-        console.log("Hook: Found scan error:", error);
+        console.warn("Hook: Found scan error:", error);
         sessionStorage.removeItem("qr_scan_error");
         console.error("Scanner error:", error);
       }
@@ -39,29 +39,29 @@ export function useScannerOrClipboard(onScanResult: (text: string) => void) {
   }, [onScanResult]);
 
   const handleScanOrPaste = useCallback(async () => {
-    console.log("Hook: handleScanOrPaste called");
+    console.warn("Hook: handleScanOrPaste called");
 
     try {
       // Check if we're on mobile platform
       const platform = await invoke<string>("get_platform");
       const isMobile = platform === "ios" || platform === "android";
 
-      console.log("Hook: Platform detected:", platform, "isMobile:", isMobile);
+      console.warn("Hook: Platform detected:", platform, "isMobile:", isMobile);
 
       if (isMobile) {
         // Request camera permissions first
         try {
-          console.log("Hook: Requesting camera permissions...");
+          console.warn("Hook: Requesting camera permissions...");
           const permissionState = await requestPermissions();
           logger.info("Camera permission state:" + permissionState);
 
           if (permissionState === "denied") {
-            console.log("Hook: Camera permission denied, opening settings");
+            console.warn("Hook: Camera permission denied, opening settings");
             await openAppSettings();
             return;
           } else if (permissionState === "granted") {
             // Navigate to dedicated scanner page
-            console.log("Hook: Permission granted, navigating to scanner");
+            console.warn("Hook: Permission granted, navigating to scanner");
             logger.info("Navigating to QR scanner");
             navigate("/qr-scanner", {
               state: {
@@ -80,7 +80,7 @@ export function useScannerOrClipboard(onScanResult: (text: string) => void) {
         }
       } else {
         // On desktop, go directly to scanner
-        console.log("Hook: Desktop platform, navigating to scanner");
+        console.warn("Hook: Desktop platform, navigating to scanner");
         navigate("/qr-scanner", {
           state: {
             returnTo: location.pathname,
@@ -96,7 +96,7 @@ export function useScannerOrClipboard(onScanResult: (text: string) => void) {
         },
       });
     }
-  }, [navigate, location.pathname, onScanResult]);
+  }, [navigate, location.pathname]);
 
   return { handleScanOrPaste };
 }

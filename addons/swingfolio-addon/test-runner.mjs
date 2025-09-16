@@ -29,7 +29,7 @@ function parseCSV(csv) {
 
 // Main test function
 async function runTest() {
-  console.log("--- Running May P/L Calculation Test ---");
+  console.warn("--- Running May P/L Calculation Test ---");
 
   // Load and parse activities
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,20 +69,20 @@ async function runTest() {
 
   const appValue = 12402.19;
 
-  console.log("\n--- P/L Calculation Comparison for May 2025 ---");
-  console.log("Method   | Fees Included | Realized P/L (CAD)");
-  console.log("---------|---------------|--------------------");
+  console.warn("\n--- P/L Calculation Comparison for May 2025 ---");
+  console.warn("Method   | Fees Included | Realized P/L (CAD)");
+  console.warn("---------|---------------|--------------------");
   for (const method of methods) {
     for (const includeFees of feeOptions) {
-      console.log(
+      console.warn(
         `${method.padEnd(8)} | ${includeFees.toString().padEnd(13)} | ${results[method][
           includeFees
         ].toFixed(2)}`,
       );
     }
   }
-  console.log("-------------------------------------------------");
-  console.log(`App Value: $${appValue.toFixed(2)}`);
+  console.warn("-------------------------------------------------");
+  console.warn(`App Value: $${appValue.toFixed(2)}`);
 }
 
 runTest().catch(console.error);

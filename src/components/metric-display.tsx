@@ -49,7 +49,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
       />
     ) : null;
 
-  const labelContent = labelComponent || (
+  const labelContent = labelComponent ?? (
     <div className="text-muted-foreground flex items-center text-xs">
       <span>{label}</span>
       <Popover>

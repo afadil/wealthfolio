@@ -47,13 +47,13 @@ export default function DashboardPage() {
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
 
   const totalValue = useMemo(() => {
-    return holdings?.reduce((acc, holding) => acc + (holding.marketValue?.base || 0), 0) ?? 0;
+    return holdings?.reduce((acc, holding) => acc + (holding.marketValue?.base ?? 0), 0) ?? 0;
   }, [holdings]);
 
   const { valuationHistory, isLoading: isValuationHistoryLoading } = useValuationHistory(dateRange);
 
   const { settings } = useSettingsContext();
-  const baseCurrency = settings?.baseCurrency || "USD";
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   // Calculate gainLossAmount and simpleReturn from valuationHistory
   const { gainLossAmount, simpleReturn } = useMemo(() => {
@@ -72,8 +72,8 @@ export default function DashboardPage() {
         date: item.valuationDate,
         totalValue: item.totalValue,
         netContribution: item.netContribution,
-        currency: item.baseCurrency || baseCurrency,
-      })) || []
+        currency: item.baseCurrency ?? baseCurrency,
+      })) ?? []
     );
   }, [valuationHistory, baseCurrency]);
 

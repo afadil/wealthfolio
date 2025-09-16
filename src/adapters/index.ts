@@ -3,14 +3,13 @@ import * as web from "./web";
 
 export enum RUN_ENV {
   DESKTOP = "desktop",
-  MOBILE = "desktop", // iOS and Android are treated as desktop for now
   WEB = "web",
   UNSUPPORTED = "unsupported",
 }
 
 declare global {
   interface Window {
-    __TAURI__?: any;
+    __TAURI__?: unknown;
   }
 }
 

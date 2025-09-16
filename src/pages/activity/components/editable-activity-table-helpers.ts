@@ -5,7 +5,7 @@ import React from "react";
 export type ExtendedColumnDef<TData extends object, TValue = unknown> = ColumnDef<TData, TValue> & {
   id?: string;
   accessorKey?: string;
-  validationSchema?: ZodType<any, ZodTypeDef, any>;
+  validationSchema?: ZodType<unknown, ZodTypeDef, unknown>;
   className?: string | ((row: TData) => string);
   style?: React.CSSProperties;
   meta?: ColumnMeta<TData, TValue> & {
@@ -21,7 +21,7 @@ export type ExtendedColumnDef<TData extends object, TValue = unknown> = ColumnDe
       | "moneyInput"
       | "accountSelect"
       | "currencySelect";
-    options?: { label: string; value: any }[];
+    options?: { label: string; value: unknown }[];
   };
 };
 
@@ -41,7 +41,7 @@ export function parseAndValidate<T extends object>(
   let parsedValue: unknown = rawValue;
   let errorMessage: string | null = null;
 
-  const schemaType = (schema as any)?._def?.typeName;
+  const schemaType = (schema as { _def?: { typeName?: string } } | undefined)?._def?.typeName;
   if (schemaType === "ZodNumber") {
     if (rawValue.trim() === "") {
       parsedValue = undefined;
@@ -65,7 +65,8 @@ export function handleKeyDown<T extends object>(
 ) {
   if (!colDef.validationSchema) return;
 
-  const schemaType = (colDef.validationSchema as any)?._def?.typeName;
+  const schemaType = (colDef.validationSchema as { _def?: { typeName?: string } } | undefined)?._def
+    ?.typeName;
   if (schemaType === "ZodNumber") {
     const allowedKeys = [
       "Backspace",
@@ -90,7 +91,8 @@ export function handlePaste<T extends object>(
   colDef: ExtendedColumnDef<T>,
 ) {
   if (!colDef.validationSchema) return;
-  const schemaType = (colDef.validationSchema as any)?._def?.typeName;
+  const schemaType = (colDef.validationSchema as { _def?: { typeName?: string } } | undefined)?._def
+    ?.typeName;
   if (schemaType === "ZodNumber") {
     const paste = e.clipboardData.getData("text");
     if (!/^-?\d*\.?\d*$/.test(paste)) {

@@ -60,7 +60,7 @@ export const AssetProfilePage = () => {
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = queryParams.get("tab") || "overview";
+  const defaultTab = queryParams.get("tab") ?? "overview";
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [formData, setFormData] = useState<AssetProfileFormData>({
@@ -111,26 +111,26 @@ export const AssetProfilePage = () => {
 
   useEffect(() => {
     setFormData({
-      name: holding?.instrument?.name || "",
-      sectors: holding?.instrument?.sectors || [],
-      countries: holding?.instrument?.countries || [],
-      assetSubClass: holding?.instrument?.assetSubclass || "",
-      assetClass: holding?.instrument?.assetClass || "",
-      notes: holding?.instrument?.notes || "",
-      dataSource: (holding?.instrument?.dataSource as DataSource) || DataSource.YAHOO,
+      name: holding?.instrument?.name ?? "",
+      sectors: holding?.instrument?.sectors ?? [],
+      countries: holding?.instrument?.countries ?? [],
+      assetSubClass: holding?.instrument?.assetSubclass ?? "",
+      assetClass: holding?.instrument?.assetClass ?? "",
+      notes: holding?.instrument?.notes ?? "",
+      dataSource: (holding?.instrument?.dataSource as DataSource) ?? DataSource.YAHOO,
     });
   }, [holding]);
 
   const handleCancel = () => {
     setIsEditing(false);
     setFormData({
-      name: holding?.instrument?.name || "",
-      sectors: holding?.instrument?.sectors || [],
-      countries: holding?.instrument?.countries || [],
-      assetSubClass: holding?.instrument?.assetSubclass || "",
-      assetClass: holding?.instrument?.assetClass || "",
-      notes: holding?.instrument?.notes || "",
-      dataSource: (holding?.instrument?.dataSource as DataSource) || DataSource.YAHOO,
+      name: holding?.instrument?.name ?? "",
+      sectors: holding?.instrument?.sectors ?? [],
+      countries: holding?.instrument?.countries ?? [],
+      assetSubClass: holding?.instrument?.assetSubclass ?? "",
+      assetClass: holding?.instrument?.assetClass ?? "",
+      notes: holding?.instrument?.notes ?? "",
+      dataSource: (holding?.instrument?.dataSource as DataSource) ?? DataSource.YAHOO,
     });
   };
 
@@ -143,22 +143,22 @@ export const AssetProfilePage = () => {
     return {
       id: holding.instrument.id,
       symbol: holding.instrument.symbol,
-      name: holding.instrument.name || "-",
+      name: holding.instrument.name ?? "-",
       isin: null,
       assetType: null,
       symbolMapping: null,
-      assetClass: holding.instrument.assetClass || "",
-      assetSubClass: holding.instrument.assetSubclass || "",
-      notes: holding.instrument.notes || null,
-      countries: JSON.stringify(holding.instrument.countries || []),
+      assetClass: holding.instrument.assetClass ?? "",
+      assetSubClass: holding.instrument.assetSubclass ?? "",
+      notes: holding.instrument.notes ?? null,
+      countries: JSON.stringify(holding.instrument.countries ?? []),
       categories: null,
       classes: null,
       attributes: null,
       createdAt: holding.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
-      currency: holding.instrument.currency || "USD",
-      dataSource: (holding.instrument.dataSource as DataSource) || DataSource.YAHOO,
-      sectors: JSON.stringify(holding.instrument.sectors || []),
+      currency: holding.instrument.currency ?? "USD",
+      dataSource: (holding.instrument.dataSource as DataSource) ?? DataSource.YAHOO,
+      sectors: JSON.stringify(holding.instrument.sectors ?? []),
       url: null,
       marketPrice: quote?.close ?? 0,
       totalGainAmount,
@@ -249,7 +249,7 @@ export const AssetProfilePage = () => {
           heading="Quote History"
           headingPrefix={symbol}
           displayBack={true}
-          backUrl={location.state?.from || "/holdings?tab=holdings"} // Use from state or default back
+          backUrl={location.state?.from ?? "/holdings?tab=holdings"} // Use from state or default back
         />
         <QuoteHistoryTable
           data={quoteHistory ?? []}
@@ -267,7 +267,7 @@ export const AssetProfilePage = () => {
             }
             // Set currency if missing
             if (!updatedQuote.currency) {
-              updatedQuote.currency = profile?.currency || "USD";
+              updatedQuote.currency = profile?.currency ?? "USD";
             }
             saveQuoteMutation.mutate(updatedQuote);
           }}
@@ -294,7 +294,7 @@ export const AssetProfilePage = () => {
         <ApplicationHeader
           heading={`Error loading data for ${symbol}`}
           displayBack={true}
-          backUrl={location.state?.from || "/holdings?tab=holdings"} // Use from state or default back
+          backUrl={location.state?.from ?? "/holdings?tab=holdings"} // Use from state or default back
         />
         <p>
           Could not load necessary information for this symbol. Please check the symbol or try again
@@ -323,14 +323,14 @@ export const AssetProfilePage = () => {
               data-tauri-drag-region="true"
               className="draggable flex flex-1 items-center space-x-4"
             >
-              {(profile?.symbol || holding?.instrument?.symbol) && (
+              {(profile?.symbol ?? holding?.instrument?.symbol) && (
                 <>
                   <TickerAvatar
-                    symbol={profile?.symbol || holding?.instrument?.symbol || symbol}
+                    symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
                     className="h-8 w-8"
                   />
                   <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight">
-                    {profile?.symbol || holding?.instrument?.symbol}
+                    {profile?.symbol ?? holding?.instrument?.symbol}
                   </h1>
                   <span className="h-6 border-l-2"></span>
                 </>
@@ -365,7 +365,7 @@ export const AssetProfilePage = () => {
                 ) : (
                   <>
                     <h1 className="font-heading text-xl font-bold tracking-tight">
-                      {formData.name || holding?.instrument?.symbol || symbol || "-"}
+                      {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
                     </h1>
                     <Button
                       variant="ghost"
@@ -416,8 +416,8 @@ export const AssetProfilePage = () => {
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
               <AssetHistoryCard
-                symbol={profile.symbol || ""}
-                currency={profile.currency || "USD"}
+                symbol={profile.symbol ?? ""}
+                currency={profile.currency ?? "USD"}
                 marketPrice={profile.marketPrice}
                 totalGainAmount={profile.totalGainAmount}
                 totalGainPercent={profile.totalGainPercent}
@@ -584,7 +584,7 @@ export const AssetProfilePage = () => {
           <TabsContent value="lots" className="pt-6">
             <AssetLotsTable
               lots={holding.lots}
-              currency={profile.currency || "USD"}
+              currency={profile.currency ?? "USD"}
               marketPrice={profile.marketPrice}
             />
           </TabsContent>

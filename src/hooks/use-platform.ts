@@ -106,13 +106,13 @@ function detectPlatformFromUserAgent(): PlatformInfo {
   let os = "unknown";
   if (/iphone|ipad|ipod/.test(userAgent)) {
     os = "ios";
-  } else if (userAgent.includes('android')) {
+  } else if (userAgent.includes("android")) {
     os = "android";
-  } else if (/mac|darwin/.test(platform) || userAgent.includes('macintosh')) {
+  } else if (/mac|darwin/.test(platform) || userAgent.includes("macintosh")) {
     os = "macos";
-  } else if (platform.includes('win') || userAgent.includes('windows')) {
+  } else if (platform.includes("win") || userAgent.includes("windows")) {
     os = "windows";
-  } else if (platform.includes('linux') || userAgent.includes('linux')) {
+  } else if (platform.includes("linux") || userAgent.includes("linux")) {
     os = "linux";
   }
 

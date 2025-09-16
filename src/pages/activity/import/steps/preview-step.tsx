@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Account, ActivityImport, CsvRowData } from "@/lib/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CSVFileViewer } from "../components/csv-file-viewer";
-import { ImportPreviewTable } from "../import-preview-table";
-import { ImportAlert } from "../components/import-alert";
-import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
 import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Account, ActivityImport, CsvRowData } from "@/lib/types";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { CSVFileViewer } from "../components/csv-file-viewer";
+import { ImportAlert } from "../components/import-alert";
+import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
+import { ImportPreviewTable } from "../import-preview-table";
 
 interface DataPreviewStepProps {
   data: CsvRowData[] | null;
@@ -38,7 +38,7 @@ export const DataPreviewStep = ({
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: (processedActivities) => {
       setImportError(null);
-      onNext(processedActivities);
+      onNext(processedActivities as ActivityImport[]);
     },
     onError: (error) => {
       setImportError(
@@ -58,7 +58,7 @@ export const DataPreviewStep = ({
     if (confirmImportMutation.isSuccess || confirmImportMutation.isError) {
       timer = setTimeout(() => {
         if (confirmImportMutation.isSuccess) {
-          onNext(confirmImportMutation.data || []);
+          onNext((confirmImportMutation.data as ActivityImport[]) || []);
         }
         confirmImportMutation.reset();
         setConfirmationState("initial");
@@ -73,6 +73,7 @@ export const DataPreviewStep = ({
     confirmImportMutation.isError,
     confirmImportMutation.data,
     confirmImportMutation.reset,
+    confirmImportMutation,
     onNext,
   ]);
 

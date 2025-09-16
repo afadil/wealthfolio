@@ -15,8 +15,7 @@ export function FeeCategoriesWidget({
 }: FeeCategoriesWidgetProps) {
   const { feesByCategory } = feeAnalytics;
 
-  // Calculate total fees for percentage calculations
-  const totalFees = feesByCategory.reduce((sum, category) => sum + category.amount, 0);
+  // Percentages are provided by the analytics service
 
   // Sort categories to ensure "Other" appears last
   const sortedCategories = [...feesByCategory].sort((a, b) => {

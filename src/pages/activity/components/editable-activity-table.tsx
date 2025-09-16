@@ -1,37 +1,5 @@
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
-import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
-import {
-  isCashActivity,
-  isCashTransfer,
-  calculateActivityValue,
-  isIncomeActivity,
-  isFeeActivity,
-  isSplitActivity,
-} from "@/lib/activity-utils";
-import type {
-  Row as TanStackRow,
-  ColumnSizingState,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
-  PaginationState,
-} from "@tanstack/react-table";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  getFilteredRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-} from "@tanstack/react-table";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { searchActivities } from "@/commands/activity";
-import { QueryKeys } from "@/lib/query-keys";
-import { useActivityMutations } from "../hooks/use-activity-mutations";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -40,36 +8,68 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ActivityDetails, Account, ActivitySearchResponse } from "@/lib/types";
 import {
-  tradeActivitySchema,
-  cashActivitySchema,
-  baseActivitySchema,
-  NewActivityFormValues,
-} from "./forms/schemas";
+  calculateActivityValue,
+  isCashActivity,
+  isCashTransfer,
+  isFeeActivity,
+  isIncomeActivity,
+  isSplitActivity,
+} from "@/lib/activity-utils";
+import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { QueryKeys } from "@/lib/query-keys";
+import { Account, ActivityDetails, ActivitySearchResponse } from "@/lib/types";
+import { cn, formatDateTime } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import type {
+  ColumnFiltersState,
+  ColumnSizingState,
+  PaginationState,
+  SortingState,
+  Row as TanStackRow,
+  VisibilityState,
+} from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import { formatAmount } from "@wealthfolio/ui";
-import { formatDateTime, cn } from "@/lib/utils";
-
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useActivityMutations } from "../hooks/use-activity-mutations";
 import {
-  SearchableSelect,
+  baseActivitySchema,
+  cashActivitySchema,
+  NewActivityFormValues,
+  tradeActivitySchema,
+} from "./forms/schemas";
+
+import { AccountSelector } from "@/components/account-selector";
+import TickerSearchInput from "@/components/ticker-search";
+import {
+  Button,
   CurrencyInput,
+  DatePickerInput,
+  DeleteConfirm,
+  Icons,
   MoneyInput,
   QuantityInput,
-  DatePickerInput,
+  SearchableSelect,
+  toast,
   ToggleGroup,
   ToggleGroupItem,
-  Button,
-  Icons,
-  DeleteConfirm,
-  toast,
 } from "@wealthfolio/ui";
-import TickerSearchInput from "@/components/ticker-search";
-import { AccountSelector } from "@/components/account-selector";
 
 // New imports for data table enhancements
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
-import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
 
 type LocalActivityDetails = ActivityDetails & { isNew?: boolean };
 
@@ -113,10 +113,10 @@ const ActivitySkeletonRow: React.FC<ActivitySkeletonRowProps> = ({
 import type { ExtendedColumnDef } from "./editable-activity-table-helpers";
 import {
   getColumnKey,
-  parseAndValidate,
   handleKeyDown,
   handlePaste,
   isRowDisabled,
+  parseAndValidate,
 } from "./editable-activity-table-helpers";
 
 interface EditableActivityTableProps {
@@ -210,17 +210,21 @@ const EditableActivityTable = ({
       "editableTableScope",
     ],
     queryFn: () => {
-      const columnFiltersObj = columnFilters.reduce((acc, curr) => {
-        acc[curr.id] = curr.value;
-        return acc;
-      }, {} as any);
-      const sortingObj = sorting.length > 0 ? sorting[0] : undefined;
+      const columnFiltersObj = columnFilters.reduce<Record<string, unknown>>(
+        (acc, curr) => {
+          acc[curr.id] = curr.value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
+      const sortingObj: { id: string; desc: boolean } | undefined =
+        sorting.length > 0 ? (sorting[0] as { id: string; desc: boolean }) : undefined;
       return searchActivities(
         pagination.pageIndex,
         pagination.pageSize,
         columnFiltersObj,
         globalFilter,
-        sortingObj as any,
+        sortingObj as { id: string; desc: boolean },
       );
     },
   });
@@ -263,7 +267,7 @@ const EditableActivityTable = ({
   }, [activitiesPage?.data, dirtyActivityIds]);
 
   const handleSheetCellEdit = useCallback(
-    (rowId: string, columnId: keyof ActivityDetails, value: any) => {
+    (rowId: string, columnId: keyof ActivityDetails, value: unknown) => {
       let updatedActivity: LocalActivityDetails | undefined;
       setLocalActivities((prevActivities) =>
         prevActivities.map((act) => {
@@ -324,7 +328,7 @@ const EditableActivityTable = ({
       } = activityToSave;
 
       // Construct the payload with fields expected by the backend API
-      const payloadForBackend: any = {
+      const payloadForBackend: Record<string, any> = {
         accountId,
         activityType,
         activityDate: date, // Map to activityDate
@@ -335,10 +339,13 @@ const EditableActivityTable = ({
       };
 
       // Conditionally add fields that might not always be present or applicable
-      if (activityToSave.hasOwnProperty("quantity")) payloadForBackend.quantity = quantity;
-      if (activityToSave.hasOwnProperty("unitPrice")) payloadForBackend.unitPrice = unitPrice;
-      if (activityToSave.hasOwnProperty("amount")) payloadForBackend.amount = amount;
-      if (activityToSave.hasOwnProperty("fee")) payloadForBackend.fee = fee;
+      if (Object.prototype.hasOwnProperty.call(activityToSave, "quantity"))
+        payloadForBackend.quantity = quantity;
+      if (Object.prototype.hasOwnProperty.call(activityToSave, "unitPrice"))
+        payloadForBackend.unitPrice = unitPrice;
+      if (Object.prototype.hasOwnProperty.call(activityToSave, "amount"))
+        payloadForBackend.amount = amount;
+      if (Object.prototype.hasOwnProperty.call(activityToSave, "fee")) payloadForBackend.fee = fee;
 
       try {
         let mutationPromise;
@@ -623,7 +630,7 @@ const EditableActivityTable = ({
         accessorKey: "currency",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
         cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => (
-          <div>{String((row.getValue("currency")) || "N/A")}</div>
+          <div>{String(row.getValue("currency") || "N/A")}</div>
         ),
         meta: { type: "currencySelect" },
         validationSchema: baseActivitySchema.shape.currency,
@@ -633,7 +640,7 @@ const EditableActivityTable = ({
         accessorKey: "notes",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Comment" />,
         cell: ({ row }: { row: TanStackRow<LocalActivityDetails> }) => {
-          return <div>{String((row.original.comment) || "")}</div>;
+          return <div>{String(row.original.comment || "")}</div>;
         },
         meta: { type: "string" },
         validationSchema: baseActivitySchema.shape.comment,
@@ -890,7 +897,7 @@ const EditableActivityTable = ({
               } else if (colDef.meta?.type === "activityTypeSelect" && colDef.meta.options) {
                 cellContent = (
                   <SearchableSelect
-                    options={colDef.meta.options}
+                    options={colDef.meta.options as { label: string; value: string }[]}
                     value={cellValue as string | undefined}
                     onValueChange={(newValue) => {
                       if (newValue !== undefined) {

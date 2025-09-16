@@ -413,10 +413,10 @@ export interface IncomeSummary {
   yoyGrowth: number | null;
 }
 
-export type DateRange = {
+export interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-};
+}
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
 
@@ -544,8 +544,8 @@ export interface UpdateAssetProfile {
   assetSubClass: string;
 }
 
-export type TrackedItem = {
+export interface TrackedItem {
   id: string;
   type: 'account' | 'symbol';
   name: string;
-};
+}

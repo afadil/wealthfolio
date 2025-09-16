@@ -78,7 +78,7 @@ export const getHistoricalValuations = async (
 ): Promise<AccountValuation[]> => {
   try {
     switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
+      case RUN_ENV.DESKTOP: {
         const params: { accountId?: string; startDate?: string; endDate?: string } = {};
         if (accountId) params.accountId = accountId;
         if (startDate) params.startDate = startDate;
@@ -88,7 +88,8 @@ export const getHistoricalValuations = async (
           "get_historical_valuations",
           Object.keys(params).length > 0 ? params : undefined,
         );
-      case RUN_ENV.WEB:
+      }
+      case RUN_ENV.WEB: {
         const params2: { accountId?: string; startDate?: string; endDate?: string } = {};
         if (accountId) params2.accountId = accountId;
         if (startDate) params2.startDate = startDate;
@@ -98,6 +99,7 @@ export const getHistoricalValuations = async (
           "get_historical_valuations",
           Object.keys(params2).length > 0 ? params2 : undefined,
         );
+      }
       default:
         throw new Error(`Unsupported`);
     }

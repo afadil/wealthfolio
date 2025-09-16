@@ -12,13 +12,13 @@ export interface AccountEditModalProps {
 export function AccountEditModal({ account, open, onClose }: AccountEditModalProps) {
   const { settings } = useSettingsContext();
   const defaultValues = {
-    id: account?.id || undefined,
-    name: account?.name || "",
-    balance: account?.balance || 0,
-    accountType: (account?.accountType || "SECURITIES") as "SECURITIES" | "CASH" | "CRYPTOCURRENCY",
+    id: account?.id ?? undefined,
+    name: account?.name ?? "",
+    balance: account?.balance ?? 0,
+    accountType: (account?.accountType ?? "SECURITIES") as "SECURITIES" | "CASH" | "CRYPTOCURRENCY",
     group: account?.group ?? undefined,
-    currency: account?.currency || settings?.baseCurrency || "USD",
-    isDefault: account?.isDefault || false,
+    currency: account?.currency ?? settings?.baseCurrency ?? "USD",
+    isDefault: account?.isDefault ?? false,
     isActive: account?.id ? account?.isActive : true,
   };
 

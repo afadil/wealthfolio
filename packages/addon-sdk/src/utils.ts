@@ -108,12 +108,12 @@ export function generateAddonId(name: string): string {
 /**
  * Type guard to check if an object is a valid addon manifest
  */
-export function isAddonManifest(obj: any): obj is AddonManifest {
+export function isAddonManifest(obj: unknown): obj is AddonManifest {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    typeof obj.id === 'string' &&
-    typeof obj.name === 'string' &&
-    typeof obj.version === 'string'
+    typeof (obj as Record<string, unknown>).id === 'string' &&
+    typeof (obj as Record<string, unknown>).name === 'string' &&
+    typeof (obj as Record<string, unknown>).version === 'string'
   );
 }

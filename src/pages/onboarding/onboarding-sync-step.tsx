@@ -12,6 +12,20 @@ interface OnboardingSyncStepProps {
 }
 
 export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProps) {
+  function toErrorMessage(err: unknown, fallback: string): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "string") return err.trim() === "" ? fallback : err;
+    if (
+      typeof err === "number" ||
+      typeof err === "boolean" ||
+      typeof err === "bigint" ||
+      typeof err === "symbol"
+    ) {
+      return String(err);
+    }
+    return fallback;
+  }
+
   const [status, setStatus] = useState<"idle" | "scanning">("idle");
   const [error, setError] = useState<string | null>(null);
   const [isScanningActive, setIsScanningActive] = useState(false);
@@ -63,8 +77,8 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
           return;
         }
         setError("Invalid QR code payload");
-      } catch (e: any) {
-        logger.error("QR parse error: " + e);
+      } catch (e: unknown) {
+        logger.error("QR parse error: " + (e instanceof Error ? e.message : String(e)));
         setError("Invalid QR code");
       }
     },
@@ -86,8 +100,8 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
       } else {
         setError("No QR detected. Align code within frame.");
       }
-    } catch (e: any) {
-      const msg = e?.toString?.() || String(e) || "Scan failed";
+    } catch (e: unknown) {
+      const msg = toErrorMessage(e, "Scan failed");
       if (!msg.toLowerCase().includes("cancel")) {
         // Normalize unsupported into a friendly message
         if (msg.toLowerCase().includes("unsupported")) {
@@ -125,7 +139,7 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
         setIsScanningActive(false);
         setError("Camera permission denied");
       }
-    } catch (e) {
+    } catch (_e) {
       setScanPermission("denied");
       setStatus("idle");
       setIsScanningActive(false);

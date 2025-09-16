@@ -69,9 +69,10 @@ export const ActivityTable = ({
 
   const { duplicateActivityMutation } = useActivityMutations();
 
-  const handleDuplicate = async (activity: ActivityDetails) => {
-    return duplicateActivityMutation.mutateAsync(activity);
-  };
+  const handleDuplicate = React.useCallback(
+    async (activity: ActivityDetails) => duplicateActivityMutation.mutateAsync(activity),
+    [duplicateActivityMutation],
+  );
 
   const columns: ColumnDef<ActivityDetails>[] = useMemo(
     () => [
@@ -80,7 +81,7 @@ export const ActivityTable = ({
         accessorKey: 'assetSymbol',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
         cell: ({ row }) => {
-          const symbol = row.getValue('assetSymbol');
+          const symbol = String(row.getValue('assetSymbol'));
           const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
           // For TickerAvatar, use $CASH for all cash symbols to get the proper icon
           const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
@@ -117,7 +118,11 @@ export const ActivityTable = ({
         header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
         cell: ({ row }) => {
           const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const formattedDate = formatDateTime(row.getValue('date'), userTimezone);
+          const dateVal = row.getValue('date');
+          const formattedDate =
+            typeof dateVal === 'string' || dateVal instanceof Date
+              ? formatDateTime(dateVal, userTimezone)
+              : formatDateTime(String(dateVal), userTimezone);
           return (
             <div className="ml-2 flex flex-col">
               <span>{formattedDate.date}</span>
@@ -132,7 +137,7 @@ export const ActivityTable = ({
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType');
+          const activityType = String(row.getValue('activityType'));
           const badgeVariant =
             activityType === 'BUY' ||
             activityType === 'DEPOSIT' ||
@@ -153,7 +158,12 @@ export const ActivityTable = ({
           );
         },
         filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
+          const cellValue = row.getValue(id) as string | undefined;
+          if (!cellValue) {
+            return false;
+          }
+
+          return value.includes(cellValue);
         },
       },
       {
@@ -169,7 +179,7 @@ export const ActivityTable = ({
           />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType');
+          const activityType = String(row.getValue('activityType'));
           const quantity = row.getValue('quantity');
 
           if (
@@ -181,7 +191,7 @@ export const ActivityTable = ({
             return <div className="pr-4 text-right">-</div>;
           }
 
-          return <div className="pr-4 text-right">{quantity}</div>;
+          return <div className="pr-4 text-right">{String(quantity)}</div>;
         },
       },
       {
@@ -196,11 +206,12 @@ export const ActivityTable = ({
           />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType');
-          const unitPrice = row.getValue('unitPrice');
+          const activityType = String(row.getValue('activityType'));
+          const unitPrice = Number(row.getValue('unitPrice'));
           const amount = row.original.amount;
-          const currency = row.getValue('currency') || 'USD';
-          const assetSymbol = row.getValue('assetSymbol');
+          const currencyVal = row.getValue('currency');
+          const currency = typeof currencyVal === 'string' ? currencyVal : 'USD';
+          const assetSymbol = String(row.getValue('assetSymbol'));
 
           if (activityType === 'FEE') {
             return <div className="pr-4 text-right">-</div>;
@@ -228,9 +239,10 @@ export const ActivityTable = ({
           <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
         ),
         cell: ({ row }) => {
-          const activityType = row.getValue('activityType');
-          const fee = row.getValue('fee');
-          const currency = row.getValue('currency') || 'USD';
+          const activityType = String(row.getValue('activityType'));
+          const fee = Number(row.getValue('fee'));
+          const currencyVal = row.getValue('currency');
+          const currency = typeof currencyVal === 'string' ? currencyVal : 'USD';
 
           return (
             <div className="text-right">
@@ -297,7 +309,12 @@ export const ActivityTable = ({
         id: 'accountId',
         accessorKey: 'accountId',
         filterFn: (row, id, value: string) => {
-          return value.includes(row.getValue(id));
+          const cellValue = row.getValue(id) as string | undefined;
+          if (!cellValue) {
+            return false;
+          }
+
+          return value.includes(cellValue);
         },
         enableHiding: false,
       },
@@ -316,7 +333,7 @@ export const ActivityTable = ({
         enableHiding: false,
       },
     ],
-    [handleEdit, handleDelete],
+    [handleEdit, handleDelete, handleDuplicate],
   );
 
   const accountOptions =
@@ -345,23 +362,28 @@ export const ActivityTable = ({
     ActivitySearchResponse,
     Error
   >({
-    queryKey: [QueryKeys.ACTIVITY_DATA, columnFilters, globalFilter, sorting],
-    queryFn: async ({ pageParam = 0 }: { pageParam?: any }) => {
+    queryKey: [QueryKeys.ACTIVITY_DATA, columnFilters, globalFilter, sorting[0], sorting.length],
+    queryFn: async (context) => {
+      const pageParam = (context.pageParam as number) ?? 0;
       // convert columnFilters to an object
-      const columnFiltersObj = columnFilters.reduce((acc, curr) => {
-        acc[curr.id] = curr.value;
-        return acc;
-      }, {} as any);
+      const columnFiltersObj = columnFilters.reduce<Record<string, unknown>>(
+        (acc, curr) => {
+          acc[curr.id] = curr.value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
 
       // get sorting first element if exists
-      const sortingObj = sorting.length > 0 ? sorting[0] : undefined;
+      const sortingObj: { id: string; desc: boolean } | undefined =
+        sorting.length > 0 ? (sorting[0] as { id: string; desc: boolean }) : undefined;
 
       const fetchedData = searchActivities(
         pageParam,
         fetchSize,
         columnFiltersObj,
         globalFilter,
-        sortingObj as any,
+        sortingObj as { id: string; desc: boolean },
       );
       return fetchedData;
     },
@@ -369,8 +391,14 @@ export const ActivityTable = ({
     initialPageParam: 0,
   });
 
-  const flatData = React.useMemo(() => data?.pages?.flatMap((page) => page.data) ?? [], [data]);
-  const totalDBRowCount = data?.pages?.[0]?.meta?.totalRowCount ?? 0;
+  const { flatData, totalDBRowCount }: { flatData: ActivityDetails[]; totalDBRowCount: number } =
+    React.useMemo(() => {
+      const pages = data?.pages ?? [];
+      return {
+        flatData: pages.flatMap((page) => page.data),
+        totalDBRowCount: pages[0]?.meta?.totalRowCount ?? 0,
+      };
+    }, [data]);
   const totalFetched = flatData.length;
 
   const fetchMoreOnBottomReached = React.useCallback(
@@ -388,7 +416,7 @@ export const ActivityTable = ({
         }
       }
     },
-    [fetchNextPage, isFetching, totalFetched, totalDBRowCount],
+    [fetchNextPage, isFetching, isLoading, totalFetched, totalDBRowCount],
   );
 
   const fetchMoreOnBottomReachedDebounced = React.useMemo(

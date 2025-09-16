@@ -1,35 +1,34 @@
-import { useMemo, useState } from "react";
 import { ApplicationHeader } from "@/components/header";
-import { ApplicationShell } from "@wealthfolio/ui";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
   SheetDescription,
   SheetFooter,
-  SheetClose,
+  SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { AmountDisplay } from "@wealthfolio/ui";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AmountDisplay, ApplicationShell } from "@wealthfolio/ui";
+import { useMemo, useState } from "react";
 
-import { ClassesChart } from "./components/classes-chart";
-import { HoldingsTable } from "./components/holdings-table";
-import { PortfolioComposition } from "./components/composition-chart";
-import { SectorsChart } from "./components/sectors-chart";
-import { useHoldings } from "@/hooks/use-holdings";
-import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { useLocation } from "react-router-dom";
-import { CountryChart } from "./components/country-chart";
-import { CashHoldingsWidget } from "./components/cash-holdings-widget";
 import { AccountSelector } from "@/components/account-selector";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
-import { HoldingCurrencyChart } from "./components/currency-chart";
-import { AccountAllocationChart } from "./components/account-allocation-chart";
 import { Badge } from "@/components/ui/badge";
+import { useHoldings } from "@/hooks/use-holdings";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
+import { useLocation } from "react-router-dom";
+import { AccountAllocationChart } from "./components/account-allocation-chart";
+import { CashHoldingsWidget } from "./components/cash-holdings-widget";
+import { ClassesChart } from "./components/classes-chart";
+import { PortfolioComposition } from "./components/composition-chart";
+import { CountryChart } from "./components/country-chart";
+import { HoldingCurrencyChart } from "./components/currency-chart";
+import { HoldingsTable } from "./components/holdings-table";
+import { SectorsChart } from "./components/sectors-chart";
 
 // Define a type for the filter criteria
 type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
@@ -37,12 +36,12 @@ type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" |
 export const HoldingsPage = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = queryParams.get("tab") || "overview";
+  const defaultTab = queryParams.get("tab") ?? "overview";
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
     name: "All Portfolio",
-    accountType: "PORTFOLIO" as any,
+    accountType: "PORTFOLIO" as unknown as Account["accountType"],
     balance: 0,
     currency: "USD",
     isDefault: false,
@@ -53,7 +52,7 @@ export const HoldingsPage = () => {
 
   const { settings } = useSettingsContext();
 
-  const { holdings, isLoading } = useHoldings(selectedAccount?.id || PORTFOLIO_ACCOUNT_ID);
+  const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState("");
@@ -62,27 +61,22 @@ export const HoldingsPage = () => {
   const [sheetCompositionFilter, setSheetCompositionFilter] = useState<Instrument["id"] | null>(
     null,
   );
-  const [sheetAccountIdsFilter, setSheetAccountIdsFilter] = useState<string[] | null>(null);
+  // Removed unused sheetAccountIdsFilter state
 
   const handleChartSectionClick = (
     type: SheetFilterType,
     name: string,
     title?: string,
     compositionId?: Instrument["id"],
-    accountIdsForFilter?: string[],
+    _accountIdsForFilter?: string[],
   ) => {
     setSheetFilterType(type);
     setSheetFilterName(name);
-    setSheetTitle(title || `Details for ${name}`);
+    setSheetTitle(title ?? `Details for ${name}`);
     if (type === "composition" && compositionId) {
       setSheetCompositionFilter(compositionId);
     } else {
       setSheetCompositionFilter(null);
-    }
-    if (type === "account" && accountIdsForFilter) {
-      setSheetAccountIdsFilter(accountIdsForFilter);
-    } else {
-      setSheetAccountIdsFilter(null);
     }
     setIsSheetOpen(true);
   };
@@ -98,7 +92,7 @@ export const HoldingsPage = () => {
       case "class":
         filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          const assetSubClass = isCash ? "Cash" : h.instrument?.assetSubclass || "Other";
+          const assetSubClass = isCash ? "Cash" : (h.instrument?.assetSubclass ?? "Other");
           return assetSubClass === sheetFilterName;
         });
         break;
@@ -130,10 +124,12 @@ export const HoldingsPage = () => {
         break;
     }
 
-    return filteredHoldings.sort(
-      (a, b) => (Number(b.marketValue?.base) || 0) - (Number(a.marketValue?.base) || 0),
-    );
-  }, [holdings, sheetFilterType, sheetFilterName, sheetCompositionFilter, sheetAccountIdsFilter]);
+    return filteredHoldings.sort((a, b) => {
+      const bBase = b.marketValue?.base ?? 0;
+      const aBase = a.marketValue?.base ?? 0;
+      return Number(bBase) - Number(aBase);
+    });
+  }, [holdings, sheetFilterType, sheetFilterName, sheetCompositionFilter]);
 
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
@@ -141,9 +137,9 @@ export const HoldingsPage = () => {
 
   const { cashHoldings, nonCashHoldings } = useMemo(() => {
     const cash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) || [];
+      holdings?.filter((holding) => holding.holdingType?.toLowerCase() === HoldingType.CASH) ?? [];
     const nonCash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) || [];
+      holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
     return { cashHoldings: cash, nonCashHoldings: nonCash };
   }, [holdings]);
 
@@ -178,19 +174,19 @@ export const HoldingsPage = () => {
               includePortfolio={true}
             />
           </div>
-          <CashHoldingsWidget cashHoldings={cashHoldings || []} isLoading={isLoading} />
+          <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
         </div>
 
         <TabsContent value="holdings" className="min-h-0 flex-1 py-2">
-          <HoldingsTable holdings={nonCashHoldings || []} isLoading={isLoading} />
+          <HoldingsTable holdings={nonCashHoldings ?? []} isLoading={isLoading} />
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-4">
           {/* Top row: Summary widgets */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <HoldingCurrencyChart
-              holdings={holdings || []}
-              baseCurrency={settings?.baseCurrency || "USD"}
+              holdings={holdings ?? []}
+              baseCurrency={settings?.baseCurrency ?? "USD"}
               isLoading={isLoading}
               onCurrencySectionClick={(currencyName) =>
                 handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
@@ -219,7 +215,7 @@ export const HoldingsPage = () => {
           {/* Second row: Composition and Sector */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="col-span-1 md:col-span-3">
-              <PortfolioComposition holdings={nonCashHoldings} isLoading={isLoading} />
+              <PortfolioComposition holdings={nonCashHoldings ?? []} isLoading={isLoading} />
             </div>
 
             {/* Sectors Chart - Now self-contained */}
@@ -257,8 +253,8 @@ export const HoldingsPage = () => {
                     symbol = `$CASH-${holding.localCurrency}`;
                   } else if (holding.instrument) {
                     displayName =
-                      holding.instrument.name || holding.instrument.symbol || "Unnamed Security";
-                    symbol = holding.instrument.symbol || "-";
+                      holding.instrument.name ?? holding.instrument.symbol ?? "Unnamed Security";
+                    symbol = holding.instrument.symbol ?? "-";
                   }
 
                   return (
@@ -274,7 +270,7 @@ export const HoldingsPage = () => {
                         </div>
                         <div className="text-right font-semibold">
                           <AmountDisplay
-                            value={Number(holding.marketValue?.base) || 0}
+                            value={Number(holding.marketValue?.base ?? 0)}
                             currency={holding.baseCurrency}
                           />
                         </div>

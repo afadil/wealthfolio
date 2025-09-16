@@ -16,7 +16,7 @@ import {
   ExportedFileFormat,
   Goal,
 } from '@/lib/types';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { QueryObserverResult, useMutation, useQuery } from '@tanstack/react-query';
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -123,13 +123,14 @@ export function useExportData() {
       } else {
         // Regular export success
         toast({
-          title: 'File saved successfully.',
+          title: 'Export completed',
+          description: 'File saved successfully. Check your download location.',
           variant: 'success',
         });
       }
     },
     onError: (e) => {
-      logger.error(`Error while exporting: ${e}`);
+      logger.error(`Error while exporting: ${String(e)}`);
       toast({
         title: 'Something went wrong.',
         variant: 'destructive',
@@ -141,7 +142,7 @@ export function useExportData() {
     try {
       await exportDataMutation(params);
     } catch (error) {
-      logger.error(`Error while exporting: ${error}`);
+      logger.error(`Error while exporting: ${String(error)}`);
     }
   };
 
@@ -154,9 +155,12 @@ export function useExportData() {
 }
 
 async function fetchAndFormatData(
-  queryFn: () => Promise<any>,
+  queryFn: () => Promise<QueryObserverResult<unknown[], Error>>,
   format: ExportedFileFormat,
 ): Promise<string | undefined> {
   const response = await queryFn();
-  return formatData(response.data, format);
+
+  // Handle empty data gracefully - export empty file instead of error
+  const data = response.data ?? [];
+  return formatData(data, format);
 }

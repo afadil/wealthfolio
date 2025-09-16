@@ -336,7 +336,7 @@ export default function IncomePage() {
 
                       const chartItems = [
                         ...top5Stocks.map(([symbol, income]) => ({
-                          symbol: (/\[(.*?)\]/.exec(symbol))?.[1] || symbol,
+                          symbol: /\[(.*?)\]/.exec(symbol)?.[1] || symbol,
                           companyName: symbol.replace(/\[.*?\]-/, "").trim(),
                           income,
                           isOther: false,
@@ -402,7 +402,7 @@ export default function IncomePage() {
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center">
                         <Badge className="bg-primary mr-2 flex min-w-[55px] items-center justify-center rounded-sm text-xs">
-                          {(/\[(.*?)\]/.exec(symbol))?.[1] || symbol}
+                          {/\[(.*?)\]/.exec(symbol)?.[1] || symbol}
                         </Badge>
                         <span className="text-muted-foreground mr-16 text-xs">
                           {symbol.replace(/\[.*?\]-/, "").trim()}

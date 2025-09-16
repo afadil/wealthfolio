@@ -31,7 +31,7 @@ export function RatingDialog({
   const [rating, setRating] = React.useState<number>(0);
   const [review, setReview] = React.useState("");
 
-  const { submitRating, isSubmittingRating } = useAddonRatingMutation();
+  const { submitRatingAsync, isSubmittingRating } = useAddonRatingMutation();
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -39,7 +39,7 @@ export function RatingDialog({
     }
 
     try {
-      await submitRating({
+      await submitRatingAsync({
         addonId,
         rating,
         review: review.trim() || undefined,

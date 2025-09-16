@@ -22,7 +22,7 @@ const enable: AddonEnableFunction = (context) => {
   context.api.logger.info('📈 Swingfolio addon is being enabled!');
 
   // Store references to items for cleanup
-  const addedItems: Array<{ remove: () => void }> = [];
+  const addedItems: { remove: () => void }[] = [];
 
   try {
     // Add sidebar navigation item

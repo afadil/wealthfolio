@@ -1,24 +1,24 @@
-import { useState, useCallback, useMemo, memo } from "react";
-import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
+import { AccountSelector } from "@/components/account-selector";
+import { TickerAvatar } from "@/components/ticker-avatar";
+import TickerSearchInput from "@/components/ticker-search";
+import { Icons } from "@/components/ui/icons";
+import { Account } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import {
+  Button,
   Card,
   CardContent,
-  Button,
-  MoneyInput,
-  QuantityInput,
+  DatePickerInput,
+  FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormControl,
   FormMessage,
-  DatePickerInput,
+  MoneyInput,
+  QuantityInput,
 } from "@wealthfolio/ui";
-import { Icons } from "@/components/ui/icons";
-import { AccountSelector } from "@/components/account-selector";
-import TickerSearchInput from "@/components/ticker-search";
-import { TickerAvatar } from "@/components/ticker-avatar";
-import { cn } from "@/lib/utils";
-import { Account } from "@/lib/types";
+import { memo, useCallback, useMemo, useState } from "react";
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 export interface BulkHoldingRow {
   id: string;
@@ -48,13 +48,13 @@ const HoldingRow = memo(
     canRemove,
   }: {
     index: number;
-    field: any;
+    field: BulkHoldingRow;
     onRemove: (index: number) => void;
     onAddRow: () => void;
     isLast: boolean;
     isSelected: boolean;
     onSelectRow: (id: string) => void;
-    setFocus: any;
+    setFocus: (name: string) => void;
     canRemove: boolean;
   }) => {
     const { control } = useFormContext();
@@ -349,7 +349,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
               <HoldingRow
                 key={field.id}
                 index={index}
-                field={field}
+                field={field as BulkHoldingRow}
                 onRemove={removeRow}
                 onAddRow={addRow}
                 isLast={index === fields.length - 1}

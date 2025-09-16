@@ -216,7 +216,7 @@ function updateOpenPositionsWithMarketPrices(
     // Find matching holding by symbol
     const matchingHolding = findMatchingHolding(position.symbol, holdings);
 
-    if (matchingHolding && matchingHolding.price != null && matchingHolding.price > 0) {
+    if (matchingHolding?.price != null && matchingHolding.price > 0) {
       // Get current price and ensure it's in the same currency as the position
       let currentPrice = matchingHolding.price;
 

@@ -31,7 +31,7 @@ import AboutSettingsPage from "./pages/settings/about/about-page";
 export function AppRoutes() {
   useGlobalEventListener();
   const [dynamicRoutes, setDynamicRoutes] = useState<
-    { path: string; component: React.LazyExoticComponent<React.ComponentType<any>> }[]
+    { path: string; component: React.LazyExoticComponent<React.ComponentType<unknown>> }[]
   >([]);
 
   // Subscribe to dynamic route updates

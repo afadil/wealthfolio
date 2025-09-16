@@ -25,11 +25,11 @@ export function PortfolioUpdateTrigger({
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
 
   // Define handlers internally
-  const handleUpdate = async () => {
+  const handleUpdate = () => {
     updatePortfolioMutation.mutate();
   };
 
-  const handleRecalculate = async () => {
+  const handleRecalculate = () => {
     recalculatePortfolioMutation.mutate();
   };
 

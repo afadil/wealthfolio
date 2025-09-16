@@ -48,7 +48,7 @@ interface AccountFormlProps {
   onSuccess?: () => void;
 }
 
-export function AccountForm({ defaultValues, onSuccess = () => {} }: AccountFormlProps) {
+export function AccountForm({ defaultValues, onSuccess = () => undefined }: AccountFormlProps) {
   const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
   const form = useForm<NewAccount>({

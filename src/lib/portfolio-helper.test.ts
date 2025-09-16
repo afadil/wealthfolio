@@ -26,9 +26,9 @@ function performanceToValuations(metrics: SimplePerformanceMetrics[]): AccountVa
 describe("calculateGoalProgress", () => {
   it("should return empty array if essential data is missing", () => {
     expect(calculateGoalProgress([], [], [])).toEqual([]);
-    expect(calculateGoalProgress(undefined as any, [], [])).toEqual([]);
-    expect(calculateGoalProgress([], undefined as any, [])).toEqual([]);
-    expect(calculateGoalProgress([], [], undefined as any)).toEqual([]);
+    expect(calculateGoalProgress(undefined as unknown as AccountValuation[], [], [])).toEqual([]);
+    expect(calculateGoalProgress([], undefined as unknown as Goal[], [])).toEqual([]);
+    expect(calculateGoalProgress([], [], undefined as unknown as GoalAllocation[])).toEqual([]);
   });
 
   it("should calculate goal progress correctly as a decimal ratio and handle various scenarios", () => {

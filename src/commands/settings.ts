@@ -11,7 +11,7 @@ export const getSettings = async (): Promise<Settings> => {
       default:
         throw new Error(`Unsupported`);
     }
-  } catch (error) {
+  } catch (_error) {
     logger.error("Error fetching settings.");
     return {} as Settings;
   }
@@ -43,7 +43,7 @@ export const isAutoUpdateCheckEnabled = async (): Promise<boolean> => {
       default:
         throw new Error(`Unsupported`);
     }
-  } catch (error) {
+  } catch (_error) {
     logger.error("Error checking auto-update setting.");
     return true; // Default to enabled
   }
@@ -52,10 +52,11 @@ export const isAutoUpdateCheckEnabled = async (): Promise<boolean> => {
 export const backupDatabase = async (): Promise<{ filename: string; data: Uint8Array }> => {
   try {
     switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
+      case RUN_ENV.DESKTOP: {
         const result = await invokeTauri<[string, number[]]>("backup_database");
         const [filename, data] = result;
         return { filename, data: new Uint8Array(data) };
+      }
       case RUN_ENV.WEB:
         return invokeWeb("backup_database");
       default:

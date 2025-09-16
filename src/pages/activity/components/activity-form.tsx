@@ -109,7 +109,14 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
-      const { showCurrencySelect, id, ...submitData } = { ...data, isDraft: false };
+      const {
+        showCurrencySelect: _showCurrencySelect,
+        id,
+        ...submitData
+      } = {
+        ...data,
+        isDraft: false,
+      };
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (

@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Icons } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
@@ -81,7 +81,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                   aria-label="Open navigation menu"
                 >
                   <div className="flex h-6 w-6 items-center justify-center transition-transform duration-200">
-                    <Icons.MoreVertical className="h-5 w-5" aria-hidden="true" />
+                    <Icons.Menu className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <span className="mt-1 truncate text-[10px] font-medium">More</span>
                 </button>

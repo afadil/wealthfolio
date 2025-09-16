@@ -1,31 +1,31 @@
-import { useState, useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { recalculatePortfolio } from "@/commands/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { SettingsHeader } from "../header";
-import { recalculatePortfolio } from "@/commands/portfolio";
 // Inline scanner (replaces previous navigation-based scanner page)
-import { scan, cancel, requestPermissions, Format } from "@tauri-apps/plugin-barcode-scanner";
+import { logger } from "@/adapters";
+import { cancel, Format, requestPermissions, scan } from "@tauri-apps/plugin-barcode-scanner";
 import {
+  AlertFeedback,
+  Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Separator,
-  Button,
-  Textarea,
-  Badge,
-  Icons,
-  useToast,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Icons,
   Input,
   Label,
-  AlertFeedback,
+  Separator,
+  Textarea,
+  useToast,
 } from "@wealthfolio/ui";
-import { logger } from "@/adapters";
 
 interface PairPayload {
   host: string;
@@ -55,6 +55,20 @@ interface SyncStatusData {
 type SyncUIStatus = "idle" | "generating" | "scanning" | "syncing" | "success" | "error";
 
 export default function SyncSettingsPage() {
+  function toErrorMessage(err: unknown, fallback: string): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "string") return err.trim() === "" ? fallback : err;
+    if (
+      typeof err === "number" ||
+      typeof err === "boolean" ||
+      typeof err === "bigint" ||
+      typeof err === "symbol"
+    ) {
+      return String(err);
+    }
+    return fallback;
+  }
+
   const [status, setStatus] = useState<SyncStatusData | null>(null);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [pairPayload, setPairPayload] = useState("");
@@ -79,7 +93,7 @@ export default function SyncSettingsPage() {
           setParsedPayload(null);
           setError("Invalid payload: missing host or port");
         }
-      } catch (e) {
+      } catch (_e) {
         setParsedPayload(null);
         setError("Invalid JSON format");
       }
@@ -136,8 +150,8 @@ export default function SyncSettingsPage() {
               });
               return handlePostSyncSuccess();
             })
-            .catch((e: any) => {
-              const errorMessage = e?.toString() || "Failed to sync with master device";
+            .catch((e: unknown) => {
+              const errorMessage = toErrorMessage(e, "Failed to sync with master device");
               setError(errorMessage);
               setSyncStatus("error");
               toast({ title: "Sync Failed", description: errorMessage, variant: "destructive" });
@@ -147,7 +161,7 @@ export default function SyncSettingsPage() {
           toast({ title: "QR Scanned", description: "Pairing data captured successfully" });
         }
       } catch (parseError) {
-        logger.error("Parse error: " + parseError);
+        logger.error("Parse error: " + String(parseError));
         setSyncStatus("idle");
         toast({ title: "QR Scanned", description: "Pairing data captured successfully" });
       }
@@ -186,8 +200,8 @@ export default function SyncSettingsPage() {
       } else {
         setScanError("No QR detected. Align code within frame.");
       }
-    } catch (e: any) {
-      const msg = e?.toString() || "Scan failed";
+    } catch (e: unknown) {
+      const msg = toErrorMessage(e, "Scan failed");
       if (!msg.includes("cancel")) {
         setScanError(msg);
       }
@@ -252,10 +266,10 @@ export default function SyncSettingsPage() {
         description: result,
       });
       await refresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({
         title: "Failed to Set as Master",
-        description: e?.toString() || "Unknown error",
+        description: toErrorMessage(e, "Unknown error"),
         variant: "destructive",
       });
     }
@@ -269,10 +283,10 @@ export default function SyncSettingsPage() {
         description: result,
       });
       await refresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast({
         title: "Failed to Remove Master",
-        description: e?.toString() || "Unknown error",
+        description: toErrorMessage(e, "Unknown error"),
         variant: "destructive",
       });
     }
@@ -292,12 +306,12 @@ export default function SyncSettingsPage() {
         title: "QR Code Generated",
         description: "Ready for mobile device to scan",
       });
-    } catch (e: any) {
-      setError(e?.toString() || "Failed to generate QR code");
+    } catch (e: unknown) {
+      setError(toErrorMessage(e, "Failed to generate QR code"));
       setSyncStatus("error");
       toast({
         title: "Generation Failed",
-        description: e?.toString() || "Failed to generate QR code",
+        description: toErrorMessage(e, "Failed to generate QR code"),
         variant: "destructive",
       });
     } finally {
@@ -328,8 +342,8 @@ export default function SyncSettingsPage() {
         description: result,
       });
       await handlePostSyncSuccess();
-    } catch (e: any) {
-      const errorMessage = e?.toString() || "Failed to sync with master device";
+    } catch (e: unknown) {
+      const errorMessage = toErrorMessage(e, "Failed to sync with master device");
       setError(errorMessage);
       setSyncStatus("error");
       toast({
@@ -359,8 +373,8 @@ export default function SyncSettingsPage() {
         description: result,
       });
       await handlePostSyncSuccess();
-    } catch (e: any) {
-      const errorMessage = e?.toString() || "Failed to perform full sync with master device";
+    } catch (e: unknown) {
+      const errorMessage = toErrorMessage(e, "Failed to perform full sync with master device");
       setError(errorMessage);
       setSyncStatus("error");
       toast({
@@ -382,8 +396,8 @@ export default function SyncSettingsPage() {
         title: "Sync Initialized",
         description: result,
       });
-    } catch (e: any) {
-      const errorMessage = e?.toString() || "Failed to initialize sync";
+    } catch (e: unknown) {
+      const errorMessage = toErrorMessage(e, "Failed to initialize sync");
       setError(errorMessage);
       setSyncStatus("error");
       toast({
@@ -402,7 +416,7 @@ export default function SyncSettingsPage() {
           title: "Copied",
           description: "Pairing data copied to clipboard",
         });
-      } catch (e) {
+      } catch (_e) {
         toast({
           title: "Copy Failed",
           description: "Could not copy to clipboard",
@@ -568,13 +582,13 @@ export default function SyncSettingsPage() {
               <div className="flex items-center gap-2">
                 <Icons.Smartphone className="h-5 w-5" />
                 <span className="break-all lg:break-normal">
-                  {status?.device_name || "This Device"}
+                  {status?.device_name ?? "This Device"}
                 </span>
               </div>
               {status?.is_master && <Badge variant="default">Master</Badge>}
             </CardTitle>
             <CardDescription className="break-all">
-              Device ID: {status?.device_id || "Loading..."}
+              Device ID: {status?.device_id ?? "Loading..."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -698,10 +712,10 @@ export default function SyncSettingsPage() {
                   <Button
                     onClick={handleScanQR}
                     variant="outline"
-                    disabled={syncStatus === ("scanning" as any)}
+                    disabled={syncStatus === "scanning"}
                     className="w-full transition-transform duration-200 active:scale-95"
                   >
-                    {syncStatus === ("scanning" as any) ? (
+                    {syncStatus === "scanning" ? (
                       <>
                         <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                         Scanning...
@@ -730,12 +744,12 @@ export default function SyncSettingsPage() {
                         <Input
                           id="host"
                           placeholder="192.168.1.100"
-                          value={parsedPayload?.host || ""}
+                          value={parsedPayload?.host ?? ""}
                           className="w-full"
                           onChange={(e) => {
                             const newPayload = JSON.stringify({
                               host: e.target.value,
-                              port: parsedPayload?.port || 33445,
+                              port: parsedPayload?.port ?? 33445,
                             });
                             updatePairPayload(newPayload);
                           }}
@@ -747,10 +761,11 @@ export default function SyncSettingsPage() {
                           id="port"
                           type="number"
                           placeholder="33445"
-                          value={parsedPayload?.port || ""}
+                          value={parsedPayload?.port ?? ""}
                           onChange={(e) => {
                             const newPayload = JSON.stringify({
-                              host: parsedPayload?.host || "",
+                              host: parsedPayload?.host ?? "",
+                              // Keep logical OR to handle NaN from parseInt
                               port: parseInt(e.target.value) || 33445,
                             });
                             updatePairPayload(newPayload);

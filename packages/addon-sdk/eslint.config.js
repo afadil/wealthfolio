@@ -3,7 +3,7 @@ import { createBaseConfig } from '../../eslint.base.config.js';
 export default [
   // Package-specific ignores
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', 'tsup.config.ts'],
   },
 
   // Use base config with SDK-specific options

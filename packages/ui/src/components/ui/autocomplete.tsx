@@ -7,15 +7,15 @@ import { Icons } from "@/components/ui/icons";
 
 export type Option = Record<"value" | "label", string> & Record<string, string>;
 
-type AutoCompleteProps = {
+interface AutoCompleteProps {
   emptyMessage: string;
   value?: Option;
   onValueChange?: (value: Option) => void;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
-  search: any;
-};
+  search: (query: string) => Promise<{ items?: { symbol: string; name: string }[] }>;
+}
 
 export const AutoComplete = ({
   placeholder,
@@ -29,26 +29,29 @@ export const AutoComplete = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [isOpen, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Option>(value as Option);
-  const [inputValue, setInputValue] = useState<string>(value?.label || "");
+  const [selected, setSelected] = useState<Option | undefined>(value);
+  const [inputValue, setInputValue] = useState<string>(value?.label ?? "");
   const [options, setOptions] = useState<Option[]>([]);
 
   // Function to fetch options from backend
-  const fetchOptions = async (searchValue: string) => {
-    const response = await search(searchValue);
-    const data = response?.items?.map((item: any) => ({
-      label: item.symbol + " - " + item.name,
-      value: item.symbol,
-    }));
+  const fetchOptions = useCallback(
+    async (searchValue: string) => {
+      const response = await search(searchValue);
+      const data = response?.items?.map((item) => ({
+        label: item.symbol + " - " + item.name,
+        value: item.symbol,
+      }));
 
-    setOptions(data || []);
-  };
+      setOptions(data ?? []);
+    },
+    [search],
+  );
 
   useEffect(() => {
     if (inputValue) {
-      fetchOptions(inputValue);
+      void fetchOptions(inputValue);
     }
-  }, [inputValue]);
+  }, [inputValue, fetchOptions]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -106,7 +109,7 @@ export const AutoComplete = ({
     <CommandPrimitive onKeyDown={handleKeyDown}>
       <div className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50">
         <CommandInput
-          ref={inputRef as any}
+          ref={inputRef}
           value={inputValue}
           onValueChange={isLoading ? undefined : setInputValue}
           //onBlur={handleBlur}

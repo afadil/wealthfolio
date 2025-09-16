@@ -25,7 +25,7 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
 
   const { data: deposits, isLoading: isDepositsLoading } = useQuery<DepositsCalculation, Error>({
     queryKey: [QueryKeys.CONTRIBUTION_LIMIT_PROGRESS, accountId, currentYear],
-    queryFn: () => calculateDepositsForLimit(limitForAccount?.id || ""),
+    queryFn: () => calculateDepositsForLimit(limitForAccount?.id ?? ""),
     enabled: !isLimitsLoading,
   });
 
@@ -40,14 +40,14 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
       <Card className="dark:border-primary/20 dark:bg-primary/20 border-none bg-indigo-100 p-6 shadow-sm">
         <div className="flex items-center justify-between text-sm">
           <span>
-            You've contributed{" "}
+            You&apos;ve contributed{" "}
             <span className="font-semibold">
               <PrivacyAmount
-                value={accountDeposit?.convertedAmount || 0}
-                currency={deposits?.baseCurrency || "USD"}
+                value={accountDeposit?.convertedAmount ?? 0}
+                currency={deposits?.baseCurrency ?? "USD"}
               />
             </span>{" "}
-            so far in {currentYear}. There's no contribution limit set for this account.
+            so far in {currentYear}. There&apos;s no contribution limit set for this account.
           </span>
         </div>
       </Card>
@@ -60,8 +60,8 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
         key={limitForAccount.id}
         limit={limitForAccount}
         deposit={accountDeposit}
-        totalDeposits={deposits?.total || 0}
-        baseCurrency={deposits?.baseCurrency || "USD"}
+        totalDeposits={deposits?.total ?? 0}
+        baseCurrency={deposits?.baseCurrency ?? "USD"}
       />
     </div>
   );
@@ -95,9 +95,9 @@ function AccountContributionLimitItem({
           <div className="text-sm">
             {isOverLimit ? (
               <span>
-                You've contributed{" "}
+                You&apos;ve contributed{" "}
                 <span className="font-semibold">
-                  <PrivacyAmount value={deposit?.convertedAmount || 0} currency={baseCurrency} />
+                  <PrivacyAmount value={deposit?.convertedAmount ?? 0} currency={baseCurrency} />
                 </span>{" "}
                 to this account in {limit.contributionYear}. Your total is{" "}
                 <span className="text-destructive font-semibold">
@@ -111,9 +111,9 @@ function AccountContributionLimitItem({
               </span>
             ) : (
               <span>
-                You've contributed{" "}
+                You&apos;ve contributed{" "}
                 <span className="font-semibold">
-                  <PrivacyAmount value={deposit?.convertedAmount || 0} currency={baseCurrency} />
+                  <PrivacyAmount value={deposit?.convertedAmount ?? 0} currency={baseCurrency} />
                 </span>{" "}
                 to this account in {limit.contributionYear}. Your total contribution towards the{" "}
                 <span className="font-semibold">

@@ -56,11 +56,10 @@ export function SavingGoals() {
     isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
   const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
 
-  console.log("goals errors", isErrorGoals);
-
-  console.log("goals errorValuations", errorValuations);
-  console.log("isErrorAllocations", isErrorAllocations);
-  console.log("isErrorAccounts", isErrorAccounts);
+  console.warn("goals errors", isErrorGoals);
+  console.warn("goals errorValuations", errorValuations);
+  console.warn("isErrorAllocations", isErrorAllocations);
+  console.warn("isErrorAccounts", isErrorAccounts);
   if (isLoading) {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">
