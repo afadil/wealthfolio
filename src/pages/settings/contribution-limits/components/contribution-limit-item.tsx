@@ -15,12 +15,12 @@ import {
   formatAmount,
 } from "@wealthfolio/ui";
 
-type ContributionLimitItemProps = {
+interface ContributionLimitItemProps {
   limit: ContributionLimit;
   accounts: Account[];
   onEdit: (limit: ContributionLimit) => void;
   onDelete: (limit: ContributionLimit) => void;
-};
+}
 
 export function ContributionLimitItem({
   limit,

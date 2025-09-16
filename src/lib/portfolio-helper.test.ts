@@ -2,9 +2,9 @@ import { calculateGoalProgress } from "./portfolio-helper";
 import { AccountValuation, Goal, GoalAllocation, SimplePerformanceMetrics } from "./types";
 
 function performanceToValuations(metrics: SimplePerformanceMetrics[]): AccountValuation[] {
-  let base_date = new Date();
+  const base_date = new Date();
   return metrics.map((pm: SimplePerformanceMetrics, idx: number): AccountValuation => {
-    let new_date = new Date();
+    const new_date = new Date();
     new_date.setDate(base_date.getDate() + idx);
     return {
       id: `${pm.accountId}-${idx}`,

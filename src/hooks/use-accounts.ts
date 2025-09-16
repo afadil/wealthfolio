@@ -3,7 +3,7 @@ import { Account } from "@/lib/types";
 import { getAccounts } from "@/commands/account";
 import { QueryKeys } from "@/lib/query-keys";
 
-export function useAccounts(filterActive: boolean = true) {
+export function useAccounts(filterActive = true) {
   const {
     data: fetchedAccounts = [],
     isLoading,

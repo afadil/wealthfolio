@@ -44,7 +44,7 @@ export const DataPreviewStep = ({
       setImportError(
         typeof error === "string" ? error : "An error occurred while processing your import",
       );
-      onError && onError(); // Notify parent of the error
+      onError?.(); // Notify parent of the error
       setConfirmationState("initial");
     },
   });

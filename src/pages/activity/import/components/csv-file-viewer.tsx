@@ -75,7 +75,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
       accessorKey: "isValid",
       header: () => <span className="sr-only">Status</span>,
       cell: ({ row }) => {
-        const isValid = row.getValue("isValid") as boolean;
+        const isValid = row.getValue("isValid");
         const errors = row.original.errors || [];
         const lineNumber = row.original.id + 1;
 
@@ -118,7 +118,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
         );
       },
       filterFn: (row, id, filterValue: string[]) => {
-        const isValid = row.getValue(id) as boolean;
+        const isValid = row.getValue(id);
         const filterBoolean = filterValue[0] === "true";
         return isValid === filterBoolean;
       },
@@ -128,7 +128,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
       accessorKey: "content",
       header: ({ column }) => <DataTableColumnHeader column={column} title="CSV Content" />,
       cell: ({ row }) => {
-        const content = row.getValue("content") as string;
+        const content = row.getValue("content");
         const isHeader = row.original.id === 0;
 
         return (

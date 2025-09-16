@@ -55,7 +55,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
   // TanStack Query automatically fetches store listings on component mount
 
   const filteredAndSortedListings = useMemo(() => {
-    let filtered = storeListings.filter((listing) => {
+    const filtered = storeListings.filter((listing) => {
       // Only show active, deprecated, and coming-soon addons (exclude inactive)
       if (!isAddonDisplayable(listing)) return false;
 
@@ -65,15 +65,14 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         listing.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (listing.tags &&
-          listing.tags.some((tag: string) =>
+        (listing.tags?.some((tag: string) =>
             tag.toLowerCase().includes(searchQuery.toLowerCase()),
           ));
 
       if (!matchesSearch) return false;
 
       // Tag filter
-      if (selectedTag && (!listing.tags || !listing.tags.includes(selectedTag))) {
+      if (selectedTag && (!listing.tags?.includes(selectedTag))) {
         return false;
       }
 

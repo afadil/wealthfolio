@@ -1,17 +1,17 @@
-import { Table } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Icons } from "@/components/ui/icons";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Icons } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
+import { Table } from "@tanstack/react-table";
 
-import { DataTableFacetedFilter } from "./data-table-faceted-filter";
-import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 import { useEffect, useState } from "react";
+import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
+import { DataTableFacetedFilter } from "./data-table-faceted-filter";
 
 interface ColumnMeta {
   label?: string;
@@ -20,7 +20,7 @@ interface ColumnMeta {
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
   searchBy?: string;
-  filters?: DataTableFacetedFilterProps<TData, any>[];
+  filters?: DataTableFacetedFilterProps<TData, unknown>[];
   showColumnToggle?: boolean;
 }
 
@@ -45,10 +45,10 @@ export function DataTableToolbar<TData>({
           />
         )}
         {filters?.map((filter) => (
-          <DataTableFacetedFilter<TData, any>
+          <DataTableFacetedFilter<TData, unknown>
             id={filter.id}
             key={filter.id}
-            column={table.getColumn(filter.id!)}
+            column={table.getColumn(filter.id)}
             title={filter.title}
             options={filter.options}
           />
@@ -102,12 +102,12 @@ export function DataTableToolbar<TData>({
 function SearchInput({
   value: initialValue,
   onChange,
-  debounceTime = 800,
+  _debounceTime = 800,
   ...props
 }: {
   value: string | number;
   onChange: (value: string | number) => void;
-  debounceTime?: number;
+  _debounceTime?: number;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange">) {
   const [value, setValue] = useState(initialValue);
 
@@ -115,7 +115,7 @@ function SearchInput({
     setValue(initialValue);
   }, [initialValue]);
 
-  const handleKeyDown = (e: any) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       onChange(value); // Invoke onChange with the current value
     }

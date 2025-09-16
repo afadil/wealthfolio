@@ -42,7 +42,7 @@ const hasFieldError = (activity: ActivityImport, fieldName: string): boolean => 
 
 // Helper function to get error message for a field
 const getFieldErrorMessage = (activity: ActivityImport, fieldName: string): string[] => {
-  if (activity.errors && activity.errors[fieldName]) {
+  if (activity.errors?.[fieldName]) {
     return activity.errors[fieldName];
   }
   return [];
@@ -108,7 +108,7 @@ export const ImportPreviewTable = ({
         }
         return result;
       },
-      [] as Array<{ label: string; value: string }>,
+      [] as { label: string; value: string }[],
     );
   }, [activities]);
 
@@ -268,7 +268,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       accessorKey: "isValid",
       header: () => <span className="sr-only">Status</span>,
       cell: ({ row }) => {
-        const isValid = row.getValue("isValid") as boolean;
+        const isValid = row.getValue("isValid");
         const errors = row.original.errors || {};
         const lineNumber = row.original.lineNumber;
 
@@ -318,13 +318,13 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         );
       },
       filterFn: (row, id, filterValue: string[]) => {
-        const isValid = row.getValue(id) as boolean;
+        const isValid = row.getValue(id);
         const filterBoolean = filterValue[0] === "true";
         return isValid === filterBoolean;
       },
       sortingFn: (rowA, rowB, id) => {
-        const statusA = rowA.getValue(id) as boolean;
-        const statusB = rowB.getValue(id) as boolean;
+        const statusA = rowA.getValue(id);
+        const statusB = rowB.getValue(id);
         return statusA === statusB ? 0 : statusA ? -1 : 1;
       },
     },
@@ -333,7 +333,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       accessorKey: "account",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
       cell: ({ row }) => {
-        const accountId = row.original.accountId as string;
+        const accountId = row.original.accountId;
         const hasError = hasFieldError(row.original, "accountId");
         const errorMessages = getFieldErrorMessage(row.original, "accountId");
         const account = accounts.find((acc) => acc.id === accountId);
@@ -371,7 +371,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       accessorKey: "activityType",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
       cell: ({ row }) => {
-        const type = row.getValue("activityType") as string;
+        const type = row.getValue("activityType");
         const hasError = hasFieldError(row.original, "activityType");
         const errorMessages = getFieldErrorMessage(row.original, "activityType");
         return (
@@ -391,7 +391,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const hasError = hasFieldError(row.original, "symbol");
         const errorMessages = getFieldErrorMessage(row.original, "symbol");
-        const symbol = row.getValue("symbol") as String;
+        const symbol = row.getValue("symbol");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
@@ -406,8 +406,8 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         );
       },
       sortingFn: (rowA, rowB, id) => {
-        const profileA = rowA.getValue(id) as string;
-        const profileB = rowB.getValue(id) as string;
+        const profileA = rowA.getValue(id);
+        const profileB = rowB.getValue(id);
         return profileA.localeCompare(profileB);
       },
       enableHiding: false,
@@ -420,8 +420,8 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue("activityType") as string;
-        const quantity = row.getValue("quantity") as number;
+        const activityType = row.getValue("activityType");
+        const quantity = row.getValue("quantity");
         const hasError = hasFieldError(row.original, "quantity");
         const errorMessages = getFieldErrorMessage(row.original, "quantity");
 
@@ -443,9 +443,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Price" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue("activityType") as string;
-        const unitPrice = row.getValue("unitPrice") as number;
-        const currency = (row.getValue("currency") as string) || "USD";
+        const activityType = row.getValue("activityType");
+        const unitPrice = row.getValue("unitPrice");
+        const currency = (row.getValue("currency")) || "USD";
         const hasError = hasFieldError(row.original, "unitPrice");
         const errorMessages = getFieldErrorMessage(row.original, "unitPrice");
 
@@ -467,9 +467,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue("activityType") as string;
-        const amount = row.getValue("amount") as number;
-        const currency = (row.getValue("currency") as string) || "USD";
+        const activityType = row.getValue("activityType");
+        const amount = row.getValue("amount");
+        const currency = (row.getValue("currency")) || "USD";
 
         // Check if amount field has errors directly
         const hasError = hasFieldError(row.original, "amount");
@@ -493,9 +493,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
       ),
       cell: ({ row }) => {
-        const activityType = row.getValue("activityType") as string;
-        const fee = row.getValue("fee") as number;
-        const currency = (row.getValue("currency") as string) || "USD";
+        const activityType = row.getValue("activityType");
+        const fee = row.getValue("fee");
+        const currency = (row.getValue("currency")) || "USD";
         const hasError = hasFieldError(row.original, "fee");
         const errorMessages = getFieldErrorMessage(row.original, "fee");
 
@@ -516,7 +516,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const hasError = hasFieldError(row.original, "currency");
         const errorMessages = getFieldErrorMessage(row.original, "currency");
-        const currency = (row.getValue("currency") as string) || "-";
+        const currency = (row.getValue("currency")) || "-";
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>

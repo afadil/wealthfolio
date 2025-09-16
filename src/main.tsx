@@ -25,7 +25,7 @@ if (import.meta.env.DEV) {
 // Load addons after context is injected
 loadAllAddons();
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,

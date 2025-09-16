@@ -19,7 +19,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
   onSubmit,
 }) => {
   const [allocations, setAllocations] = useState<GoalAllocation[]>(existingAllocations || []);
-  const [totalAllocations, setTotalAllocations] = useState<{ [accountId: string]: number }>({});
+  const [totalAllocations, setTotalAllocations] = useState<Record<string, number>>({});
   const [isExceeding, setIsExceeding] = useState<boolean>(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
         }, 0);
         return acc;
       },
-      {} as { [accountId: string]: number },
+      {} as Record<string, number>,
     );
 
     setTotalAllocations(totals);

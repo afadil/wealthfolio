@@ -12,7 +12,7 @@ export function formatData(data: any, format: ExportedFileFormat): string {
 
 export function convertToCSV(data: any) {
   if (!data || data.length === 0) return "";
-  let headers = Object.keys(data[0]);
+  const headers = Object.keys(data[0]);
   // Check if 'assetID' is present and replace it with 'symbol'
   const assetIDIndex = headers.indexOf("assetId");
   if (assetIDIndex !== -1) {

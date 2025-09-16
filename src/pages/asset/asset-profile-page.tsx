@@ -26,8 +26,8 @@ import { getAssetProfile } from "@/commands/market-data";
 
 interface AssetProfileFormData {
   name: string;
-  sectors: Array<Sector>;
-  countries: Array<Country>;
+  sectors: Sector[];
+  countries: Country[];
   assetClass: string;
   assetSubClass: string;
   notes: string;
@@ -256,7 +256,7 @@ export const AssetProfilePage = () => {
           // Default to non-manual source, disable changing it as there's no profile context
           isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
           onSaveQuote={(quote: Quote) => {
-            let updatedQuote = { ...quote };
+            const updatedQuote = { ...quote };
             // Generate id if missing
             if (!updatedQuote.id) {
               const datePart = new Date(updatedQuote.timestamp)
@@ -596,7 +596,7 @@ export const AssetProfilePage = () => {
             data={quoteHistory ?? []}
             isManualDataSource={formData.dataSource === DataSource.MANUAL}
             onSaveQuote={(quote: Quote) => {
-              let updatedQuote = { ...quote };
+              const updatedQuote = { ...quote };
               // Generate id if missing
               if (!updatedQuote.id) {
                 const datePart = new Date(updatedQuote.timestamp)
