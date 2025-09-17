@@ -7,6 +7,9 @@ import { ErrorBoundary } from "@wealthfolio/ui";
 import { getDynamicNavItems, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import { useState, useEffect } from "react";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
+import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
+import { MobileNavigationContainer } from "@/components/mobile-navigation/mobile-navigation-container";
+import { cn } from "@/lib/utils";
 
 const staticNavigation: NavigationProps = {
   primary: [
@@ -49,6 +52,9 @@ const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
   const [dynamicItems, setDynamicItems] = useState<NavigationProps["primary"]>([]);
+  const { isMobile: isMobilePlatform } = usePlatform();
+  const isMobileViewport = useIsMobileViewport();
+  const shouldUseMobileNavigation = isMobilePlatform || isMobileViewport;
 
   // Setup navigation event listener for menu navigation
   useNavigationEventListener();
@@ -91,13 +97,28 @@ const AppLayout = () => {
       <div className="scan-hide-target">
         <SidebarNav navigation={navigation} />
       </div>
-      <div className="relative flex h-screen w-full max-w-full overflow-auto">
+      <div
+        className={cn(
+          "relative flex h-screen w-full max-w-full",
+          shouldUseMobileNavigation ? "overflow-hidden" : "overflow-auto",
+        )}
+      >
         <ErrorBoundary>
-          <main className="flex w-full max-w-full flex-1 flex-col overflow-x-hidden">
+          <main className="flex w-full max-w-full flex-1 flex-col overflow-hidden">
             <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
-            <div className="momentum-scroll w-full max-w-full flex-1 overflow-auto scroll-smooth pb-16 md:pb-0">
-              <Outlet />
-            </div>
+            {shouldUseMobileNavigation ? (
+              <div className="flex w-full flex-1">
+                <MobileNavigationContainer>
+                  <div className="momentum-scroll w-full max-w-full flex-1 overflow-auto scroll-smooth pb-20 md:pb-0">
+                    <Outlet />
+                  </div>
+                </MobileNavigationContainer>
+              </div>
+            ) : (
+              <div className="momentum-scroll w-full max-w-full flex-1 overflow-auto scroll-smooth pb-16 md:pb-0">
+                <Outlet />
+              </div>
+            )}
           </main>
         </ErrorBoundary>
       </div>
