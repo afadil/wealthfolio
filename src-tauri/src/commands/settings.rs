@@ -54,23 +54,32 @@ pub async fn update_settings(
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
     if let Some(menu_visible) = settings_update.menu_bar_visible {
-        if menu_visible {
-            // Create and set the menu
-            match crate::menu::create_menu(&handle) {
-                Ok(menu) => {
-                    if let Err(e) = handle.set_menu(menu) {
-                        debug!("Failed to set menu: {}", e);
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            if menu_visible {
+                // Create and set the menu on desktop platforms
+                match crate::menu::create_menu(&handle) {
+                    Ok(menu) => {
+                        if let Err(e) = handle.set_menu(menu) {
+                            debug!("Failed to set menu: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        debug!("Failed to create menu: {}", e);
                     }
                 }
-                Err(e) => {
-                    debug!("Failed to create menu: {}", e);
+            } else {
+                // Remove the menu entirely by setting it to None
+                if let Err(e) = handle.remove_menu() {
+                    debug!("Failed to remove menu: {}", e);
                 }
             }
-        } else {
-            // Remove the menu entirely by setting it to None
-            if let Err(e) = handle.remove_menu() {
-                debug!("Failed to remove menu: {}", e);
-            }
+        }
+
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        {
+            let _ = menu_visible;
+            debug!("Menu bar visibility toggling is not supported on mobile runtimes.");
         }
     }
 

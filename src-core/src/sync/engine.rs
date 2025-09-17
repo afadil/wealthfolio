@@ -635,9 +635,6 @@ impl SyncEngine {
                                 break;
                             }
                         }
-                        Ok(WireMessage::Pull { .. }) => {
-                            // Peer shouldn't Pull in this direction during our pull phase.
-                        }
                         Ok(WireMessage::Ack { .. }) => { /* ignore */ }
                         Err(e) => {
                             return Err(anyhow::anyhow!(
@@ -655,10 +652,14 @@ impl SyncEngine {
             }
         }
 
-        if !(received_accounts && received_assets && received_activities) {
+        if !(received_accounts && received_assets && received_activities
+            && received_activity_import_profiles && received_app_settings
+            && received_contribution_limits && received_goals && received_goals_allocation) {
             info!(
-                "Peer {} did not send full batches (acc: {}, assets: {}, acts: {}); ending early.",
-                peer.name, received_accounts, received_assets, received_activities
+                "Peer {} did not send full batches (acc: {}, assets: {}, acts: {}, profiles: {}, settings: {}, limits: {}, goals: {}, alloc: {}); ending early.",
+                peer.name, received_accounts, received_assets, received_activities,
+                received_activity_import_profiles, received_app_settings,
+                received_contribution_limits, received_goals, received_goals_allocation
             );
             return Ok(());
         }
