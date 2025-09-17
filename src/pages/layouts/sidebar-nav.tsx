@@ -27,6 +27,28 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isPathActive = (pathname: string, href: string) => {
+    if (!href) {
+      return false;
+    }
+
+    const ensureLeadingSlash = href.startsWith("/") ? href : `/${href}`;
+    const normalize = (value: string) => {
+      if (value.length > 1 && value.endsWith("/")) {
+        return value.slice(0, -1);
+      }
+      return value;
+    };
+
+    const normalizedHref = normalize(ensureLeadingSlash);
+    const normalizedPath = normalize(pathname);
+
+    if (normalizedHref === "/") {
+      return normalizedPath === "/";
+    }
+
+    return normalizedPath === normalizedHref || normalizedPath.startsWith(`${normalizedHref}/`);
+  };
   const MobileBottomBar = () => {
     const primaryItems = navigation?.primary || [];
     const secondaryItems = navigation?.secondary || [];
@@ -37,37 +59,44 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     const hasMoreItems = moreItems.length > 0;
 
     return (
-      <div className="bg-background/95 supports-backdrop-filter:bg-background/60 pb-safe fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur md:hidden">
-        <nav className="flex h-16 items-center px-2">
-          {directItems.map((item) => (
-            <Link
-              key={item.title}
-              to={item.href}
-              className={cn(
-                "mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center px-1 py-2.5 transition-all duration-200 active:scale-95",
-                location.pathname.includes(item.href)
-                  ? "text-foreground bg-success/10 scale-105"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105",
-              )}
-            >
-              <div
+      <div className="bg-background/95 supports-backdrop-filter:bg-background/60 safe-area-inset-bottom fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur md:hidden">
+        <nav className="touch-manipulation flex h-16 items-center px-2" aria-label="Primary navigation">
+          {directItems.map((item) => {
+            const isActive = isPathActive(location.pathname, item.href);
+
+            return (
+              <Link
+                key={item.title}
+                to={item.href}
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center transition-transform duration-200",
-                  location.pathname.includes(item.href) && "scale-110",
+                  "mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center px-1 py-2.5 transition-all duration-200 active:scale-95",
+                  isActive
+                    ? "text-foreground bg-success/10 scale-105"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105",
                 )}
+                aria-current={isActive ? "page" : undefined}
+                aria-label={item.title}
               >
-                {item.icon ?? <Icons.ArrowRight className="h-5 w-5" aria-hidden="true" />}
-              </div>
-              <span
-                className={cn(
-                  "mt-1 truncate text-[10px] font-medium transition-all duration-200",
-                  location.pathname.includes(item.href) && "font-semibold",
-                )}
-              >
-                {item.title}
-              </span>
-            </Link>
-          ))}
+                <span
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center transition-transform duration-200",
+                    isActive && "scale-110",
+                  )}
+                  aria-hidden="true"
+                >
+                  {item.icon ?? <Icons.ArrowRight className="h-5 w-5" />}
+                </span>
+                <span
+                  className={cn(
+                    "mt-1 truncate text-[10px] font-medium transition-all duration-200",
+                    isActive && "font-semibold",
+                  )}
+                >
+                  {item.title}
+                </span>
+              </Link>
+            );
+          })}
 
           {hasMoreItems && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -99,10 +128,11 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
                       onClick={() => setMobileMenuOpen(false)}
                       className={cn(
                         "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm shadow-md transition-all duration-200 active:scale-95",
-                        location.pathname.includes(item.href)
+                        isPathActive(location.pathname, item.href)
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted/60 text-foreground/80 hover:bg-muted",
                       )}
+                      aria-current={isPathActive(location.pathname, item.href) ? "page" : undefined}
                     >
                       <span className="flex h-5 w-5 items-center justify-center">
                         {item.icon ?? <Icons.ArrowRight className="h-4 w-4" aria-hidden="true" />}
@@ -121,23 +151,26 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
               to={allItems[3].href}
               className={cn(
                 "mx-1 flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-xs transition-all duration-200 active:scale-95",
-                location.pathname.includes(allItems[3].href)
+                isPathActive(location.pathname, allItems[3].href)
                   ? "text-foreground bg-muted scale-105 shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-105",
               )}
+              aria-current={isPathActive(location.pathname, allItems[3].href) ? "page" : undefined}
+              aria-label={allItems[3].title}
             >
-              <div
+              <span
                 className={cn(
                   "flex h-6 w-6 items-center justify-center transition-transform duration-200",
-                  location.pathname.includes(allItems[3].href) && "scale-110",
+                  isPathActive(location.pathname, allItems[3].href) && "scale-110",
                 )}
+                aria-hidden="true"
               >
-                {allItems[3].icon ?? <Icons.ArrowRight className="h-5 w-5" aria-hidden="true" />}
-              </div>
+                {allItems[3].icon ?? <Icons.ArrowRight className="h-5 w-5" />}
+              </span>
               <span
                 className={cn(
                   "mt-1 truncate text-[10px] font-medium transition-all duration-200",
-                  location.pathname.includes(allItems[3].href) && "font-semibold",
+                  isPathActive(location.pathname, allItems[3].href) && "font-semibold",
                 )}
               >
                 {allItems[3].title}
@@ -235,10 +268,11 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
     className?: string;
     onClick?: () => void;
   }) {
+    const isActive = isPathActive(location.pathname, item.href);
     return (
       <Button
         key={item.title}
-        variant={location.pathname.includes(item.href) ? "secondary" : "ghost"}
+        variant={isActive ? "secondary" : "ghost"}
         asChild
         className={cn(
           "text-foreground mb-1 h-12 rounded-md transition-all duration-300 [&_svg]:size-5!",
@@ -246,8 +280,16 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
           className,
         )}
       >
-        <Link key={item.title} to={item.href} title={item.title} {...props}>
-          {item.icon ?? <Icons.ArrowRight className="h-5 w-5" aria-hidden="true" />}
+        <Link
+          key={item.title}
+          to={item.href}
+          title={item.title}
+          aria-current={isActive ? "page" : undefined}
+          {...props}
+        >
+          <span aria-hidden="true">
+            {item.icon ?? <Icons.ArrowRight className="h-5 w-5" />}
+          </span>
 
           <span
             className={cn({
