@@ -1,6 +1,4 @@
-import React from "react";
-import { format, parseISO } from "date-fns";
-import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartLegend,
@@ -10,8 +8,10 @@ import {
 } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatAmount } from "@wealthfolio/ui";
+import { format, parseISO } from "date-fns";
+import React from "react";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
@@ -134,7 +134,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                   />
                 }
               />
-              <ChartLegend content={<ChartLegendContent />} />
+              <ChartLegend content={<ChartLegendContent payload={[]} />} />
               <Bar
                 yAxisId="left"
                 dataKey="income"
