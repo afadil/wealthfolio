@@ -1,19 +1,19 @@
-import { GainAmount, GainPercent, IntervalSelector } from "@wealthfolio/ui";
 import { HistoryChart } from "@/components/history-chart";
-import Balance from "./balance";
-import { Skeleton } from "@/components/ui/skeleton";
-import SavingGoals from "./goals";
-import { useMemo, useState } from "react";
 import { PrivacyToggle } from "@/components/privacy-toggle";
-import { AccountsSummary } from "./accounts-summary";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { useValuationHistory } from "@/hooks/use-valuation-history";
-import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
-import { DateRange, TimePeriod } from "@/lib/types";
-import { subMonths } from "date-fns";
-import { calculatePerformanceMetrics } from "@/lib/utils";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
+import { useValuationHistory } from "@/hooks/use-valuation-history";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { DateRange, TimePeriod } from "@/lib/types";
+import { calculatePerformanceMetrics } from "@/lib/utils";
+import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
+import { GainAmount, GainPercent, IntervalSelector } from "@wealthfolio/ui";
+import { subMonths } from "date-fns";
+import { useMemo, useState } from "react";
+import { AccountsSummary } from "./accounts-summary";
+import Balance from "./balance";
+import SavingGoals from "./goals";
 
 function DashboardSkeleton() {
   return (
@@ -95,9 +95,9 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
-      <div className="flex px-4 py-2 md:px-6 lg:px-10">
+      <div className="flex px-4 md:px-6 lg:px-10">
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-          <div className="flex items-start gap-2 pt-10">
+          <div className="flex items-start gap-2">
             <div>
               <div className="flex items-center gap-3">
                 <Balance
