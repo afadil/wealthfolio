@@ -4,7 +4,7 @@ import { ErrorBoundary } from "@wealthfolio/ui";
 
 const OnboardingLayout = () => {
   return (
-    <div className="bg-background flex min-h-screen">
+    <div className="bg-background scan-hide-target flex min-h-screen">
       <div className="relative flex h-screen w-full overflow-auto">
         <ErrorBoundary>
           <main className="flex w-full flex-1 flex-col">
