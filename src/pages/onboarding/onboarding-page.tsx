@@ -61,7 +61,7 @@ const OnboardingPage = () => {
   };
 
   return (
-    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center">
+    <section className="scan-hide-target grid min-h-screen grid-rows-[auto_1fr] justify-items-center">
       <img
         alt="Wealthfolio Illustration"
         className="align-self-end mx-auto h-20 w-20 md:h-32 md:w-32 lg:h-40 lg:w-40"
