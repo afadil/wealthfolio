@@ -130,7 +130,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
                 />
               }
             />
-            <ChartLegend content={<ChartLegendContent />} />
+            <ChartLegend content={<ChartLegendContent payload={[]} />} />
             {data.map((series, seriesIndex) => (
               <Line
                 key={series.id}

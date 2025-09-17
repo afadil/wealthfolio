@@ -1,4 +1,5 @@
 import type React from "react";
+import type { ComponentProps } from "react";
 import { Cell, Pie, PieChart, Sector } from "recharts";
 import type { NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
@@ -173,6 +174,32 @@ export const DonutChart: React.FC<DonutChartProps> = ({
     );
   };
 
+  type PieComponentProps = ComponentProps<typeof Pie>;
+
+  const pieProps = {
+    data,
+    cy: "80%",
+    innerRadius: "110%",
+    outerRadius: "140%",
+    paddingAngle: 4,
+    cornerRadius: 6,
+    animationDuration: 100,
+    dataKey: "value",
+    nameKey: "name",
+    activeIndex: activeIndex !== -1 ? activeIndex : undefined,
+    activeShape: renderActiveShape,
+    inactiveShape: renderInactiveShape,
+    onMouseEnter: onPieEnter,
+    onMouseLeave: onPieLeave,
+    onClick: (_event, index) => {
+      if (onSectionClick && data[index]) {
+        onSectionClick(data[index], index);
+      }
+    },
+    startAngle,
+    endAngle,
+  } as PieComponentProps;
+
   return (
     <ChartContainer config={{}} className="h-[160px] w-full p-0">
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
@@ -183,29 +210,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
             position={{ y: 0 }}
           />
         )}
-        <Pie
-          data={data}
-          cy="80%"
-          innerRadius="110%"
-          outerRadius="140%"
-          paddingAngle={4}
-          cornerRadius={6}
-          animationDuration={100}
-          dataKey="value"
-          nameKey="name"
-          activeIndex={activeIndex !== -1 ? activeIndex : undefined}
-          activeShape={renderActiveShape}
-          inactiveShape={renderInactiveShape}
-          onMouseEnter={onPieEnter}
-          onMouseLeave={onPieLeave}
-          onClick={(_event, index) => {
-            if (onSectionClick && data[index]) {
-              onSectionClick(data[index], index);
-            }
-          }}
-          startAngle={startAngle}
-          endAngle={endAngle}
-        >
+        <Pie {...pieProps}>
           {data.map((_, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
