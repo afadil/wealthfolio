@@ -85,6 +85,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.544.0",
+    "motion": "^12.23.15",
     "react-aria-components": "^1.12.2",
     "react-day-picker": "^9.10.0",
     "react-dropzone": "^14.3.8",

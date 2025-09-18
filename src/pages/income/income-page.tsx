@@ -1,22 +1,19 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ApplicationHeader } from "@/components/header";
-import { ApplicationShell } from "@wealthfolio/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PieChart, Pie, Cell } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Icons } from "@/components/ui/icons";
 import { getIncomeSummary } from "@/commands/portfolio";
-import type { IncomeSummary } from "@/lib/types";
-import { QueryKeys } from "@/lib/query-keys";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { GainPercent } from "@wealthfolio/ui";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { ApplicationHeader } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
-import { PrivacyAmount } from "@wealthfolio/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { Icons } from "@/components/ui/icons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { AmountDisplay } from "@wealthfolio/ui";
+import { QueryKeys } from "@/lib/query-keys";
+import type { IncomeSummary } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { AmountDisplay, ApplicationShell, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
+import React, { useState } from "react";
+import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
 
 const periods: { code: "TOTAL" | "YTD" | "LAST_YEAR"; label: string }[] = [
@@ -71,7 +68,7 @@ export default function IncomePage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <ApplicationShell className="p-6">
+      <ApplicationShell>
         <ApplicationHeader heading="Investment Income">
           <div className="flex items-center space-x-2">
             <IncomePeriodSelector

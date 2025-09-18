@@ -1,87 +1,24 @@
-import { Icons } from "@/components/ui/icons";
-import { Toaster } from "@/components/ui/toaster";
-import { Outlet, Navigate, useLocation } from "react-router-dom";
-import { type NavigationProps, SidebarNav } from "./sidebar-nav";
-import { useSettings } from "@/hooks/use-settings";
-import { ErrorBoundary } from "@wealthfolio/ui";
-import { getDynamicNavItems, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
-import { useState, useEffect } from "react";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
 import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
-import { MobileNavigationContainer } from "@/components/mobile-navigation/mobile-navigation-container";
+import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
-
-const staticNavigation: NavigationProps = {
-  primary: [
-    {
-      icon: <Icons.Dashboard className="h-5 w-5" />,
-      title: "Dashboard",
-      href: "/dashboard",
-    },
-    {
-      icon: <Icons.Holdings className="h-5 w-5" />,
-      title: "Holdings",
-      href: "/holdings",
-    },
-    {
-      icon: <Icons.Performance className="h-5 w-5" />,
-      title: "Performance",
-      href: "/performance",
-    },
-    {
-      icon: <Icons.Income className="h-5 w-5" />,
-      title: "Income",
-      href: "/income",
-    },
-    {
-      icon: <Icons.Activity className="h-5 w-5" />,
-      title: "Activities",
-      href: "/activities",
-    },
-  ],
-  secondary: [
-    {
-      icon: <Icons.Settings className="h-5 w-5" />,
-      title: "Settings",
-      href: "/settings",
-    },
-  ],
-};
+import { MobileNavigationContainer } from "@/pages/layouts/mobile-navigation-container";
+import { ErrorBoundary, Toaster } from "@wealthfolio/ui";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useNavigation } from "./navigation/app-navigation";
+import { AppSidebar } from "./navigation/app-sidebar";
+import { MobileNavBar } from "./navigation/mobile-navbar";
 
 const AppLayout = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
-  const [dynamicItems, setDynamicItems] = useState<NavigationProps["primary"]>([]);
+  const navigation = useNavigation();
   const { isMobile: isMobilePlatform } = usePlatform();
   const isMobileViewport = useIsMobileViewport();
   const shouldUseMobileNavigation = isMobilePlatform || isMobileViewport;
 
   // Setup navigation event listener for menu navigation
   useNavigationEventListener();
-
-  // Subscribe to navigation updates from addons
-  useEffect(() => {
-    const updateDynamicItems = () => {
-      const itemsFromRuntime = getDynamicNavItems();
-      setDynamicItems(itemsFromRuntime);
-    };
-
-    // Initial load
-    updateDynamicItems();
-
-    // Subscribe to updates
-    const unsubscribe = subscribeToNavigationUpdates(updateDynamicItems);
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // Combine static and dynamic navigation items
-  const navigation: NavigationProps = {
-    primary: [...staticNavigation.primary, ...dynamicItems],
-    secondary: staticNavigation.secondary,
-  };
 
   if (isSettingsLoading) {
     return null;
@@ -93,9 +30,9 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="app-shell bg-background flex min-h-screen max-w-full overflow-x-hidden">
+    <div className="app-shell bg-background text-foreground flex min-h-screen max-w-full overflow-x-hidden pt-6 lg:pt-2">
       <div className="scan-hide-target">
-        <SidebarNav navigation={navigation} />
+        <AppSidebar navigation={navigation} />
       </div>
       <div
         className={cn(
@@ -118,6 +55,7 @@ const AppLayout = () => {
           </main>
         </ErrorBoundary>
       </div>
+      {shouldUseMobileNavigation && <MobileNavBar navigation={navigation} />}
       <Toaster />
       {/* <TailwindIndicator /> */}
     </div>

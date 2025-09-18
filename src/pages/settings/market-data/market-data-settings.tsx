@@ -1,32 +1,32 @@
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { SettingsHeader } from "./header";
 import { Icons } from "@/components/ui/icons";
+import { Separator } from "@/components/ui/separator";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { SettingsHeader } from "../header";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import {
-  useMarketDataProviderSettings,
-  useUpdateMarketDataProviderSettings,
-  useSetApiKey,
-  useDeleteApiKey,
-} from "./use-market-data-settings";
 import { MarketDataProviderSetting } from "@/commands/market-data";
-import { cn } from "@/lib/utils";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getSecret } from "@/commands/secrets";
-import { QueryKeys } from "@/lib/query-keys";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import {
   useRecalculatePortfolioMutation,
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
+import { QueryKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 import { ActionConfirm } from "@wealthfolio/ui";
+import {
+  useDeleteApiKey,
+  useMarketDataProviderSettings,
+  useSetApiKey,
+  useUpdateMarketDataProviderSettings,
+} from "./use-market-data-settings";
 
 const useApiKeyStatus = (providerId: string) => {
   const queryClient = useQueryClient();

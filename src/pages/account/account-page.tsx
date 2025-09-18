@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
 import { ApplicationHeader } from "@/components/header";
+import { HistoryChart } from "@/components/history-chart";
+import {} from "@/components/ui/card";
 import {
   ApplicationShell,
   Card,
@@ -11,21 +12,20 @@ import {
   IntervalSelector,
   PrivacyAmount,
 } from "@wealthfolio/ui";
-import { HistoryChart } from "@/components/history-chart";
-import {} from "@/components/ui/card";
+import { useMemo, useState } from "react";
 
-import { useParams } from "react-router-dom";
-import AccountMetrics from "./account-metrics";
-import AccountHoldings from "./account-holdings";
-import { AccountValuation, DateRange, TrackedItem, TimePeriod } from "@/lib/types";
-import { useAccounts } from "@/hooks/use-accounts";
-import { AccountContributionLimit } from "./account-contribution-limit";
 import { PrivacyToggle } from "@/components/privacy-toggle";
+import { useAccounts } from "@/hooks/use-accounts";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
+import { AccountValuation, DateRange, TimePeriod, TrackedItem } from "@/lib/types";
+import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { subMonths } from "date-fns";
-import { calculatePerformanceMetrics } from "@/lib/utils";
+import { useParams } from "react-router-dom";
+import { AccountContributionLimit } from "./account-contribution-limit";
+import AccountHoldings from "./account-holdings";
+import AccountMetrics from "./account-metrics";
 
 interface HistoryChartData {
   date: string;
@@ -115,7 +115,7 @@ const AccountPage = () => {
   }, [accountPerformance, selectedIntervalCode, frontendSimpleReturn]);
 
   return (
-    <ApplicationShell className="p-6">
+    <ApplicationShell>
       <ApplicationHeader
         heading={account?.name ?? "Account"}
         headingPrefix={account?.group ?? account?.currency}

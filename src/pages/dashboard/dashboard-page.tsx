@@ -93,9 +93,9 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden">
+    <div className="flex min-h-screen flex-col overflow-x-hidden pt-6 lg:pt-2">
       <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
-      <div className="flex px-4 md:px-6 lg:px-10">
+      <div className="flex px-6 lg:px-10">
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
           <div className="flex items-start gap-2">
             <div>
@@ -110,19 +110,19 @@ export default function DashboardPage() {
               </div>
               <div className="text-md flex space-x-3">
                 <GainAmount
-                  className="text-md font-light"
+                  className="lg:text-md text-sm font-light"
                   value={gainLossAmount}
                   currency={baseCurrency}
                   displayCurrency={false}
                 ></GainAmount>
                 <div className="border-secondary my-1 border-r pr-2" />
                 <GainPercent
-                  className="text-md font-light"
+                  className="lg:text-md text-sm font-light"
                   value={simpleReturn}
                   animated={true}
                 ></GainPercent>
                 {selectedIntervalDescription && (
-                  <span className="text-md text-muted-foreground ml-1 font-light">
+                  <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
                     {selectedIntervalDescription}
                   </span>
                 )}

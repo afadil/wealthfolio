@@ -1,19 +1,17 @@
+import { getAccounts } from "@/commands/account";
 import { ApplicationHeader } from "@/components/header";
-import { Icons } from "@/components/ui/icons";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { QueryKeys } from "@/lib/query-keys";
+import { Account, ActivityDetails } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { ApplicationShell, Button, Icons, Separator } from "@wealthfolio/ui";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Account, ActivityDetails } from "@/lib/types";
-import { getAccounts } from "@/commands/account";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
-import { QueryKeys } from "@/lib/query-keys";
-import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { ActivityForm } from "./components/activity-form";
-import EditableActivityTable from "./components/editable-activity-table";
 import ActivityTable from "./components/activity-table";
+import EditableActivityTable from "./components/editable-activity-table";
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
+import { useActivityMutations } from "./hooks/use-activity-mutations";
 
 const ActivityPage = () => {
   const [showForm, setShowForm] = useState(false);
@@ -53,7 +51,7 @@ const ActivityPage = () => {
   }, []);
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <ApplicationShell>
       <div className="shrink-0">
         <ApplicationHeader heading="Activity">
           <div className="flex flex-wrap items-center gap-2">
@@ -125,7 +123,7 @@ const ActivityPage = () => {
           setShowBulkHoldingsForm(false);
         }}
       />
-    </div>
+    </ApplicationShell>
   );
 };
 
