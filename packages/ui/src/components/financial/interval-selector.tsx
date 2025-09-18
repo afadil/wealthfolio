@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { Icons } from "@/components/ui/icons";
-import { subWeeks, subMonths, subYears, startOfYear } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { startOfYear, subMonths, subWeeks, subYears } from "date-fns";
+import { motion } from "framer-motion";
+import React, { useCallback, useState } from "react";
 
 export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
 export interface DateRange {
@@ -138,48 +138,32 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       >
         <Button
           className={cn(
-            "relative -m-1 h-7 overflow-hidden rounded-full px-4 py-0 transition-all duration-200",
+            "relative h-7 min-h-0 overflow-hidden rounded-full px-4 py-0 leading-none transition-all duration-200",
             isSelected
-              ? "bg-primary text-primary-foreground"
+              ? "text-primary-foreground bg-transparent"
               : "text-muted-foreground hover:text-foreground border-0 bg-transparent shadow-none hover:bg-transparent",
           )}
           variant="ghost"
+          size="sm"
           onClick={() => handleClick(code)}
           disabled={isLoading}
         >
           <div className="relative z-10">
-            <AnimatePresence mode="wait">
-              {showSpinner ? (
-                <motion.div
-                  key="spinner"
-                  initial={{ opacity: 0, rotate: 0 }}
-                  animate={{ opacity: 1, rotate: 360 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Icons.Spinner
-                    className={cn("h-4 w-4 animate-spin", isSelected ? "text-primary-foreground" : "text-current")}
-                  />
-                </motion.div>
-              ) : (
-                <motion.span
-                  key="text"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className={isSelected ? "text-primary-foreground" : ""}
-                >
-                  {code}
-                </motion.span>
-              )}
-            </AnimatePresence>
+            {showSpinner ? (
+              <Icons.Spinner
+                className={cn("h-3.5 w-3.5 animate-spin", isSelected ? "text-primary-foreground" : "text-current")}
+              />
+            ) : (
+              <span className={cn("leading-none transition-colors", isSelected ? "text-primary-foreground" : "")}>
+                {code}
+              </span>
+            )}
           </div>
           {isSelected && (
             <motion.div
+              layoutId="intervalSelectorIndicator"
               className="bg-primary absolute inset-0 rounded-full"
-              layoutId="selectedIndicator"
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
             />
           )}
         </Button>
