@@ -108,11 +108,7 @@ const AppLayout = () => {
             <div data-tauri-drag-region="true" className="draggable h-6 w-full"></div>
             {shouldUseMobileNavigation ? (
               <div className="flex w-full flex-1">
-                <MobileNavigationContainer>
-                  <div className="momentum-scroll w-full max-w-full flex-1 overflow-auto scroll-smooth pb-20 md:pb-0">
-                    <Outlet />
-                  </div>
-                </MobileNavigationContainer>
+                <MobileNavigationContainer />
               </div>
             ) : (
               <div className="momentum-scroll w-full max-w-full flex-1 overflow-auto scroll-smooth pb-16 md:pb-0">

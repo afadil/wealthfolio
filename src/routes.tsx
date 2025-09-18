@@ -27,7 +27,6 @@ import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import AboutSettingsPage from "./pages/settings/about/about-page";
-import { NavigationProvider } from "@/context/navigation-context";
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -54,8 +53,7 @@ export function AppRoutes() {
 
   return (
     <BrowserRouter>
-      <NavigationProvider>
-        <Routes>
+      <Routes>
           {/* QR Scanner - No layout for fullscreen camera access */}
           {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}
 
@@ -104,8 +102,7 @@ export function AppRoutes() {
             </Route>
             <Route path="*" element={<h1>Not Found</h1>} />
           </Route>
-        </Routes>
-      </NavigationProvider>
+      </Routes>
     </BrowserRouter>
   );
 }

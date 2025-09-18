@@ -3,20 +3,20 @@
   "version": "2.0.0",
   "type": "module",
   "description": "TypeScript SDK for building Wealthfolio addons with enhanced functionality and type safety",
-  "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "main": "dist/index.js",
+  "types": "dist/src/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.mts"
+      "import": "./dist/index.js",
+      "types": "./dist/src/index.d.ts"
     },
     "./types": {
-      "import": "./dist/types.mjs",
-      "types": "./dist/types.d.mts"
+      "import": "./dist/types.js",
+      "types": "./dist/src/types.d.ts"
     },
     "./permissions": {
-      "import": "./dist/permissions.mjs",
-      "types": "./dist/permissions.d.mts"
+      "import": "./dist/permissions.js",
+      "types": "./dist/src/permissions.d.ts"
     }
   },
   "files": [
@@ -45,7 +45,7 @@
     "url": "https://github.com/afadil/wealthfolio/issues"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && pnpm run build:types",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "lint": "eslint .",
@@ -54,6 +54,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check": "tsc --noEmit",
+    "build:types": "tsc -p tsconfig.json",
     "prepack": "npm run build"
   },
   "peerDependencies": {

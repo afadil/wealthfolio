@@ -7,7 +7,7 @@ export default defineConfig({
     permissions: 'src/permissions.ts',
   },
   format: ['esm'],
-  dts: true,
+  dts: false,
   clean: true,
   sourcemap: true,
   minify: false,

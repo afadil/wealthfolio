@@ -40,6 +40,10 @@
     "barcode-scanner:allow-cancel",
     "barcode-scanner:allow-request-permissions",
     "barcode-scanner:allow-check-permissions",
-    "barcode-scanner:allow-vibrate"
+    "barcode-scanner:allow-vibrate",
+    "haptics:allow-impact-feedback",
+    "haptics:allow-notification-feedback",
+    "haptics:allow-selection-feedback",
+    "haptics:allow-vibrate"
   ]
 }

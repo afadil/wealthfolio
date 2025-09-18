@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vite",
     "dev:web": "node scripts/dev-web.mjs",
-    "build": "tsc && vite build && pnpm -r build",
+    "build": "pnpm run build:types && tsc && vite build && pnpm -r build",
+    "build:types": "pnpm -r run build:types",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
@@ -43,6 +44,7 @@
     "@tanstack/react-virtual": "^3.13.12",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-barcode-scanner": "~2.4.0",
+    "@tauri-apps/plugin-haptics": "~2.0.0",
     "@tauri-apps/plugin-dialog": "~2.4.0",
     "@tauri-apps/plugin-fs": "~2.4.2",
     "@tauri-apps/plugin-log": "~2.7.0",
