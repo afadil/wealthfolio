@@ -21,7 +21,7 @@ import ContributionLimitPage from "./pages/settings/contribution-limits/contribu
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
-import MarketDataSettingsPage from "./pages/settings/market-data-settings";
+import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import SyncSettingsPage from "./pages/settings/sync/sync-page";
 import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found

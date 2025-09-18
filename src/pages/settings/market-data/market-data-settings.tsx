@@ -3,11 +3,11 @@ import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { SettingsHeader } from "./header";
+
+import { SettingsHeader } from "../header";
 
 import { MarketDataProviderSetting } from "@/commands/market-data";
 import { getSecret } from "@/commands/secrets";
-import { ImportQuotesSection } from "@/components/quote-import/ImportQuotesSection";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

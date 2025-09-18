@@ -1,31 +1,28 @@
-import { useMemo } from "react";
-import { subMonths } from "date-fns";
-import { PerformanceChart } from "@/components/performance-chart";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import { DateRangeSelector } from "@wealthfolio/ui";
-import { ApplicationHeader } from "@/components/header";
-import { ApplicationShell } from "@wealthfolio/ui";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
-import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
-import { AlertFeedback } from "@wealthfolio/ui";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { TrackedItem, PerformanceMetrics, ReturnData, DateRange } from "@/lib/types";
-import { GainPercent } from "@wealthfolio/ui";
-import NumberFlow from "@number-flow/react";
-import { AccountSelector } from "../../components/account-selector";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { ApplicationHeader } from "@/components/header";
 import {
+  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
+  MAX_DRAWDOWN_INFO as maxDrawdownInfo,
   MetricLabelWithInfo,
   TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
-  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
   VOLATILITY_INFO as volatilityInfo,
-  MAX_DRAWDOWN_INFO as maxDrawdownInfo,
 } from "@/components/metric-display";
+import { PerformanceChart } from "@/components/performance-chart";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { Icons } from "@/components/ui/icons";
+import { Separator } from "@/components/ui/separator";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { DateRange, PerformanceMetrics, ReturnData, TrackedItem } from "@/lib/types";
+import NumberFlow from "@number-flow/react";
+import { AlertFeedback, ApplicationShell, DateRangeSelector, GainPercent } from "@wealthfolio/ui";
+import { subMonths } from "date-fns";
+import { useMemo } from "react";
+import { AccountSelector } from "../../components/account-selector";
+import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 
 const PORTFOLIO_TOTAL: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
@@ -300,7 +297,7 @@ export default function PerformancePage() {
   };
 
   return (
-    <ApplicationShell className="p-6">
+    <ApplicationShell>
       <ApplicationHeader
         heading="Performance"
         className="flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"

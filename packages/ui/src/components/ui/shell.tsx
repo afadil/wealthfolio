@@ -6,7 +6,7 @@ type ApplicationShellProps = React.HTMLAttributes<HTMLDivElement>;
 
 export function ApplicationShell({ children, className, ...props }: ApplicationShellProps) {
   return (
-    <div className={cn("grid items-start gap-8", className)} {...props}>
+    <div className={cn("grid h-full flex-col items-start gap-8 p-2 lg:p-6", className)} {...props}>
       {children}
     </div>
   );
