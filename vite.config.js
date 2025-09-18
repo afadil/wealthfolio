@@ -1,7 +1,8 @@
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import path from "path";
 import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
+
 var host = process.env.TAURI_DEV_HOST;
 var apiTarget = process.env.VITE_API_TARGET || process.env.WF_API_TARGET || "http://127.0.0.1:8080";
 // https://vitejs.dev/config/

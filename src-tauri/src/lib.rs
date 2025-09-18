@@ -160,7 +160,9 @@ pub fn run() {
             // Initialize mobile-only plugins
             #[cfg(any(target_os = "android", target_os = "ios"))]
             {
-                let _ = app.handle().plugin(tauri_plugin_barcode_scanner::init());
+                let handle = app.handle();
+                let _ = handle.plugin(tauri_plugin_barcode_scanner::init());
+                let _ = handle.plugin(tauri_plugin_haptics::init());
             }
 
             let handle = app.handle().clone();
