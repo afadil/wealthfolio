@@ -23,7 +23,6 @@ import {
   Input,
   Label,
   Separator,
-  Textarea,
   useToast,
 } from "@wealthfolio/ui";
 
@@ -301,11 +300,6 @@ export default function SyncSettingsPage() {
       const payload = await invoke<string>("generate_pairing_payload");
       setQrPayload(payload);
       setSyncStatus("idle");
-
-      toast({
-        title: "QR Code Generated",
-        description: "Ready for mobile device to scan",
-      });
     } catch (e: unknown) {
       setError(toErrorMessage(e, "Failed to generate QR code"));
       setSyncStatus("error");
@@ -430,6 +424,13 @@ export default function SyncSettingsPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Auto-generate QR when this device is master
+  useEffect(() => {
+    if (status?.is_master && !qrPayload && !isGeneratingQR) {
+      generateQR();
+    }
+  }, [status?.is_master, qrPayload, isGeneratingQR, generateQR]);
 
   const getSyncStatusBadge = () => {
     switch (syncStatus) {
@@ -820,69 +821,57 @@ export default function SyncSettingsPage() {
               Pair New Device
             </CardTitle>
             <CardDescription>
-              Generate a QR code for mobile devices to scan and connect
+              Scan the QR code on the mobile device to link it to this device
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <Button
-                onClick={generateQR}
-                disabled={isGeneratingQR}
-                className="w-full transition-transform duration-200 active:scale-95"
-              >
-                {isGeneratingQR ? (
-                  <>
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Icons.QrCode className="mr-2 h-4 w-4" />
-                    Generate Pairing QR
-                  </>
-                )}
-              </Button>
-
-              {qrPayload && (
-                <div className="space-y-3">
-                  <div className="flex justify-center">
-                    <div className="rounded-lg border bg-white p-4 shadow-sm">
+              <div className="space-y-3">
+                <div className="flex justify-center">
+                  <div className="rounded-lg border bg-white p-4 shadow-sm">
+                    {qrPayload ? (
                       <QRCode value={qrPayload} size={180} className="h-auto max-w-full" />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 lg:flex-row lg:gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(qrPayload)}
-                      className="flex-1 transition-transform duration-200 active:scale-95"
-                    >
-                      <Icons.Copy className="mr-2 h-3 w-3" />
-                      Copy Data
-                    </Button>
-                    <Collapsible>
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full transition-transform duration-200 active:scale-95 lg:w-auto"
-                        >
-                          <Icons.Eye className="mr-2 h-3 w-3" />
-                          View Data
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <Textarea
-                          value={qrPayload}
-                          readOnly
-                          className="mt-2 max-w-full font-mono text-xs"
-                          rows={4}
-                        />
-                      </CollapsibleContent>
-                    </Collapsible>
+                    ) : (
+                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                        <Icons.Spinner className="h-4 w-4 animate-spin" />
+                        <span>Generating QR...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
+                <div className="flex flex-col gap-2 lg:flex-row lg:justify-center lg:gap-2">
+                  <Button
+                    onClick={generateQR}
+                    disabled={isGeneratingQR}
+                    className="w-full transition-transform duration-200 active:scale-95 lg:w-auto"
+                  >
+                    {isGeneratingQR ? (
+                      <>
+                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        Regenerating...
+                      </>
+                    ) : (
+                      <>
+                        <Icons.QrCode className="mr-2 h-4 w-4" />
+                        Regenerate
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (qrPayload) {
+                        copyToClipboard(qrPayload);
+                      }
+                    }}
+                    disabled={!qrPayload}
+                    className="w-full transition-transform duration-200 active:scale-95 lg:w-auto"
+                  >
+                    <Icons.Copy className="mr-2 h-4 w-4" />
+                    Copy Data
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
