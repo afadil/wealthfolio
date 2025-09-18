@@ -11,7 +11,6 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ navigation }: AppSidebarProps) {
-  const location = useLocation();
   const [collapsed, setCollapsed] = useState(true);
 
   return (

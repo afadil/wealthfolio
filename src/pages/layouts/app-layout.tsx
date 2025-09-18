@@ -30,7 +30,7 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="app-shell bg-background text-foreground flex min-h-screen max-w-full overflow-x-hidden pt-6 lg:pt-2">
+    <div className="app-shell bg-background text-foreground flex min-h-screen max-w-full overflow-x-hidden pt-10 lg:pt-2">
       <div className="scan-hide-target">
         <AppSidebar navigation={navigation} />
       </div>

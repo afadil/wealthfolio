@@ -57,14 +57,14 @@ function PerformanceContent({
   return (
     <div className="relative flex h-full w-full flex-col">
       {chartData && chartData.length > 0 && (
-        <div className="min-h-0 w-full flex-1">
+        <div className="min-h-[260px] w-full flex-1 sm:min-h-[320px]">
           <PerformanceChart data={chartData} />
         </div>
       )}
 
       {!chartData?.length && !isLoading && !hasErrors && (
         <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center"
+          className="mx-auto flex max-w-[420px] flex-col items-center justify-center gap-2 px-4 text-center"
           icon={<Icons.BarChart className="h-10 w-10" />}
           title="No performance data"
           description="Select accounts to compare their performance over time."
@@ -77,10 +77,10 @@ function PerformanceContent({
           <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
             <div className="animate-progress-border bg-primary absolute top-0 left-0 h-[2px]"></div>
           </div>
-          <div className="absolute right-4 bottom-4">
-            <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
-              <p className="text-muted-foreground flex items-center text-xs font-medium">
-                <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
+          <div className="absolute bottom-3 left-1/2 w-full max-w-[220px] -translate-x-1/2 px-4 sm:bottom-4 sm:left-auto sm:max-w-none sm:translate-x-0 sm:px-0">
+            <div className="bg-background/90 rounded-md border px-3 py-1.5 text-center shadow-sm backdrop-blur-sm">
+              <p className="text-muted-foreground flex items-center justify-center gap-2 text-xs font-medium sm:justify-start">
+                <span className="bg-primary inline-block h-2 w-2 animate-pulse rounded-full"></span>
                 Calculating...
               </p>
             </div>
@@ -128,10 +128,10 @@ const SelectedItemBadge = ({
   onDelete: (e: React.MouseEvent) => void;
 }) => {
   return (
-    <div className="my-2 flex items-center">
+    <div className="flex flex-shrink-0 items-center py-1">
       <Badge
-        className={`rounded-md px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
-          isSelected ? "ring-primary ring-2" : ""
+        className={`rounded-md px-0 shadow-sm transition-all ${
+          isSelected ? "ring-primary ring-2" : "ring-transparent ring-1"
         }`}
         onClick={onSelect}
         role="button"
@@ -145,7 +145,7 @@ const SelectedItemBadge = ({
         }}
         aria-pressed={isSelected}
       >
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-3 px-3 py-1">
           <div
             className={`h-4 w-1 rounded-full ${
               item.type === "account"
@@ -153,10 +153,11 @@ const SelectedItemBadge = ({
                 : "bg-orange-500 dark:bg-orange-400"
             }`}
           ></div>
-          <span className="text-sm font-medium">{item.name}</span>
+          <span className="text-sm font-medium leading-none">{item.name}</span>
         </div>
         <button
-          className="ml-3 text-gray-500 transition-all duration-150 hover:scale-110 hover:text-gray-800 dark:text-zinc-400 hover:dark:text-zinc-100"
+          type="button"
+          className="pr-2 text-gray-500 transition-transform duration-150 hover:scale-110 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:text-zinc-400 hover:dark:text-zinc-100"
           onClick={onDelete}
           aria-label={`Remove ${item.name}`}
         >
@@ -307,116 +308,117 @@ export default function PerformancePage() {
         </div>
       </ApplicationHeader>
 
-      <div className="flex h-[calc(100vh-12rem)] flex-col space-y-6">
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedItems.map((item) => (
-            <SelectedItemBadge
-              key={item.id}
-              item={item}
-              isSelected={selectedItemId === item.id}
-              onSelect={() => handleBadgeSelect(item)}
-              onDelete={(e) => handleBadgeDelete(e, item)}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 lg:gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="-mx-2 flex gap-2 overflow-x-auto pb-1 pl-2 pr-4 sm:m-0 sm:flex-wrap sm:overflow-visible sm:p-0">
+            {selectedItems.map((item) => (
+              <SelectedItemBadge
+                key={item.id}
+                item={item}
+                isSelected={selectedItemId === item.id}
+                onSelect={() => handleBadgeSelect(item)}
+                onDelete={(e) => handleBadgeDelete(e, item)}
+              />
+            ))}
+          </div>
+          {selectedItems.length > 0 && <Separator className="hidden sm:block" />}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="w-full sm:w-auto">
+              <AccountSelector
+                setSelectedAccount={handleAccountSelect}
+                variant="button"
+                buttonText="Add account"
+                includePortfolio={true}
+                className="w-full sm:w-auto"
+              />
+            </div>
+            <BenchmarkSymbolSelector
+              onSelect={handleSymbolSelect}
+              className="w-full sm:w-auto"
             />
-          ))}
-          {selectedItems.length > 0 && <Separator orientation="vertical" className="mx-2 h-6" />}
-
-          <AccountSelector
-            setSelectedAccount={handleAccountSelect}
-            variant="button"
-            buttonText="Add account"
-            includePortfolio={true}
-          />
-          <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
+          </div>
         </div>
 
         <Card className="flex min-h-0 flex-1 flex-col">
-          <CardHeader className="pb-1">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Performance</CardTitle>
-                  <CardDescription>{displayDateRange}</CardDescription>
-                </div>
-                {performanceData && performanceData.length > 0 && (
-                  <div className="grid grid-cols-2 gap-6 rounded-lg p-2 backdrop-blur-sm md:grid-cols-4">
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
-                      <div className="flex items-baseline justify-center">
-                        <span
-                          className={`text-lg ${
-                            selectedItemData && selectedItemData.totalReturn >= 0
-                              ? "text-success"
-                              : "text-destructive"
-                          }`}
-                        >
-                          <GainPercent
-                            value={selectedItemData?.totalReturn || 0}
-                            animated={true}
-                            className="text-lg"
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo
-                        label="Annualized Return"
-                        infoText={annualizedReturnInfo}
-                      />
-                      <div className="flex items-baseline justify-center">
-                        <span
-                          className={`text-lg ${
-                            selectedItemData && selectedItemData.annualizedReturn >= 0
-                              ? "text-success"
-                              : "text-destructive"
-                          }`}
-                        >
-                          <GainPercent
-                            value={selectedItemData?.annualizedReturn || 0}
-                            animated={true}
-                            className="text-lg"
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
-                      <div className="flex items-baseline justify-center">
-                        <span className="text-foreground text-lg">
-                          <NumberFlow
-                            value={selectedItemData?.volatility || 0}
-                            animated={true}
-                            format={{
-                              style: "percent",
-                              maximumFractionDigits: 2,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
-                      <div className="flex items-baseline justify-center">
-                        <span className="text-destructive text-lg">
-                          <NumberFlow
-                            value={(selectedItemData?.maxDrawdown || 0) * -1}
-                            animated={true}
-                            format={{
-                              style: "percent",
-                              maximumFractionDigits: 2,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+          <CardHeader className="space-y-4 pb-3 sm:pb-2">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-xl">Performance</CardTitle>
+                <CardDescription>{displayDateRange}</CardDescription>
+                {selectedItemData && (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Viewing <span className="text-foreground">{selectedItemData.name}</span>
+                  </span>
                 )}
               </div>
+              {performanceData && performanceData.length > 0 && (
+                <div className="grid w-full gap-3 rounded-lg border border-border/40 bg-muted/40 p-3 sm:grid-cols-2 md:w-auto md:grid-cols-4 md:gap-4 md:p-4">
+                  <div className="flex flex-col gap-1 text-left">
+                    <MetricLabelWithInfo
+                      label="Total Return"
+                      infoText={totalReturnInfo}
+                      className="justify-start"
+                    />
+                    <GainPercent
+                      value={selectedItemData?.totalReturn ?? 0}
+                      animated={true}
+                      className="text-base font-semibold sm:text-lg"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1 text-left">
+                    <MetricLabelWithInfo
+                      label="Annualized Return"
+                      infoText={annualizedReturnInfo}
+                      className="justify-start"
+                    />
+                    <GainPercent
+                      value={selectedItemData?.annualizedReturn ?? 0}
+                      animated={true}
+                      className="text-base font-semibold sm:text-lg"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1 text-left">
+                    <MetricLabelWithInfo
+                      label="Volatility"
+                      infoText={volatilityInfo}
+                      className="justify-start"
+                    />
+                    <span className="text-base font-semibold text-foreground sm:text-lg">
+                      <NumberFlow
+                        value={selectedItemData?.volatility ?? 0}
+                        animated={true}
+                        format={{
+                          style: "percent",
+                          maximumFractionDigits: 2,
+                        }}
+                      />
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 text-left">
+                    <MetricLabelWithInfo
+                      label="Max Drawdown"
+                      infoText={maxDrawdownInfo}
+                      className="justify-start"
+                    />
+                    <span className="text-base font-semibold text-destructive sm:text-lg">
+                      <NumberFlow
+                        value={selectedItemData?.maxDrawdown ?? 0}
+                        animated={true}
+                        format={{
+                          style: "percent",
+                          maximumFractionDigits: 2,
+                        }}
+                      />
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardHeader>
-          <CardContent className="min-h-0 flex-1 p-6">
+          <CardContent className="min-h-0 flex-1 px-3 pb-4 pt-2 sm:px-6 sm:pb-6 sm:pt-6">
             <PerformanceContent
               chartData={chartData}
               isLoading={isLoadingPerformance}

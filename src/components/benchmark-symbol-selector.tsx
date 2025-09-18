@@ -72,9 +72,10 @@ const BENCHMARKS = [
 
 interface BenchmarkSymbolSelectorProps {
   onSelect: (symbol: { id: string; name: string }) => void;
+  className?: string;
 }
 
-export function BenchmarkSymbolSelector({ onSelect }: BenchmarkSymbolSelectorProps) {
+export function BenchmarkSymbolSelector({ onSelect, className }: BenchmarkSymbolSelectorProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,7 +121,10 @@ export function BenchmarkSymbolSelector({ onSelect }: BenchmarkSymbolSelectorPro
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="bg-secondary/30 hover:bg-muted/80 flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
+          className={cn(
+            "bg-secondary/30 hover:bg-muted/80 flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium",
+            className,
+          )}
           size="sm"
         >
           <Icons.Plus className="h-4 w-4" />
