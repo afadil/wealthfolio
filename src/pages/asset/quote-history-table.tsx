@@ -35,7 +35,6 @@ import {
   createColumnHelper,
   flexRender,
   SortingState,
-  ColumnDef,
 } from "@tanstack/react-table";
 
 interface QuoteHistoryTableProps {
@@ -152,7 +151,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     handleDelete: (quoteId: string) => void;
   }
 
-  const columns = useMemo<ColumnDef<Quote, unknown>[]>(
+  const columns = useMemo(
     () => [
       columnHelper.accessor("timestamp", {
         header: "Date",
@@ -320,7 +319,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
           ]
         : []),
     ],
-    [isManualDataSource],
+    [isManualDataSource, handleInputChange, handleEdit, handleSave, handleCancel, handleDelete],
   );
 
   const table = useReactTable({
