@@ -344,7 +344,10 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className="bg-secondary/30 hover:bg-muted/80 flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
+              className={cn(
+                "bg-secondary/30 hover:bg-muted/80 flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium",
+                className,
+              )}
               size="sm"
             >
               <Icons.Plus className="h-4 w-4" />
