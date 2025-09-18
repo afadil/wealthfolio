@@ -482,16 +482,6 @@ body.qr-scan-active .scan-hide-target {
     box-sizing: border-box;
   }
 
-  /* Better touch targets */
-  button,
-  [role="button"],
-  input,
-  select,
-  textarea {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
   /* Smooth transitions for better feel */
   button,
   [role="button"] {
