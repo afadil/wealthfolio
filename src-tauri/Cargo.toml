@@ -40,6 +40,7 @@ hostname = "0.3"
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 appstore = [] # Feature flag for App Store builds
+wealthfolio-pro = ["wealthfolio_core/wealthfolio-pro"]
 
 [lib]
 name = "wealthfolio_app_lib"

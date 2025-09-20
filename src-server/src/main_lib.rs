@@ -19,8 +19,10 @@ use wealthfolio_core::{
     goals::{GoalRepository, GoalService, GoalServiceTrait},
     limits::{ContributionLimitRepository, ContributionLimitService, ContributionLimitServiceTrait},
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
-    sync::store,
 };
+
+#[cfg(feature = "wealthfolio-pro")]
+use wealthfolio_core::sync::store;
 
 pub struct AppState {
     pub account_service: Arc<AccountService<Arc<db::DbPool>>>,
@@ -66,6 +68,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
 
     // Ensure a device ID exists in the database for trigger stamping (origin/updated_version)
+    #[cfg(feature = "wealthfolio-pro")]
     {
         let mut conn = pool.get()?;
         // Record the stable instance_id into sync_device so triggers can reference it

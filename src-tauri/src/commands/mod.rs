@@ -12,4 +12,5 @@ pub mod utilities;
 pub mod secrets;
 pub mod providers_settings;
 pub mod error;
+#[cfg(feature = "wealthfolio-pro")]
 pub mod sync;

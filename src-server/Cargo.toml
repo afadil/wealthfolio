@@ -30,6 +30,10 @@ wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }
 
 hyper = { version = "0.14", features = ["full"] }
 
+[features]
+default = []
+wealthfolio-pro = ["wealthfolio_core/wealthfolio-pro"]
+
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3"

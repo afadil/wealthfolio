@@ -42,28 +42,21 @@ r2d2 = "0.8"
 # Runtime
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 
-# Optional: P2P over WebSocket + mDNS (enabled by feature "p2p")
-axum = { version = "0.8", features = ["ws"], optional = true }
-tokio-tungstenite = { version = "0.27", optional = true }
-
-# Optional: TLS/mTLS for wss (enabled by feature "tls")
-rcgen = { version = "0.14", optional = true }
-sha2 = { version = "0.10", optional = true }
-rustls = { version = "0.23", optional = true }
-tokio-rustls = { version = "0.26", optional = true }
-rustls-pemfile = { version = "2", optional = true }
-base64 = { version = "0.22", optional = true }
-
-
 # Optional: crypto identity (public-key IDs)
 ed25519-dalek = { version = "2.2", features = ["serde", "rand_core"], optional = true }
 rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
+# Optional: pro-only sync engine
+wealthfolio_sync = { path = "../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
+
 [features]
 default = ["p2p", "tls"]          # For Tauri app builds
-p2p = ["axum", "tokio-tungstenite"]
-tls = ["rcgen", "sha2", "rustls", "tokio-rustls", "rustls-pemfile", "base64"]
+p2p = []
+tls = []
 crypto-id = ["ed25519-dalek", "rand_core"]
+wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
+wealthfolio-pro = ["wealthfolio-pro-sync"]
+pro = ["wealthfolio-pro"]
 
 
 [dev-dependencies]

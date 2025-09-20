@@ -27,10 +27,16 @@ import {
 } from "@wealthfolio/ui";
 
 interface PairPayload {
-  host: string;
-  port: number;
+  device_id: string;
+  device_name?: string;
+  fingerprint?: string;
+  listen_endpoints?: string[];
+  host?: string;
   alt?: string[];
-  ts?: number;
+  port?: number;
+  note?: string;
+  ts?: string;
+  v?: number;
 }
 
 interface PeerInfo {
@@ -84,13 +90,30 @@ export default function SyncSettingsPage() {
     setPairPayload(newPayload);
     if (newPayload.trim()) {
       try {
-        const parsed = JSON.parse(newPayload);
-        if (parsed.host && parsed.port) {
-          setParsedPayload(parsed);
+        const parsed = JSON.parse(newPayload) as Partial<PairPayload>;
+        const hasDevice = typeof parsed.device_id === "string" && parsed.device_id.length > 0;
+        const endpoints = Array.isArray(parsed.listen_endpoints) ? parsed.listen_endpoints : [];
+        const hasNetwork =
+          endpoints.length > 0 ||
+          (typeof parsed.host === "string" && parsed.host.trim() !== "" && typeof parsed.port === "number");
+
+        if (hasDevice && hasNetwork) {
+          setParsedPayload({
+            device_id: parsed.device_id!,
+            device_name: parsed.device_name,
+            fingerprint: parsed.fingerprint,
+            listen_endpoints: endpoints,
+            host: parsed.host,
+            alt: Array.isArray(parsed.alt) ? parsed.alt : undefined,
+            port: parsed.port,
+            note: parsed.note,
+            ts: typeof parsed.ts === "string" ? parsed.ts : undefined,
+            v: typeof parsed.v === "number" ? parsed.v : undefined,
+          });
           setError(null);
         } else {
           setParsedPayload(null);
-          setError("Invalid payload: missing host or port");
+          setError("Invalid payload: missing device info or endpoints");
         }
       } catch (_e) {
         setParsedPayload(null);

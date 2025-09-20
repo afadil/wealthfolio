@@ -20,6 +20,7 @@ use updater::check_for_update;
 use dotenvy::dotenv;
 use std::env;
 use std::sync::Arc;
+#[cfg(feature = "wealthfolio-pro")]
 use uuid;
 use wealthfolio_core::secrets::SecretManager;
 
@@ -29,12 +30,18 @@ use tauri::Manager;
 
 use context::ServiceContext;
 use events::{emit_portfolio_trigger_update, emit_app_ready, PortfolioRequestPayload};
+#[cfg(feature = "wealthfolio-pro")]
 use wealthfolio_core::sync::engine::SyncEngine;
 
+#[cfg(feature = "wealthfolio-pro")]
 #[derive(Clone)]
 pub struct SyncHandles {
     pub engine: SyncEngine,
 }
+
+#[cfg(not(feature = "wealthfolio-pro"))]
+#[derive(Clone)]
+pub struct SyncHandles;
 
 /// Spawns background tasks such as menu setup, update checks, and initial portfolio sync.
 fn spawn_background_tasks(
@@ -87,42 +94,45 @@ fn spawn_background_tasks(
         .build();
     emit_portfolio_trigger_update(&handle, initial_payload);
 
-    // P2P sync (desktop and mobile)
-    let handle_clone = handle.clone();
-    let ctx_for_sync = _context.clone();
-    tauri::async_runtime::spawn(async move {
-        // 1) Get DB pool
-        let pool = ctx_for_sync.db_pool();
+    #[cfg(feature = "wealthfolio-pro")]
+    {
+        let handle_clone = handle.clone();
+        let ctx_for_sync = _context.clone();
+        tauri::async_runtime::spawn(async move {
+            // 1) Get DB pool
+            let pool = ctx_for_sync.db_pool();
 
-        // 2) Stable device_id from OS keyring on all platforms
-        let device_id_str = get_or_create_device_id()
-            .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-        let device_id = uuid::Uuid::parse_str(&device_id_str)
-            .unwrap_or_else(|_| uuid::Uuid::new_v4());
+            // 2) Stable device_id from OS keyring on all platforms
+            let device_id_str = get_or_create_device_id()
+                .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+            let device_id = uuid::Uuid::parse_str(&device_id_str)
+                .unwrap_or_else(|_| uuid::Uuid::new_v4());
 
-        // Mirror device_id into DB for triggers
-        {
-            use diesel::prelude::*;
-            let mut conn = pool.get().expect("db conn");
-            let _ = diesel::sql_query("PRAGMA foreign_keys = ON;").execute(&mut conn);
-            let _ = diesel::sql_query("INSERT OR REPLACE INTO sync_device(id) VALUES (?1)")
-                .bind::<diesel::sql_types::Text, _>(&device_id_str)
-                .execute(&mut conn);
-        }
+            // Mirror device_id into DB for triggers
+            {
+                use diesel::prelude::*;
+                let mut conn = pool.get().expect("db conn");
+                let _ = diesel::sql_query("PRAGMA foreign_keys = ON;").execute(&mut conn);
+                let _ = diesel::sql_query("INSERT OR REPLACE INTO sync_device(id) VALUES (?1)")
+                    .bind::<diesel::sql_types::Text, _>(&device_id_str)
+                    .execute(&mut conn);
+            }
 
-        // 3) Create and start the engine
-        let engine = SyncEngine::with_device_id(pool.clone(), device_id).expect("sync engine");
-        if let Err(_e) = engine.start().await {
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            log::error!("sync start error: {_e}");
-            return;
-        }
+            // 3) Create and start the engine
+            let engine = SyncEngine::with_device_id(pool.clone(), device_id).expect("sync engine");
+            if let Err(_e) = engine.start().await {
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                log::error!("sync start error: {_e}");
+                return;
+            }
 
-        // Keep engine reachable from commands
-        handle_clone.manage(SyncHandles { engine });
-    });
+            // Keep engine reachable from commands
+            handle_clone.manage(SyncHandles { engine });
+        });
+    }
 }
 
+#[cfg(feature = "wealthfolio-pro")]
 fn get_or_create_device_id() -> Result<String, Box<dyn std::error::Error>> {
     if let Some(existing) = SecretManager::get_secret("device_id").ok().flatten() {
         return Ok(existing);
@@ -317,15 +327,25 @@ pub fn run() {
             commands::addon::clear_addon_staging,
             commands::addon::submit_addon_rating,
             // Sync (QR pairing)
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::get_sync_status,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::get_device_name,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::generate_pairing_payload,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::sync_with_master,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::force_full_sync_with_master,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::sync_now,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::probe_local_network_access,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::initialize_sync_for_existing_data,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::set_as_master,
+            #[cfg(feature = "wealthfolio-pro")]
             commands::sync::remove_master_device,
         ])
         .build(tauri::generate_context!())
