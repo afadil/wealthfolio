@@ -1,6 +1,7 @@
 use futures::future::join_all;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use serde::Serialize;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
@@ -9,10 +10,15 @@ use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::context::ServiceContext;
 use crate::events::{
     emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
-    MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START, PORTFOLIO_TRIGGER_RECALCULATE,
-    PORTFOLIO_TRIGGER_UPDATE, PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR,
-    PORTFOLIO_UPDATE_START,
+    ResourceEventPayload, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START,
+    PORTFOLIO_TRIGGER_RECALCULATE, PORTFOLIO_TRIGGER_UPDATE, PORTFOLIO_UPDATE_COMPLETE,
+    PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START, RESOURCE_CHANGED,
 };
+
+#[cfg(feature = "wealthfolio-pro")]
+use crate::SyncHandles;
+#[cfg(feature = "wealthfolio-pro")]
+use wealthfolio_core::sync::peer_store;
 
 /// Sets up the global event listeners for the application.
 pub fn setup_event_listeners(handle: AppHandle) {
@@ -26,6 +32,11 @@ pub fn setup_event_listeners(handle: AppHandle) {
     let recalc_handle = handle.clone();
     handle.listen(PORTFOLIO_TRIGGER_RECALCULATE, move |event| {
         handle_portfolio_request(recalc_handle.clone(), event.payload(), true); // force_recalc = true
+    });
+
+    let resource_handle = handle.clone();
+    handle.listen(RESOURCE_CHANGED, move |event| {
+        handle_resource_change(resource_handle.clone(), event.payload());
     });
 }
 
@@ -129,6 +140,255 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
             }
         }
     }
+}
+
+fn handle_resource_change(handle: AppHandle, payload_str: &str) {
+    debug!("Received resource change event: {:?}", payload_str);
+
+    match serde_json::from_str::<ResourceEventPayload>(payload_str) {
+        Ok(event) => {
+            #[cfg(feature = "wealthfolio-pro")]
+            schedule_peer_sync(handle.clone());
+
+            match event.resource_type.as_str() {
+                "account" => handle_account_resource_change(handle.clone(), &event),
+                "activity" => handle_activity_resource_change(handle.clone(), &event),
+                _ => {
+                    // Default to a lightweight portfolio update when resource type is unknown
+                    emit_portfolio_trigger_update(
+                        &handle,
+                        PortfolioRequestPayload::builder()
+                            .account_ids(None)
+                            .symbols(None)
+                            .build(),
+                    );
+                }
+            }
+        }
+        Err(err) => warn!("Failed to parse resource change payload: {}", err),
+    }
+}
+
+fn handle_account_resource_change(handle: AppHandle, event: &ResourceEventPayload) {
+    let account_id = event
+        .payload
+        .get("account_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let account_currency = event
+        .payload
+        .get("currency")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let context = handle.try_state::<Arc<ServiceContext>>();
+
+    let mut payload_builder = PortfolioRequestPayload::builder();
+
+    if event.action == "deleted" {
+        payload_builder = payload_builder.account_ids(None);
+    } else if let Some(ref id) = account_id {
+        payload_builder = payload_builder.account_ids(Some(vec![id.clone()]));
+    } else {
+        payload_builder = payload_builder.account_ids(None);
+    }
+
+    if let (Some(currency), Some(ctx)) = (&account_currency, context.as_ref()) {
+        match ctx.settings_service().get_base_currency() {
+            Ok(Some(base_currency)) if !base_currency.is_empty() && base_currency != *currency => {
+                let symbol = format!("{}{}=X", currency, base_currency);
+                payload_builder = payload_builder.symbols(Some(vec![symbol]));
+            }
+            Ok(_) => {
+                debug!(
+                    "Base currency unavailable or matches account currency; skipping symbol sync"
+                );
+            }
+            Err(err) => warn!("Failed to fetch base currency for account sync: {}", err),
+        }
+    }
+
+    let payload = payload_builder.build();
+
+    emit_portfolio_trigger_recalculate(&handle, payload);
+}
+
+fn handle_activity_resource_change(handle: AppHandle, event: &ResourceEventPayload) {
+    let context = match handle.try_state::<Arc<ServiceContext>>() {
+        Some(ctx) => ctx,
+        None => {
+            warn!("ServiceContext not available for activity resource change");
+            return;
+        }
+    };
+
+    let mut account_ids: HashSet<String> = HashSet::new();
+    let mut symbols: HashSet<String> = HashSet::new();
+
+    if let Some(account_id) = event.payload.get("account_id").and_then(|v| v.as_str()) {
+        account_ids.insert(account_id.to_string());
+        collect_activity_symbols(
+            &context,
+            account_id,
+            event.payload.get("currency").and_then(|v| v.as_str()),
+            event.payload.get("asset_id").and_then(|v| v.as_str()),
+            &mut symbols,
+        );
+    }
+
+    if let Some(previous_account_id) = event
+        .payload
+        .get("previous_account_id")
+        .and_then(|v| v.as_str())
+    {
+        account_ids.insert(previous_account_id.to_string());
+        collect_activity_symbols(
+            &context,
+            previous_account_id,
+            event
+                .payload
+                .get("previous_currency")
+                .and_then(|v| v.as_str()),
+            event
+                .payload
+                .get("previous_asset_id")
+                .and_then(|v| v.as_str()),
+            &mut symbols,
+        );
+    }
+
+    if event.action == "imported" {
+        if let Some(account_id) = event.payload.get("account_id").and_then(|v| v.as_str()) {
+            account_ids.insert(account_id.to_string());
+            if let Some(activity_list) = event.payload.get("activities").and_then(|v| v.as_array())
+            {
+                for item in activity_list {
+                    let currency = item.get("currency").and_then(|v| v.as_str());
+                    let asset_id = item.get("asset_id").and_then(|v| v.as_str());
+                    collect_activity_symbols(
+                        &context,
+                        account_id,
+                        currency,
+                        asset_id,
+                        &mut symbols,
+                    );
+                }
+            }
+        }
+    }
+
+    let mut builder = PortfolioRequestPayload::builder();
+
+    if account_ids.is_empty() {
+        builder = builder.account_ids(None);
+    } else {
+        builder = builder.account_ids(Some(account_ids.into_iter().collect()));
+    }
+
+    if !symbols.is_empty() {
+        builder = builder.symbols(Some(symbols.into_iter().collect()));
+    }
+
+    // Activities can affect market data, force a refresh.
+    builder = builder.refetch_all_market_data(true);
+
+    emit_portfolio_trigger_recalculate(&handle, builder.build());
+}
+
+fn collect_activity_symbols(
+    context: &Arc<ServiceContext>,
+    account_id: &str,
+    activity_currency: Option<&str>,
+    asset_id: Option<&str>,
+    symbols: &mut HashSet<String>,
+) {
+    if let Some(asset_id) = asset_id {
+        if !asset_id.is_empty() {
+            symbols.insert(asset_id.to_string());
+        }
+    }
+
+    if let Some(currency) = activity_currency {
+        match context.account_service().get_account(account_id) {
+            Ok(account) => {
+                if currency != account.currency {
+                    symbols.insert(format!("{}{}=X", account.currency, currency));
+                }
+            }
+            Err(err) => warn!(
+                "Unable to resolve account {} for activity resource change: {}",
+                account_id, err
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "wealthfolio-pro")]
+fn schedule_peer_sync(handle: AppHandle) {
+    if let Some(sync_handles) = handle.try_state::<SyncHandles>() {
+        let engine = sync_handles.engine.clone();
+        spawn(async move {
+            let pool = engine.db_pool();
+            let peers = match pool.get() {
+                Ok(mut conn) => match peer_store::load_peers(&mut conn) {
+                    Ok(peers) => peers,
+                    Err(err) => {
+                        warn!("Failed to load peers for realtime sync: {}", err);
+                        return;
+                    }
+                },
+                Err(err) => {
+                    warn!(
+                        "Failed to get database connection for realtime sync: {}",
+                        err
+                    );
+                    return;
+                }
+            };
+
+            for peer in peers
+                .into_iter()
+                .filter(|peer| peer_has_routable_endpoint(peer))
+            {
+                let engine = engine.clone();
+                spawn(async move {
+                    if let Err(err) = engine.sync_now(peer.id).await {
+                        warn!("Realtime sync with peer {} failed: {}", peer.id, err);
+                    }
+                });
+            }
+        });
+    }
+}
+
+#[cfg(feature = "wealthfolio-pro")]
+fn peer_has_routable_endpoint(peer: &peer_store::PersistedPeer) -> bool {
+    if peer
+        .listen_endpoints
+        .iter()
+        .any(|endpoint| endpoint_is_routable(endpoint))
+    {
+        return true;
+    }
+
+    endpoint_is_routable(&peer.address)
+}
+
+fn endpoint_is_routable(endpoint: &str) -> bool {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let normalized = if trimmed.contains("://") {
+        trimmed.to_ascii_lowercase()
+    } else {
+        format!("quic://{}", trimmed).to_ascii_lowercase()
+    };
+
+    !(normalized.contains("://0.0.0.0")
+        || normalized.contains("://[::]")
+        || normalized.contains("://localhost"))
 }
 
 // This function handles the portfolio snapshot and history calculation logic

@@ -1,8 +1,7 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
+use crate::events::{emit_resource_changed, ResourceEventPayload};
 use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
@@ -10,56 +9,7 @@ use wealthfolio_core::activities::{
     NewActivity, Sort,
 };
 
-// Helper function to generate symbols for portfolio recalculation (single activity)
-fn get_symbols_to_sync(
-    state: &State<'_, Arc<ServiceContext>>,
-    activity_account_id: &str,
-    activity_currency: &str,
-    activity_asset_id: &str,
-) -> Result<Vec<String>, String> {
-    let account = state
-        .account_service()
-        .get_account(activity_account_id)
-        .map_err(|e| format!("Failed to get account {}: {}", activity_account_id, e))?;
-    let account_currency = account.currency;
-
-    let mut symbols = vec![activity_asset_id.to_string()];
-
-    if !activity_currency.is_empty() && activity_currency != &account_currency {
-        let fx_symbol = format!("{}{}=X", account_currency, activity_currency);
-        symbols.push(fx_symbol);
-    }
-    Ok(symbols)
-}
-
-// Helper function to generate symbols for imported activities (batch)
-fn get_all_symbols_to_sync(
-    state: &State<'_, Arc<ServiceContext>>,
-    account_id: &str,
-    activities: &[ActivityImport], // Use slice
-) -> Result<Vec<String>, String> {
-    let account = state
-        .account_service()
-        .get_account(account_id)
-        .map_err(|e| format!("Failed to get account {}: {}", account_id, e))?;
-    let account_currency = account.currency;
-
-    let mut all_symbols: HashSet<String> = HashSet::new();
-
-    for activity_import in activities {
-        // Add asset symbol
-        if !activity_import.symbol.is_empty() {
-            all_symbols.insert(activity_import.symbol.clone());
-        }
-
-        // Add FX symbol if currencies differ
-        if !activity_import.currency.is_empty() && activity_import.currency != account_currency {
-            let fx_symbol = format!("{}{}=X", account_currency, activity_import.currency);
-            all_symbols.insert(fx_symbol);
-        }
-    }
-    Ok(all_symbols.into_iter().collect())
-}
+use serde_json::json;
 
 #[tauri::command]
 pub async fn get_activities(
@@ -99,20 +49,19 @@ pub async fn create_activity(
     debug!("Creating activity...");
     let result = state.activity_service().create_activity(activity).await?;
 
-    let handle = handle.clone();
-    let symbols_for_payload = get_symbols_to_sync(
-        &state,
-        &result.account_id,
-        &result.currency,
-        &result.asset_id,
-    )?;
-
-    let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![result.account_id.clone()]))
-        .refetch_all_market_data(true)
-        .symbols(Some(symbols_for_payload))
-        .build();
-    emit_portfolio_trigger_recalculate(&handle, payload);
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "activity",
+            "created",
+            json!({
+                "activity_id": result.id,
+                "account_id": result.account_id,
+                "currency": result.currency,
+                "asset_id": result.asset_id,
+            }),
+        ),
+    );
 
     Ok(result)
 }
@@ -131,26 +80,23 @@ pub async fn update_activity(
         .map_err(|e| e.to_string())?;
 
     let result = state.activity_service().update_activity(activity).await?;
-    let handle = handle.clone();
 
-    let symbols_for_payload = get_symbols_to_sync(
-        &state,
-        &result.account_id,
-        &result.currency,
-        &result.asset_id,
-    )?;
-
-    let mut account_ids_for_payload = vec![result.account_id.clone()];
-    if original_activity.account_id != result.account_id {
-        account_ids_for_payload.push(original_activity.account_id);
-    }
-
-    let payload: PortfolioRequestPayload = PortfolioRequestPayload::builder()
-        .account_ids(Some(account_ids_for_payload))
-        .refetch_all_market_data(true)
-        .symbols(Some(symbols_for_payload))
-        .build();
-    emit_portfolio_trigger_recalculate(&handle, payload);
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "activity",
+            "updated",
+            json!({
+                "activity_id": result.id,
+                "account_id": result.account_id,
+                "currency": result.currency,
+                "asset_id": result.asset_id,
+                "previous_account_id": original_activity.account_id,
+                "previous_currency": original_activity.currency,
+                "previous_asset_id": original_activity.asset_id,
+            }),
+        ),
+    );
 
     Ok(result)
 }
@@ -167,16 +113,20 @@ pub async fn delete_activity(
         .delete_activity(activity_id)
         .await
         .map_err(|e| e.to_string())?;
-    let handle = handle.clone();
-    let account_id_clone = result.account_id.clone();
-    let symbols = vec![result.asset_id.clone()];
 
-    let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id_clone]))
-        .refetch_all_market_data(true)
-        .symbols(Some(symbols))
-        .build();
-    emit_portfolio_trigger_recalculate(&handle, payload);
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "activity",
+            "deleted",
+            json!({
+                "activity_id": result.id,
+                "account_id": result.account_id,
+                "currency": result.currency,
+                "asset_id": result.asset_id,
+            }),
+        ),
+    );
 
     Ok(result)
 }
@@ -225,22 +175,31 @@ pub async fn import_activities(
     handle: AppHandle,
 ) -> Result<Vec<ActivityImport>, String> {
     debug!("Importing activities for account: {}", account_id);
-
-    // Generate symbols (including FX) using the new helper function
-    let symbols_for_payload = get_all_symbols_to_sync(&state, &account_id, &activities)?;
+    let event_metadata: Vec<_> = activities
+        .iter()
+        .map(|activity| {
+            json!({
+                "asset_id": activity.symbol,
+                "currency": activity.currency,
+            })
+        })
+        .collect();
 
     let result = state
         .activity_service()
         .import_activities(account_id.clone(), activities) // activities is moved here
         .await?;
-    let handle = handle.clone();
-
-    let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id])) // account_id is still available
-        .refetch_all_market_data(true)
-        .symbols(Some(symbols_for_payload))
-        .build();
-    emit_portfolio_trigger_recalculate(&handle, payload);
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new(
+            "activity",
+            "imported",
+            json!({
+                "account_id": account_id,
+                "activities": event_metadata,
+            }),
+        ),
+    );
 
     Ok(result)
 }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tauri::Emitter;
 
 pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
@@ -29,6 +30,31 @@ pub const MARKET_SYNC_COMPLETE: &str = "market:sync-complete";
 
 /// Event emitted when the market data sync process encounters an error.
 pub const MARKET_SYNC_ERROR: &str = "market:sync-error";
+
+/// Event emitted whenever an application resource changes (account, activity, etc.).
+pub const RESOURCE_CHANGED: &str = "resource:changed";
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ResourceEventPayload {
+    pub resource_type: String,
+    pub action: String,
+    #[serde(default)]
+    pub payload: Value,
+}
+
+impl ResourceEventPayload {
+    pub fn new(
+        resource_type: impl Into<String>,
+        action: impl Into<String>,
+        payload: Value,
+    ) -> Self {
+        Self {
+            resource_type: resource_type.into(),
+            action: action.into(),
+            payload,
+        }
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PortfolioRequestPayload {
@@ -122,6 +148,17 @@ pub fn emit_portfolio_trigger_recalculate(
                 e
             )
         });
+}
+
+pub fn emit_resource_changed(handle: &tauri::AppHandle, payload: ResourceEventPayload) {
+    handle.emit(RESOURCE_CHANGED, &payload).unwrap_or_else(|e| {
+        log::error!(
+            "Failed to emit {} event for payload {:?}: {}",
+            RESOURCE_CHANGED,
+            payload,
+            e
+        )
+    });
 }
 
 /// Emits the APP_READY event once the ServiceContext has been initialized.

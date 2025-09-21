@@ -37,6 +37,23 @@ pub struct SyncStatusResponse {
     peers: Vec<PeerInfo>,
 }
 
+fn endpoint_is_routable(endpoint: &str) -> bool {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let normalized = if trimmed.contains("://") {
+        trimmed.to_ascii_lowercase()
+    } else {
+        format!("quic://{}", trimmed).to_ascii_lowercase()
+    };
+
+    !(normalized.contains("://0.0.0.0")
+        || normalized.contains("://[::]")
+        || normalized.contains("://localhost"))
+}
+
 fn sanitize_endpoints<I>(candidates: I) -> Vec<String>
 where
     I: IntoIterator<Item = String>,
@@ -301,6 +318,18 @@ pub struct SyncNowArgs {
 #[tauri::command]
 pub async fn sync_now(state: State<'_, SyncHandles>, payload: SyncNowArgs) -> Result<(), String> {
     let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
+
+    let pool = state.engine.db_pool();
+    if let Ok(mut conn) = pool.get() {
+        if let Ok(Some(peer)) = peer_store::get_peer_by_id(&mut conn, &id) {
+            let endpoints = sanitize_endpoints(peer.listen_endpoints.clone());
+            let has_address = endpoint_is_routable(&peer.address);
+            if endpoints.is_empty() && !has_address {
+                return Err("Peer has no routable endpoints. Regenerate the pairing code on that device and scan it again.".to_string());
+            }
+        }
+    }
+
     state.engine.sync_now(id).await.map_err(|e| e.to_string())
 }
 
