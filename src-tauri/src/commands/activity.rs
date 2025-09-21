@@ -98,7 +98,7 @@ pub async fn create_activity(
 ) -> Result<Activity, String> {
     debug!("Creating activity...");
     let result = state.activity_service().create_activity(activity).await?;
-    
+
     let handle = handle.clone();
     let symbols_for_payload = get_symbols_to_sync(
         &state,
@@ -162,7 +162,11 @@ pub async fn delete_activity(
     handle: AppHandle,
 ) -> Result<Activity, String> {
     debug!("Deleting activity...");
-    let result = state.activity_service().delete_activity(activity_id).await.map_err(|e| e.to_string())?;
+    let result = state
+        .activity_service()
+        .delete_activity(activity_id)
+        .await
+        .map_err(|e| e.to_string())?;
     let handle = handle.clone();
     let account_id_clone = result.account_id.clone();
     let symbols = vec![result.asset_id.clone()];
@@ -192,7 +196,11 @@ pub async fn save_account_import_mapping(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Saving import mapping for account: {}", mapping.account_id);
-    state.activity_service().save_import_mapping(mapping).await.map_err(|e| e.to_string())
+    state
+        .activity_service()
+        .save_import_mapping(mapping)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

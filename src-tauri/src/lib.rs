@@ -1,8 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod commands;
 mod addons;
+mod commands;
 mod context;
 mod events;
 mod listeners;
@@ -24,12 +24,11 @@ use std::sync::Arc;
 use uuid;
 use wealthfolio_core::secrets::SecretManager;
 
-
 use tauri::AppHandle;
 use tauri::Manager;
 
 use context::ServiceContext;
-use events::{emit_portfolio_trigger_update, emit_app_ready, PortfolioRequestPayload};
+use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayload};
 #[cfg(feature = "wealthfolio-pro")]
 use wealthfolio_core::sync::engine::SyncEngine;
 
@@ -103,10 +102,10 @@ fn spawn_background_tasks(
             let pool = ctx_for_sync.db_pool();
 
             // 2) Stable device_id from OS keyring on all platforms
-            let device_id_str = get_or_create_device_id()
-                .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-            let device_id = uuid::Uuid::parse_str(&device_id_str)
-                .unwrap_or_else(|_| uuid::Uuid::new_v4());
+            let device_id_str =
+                get_or_create_device_id().unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+            let device_id =
+                uuid::Uuid::parse_str(&device_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4());
 
             // Mirror device_id into DB for triggers
             {
@@ -163,8 +162,12 @@ pub fn run() {
             // Only initialize desktop-only plugins on non-mobile platforms
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
-                let _ = app.handle().plugin(tauri_plugin_updater::Builder::new().build());
-                let _ = app.handle().plugin(tauri_plugin_window_state::Builder::new().build());
+                let _ = app
+                    .handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build());
+                let _ = app
+                    .handle()
+                    .plugin(tauri_plugin_window_state::Builder::new().build());
             }
 
             // Initialize mobile-only plugins
@@ -334,19 +337,15 @@ pub fn run() {
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::generate_pairing_payload,
             #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::sync_with_master,
+            commands::sync::sync_with_peer,
             #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::force_full_sync_with_master,
+            commands::sync::force_full_sync_with_peer,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::sync_now,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::probe_local_network_access,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::initialize_sync_for_existing_data,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::set_as_master,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::remove_master_device,
         ])
         .build(tauri::generate_context!())
         .expect("error while running wealthfolio application");

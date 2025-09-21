@@ -120,7 +120,7 @@ pub async fn update_account(
     let account_id_clone = updated_account.id.clone();
 
     let payload = PortfolioRequestPayload::builder()
-        .account_ids(Some(vec![account_id_clone])) 
+        .account_ids(Some(vec![account_id_clone]))
         .build();
 
     // Emit the recalculation request

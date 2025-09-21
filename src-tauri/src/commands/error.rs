@@ -14,4 +14,4 @@ where
     }
 }
 
-pub type CommandResult<T, E = CommandError> = Result<T, E>; 
+pub type CommandResult<T, E = CommandError> = Result<T, E>;

@@ -17,7 +17,9 @@ pub async fn get_settings(state: State<'_, Arc<ServiceContext>>) -> Result<Setti
 }
 
 #[tauri::command]
-pub async fn is_auto_update_check_enabled(state: State<'_, Arc<ServiceContext>>) -> Result<bool, String> {
+pub async fn is_auto_update_check_enabled(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<bool, String> {
     debug!("Checking if auto-update check is enabled...");
     state
         .settings_service()

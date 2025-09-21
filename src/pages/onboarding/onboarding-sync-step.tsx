@@ -13,6 +13,35 @@ interface OnboardingSyncStepProps {
   onBack: () => void;
 }
 
+function sanitizeEndpoints(endpoints: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+
+  for (const entry of endpoints) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (trimmed === '') continue;
+
+    const normalized = trimmed.includes('://')
+      ? trimmed
+      : `quic://${trimmed.replace(/^quic:\/\//i, '')}`;
+    const lower = normalized.toLowerCase();
+    if (
+      lower.includes('://0.0.0.0') ||
+      lower.includes('://[::]') ||
+      lower.includes('://localhost')
+    ) {
+      continue;
+    }
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      cleaned.push(normalized);
+    }
+  }
+
+  return cleaned;
+}
+
 export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProps) {
   function toErrorMessage(err: unknown, fallback: string): string {
     if (err instanceof Error) return err.message;
@@ -66,13 +95,25 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
     async (content: string) => {
       try {
         const parsed = JSON.parse(content);
-        if (parsed.host && parsed.port) {
-          // Preflight: trigger Local Network permission before actual sync
-          try {
-            await invoke('probe_local_network_access', { host: parsed.host, port: parsed.port });
-          } catch (_) {}
-          const payload = JSON.stringify({ host: parsed.host, port: parsed.port });
-          await invoke('sync_with_master', { payload });
+        const hasDevice = typeof parsed.device_id === 'string' && parsed.device_id.length > 0;
+        const rawEndpoints = Array.isArray(parsed.listen_endpoints) ? parsed.listen_endpoints : [];
+        const sanitizedEndpoints = sanitizeEndpoints(rawEndpoints);
+        const hasEndpoints =
+          sanitizedEndpoints.length > 0 ||
+          (typeof parsed.host === 'string' && parsed.host.trim() !== '' && typeof parsed.port === 'number');
+
+        if (hasDevice && hasEndpoints) {
+          if (parsed.host && parsed.port) {
+            try {
+              await invoke('probe_local_network_access', { host: parsed.host, port: parsed.port });
+            } catch (_) {}
+          }
+
+          const payload = JSON.stringify({
+            ...parsed,
+            listen_endpoints: sanitizedEndpoints,
+          });
+          await invoke('sync_with_peer', { payload });
           await queryClient.invalidateQueries();
           await recalculatePortfolio();
           onSuccess();

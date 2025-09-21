@@ -260,7 +260,7 @@ fn handle_portfolio_calculation(
                     history_errors.join("; ")
                 );
             }
-        } 
+        }
 
         if let Err(e) = app_handle.emit(PORTFOLIO_UPDATE_COMPLETE, ()) {
             error!("Failed to emit {} event: {}", PORTFOLIO_UPDATE_COMPLETE, e);

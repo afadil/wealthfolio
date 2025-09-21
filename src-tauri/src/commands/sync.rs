@@ -1,5 +1,6 @@
 #![cfg(feature = "wealthfolio-pro")]
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -24,17 +25,50 @@ pub struct PeerInfo {
     paired: bool,
     last_seen: Option<String>,
     last_sync: Option<String>,
-    is_master: bool,
+    fingerprint: String,
+    listen_endpoints: Vec<String>,
 }
 
 #[derive(Serialize)]
 pub struct SyncStatusResponse {
     device_id: String,
     device_name: String,
-    is_master: bool,
     server_running: bool,
-    master_device: Option<PeerInfo>,
-    other_peers: Vec<PeerInfo>,
+    peers: Vec<PeerInfo>,
+}
+
+fn sanitize_endpoints<I>(candidates: I) -> Vec<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut seen = HashSet::new();
+    let mut cleaned = Vec::new();
+
+    for candidate in candidates {
+        let trimmed = candidate.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let mut normalized = trimmed.to_string();
+        if !normalized.contains("://") {
+            normalized = format!("quic://{}", normalized.trim_start_matches("quic://"));
+        }
+
+        let lower = normalized.to_lowercase();
+        if lower.contains("://0.0.0.0")
+            || lower.contains("://[::]")
+            || lower.contains("://localhost")
+        {
+            continue;
+        }
+
+        if seen.insert(lower) {
+            cleaned.push(normalized);
+        }
+    }
+
+    cleaned
 }
 
 #[tauri::command]
@@ -48,7 +82,9 @@ pub async fn get_device_name() -> Result<String, String> {
 #[tauri::command]
 pub async fn get_sync_status(state: State<'_, SyncHandles>) -> Result<SyncStatusResponse, String> {
     let device_id = state.engine.device_id();
-    let device_name = get_device_name().await.unwrap_or_else(|_| "Unknown Device".to_string());
+    let device_name = get_device_name()
+        .await
+        .unwrap_or_else(|_| "Unknown Device".to_string());
 
     let db_pool = state.engine.db_pool();
     let peers = {
@@ -56,73 +92,71 @@ pub async fn get_sync_status(state: State<'_, SyncHandles>) -> Result<SyncStatus
         peer_store::load_peers(&mut conn).map_err(|e| e.to_string())?
     };
 
-    let is_master = check_is_master(&state).await;
-
-    let mut master_device = None;
-    let mut other_peers = Vec::new();
-
-    for peer in peers {
-        if peer.id == device_id {
-            continue;
-        }
-        let info = PeerInfo {
-            id: peer.id.to_string(),
-            name: peer.name.clone(),
-            address: peer.address.clone(),
-            paired: peer.paired,
-            last_seen: peer.last_seen.map(|d| d.to_rfc3339()),
-            last_sync: peer.last_sync.map(|d| d.to_rfc3339()),
-            is_master: peer.is_master,
-        };
-        if peer.is_master {
-            master_device = Some(info);
-        } else {
-            other_peers.push(info);
-        }
-    }
+    let peers = peers
+        .into_iter()
+        .filter(|peer| peer.id != device_id)
+        .map(|peer| {
+            let sanitized_endpoints = sanitize_endpoints(peer.listen_endpoints.clone());
+            let address = sanitized_endpoints
+                .first()
+                .cloned()
+                .unwrap_or_else(|| peer.address.clone());
+            PeerInfo {
+                id: peer.id.to_string(),
+                name: peer.name,
+                address,
+                paired: peer.paired,
+                last_seen: peer.last_seen.map(|d| d.to_rfc3339()),
+                last_sync: peer.last_sync.map(|d| d.to_rfc3339()),
+                fingerprint: peer.fingerprint,
+                listen_endpoints: sanitized_endpoints,
+            }
+        })
+        .collect();
 
     Ok(SyncStatusResponse {
         device_id: device_id.to_string(),
         device_name,
-        is_master,
         server_running: true,
-        master_device,
-        other_peers,
+        peers,
     })
-}
-
-async fn check_is_master(state: &State<'_, SyncHandles>) -> bool {
-    let db_pool = state.engine.db_pool();
-    match db_pool.get() {
-        Ok(mut conn) => peer_store::is_local_master(&mut conn, &state.engine.device_id()).unwrap_or(false),
-        Err(_) => false,
-    }
 }
 
 #[tauri::command]
 pub async fn generate_pairing_payload(state: State<'_, SyncHandles>) -> Result<String, String> {
     let port = 33445;
-    let (host, alt_hosts) = select_ips();
+    let (host, raw_hosts) = select_ips();
 
-    let mut endpoints = Vec::new();
-    push_endpoint(&mut endpoints, &host, port);
-    for alt in &alt_hosts {
+    let mut endpoint_candidates = Vec::new();
+    endpoint_candidates.push(format!("quic://{}:{}", host, port));
+    for alt in &raw_hosts {
         if alt != &host {
-            push_endpoint(&mut endpoints, alt, port);
+            endpoint_candidates.push(format!("quic://{}:{}", alt, port));
         }
     }
     for endpoint in state.engine.listen_endpoints() {
-        if !endpoints.contains(endpoint) {
-            endpoints.push(endpoint.clone());
-        }
+        endpoint_candidates.push(endpoint.clone());
     }
+
+    let mut listen_endpoints = sanitize_endpoints(endpoint_candidates);
+    if listen_endpoints.is_empty() {
+        listen_endpoints.push(format!("quic://{}:{}", host, port));
+    }
+
+    let mut alt_hosts: Vec<String> = raw_hosts
+        .into_iter()
+        .filter(|alt| alt != &host)
+        .filter(|alt| !alt.trim().is_empty() && alt != "0.0.0.0" && alt != "::")
+        .collect();
+    alt_hosts.sort();
+    alt_hosts.dedup();
 
     let payload = serde_json::json!({
         "v": 2,
         "device_id": state.engine.device_id().to_string(),
         "device_name": get_device_name().await.unwrap_or_else(|_| "Unknown Device".to_string()),
         "fingerprint": state.engine.fingerprint().to_string(),
-        "listen_endpoints": endpoints,
+        "listen_endpoints": listen_endpoints,
         "host": host,
         "alt": alt_hosts,
         "port": port,
@@ -131,13 +165,6 @@ pub async fn generate_pairing_payload(state: State<'_, SyncHandles>) -> Result<S
     });
 
     Ok(payload.to_string())
-}
-
-fn push_endpoint(endpoints: &mut Vec<String>, host: &str, port: u16) {
-    let candidate = format!("quic://{}:{}", host, port);
-    if !endpoints.iter().any(|existing| existing == &candidate) {
-        endpoints.push(candidate);
-    }
 }
 
 #[derive(Deserialize)]
@@ -159,24 +186,22 @@ struct PairingRequest {
 }
 
 fn parse_pairing_payload(raw: &str) -> Result<PairingRequest, String> {
-    let payload: RawPairPayload = serde_json::from_str(raw).map_err(|e| format!("Invalid payload: {e}"))?;
+    let payload: RawPairPayload =
+        serde_json::from_str(raw).map_err(|e| format!("Invalid payload: {e}"))?;
     let remote_id = payload
         .device_id
         .ok_or_else(|| "Pairing payload missing device_id".to_string())?;
 
     let listen_endpoints = if let Some(listen) = payload.listen_endpoints {
-        if listen.is_empty() {
+        let cleaned = sanitize_endpoints(listen.into_iter());
+        if cleaned.is_empty() {
             build_endpoints_from_host(payload.host, payload.alt, payload.port)?
         } else {
-            listen
+            cleaned
         }
     } else {
         build_endpoints_from_host(payload.host, payload.alt, payload.port)?
     };
-
-    if listen_endpoints.is_empty() {
-        return Err("Pairing payload missing network endpoints".to_string());
-    }
 
     let name = payload
         .device_name
@@ -198,17 +223,25 @@ fn build_endpoints_from_host(
     let host = host.ok_or_else(|| "Pairing payload missing host".to_string())?;
     let port = port.unwrap_or(33445);
     let mut endpoints = Vec::new();
-    push_endpoint(&mut endpoints, &host, port);
+    endpoints.push(format!("quic://{}:{}", host, port));
     if let Some(alternates) = alt {
         for candidate in alternates {
-            push_endpoint(&mut endpoints, &candidate, port);
+            endpoints.push(format!("quic://{}:{}", candidate, port));
         }
     }
-    Ok(endpoints)
+    let cleaned = sanitize_endpoints(endpoints);
+    if cleaned.is_empty() {
+        Err("Pairing payload missing routable endpoints".to_string())
+    } else {
+        Ok(cleaned)
+    }
 }
 
 #[tauri::command]
-pub async fn sync_with_master(state: State<'_, SyncHandles>, payload: String) -> Result<String, String> {
+pub async fn sync_with_peer(
+    state: State<'_, SyncHandles>,
+    payload: String,
+) -> Result<String, String> {
     let request = parse_pairing_payload(&payload)?;
 
     let pairing = PeerPairingPayload {
@@ -242,27 +275,40 @@ pub async fn probe_local_network_access(host: String, port: u16) -> Result<(), S
     log::info!("Probing local network access to {}", addr);
     #[cfg(any(target_os = "ios", target_os = "macos"))]
     {
-        let _ = tokio::time::timeout(Duration::from_secs(2), tokio::net::TcpStream::connect(&addr)).await;
+        let _ = tokio::time::timeout(
+            Duration::from_secs(2),
+            tokio::net::TcpStream::connect(&addr),
+        )
+        .await;
     }
     #[cfg(not(any(target_os = "ios", target_os = "macos")))]
     {
-        let _ = tokio::time::timeout(Duration::from_secs(2), tokio::net::TcpStream::connect(&addr)).await;
+        let _ = tokio::time::timeout(
+            Duration::from_secs(2),
+            tokio::net::TcpStream::connect(&addr),
+        )
+        .await;
     }
     Ok(())
 }
 
-#[tauri::command]
-pub async fn sync_now(state: State<'_, SyncHandles>, peer_id: String) -> Result<(), String> {
-    let id = Uuid::parse_str(&peer_id).map_err(|e| e.to_string())?;
-    state
-        .engine
-        .sync_now(id)
-        .await
-        .map_err(|e| e.to_string())
+#[derive(Deserialize)]
+pub struct SyncNowArgs {
+    #[serde(alias = "peerId")]
+    peer_id: String,
 }
 
 #[tauri::command]
-pub async fn force_full_sync_with_master(state: State<'_, SyncHandles>, payload: String) -> Result<String, String> {
+pub async fn sync_now(state: State<'_, SyncHandles>, payload: SyncNowArgs) -> Result<(), String> {
+    let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
+    state.engine.sync_now(id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn force_full_sync_with_peer(
+    state: State<'_, SyncHandles>,
+    payload: String,
+) -> Result<String, String> {
     let request = parse_pairing_payload(&payload)?;
 
     let pairing = PeerPairingPayload {
@@ -282,7 +328,8 @@ pub async fn force_full_sync_with_master(state: State<'_, SyncHandles>, payload:
     let pool = state.engine.db_pool();
     {
         let mut conn = pool.get().map_err(|e| e.to_string())?;
-        store::reset_peer_checkpoint(&mut conn, &request.remote_id.to_string()).map_err(|e| e.to_string())?;
+        store::reset_peer_checkpoint(&mut conn, &request.remote_id.to_string())
+            .map_err(|e| e.to_string())?;
     }
 
     state
@@ -295,7 +342,9 @@ pub async fn force_full_sync_with_master(state: State<'_, SyncHandles>, payload:
 }
 
 #[tauri::command]
-pub async fn initialize_sync_for_existing_data(state: State<'_, SyncHandles>) -> Result<String, String> {
+pub async fn initialize_sync_for_existing_data(
+    state: State<'_, SyncHandles>,
+) -> Result<String, String> {
     let pool = state.engine.db_pool();
     let device_id = state.engine.device_id().to_string();
 
@@ -314,40 +363,6 @@ pub async fn initialize_sync_for_existing_data(state: State<'_, SyncHandles>) ->
     ))
 }
 
-#[tauri::command]
-pub async fn set_as_master(state: State<'_, SyncHandles>) -> Result<String, String> {
-    let device_name = get_device_name().await.unwrap_or_else(|_| "This Device".to_string());
-    let device_id = state.engine.device_id();
-    let fingerprint = state.engine.fingerprint().to_string();
-    let listen_endpoints: Vec<String> = state.engine.listen_endpoints().to_vec();
-
-    let db_pool = state.engine.db_pool();
-    let mut conn = db_pool.get().map_err(|e| e.to_string())?;
-    peer_store::set_local_master(&mut conn, &device_id, &device_name, &fingerprint, &listen_endpoints)
-        .map_err(|e| format!("Failed to set master status: {e}"))?;
-
-    let peers = peer_store::load_peers(&mut conn).map_err(|e| e.to_string())?;
-    for peer in peers {
-        if peer.is_master && peer.id != device_id {
-            let _ = peer_store::delete_peer(&mut conn, &peer.id);
-        }
-    }
-
-    Ok("Device set as master. Other devices can now connect to this one.".to_string())
-}
-
-#[tauri::command]
-pub async fn remove_master_device(state: State<'_, SyncHandles>) -> Result<String, String> {
-    let device_id = state.engine.device_id();
-    let db_pool = state.engine.db_pool();
-
-    let mut conn = db_pool.get().map_err(|e| e.to_string())?;
-    peer_store::clear_local_master(&mut conn, &device_id)
-        .map_err(|e| format!("Failed to remove master status: {e}"))?;
-
-    Ok("Master status removed. You can now pair with a new master device.".to_string())
-}
-
 fn select_ips() -> (String, Vec<String>) {
     if let Ok(host) = std::env::var("WF_SYNC_HOST") {
         return (host.clone(), vec![host]);
@@ -359,7 +374,11 @@ fn select_ips() -> (String, Vec<String>) {
     if let Ok(ifaces) = get_if_addrs::get_if_addrs() {
         for iface in ifaces {
             let name = iface.name.to_lowercase();
-            if name.starts_with("lo") || name.contains("awdl") || name.contains("utun") || name.contains("llw") {
+            if name.starts_with("lo")
+                || name.contains("awdl")
+                || name.contains("utun")
+                || name.contains("llw")
+            {
                 continue;
             }
             let ip = match iface.addr {

@@ -31,6 +31,7 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  Eraser,
   ExternalLink,
   Eye,
   EyeOff,
@@ -48,6 +49,7 @@ import {
   Home,
   Info,
   LayoutDashboard,
+  Link,
   ListChecks,
   ListCollapse,
   Loader,
@@ -191,6 +193,8 @@ export const Icons = {
   ExternalLink: ExternalLink,
   TrendingUp: TrendingUp,
   TrendingDown: TrendingDown,
+  Link: Link,
+  Eraser: Eraser,
 
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg
