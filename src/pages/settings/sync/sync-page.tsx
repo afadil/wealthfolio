@@ -103,12 +103,15 @@ export default function SyncSettingsPage() {
   const queryClient = useQueryClient();
 
   const [status, setStatus] = useState<SyncStatusData | null>(null);
+  const [isSyncAvailable, setIsSyncAvailable] = useState(false);
+  const [isSyncChecked, setIsSyncChecked] = useState(false);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [pairPayload, setPairPayload] = useState("");
   const [parsedPayload, setParsedPayload] = useState<PairPayload | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncUIStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [isScanningActive, setIsScanningActive] = useState(false);
   const [scanPermission, setScanPermission] = useState<CameraPermissionState>("idle");
@@ -161,8 +164,13 @@ export default function SyncSettingsPage() {
     try {
       const s = await invoke<SyncStatusData>("get_sync_status");
       setStatus(s);
+      setIsSyncAvailable(true);
+      setIsSyncChecked(true);
     } catch (e) {
       console.error("Failed to get sync status:", e);
+      setIsSyncAvailable(false);
+      setStatus(null);
+      setIsSyncChecked(true);
     }
   }, []);
 
@@ -181,28 +189,57 @@ export default function SyncSettingsPage() {
     (scannedContent: string) => {
       updatePairPayload(scannedContent);
       try {
-        const parsed = JSON.parse(scannedContent);
-        const hasDevice = typeof parsed.device_id === "string" && parsed.device_id.length > 0;
-        const rawEndpoints = Array.isArray(parsed.listen_endpoints) ? parsed.listen_endpoints : [];
+        const raw: unknown = JSON.parse(scannedContent);
+        if (typeof raw !== "object" || raw === null) {
+          throw new Error("Invalid pairing data");
+        }
+        interface PairingDraft {
+          device_id?: unknown;
+          device_name?: unknown;
+          fingerprint?: unknown;
+          listen_endpoints?: unknown;
+          host?: unknown;
+          alt?: unknown;
+          port?: unknown;
+          note?: unknown;
+          ts?: unknown;
+          v?: unknown;
+        }
+        const rec = raw as PairingDraft;
+        const deviceId = typeof rec.device_id === "string" ? rec.device_id : "";
+        const hasDevice = deviceId.length > 0;
+        const rawEndpointsUnknown = Array.isArray(rec.listen_endpoints) ? rec.listen_endpoints : [];
+        const rawEndpoints: string[] = rawEndpointsUnknown.filter(
+          (v): v is string => typeof v === "string",
+        );
         const sanitizedEndpoints = sanitizeEndpoints(rawEndpoints);
         const hasEndpoints =
           sanitizedEndpoints.length > 0 ||
-          (typeof parsed.host === "string" &&
-            parsed.host.trim() !== "" &&
-            typeof parsed.port === "number");
+          (typeof rec.host === "string" && rec.host.trim() !== "" && typeof rec.port === "number");
 
         if (hasDevice && hasEndpoints) {
           setSyncStatus("syncing");
-          const payload = JSON.stringify({
-            ...parsed,
+          const payloadObj: PairPayload = {
+            device_id: deviceId,
+            device_name: typeof rec.device_name === "string" ? rec.device_name : undefined,
+            fingerprint: typeof rec.fingerprint === "string" ? rec.fingerprint : undefined,
             listen_endpoints: sanitizedEndpoints,
-          });
+            host: typeof rec.host === "string" ? rec.host : undefined,
+            alt: Array.isArray(rec.alt)
+              ? rec.alt.filter((v): v is string => typeof v === "string")
+              : undefined,
+            port: typeof rec.port === "number" ? rec.port : undefined,
+            note: typeof rec.note === "string" ? rec.note : undefined,
+            ts: typeof rec.ts === "string" ? rec.ts : undefined,
+            v: typeof rec.v === "number" ? rec.v : undefined,
+          };
+          const payload = JSON.stringify(payloadObj);
           invoke<string>("sync_with_peer", { payload })
             .then(() => {
               setSyncStatus("success");
               toast({
                 title: "Sync Successful",
-                description: `Connected to ${parsed.device_name ?? parsed.device_id.slice(0, 8)}`,
+                description: `Connected to ${payloadObj.device_name ?? payloadObj.device_id.slice(0, 8)}`,
               });
               return handlePostSyncSuccess();
             })
@@ -226,6 +263,7 @@ export default function SyncSettingsPage() {
   );
 
   const startInlineScan = useCallback(async () => {
+    if (!isSyncAvailable) return;
     setIsScanningActive(true);
     setScanError(null);
     setScanPermission("pending");
@@ -242,7 +280,7 @@ export default function SyncSettingsPage() {
       setScanPermission("denied");
       setSyncStatus("idle");
     }
-  }, []);
+  }, [isSyncAvailable]);
 
   const performScan = useCallback(async () => {
     if (scanPermission !== "granted" || isScanInFlight) return;
@@ -274,7 +312,9 @@ export default function SyncSettingsPage() {
 
   const cancelInlineScan = useCallback(() => {
     cancel()
-      .catch(() => {})
+      .catch((err: unknown) => {
+        logger.debug("Cancel scan error: " + String(err));
+      })
       .finally(() => {
         setIsScanningActive(false);
         setScanPermission("idle");
@@ -311,6 +351,7 @@ export default function SyncSettingsPage() {
   }, [isScanningActive]);
 
   const generateQR = useCallback(async () => {
+    if (!isSyncAvailable) return;
     setIsGeneratingQR(true);
     setSyncStatus("generating");
     setError(null);
@@ -327,10 +368,10 @@ export default function SyncSettingsPage() {
     } finally {
       setIsGeneratingQR(false);
     }
-  }, [toast]);
+  }, [toast, isSyncAvailable]);
 
   const doSync = useCallback(async () => {
-    if (!pairPayload.trim() || !parsedPayload) return;
+    if (!isSyncAvailable || !pairPayload.trim() || !parsedPayload) return;
 
     setSyncStatus("syncing");
     setError(null);
@@ -347,10 +388,10 @@ export default function SyncSettingsPage() {
       setSyncStatus("error");
       toast({ title: "Sync Failed", description: errorMessage, variant: "destructive" });
     }
-  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast]);
+  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast, isSyncAvailable]);
 
   const doFullSync = useCallback(async () => {
-    if (!pairPayload.trim() || !parsedPayload) return;
+    if (!isSyncAvailable || !pairPayload.trim() || !parsedPayload) return;
 
     setSyncStatus("syncing");
     setError(null);
@@ -367,10 +408,11 @@ export default function SyncSettingsPage() {
       setSyncStatus("error");
       toast({ title: "Full Sync Failed", description: errorMessage, variant: "destructive" });
     }
-  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast]);
+  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast, isSyncAvailable]);
 
   const syncExistingPeer = useCallback(
     async (peer: PeerInfo) => {
+      if (!isSyncAvailable) return;
       setSyncStatus("syncing");
       setError(null);
       try {
@@ -385,11 +427,12 @@ export default function SyncSettingsPage() {
         toast({ title: "Sync Failed", description: errorMessage, variant: "destructive" });
       }
     },
-    [handlePostSyncSuccess, toast],
+    [handlePostSyncSuccess, toast, isSyncAvailable],
   );
 
   const forceResyncPeer = useCallback(
     async (peer: PeerInfo) => {
+      if (!isSyncAvailable) return;
       setSyncStatus("syncing");
       setError(null);
       try {
@@ -416,10 +459,11 @@ export default function SyncSettingsPage() {
         toast({ title: "Full Sync Failed", description: errorMessage, variant: "destructive" });
       }
     },
-    [handlePostSyncSuccess, toast],
+    [handlePostSyncSuccess, toast, isSyncAvailable],
   );
 
   const initializeSync = useCallback(async () => {
+    if (!isSyncAvailable) return;
     setSyncStatus("generating");
     setError(null);
 
@@ -433,7 +477,7 @@ export default function SyncSettingsPage() {
       setSyncStatus("error");
       toast({ title: "Initialization Failed", description: errorMessage, variant: "destructive" });
     }
-  }, [toast]);
+  }, [toast, isSyncAvailable]);
 
   const copyToClipboard = useCallback(
     async (text: string) => {
@@ -456,10 +500,13 @@ export default function SyncSettingsPage() {
   }, [refresh]);
 
   useEffect(() => {
+    if (!isSyncChecked || !isSyncAvailable) {
+      return;
+    }
     if (!qrPayload && !isGeneratingQR) {
       generateQR();
     }
-  }, [generateQR, isGeneratingQR, qrPayload]);
+  }, [generateQR, isGeneratingQR, qrPayload, isSyncAvailable, isSyncChecked]);
 
   const getSyncStatusBadge = () => {
     switch (syncStatus) {
@@ -574,256 +621,243 @@ export default function SyncSettingsPage() {
 
   return (
     <div className="w-full max-w-full space-y-4 overflow-x-hidden lg:space-y-6">
-      {isScanningActive && renderOverlay()}
+      {!isSyncChecked ? (
+        <>
+          <SettingsHeader
+            heading="Sync Your Devices"
+            text="We’re checking your setup to see if device sync is available."
+          />
+          <Card>
+            <CardContent className="flex items-center gap-2 p-4 text-sm">
+              <Icons.Spinner className="h-4 w-4 animate-spin" />
+              Checking sync...
+            </CardContent>
+          </Card>
+        </>
+      ) : !isSyncAvailable ? (
+        <>
+          <SettingsHeader
+            heading="Sync Your Devices"
+            text="Device-to-device sync is a Wealthfolio Pro feature. Upgrade to connect your desktop and mobile, keep data private, and stay in sync everywhere."
+          />
 
-      <SettingsHeader
-        heading="Peer Sync"
-        text="Share pairing information and connect your devices without a primary/secondary distinction."
-      />
-
-      <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-        <div>
-          <p className="text-muted-foreground text-sm">This device</p>
-          <p className="text-lg font-semibold">{status?.device_name ?? "Unknown device"}</p>
-          <p className="text-muted-foreground text-xs break-all">{status?.device_id ?? ""}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant={status?.server_running ? "default" : "destructive"}>
-            {status?.server_running ? "Listener running" : "Listener stopped"}
-          </Badge>
-          {getSyncStatusBadge()}
-        </div>
-      </div>
-
-      {error && (
-        <AlertFeedback variant="error" title="Sync Issue">
-          {error}
-        </AlertFeedback>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icons.QrCode className="h-5 w-5" />
-              Share Pairing Code
-            </CardTitle>
-            <CardDescription>
-              Generate a QR code or copy the payload so another device can connect to this one.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-              <div className="bg-background rounded-lg border p-4 shadow-inner">
-                {qrPayload ? (
-                  <QRCode value={qrPayload} size={180} className="h-auto w-36 sm:w-48" />
-                ) : (
-                  <div className="text-muted-foreground flex h-36 w-36 items-center justify-center text-sm sm:h-48 sm:w-48">
-                    QR unavailable
-                  </div>
-                )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icons.Link className="h-5 w-5" />
+                Upgrade to Pro
+              </CardTitle>
+              <CardDescription>
+                Unlock seamless sync, the mobile app, and private BYOK AI assistance.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="mb-2 text-sm font-medium">Community Edition</p>
+                  <ul className="text-muted-foreground space-y-2 text-sm">
+                    <li>• Local-first on your device</li>
+                    <li>• Manual export/import</li>
+                    <li>• Core portfolio tools</li>
+                    <li>• Community support</li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="mb-2 text-sm font-medium">Wealthfolio Pro</p>
+                  <ul className="space-y-2 text-sm">
+                    <li>• Mobile app (iOS & Android)</li>
+                    <li>• Private, peer-to-peer device sync</li>
+                    <li>• BYOK AI Assistant (your own key)</li>
+                    <li>• Unlimited devices & background sync</li>
+                    <li>• Priority updates & support</li>
+                  </ul>
+                </div>
               </div>
-              <div className="flex w-full flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                  onClick={generateQR}
-                  disabled={isGeneratingQR}
+                  onClick={() => {
+                    try {
+                      window.open("https://wealthfolio.app/pro", "_blank", "noopener,noreferrer");
+                    } catch {}
+                  }}
                   className="transition-transform active:scale-95"
                 >
-                  {isGeneratingQR ? (
-                    <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Icons.Refresh className="mr-2 h-4 w-4" />
-                      Regenerate QR
-                    </>
-                  )}
+                  Upgrade to Pro
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => qrPayload && copyToClipboard(qrPayload)}
-                  disabled={!qrPayload}
-                  className="transition-transform active:scale-95"
+                  onClick={() => {
+                    try {
+                      window.open("https://wealthfolio.app", "_blank", "noopener,noreferrer");
+                    } catch {}
+                  }}
                 >
-                  <Icons.Copy className="mr-2 h-4 w-4" />
-                  Copy Payload
+                  Learn more
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          {isScanningActive && renderOverlay()}
+
+          <SettingsHeader
+            heading="Sync Your Devices"
+            text="Connect this device with others to keep your portfolio up to date—secure, local-first, and fast."
+          />
+
+          <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+            <div>
+              <p className="text-muted-foreground text-sm">This device</p>
+              <p className="text-lg font-semibold">{status?.device_name ?? "Unknown device"}</p>
             </div>
-            {qrPayload && (
-              <div className="bg-muted/40 text-muted-foreground rounded-md border p-3 font-mono text-xs leading-relaxed">
-                {qrPayload}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icons.Link className="h-5 w-5" />
-              Connect to a Peer
-            </CardTitle>
-            <CardDescription>
-              Scan or paste a pairing payload shared by another device.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={startInlineScan}
-                variant="outline"
-                disabled={syncStatus === "scanning"}
-                className="transition-transform active:scale-95"
-              >
-                {syncStatus === "scanning" ? (
-                  <>
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <Icons.QrCode className="mr-2 h-4 w-4" />
-                    Scan QR Code
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setPairPayload("");
-                  updatePairPayload("");
-                }}
-              >
-                <Icons.Eraser className="mr-2 h-4 w-4" />
-                Clear
-              </Button>
+            <div className="flex items-center gap-3">
+              <Badge variant={status?.server_running ? "default" : "destructive"}>
+                {status?.server_running ? "Sync ready" : "Sync paused"}
+              </Badge>
+              {getSyncStatusBadge()}
             </div>
+          </div>
 
-            <Textarea
-              value={pairPayload}
-              onChange={(event) => updatePairPayload(event.target.value)}
-              placeholder="Paste or scan the pairing payload JSON here"
-              rows={10}
-            />
+          {error && (
+            <AlertFeedback variant="error" title="We couldn't complete that action">
+              {error}
+            </AlertFeedback>
+          )}
 
-            {parsedPayload ? (
-              <div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-sm">
-                <p>
-                  <span className="font-semibold">Device:</span>{" "}
-                  {parsedPayload.device_name ?? parsedPayload.device_id}
-                </p>
-                <p>
-                  <span className="font-semibold">Primary endpoint:</span>{" "}
-                  {parsedPayload.listen_endpoints?.[0] ?? parsedPayload.host ?? "—"}
-                </p>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Provide a complete payload with a device id and at least one endpoint
-                (listen_endpoints or host/port).
-              </p>
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={doSync} disabled={!parsedPayload || syncStatus === "syncing"}>
-                {syncStatus === "syncing" ? (
-                  <>
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <Icons.Spinner className="mr-2 h-4 w-4" />
-                    Sync Now
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={doFullSync}
-                disabled={!parsedPayload || syncStatus === "syncing"}
-                variant="outline"
-              >
-                <Icons.Download className="mr-2 h-4 w-4" />
-                Force Full Sync
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Icons.Database className="h-5 w-5" />
-            Prepare Existing Data
-          </CardTitle>
-          <CardDescription>
-            Stamp current records with sync metadata before pairing this device with others.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-muted-foreground text-sm">
-            Only needed the first time you enable sync on an existing database.
-          </p>
-          <Button onClick={initializeSync} disabled={syncStatus === "generating"}>
-            {syncStatus === "generating" ? (
-              <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Initializing...
-              </>
-            ) : (
-              <>
-                <Icons.Spinner className="mr-2 h-4 w-4" />
-                Initialize Metadata
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Icons.Users className="h-5 w-5" />
-            Paired Devices
-          </CardTitle>
-          <CardDescription>Peers that have exchanged data with this device.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {peers.length ? (
-            peers.map((peer) => (
-              <div
-                key={peer.id}
-                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{peer.name}</span>
-                    <Badge variant={peer.paired ? "default" : "secondary"}>
-                      {peer.paired ? "Paired" : "Pending"}
-                    </Badge>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icons.QrCode className="h-5 w-5" />
+                  Share pairing code
+                </CardTitle>
+                <CardDescription>
+                  Show this QR on the device you want to sync from. The other device just scans.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                  <div className="bg-background rounded-lg border p-4 shadow-inner">
+                    {qrPayload ? (
+                      <QRCode value={qrPayload} size={180} className="h-auto w-36 sm:w-48" />
+                    ) : (
+                      <div className="text-muted-foreground flex h-36 w-36 items-center justify-center text-sm sm:h-48 sm:w-48">
+                        QR unavailable
+                      </div>
+                    )}
                   </div>
-                  <p className="text-muted-foreground text-sm break-all">
-                    {peer.listen_endpoints[0] ?? peer.address}
-                  </p>
-                  <div className="text-muted-foreground space-y-1 text-xs">
-                    <p>
-                      Last seen: {peer.last_seen ? new Date(peer.last_seen).toLocaleString() : "—"}
-                    </p>
-                    <p>
-                      Last sync: {peer.last_sync ? new Date(peer.last_sync).toLocaleString() : "—"}
-                    </p>
+                  <div className="flex w-full flex-col gap-2">
+                    <Button
+                      onClick={generateQR}
+                      disabled={isGeneratingQR}
+                      className="transition-transform active:scale-95"
+                    >
+                      {isGeneratingQR ? (
+                        <>
+                          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Icons.Refresh className="mr-2 h-4 w-4" />
+                          Refresh QR
+                        </>
+                      )}
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => qrPayload && copyToClipboard(qrPayload)}
+                        disabled={!qrPayload}
+                        className="transition-transform active:scale-95"
+                      >
+                        <Icons.Copy className="mr-2 h-4 w-4" />
+                        Copy code
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowAdvanced((v) => !v)}>
+                        {showAdvanced ? "Hide advanced" : "Show advanced"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
+                {showAdvanced && qrPayload && (
+                  <div className="bg-muted/40 text-muted-foreground rounded-md border p-3 font-mono text-xs leading-relaxed">
+                    {qrPayload}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icons.Link className="h-5 w-5" />
+                  Connect to another device
+                </CardTitle>
+                <CardDescription>
+                  Scan the QR shown on the other device, or paste the code if you copied it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    size="sm"
-                    onClick={() => syncExistingPeer(peer)}
-                    disabled={syncStatus === "syncing"}
+                    onClick={startInlineScan}
+                    variant="outline"
+                    disabled={syncStatus === "scanning"}
+                    className="transition-transform active:scale-95"
                   >
+                    {syncStatus === "scanning" ? (
+                      <>
+                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        Scanning...
+                      </>
+                    ) : (
+                      <>
+                        <Icons.QrCode className="mr-2 h-4 w-4" />
+                        Scan QR code
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setPairPayload("");
+                      updatePairPayload("");
+                    }}
+                  >
+                    <Icons.Eraser className="mr-2 h-4 w-4" />
+                    Clear
+                  </Button>
+                </div>
+
+                <Textarea
+                  value={pairPayload}
+                  onChange={(event) => updatePairPayload(event.target.value)}
+                  placeholder="Paste the pairing code here (optional)"
+                  rows={10}
+                />
+
+                {parsedPayload ? (
+                  <div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-sm">
+                    <p>
+                      <span className="font-semibold">Device:</span>{" "}
+                      {parsedPayload.device_name ?? parsedPayload.device_id}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Primary connection:</span>{" "}
+                      {parsedPayload.listen_endpoints?.[0] ?? parsedPayload.host ?? "—"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No code yet—scan a QR or paste one above.
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={doSync} disabled={!parsedPayload || syncStatus === "syncing"}>
                     {syncStatus === "syncing" ? (
                       <>
                         <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
@@ -831,28 +865,129 @@ export default function SyncSettingsPage() {
                       </>
                     ) : (
                       <>
-                        <Icons.Refresh className="mr-2 h-4 w-4" />
-                        Sync Now
+                        <Icons.Spinner className="mr-2 h-4 w-4" />
+                        Sync now
                       </>
                     )}
                   </Button>
                   <Button
-                    size="sm"
+                    onClick={doFullSync}
+                    disabled={!parsedPayload || syncStatus === "syncing"}
                     variant="outline"
-                    onClick={() => forceResyncPeer(peer)}
-                    disabled={syncStatus === "syncing"}
                   >
                     <Icons.Download className="mr-2 h-4 w-4" />
-                    Force Full Sync
+                    Full sync
                   </Button>
                 </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground text-sm">No peers paired yet.</p>
-          )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icons.Database className="h-5 w-5" />
+                Prepare existing data
+              </CardTitle>
+              <CardDescription>
+                One-time step to prepare your current records for syncing across devices.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-muted-foreground text-sm">
+                Only needed the first time you enable sync on an existing database.
+              </p>
+              <Button onClick={initializeSync} disabled={syncStatus === "generating"}>
+                {syncStatus === "generating" ? (
+                  <>
+                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    Initializing...
+                  </>
+                ) : (
+                  <>
+                    <Icons.Spinner className="mr-2 h-4 w-4" />
+                    Initialize metadata
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icons.Users className="h-5 w-5" />
+                Paired devices
+              </CardTitle>
+              <CardDescription>
+                Devices you&apos;ve connected with and exchanged data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {peers.length ? (
+                peers.map((peer) => (
+                  <div
+                    key={peer.id}
+                    className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{peer.name}</span>
+                        <Badge variant={peer.paired ? "default" : "secondary"}>
+                          {peer.paired ? "Paired" : "Pending"}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground text-sm break-all">
+                        {peer.listen_endpoints[0] ?? peer.address}
+                      </p>
+                      <div className="text-muted-foreground space-y-1 text-xs">
+                        <p>
+                          Last seen:{" "}
+                          {peer.last_seen ? new Date(peer.last_seen).toLocaleString() : "—"}
+                        </p>
+                        <p>
+                          Last sync:{" "}
+                          {peer.last_sync ? new Date(peer.last_sync).toLocaleString() : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => syncExistingPeer(peer)}
+                        disabled={syncStatus === "syncing"}
+                      >
+                        {syncStatus === "syncing" ? (
+                          <>
+                            <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                            Syncing...
+                          </>
+                        ) : (
+                          <>
+                            <Icons.Refresh className="mr-2 h-4 w-4" />
+                            Sync now
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => forceResyncPeer(peer)}
+                        disabled={syncStatus === "syncing"}
+                      >
+                        <Icons.Download className="mr-2 h-4 w-4" />
+                        Full sync
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-sm">No devices paired yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
