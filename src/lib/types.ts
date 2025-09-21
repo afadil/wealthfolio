@@ -1,15 +1,15 @@
-import * as z from "zod";
 import { importActivitySchema, importMappingSchema } from "@/lib/schemas";
-import { ActivityType, DataSource, AccountType, HoldingType } from "./constants";
+import * as z from "zod";
+import { AccountType, ActivityType, DataSource, HoldingType } from "./constants";
 
 export {
+  AccountType,
   ActivityType,
   DataSource,
-  AccountType,
-  ImportFormat,
   ExportDataType,
   ExportedFileFormat,
   HoldingType,
+  ImportFormat,
 } from "./constants";
 
 export type { ImportRequiredField } from "./constants";
@@ -321,6 +321,7 @@ export interface Settings {
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
+  isPro: boolean;
 }
 
 export interface SettingsContextType {

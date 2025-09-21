@@ -61,9 +61,15 @@ impl SettingsRepositoryTrait for SettingsRepository {
             }
         }
 
-        // Defaults are now handled by Settings::default(), but we ensure onboarding_completed
-        // defaults to false if not explicitly found or if parsing fails above.
-        // The call to `Settings::default()` already sets it to false initially.
+        // Detect Pro status based on feature availability
+        #[cfg(feature = "wealthfolio-pro")]
+        {
+            settings.is_pro = true;
+        }
+        #[cfg(not(feature = "wealthfolio-pro"))]
+        {
+            settings.is_pro = false;
+        }
 
         Ok(settings)
     }
@@ -98,7 +104,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         })
                         .execute(conn)?;
                 }
-                
+
                 if let Some(onboarding_completed) = settings.onboarding_completed {
                     diesel::replace_into(app_settings)
                         .values(&AppSetting {
@@ -159,7 +165,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
     async fn update_setting(&self, setting_key_param: &str, setting_value_param: &str) -> Result<()> {
         let key = setting_key_param.to_string();
         let value = setting_value_param.to_string();
-        
+
         self.writer
             .exec(move |conn| {
                 diesel::replace_into(app_settings)

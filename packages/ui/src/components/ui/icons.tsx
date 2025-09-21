@@ -77,6 +77,7 @@ import {
   Search,
   Shield,
   Smartphone,
+  Sparkles,
   Split,
   Star,
   Store,
@@ -195,6 +196,7 @@ export const Icons = {
   TrendingDown: TrendingDown,
   Link: Link,
   Eraser: Eraser,
+  Sparkles: Sparkles,
 
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg
