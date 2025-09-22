@@ -2,17 +2,17 @@
 
 use std::collections::HashSet;
 use std::time::Duration;
-
 use chrono::Utc;
-use diesel::prelude::*;
-use diesel::sql_query;
-use diesel::sql_types::{BigInt, Text};
+use diesel::prelude::RunQueryDsl;
 use serde::{Deserialize, Serialize};
-use tauri::State;
-use tokio::task;
+use serde_json::json;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use crate::SyncHandles;
+use crate::{
+    events::{emit_resource_changed, ResourceEventPayload},
+    SyncHandles,
+};
 use wealthfolio_core::sync::engine::PeerPairingPayload;
 use wealthfolio_core::sync::peer_store;
 use wealthfolio_core::sync::store;
@@ -257,6 +257,7 @@ fn build_endpoints_from_host(
 #[tauri::command]
 pub async fn sync_with_peer(
     state: State<'_, SyncHandles>,
+    handle: AppHandle,
     payload: String,
 ) -> Result<String, String> {
     let request = parse_pairing_payload(&payload)?;
@@ -281,6 +282,8 @@ pub async fn sync_with_peer(
         .await
         .map_err(|e| format!("Sync failed: {e}"))?;
 
+    emit_sync_completed(&handle);
+
     Ok(format!("Successfully synced with {}", request.remote_name))
 }
 
@@ -289,16 +292,6 @@ pub async fn sync_with_peer(
 #[tauri::command]
 pub async fn probe_local_network_access(host: String, port: u16) -> Result<(), String> {
     let addr = format!("{}:{}", host, port);
-    log::info!("Probing local network access to {}", addr);
-    #[cfg(any(target_os = "ios", target_os = "macos"))]
-    {
-        let _ = tokio::time::timeout(
-            Duration::from_secs(2),
-            tokio::net::TcpStream::connect(&addr),
-        )
-        .await;
-    }
-    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
     {
         let _ = tokio::time::timeout(
             Duration::from_secs(2),
@@ -316,7 +309,7 @@ pub struct SyncNowArgs {
 }
 
 #[tauri::command]
-pub async fn sync_now(state: State<'_, SyncHandles>, payload: SyncNowArgs) -> Result<(), String> {
+pub async fn sync_now(state: State<'_, SyncHandles>, handle: AppHandle, payload: SyncNowArgs) -> Result<(), String> {
     let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
 
     let pool = state.engine.db_pool();
@@ -330,12 +323,15 @@ pub async fn sync_now(state: State<'_, SyncHandles>, payload: SyncNowArgs) -> Re
         }
     }
 
-    state.engine.sync_now(id).await.map_err(|e| e.to_string())
+    state.engine.sync_now(id).await.map_err(|e| e.to_string())?;
+    emit_sync_completed(&handle);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn force_full_sync_with_peer(
     state: State<'_, SyncHandles>,
+    handle: AppHandle,
     payload: String,
 ) -> Result<String, String> {
     let request = parse_pairing_payload(&payload)?;
@@ -367,6 +363,8 @@ pub async fn force_full_sync_with_peer(
         .await
         .map_err(|e| format!("Full sync failed: {e}"))?;
 
+    emit_sync_completed(&handle);
+
     Ok(format!("Full sync completed with {}", request.remote_name))
 }
 
@@ -374,21 +372,22 @@ pub async fn force_full_sync_with_peer(
 pub async fn initialize_sync_for_existing_data(
     state: State<'_, SyncHandles>,
 ) -> Result<String, String> {
-    let pool = state.engine.db_pool();
-    let device_id = state.engine.device_id().to_string();
+    let stats = state
+        .engine
+        .initialize_existing_data()
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let result: (usize, usize, usize) = task::spawn_blocking(move || {
-        let mut conn = pool.get().map_err(|e| e.to_string())?;
-        store::enable_pragmas(&mut conn).map_err(|e| e.to_string())?;
-        initialize_existing_rows(&mut conn, &device_id)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-
-    let (accounts_updated, activities_updated, assets_updated) = result;
     Ok(format!(
-        "Initialized sync metadata: {} accounts, {} activities, {} assets updated and ready for sync",
-        accounts_updated, activities_updated, assets_updated
+        "Initialized sync metadata: {accounts} accounts, {assets} assets, {activities} activities, {profiles} profiles, {settings} settings, {limits} limits, {goals} goals, {allocations} allocations",
+        accounts = stats.accounts,
+        assets = stats.assets,
+        activities = stats.activities,
+        profiles = stats.profiles,
+        settings = stats.settings,
+        limits = stats.limits,
+        goals = stats.goals,
+        allocations = stats.allocations,
     ))
 }
 
@@ -453,57 +452,9 @@ fn select_ips() -> (String, Vec<String>) {
     (chosen, candidates)
 }
 
-fn initialize_existing_rows(
-    conn: &mut store::DbConn,
-    device_id: &str,
-) -> Result<(usize, usize, usize), String> {
-    let accounts = mark_records(
-        conn,
-        "SELECT id as value FROM accounts WHERE updated_version = 0",
-        "UPDATE accounts SET updated_version = ?1, origin = ?2 WHERE id = ?3",
-        device_id,
-    )?;
-    let activities = mark_records(
-        conn,
-        "SELECT id as value FROM activities WHERE updated_version = 0",
-        "UPDATE activities SET updated_version = ?1, origin = ?2 WHERE id = ?3",
-        device_id,
-    )?;
-    let assets = mark_records(
-        conn,
-        "SELECT id as value FROM assets WHERE updated_version = 0",
-        "UPDATE assets SET updated_version = ?1, origin = ?2 WHERE id = ?3",
-        device_id,
-    )?;
-
-    Ok((accounts, activities, assets))
-}
-
-fn mark_records(
-    conn: &mut store::DbConn,
-    select_sql: &str,
-    update_sql: &str,
-    device_id: &str,
-) -> Result<usize, String> {
-    #[derive(QueryableByName)]
-    struct IdRow {
-        #[diesel(sql_type = Text)]
-        value: String,
-    }
-
-    let rows = sql_query(select_sql)
-        .load::<IdRow>(conn)
-        .map_err(|e| e.to_string())?;
-
-    for row in &rows {
-        let version = store::bump_clock(conn).map_err(|e| e.to_string())?;
-        sql_query(update_sql)
-            .bind::<BigInt, _>(version)
-            .bind::<Text, _>(device_id)
-            .bind::<Text, _>(&row.value)
-            .execute(conn)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(rows.len())
+fn emit_sync_completed(handle: &AppHandle) {
+    emit_resource_changed(
+        handle,
+        ResourceEventPayload::new("sync", "completed", json!({})),
+    );
 }
