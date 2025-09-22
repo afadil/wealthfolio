@@ -3,7 +3,6 @@
 use std::collections::HashSet;
 use std::time::Duration;
 use chrono::Utc;
-use diesel::prelude::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, State};

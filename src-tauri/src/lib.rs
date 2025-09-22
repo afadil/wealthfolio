@@ -22,6 +22,7 @@ use std::env;
 use std::sync::Arc;
 #[cfg(feature = "wealthfolio-pro")]
 use uuid;
+#[cfg(feature = "wealthfolio-pro")]
 use wealthfolio_core::secrets::SecretManager;
 
 use tauri::AppHandle;
@@ -29,6 +30,8 @@ use tauri::Manager;
 
 use context::ServiceContext;
 use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayload};
+#[cfg(feature = "wealthfolio-pro")]
+use events::emit_portfolio_trigger_recalculate;
 #[cfg(feature = "wealthfolio-pro")]
 use wealthfolio_core::sync::engine::SyncEngine;
 
@@ -118,7 +121,19 @@ fn spawn_background_tasks(
             }
 
             // 3) Create and start the engine
-            let engine = SyncEngine::with_device_id(pool.clone(), device_id).expect("sync engine");
+            let mut engine = SyncEngine::with_device_id(pool.clone(), device_id).expect("sync engine");
+
+            // Notify app when a sync Pull actually applies local data: trigger recalc
+            let handle_for_cb = handle_clone.clone();
+            engine.set_on_apply_sync(Arc::new(move || {
+                emit_portfolio_trigger_recalculate(
+                    &handle_for_cb,
+                    PortfolioRequestPayload::builder()
+                        .refetch_all_market_data(true)
+                        .build(),
+                );
+            }));
+
             if let Err(_e) = engine.start().await {
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 log::error!("sync start error: {_e}");
