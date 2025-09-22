@@ -13,6 +13,7 @@ use crate::{
     SyncHandles,
 };
 use wealthfolio_core::sync::engine::PeerPairingPayload;
+use wealthfolio_core::sync::pairing::{self, PairingRequest};
 use wealthfolio_core::sync::peer_store;
 use wealthfolio_core::sync::store;
 
@@ -34,57 +35,6 @@ pub struct SyncStatusResponse {
     device_name: String,
     server_running: bool,
     peers: Vec<PeerInfo>,
-}
-
-fn endpoint_is_routable(endpoint: &str) -> bool {
-    let trimmed = endpoint.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-
-    let normalized = if trimmed.contains("://") {
-        trimmed.to_ascii_lowercase()
-    } else {
-        format!("quic://{}", trimmed).to_ascii_lowercase()
-    };
-
-    !(normalized.contains("://0.0.0.0")
-        || normalized.contains("://[::]")
-        || normalized.contains("://localhost"))
-}
-
-fn sanitize_endpoints<I>(candidates: I) -> Vec<String>
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut seen = HashSet::new();
-    let mut cleaned = Vec::new();
-
-    for candidate in candidates {
-        let trimmed = candidate.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        let mut normalized = trimmed.to_string();
-        if !normalized.contains("://") {
-            normalized = format!("quic://{}", normalized.trim_start_matches("quic://"));
-        }
-
-        let lower = normalized.to_lowercase();
-        if lower.contains("://0.0.0.0")
-            || lower.contains("://[::]")
-            || lower.contains("://localhost")
-        {
-            continue;
-        }
-
-        if seen.insert(lower) {
-            cleaned.push(normalized);
-        }
-    }
-
-    cleaned
 }
 
 #[tauri::command]
@@ -112,7 +62,7 @@ pub async fn get_sync_status(state: State<'_, SyncHandles>) -> Result<SyncStatus
         .into_iter()
         .filter(|peer| peer.id != device_id)
         .map(|peer| {
-            let sanitized_endpoints = sanitize_endpoints(peer.listen_endpoints.clone());
+            let sanitized_endpoints = pairing::sanitize_endpoints(peer.listen_endpoints.clone());
             let address = sanitized_endpoints
                 .first()
                 .cloned()
@@ -154,7 +104,7 @@ pub async fn generate_pairing_payload(state: State<'_, SyncHandles>) -> Result<S
         endpoint_candidates.push(endpoint.clone());
     }
 
-    let mut listen_endpoints = sanitize_endpoints(endpoint_candidates);
+    let mut listen_endpoints = pairing::sanitize_endpoints(endpoint_candidates);
     if listen_endpoints.is_empty() {
         listen_endpoints.push(format!("quic://{}:{}", host, port));
     }
@@ -183,85 +133,13 @@ pub async fn generate_pairing_payload(state: State<'_, SyncHandles>) -> Result<S
     Ok(payload.to_string())
 }
 
-#[derive(Deserialize)]
-struct RawPairPayload {
-    device_id: Option<Uuid>,
-    device_name: Option<String>,
-    fingerprint: Option<String>,
-    listen_endpoints: Option<Vec<String>>,
-    host: Option<String>,
-    alt: Option<Vec<String>>,
-    port: Option<u16>,
-}
+async fn upsert_peer_from_payload(
+    state: &State<'_, SyncHandles>,
+    payload: &str,
+) -> Result<PairingRequest, String> {
+    let request = pairing::parse_pairing_payload(payload)?;
 
-struct PairingRequest {
-    remote_id: Uuid,
-    remote_name: String,
-    fingerprint: String,
-    listen_endpoints: Vec<String>,
-}
-
-fn parse_pairing_payload(raw: &str) -> Result<PairingRequest, String> {
-    let payload: RawPairPayload =
-        serde_json::from_str(raw).map_err(|e| format!("Invalid payload: {e}"))?;
-    let remote_id = payload
-        .device_id
-        .ok_or_else(|| "Pairing payload missing device_id".to_string())?;
-
-    let listen_endpoints = if let Some(listen) = payload.listen_endpoints {
-        let cleaned = sanitize_endpoints(listen.into_iter());
-        if cleaned.is_empty() {
-            build_endpoints_from_host(payload.host, payload.alt, payload.port)?
-        } else {
-            cleaned
-        }
-    } else {
-        build_endpoints_from_host(payload.host, payload.alt, payload.port)?
-    };
-
-    let name = payload
-        .device_name
-        .unwrap_or_else(|| format!("Peer@{}", &remote_id.to_string()[..8]));
-
-    Ok(PairingRequest {
-        remote_id,
-        remote_name: name,
-        fingerprint: payload.fingerprint.unwrap_or_default(),
-        listen_endpoints,
-    })
-}
-
-fn build_endpoints_from_host(
-    host: Option<String>,
-    alt: Option<Vec<String>>,
-    port: Option<u16>,
-) -> Result<Vec<String>, String> {
-    let host = host.ok_or_else(|| "Pairing payload missing host".to_string())?;
-    let port = port.unwrap_or(33445);
-    let mut endpoints = Vec::new();
-    endpoints.push(format!("quic://{}:{}", host, port));
-    if let Some(alternates) = alt {
-        for candidate in alternates {
-            endpoints.push(format!("quic://{}:{}", candidate, port));
-        }
-    }
-    let cleaned = sanitize_endpoints(endpoints);
-    if cleaned.is_empty() {
-        Err("Pairing payload missing routable endpoints".to_string())
-    } else {
-        Ok(cleaned)
-    }
-}
-
-#[tauri::command]
-pub async fn sync_with_peer(
-    state: State<'_, SyncHandles>,
-    handle: AppHandle,
-    payload: String,
-) -> Result<String, String> {
-    let request = parse_pairing_payload(&payload)?;
-
-    let pairing = PeerPairingPayload {
+    let pairing_payload = PeerPairingPayload {
         id: request.remote_id,
         name: request.remote_name.clone(),
         listen_endpoints: request.listen_endpoints.clone(),
@@ -271,9 +149,20 @@ pub async fn sync_with_peer(
 
     state
         .engine
-        .upsert_peer(pairing)
+        .upsert_peer(pairing_payload)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to add peer: {e}"))?;
+
+    Ok(request)
+}
+
+#[tauri::command]
+pub async fn sync_with_peer(
+    state: State<'_, SyncHandles>,
+    handle: AppHandle,
+    payload: String,
+) -> Result<String, String> {
+    let request = upsert_peer_from_payload(&state, &payload).await?;
 
     state
         .engine
@@ -314,8 +203,8 @@ pub async fn sync_now(state: State<'_, SyncHandles>, handle: AppHandle, payload:
     let pool = state.engine.db_pool();
     if let Ok(mut conn) = pool.get() {
         if let Ok(Some(peer)) = peer_store::get_peer_by_id(&mut conn, &id) {
-            let endpoints = sanitize_endpoints(peer.listen_endpoints.clone());
-            let has_address = endpoint_is_routable(&peer.address);
+            let endpoints = pairing::sanitize_endpoints(peer.listen_endpoints.clone());
+            let has_address = pairing::endpoint_is_routable(&peer.address);
             if endpoints.is_empty() && !has_address {
                 return Err("Peer has no routable endpoints. Regenerate the pairing code on that device and scan it again.".to_string());
             }
@@ -333,21 +222,7 @@ pub async fn force_full_sync_with_peer(
     handle: AppHandle,
     payload: String,
 ) -> Result<String, String> {
-    let request = parse_pairing_payload(&payload)?;
-
-    let pairing = PeerPairingPayload {
-        id: request.remote_id,
-        name: request.remote_name.clone(),
-        listen_endpoints: request.listen_endpoints.clone(),
-        fingerprint: request.fingerprint.clone(),
-        pairing_token: None,
-    };
-
-    state
-        .engine
-        .upsert_peer(pairing)
-        .await
-        .map_err(|e| e.to_string())?;
+    let request = upsert_peer_from_payload(&state, &payload).await?;
 
     let pool = state.engine.db_pool();
     {
