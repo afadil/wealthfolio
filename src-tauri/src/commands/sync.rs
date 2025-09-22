@@ -1,6 +1,5 @@
 #![cfg(feature = "wealthfolio-pro")]
 
-use std::collections::HashSet;
 use std::time::Duration;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
