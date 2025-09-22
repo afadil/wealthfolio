@@ -1,14 +1,14 @@
 // useGlobalEventListener.ts
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/components/ui/use-toast";
 import { listenMarketSyncComplete } from "@/commands/portfolio-listener";
+import { toast } from "@/components/ui/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect } from "react";
 
 import {
-  listenPortfolioUpdateStart,
+  listenMarketSyncStart,
   listenPortfolioUpdateComplete,
   listenPortfolioUpdateError,
-  listenMarketSyncStart,
+  listenPortfolioUpdateStart,
 } from "@/commands/portfolio-listener";
 import { logger } from "./adapters";
 
@@ -55,14 +55,14 @@ const handlePortfolioUpdateError = (error: string) => {
 const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
 
-  const handlePortfolioUpdateComplete = () => {
+  const handlePortfolioUpdateComplete = useCallback(() => {
     queryClient.invalidateQueries();
     toast({
       description: "Portfolio Updated Successfully!",
       variant: "subtle",
       duration: 2000,
     });
-  };
+  }, [queryClient]);
 
   useEffect(() => {
     let actualCleanup = () => {
