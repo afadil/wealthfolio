@@ -13,6 +13,7 @@ use reqwest::{header, Client};
 use serde_json::json;
 use yahoo::{YQuoteItem, YahooError};
 use yahoo_finance_api as yahoo;
+use urlencoding::encode;
 
 #[derive(Debug, Clone)]
 pub struct CrumbData {
@@ -66,7 +67,8 @@ impl YahooProvider {
     }
 
     pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, yahoo::YahooError> {
-        let result = self.provider.search_ticker(query).await?;
+        let encoded_query = encode(query);
+        let result = self.provider.search_ticker(&encoded_query).await?;
 
         let asset_profiles = result.quotes.iter().map(QuoteSummary::from).collect();
 

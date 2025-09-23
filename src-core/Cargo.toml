@@ -34,5 +34,6 @@ futures = "0.3"
 serde_with = "3.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 keyring = "2"
+urlencoding = "2"
 
 [dev-dependencies]
