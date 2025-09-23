@@ -136,7 +136,17 @@ async fn upsert_peer_from_payload(
     state: &State<'_, SyncHandles>,
     payload: &str,
 ) -> Result<PairingRequest, String> {
-    let request = pairing::parse_pairing_payload(payload)?;
+    log::info!("[pairing] received payload: {}", payload);
+    let request = match pairing::parse_pairing_payload(payload) {
+        Ok(req) => req,
+        Err(_) => return Err("Invalid QR code".to_string()),
+    };
+
+    log::info!(
+        "[pairing] parsed endpoints for {}: {:?}",
+        request.remote_name,
+        request.listen_endpoints
+    );
 
     let pairing_payload = PeerPairingPayload {
         id: request.remote_id,
@@ -146,11 +156,17 @@ async fn upsert_peer_from_payload(
         pairing_token: None,
     };
 
+    log::info!(
+        "[pairing] storing peer {} endpoints={:?}",
+        pairing_payload.name,
+        pairing_payload.listen_endpoints
+    );
+
     state
         .engine
         .upsert_peer(pairing_payload)
         .await
-        .map_err(|e| format!("Failed to add peer: {e}"))?;
+        .map_err(|_| "Failed to pair this device. Please try again.".to_string())?;
 
     Ok(request)
 }
@@ -167,7 +183,11 @@ pub async fn sync_with_peer(
         .engine
         .sync_now(request.remote_id)
         .await
-        .map_err(|e| format!("Sync failed: {e}"))?;
+        .map_err(|err| {
+            let msg = err.to_string();
+            log::error!("sync_with_peer error: {}", msg);
+            "Sync failed after pairing. Please try again.".to_string()
+        })?;
 
     emit_sync_completed(&handle);
 
@@ -199,18 +219,15 @@ pub struct SyncNowArgs {
 pub async fn sync_now(state: State<'_, SyncHandles>, handle: AppHandle, payload: SyncNowArgs) -> Result<(), String> {
     let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
 
-    let pool = state.engine.db_pool();
-    if let Ok(mut conn) = pool.get() {
-        if let Ok(Some(peer)) = peer_store::get_peer_by_id(&mut conn, &id) {
-            let endpoints = pairing::sanitize_endpoints(peer.listen_endpoints.clone());
-            let has_address = pairing::endpoint_is_routable(&peer.address);
-            if endpoints.is_empty() && !has_address {
-                return Err("Peer has no routable endpoints. Regenerate the pairing code on that device and scan it again.".to_string());
-            }
-        }
-    }
-
-    state.engine.sync_now(id).await.map_err(|e| e.to_string())?;
+    state
+        .engine
+        .sync_now(id)
+        .await
+        .map_err(|err| {
+            let msg = err.to_string();
+            log::error!("sync_now error: {}", msg);
+            "Failed to sync with this device. Please try again.".to_string()
+        })?;
     emit_sync_completed(&handle);
     Ok(())
 }
@@ -225,16 +242,16 @@ pub async fn force_full_sync_with_peer(
 
     let pool = state.engine.db_pool();
     {
-        let mut conn = pool.get().map_err(|e| e.to_string())?;
+        let mut conn = pool.get().map_err(|_| "Failed to pair this device. Please try again.".to_string())?;
         store::reset_peer_checkpoint(&mut conn, &request.remote_id.to_string())
-            .map_err(|e| e.to_string())?;
+            .map_err(|_| "Failed to pair this device. Please try again.".to_string())?;
     }
 
     state
         .engine
         .sync_now(request.remote_id)
         .await
-        .map_err(|e| format!("Full sync failed: {e}"))?;
+        .map_err(|_| "Full sync failed. Please try again.".to_string())?;
 
     emit_sync_completed(&handle);
 

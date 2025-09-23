@@ -73,51 +73,35 @@ CREATE TABLE IF NOT EXISTS sync_device (
 CREATE TABLE IF NOT EXISTS sync_peer_checkpoint (
   peer_id TEXT PRIMARY KEY,
   last_version_sent     INTEGER NOT NULL DEFAULT 0,
-  last_version_received INTEGER NOT NULL DEFAULT 0
+  last_version_received INTEGER NOT NULL DEFAULT 0,
+  remote_clock          INTEGER NOT NULL DEFAULT 0,
+  remote_known_local    INTEGER NOT NULL DEFAULT 0
 );
 
 -- 5) Persistent peer storage for device pairing and trust management
 CREATE TABLE IF NOT EXISTS sync_peers (
-  id           TEXT PRIMARY KEY,
-  name         TEXT NOT NULL,
-  address      TEXT NOT NULL,
-  fingerprint  TEXT NOT NULL DEFAULT '',
-  paired       BOOLEAN NOT NULL DEFAULT false,
-  trusted      BOOLEAN NOT NULL DEFAULT false,
-  is_master    BOOLEAN NOT NULL DEFAULT false,
-  last_seen    TEXT NOT NULL,
-  last_sync    TEXT,
-  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- 5b) Peer metadata/state tables (merged from p2p_sync_upgrade)
-CREATE TABLE IF NOT EXISTS sync_peer_metadata (
-  peer_id TEXT PRIMARY KEY REFERENCES sync_peers(id) ON DELETE CASCADE,
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  fingerprint     TEXT NOT NULL DEFAULT '',
+  paired          BOOLEAN NOT NULL DEFAULT false,
+  trusted         BOOLEAN NOT NULL DEFAULT false,
   listen_endpoints TEXT NOT NULL DEFAULT '[]',
-  pairing_token TEXT,
-  state TEXT NOT NULL DEFAULT 'idle',
-  last_error TEXT,
-  last_success TEXT,
-  failure_count INTEGER NOT NULL DEFAULT 0,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  pairing_token   TEXT,
+  state           TEXT NOT NULL DEFAULT 'idle',
+  last_error      TEXT,
+  last_success    TEXT,
+  failure_count   INTEGER NOT NULL DEFAULT 0,
+  address         TEXT NOT NULL,
+  last_seen       TEXT NOT NULL,
+  last_sync       TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS sync_peer_clock (
-  peer_id TEXT PRIMARY KEY REFERENCES sync_peers(id) ON DELETE CASCADE,
-  remote_clock INTEGER NOT NULL DEFAULT 0,
-  remote_known_local INTEGER NOT NULL DEFAULT 0,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
 
-CREATE INDEX IF NOT EXISTS idx_sync_peer_metadata_state ON sync_peer_metadata(state);
-CREATE INDEX IF NOT EXISTS idx_sync_peer_metadata_failure_count ON sync_peer_metadata(failure_count);
+CREATE INDEX IF NOT EXISTS idx_sync_peers_state ON sync_peers(state);
+CREATE INDEX IF NOT EXISTS idx_sync_peers_failure_count ON sync_peers(failure_count);
 
--- Backfill metadata for existing peers
-INSERT INTO sync_peer_metadata (peer_id, listen_endpoints, state, last_error, last_success, failure_count, updated_at, created_at)
-SELECT id, '[]', 'idle', NULL, NULL, 0, datetime('now'), datetime('now')
-FROM sync_peers
-WHERE id NOT IN (SELECT peer_id FROM sync_peer_metadata);
 
 -- 5) Triggers for accounts: INSERT/UPDATE stamp, DELETE -> tombstone
 CREATE TRIGGER IF NOT EXISTS accounts_ai AFTER INSERT ON accounts

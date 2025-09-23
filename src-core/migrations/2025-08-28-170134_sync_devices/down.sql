@@ -36,8 +36,6 @@ DROP TRIGGER IF EXISTS accounts_ai;
 
 -- Drop tables (in reverse order of creation)
 DROP TABLE IF EXISTS sync_peers;
-DROP TABLE IF EXISTS sync_peer_clock;
-DROP TABLE IF EXISTS sync_peer_metadata;
 DROP TABLE IF EXISTS sync_peer_checkpoint;
 DROP TABLE IF EXISTS sync_device;
 DROP TABLE IF EXISTS sync_sequence;
@@ -59,8 +57,8 @@ DROP INDEX IF EXISTS idx_activities_deleted;
 DROP INDEX IF EXISTS idx_accounts_deleted;
 DROP INDEX IF EXISTS idx_activities_updated_version;
 DROP INDEX IF EXISTS idx_accounts_updated_version;
-DROP INDEX IF EXISTS idx_sync_peer_metadata_failure_count;
-DROP INDEX IF EXISTS idx_sync_peer_metadata_state;
+DROP INDEX IF EXISTS idx_sync_peers_failure_count;
+DROP INDEX IF EXISTS idx_sync_peers_state;
 
 -- Remove sync metadata columns from existing tables
 -- Note: SQLite doesn't support DROP COLUMN directly, but since this is a down migration
