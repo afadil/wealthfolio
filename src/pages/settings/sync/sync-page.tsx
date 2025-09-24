@@ -1,9 +1,18 @@
 import { logger } from "@/adapters";
 import { recalculatePortfolio } from "@/commands/portfolio";
+import {
+  forceFullSyncWithPeer,
+  generatePairingPayload,
+  getSyncStatus,
+  initializeSyncForExistingData,
+  pairAndSync,
+  syncNow,
+  type PeerInfo,
+  type SyncStatus as SyncStatusData,
+} from "@/commands/sync";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { useQueryClient } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
 import { cancel, Format, requestPermissions, scan } from "@tauri-apps/plugin-barcode-scanner";
 import {
   AlertFeedback,
@@ -41,24 +50,6 @@ interface PairPayload {
   note?: string;
   ts?: string;
   v?: number;
-}
-
-interface PeerInfo {
-  id: string;
-  name: string;
-  address: string;
-  paired: boolean;
-  last_seen?: string;
-  last_sync?: string;
-  fingerprint: string;
-  listen_endpoints: string[];
-}
-
-interface SyncStatusData {
-  device_id: string;
-  device_name: string;
-  server_running: boolean;
-  peers: PeerInfo[];
 }
 
 function sanitizeEndpoints(endpoints: readonly string[]): string[] {
@@ -171,7 +162,7 @@ export default function SyncSettingsPage() {
     if (!isPro) return;
 
     try {
-      const s = await invoke<SyncStatusData>("get_sync_status");
+      const s = await getSyncStatus();
       setStatus(s);
     } catch (e) {
       console.error("Failed to get sync status:", e);
@@ -239,7 +230,7 @@ export default function SyncSettingsPage() {
             v: typeof rec.v === "number" ? rec.v : undefined,
           };
           const payload = JSON.stringify(payloadObj);
-          invoke<string>("sync_with_peer", { payload })
+          pairAndSync(payload)
             .then(() => {
               setSyncStatus("success");
               toast({
@@ -362,7 +353,7 @@ export default function SyncSettingsPage() {
     setError(null);
 
     try {
-      const payload = await invoke<string>("generate_pairing_payload");
+      const payload = await generatePairingPayload();
       setQrPayload(payload);
       setSyncStatus("idle");
     } catch (e: unknown) {
@@ -383,7 +374,7 @@ export default function SyncSettingsPage() {
 
     try {
       const payload = JSON.stringify(parsedPayload);
-      const result = await invoke<string>("sync_with_peer", { payload });
+      const result = await pairAndSync(payload);
       setSyncStatus("success");
       toast({ title: "Sync Completed", description: result });
       await handlePostSyncSuccess();
@@ -403,7 +394,7 @@ export default function SyncSettingsPage() {
 
     try {
       const payload = JSON.stringify(parsedPayload);
-      const result = await invoke<string>("force_full_sync_with_peer", { payload });
+      const result = await forceFullSyncWithPeer(payload);
       setSyncStatus("success");
       toast({ title: "Full Sync Completed", description: result });
       await handlePostSyncSuccess();
@@ -421,7 +412,7 @@ export default function SyncSettingsPage() {
       setSyncStatus("syncing");
       setError(null);
       try {
-        await invoke("sync_now", { payload: { peer_id: peer.id } });
+        await syncNow({ peer_id: peer.id });
         setSyncStatus("success");
         toast({ title: "Sync Started", description: `Requested sync with ${peer.name}` });
         await handlePostSyncSuccess();
@@ -453,7 +444,7 @@ export default function SyncSettingsPage() {
           fingerprint: peer.fingerprint,
           listen_endpoints: sanitized,
         });
-        const result = await invoke<string>("force_full_sync_with_peer", { payload });
+        const result = await forceFullSyncWithPeer(payload);
         setSyncStatus("success");
         toast({ title: "Full Sync Requested", description: result });
         await handlePostSyncSuccess();
@@ -473,7 +464,7 @@ export default function SyncSettingsPage() {
     setError(null);
 
     try {
-      const result = await invoke<string>("initialize_sync_for_existing_data");
+      const result = await initializeSyncForExistingData();
       setSyncStatus("success");
       toast({ title: "Sync Initialized", description: result });
     } catch (e: unknown) {

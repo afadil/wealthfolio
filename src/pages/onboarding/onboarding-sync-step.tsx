@@ -1,12 +1,14 @@
-import { logger } from '@/adapters';
-import { recalculatePortfolio } from '@/commands/portfolio';
-import { useQueryClient } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api/core';
-import { cancel, Format, requestPermissions, scan } from '@tauri-apps/plugin-barcode-scanner';
-import { AlertFeedback, Button, Card, CardContent, Icons } from '@wealthfolio/ui';
-import { motion, type Variants } from 'framer-motion';
-import { useCallback, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { logger } from "@/adapters";
+import { recalculatePortfolio } from "@/commands/portfolio";
+import { pairAndSync, probeLocalNetworkAccess } from "@/commands/sync";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { useQueryClient } from "@tanstack/react-query";
+import { cancel, Format, requestPermissions, scan } from "@tauri-apps/plugin-barcode-scanner";
+import { AlertFeedback, Button, Card, CardContent, Icons } from "@wealthfolio/ui";
+import { motion, type Variants } from "framer-motion";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 
 interface OnboardingSyncStepProps {
   onSuccess: () => void;
@@ -18,18 +20,18 @@ function sanitizeEndpoints(endpoints: readonly string[]): string[] {
   const cleaned: string[] = [];
 
   for (const entry of endpoints) {
-    if (typeof entry !== 'string') continue;
+    if (typeof entry !== "string") continue;
     const trimmed = entry.trim();
-    if (trimmed === '') continue;
+    if (trimmed === "") continue;
 
-    const normalized = trimmed.includes('://')
+    const normalized = trimmed.includes("://")
       ? trimmed
-      : `quic://${trimmed.replace(/^quic:\/\//i, '')}`;
+      : `quic://${trimmed.replace(/^quic:\/\//i, "")}`;
     const lower = normalized.toLowerCase();
     if (
-      lower.includes('://0.0.0.0') ||
-      lower.includes('://[::]') ||
-      lower.includes('://localhost')
+      lower.includes("://0.0.0.0") ||
+      lower.includes("://[::]") ||
+      lower.includes("://localhost")
     ) {
       continue;
     }
@@ -45,26 +47,28 @@ function sanitizeEndpoints(endpoints: readonly string[]): string[] {
 export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProps) {
   function toErrorMessage(err: unknown, fallback: string): string {
     if (err instanceof Error) return err.message;
-    if (typeof err === 'string') return err.trim() === '' ? fallback : err;
+    if (typeof err === "string") return err.trim() === "" ? fallback : err;
     if (
-      typeof err === 'number' ||
-      typeof err === 'boolean' ||
-      typeof err === 'bigint' ||
-      typeof err === 'symbol'
+      typeof err === "number" ||
+      typeof err === "boolean" ||
+      typeof err === "bigint" ||
+      typeof err === "symbol"
     ) {
       return String(err);
     }
     return fallback;
   }
 
-  const [status, setStatus] = useState<'idle' | 'scanning'>('idle');
+  const [status, setStatus] = useState<"idle" | "scanning">("idle");
   const [error, setError] = useState<string | null>(null);
   const [isScanningActive, setIsScanningActive] = useState(false);
-  const [scanPermission, setScanPermission] = useState<'idle' | 'pending' | 'granted' | 'denied'>(
-    'idle',
+  const [scanPermission, setScanPermission] = useState<"idle" | "pending" | "granted" | "denied">(
+    "idle",
   );
   const [isScanInFlight, setIsScanInFlight] = useState(false);
   const queryClient = useQueryClient();
+  const { updateSettings } = useSettingsContext();
+  const navigate = useNavigate();
 
   // Keep the camera preview visible by making the app background transparent
   useEffect(() => {
@@ -77,13 +81,13 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
     const prevBodyBg = body.style.background;
     const prevHtmlColor = html.style.backgroundColor;
     const prevBodyColor = body.style.backgroundColor;
-    html.style.background = 'transparent';
-    body.style.background = 'transparent';
-    html.style.backgroundColor = 'transparent';
-    body.style.backgroundColor = 'transparent';
-    body.classList.add('qr-scan-active');
+    html.style.background = "transparent";
+    body.style.background = "transparent";
+    html.style.backgroundColor = "transparent";
+    body.style.backgroundColor = "transparent";
+    body.classList.add("qr-scan-active");
     return () => {
-      body.classList.remove('qr-scan-active');
+      body.classList.remove("qr-scan-active");
       html.style.background = prevHtmlBg;
       body.style.background = prevBodyBg;
       html.style.backgroundColor = prevHtmlColor;
@@ -95,17 +99,19 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
     async (content: string) => {
       try {
         const parsed = JSON.parse(content);
-        const hasDevice = typeof parsed.device_id === 'string' && parsed.device_id.length > 0;
+        const hasDevice = typeof parsed.device_id === "string" && parsed.device_id.length > 0;
         const rawEndpoints = Array.isArray(parsed.listen_endpoints) ? parsed.listen_endpoints : [];
         const sanitizedEndpoints = sanitizeEndpoints(rawEndpoints);
         const hasEndpoints =
           sanitizedEndpoints.length > 0 ||
-          (typeof parsed.host === 'string' && parsed.host.trim() !== '' && typeof parsed.port === 'number');
+          (typeof parsed.host === "string" &&
+            parsed.host.trim() !== "" &&
+            typeof parsed.port === "number");
 
         if (hasDevice && hasEndpoints) {
           if (parsed.host && parsed.port) {
             try {
-              await invoke('probe_local_network_access', { host: parsed.host, port: parsed.port });
+              await probeLocalNetworkAccess(parsed.host, parsed.port);
             } catch (_) {}
           }
 
@@ -113,23 +119,32 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
             ...parsed,
             listen_endpoints: sanitizedEndpoints,
           });
-          await invoke('sync_with_peer', { payload });
+          await pairAndSync(payload);
           await queryClient.invalidateQueries();
           await recalculatePortfolio();
-          onSuccess();
+
+          // Complete onboarding and navigate to main app
+          try {
+            await updateSettings({ onboardingCompleted: true });
+            navigate("/dashboard");
+          } catch (_error) {
+            logger.error("Failed to complete onboarding after sync.");
+            // Still call onSuccess as fallback
+            onSuccess();
+          }
           return;
         }
-        setError('Invalid QR code payload');
+        setError("Invalid QR code payload");
       } catch (e: unknown) {
-        logger.error('QR parse error: ' + (e instanceof Error ? e.message : String(e)));
-        setError('Invalid QR code');
+        logger.error("QR parse error: " + (e instanceof Error ? e.message : String(e)));
+        setError("Invalid QR code");
       }
     },
-    [onSuccess, queryClient],
+    [onSuccess, queryClient, updateSettings, navigate],
   );
 
   const performScan = useCallback(async () => {
-    if (scanPermission !== 'granted' || isScanInFlight) {
+    if (scanPermission !== "granted" || isScanInFlight) {
       return;
     }
     setIsScanInFlight(true);
@@ -141,15 +156,15 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
         await processScannedContent(content);
         setIsScanningActive(false);
       } else {
-        setError('No QR detected. Align code within frame.');
+        setError("No QR detected. Align code within frame.");
       }
     } catch (e: unknown) {
-      const msg = toErrorMessage(e, 'Scan failed');
-      if (!msg.toLowerCase().includes('cancel')) {
+      const msg = toErrorMessage(e, "Scan failed");
+      if (!msg.toLowerCase().includes("cancel")) {
         // Normalize unsupported into a friendly message
-        if (msg.toLowerCase().includes('unsupported')) {
+        if (msg.toLowerCase().includes("unsupported")) {
           setError(
-            'QR scanning is unavailable in this environment. Please use the Settings → Sync page or a supported mobile build.',
+            "QR scanning is unavailable in this environment. Please use the Settings → Sync page or a supported mobile build.",
           );
         } else {
           setError(msg);
@@ -157,36 +172,36 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
       }
     } finally {
       setIsScanInFlight(false);
-      setStatus('idle');
+      setStatus("idle");
     }
   }, [scanPermission, isScanInFlight, processScannedContent]);
 
   // Auto-run scan after permission granted
   useEffect(() => {
-    if (isScanningActive && scanPermission === 'granted') {
+    if (isScanningActive && scanPermission === "granted") {
       void performScan();
     }
   }, [isScanningActive, scanPermission, performScan]);
 
   const startInlineScan = useCallback(async () => {
     setIsScanningActive(true);
-    setStatus('scanning');
+    setStatus("scanning");
     setError(null);
     try {
       const perm = await requestPermissions();
-      if (perm === 'granted') {
-        setScanPermission('granted');
+      if (perm === "granted") {
+        setScanPermission("granted");
       } else {
-        setScanPermission('denied');
-        setStatus('idle');
+        setScanPermission("denied");
+        setStatus("idle");
         setIsScanningActive(false);
-        setError('Camera permission denied');
+        setError("Camera permission denied");
       }
     } catch (_e) {
-      setScanPermission('denied');
-      setStatus('idle');
+      setScanPermission("denied");
+      setStatus("idle");
       setIsScanningActive(false);
-      setError('Failed to request camera permission');
+      setError("Failed to request camera permission");
     }
   }, []);
 
@@ -195,8 +210,8 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
       .catch(() => {})
       .finally(() => {
         setIsScanningActive(false);
-        setScanPermission('idle');
-        setStatus('idle');
+        setScanPermission("idle");
+        setStatus("idle");
       });
   }, []);
 
@@ -217,7 +232,7 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
       opacity: 1,
       y: 0,
       transition: {
-        type: 'spring' as const,
+        type: "spring" as const,
         stiffness: 300,
         damping: 24,
       },
@@ -227,20 +242,20 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
   const scanningStates = {
     idle: {
       icon: Icons.QrCode,
-      title: 'Ready to Scan',
-      description: 'Tap the button below to start scanning the QR code from your desktop.',
+      title: "Ready to Scan",
+      description: "Tap the button below to start scanning the QR code from your desktop.",
     },
     scanning: {
       icon: Icons.Spinner,
-      title: 'Scanning...',
-      description: 'Point your camera at the QR code displayed on your desktop Wealthfolio.',
+      title: "Scanning...",
+      description: "Point your camera at the QR code displayed on your desktop Wealthfolio.",
     },
   };
 
   const currentState = scanningStates[status];
 
   const cancelOverlay =
-    isScanningActive && typeof document !== 'undefined'
+    isScanningActive && typeof document !== "undefined"
       ? createPortal(
           <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[1000] flex justify-center">
             <Button
@@ -264,7 +279,7 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
         initial="initial"
         animate="animate"
         className={`space-y-8 px-4 py-4 md:px-12 lg:px-16 xl:px-20 ${
-          isScanningActive ? 'scan-hide-target' : ''
+          isScanningActive ? "scan-hide-target" : ""
         }`}
       >
         {/* Header */}
@@ -289,12 +304,12 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
               >
                 <div
                   className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${
-                    status === 'scanning' ? 'bg-primary/20' : 'bg-muted/80'
+                    status === "scanning" ? "bg-primary/20" : "bg-muted/80"
                   }`}
                 >
                   <currentState.icon
                     className={`h-10 w-10 ${
-                      status === 'scanning' ? 'text-primary animate-spin' : 'text-muted-foreground'
+                      status === "scanning" ? "text-primary animate-spin" : "text-muted-foreground"
                     }`}
                   />
                 </div>
@@ -327,11 +342,11 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     onClick={startInlineScan}
-                    disabled={status === 'scanning'}
+                    disabled={status === "scanning"}
                     size="lg"
                     className="w-full px-6 py-3 sm:w-auto"
                   >
-                    {status === 'scanning' ? (
+                    {status === "scanning" ? (
                       <>
                         <Icons.Spinner className="mr-2 h-5 w-5 animate-spin" />
                         Scanning...

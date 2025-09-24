@@ -346,14 +346,22 @@ fn schedule_peer_sync(handle: AppHandle) {
                 }
             };
 
-            for peer in peers
-                .into_iter()
-                .filter(|peer| peer_has_routable_endpoint(peer))
-            {
+            for peer in peers.into_iter() {
                 let engine = engine.clone();
                 spawn(async move {
-                    if let Err(err) = engine.sync_now(peer.id).await {
-                        warn!("Realtime sync with peer {} failed: {}", peer.id, err);
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    {
+                        // Desktop: send control-plane notification; mobile should dial back.
+                        if let Err(err) = engine.request_sync_from_peer(peer.id).await {
+                            warn!("Realtime notify with peer {} failed: {}", peer.id, err);
+                        }
+                    }
+                    #[cfg(any(target_os = "android", target_os = "ios"))]
+                    {
+                        // Mobile: we are dialer; attempt immediate sync.
+                        if let Err(err) = engine.sync_now(peer.id).await {
+                            warn!("Realtime mobile sync with peer {} failed: {}", peer.id, err);
+                        }
                     }
                 });
             }
@@ -361,35 +369,7 @@ fn schedule_peer_sync(handle: AppHandle) {
     }
 }
 
-#[cfg(feature = "wealthfolio-pro")]
-fn peer_has_routable_endpoint(peer: &peer_store::PersistedPeer) -> bool {
-    if peer
-        .listen_endpoints
-        .iter()
-        .any(|endpoint| endpoint_is_routable(endpoint))
-    {
-        return true;
-    }
-
-    endpoint_is_routable(&peer.address)
-}
-
-fn endpoint_is_routable(endpoint: &str) -> bool {
-    let trimmed = endpoint.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-
-    let normalized = if trimmed.contains("://") {
-        trimmed.to_ascii_lowercase()
-    } else {
-        format!("quic://{}", trimmed).to_ascii_lowercase()
-    };
-
-    !(normalized.contains("://0.0.0.0")
-        || normalized.contains("://[::]")
-        || normalized.contains("://localhost"))
-}
+// Removed unused routable checks; engine will handle connectivity fallbacks
 
 // This function handles the portfolio snapshot and history calculation logic
 fn handle_portfolio_calculation(

@@ -136,15 +136,22 @@ async fn upsert_peer_from_payload(
     state: &State<'_, SyncHandles>,
     payload: &str,
 ) -> Result<PairingRequest, String> {
-    log::info!("[pairing] received payload: {}", payload);
+    log::debug!("[pairing] received payload: {}", payload);
     let request = match pairing::parse_pairing_payload(payload) {
-        Ok(req) => req,
-        Err(_) => return Err("Invalid QR code".to_string()),
+        Ok(req) => {
+            log::debug!("[pairing] successfully parsed payload for device: {}", req.remote_name);
+            req
+        },
+        Err(e) => {
+            log::error!("[pairing] failed to parse payload: {}", e);
+            return Err("Invalid QR code".to_string());
+        },
     };
 
-    log::info!(
-        "[pairing] parsed endpoints for {}: {:?}",
+    log::debug!(
+        "[pairing] parsed endpoints for {} ({}): {:?}",
         request.remote_name,
+        request.remote_id,
         request.listen_endpoints
     );
 
@@ -156,9 +163,10 @@ async fn upsert_peer_from_payload(
         pairing_token: None,
     };
 
-    log::info!(
-        "[pairing] storing peer {} endpoints={:?}",
+    log::debug!(
+        "[pairing] storing peer {} (id: {}) with endpoints={:?}",
         pairing_payload.name,
+        pairing_payload.id,
         pairing_payload.listen_endpoints
     );
 
@@ -166,29 +174,65 @@ async fn upsert_peer_from_payload(
         .engine
         .upsert_peer(pairing_payload)
         .await
-        .map_err(|_| "Failed to pair this device. Please try again.".to_string())?;
+        .map_err(|e| {
+            log::error!("[pairing] failed to upsert peer: {}", e);
+            "Failed to pair this device. Please try again.".to_string()
+        })?;
+
+    log::debug!("[pairing] successfully stored peer: {}", request.remote_name);
 
     Ok(request)
 }
 
 #[tauri::command]
-pub async fn sync_with_peer(
+pub async fn pair_and_sync(
     state: State<'_, SyncHandles>,
     handle: AppHandle,
     payload: String,
 ) -> Result<String, String> {
+    log::debug!("[pair_and_sync] Starting pairing and sync process");
+    log::debug!("[pair_and_sync] Payload received: {}", payload);
+
     let request = upsert_peer_from_payload(&state, &payload).await?;
 
-    state
-        .engine
-        .sync_now(request.remote_id)
-        .await
-        .map_err(|err| {
-            let msg = err.to_string();
-            log::error!("sync_with_peer error: {}", msg);
-            "Sync failed after pairing. Please try again.".to_string()
-        })?;
+    log::debug!("[pair_and_sync] Successfully paired with device: {} ({})", request.remote_name, request.remote_id);
 
+    // Try sync with retry logic for connection issues
+    for attempt in 1..=2 {
+        log::debug!("[pair_and_sync] Sync attempt {} with {}", attempt, request.remote_name);
+
+        match state.engine.sync_now(request.remote_id).await {
+            Ok(_) => {
+                log::debug!("[pair_and_sync] Sync successful on attempt {}", attempt);
+                break;
+            }
+            Err(err) => {
+                let msg = err.to_string();
+                log::warn!("[pair_and_sync] Sync attempt {} failed: {}", attempt, msg);
+
+                // Only retry for connection-related errors
+                if attempt == 1 && (msg.contains("connection lost") || msg.contains("read error")) {
+                    log::debug!("[pair_and_sync] Retrying sync due to connection issue...");
+                    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+                    continue;
+                }
+
+                // Handle non-retryable errors or final retry failure
+                log::error!("[pair_and_sync] sync error: {}", msg);
+                return Err(if msg.contains("connection lost") || msg.contains("read error") {
+                    "Connection lost during sync. The devices paired successfully, but sync was interrupted. Please try again.".to_string()
+                } else if msg.contains("timeout") {
+                    "Sync timed out. Please ensure both devices are on the same network and try again.".to_string()
+                } else if msg.contains("network") || msg.contains("connection") {
+                    "Network error during sync. Please check your connection and try again.".to_string()
+                } else {
+                    format!("Sync failed after pairing: {}. Please try again.", msg)
+                });
+            }
+        }
+    }
+
+    log::debug!("[pair_and_sync] Sync completed successfully with {}", request.remote_name);
     emit_sync_completed(&handle);
 
     Ok(format!("Successfully synced with {}", request.remote_name))
@@ -219,17 +263,42 @@ pub struct SyncNowArgs {
 pub async fn sync_now(state: State<'_, SyncHandles>, handle: AppHandle, payload: SyncNowArgs) -> Result<(), String> {
     let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
 
+    match state.engine.sync_now(id).await {
+        Ok(()) => {
+            emit_sync_completed(&handle);
+            Ok(())
+        }
+        Err(err) => {
+            let msg = err.to_string();
+            log::warn!("sync_now direct dial failed: {}", msg);
+            // Desktop: fall back to control-plane notify so the peer dials us
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                if let Err(e) = state.engine.request_sync_from_peer(id).await {
+                    log::error!("sync_now fallback notify failed: {}", e);
+                    return Err("Failed to sync with this device. Please try again.".to_string());
+                }
+                // Do not emit completion here; the actual sync will be driven by the peer.
+                return Ok(());
+            }
+            // Mobile: surface the error
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                log::error!("sync_now error: {}", msg);
+                return Err("Failed to sync with this device. Please try again.".to_string());
+            }
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn notify_peer_sync(state: State<'_, SyncHandles>, payload: SyncNowArgs) -> Result<(), String> {
+    let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
     state
         .engine
-        .sync_now(id)
+        .request_sync_from_peer(id)
         .await
-        .map_err(|err| {
-            let msg = err.to_string();
-            log::error!("sync_now error: {}", msg);
-            "Failed to sync with this device. Please try again.".to_string()
-        })?;
-    emit_sync_completed(&handle);
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
