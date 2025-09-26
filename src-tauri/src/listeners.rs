@@ -349,19 +349,8 @@ fn schedule_peer_sync(handle: AppHandle) {
             for peer in peers.into_iter() {
                 let engine = engine.clone();
                 spawn(async move {
-                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                    {
-                        // Desktop: send control-plane notification; mobile should dial back.
-                        if let Err(err) = engine.request_sync_from_peer(peer.id).await {
-                            warn!("Realtime notify with peer {} failed: {}", peer.id, err);
-                        }
-                    }
-                    #[cfg(any(target_os = "android", target_os = "ios"))]
-                    {
-                        // Mobile: we are dialer; attempt immediate sync.
-                        if let Err(err) = engine.sync_now(peer.id).await {
-                            warn!("Realtime mobile sync with peer {} failed: {}", peer.id, err);
-                        }
+                    if let Err(err) = engine.sync_now(peer.id).await {
+                        warn!("Realtime sync with peer {} failed: {}", peer.id, err);
                     }
                 });
             }

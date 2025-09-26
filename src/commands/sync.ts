@@ -102,22 +102,6 @@ export const syncNow = async (args: SyncNowArgs): Promise<void> => {
   }
 };
 
-export const notifyPeerSync = async (args: SyncNowArgs): Promise<void> => {
-  try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("notify_peer_sync", { payload: args });
-      case RUN_ENV.WEB:
-        return invokeWeb("notify_peer_sync", { payload: args });
-      default:
-        throw new Error("Unsupported environment");
-    }
-  } catch (_error) {
-    logger.error("Error notifying peer to sync.");
-    throw _error;
-  }
-};
-
 export const initializeSyncForExistingData = async (): Promise<string> => {
   try {
     switch (getRunEnv()) {

@@ -263,42 +263,17 @@ pub struct SyncNowArgs {
 pub async fn sync_now(state: State<'_, SyncHandles>, handle: AppHandle, payload: SyncNowArgs) -> Result<(), String> {
     let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
 
-    match state.engine.sync_now(id).await {
-        Ok(()) => {
-            emit_sync_completed(&handle);
-            Ok(())
-        }
-        Err(err) => {
-            let msg = err.to_string();
-            log::warn!("sync_now direct dial failed: {}", msg);
-            // Desktop: fall back to control-plane notify so the peer dials us
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            {
-                if let Err(e) = state.engine.request_sync_from_peer(id).await {
-                    log::error!("sync_now fallback notify failed: {}", e);
-                    return Err("Failed to sync with this device. Please try again.".to_string());
-                }
-                // Do not emit completion here; the actual sync will be driven by the peer.
-                return Ok(());
-            }
-            // Mobile: surface the error
-            #[cfg(any(target_os = "android", target_os = "ios"))]
-            {
-                log::error!("sync_now error: {}", msg);
-                return Err("Failed to sync with this device. Please try again.".to_string());
-            }
-        }
-    }
-}
-
-#[tauri::command]
-pub async fn notify_peer_sync(state: State<'_, SyncHandles>, payload: SyncNowArgs) -> Result<(), String> {
-    let id = Uuid::parse_str(&payload.peer_id).map_err(|e| e.to_string())?;
     state
         .engine
-        .request_sync_from_peer(id)
+        .sync_now(id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|err| {
+            log::error!("sync_now error: {}", err);
+            "Failed to sync with this device. Please try again.".to_string()
+        })?;
+
+    emit_sync_completed(&handle);
+    Ok(())
 }
 
 #[tauri::command]

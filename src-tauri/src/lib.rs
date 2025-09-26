@@ -134,41 +134,10 @@ fn spawn_background_tasks(
                 );
             }));
 
-            // When we receive a control-plane SyncNow:
-            // - Mobile: run sync over the existing control session via substream.
-            // - Desktop: no-op (we expect mobile to be the long-lived side).
-            let engine_for_ctrl = engine.clone();
-            let handle_for_ctrl = handle_clone.clone();
-            engine.set_on_control_sync_now(Arc::new(move |peer_id| {
-                #[cfg(any(target_os = "android", target_os = "ios"))]
-                {
-                    let engine_to_use = engine_for_ctrl.clone();
-                    let handle_to_use = handle_for_ctrl.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(e) = engine_to_use.sync_over_control_session(peer_id).await {
-                            log::warn!("[control] substream sync failed: {}", e);
-                            return;
-                        }
-                        emit_portfolio_trigger_recalculate(
-                            &handle_to_use,
-                            PortfolioRequestPayload::builder()
-                                .refetch_all_market_data(true)
-                                .build(),
-                        );
-                    });
-                }
-            }));
-
             if let Err(_e) = engine.start().await {
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 log::error!("sync start error: {_e}");
                 return;
-            }
-
-            // On mobile, maintain persistent control sessions to desktop peers.
-            #[cfg(any(target_os = "android", target_os = "ios"))]
-            {
-                engine.spawn_mobile_reconnect_loops();
             }
 
             // Keep engine reachable from commands
@@ -388,8 +357,6 @@ pub fn run() {
             commands::sync::force_full_sync_with_peer,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::sync_now,
-            #[cfg(feature = "wealthfolio-pro")]
-            commands::sync::notify_peer_sync,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::probe_local_network_access,
             #[cfg(feature = "wealthfolio-pro")]
