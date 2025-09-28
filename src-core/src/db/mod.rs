@@ -1,6 +1,7 @@
 use chrono::Local;
-use log::{error, info};
+use log::{error, info, warn};
 use std::fs;
+use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -187,74 +188,47 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
         info!("Created pre-restore backup at: {} (including WAL/SHM files if present)", restore_backup_path);
     }
 
-    // Remove existing WAL and SHM files to ensure clean state
-    // On Windows, these files might be locked by active connections, so we need to handle this gracefully
+    // Remove existing WAL and SHM files to ensure clean state.
+    // On Windows, these files might be locked by active connections; tolerate sharing violations.
     let wal_path = format!("{}-wal", db_path);
     let shm_path = format!("{}-shm", db_path);
-    
+
     if Path::new(&wal_path).exists() {
-        // Try to remove WAL file, but don't fail if it's locked (Windows issue)
-        if let Err(e) = fs::remove_file(&wal_path) {
-            error!("Failed to remove existing WAL file: {}", e);
-            #[cfg(target_os = "windows")]
-            {
-                // On Windows, if the file is locked, we'll proceed anyway
-                // The restore will still work, but might leave the old WAL file
-                if e.kind() == std::io::ErrorKind::PermissionDenied {
-                    info!("WAL file is locked by another process, proceeding with restore anyway");
-                } else {
-                    return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
-                }
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
-            }
+        if let Err(e) = try_remove_file_best_effort(&wal_path, "WAL") {
+            return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
         }
     }
-    
+
     if Path::new(&shm_path).exists() {
-        // Try to remove SHM file, but don't fail if it's locked (Windows issue)
-        if let Err(e) = fs::remove_file(&shm_path) {
-            error!("Failed to remove existing SHM file: {}", e);
-            #[cfg(target_os = "windows")]
-            {
-                // On Windows, if the file is locked, we'll proceed anyway
-                if e.kind() == std::io::ErrorKind::PermissionDenied {
-                    info!("SHM file is locked by another process, proceeding with restore anyway");
-                } else {
-                    return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
-                }
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
-            }
+        if let Err(e) = try_remove_file_best_effort(&shm_path, "SHM") {
+            return Err(Error::Database(DatabaseError::BackupFailed(e.to_string())));
         }
     }
 
     // Copy the main backup file
-    fs::copy(backup_file_path, &db_path).map_err(|e| {
-        error!("Failed to restore database: {}", e);
-        Error::Database(DatabaseError::BackupFailed(e.to_string()))
-    })?;
+    copy_with_retries(backup_file_path, &db_path, 5, std::time::Duration::from_millis(200))?;
 
     // Copy WAL file if it exists in backup
     let backup_wal_path = format!("{}-wal", backup_file_path);
     if Path::new(&backup_wal_path).exists() {
-        fs::copy(&backup_wal_path, &wal_path).map_err(|e| {
-            error!("Failed to restore WAL file: {}", e);
-            Error::Database(DatabaseError::BackupFailed(e.to_string()))
-        })?;
+        if let Err(e) = copy_with_retries(&backup_wal_path, &wal_path, 3, std::time::Duration::from_millis(200)) {
+            // WAL copy failure is non-fatal; DB will recreate WAL on next write.
+            warn!("Failed to restore WAL file (non-fatal): {}", e);
+        }
     }
 
     // Copy SHM file if it exists in backup
     let backup_shm_path = format!("{}-shm", backup_file_path);
     if Path::new(&backup_shm_path).exists() {
-        fs::copy(&backup_shm_path, &shm_path).map_err(|e| {
-            error!("Failed to restore SHM file: {}", e);
-            Error::Database(DatabaseError::BackupFailed(e.to_string()))
-        })?;
+        if let Err(e) = copy_with_retries(&backup_shm_path, &shm_path, 3, std::time::Duration::from_millis(200)) {
+            // SHM copy failure is non-fatal; it'll be recreated as needed.
+            warn!("Failed to restore SHM file (non-fatal): {}", e);
+        }
+    }
+
+    // Ensure desired journal mode; recreate WAL after restore for consistency
+    if let Ok(mut conn) = SqliteConnection::establish(&db_path) {
+        let _ = conn.batch_execute("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
     }
 
     info!("Database restored successfully");
@@ -272,11 +246,13 @@ pub fn restore_database_safe(app_data_dir: &str, backup_file_path: &str) -> Resu
     if let Ok(mut conn) = SqliteConnection::establish(&db_path) {
         use diesel::RunQueryDsl;
         let _ = diesel::sql_query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&mut conn);
+        // Try to temporarily switch to DELETE journal mode to minimize WAL interactions
+        let _ = diesel::sql_query("PRAGMA journal_mode = DELETE").execute(&mut conn);
         info!("Executed WAL checkpoint before restore");
     }
     
     // Small delay to allow any pending operations to complete
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(150));
     
     // Now perform the actual restore
     restore_database(app_data_dir, backup_file_path)
@@ -305,6 +281,84 @@ impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for Connec
 
         Ok(())
     }
+}
+
+// --- Internal helpers for robust, cross-platform file operations ---
+
+/// Determine if an IO error on Windows is a sharing/lock violation.
+#[inline]
+#[allow(unused_variables)]
+fn is_sharing_violation(e: &io::Error) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        matches!(e.raw_os_error(), Some(32) | Some(33))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+/// Try to remove a file; on Windows, tolerate sharing violations and continue.
+fn try_remove_file_best_effort(path: &str, label: &str) -> std::result::Result<(), io::Error> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            if is_sharing_violation(&e) {
+                warn!(
+                    "{} file appears to be in use ({}). Proceeding with restore anyway.",
+                    label, e
+                );
+                Ok(())
+            } else if e.kind() == io::ErrorKind::NotFound {
+                Ok(())
+            } else {
+                error!("Failed to remove existing {} file '{}': {}", label, path, e);
+                Err(e)
+            }
+        }
+    }
+}
+
+/// Copy a file with retry/backoff; maps errors into existing Result type on failure.
+fn copy_with_retries(src: &str, dst: &str, attempts: usize, backoff: std::time::Duration) -> Result<()> {
+    let mut last_err: Option<io::Error> = None;
+    for i in 0..attempts {
+        match fs::copy(src, dst) {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                // On Windows, if destination is locked, wait and retry
+                if let Some(ref err) = last_err {
+                    if is_sharing_violation(err) {
+                        warn!(
+                            "Attempt {}/{}: destination appears locked when copying to '{}'. Retrying in {:?}...",
+                            i + 1,
+                            attempts,
+                            dst,
+                            backoff
+                        );
+                        std::thread::sleep(backoff);
+                        continue;
+                    }
+                }
+                // For other errors, retry a couple times anyway
+                warn!(
+                    "Attempt {}/{}: failed to copy '{}' -> '{}': {}. Retrying in {:?}...",
+                    i + 1,
+                    attempts,
+                    src,
+                    dst,
+                    last_err.as_ref().unwrap(),
+                    backoff
+                );
+                std::thread::sleep(backoff);
+            }
+        }
+    }
+    let e = last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "unknown copy error"));
+    error!("Failed to copy '{}' -> '{}': {}", src, dst, e);
+    Err(Error::Database(DatabaseError::BackupFailed(e.to_string())))
 }
 
 /// Trait for executing database transactions

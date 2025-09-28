@@ -85,7 +85,9 @@ export const ActivityTable = ({
               <TickerAvatar symbol={avatarSymbol} className="w-8 h-8 mr-2" />
               <div className="flex flex-col">
                 <span className="font-medium">{displaySymbol}</span>
-                <span className="text-xs text-muted-foreground">{row.getValue('assetName')}</span>
+                <span className="text-xs text-muted-foreground">
+                  {isCash ? row.getValue('currency') : row.getValue('assetName')}
+                </span>
               </div>
             </div>
           );

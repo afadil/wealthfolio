@@ -23,6 +23,7 @@ import PerformancePage from '@/pages/performance/performance-page';
 import MarketDataSettingsPage from './pages/settings/market-data-settings';
 import AddonSettingsPage from './pages/settings/addons/addon-settings';
 import { QuoteImportPage } from './pages/settings/QuoteImportPage';
+import AboutSettingsPage from './pages/settings/about/about-page';
 import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 
 export function AppRoutes() {
@@ -82,6 +83,7 @@ export function AppRoutes() {
             <Route path="accounts" element={<SettingsAccountsPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
+            <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />

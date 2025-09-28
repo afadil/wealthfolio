@@ -36,7 +36,7 @@ const OnboardingPage = () => {
   };
 
   return (
-    <section className="grid min-h-screen grid-rows-[auto_1fr] justify-items-center py-16 ">
+  <section className="grid h-full grid-rows-[auto_1fr] justify-items-center py-16 ">
       <img
         alt="Wealthfolio Illustration"
         className="align-self-end mx-auto mb-8"

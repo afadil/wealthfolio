@@ -28,7 +28,7 @@ export function SidebarNav({ navigation }: { navigation: NavigationProps }) {
   return (
     <div
       className={cn({
-        'light:bg-secondary/50 h-screen border-r pt-12 transition-[width] duration-300 ease-in-out md:flex':
+  'light:bg-secondary/50 h-screen box-border border-r pt-12 transition-[width] duration-300 ease-in-out md:flex':
           true,
         'md:w-sidebar': !collapsed,
         'md:w-sidebar-collapsed': collapsed,

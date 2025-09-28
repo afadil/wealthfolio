@@ -54,7 +54,7 @@ const ActivityPage = () => {
 
 
   return (
-    <div className="flex h-screen flex-col p-6">
+  <div className="flex h-full flex-col p-6">
       <div className="flex-shrink-0">
         <ApplicationHeader heading="Activity">
           <div className="flex flex-wrap items-center gap-2">

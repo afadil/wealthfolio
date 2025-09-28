@@ -6,7 +6,14 @@ import { useSettings } from '@/hooks/use-settings';
 import { useSettingsMutation } from '@/hooks/use-settings-mutation';
 
 interface ExtendedSettingsContextType extends SettingsContextType {
-  updateSettings: (updates: Partial<Pick<Settings, 'theme' | 'font' | 'baseCurrency' | 'onboardingCompleted'>>) => Promise<void>;
+  updateSettings: (
+    updates: Partial<
+      Pick<
+        Settings,
+        'theme' | 'font' | 'baseCurrency' | 'onboardingCompleted' | 'menuBarVisible'
+      >
+    >,
+  ) => Promise<void>;
 }
 
 const SettingsContext = createContext<ExtendedSettingsContextType | undefined>(undefined);
@@ -25,7 +32,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   };
 
   // Batch update function
-  const updateSettings = async (updates: Partial<Pick<Settings, 'theme' | 'font' | 'baseCurrency' | 'onboardingCompleted'>>) => {
+  const updateSettings = async (
+    updates: Partial<
+      Pick<
+        Settings,
+        'theme' | 'font' | 'baseCurrency' | 'onboardingCompleted' | 'menuBarVisible'
+      >
+    >,
+  ) => {
     if (!settings) throw new Error('Settings not loaded');
     await updateMutation.mutateAsync({ ...settings, ...updates });
   };

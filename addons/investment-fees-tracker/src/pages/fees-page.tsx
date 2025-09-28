@@ -7,7 +7,7 @@ import type { AddonContext } from '@wealthfolio/addon-sdk';
 // Simple ApplicationShell replacement since it's not exported from UI package
 function ApplicationShell({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`min-h-screen bg-background ${className || ''}`}>
+  <div className={`min-h-full bg-background ${className || ''}`}>
       <main className="flex-1">
         {children}
       </main>

@@ -79,7 +79,7 @@ export function ImportHelpPopover() {
 
               <div>
                 <p className="font-semibold">Example CSV format:</p>
-                <pre className="mt-2 overflow-x-auto bg-muted p-3 text-xs leading-relaxed">
+                <pre className="mt-2 overflow-x-auto bg-muted p-3 text-xs leading-relaxed select-all">
                   <span className="text-muted-foreground"># Standard format:</span>
                   <br />
                   date,symbol,quantity,activityType,unitPrice,currency,fee,amount

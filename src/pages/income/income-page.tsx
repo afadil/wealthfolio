@@ -426,7 +426,7 @@ export default function IncomePage() {
 
 function IncomeDashboardSkeleton() {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+  <div className="flex h-full flex-col bg-background">
       <main className="flex-1 space-y-6 px-4 py-6 md:px-6">
         <div className="grid gap-6 md:grid-cols-3">
           {[...Array(3)].map((_, index) => (

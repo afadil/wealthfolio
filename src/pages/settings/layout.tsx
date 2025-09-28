@@ -8,6 +8,10 @@ const sidebarNavItems = [
     href: 'general',
   },
   {
+    title: 'Appearance',
+    href: 'appearance',
+  },
+  {
     title: 'Accounts',
     href: 'accounts',
   },
@@ -32,12 +36,12 @@ const sidebarNavItems = [
     href: 'addons',
   },
   {
-    title: 'Appearance',
-    href: 'appearance',
-  },
-  {
     title: 'Data Export',
     href: 'exports',
+  },
+  {
+    title: 'About',
+    href: 'about',
   },
 ];
 
