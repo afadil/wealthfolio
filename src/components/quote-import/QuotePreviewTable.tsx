@@ -65,7 +65,7 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
                   <TableCell>
                     <Badge
                       variant={quote.validationStatus === 'valid' ? 'default' : 'destructive'}
-                      className={getStatusColor(quote.validationStatus)}
+                      className={`whitespace-nowrap ${getStatusColor(quote.validationStatus)}`}
                     >
                       {formatValidationStatus(quote.validationStatus)}
                     </Badge>

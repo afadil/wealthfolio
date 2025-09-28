@@ -22,7 +22,7 @@ import ContributionLimitPage from './pages/settings/contribution-limits/contribu
 import PerformancePage from '@/pages/performance/performance-page';
 import MarketDataSettingsPage from './pages/settings/market-data-settings';
 import AddonSettingsPage from './pages/settings/addons/addon-settings';
-import { QuoteImportPage } from './pages/settings/QuoteImportPage';
+
 import AboutSettingsPage from './pages/settings/about/about-page';
 import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
 
@@ -87,7 +87,7 @@ export function AppRoutes() {
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
-            <Route path="import-quotes" element={<QuoteImportPage />} />
+
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />

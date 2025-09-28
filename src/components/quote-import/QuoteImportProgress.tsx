@@ -27,6 +27,8 @@ export function QuoteImportProgress({
   failedRows,
   onCancel,
 }: QuoteImportProgressProps) {
+  // If not importing, show 100% progress (import completed)
+  const displayProgress = isImporting ? progress : 100;
   return (
     <Card>
       <CardHeader>
@@ -42,9 +44,9 @@ export function QuoteImportProgress({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>Progress</span>
-            <span>{Math.round(progress)}%</span>
+            <span>{Math.round(displayProgress)}%</span>
           </div>
-          <Progress value={progress} className="w-full" />
+          <Progress value={displayProgress} className="w-full" />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
