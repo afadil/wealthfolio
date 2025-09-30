@@ -375,6 +375,8 @@ impl Default for ImportMappingData {
         activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
         activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
         activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
+        activity_mappings.insert("LOAN_TAKEN".to_string(), vec!["LOAN_TAKEN".to_string()]);
+        activity_mappings.insert("LOAN_REPAID".to_string(), vec!["LOAN_REPAID".to_string()]);
 
         ImportMappingData {
             account_id: String::new(),
@@ -426,6 +428,8 @@ pub enum ActivityType {
     Split,
     AddHolding,
     RemoveHolding,
+    LoanTaken,
+    LoanRepaid,
 }
 
 impl ActivityType {
@@ -445,6 +449,8 @@ impl ActivityType {
             ActivityType::Split => ACTIVITY_TYPE_SPLIT,
             ActivityType::AddHolding => ACTIVITY_TYPE_ADD_HOLDING,
             ActivityType::RemoveHolding => ACTIVITY_TYPE_REMOVE_HOLDING,
+            ActivityType::LoanTaken => ACTIVITY_TYPE_LOAN_TAKEN,
+            ActivityType::LoanRepaid => ACTIVITY_TYPE_LOAN_REPAID,
         }
     }
 }
@@ -468,6 +474,8 @@ impl FromStr for ActivityType {
             s if s == ACTIVITY_TYPE_SPLIT => Ok(ActivityType::Split),
             s if s == ACTIVITY_TYPE_ADD_HOLDING => Ok(ActivityType::AddHolding),
             s if s == ACTIVITY_TYPE_REMOVE_HOLDING => Ok(ActivityType::RemoveHolding),
+            s if s == ACTIVITY_TYPE_LOAN_TAKEN => Ok(ActivityType::LoanTaken),
+            s if s == ACTIVITY_TYPE_LOAN_REPAID => Ok(ActivityType::LoanRepaid),
             _ => Err(format!("Unknown activity type: {}", s)),
         }
     }

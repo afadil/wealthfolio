@@ -183,6 +183,8 @@ pub struct HoldingsCalculator {
             ActivityType::RemoveHolding => self.handle_remove_holding(activity, state, account_currency, fee_acct),
             ActivityType::TransferIn => self.handle_transfer_in(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::TransferOut => self.handle_transfer_out(activity, state, account_currency, amount_acct, fee_acct),
+            ActivityType::LoanTaken => self.handle_loan_taken(activity, state, account_currency, amount_acct, fee_acct),
+            ActivityType::LoanRepaid => self.handle_loan_repaid(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::Split => Ok(()), 
          }
     }
@@ -844,6 +846,88 @@ pub struct HoldingsCalculator {
                     .or_insert(Decimal::ZERO) -= fee_acct;
             }
         }
+        Ok(())
+    }
+
+    fn handle_loan_taken(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        amount_acct: Decimal, // Already converted using activity date
+        fee_acct: Decimal,    // Already converted using activity date
+    ) -> Result<()> {
+        let base_ccy = self.base_currency.read().unwrap();
+        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_amount = activity.amount.unwrap_or(Decimal::ZERO);
+        
+        // Convert loan amount to base currency for tracking
+        let amount_base = match self.fx_service.convert_currency_for_date(
+            activity_amount,
+            &activity.currency,
+            &base_ccy,
+            activity_date,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Holdings Calc (Loan Taken Base {}): Failed conversion {} {}->{} on {}: {}. Base loan balance not updated.", activity.id, activity_amount, &activity.currency, &base_ccy, activity_date, e);
+                Decimal::ZERO
+            }
+        };
+
+        // Loan taken: increases cash but does NOT affect net_contribution
+        // (because it's not the user's own money)
+        let net_amount_acct = amount_acct - fee_acct;
+        *state
+            .cash_balances
+            .entry(account_currency.to_string())
+            .or_insert(Decimal::ZERO) += net_amount_acct;
+        
+        // Track loan balance (pre-fee amount)
+        state.outstanding_loans += amount_acct;
+        state.outstanding_loans_base += amount_base;
+        
+        Ok(())
+    }
+
+    fn handle_loan_repaid(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        amount_acct: Decimal, // Already converted using activity date
+        fee_acct: Decimal,    // Already converted using activity date
+    ) -> Result<()> {
+        let base_ccy = self.base_currency.read().unwrap();
+        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_amount = activity.amount.unwrap_or(Decimal::ZERO);
+        
+        // Convert loan repayment amount to base currency for tracking
+        let amount_base = match self.fx_service.convert_currency_for_date(
+            activity_amount,
+            &activity.currency,
+            &base_ccy,
+            activity_date,
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Holdings Calc (Loan Repaid Base {}): Failed conversion {} {}->{} on {}: {}. Base loan balance not updated.", activity.id, activity_amount, &activity.currency, &base_ccy, activity_date, e);
+                Decimal::ZERO
+            }
+        };
+
+        // Loan repaid: decreases cash but does NOT affect net_contribution
+        // (because it's not reducing the user's own investment)
+        let net_amount_acct = amount_acct + fee_acct;
+        *state
+            .cash_balances
+            .entry(account_currency.to_string())
+            .or_insert(Decimal::ZERO) -= net_amount_acct;
+        
+        // Reduce loan balance (pre-fee amount)
+        state.outstanding_loans -= amount_acct;
+        state.outstanding_loans_base -= amount_base;
+        
         Ok(())
     }
 
