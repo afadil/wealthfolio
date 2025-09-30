@@ -46,7 +46,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   
   if (isLoading) {
     return (
-      <div className="p-6 min-h-screen flex items-center justify-center bg-background">
+  <div className="p-6 h-full flex items-center justify-center bg-background">
         <div className="text-center">
           <Icons.Loader className="h-8 w-8 animate-spin text-primary mx-auto" />
           <p className="mt-4 text-muted-foreground text-sm">
@@ -59,7 +59,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
 
   if (error) {
     return (
-      <div className="p-6 min-h-screen flex items-center justify-center bg-background">
+  <div className="p-6 h-full flex items-center justify-center bg-background">
         <div className="p-6 text-center bg-red-50 dark:bg-red-950 text-destructive rounded-xl border border-red-200 dark:border-red-800 max-w-md">
           <h3 className="mb-2 text-base font-semibold">
             Error Loading Data
@@ -75,7 +75,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   // Show empty placeholder if no goals exist
   if (!goals || goals.length === 0) {
     return (
-      <div className="bg-background min-h-screen">
+  <div className="bg-background h-full">
         {/* Header */}
         <header className="w-full p-3 sm:p-6 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
           <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
   }
 
   return (
-    <div className="bg-background flex flex-col min-h-screen">
+  <div className="bg-background flex flex-col h-full">
       {/* Header - Full Width */}
       <header className="w-full p-3 sm:p-6 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">

@@ -125,7 +125,22 @@ Ensure you have the following installed on your machine:
    pnpm install
    ```
 
-3. **Run in Development Mode**:
+3. **Setup environment configuration**:
+
+   Copy the environment template and configure it for your setup:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Update the `.env` file with your database path and other configuration as needed:
+
+   ```bash
+   # Database location
+   DATABASE_URL=../db/wealthfolio.db
+   ```
+
+4. **Run in Development Mode**:
 
   Build and run the desktop application using Tauri:
 
@@ -133,7 +148,7 @@ Ensure you have the following installed on your machine:
   pnpm tauri dev
   ```
 
-4. **Build for Production**:
+5. **Build for Production**:
 
   Build the application for production:
 

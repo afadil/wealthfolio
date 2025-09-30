@@ -3,7 +3,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/ui/icons';
-import { useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
+import { useUpdatePortfolioMutation, useRecalculatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
 import { formatDateTime } from '@/lib/utils';
 
 // Rename interface
@@ -15,12 +15,17 @@ interface PortfolioUpdateTriggerProps {
 // Rename function
 export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: PortfolioUpdateTriggerProps) {
 
-  // Instantiate the mutation hook inside the component
+  // Instantiate the mutation hooks inside the component
   const updatePortfolioMutation = useUpdatePortfolioMutation();
+  const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
 
-  // Define handleRecalculate internally
-  const handleRecalculate = async () => {
+  // Define handlers internally
+  const handleUpdate = async () => {
     updatePortfolioMutation.mutate();
+  };
+
+  const handleRecalculate = async () => {
+    recalculatePortfolioMutation.mutate();
   };
 
   return (
@@ -39,7 +44,7 @@ export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: Portfolio
             </h4>
           </div>
           <Button
-            onClick={handleRecalculate} // Use internal handler
+            onClick={handleUpdate} // Use internal handler
             variant="outline"
             size="sm"
             className="rounded-full"
@@ -51,6 +56,20 @@ export function PortfolioUpdateTrigger({ lastCalculatedAt, children }: Portfolio
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
             {updatePortfolioMutation.isPending ? 'Updating portfolio...' : 'Update Portfolio'}
+          </Button>
+          <Button
+            onClick={handleRecalculate}
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            disabled={recalculatePortfolioMutation.isPending}
+          >
+            {recalculatePortfolioMutation.isPending ? (
+              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Refresh className="mr-2 h-4 w-4" />
+            )}
+            {recalculatePortfolioMutation.isPending ? 'Recalculating...' : 'Recalculate'}
           </Button>
         </div>
       </HoverCardContent>

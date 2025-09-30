@@ -8,6 +8,10 @@ const sidebarNavItems = [
     href: 'general',
   },
   {
+    title: 'Appearance',
+    href: 'appearance',
+  },
+  {
     title: 'Accounts',
     href: 'accounts',
   },
@@ -23,21 +27,18 @@ const sidebarNavItems = [
     title: 'Market Data',
     href: 'market-data',
   },
-  {
-    title: 'Import Quotes',
-    href: 'import-quotes',
-  },
+
   {
     title: 'Add-ons',
     href: 'addons',
   },
   {
-    title: 'Appearance',
-    href: 'appearance',
-  },
-  {
     title: 'Data Export',
     href: 'exports',
+  },
+  {
+    title: 'About',
+    href: 'about',
   },
 ];
 

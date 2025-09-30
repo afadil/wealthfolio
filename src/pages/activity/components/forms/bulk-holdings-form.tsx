@@ -125,10 +125,10 @@ const HoldingRow = memo(({
       onClick={handleRowClick}
     >
       {/* Ticker Input */}
-      <div className="col-span-5">
-        <div className="flex items-center gap-2">
-          <TickerAvatar symbol={ticker} />
-          <div className="flex-1">
+      <div className="col-span-6">
+        <div className="flex items-center gap-2 min-w-0">
+          <TickerAvatar symbol={ticker} className="flex-shrink-0" />
+          <div className="flex-1 min-w-0">
             <FormField
               control={control}
               name={`holdings.${index}.ticker`}
@@ -141,7 +141,7 @@ const HoldingRow = memo(({
                   }}
                   value={tickerField.value}
                   placeholder="Search ticker..."
-                  className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                  className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background truncate"
                 />
               )}
             />
@@ -150,14 +150,14 @@ const HoldingRow = memo(({
       </div>
 
       {/* Shares Input */}
-      <div className="col-span-2 text-right">
+      <div className="col-span-1 text-right">
         <FormField
           control={control}
           name={`holdings.${index}.sharesOwned`}
           render={({ field: sharesField }) => (
             <QuantityInput
               {...sharesField}
-              placeholder="Add shares"
+              placeholder="Shares"
               className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
               onKeyDown={handleSharesKeyDown}
             />
@@ -323,8 +323,8 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
 
           {/* Table Header */}
           <div className="grid grid-cols-12 gap-3 border-b pb-3 text-sm text-muted-foreground">
-            <div className="col-span-5">Tickers</div>
-            <div className="col-span-2 text-right">Shares owned</div>
+            <div className="col-span-6">Tickers</div>
+            <div className="col-span-1 text-right">Shares</div>
             <div className="col-span-2 text-right">Average cost</div>
             <div className="col-span-2 whitespace-nowrap text-right">Total value</div>
             <div className="col-span-1 text-right"></div>

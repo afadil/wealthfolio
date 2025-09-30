@@ -325,6 +325,7 @@ export interface Settings {
   baseCurrency: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
+  menuBarVisible: boolean;
 }
 
 export interface SettingsContextType {
