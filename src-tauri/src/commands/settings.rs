@@ -4,6 +4,8 @@ use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
 use tauri::{AppHandle, State};
+#[cfg(feature = "wealthfolio-pro")]
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 
@@ -48,6 +50,12 @@ pub async fn update_settings(
             new_base_currency_val = Some(updated_currency.clone());
         }
     }
+
+    // Check if sync_enabled is being toggled and track the new value
+    #[cfg(feature = "wealthfolio-pro")]
+    let sync_change = settings_update.sync_enabled;
+    #[cfg(not(feature = "wealthfolio-pro"))]
+    let sync_change: Option<bool> = None;
 
     // Update settings in the database (this applies all changes in settings_update)
     service
@@ -110,6 +118,48 @@ pub async fn update_settings(
             });
         }
     }
+
+    // If sync_enabled was changed, show restart dialog (sync engine starts/stops at app launch)
+    #[cfg(feature = "wealthfolio-pro")]
+    if let Some(new_sync_state) = sync_change {
+        let action = if new_sync_state {
+            "enabled"
+        } else {
+            "disabled"
+        };
+        debug!("Sync {} setting changed; prompting for restart", action);
+
+        // Show restart dialog on desktop platforms
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            let handle_clone = handle.clone();
+            let message = if new_sync_state {
+                "Sync has been enabled successfully!\n\n\
+                 For the changes to take effect, the application needs to restart.\n\n\
+                 Would you like to restart now?"
+            } else {
+                "Sync has been disabled successfully!\n\n\
+                 For the changes to take effect, the application needs to restart.\n\n\
+                 Would you like to restart now?"
+            };
+
+            tauri::async_runtime::spawn(async move {
+                let should_restart = handle_clone
+                    .dialog()
+                    .message(message)
+                    .title("Restart Required")
+                    .buttons(MessageDialogButtons::OkCancel)
+                    .kind(MessageDialogKind::Info)
+                    .blocking_show();
+
+                if should_restart {
+                    handle_clone.restart();
+                }
+            });
+        }
+    }
+    #[allow(unused_variables)]
+    let _ = sync_change;
 
     // Return the latest settings from the database
     service

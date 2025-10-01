@@ -1,5 +1,6 @@
 import { logger } from "@/adapters";
 import { recalculatePortfolio } from "@/commands/portfolio";
+import { updateSettings } from "@/commands/settings";
 import {
   forceFullSyncWithPeer,
   generatePairingPayload,
@@ -15,6 +16,15 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cancel, Format, requestPermissions, scan } from "@tauri-apps/plugin-barcode-scanner";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
   AlertFeedback,
   Badge,
   Button,
@@ -98,7 +108,7 @@ function toErrorMessage(err: unknown, fallback: string): string {
 export default function SyncSettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { settings, isLoading: isSettingsLoading } = useSettingsContext();
+  const { settings, isLoading: isSettingsLoading, refetch: refetchSettings } = useSettingsContext();
   const { isMobile, isDesktop } = usePlatform();
 
   const [manualPairingOverride, setManualPairingOverride] = useState(false);
@@ -119,6 +129,8 @@ export default function SyncSettingsPage() {
   }, []);
 
   const isPro = Boolean(settings?.isPro);
+  const isSyncEnabled = Boolean(settings?.syncEnabled);
+  const [isEnablingSync, setIsEnablingSync] = useState(false);
 
   const {
     data: statusData,
@@ -127,7 +139,7 @@ export default function SyncSettingsPage() {
   } = useQuery({
     queryKey: ["sync-status"],
     queryFn: getSyncStatus,
-    enabled: isPro && !isSettingsLoading,
+    enabled: isPro && isSyncEnabled && !isSettingsLoading,
     staleTime: 10_000,
   });
   const status: SyncStatusData | null = statusData ?? null;
@@ -139,12 +151,12 @@ export default function SyncSettingsPage() {
   } = useQuery({
     queryKey: ["sync-qr"],
     queryFn: async () => {
-      if (!isPro) {
+      if (!isPro || !isSyncEnabled) {
         return null;
       }
       return generatePairingPayload();
     },
-    enabled: isPro && !isSettingsLoading,
+    enabled: isPro && isSyncEnabled && !isSettingsLoading,
     refetchOnWindowFocus: false,
   });
   const isGeneratingQR = isQrFetching;
@@ -281,7 +293,7 @@ export default function SyncSettingsPage() {
   );
 
   const startInlineScan = useCallback(async () => {
-    if (!isPro) return;
+    if (!isPro || !isSyncEnabled) return;
     setIsScanningActive(true);
     setScanError(null);
     setScanPermission("pending");
@@ -298,7 +310,7 @@ export default function SyncSettingsPage() {
       setScanPermission("denied");
       setSyncStatus("idle");
     }
-  }, [isPro]);
+  }, [isPro, isSyncEnabled]);
 
   const performScan = useCallback(async () => {
     if (scanPermission !== "granted" || isScanInFlight) return;
@@ -369,7 +381,7 @@ export default function SyncSettingsPage() {
   }, [isScanningActive]);
 
   const generateQR = useCallback(async () => {
-    if (!isPro) return;
+    if (!isPro || !isSyncEnabled) return;
     setSyncStatus("generating");
     setError(null);
 
@@ -383,10 +395,10 @@ export default function SyncSettingsPage() {
     }
 
     setSyncStatus("idle");
-  }, [isPro, refetchQr, toast]);
+  }, [isPro, isSyncEnabled, refetchQr, toast]);
 
   const doSync = useCallback(async () => {
-    if (!isPro || !pairPayload.trim() || !parsedPayload) return;
+    if (!isPro || !isSyncEnabled || !pairPayload.trim() || !parsedPayload) return;
 
     setSyncStatus("syncing");
     setError(null);
@@ -403,10 +415,10 @@ export default function SyncSettingsPage() {
       setSyncStatus("error");
       toast({ title: "Sync Failed", description: errorMessage, variant: "destructive" });
     }
-  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast, isPro]);
+  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast, isPro, isSyncEnabled]);
 
   const doFullSync = useCallback(async () => {
-    if (!isPro || !pairPayload.trim() || !parsedPayload) return;
+    if (!isPro || !isSyncEnabled || !pairPayload.trim() || !parsedPayload) return;
 
     setSyncStatus("syncing");
     setError(null);
@@ -423,11 +435,11 @@ export default function SyncSettingsPage() {
       setSyncStatus("error");
       toast({ title: "Full Sync Failed", description: errorMessage, variant: "destructive" });
     }
-  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast, isPro]);
+  }, [handlePostSyncSuccess, pairPayload, parsedPayload, toast, isPro, isSyncEnabled]);
 
   const syncExistingPeer = useCallback(
     async (peer: PeerInfo) => {
-      if (!isPro) return;
+      if (!isPro || !isSyncEnabled) return;
       setSyncStatus("syncing");
       setError(null);
       try {
@@ -447,18 +459,20 @@ export default function SyncSettingsPage() {
         toast({ title: "Sync Failed", description: errorMessage, variant: "destructive" });
       }
     },
-    [handlePostSyncSuccess, isMobile, toast, isPro],
+    [handlePostSyncSuccess, isMobile, toast, isPro, isSyncEnabled],
   );
 
   const forceResyncPeer = useCallback(
     async (peer: PeerInfo, preSanitized?: string[]) => {
-      if (!isPro) return;
+      if (!isPro || !isSyncEnabled) return;
       setSyncStatus("syncing");
       setError(null);
       try {
-        const sanitized = preSanitized ?? sanitizeEndpoints(
-          peer.listen_endpoints.length > 0 ? peer.listen_endpoints : [peer.address],
-        );
+        const sanitized =
+          preSanitized ??
+          sanitizeEndpoints(
+            peer.listen_endpoints.length > 0 ? peer.listen_endpoints : [peer.address],
+          );
         if (sanitized.length === 0) {
           throw new Error("Peer does not have any routable endpoints");
         }
@@ -473,9 +487,7 @@ export default function SyncSettingsPage() {
         setSyncStatus("success");
         toast({
           title: "Full sync in progress",
-          description: isMobile
-            ? result
-            : `${result} We'll finish as soon as the device responds.`,
+          description: isMobile ? result : `${result} We'll finish as soon as the device responds.`,
         });
         await handlePostSyncSuccess();
       } catch (e: unknown) {
@@ -485,11 +497,11 @@ export default function SyncSettingsPage() {
         toast({ title: "Full Sync Failed", description: errorMessage, variant: "destructive" });
       }
     },
-    [handlePostSyncSuccess, isMobile, toast, isPro],
+    [handlePostSyncSuccess, isMobile, toast, isPro, isSyncEnabled],
   );
 
   const initializeSync = useCallback(async () => {
-    if (!isPro) return;
+    if (!isPro || !isSyncEnabled) return;
     setSyncStatus("generating");
     setError(null);
 
@@ -503,7 +515,7 @@ export default function SyncSettingsPage() {
       setSyncStatus("error");
       toast({ title: "Initialization Failed", description: errorMessage, variant: "destructive" });
     }
-  }, [toast, isPro]);
+  }, [toast, isPro, isSyncEnabled]);
 
   const copyToClipboard = useCallback(
     async (text: string) => {
@@ -570,6 +582,42 @@ export default function SyncSettingsPage() {
   };
 
   const peers = status?.peers ?? [];
+
+  const enableSync = useCallback(async () => {
+    if (!isPro) return;
+    setIsEnablingSync(true);
+    try {
+      await updateSettings({ syncEnabled: true });
+      await refetchSettings();
+      toast({
+        title: "Sync Enabled",
+        description: "Sync has been enabled successfully.",
+      });
+    } catch (e: unknown) {
+      const errorMessage = toErrorMessage(e, "Failed to enable sync");
+      toast({ title: "Enable Failed", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsEnablingSync(false);
+    }
+  }, [isPro, refetchSettings, toast]);
+
+  const disableSync = useCallback(async () => {
+    if (!isPro || !isSyncEnabled) return;
+    setIsEnablingSync(true);
+    try {
+      await updateSettings({ syncEnabled: false });
+      await refetchSettings();
+      toast({
+        title: "Sync Disabled",
+        description: "Sync has been disabled successfully.",
+      });
+    } catch (e: unknown) {
+      const errorMessage = toErrorMessage(e, "Failed to disable sync");
+      toast({ title: "Disable Failed", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsEnablingSync(false);
+    }
+  }, [isPro, isSyncEnabled, refetchSettings, toast]);
 
   const renderOverlay = () => (
     <div
@@ -667,6 +715,90 @@ export default function SyncSettingsPage() {
           />
           <UpgradeCallout />
         </>
+      ) : !isSyncEnabled ? (
+        <>
+          <SettingsHeader
+            heading="Device Sync"
+            text="Keep your portfolio in sync across all your devices."
+          />
+          <Card className="border-primary/20 from-primary/5 to-primary/10 bg-gradient-to-br">
+            <CardHeader className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-full">
+                  <Icons.Refresh className="text-primary h-6 w-6" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Enable Device Sync</CardTitle>
+                  <CardDescription className="text-muted-foreground/80 mt-1">
+                    Stay synchronized across all your devices
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <h4 className="font-medium">Key Features</h4>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <Icons.Check className="text-primary mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <span>
+                      <strong>Real-time sync:</strong> Changes appear instantly on all paired
+                      devices
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Icons.Check className="text-primary mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <span>
+                      <strong>Secure pairing:</strong> End-to-end encrypted connections between your
+                      devices
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Icons.Check className="text-primary mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <span>
+                      <strong>Local-first:</strong> Your data stays on your devices, no cloud
+                      required
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Icons.Check className="text-primary mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <span>
+                      <strong>Conflict resolution:</strong> Smart merge keeps your data consistent
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <div className="bg-muted/40 rounded-lg border p-4">
+                <div className="flex items-start gap-3">
+                  <Icons.Info className="text-muted-foreground mt-0.5 h-5 w-5 flex-shrink-0" />
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">How it works</p>
+                    <p className="text-muted-foreground">
+                      After enabling sync, you'll generate a pairing code to connect this device
+                      with your other devices. Changes will automatically sync when devices are on
+                      the same network or online.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 pt-2">
+                <Button onClick={enableSync} disabled={isEnablingSync} size="lg" className="w-full">
+                  {isEnablingSync ? (
+                    <>
+                      <Icons.Spinner className="mr-2 h-5 w-5 animate-spin" />
+                      Enabling...
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Refresh className="mr-2 h-5 w-5" />
+                      Enable Sync
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       ) : (
         <>
           {isScanningActive && renderOverlay()}
@@ -729,7 +861,8 @@ export default function SyncSettingsPage() {
                 </div>
                 {!isMobile && (
                   <p className="text-muted-foreground text-center text-xs">
-                    Pairing another desktop? Click Copy and paste the code into Manual pairing on that machine.
+                    Pairing another desktop? Click Copy and paste the code into Manual pairing on
+                    that machine.
                   </p>
                 )}
               </div>
@@ -784,7 +917,8 @@ export default function SyncSettingsPage() {
                   </Button>
                 </CollapsibleTrigger>
                 <CardDescription className="mt-2">
-                  Use this when pairing two desktops: copy the code from one device and paste it here.
+                  Use this when pairing two desktops: copy the code from one device and paste it
+                  here.
                 </CardDescription>
               </CardHeader>
               <CollapsibleContent>
@@ -881,11 +1015,11 @@ export default function SyncSettingsPage() {
 
               {/* Other Paired Devices */}
               {peers.length > 0 ? (
-    peers.map((peer) => {
-      const sanitizedPeerEndpoints = sanitizeEndpoints(
-        peer.listen_endpoints.length > 0 ? peer.listen_endpoints : [peer.address],
-      );
-      const hasDialableEndpoint = sanitizedPeerEndpoints.length > 0;
+                peers.map((peer) => {
+                  const sanitizedPeerEndpoints = sanitizeEndpoints(
+                    peer.listen_endpoints.length > 0 ? peer.listen_endpoints : [peer.address],
+                  );
+                  const hasDialableEndpoint = sanitizedPeerEndpoints.length > 0;
 
                   return (
                     <div
@@ -968,36 +1102,89 @@ export default function SyncSettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Initialize Sync */}
+          {/* Sync Management */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Icons.Database className="h-5 w-5" />
-                Setup
+                <Icons.Settings className="h-5 w-5" />
+                Sync Management
               </CardTitle>
-              <CardDescription>Prepare existing data for sync.</CardDescription>
+              <CardDescription>Manage your sync settings and data.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-muted-foreground text-sm">
-                Run once to enable sync on existing data.
-              </p>
-              <Button
-                onClick={initializeSync}
-                disabled={syncStatus === "generating"}
-                variant="outline"
-              >
-                {syncStatus === "generating" ? (
-                  <>
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                    Setting up...
-                  </>
-                ) : (
-                  <>
-                    <Icons.Database className="mr-2 h-4 w-4" />
-                    Setup sync
-                  </>
-                )}
-              </Button>
+            <CardContent className="space-y-4">
+              {/* Initialize existing data */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Initialize existing data</p>
+                  <p className="text-muted-foreground text-sm">
+                    Run once to enable sync on existing data.
+                  </p>
+                </div>
+                <Button
+                  onClick={initializeSync}
+                  disabled={syncStatus === "generating"}
+                  variant="outline"
+                  className="sm:w-auto"
+                >
+                  {syncStatus === "generating" ? (
+                    <>
+                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Database className="mr-2 h-4 w-4" />
+                      Setup sync
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Disable sync */}
+              <div className="border-t pt-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Disable sync</p>
+                    <p className="text-muted-foreground text-sm">
+                      Turn off sync and stop the sync engine.
+                    </p>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button disabled={isEnablingSync} variant="destructive" className="sm:w-auto">
+                        <Icons.Close className="mr-2 h-4 w-4" />
+                        Disable sync
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Disable Device Sync?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will turn off sync and stop the sync engine. Your data will remain on
+                          this device, but changes will no longer sync with your other devices.
+                          <br />
+                          <br />
+                          You can re-enable sync anytime, and your existing paired devices will
+                          remain configured.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={disableSync} disabled={isEnablingSync}>
+                          {isEnablingSync ? (
+                            <>
+                              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                              Disabling...
+                            </>
+                          ) : (
+                            "Disable sync"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </>

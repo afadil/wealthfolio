@@ -1,11 +1,11 @@
 use crate::db::{get_connection, DbPool, WriteHandle};
 use crate::errors::{Error, Result};
-use crate::settings::{AppSetting, Settings, SettingsUpdate};
 use crate::schema::app_settings::dsl::*;
 use crate::schema::{accounts, assets};
+use crate::settings::{AppSetting, Settings, SettingsUpdate};
+use async_trait::async_trait;
 use diesel::prelude::*;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 // Define the trait for SettingsRepository
 #[async_trait]
@@ -13,7 +13,11 @@ pub trait SettingsRepositoryTrait: Send + Sync {
     fn get_settings(&self) -> Result<Settings>;
     async fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()>;
     fn get_setting(&self, setting_key_param: &str) -> Result<String>;
-    async fn update_setting(&self, setting_key_param: &str, setting_value_param: &str) -> Result<()>;
+    async fn update_setting(
+        &self,
+        setting_key_param: &str,
+        setting_value_param: &str,
+    ) -> Result<()>;
     fn get_distinct_currencies_excluding_base(&self, base_currency: &str) -> Result<Vec<String>>;
 }
 
@@ -47,15 +51,16 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "base_currency" => settings.base_currency = value,
                 "instance_id" => settings.instance_id = value,
                 "onboarding_completed" => {
-                    // Parse the string value into a boolean
                     settings.onboarding_completed = value.parse().unwrap_or(false);
                 }
                 "auto_update_check_enabled" => {
-                    // Parse the string value into a boolean
                     settings.auto_update_check_enabled = value.parse().unwrap_or(true);
                 }
                 "menu_bar_visible" => {
                     settings.menu_bar_visible = value.parse().unwrap_or(true);
+                }
+                "sync_enabled" => {
+                    settings.sync_enabled = value.parse().unwrap_or(false);
                 }
                 _ => {} // Ignore unknown settings
             }
@@ -132,6 +137,15 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         .execute(conn)?;
                 }
 
+                if let Some(sync_enabled) = settings.sync_enabled {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSetting {
+                            setting_key: "sync_enabled".to_string(),
+                            setting_value: sync_enabled.to_string(),
+                        })
+                        .execute(conn)?;
+                }
+
                 Ok(())
             })
             .await
@@ -151,9 +165,10 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 let default_value = match setting_key_param {
                     "theme" => "light",
                     "font" => "font-mono",
-                    "onboarding_completed" => "false", // Add default for onboarding_completed
-                    "auto_update_check_enabled" => "true", // Add default for auto_update_check_enabled
+                    "onboarding_completed" => "false",
+                    "auto_update_check_enabled" => "true",
                     "menu_bar_visible" => "true",
+                    "sync_enabled" => "false",
                     _ => return Err(Error::from(diesel::result::Error::NotFound)),
                 };
                 Ok(default_value.to_string())
@@ -162,7 +177,11 @@ impl SettingsRepositoryTrait for SettingsRepository {
         }
     }
 
-    async fn update_setting(&self, setting_key_param: &str, setting_value_param: &str) -> Result<()> {
+    async fn update_setting(
+        &self,
+        setting_key_param: &str,
+        setting_value_param: &str,
+    ) -> Result<()> {
         let key = setting_key_param.to_string();
         let value = setting_value_param.to_string();
 
@@ -170,7 +189,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
             .exec(move |conn| {
                 diesel::replace_into(app_settings)
                     .values(AppSetting {
-                        setting_key: key.clone(), // Ensure key is cloned if used after move
+                        setting_key: key.clone(),     // Ensure key is cloned if used after move
                         setting_value: value.clone(), // Ensure value is cloned if used after move
                     })
                     .execute(conn)?;

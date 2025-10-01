@@ -9,15 +9,19 @@ import { Settings, SettingsContextType } from "@/lib/types";
 interface ExtendedSettingsContextType extends SettingsContextType {
   updateSettings: (
     updates: Partial<
-      Pick<Settings, "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible">
+      Pick<
+        Settings,
+        "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible" | "syncEnabled"
+      >
     >,
   ) => Promise<void>;
+  refetch: () => Promise<void>;
 }
 
 const SettingsContext = createContext<ExtendedSettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const { data, isLoading, isError } = useSettings();
+  const { data, isLoading, isError, refetch } = useSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
 
@@ -31,7 +35,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Batch update function
   const updateSettings = async (
     updates: Partial<
-      Pick<Settings, "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible">
+      Pick<
+        Settings,
+        "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible" | "syncEnabled"
+      >
     >,
   ) => {
     if (!settings) throw new Error("Settings not loaded");
@@ -62,6 +69,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     isError,
     updateBaseCurrency,
     updateSettings,
+    refetch,
     accountsGrouped,
     setAccountsGrouped,
   };

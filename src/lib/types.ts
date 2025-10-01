@@ -322,6 +322,7 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
   isPro: boolean;
+  syncEnabled: boolean;
 }
 
 export interface SettingsContextType {

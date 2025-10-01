@@ -29,13 +29,13 @@ use tauri::AppHandle;
 use tauri::Manager;
 
 use context::ServiceContext;
-use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayload};
 #[cfg(feature = "wealthfolio-pro")]
 use events::emit_portfolio_trigger_recalculate;
-#[cfg(feature = "wealthfolio-pro")]
-use wealthfolio_core::sync::{engine::SyncEngine, transport};
+use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayload};
 #[cfg(feature = "wealthfolio-pro")]
 use sync_identity::get_or_create_sync_identity;
+#[cfg(feature = "wealthfolio-pro")]
+use wealthfolio_core::sync::{engine::SyncEngine, transport};
 
 #[cfg(feature = "wealthfolio-pro")]
 #[derive(Clone)]
@@ -103,6 +103,17 @@ fn spawn_background_tasks(
         let handle_clone = handle.clone();
         let ctx_for_sync = _context.clone();
         tauri::async_runtime::spawn(async move {
+            // Check if sync is enabled before starting
+            let is_sync_enabled = ctx_for_sync
+                .settings_service()
+                .is_sync_enabled()
+                .unwrap_or(false);
+
+            if !is_sync_enabled {
+                log::debug!("sync is disabled in settings; skipping sync engine startup");
+                return;
+            }
+
             // 1) Get DB pool
             let pool = ctx_for_sync.db_pool();
 
@@ -156,6 +167,8 @@ fn spawn_background_tasks(
                 log::error!("sync start error: {_e}");
                 return;
             }
+
+            log::info!("sync engine started successfully");
 
             // Keep engine reachable from commands
             handle_clone.manage(SyncHandles { engine });
