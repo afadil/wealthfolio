@@ -6,6 +6,8 @@ mod commands;
 mod context;
 mod events;
 mod listeners;
+#[cfg(feature = "wealthfolio-pro")]
+mod sync_identity;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod menu;
@@ -22,8 +24,6 @@ use std::env;
 use std::sync::Arc;
 #[cfg(feature = "wealthfolio-pro")]
 use uuid;
-#[cfg(feature = "wealthfolio-pro")]
-use wealthfolio_core::secrets::SecretManager;
 
 use tauri::AppHandle;
 use tauri::Manager;
@@ -33,7 +33,9 @@ use events::{emit_app_ready, emit_portfolio_trigger_update, PortfolioRequestPayl
 #[cfg(feature = "wealthfolio-pro")]
 use events::emit_portfolio_trigger_recalculate;
 #[cfg(feature = "wealthfolio-pro")]
-use wealthfolio_core::sync::engine::SyncEngine;
+use wealthfolio_core::sync::{engine::SyncEngine, transport};
+#[cfg(feature = "wealthfolio-pro")]
+use sync_identity::get_or_create_sync_identity;
 
 #[cfg(feature = "wealthfolio-pro")]
 #[derive(Clone)]
@@ -104,11 +106,18 @@ fn spawn_background_tasks(
             // 1) Get DB pool
             let pool = ctx_for_sync.db_pool();
 
-            // 2) Stable device_id from OS keyring on all platforms
-            let device_id_str =
-                get_or_create_device_id().unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-            let device_id =
-                uuid::Uuid::parse_str(&device_id_str).unwrap_or_else(|_| uuid::Uuid::new_v4());
+            // 2) Stable device_id and QUIC identity from OS keyring on all platforms
+            let (device_id, identity) = match get_or_create_sync_identity() {
+                Ok(value) => value,
+                Err(err) => {
+                    log::warn!("failed to load sync identity from keyring: {err}");
+                    let fallback_id = uuid::Uuid::new_v4();
+                    let identity = transport::Identity::generate_for_device(fallback_id)
+                        .expect("generate fallback sync identity");
+                    (fallback_id, Arc::new(identity))
+                }
+            };
+            let device_id_str = device_id.to_string();
 
             // Mirror device_id into DB for triggers
             {
@@ -121,7 +130,15 @@ fn spawn_background_tasks(
             }
 
             // 3) Create and start the engine
-            let mut engine = SyncEngine::with_device_id(pool.clone(), device_id).expect("sync engine");
+            let listen_addr = "0.0.0.0:33445".to_string();
+            let listen_endpoints = vec![format!("quic://{listen_addr}")];
+            let mut engine = SyncEngine::with_identity(
+                pool.clone(),
+                device_id,
+                listen_addr,
+                listen_endpoints,
+                Arc::clone(&identity),
+            );
 
             // Notify app when a sync Pull actually applies local data: trigger recalc
             let handle_for_cb = handle_clone.clone();
@@ -144,16 +161,6 @@ fn spawn_background_tasks(
             handle_clone.manage(SyncHandles { engine });
         });
     }
-}
-
-#[cfg(feature = "wealthfolio-pro")]
-fn get_or_create_device_id() -> Result<String, Box<dyn std::error::Error>> {
-    if let Some(existing) = SecretManager::get_secret("device_id").ok().flatten() {
-        return Ok(existing);
-    }
-    let id = uuid::Uuid::new_v4().to_string();
-    SecretManager::set_secret("device_id", &id)?;
-    Ok(id)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

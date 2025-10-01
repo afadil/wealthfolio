@@ -6689,6 +6689,8 @@ dependencies = [
 name = "wealthfolio-app"
 version = "1.2.3"
 dependencies = [
+ "anyhow",
+ "base64 0.22.1",
  "chrono",
  "diesel",
  "dotenvy",
