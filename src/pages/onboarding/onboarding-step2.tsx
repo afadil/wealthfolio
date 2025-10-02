@@ -1,11 +1,6 @@
+import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/ui/icons";
-import React, { useEffect, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { motion } from "framer-motion";
-import { useSettingsContext } from "@/lib/settings-provider";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -14,9 +9,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Icons } from "@/components/ui/icons";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { CurrencyInput } from "@wealthfolio/ui";
-import { Card, CardContent } from "@/components/ui/card";
-import { ThemeSelector } from "@/components/theme-selector";
+import { motion } from "framer-motion";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 // Onboarding schema with system theme option
 const onboardingSettingsSchema = z.object({
@@ -91,11 +91,8 @@ export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack
 
   async function onSubmit(data: OnboardingSettingsValues) {
     try {
-      await updateSettings({
-        baseCurrency: data.baseCurrency,
-        theme: data.theme,
-        onboardingCompleted: true,
-      });
+      await updateSettings({ baseCurrency: data.baseCurrency, theme: data.theme });
+      await updateSettings({ onboardingCompleted: true });
       onNext();
     } catch (error) {
       console.error("Failed to save onboarding settings:", error);

@@ -103,16 +103,11 @@ fn spawn_background_tasks(
         let handle_clone = handle.clone();
         let ctx_for_sync = _context.clone();
         tauri::async_runtime::spawn(async move {
-            // Check if sync is enabled before starting
+            // Check if sync is enabled
             let is_sync_enabled = ctx_for_sync
                 .settings_service()
                 .is_sync_enabled()
                 .unwrap_or(false);
-
-            if !is_sync_enabled {
-                log::debug!("sync is disabled in settings; skipping sync engine startup");
-                return;
-            }
 
             // 1) Get DB pool
             let pool = ctx_for_sync.db_pool();
@@ -140,7 +135,7 @@ fn spawn_background_tasks(
                     .execute(&mut conn);
             }
 
-            // 3) Create and start the engine
+            // 3) Create the engine and make it available to commands immediately
             let listen_addr = "0.0.0.0:33445".to_string();
             let listen_endpoints = vec![format!("quic://{listen_addr}")];
             let mut engine = SyncEngine::with_identity(
@@ -150,28 +145,33 @@ fn spawn_background_tasks(
                 listen_endpoints,
                 Arc::clone(&identity),
             );
+            // Keep engine reachable from commands as early as possible
+            handle_clone.manage(SyncHandles {
+                engine: engine.clone(),
+            });
 
-            // Notify app when a sync Pull actually applies local data: trigger recalc
-            let handle_for_cb = handle_clone.clone();
-            engine.set_on_apply_sync(Arc::new(move || {
-                emit_portfolio_trigger_recalculate(
-                    &handle_for_cb,
-                    PortfolioRequestPayload::builder()
-                        .refetch_all_market_data(true)
-                        .build(),
-                );
-            }));
+            if is_sync_enabled {
+                // Notify app when a sync Pull actually applies local data: trigger recalc
+                let handle_for_cb = handle_clone.clone();
+                engine.set_on_apply_sync(Arc::new(move || {
+                    emit_portfolio_trigger_recalculate(
+                        &handle_for_cb,
+                        PortfolioRequestPayload::builder()
+                            .refetch_all_market_data(true)
+                            .build(),
+                    );
+                }));
 
-            if let Err(_e) = engine.start().await {
-                #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                log::error!("sync start error: {_e}");
-                return;
+                if let Err(_e) = engine.start().await {
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    log::error!("sync start error: {_e}");
+                    return;
+                }
+
+                log::info!("sync engine started successfully");
+            } else {
+                log::debug!("sync is disabled in settings; engine registered but not started");
             }
-
-            log::info!("sync engine started successfully");
-
-            // Keep engine reachable from commands
-            handle_clone.manage(SyncHandles { engine });
         });
     }
 }
@@ -371,6 +371,10 @@ pub fn run() {
             commands::sync::get_device_name,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::generate_pairing_payload,
+            #[cfg(feature = "wealthfolio-pro")]
+            commands::sync::enable_sync_now,
+            #[cfg(feature = "wealthfolio-pro")]
+            commands::sync::disable_sync_now,
             #[cfg(feature = "wealthfolio-pro")]
             commands::sync::pair_and_sync,
             #[cfg(feature = "wealthfolio-pro")]

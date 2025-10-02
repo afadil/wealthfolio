@@ -3,9 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
-use tauri::{AppHandle, State};
-#[cfg(feature = "wealthfolio-pro")]
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri::{AppHandle, Manager, State};
 use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 
@@ -31,7 +29,7 @@ pub async fn is_auto_update_check_enabled(
 
 #[tauri::command]
 pub async fn update_settings(
-    settings_update: SettingsUpdate,
+    mut settings_update: SettingsUpdate,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
 ) -> Result<Settings, String> {
@@ -51,11 +49,25 @@ pub async fn update_settings(
         }
     }
 
+    // Check onboarding state and sync_enabled change
+    let existing_settings = service
+        .get_settings()
+        .map_err(|e| format!("Failed to load settings: {}", e))?;
+
     // Check if sync_enabled is being toggled and track the new value
     #[cfg(feature = "wealthfolio-pro")]
-    let sync_change = settings_update.sync_enabled;
+    let mut sync_change = settings_update.sync_enabled;
     #[cfg(not(feature = "wealthfolio-pro"))]
     let sync_change: Option<bool> = None;
+
+    // During onboarding, ignore sync_enabled changes to avoid restart prompts and toggling
+    if !existing_settings.onboarding_completed {
+        settings_update.sync_enabled = None;
+        #[cfg(feature = "wealthfolio-pro")]
+        {
+            sync_change = None;
+        }
+    }
 
     // Update settings in the database (this applies all changes in settings_update)
     service
@@ -119,43 +131,31 @@ pub async fn update_settings(
         }
     }
 
-    // If sync_enabled was changed, show restart dialog (sync engine starts/stops at app launch)
+    // If sync_enabled was changed by the user in Settings UI, hot start/stop engine instead of restart.
     #[cfg(feature = "wealthfolio-pro")]
     if let Some(new_sync_state) = sync_change {
-        let action = if new_sync_state {
-            "enabled"
-        } else {
-            "disabled"
-        };
-        debug!("Sync {} setting changed; prompting for restart", action);
-
-        // Show restart dialog on desktop platforms
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        {
-            let handle_clone = handle.clone();
-            let message = if new_sync_state {
-                "Sync has been enabled successfully!\n\n\
-                 For the changes to take effect, the application needs to restart.\n\n\
-                 Would you like to restart now?"
+        debug!(
+            "Sync {} setting changed",
+            if new_sync_state {
+                "enabled"
             } else {
-                "Sync has been disabled successfully!\n\n\
-                 For the changes to take effect, the application needs to restart.\n\n\
-                 Would you like to restart now?"
-            };
+                "disabled"
+            }
+        );
 
-            tauri::async_runtime::spawn(async move {
-                let should_restart = handle_clone
-                    .dialog()
-                    .message(message)
-                    .title("Restart Required")
-                    .buttons(MessageDialogButtons::OkCancel)
-                    .kind(MessageDialogKind::Info)
-                    .blocking_show();
-
-                if should_restart {
-                    handle_clone.restart();
-                }
-            });
+        // Hot start/stop engine (desktop and mobile)
+        if let Some(sync_handles) = handle.try_state::<crate::SyncHandles>() {
+            if new_sync_state {
+                let engine = sync_handles.engine.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = engine.start().await;
+                });
+            } else {
+                let engine = sync_handles.engine.clone();
+                tauri::async_runtime::spawn(async move {
+                    engine.stop_server().await;
+                });
+            }
         }
     }
     #[allow(unused_variables)]

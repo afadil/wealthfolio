@@ -95,49 +95,77 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
     };
   }, [isScanningActive]);
 
+  interface QrPayload {
+    device_id?: string;
+    device_name?: string;
+    fingerprint?: string;
+    listen_endpoints?: string[];
+    host?: string;
+    alt?: string[];
+    port?: number;
+    [k: string]: unknown;
+  }
+
   const processScannedContent = useCallback(
     async (content: string) => {
+      // Parse QR payload safely, report parse errors only as invalid QR
+      let parsed: QrPayload;
       try {
-        const parsed = JSON.parse(content);
-        const hasDevice = typeof parsed.device_id === "string" && parsed.device_id.length > 0;
-        const rawEndpoints = Array.isArray(parsed.listen_endpoints) ? parsed.listen_endpoints : [];
-        const sanitizedEndpoints = sanitizeEndpoints(rawEndpoints);
-        const hasEndpoints =
-          sanitizedEndpoints.length > 0 ||
-          (typeof parsed.host === "string" &&
-            parsed.host.trim() !== "" &&
-            typeof parsed.port === "number");
-
-        if (hasDevice && hasEndpoints) {
-          if (parsed.host && parsed.port) {
-            try {
-              await probeLocalNetworkAccess(parsed.host, parsed.port);
-            } catch (_) {}
-          }
-
-          const payload = JSON.stringify({
-            ...parsed,
-            listen_endpoints: sanitizedEndpoints,
-          });
-          await pairAndSync(payload);
-          await queryClient.invalidateQueries();
-          await recalculatePortfolio();
-
-          // Complete onboarding and navigate to main app
-          try {
-            await updateSettings({ onboardingCompleted: true });
-            navigate("/dashboard");
-          } catch (_error) {
-            logger.error("Failed to complete onboarding after sync.");
-            // Still call onSuccess as fallback
-            onSuccess();
-          }
-          return;
-        }
-        setError("Invalid QR code payload");
+        parsed = JSON.parse(content) as QrPayload;
       } catch (e: unknown) {
         logger.error("QR parse error: " + (e instanceof Error ? e.message : String(e)));
         setError("Invalid QR code");
+        return;
+      }
+
+      const hasDevice = typeof parsed.device_id === "string" && parsed.device_id.length > 0;
+      const rawEndpoints = Array.isArray(parsed.listen_endpoints) ? parsed.listen_endpoints : [];
+      const sanitizedEndpoints = sanitizeEndpoints(rawEndpoints);
+      const hasEndpoints =
+        sanitizedEndpoints.length > 0 ||
+        (typeof parsed.host === "string" &&
+          parsed.host.trim() !== "" &&
+          typeof parsed.port === "number");
+
+      if (!hasDevice || !hasEndpoints) {
+        setError("Invalid QR code payload");
+        return;
+      }
+
+      if (parsed.host && parsed.port) {
+        try {
+          await probeLocalNetworkAccess(parsed.host, parsed.port);
+        } catch (_) {}
+      }
+
+      const payload = JSON.stringify({
+        ...parsed,
+        listen_endpoints: sanitizedEndpoints,
+      });
+
+      // Pair and sync; surface backend error message to the user
+      try {
+        await pairAndSync(payload);
+      } catch (e: unknown) {
+        const msg = toErrorMessage(
+          e,
+          "Pairing or sync failed. Ensure both devices are on the same network and try again.",
+        );
+        setError(msg);
+        return;
+      }
+
+      await queryClient.invalidateQueries();
+      await recalculatePortfolio();
+
+      // Complete onboarding and navigate to main app (send only the changed flag)
+      try {
+        await updateSettings({ onboardingCompleted: true });
+        navigate("/dashboard");
+      } catch (_error) {
+        logger.error("Failed to complete onboarding after sync.");
+        // Still call onSuccess as fallback
+        onSuccess();
       }
     },
     [onSuccess, queryClient, updateSettings, navigate],
@@ -207,7 +235,9 @@ export function OnboardingSyncStep({ onSuccess, onBack }: OnboardingSyncStepProp
 
   const cancelInlineScan = useCallback(() => {
     cancel()
-      .catch(() => {})
+      .catch((_e) => {
+        // ignore cancellation errors
+      })
       .finally(() => {
         setIsScanningActive(false);
         setScanPermission("idle");

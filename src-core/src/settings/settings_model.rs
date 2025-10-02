@@ -27,7 +27,7 @@ impl Default for Settings {
             auto_update_check_enabled: true,
             menu_bar_visible: true,
             is_pro: false,
-            sync_enabled: false,
+            sync_enabled: true,
         }
     }
 }

@@ -1,5 +1,5 @@
+import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
 import { Settings } from "@/lib/types";
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 export const getSettings = async (): Promise<Settings> => {
   try {
@@ -17,7 +17,7 @@ export const getSettings = async (): Promise<Settings> => {
   }
 };
 
-export const updateSettings = async (settingsUpdate: Settings): Promise<Settings> => {
+export const updateSettings = async (settingsUpdate: Partial<Settings>): Promise<Settings> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

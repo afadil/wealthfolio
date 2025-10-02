@@ -60,7 +60,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                     settings.menu_bar_visible = value.parse().unwrap_or(true);
                 }
                 "sync_enabled" => {
-                    settings.sync_enabled = value.parse().unwrap_or(false);
+                    settings.sync_enabled = value.parse().unwrap_or(true);
                 }
                 _ => {} // Ignore unknown settings
             }
@@ -168,7 +168,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                     "onboarding_completed" => "false",
                     "auto_update_check_enabled" => "true",
                     "menu_bar_visible" => "true",
-                    "sync_enabled" => "false",
+                    "sync_enabled" => "true",
                     _ => return Err(Error::from(diesel::result::Error::NotFound)),
                 };
                 Ok(default_value.to_string())

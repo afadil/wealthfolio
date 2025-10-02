@@ -29,7 +29,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateBaseCurrency = async (baseCurrency: Settings["baseCurrency"]) => {
     if (!settings) throw new Error("Settings not loaded");
-    await updateMutation.mutateAsync({ ...settings, baseCurrency });
+    await updateMutation.mutateAsync({ baseCurrency });
   };
 
   // Batch update function
@@ -42,7 +42,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     >,
   ) => {
     if (!settings) throw new Error("Settings not loaded");
-    await updateMutation.mutateAsync({ ...settings, ...updates });
+    await updateMutation.mutateAsync(updates);
   };
 
   useEffect(() => {
@@ -69,7 +69,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     isError,
     updateBaseCurrency,
     updateSettings,
-    refetch,
+    refetch: async () => {
+      await refetch();
+    },
     accountsGrouped,
     setAccountsGrouped,
   };
