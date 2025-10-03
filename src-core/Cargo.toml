@@ -47,7 +47,7 @@ ed25519-dalek = { version = "2.2", features = ["serde", "rand_core"], optional =
 rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
 # Optional: pro-only sync engine
-wealthfolio_sync = { path = "../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
+wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
 
 [features]
 default = ["p2p", "tls"]          # For Tauri app builds
