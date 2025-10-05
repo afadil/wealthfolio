@@ -16,34 +16,34 @@ export interface NavigationProps {
 const staticNavigation: NavigationProps = {
   primary: [
     {
-      icon: <Icons.Dashboard className="h-5 w-5" />,
+      icon: <Icons.Dashboard className="size-6" />,
       title: "Dashboard",
       href: "/dashboard",
     },
     {
-      icon: <Icons.Holdings className="h-5 w-5" />,
+      icon: <Icons.Holdings className="size-6" />,
       title: "Holdings",
       href: "/holdings",
     },
     {
-      icon: <Icons.Performance className="h-5 w-5" />,
+      icon: <Icons.Performance className="size-6" />,
       title: "Performance",
       href: "/performance",
     },
     {
-      icon: <Icons.Income className="h-5 w-5" />,
+      icon: <Icons.Income className="size-6" />,
       title: "Income",
       href: "/income",
     },
     {
-      icon: <Icons.Activity className="h-5 w-5" />,
+      icon: <Icons.Activity className="size-6" />,
       title: "Activities",
       href: "/activities",
     },
   ],
   secondary: [
     {
-      icon: <Icons.Settings className="h-5 w-5" />,
+      icon: <Icons.Settings className="size-6" />,
       title: "Settings",
       href: "/settings",
     },

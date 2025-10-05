@@ -372,6 +372,13 @@
   --sidebar-accent-foreground: hsl(var(--flexoki-tx-2));
   --sidebar-border: hsl(var(--flexoki-ui));
   --sidebar-ring: hsl(var(--flexoki-ui-3));
+
+  --liquid-glass-bg: rgba(255, 255, 255, 0.05);
+  --liquid-glass-border: rgba(255, 255, 255, 0.1);
+  --liquid-glass-shadow: rgba(0, 0, 0, 0.05);
+  --liquid-ripple-color: rgba(255, 255, 255, 0.3);
+  --liquid-flow-duration: 0.8s;
+  --liquid-bounce-duration: 0.6s;
 }
 
 .dark {
@@ -588,4 +595,59 @@ textarea,
 .allow-select {
   -webkit-user-select: text;
   user-select: text;
+}
+
+* Prevent zoom on double tap */ * {
+  touch-action: manipulation;
+}
+
+.liquid-glass {
+  background: var(--liquid-glass-bg);
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--liquid-glass-border);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 0 20px rgba(255, 255, 255, 0.1);
+  transition: all var(--liquid-flow-duration) cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+  transform-origin: center center;
+}
+
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.liquid-glass::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.02) 50%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
 }
