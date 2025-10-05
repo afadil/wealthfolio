@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import NumberFlow from "@number-flow/react";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +19,20 @@ const Balance: React.FC<BalanceProps> = ({
   isLoading = false,
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const currencySymbol = useMemo(() => {
+    const formatter = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+
+    const parts = formatter.formatToParts(0);
+    const symbolPart = parts.find((part) => part.type === "currency");
+
+    return symbolPart?.value ?? currency;
+  }, [currency]);
 
   if (isLoading) {
     return <Skeleton className="h-9 w-48" />;
@@ -27,7 +42,7 @@ const Balance: React.FC<BalanceProps> = ({
     <h1 className="font-heading text-3xl font-bold tracking-tight">
       {isBalanceHidden ? (
         <span>
-          {displayCurrency ? `${currency}` : ""}
+          {displayCurrency ? currencySymbol : ""}
           ••••••
         </span>
       ) : (
