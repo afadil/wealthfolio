@@ -4,7 +4,6 @@ import * as z from "zod";
 
 import { FontSelector } from "@/components/font-selector";
 import { ThemeSelector } from "@/components/theme-selector";
-import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -42,24 +41,15 @@ export function AppearanceForm() {
     defaultValues,
   });
 
-  function onSubmit(data: AppearanceFormValues) {
-    updateSettings({
-      theme: data.theme,
-      font: data.font,
-      menuBarVisible: data.menuBarVisible,
-    }).catch((error) => {
+  function handlePartialUpdate(data: Partial<AppearanceFormValues>) {
+    updateSettings(data).catch((error) => {
       console.error("Failed to update appearance settings:", error);
     });
   }
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={(e) => {
-          form.handleSubmit(onSubmit)(e);
-        }}
-        className="max-w-4xl space-y-6"
-      >
+      <div className="max-w-4xl space-y-6">
         <FormField
           control={form.control}
           name="font"
@@ -72,7 +62,13 @@ export function AppearanceForm() {
                 </FormDescription>
               </div>
               <FormControl>
-                <FontSelector value={field.value} onChange={field.onChange} />
+                <FontSelector
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    handlePartialUpdate({ font: value as AppearanceFormValues["font"] });
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -91,7 +87,14 @@ export function AppearanceForm() {
               </div>
               <FormMessage />
               <FormControl>
-                <ThemeSelector value={field.value} onChange={field.onChange} className="pt-2" />
+                <ThemeSelector
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    handlePartialUpdate({ theme: value as AppearanceFormValues["theme"] });
+                  }}
+                  className="pt-2"
+                />
               </FormControl>
             </FormItem>
           )}
@@ -109,16 +112,18 @@ export function AppearanceForm() {
                 </FormDescription>
               </div>
               <FormControl>
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={(value) => {
+                    field.onChange(value);
+                    handlePartialUpdate({ menuBarVisible: value });
+                  }}
+                />
               </FormControl>
             </FormItem>
           )}
         />
-
-        <Button type="submit" className="w-full sm:w-auto">
-          Update preferences
-        </Button>
-      </form>
+      </div>
     </Form>
   );
 }

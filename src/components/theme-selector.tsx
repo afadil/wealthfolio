@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FormControl, FormItem, FormLabel } from "@/components/ui/form";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 
 interface ThemeSelectorProps {
   value?: string;
@@ -20,7 +20,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
           <FormControl>
             <RadioGroupItem value="light" className="sr-only" />
           </FormControl>
-          <div className="border-muted hover:border-accent items-center rounded-md border-2 p-1">
+          <div className="border-muted hover:border-accent items-center rounded-md border-2 p-2">
             <div className="space-y-1 rounded-sm bg-[hsl(51_59%_95%)] p-1 sm:space-y-2 sm:p-2">
               <div className="space-y-1 rounded-md bg-[hsl(48_100%_97%)] p-1 sm:p-2">
                 <div className="h-1 w-[40px] rounded-lg bg-[hsl(50_14%_83%)] sm:h-2 sm:w-[80px]" />
@@ -46,7 +46,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
           <FormControl>
             <RadioGroupItem value="dark" className="sr-only" />
           </FormControl>
-          <div className="dark border-muted bg-popover hover:bg-accent hover:text-accent-foreground items-center rounded-md border-2 p-1">
+          <div className="dark border-muted bg-popover hover:bg-accent hover:text-accent-foreground items-center rounded-md border-2 p-2">
             <div className="space-y-1 rounded-sm bg-[hsl(var(--flexoki-bg))] p-1 sm:space-y-2 sm:p-2">
               <div className="space-y-1 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-1 sm:p-2">
                 <div className="h-1 w-[40px] rounded-lg bg-[hsl(var(--flexoki-ui-2))] sm:h-2 sm:w-[80px]" />
@@ -72,7 +72,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
           <FormControl>
             <RadioGroupItem value="system" className="sr-only" />
           </FormControl>
-          <div className="border-muted hover:border-accent items-center rounded-md border-2 p-1">
+          <div className="border-muted hover:border-accent items-center rounded-md border-2 p-2">
             <div className="flex overflow-hidden rounded-sm">
               {/* Light half - left side */}
               <div className="w-1/2 space-y-1 bg-[hsl(51_59%_95%)] p-1 sm:space-y-2 sm:p-2">
