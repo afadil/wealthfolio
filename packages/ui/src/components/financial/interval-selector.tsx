@@ -135,10 +135,11 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           damping: 25,
           opacity: { duration: 0.2 },
         }}
+        className="shrink-0 snap-center"
       >
         <Button
           className={cn(
-            "relative h-7 min-h-0 overflow-hidden rounded-full px-4 py-0 leading-none transition-all duration-200",
+            "relative h-7 min-h-0 overflow-hidden rounded-full px-3 py-0 text-sm leading-none transition-all duration-200 md:px-4",
             isSelected
               ? "text-primary-foreground bg-transparent"
               : "text-muted-foreground hover:text-foreground border-0 bg-transparent shadow-none hover:bg-transparent",
@@ -172,8 +173,21 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   };
 
   return (
-    <div className={cn("relative flex justify-center space-x-2", className)}>
-      {intervals.map((intervalData, index) => renderButton(intervalData, index))}
+    <div className={cn("relative w-full min-w-0", className)}>
+      <div
+        className={cn(
+          "relative z-30 w-full overflow-x-scroll overflow-y-hidden",
+          "touch-pan-x snap-x snap-mandatory overscroll-x-contain scroll-smooth",
+          "px-4 md:mx-0 md:px-0",
+          "[&::-webkit-scrollbar]:hidden",
+          "[scrollbar-width:none]",
+          "[-webkit-overflow-scrolling:touch]",
+        )}
+      >
+        <div className="mx-auto inline-flex min-w-max flex-nowrap items-center space-x-1 whitespace-nowrap md:space-x-2">
+          {intervals.map((intervalData, index) => renderButton(intervalData, index))}
+        </div>
+      </div>
     </div>
   );
 };
