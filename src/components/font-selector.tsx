@@ -26,7 +26,7 @@ const fonts = [
 
 export function FontSelector({ value, onChange, className }: FontSelectorProps) {
   return (
-    <div className={cn("grid grid-cols-3 gap-2 sm:gap-3", className)}>
+    <div className={cn("grid grid-cols-3 gap-2 md:gap-4", className)}>
       {fonts.map((font) => (
         <button
           key={font.value}

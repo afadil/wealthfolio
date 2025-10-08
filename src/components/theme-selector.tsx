@@ -13,7 +13,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
     <RadioGroup
       onValueChange={onChange}
       defaultValue={value}
-      className={cn("grid grid-cols-3 gap-2 sm:gap-4", className)}
+      className={cn("grid grid-cols-3 gap-2 md:gap-4", className)}
     >
       <FormItem>
         <FormLabel className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">

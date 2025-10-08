@@ -107,9 +107,7 @@ export function AppearanceForm() {
             <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
               <div className="space-y-0.5">
                 <FormLabel>Show menu bar</FormLabel>
-                <FormDescription>
-                  Toggle to display the application menu bar (Windows only).
-                </FormDescription>
+                <FormDescription>Toggle to display the application menu bar.</FormDescription>
               </div>
               <FormControl>
                 <Switch
