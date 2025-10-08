@@ -1,4 +1,3 @@
-import { LiquidButton } from "@/components/navigation/liquid-button";
 import { LiquidGlass } from "@/components/navigation/liquid-glass";
 import { usePlatform } from "@/hooks/use-platform";
 import { cn } from "@/lib/utils";
@@ -60,13 +59,11 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 md:hidden">
-      <div className="flex justify-center px-2 pb-[max(1.2rem,env(safe-area-inset-bottom))]">
+      <div className="flex justify-center px-4 pb-[max(1.2rem,env(safe-area-inset-bottom))]">
         <LiquidGlass
           variant="floating"
-          rippleEffect={false}
-          stretchOnDrag={false}
-          flowOnHover={false}
-          className="pointer-events-auto w-full px-2 py-2"
+          intensity="subtle"
+          className="pointer-events-auto w-full px-1 py-1"
         >
           <nav
             aria-label="Primary navigation p-0"
@@ -74,27 +71,19 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
           >
             {visibleItems.map((item) => {
               const isActive = isPathActive(location.pathname, item.href);
-              return isActive ? (
-                <LiquidButton
-                  key={item.href}
-                  onClick={() => handleNavigation(item.href, isActive)}
-                  variant={isActive ? "primary" : "ghost"}
-                  aria-current={isActive ? "page" : undefined}
-                  aria-label={item.title}
-                  className="!bg-muted/80 !flex !h-12 !w-full !items-center !justify-center !gap-0 !rounded-full !px-0 !py-0 transition-all duration-300"
-                >
-                  <span className="relative flex size-7 shrink-0 items-center justify-center">
-                    {item.icon ?? <Icons.ArrowRight className="size-6" />}
-                  </span>
-                </LiquidButton>
-              ) : (
+              return (
                 <Link
                   to={item.href}
                   onClick={() => handleNavigation(item.href, isActive)}
                   aria-label={item.title}
                   className={cn(
-                    "text-foreground relative z-10 flex h-12 w-full items-center justify-center rounded-full",
+                    "text-foreground relative z-10 flex h-14 w-full items-center justify-center rounded-full border transition-colors",
+                    isActive
+                      ? "border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/7"
+                      : "border-0",
                   )}
+                  key={item.href}
+                  aria-current={isActive ? "page" : undefined}
                 >
                   <span
                     className={cn(
@@ -133,27 +122,16 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mr-2 mb-2 flex w-40 flex-col gap-1 border-0 bg-transparent p-0 shadow-none"
+                  className="mr-0 mb-0 flex w-42 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0 "
                 >
                   {menuItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);
                     return (
-                      <LiquidButton
+                      <LiquidGlass
                         key={item.href}
-                        onClick={() => {
-                          handleNavigation(item.href, isActive);
-                          setMobileMenuOpen(false);
-                        }}
-                        variant={isActive ? "primary" : "secondary"}
-                        size="md"
-                        rippleEffect
-                        icon={item.icon ?? <Icons.ArrowRight className="size-5" />}
-                        iconPosition="left"
-                        aria-current={isActive ? "page" : undefined}
-                        className={cn(
-                          "!w-full !justify-start !gap-3 rounded-full !px-2.5 text-sm",
-                          !isActive && "!border-0 !bg-white/5 hover:!bg-white/10",
-                        )}
+                        variant="floating"
+                        intensity="subtle"
+                       
                         style={
                           isActive
                             ? {
@@ -163,8 +141,21 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                             : undefined
                         }
                       >
-                        {item.title}
-                      </LiquidButton>
+                        <Link
+                          to={item.href}
+                          onClick={() => {
+                            handleNavigation(item.href, isActive);
+                            setMobileMenuOpen(false);
+                          }}
+                          aria-current={isActive ? "page" : undefined}
+                          className="relative z-10 flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm"
+                        >
+                          <span className="flex size-6 shrink-0 items-center justify-center">
+                            {item.icon ?? <Icons.ArrowRight className="size-5" />}
+                          </span>
+                          <span className="truncate text-left">{item.title}</span>
+                        </Link>
+                      </LiquidGlass>
                     );
                   })}
                 </DropdownMenuContent>
