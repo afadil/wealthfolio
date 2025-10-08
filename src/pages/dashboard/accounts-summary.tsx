@@ -1,18 +1,16 @@
-import React, { useState, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { Icons } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
-import { GainPercent } from "@wealthfolio/ui";
-import { GainAmount } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AccountValuation } from "@/lib/types";
-import { PrivacyAmount } from "@wealthfolio/ui";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { useAccounts } from "@/hooks/use-accounts";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
-import { calculatePerformanceMetrics } from "@/lib/utils";
+import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useLatestValuations } from "@/hooks/use-latest-valuations";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { AccountValuation } from "@/lib/types";
+import { calculatePerformanceMetrics } from "@/lib/utils";
+import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
+import React, { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 // Define a unified type for displaying both individual accounts and groups
 interface AccountSummaryDisplayData {
@@ -297,8 +295,14 @@ export const AccountsSummary = React.memo(() => {
         }
       });
 
-      const actualGroups: AccountSummaryDisplayData[] = Object.entries(groups).map(
-        ([groupName, groupAccounts]) => {
+      // Separate single-account groups from multi-account groups
+      const actualGroups: AccountSummaryDisplayData[] = [];
+
+      Object.entries(groups).forEach(([groupName, groupAccounts]) => {
+        // If group has only one account, treat it as standalone
+        if (groupAccounts.length === 1) {
+          standaloneAccounts.push(groupAccounts[0]);
+        } else {
           const baseCurrency = groupAccounts[0]?.baseCurrency ?? settings?.baseCurrency ?? "USD";
 
           const totalValueBaseCurrency = groupAccounts.reduce(
@@ -322,7 +326,7 @@ export const AccountsSummary = React.memo(() => {
               ? totalGainLossAmountBase / totalNetContributionBase
               : null;
 
-          return {
+          actualGroups.push({
             accountName: groupName,
             totalValueBaseCurrency,
             baseCurrency,
@@ -331,9 +335,9 @@ export const AccountsSummary = React.memo(() => {
             isGroup: true,
             accountCount: groupAccounts.length,
             accounts: groupAccounts,
-          };
-        },
-      );
+          });
+        }
+      });
 
       actualGroups.sort(
         (a, b) => Number(b.totalValueBaseCurrency) - Number(a.totalValueBaseCurrency),
@@ -351,7 +355,7 @@ export const AccountsSummary = React.memo(() => {
             );
 
             return (
-              <Card key={group.accountName} className="border-none shadow-none">
+              <Card key={group.accountName} className="shadow-none">
                 <CardHeader>
                   <AccountSummaryComponent
                     item={group}
@@ -376,7 +380,7 @@ export const AccountsSummary = React.memo(() => {
             );
           })}
           {standaloneAccounts.map((account) => (
-            <Card key={account.accountId} className="border-none shadow-sm">
+            <Card key={account.accountId} className="shadow-none">
               <CardHeader className="py-6">
                 <AccountSummaryComponent
                   item={account}
