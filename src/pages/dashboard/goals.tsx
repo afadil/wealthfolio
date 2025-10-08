@@ -1,18 +1,17 @@
 import { getGoals, getGoalsAllocation } from "@/commands/goal";
-import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Icons } from "@/components/ui/icons";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { calculateGoalProgress } from "@/lib/portfolio-helper";
 import { Goal, GoalAllocation } from "@/lib/types";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
-import { formatPercent } from "@wealthfolio/ui";
-import { Icons } from "@/components/ui/icons";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { AmountDisplay } from "@wealthfolio/ui";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
-import { useAccounts } from "@/hooks/use-accounts";
+import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { useMemo } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
@@ -56,10 +55,6 @@ export function SavingGoals() {
     isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
   const isError = isErrorAccounts || !!errorValuations || isErrorGoals || isErrorAllocations;
 
-  console.warn("goals errors", isErrorGoals);
-  console.warn("goals errorValuations", errorValuations);
-  console.warn("isErrorAllocations", isErrorAllocations);
-  console.warn("isErrorAccounts", isErrorAccounts);
   if (isLoading) {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">
@@ -67,7 +62,7 @@ export function SavingGoals() {
           <CardTitle className="text-md">Saving Goals</CardTitle>
         </CardHeader>
         <CardContent>
-          <Card className="w-full border-none shadow-sm">
+          <Card className="w-full shadow-sm">
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <Skeleton className="h-4 w-1/4" />
@@ -89,7 +84,7 @@ export function SavingGoals() {
           <CardTitle className="text-md">Saving Goals</CardTitle>
         </CardHeader>
         <CardContent>
-          <Card className="w-full border-none shadow-sm">
+          <Card className="w-full shadow-sm">
             <CardContent className="pt-6">
               <div className="text-destructive flex flex-col items-center justify-center py-6 text-center">
                 <Icons.AlertCircle className="mb-2 h-12 w-12" />
@@ -110,7 +105,7 @@ export function SavingGoals() {
           <CardTitle className="text-md">Saving Goals</CardTitle>
         </CardHeader>
         <CardContent>
-          <Card className="w-full border-none shadow-sm">
+          <Card className="w-full shadow-sm">
             <CardContent className="pt-6">
               {goals && goals.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -140,7 +135,7 @@ export function SavingGoals() {
             <CardTitle className="text-md">Saving Goals</CardTitle>
           </CardHeader>
           <CardContent>
-            <Card className="w-full border-none shadow-sm">
+            <Card className="w-full shadow-none">
               <CardContent className="pt-6">
                 {goals && goals.length > 0 ? (
                   [...goals]

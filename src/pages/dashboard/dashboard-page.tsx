@@ -136,12 +136,14 @@ export default function DashboardPage() {
         {valuationHistory && chartData.length > 0 ? (
           <>
             <HistoryChart data={chartData} />
-            <IntervalSelector
-              className="relative right-0 bottom-0 left-0 z-10"
-              onIntervalSelect={handleIntervalSelect}
-              isLoading={isValuationHistoryLoading}
-              initialSelection={INITIAL_INTERVAL_CODE}
-            />
+            <div className="flex w-full justify-center">
+              <IntervalSelector
+                className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
+                onIntervalSelect={handleIntervalSelect}
+                isLoading={isValuationHistoryLoading}
+                initialSelection={INITIAL_INTERVAL_CODE}
+              />
+            </div>
           </>
         ) : null}
       </div>
