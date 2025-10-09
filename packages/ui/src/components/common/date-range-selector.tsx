@@ -1,10 +1,11 @@
-import { Button } from "../ui/button";
-import { startOfYear, subDays, subMonths, subYears, isSameDay } from "date-fns";
+import { isSameDay, startOfYear, subDays, subMonths, subYears } from "date-fns";
 import { DateRange as DayPickerDateRange } from "react-day-picker";
-import { Calendar } from "../ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Icons } from "../ui/icons";
 import { cn } from "../../lib/utils";
+import { AnimatedToggleGroup } from "../ui/animated-toggle-group";
+import { Button } from "../ui/button";
+import { Calendar } from "../ui/calendar";
+import { Icons } from "../ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 // Define a generic DateRange type for this component
 export interface DateRange {
@@ -72,36 +73,40 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
     return isSameDay(date1, date2);
   };
 
-  // Check if current range matches any predefined range
-  const isCustomRange = !ranges.some((range) => {
-    const predefinedRange = range.getValue();
-    return compareDates(value?.from, predefinedRange.from) && compareDates(value?.to, predefinedRange.to);
-  });
+  // Check if current range matches any predefined range and get the selected label
+  const getSelectedRange = () => {
+    const selected = ranges.find((range) => {
+      const predefinedRange = range.getValue();
+      return compareDates(value?.from, predefinedRange.from) && compareDates(value?.to, predefinedRange.to);
+    });
+    return selected?.label;
+  };
+
+  const selectedLabel = getSelectedRange();
+  const isCustomRange = !selectedLabel;
 
   return (
     <div className="flex items-center space-x-1">
-      <div className="bg-secondary flex space-x-1 rounded-full p-1">
-        {ranges.map((range) => {
-          const predefinedRange = range.getValue();
-          const isSelected =
-            !isCustomRange &&
-            compareDates(value?.from, predefinedRange.from) &&
-            compareDates(value?.to, predefinedRange.to);
-
-          return (
-            <Button
-              key={range.label}
-              size="sm"
-              className="h-8 rounded-full px-3 text-xs"
-              variant={isSelected ? "default" : "ghost"}
-              title={range.name}
-              onClick={() => onChange(range.getValue())}
-            >
-              {range.label}
-            </Button>
-          );
-        })}
-      </div>
+      <AnimatedToggleGroup
+        items={ranges.map((range) => ({
+          value: range.label,
+          label: range.label,
+          title: range.name,
+        }))}
+        value={selectedLabel}
+        onValueChange={(newValue) => {
+          if (!newValue) {
+            return;
+          }
+          const selectedRange = ranges.find((r) => r.label === newValue);
+          if (selectedRange) {
+            onChange(selectedRange.getValue());
+          }
+        }}
+        size="xs"
+        variant="secondary"
+        className="h-8"
+      />
 
       <Popover>
         <PopoverTrigger asChild>

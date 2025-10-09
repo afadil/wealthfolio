@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { startOfYear, subMonths, subWeeks, subYears } from "date-fns";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import React, { useCallback, useState } from "react";
 
 export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
