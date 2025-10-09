@@ -42,6 +42,8 @@ interface ActivityFormProps {
 const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   BUY: 'trade',
   SELL: 'trade',
+  SELL_SHORT: 'trade',
+  BUY_COVER: 'trade',
   DEPOSIT: 'cash',
   WITHDRAWAL: 'cash',
   INTEREST: 'income',
