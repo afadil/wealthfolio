@@ -33,7 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Account, ActivityImport } from "@/lib/types";
 import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 // Helper function to check if a field has errors
 const hasFieldError = (activity: ActivityImport, fieldName: string): boolean => {

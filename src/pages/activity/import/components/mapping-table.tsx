@@ -7,18 +7,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-  ImportFormat,
-  ActivityType,
-  ImportMappingData,
-  CsvRowData,
-  ImportRequiredField,
-  Account,
-} from "@/lib/types";
-import { MappingHeaderCell, MappingCell } from "./mapping-table-cells";
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
+import {
+  Account,
+  ActivityType,
+  CsvRowData,
+  ImportFormat,
+  ImportMappingData,
+  ImportRequiredField,
+} from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
+import { MappingCell, MappingHeaderCell } from "./mapping-table-cells";
 
 interface MappingTableProps {
   mapping: ImportMappingData;

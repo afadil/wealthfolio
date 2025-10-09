@@ -1,12 +1,12 @@
-import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Account, ActivityImport } from "@/lib/types";
 import { Icons } from "@/components/ui/icons";
-import { ImportPreviewTable } from "../import-preview-table";
-import { ImportAlert } from "../components/import-alert";
+import { Account, ActivityImport } from "@/lib/types";
+import { motion } from "motion/react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { ImportAlert } from "../components/import-alert";
+import { ImportPreviewTable } from "../import-preview-table";
 
 interface ResultStepProps {
   activities: ActivityImport[];

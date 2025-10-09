@@ -1,5 +1,5 @@
 import { Icons } from "@/components/ui/icons";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 interface Step {
   id: number;

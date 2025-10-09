@@ -13,7 +13,7 @@ import { Icons } from "@/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CurrencyInput } from "@wealthfolio/ui";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
