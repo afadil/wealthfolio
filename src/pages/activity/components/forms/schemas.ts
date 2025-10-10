@@ -59,8 +59,7 @@ export const tradeActivitySchema = baseActivitySchema.extend({
     .number({
       required_error: 'Please enter a valid quantity.',
       invalid_type_error: 'Quantity must be a number.',
-    })
-    .positive(),
+    }),
   unitPrice: z.coerce
     .number({
       required_error: 'Please enter a valid unit price.',

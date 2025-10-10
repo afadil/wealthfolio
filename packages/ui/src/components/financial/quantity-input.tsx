@@ -13,7 +13,7 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
     {
       className,
       maxDecimalPlaces = 8,
-      allowNegative = false,
+      allowNegative = true,
       value,
       defaultValue,
       onChange,
