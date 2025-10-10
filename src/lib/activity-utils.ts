@@ -133,7 +133,15 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
   if (activityType === ActivityType.SELL) {
     return Number(activityAmount) - Number(fee); // Net proceeds after fees
   }
-  
+
+  if (activityType === ActivityType.SELL_SHORT) {
+    
+    return Number(activityAmount) - Number(fee); // Net proceeds after fees
+  }
+
+  if (activityType === ActivityType.BUY_COVER) {
+    return Number(activityAmount) + Number(fee); // Total cost including fees
+  }
   // Default case - just return the activity amount
   return Number(activityAmount);
 };
