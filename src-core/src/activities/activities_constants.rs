@@ -9,6 +9,12 @@ pub const ACTIVITY_TYPE_BUY: &str = "BUY";
 /// Disposal of a security or other asset. Increases cash and decreases quantity.
 pub const ACTIVITY_TYPE_SELL: &str = "SELL";
 
+/// Short sale of a security or other asset. Increases cash and increases quantity (liability).
+pub const ACTIVITY_TYPE_SELL_SHORT: &str = "SELL_SHORT";
+
+/// Buy back an asset to close a short position. Decreases cash balance and decreases quantity (liability).
+pub const ACTIVITY_TYPE_BUY_COVER: &str = "BUY_COVER";
+
 /// Cash dividend paid into the account. Increases cash.
 pub const ACTIVITY_TYPE_DIVIDEND: &str = "DIVIDEND";
 

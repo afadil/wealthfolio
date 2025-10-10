@@ -415,6 +415,8 @@ impl ImportMapping {
 pub enum ActivityType {
     Buy,
     Sell,
+    SellShort,
+    BuyCover,
     Dividend,
     Interest,
     Deposit,
@@ -434,6 +436,8 @@ impl ActivityType {
         match self {
             ActivityType::Buy => ACTIVITY_TYPE_BUY,
             ActivityType::Sell => ACTIVITY_TYPE_SELL,
+            ActivityType::SellShort => ACTIVITY_TYPE_SELL_SHORT,
+            ActivityType::BuyCover => ACTIVITY_TYPE_BUY_COVER,
             ActivityType::Dividend => ACTIVITY_TYPE_DIVIDEND,
             ActivityType::Interest => ACTIVITY_TYPE_INTEREST,
             ActivityType::Deposit => ACTIVITY_TYPE_DEPOSIT,
@@ -457,6 +461,8 @@ impl FromStr for ActivityType {
         match s {
             s if s == ACTIVITY_TYPE_BUY => Ok(ActivityType::Buy),
             s if s == ACTIVITY_TYPE_SELL => Ok(ActivityType::Sell),
+            s if s == ACTIVITY_TYPE_SELL_SHORT => Ok(ActivityType::SellShort),
+            s if s == ACTIVITY_TYPE_BUY_COVER => Ok(ActivityType::BuyCover),
             s if s == ACTIVITY_TYPE_DIVIDEND => Ok(ActivityType::Dividend),
             s if s == ACTIVITY_TYPE_INTEREST => Ok(ActivityType::Interest),
             s if s == ACTIVITY_TYPE_DEPOSIT => Ok(ActivityType::Deposit),
