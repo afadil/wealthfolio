@@ -364,6 +364,8 @@ impl Default for ImportMappingData {
         let mut activity_mappings = std::collections::HashMap::new();
         activity_mappings.insert("BUY".to_string(), vec!["BUY".to_string()]);
         activity_mappings.insert("SELL".to_string(), vec!["SELL".to_string()]);
+        activity_mappings.insert("SELL_SHORT".to_string(), vec!["SELL_SHORT".to_string()]);
+        activity_mappings.insert("BUY_COVER".to_string(), vec!["BUY_COVER".to_string()]);
         activity_mappings.insert("DIVIDEND".to_string(), vec!["DIVIDEND".to_string()]);
         activity_mappings.insert("INTEREST".to_string(), vec!["INTEREST".to_string()]);
         activity_mappings.insert("DEPOSIT".to_string(), vec!["DEPOSIT".to_string()]);
