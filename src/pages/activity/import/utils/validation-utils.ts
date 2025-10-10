@@ -112,12 +112,14 @@ type SymbolCalculator = (
   activity: Partial<ActivityImport>,
   accountCurrency: string,
 ) => string | undefined;
+type QuantityCalculator = (activity: Partial<ActivityImport>) => number | undefined;
 type AmountCalculator = (activity: Partial<ActivityImport>) => number | undefined;
 type FeeCalculator = (activity: Partial<ActivityImport>) => number | undefined;
 
 // Define the configuration structure
 interface ActivityLogicConfig {
   calculateSymbol: SymbolCalculator;
+  calculateQuantity: QuantityCalculator;
   calculateAmount: AmountCalculator;
   calculateFee: FeeCalculator;
 }
@@ -126,6 +128,7 @@ interface ActivityLogicConfig {
 const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.BUY]: {
     calculateSymbol: (activity) => activity.symbol, // Keep original symbol
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => {
       // Calculate amount = quantity * price if both positive, using absolute values
       if (
@@ -143,6 +146,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.SELL]: {
     // Similar logic to BUY
     calculateSymbol: (activity) => activity.symbol,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => {
       if (
         activity.quantity &&
@@ -156,9 +160,33 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
+  [ActivityType.SELL_SHORT]: {
+    // Similar logic to SELL
+    calculateSymbol: (activity) => activity.symbol,
+    calculateQuantity: (activity) => {
+      if (
+        activity.quantity &&
+        activity.quantity > 0
+      ) { return -activity.quantity; }
+      return activity.quantity;
+    },
+    calculateAmount: (activity) => {
+      if (
+        activity.quantity &&
+        activity.quantity > 0 &&
+        activity.unitPrice &&
+        Math.abs(activity.unitPrice) > 0
+      ) {
+        return -activity.quantity * Math.abs(activity.unitPrice);
+      }
+      return activity.amount ? Math.abs(activity.amount) : activity.amount;
+    },
+    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  },
   [ActivityType.DEPOSIT]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) =>
       activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
@@ -166,6 +194,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.WITHDRAWAL]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) =>
       activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
@@ -173,12 +202,14 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.INTEREST]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) =>
       activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.DIVIDEND]: {
     calculateSymbol: (activity) => activity.symbol, // Usually associated with a stock
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) =>
       activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
@@ -186,6 +217,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.FEE]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => {
       // For FEE activities, amount should typically be 0 unless explicitly provided
       return activity.amount ? Math.abs(activity.amount) : 0;
@@ -204,23 +236,27 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.TAX]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.TRANSFER_IN]: {
     calculateSymbol: (activity, accountCurrency) =>
       activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.TRANSFER_OUT]: {
     calculateSymbol: (activity, accountCurrency) =>
       activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
     calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
   },
   [ActivityType.ADD_HOLDING]: {
     calculateSymbol: (activity) => activity.symbol,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => {
       // Calculate amount = quantity * price if both positive, using absolute values
       if (
@@ -237,6 +273,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   },
   [ActivityType.REMOVE_HOLDING]: {
     calculateSymbol: (activity) => activity.symbol,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: (activity) => {
       // Calculate amount = quantity * price if both positive, using absolute values
       if (
@@ -253,6 +290,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   },
   [ActivityType.SPLIT]: {
     calculateSymbol: (activity) => activity.symbol,
+    calculateQuantity: (activity) => activity.quantity,
     calculateAmount: () => 0, // SPLIT has no cash impact according to docs
     calculateFee: () => 0, // SPLIT typically has no fee
   },
@@ -262,6 +300,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
 // Default logic if type-specific logic isn't found
 const defaultLogic: ActivityLogicConfig = {
   calculateSymbol: (activity) => activity.symbol,
+  calculateQuantity: (activity) => activity.quantity,
   calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : activity.amount,
   calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
 };
@@ -335,6 +374,7 @@ function transformRowToActivity(
   // Pass a *copy* of the activity so far to avoid premature mutation within calc functions
   const currentActivityState = { ...activity };
   activity.symbol = logic.calculateSymbol(currentActivityState, accountCurrency);
+  activity.quantity = logic.calculateQuantity(currentActivityState);
   activity.amount = logic.calculateAmount(currentActivityState);
   activity.fee = logic.calculateFee(currentActivityState);
 
