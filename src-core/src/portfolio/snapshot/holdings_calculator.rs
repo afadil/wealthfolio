@@ -353,12 +353,12 @@ pub struct HoldingsCalculator {
              }
         };
         
-        let total_proceed_acct = activity.quantity * unit_price_acct + fee_acct;
+        let total_proceed_acct = activity.quantity.abs() * unit_price_acct - fee_acct;
         
         *state
             .cash_balances
             .entry(account_currency.to_string())
-            .or_insert(Decimal::ZERO) += total_proceed_acct.abs();
+            .or_insert(Decimal::ZERO) += total_proceed_acct;
         
         Ok(())
     }
@@ -389,7 +389,7 @@ pub struct HoldingsCalculator {
             }
         };
 
-        let total_cost_acct = (activity.quantity * unit_price_acct) - fee_acct;
+        let total_cost_acct = activity.quantity * unit_price_acct + fee_acct;
 
         if let Some(position) = state.positions.get_mut(&activity.asset_id) {
             // Check if currency conversion is needed and handle accordingly
