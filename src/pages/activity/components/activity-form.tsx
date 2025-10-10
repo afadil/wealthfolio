@@ -122,6 +122,18 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
         }
       }
 
+      // Ensure quantity is negative for short activities
+      if (
+        ['SELL_SHORT'].includes(
+          submitData.activityType,
+        ) &&
+        'quantity' in submitData &&
+        submitData.quantity &&
+        submitData.quantity > 0
+      ) {
+        submitData.quantity = -submitData.quantity;
+      }
+
       if ('assetDataSource' in submitData && submitData.assetDataSource === DataSource.MANUAL && account) {
         submitData.currency = submitData.currency || account.currency;
       }
