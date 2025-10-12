@@ -3,7 +3,7 @@ import { ApplicationHeader } from "@/components/header";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { ApplicationShell, Button, Icons, Separator } from "@wealthfolio/ui";
+import { Button, Icons, Separator } from "@wealthfolio/ui";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
@@ -51,7 +51,7 @@ const ActivityPage = () => {
   }, []);
 
   return (
-    <ApplicationShell>
+    <div className="content-padding flex h-full min-h-0 w-full flex-1 flex-col space-y-6">
       <div className="shrink-0">
         <ApplicationHeader heading="Activity">
           <div className="flex flex-wrap items-center gap-2">
@@ -76,7 +76,7 @@ const ActivityPage = () => {
         </ApplicationHeader>
         <Separator className="my-6" />
       </div>
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
         {showEditableTable ? (
           <EditableActivityTable
             accounts={accounts}
@@ -123,7 +123,7 @@ const ActivityPage = () => {
           setShowBulkHoldingsForm(false);
         }}
       />
-    </ApplicationShell>
+    </div>
   );
 };
 

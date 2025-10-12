@@ -1,5 +1,5 @@
-import { Card, CardContent, Icons } from '@wealthfolio/ui';
-import { motion, type Variants } from 'framer-motion';
+import { Card, CardContent, Icons } from "@wealthfolio/ui";
+import { motion, type Variants } from "motion/react";
 
 interface OnboardingSyncChoiceProps {
   onYes: () => void;
@@ -24,7 +24,7 @@ export function OnboardingSyncChoice({ onYes, onNo }: OnboardingSyncChoiceProps)
       opacity: 1,
       y: 0,
       transition: {
-        type: 'spring' as const,
+        type: "spring" as const,
         stiffness: 300,
         damping: 24,
       },

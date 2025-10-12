@@ -1,4 +1,3 @@
-import { ApplicationHeader } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,16 +10,19 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AmountDisplay, ApplicationShell } from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
+import { AmountDisplay } from "@wealthfolio/ui";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import { AccountSelector } from "@/components/account-selector";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Badge } from "@/components/ui/badge";
 import { useHoldings } from "@/hooks/use-holdings";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
-import { useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { AccountAllocationChart } from "./components/account-allocation-chart";
 import { CashHoldingsWidget } from "./components/cash-holdings-widget";
 import { ClassesChart } from "./components/classes-chart";
@@ -32,6 +34,42 @@ import { SectorsChart } from "./components/sectors-chart";
 
 // Define a type for the filter criteria
 type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
+
+// Sticky header wrapper component with scroll animation
+function StickyHeaderSection({ children }: { children: ReactNode }) {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (headerRef.current) {
+        const scrollContainer = headerRef.current.closest("[data-page-scroll-container]");
+        if (scrollContainer) {
+          const scrollTop = scrollContainer.scrollTop;
+          setIsScrolled(scrollTop > 10);
+        }
+      }
+    };
+
+    const scrollContainer = headerRef.current?.closest("[data-page-scroll-container]");
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+      return () => scrollContainer.removeEventListener("scroll", handleScroll);
+    }
+  }, []);
+
+  return (
+    <div
+      ref={headerRef}
+      className={cn(
+        "bg-background sticky top-0 z-10 -mx-3 space-y-3 px-3 pt-2 pb-3 transition-all duration-300 lg:static lg:mx-0 lg:space-y-2 lg:px-0 lg:pb-0",
+        isScrolled && "border-border border-b shadow-sm lg:border-b-0 lg:shadow-none",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 export const HoldingsPage = () => {
   const location = useLocation();
@@ -144,91 +182,122 @@ export const HoldingsPage = () => {
   }, [holdings]);
 
   return (
-    <ApplicationShell>
-      <Tabs defaultValue={defaultTab} className="flex h-full w-full flex-col">
-        <div className="shrink-0 space-y-2">
-          <ApplicationHeader heading="Holdings">
-            <TabsList
-              aria-label="Holdings views"
-              className="bg-secondary max-w-full overflow-x-auto rounded-full p-1 whitespace-nowrap"
-            >
-              <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                value="overview"
-              >
-                Analytics
-              </TabsTrigger>
-              <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                value="holdings"
-              >
-                Positions
-              </TabsTrigger>
-            </TabsList>
-          </ApplicationHeader>
-          <div className="mt-1">
-            <AccountSelector
-              selectedAccount={selectedAccount}
-              setSelectedAccount={handleAccountSelect}
-              variant="dropdown"
-              includePortfolio={true}
-            />
-          </div>
-          <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
-        </div>
-
-        <TabsContent value="holdings" className="min-h-0 flex-1 py-2">
-          <HoldingsTable holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+    <Page>
+      <Tabs defaultValue={defaultTab} className="flex h-full w-full flex-col overflow-hidden">
+        <TabsContent value="holdings" className="min-h-0 flex-1 overflow-hidden">
+          <PageContent className="space-y-0">
+            <StickyHeaderSection>
+              <PageHeader heading="Holdings">
+                <TabsList
+                  aria-label="Holdings views"
+                  className="rounded-full"
+                  // className="bg-secondary max-w-full overflow-x-auto rounded-full p-1 whitespace-nowrap"
+                >
+                  <TabsTrigger className="rounded-full" value="overview">
+                    Analytics
+                  </TabsTrigger>
+                  <TabsTrigger className="rounded-full" value="holdings">
+                    Positions
+                  </TabsTrigger>
+                </TabsList>
+              </PageHeader>
+              <div className="space-y-3">
+                <AccountSelector
+                  selectedAccount={selectedAccount}
+                  setSelectedAccount={handleAccountSelect}
+                  variant="dropdown"
+                  includePortfolio={true}
+                />
+                <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+              </div>
+            </StickyHeaderSection>
+            <div className="space-y-4 pt-4">
+              <HoldingsTable holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+            </div>
+          </PageContent>
         </TabsContent>
 
-        <TabsContent value="overview" className="space-y-4">
-          {/* Top row: Summary widgets */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <HoldingCurrencyChart
-              holdings={holdings ?? []}
-              baseCurrency={settings?.baseCurrency ?? "USD"}
-              isLoading={isLoading}
-              onCurrencySectionClick={(currencyName) =>
-                handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
-              }
-            />
+        <TabsContent value="overview" className="min-h-0 flex-1 overflow-hidden">
+          <PageContent className="space-y-0">
+            <StickyHeaderSection>
+              <PageHeader heading="Holdings">
+                <TabsList
+                  aria-label="Holdings views"
+                  className="rounded-full"
+                  // className="bg-secondary max-w-full overflow-x-auto rounded-full p-1 whitespace-nowrap"
+                >
+                  <TabsTrigger className="rounded-full" value="overview">
+                    Analytics
+                  </TabsTrigger>
+                  <TabsTrigger className="rounded-full" value="holdings">
+                    Positions
+                  </TabsTrigger>
+                </TabsList>
+              </PageHeader>
+              <div className="space-y-3">
+                <AccountSelector
+                  selectedAccount={selectedAccount}
+                  setSelectedAccount={handleAccountSelect}
+                  variant="dropdown"
+                  includePortfolio={true}
+                />
+                <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+              </div>
+            </StickyHeaderSection>
+            <div className="space-y-4 pt-4">
+              {/* Top row: Summary widgets */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <HoldingCurrencyChart
+                  holdings={holdings ?? []}
+                  baseCurrency={settings?.baseCurrency ?? "USD"}
+                  isLoading={isLoading}
+                  onCurrencySectionClick={(currencyName) =>
+                    handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
+                  }
+                />
 
-            <AccountAllocationChart isLoading={isLoading} />
+                <AccountAllocationChart isLoading={isLoading} />
 
-            <ClassesChart
-              holdings={holdings}
-              isLoading={isLoading}
-              onClassSectionClick={(className) =>
-                handleChartSectionClick("class", className, `Asset Class: ${className}`)
-              }
-            />
+                <ClassesChart
+                  holdings={holdings}
+                  isLoading={isLoading}
+                  onClassSectionClick={(className) =>
+                    handleChartSectionClick("class", className, `Asset Class: ${className}`)
+                  }
+                />
 
-            <CountryChart
-              holdings={nonCashHoldings}
-              isLoading={isLoading}
-              onCountrySectionClick={(countryName) =>
-                handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
-              }
-            />
-          </div>
+                <CountryChart
+                  holdings={nonCashHoldings}
+                  isLoading={isLoading}
+                  onCountrySectionClick={(countryName) =>
+                    handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
+                  }
+                />
+              </div>
 
-          {/* Second row: Composition and Sector */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="col-span-1 md:col-span-3">
-              <PortfolioComposition holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+              {/* Second row: Composition and Sector */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div className="col-span-1 md:col-span-3">
+                  <PortfolioComposition holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+                </div>
+
+                {/* Sectors Chart - Now self-contained */}
+                <div className="col-span-1 h-full">
+                  <SectorsChart
+                    holdings={nonCashHoldings}
+                    isLoading={isLoading}
+                    onSectorSectionClick={(sectorName) =>
+                      handleChartSectionClick(
+                        "sector",
+                        sectorName,
+                        `Holdings in Sector: ${sectorName}`,
+                      )
+                    }
+                  />
+                </div>
+              </div>
             </div>
-
-            {/* Sectors Chart - Now self-contained */}
-            <div className="col-span-1 h-full">
-              <SectorsChart
-                holdings={nonCashHoldings}
-                isLoading={isLoading}
-                onSectorSectionClick={(sectorName) =>
-                  handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
-                }
-              />
-            </div>
-          </div>
+          </PageContent>
         </TabsContent>
       </Tabs>
 
@@ -290,7 +359,7 @@ export const HoldingsPage = () => {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </ApplicationShell>
+    </Page>
   );
 };
 

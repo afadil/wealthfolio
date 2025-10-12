@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
+import { useRef, useState } from "react";
 
 interface FileDropzoneProps {
   file: File | null;

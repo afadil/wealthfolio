@@ -1,6 +1,4 @@
-import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Icons, type Icon } from "@wealthfolio/ui";
 import {
   Command,
   CommandEmpty,
@@ -10,14 +8,16 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { Account } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { Icons, type Icon } from "@wealthfolio/ui";
+import { forwardRef, useState } from "react";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { PORTFOLIO_ACCOUNT_ID, AccountType } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useSettings } from "@/hooks/use-settings";
+import { AccountType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { AnimatePresence, motion } from "motion/react";
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -38,6 +38,7 @@ interface AccountSelectorProps {
   filterActive?: boolean;
   includePortfolio?: boolean;
   className?: string;
+  iconOnly?: boolean;
 }
 
 // Extended Account type for UI that can have the PORTFOLIO type
@@ -110,6 +111,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       filterActive = true,
       includePortfolio = false,
       className,
+      iconOnly = false,
     },
     ref,
   ) => {
@@ -344,14 +346,16 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
+              aria-label={iconOnly ? "Add account" : undefined}
               className={cn(
-                "bg-secondary/30 hover:bg-muted/80 flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium",
+                "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
+                iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
                 className,
               )}
-              size="sm"
+              size={iconOnly ? "icon" : "sm"}
             >
-              <Icons.Plus className="h-4 w-4" />
-              {buttonText}
+              <Icons.Briefcase className="h-4 w-4" />
+              {!iconOnly && buttonText}
             </Button>
           );
 

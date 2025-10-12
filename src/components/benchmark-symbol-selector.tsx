@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { searchTicker } from "@/commands/market-data";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -9,12 +8,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Icons } from "@/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { Icons } from "@/components/ui/icons";
-import { searchTicker } from "@/commands/market-data";
 import { QuoteSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 const BENCHMARKS = [
   {
@@ -73,9 +73,14 @@ const BENCHMARKS = [
 interface BenchmarkSymbolSelectorProps {
   onSelect: (symbol: { id: string; name: string }) => void;
   className?: string;
+  iconOnly?: boolean;
 }
 
-export function BenchmarkSymbolSelector({ onSelect, className }: BenchmarkSymbolSelectorProps) {
+export function BenchmarkSymbolSelector({
+  onSelect,
+  className,
+  iconOnly = false,
+}: BenchmarkSymbolSelectorProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -121,14 +126,16 @@ export function BenchmarkSymbolSelector({ onSelect, className }: BenchmarkSymbol
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={iconOnly ? "Add benchmark" : undefined}
           className={cn(
-            "bg-secondary/30 hover:bg-muted/80 flex h-8 items-center gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium",
+            "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
+            iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
             className,
           )}
-          size="sm"
+          size={iconOnly ? "icon" : "sm"}
         >
-          <Icons.Plus className="h-4 w-4" />
-          Add Benchmark
+          <Icons.TrendingUp className="h-4 w-4" />
+          {!iconOnly && "Add Benchmark"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[350px] p-0">

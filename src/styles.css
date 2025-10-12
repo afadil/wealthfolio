@@ -27,6 +27,14 @@
   transform: rotateY(180deg);
 }
 
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @theme {
   /* Disable default colors to prevent their use; feel free to re-enable as needed. */
   --color-amber-*: initial;
@@ -375,10 +383,14 @@
 
   --liquid-glass-bg: rgba(255, 255, 255, 0.05);
   --liquid-glass-border: rgba(255, 255, 255, 0.1);
-  --liquid-glass-shadow: rgba(0, 0, 0, 0.05);
-  --liquid-ripple-color: rgba(255, 255, 255, 0.3);
-  --liquid-flow-duration: 0.8s;
-  --liquid-bounce-duration: 0.6s;
+
+  --inset-top: env(safe-area-inset-top, 0px);
+  --inset-right: env(safe-area-inset-right, 0px);
+  --inset-bottom: env(safe-area-inset-bottom, 0px);
+  --inset-left: env(safe-area-inset-left, 0px);
+
+  --mobile-nav-ui-height: 64px; /* nav bar height */
+  --mobile-nav-gap: 12px; /* space between nav and bottom */
 }
 
 .dark {
@@ -417,16 +429,28 @@
   }
 }
 
+.safe-area {
+  padding-top: var(--inset-top);
+  padding-right: var(--inset-right);
+  padding-left: var(--inset-left);
+}
+
+/* Keep the core application layout pinned to the viewport so the sidebar stays fixed */
+.app-shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 /* QR scanning transparency overrides */
 body.qr-scan-active,
 body.qr-scan-active #root,
-body.qr-scan-active .app-shell,
-body.qr-scan-active .settings-root {
+body.qr-scan-active .app-shell {
   background: transparent !important;
   background-color: transparent !important;
 }
-body.qr-scan-active .app-shell > *,
-body.qr-scan-active .settings-root > * {
+body.qr-scan-active .app-shell > ** {
   background: transparent !important;
 }
 body.qr-scan-active .qr-overlay {
@@ -454,6 +478,12 @@ body.qr-scan-active .scan-hide-target {
     overflow-x: hidden;
   }
 
+  /* Better momentum scrolling */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
   /* Native-like tap feedback */
   .tap-highlight-none {
     -webkit-tap-highlight-color: transparent;
@@ -468,10 +498,20 @@ body.qr-scan-active .scan-hide-target {
     padding-top: env(safe-area-inset-top, 0);
   }
 
-  /* Better momentum scrolling */
-  .momentum-scroll {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
+  /* Safe area left/right to pair with your existing top/bottom classes */
+  .safe-area-inset-x {
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* Dynamic viewport height to avoid mobile address bar issues */
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  /* Scroll-to/focus targets stop above the floating nav */
+  .scroll-pb-nav {
+    scroll-padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-nav-gap));
   }
 }
 

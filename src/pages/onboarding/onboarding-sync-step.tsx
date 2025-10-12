@@ -5,7 +5,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { cancel, Format, requestPermissions, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { AlertFeedback, Button, Card, CardContent, Icons } from "@wealthfolio/ui";
-import { motion, type Variants } from "framer-motion";
+import { type Variants, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";

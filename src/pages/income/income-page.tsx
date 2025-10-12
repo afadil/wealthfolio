@@ -1,7 +1,6 @@
 import { getIncomeSummary } from "@/commands/portfolio";
 import { ApplicationHeader } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
@@ -11,15 +10,15 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AmountDisplay, ApplicationShell, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
+import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
 
-const periods: { code: "TOTAL" | "YTD" | "LAST_YEAR"; label: string }[] = [
-  { code: "TOTAL", label: "All Time" },
-  { code: "LAST_YEAR", label: "Last Year" },
-  { code: "YTD", label: "Year to Date" },
+const periods = [
+  { value: "TOTAL" as const, label: "All Time" },
+  { value: "LAST_YEAR" as const, label: "Last Year" },
+  { value: "YTD" as const, label: "Year to Date" },
 ];
 
 const IncomePeriodSelector: React.FC<{
@@ -27,19 +26,13 @@ const IncomePeriodSelector: React.FC<{
   onPeriodSelect: (period: "TOTAL" | "YTD" | "LAST_YEAR") => void;
 }> = ({ selectedPeriod, onPeriodSelect }) => (
   <div className="flex justify-end">
-    <div className="bg-secondary flex space-x-1 rounded-full p-1">
-      {periods.map(({ code, label }) => (
-        <Button
-          key={code}
-          size="sm"
-          className="h-8 rounded-full px-2 text-xs"
-          variant={selectedPeriod === code ? "default" : "ghost"}
-          onClick={() => onPeriodSelect(code)}
-        >
-          {label}
-        </Button>
-      ))}
-    </div>
+    <AnimatedToggleGroup
+      variant="secondary"
+      size="sm"
+      items={periods}
+      value={selectedPeriod}
+      onValueChange={onPeriodSelect}
+    />
   </div>
 );
 
@@ -68,7 +61,7 @@ export default function IncomePage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <ApplicationShell>
+      <div className="content-padding h-full w-full">
         <ApplicationHeader heading="Investment Income">
           <div className="flex items-center space-x-2">
             <IncomePeriodSelector
@@ -85,7 +78,7 @@ export default function IncomePage() {
             description="There is no income data for the selected period. Try selecting a different time range or check back later."
           />
         </div>
-      </ApplicationShell>
+      </div>
     );
   }
 
@@ -153,7 +146,7 @@ export default function IncomePage() {
   const { isBalanceHidden } = useBalancePrivacy();
 
   return (
-    <ApplicationShell className="p-6">
+    <div className="content-padding h-full w-full space-y-6">
       <ApplicationHeader heading="Investment Income">
         <div className="flex items-center space-x-2">
           <IncomePeriodSelector
@@ -416,7 +409,7 @@ export default function IncomePage() {
           </Card>
         </div>
       </div>
-    </ApplicationShell>
+    </div>
   );
 }
 

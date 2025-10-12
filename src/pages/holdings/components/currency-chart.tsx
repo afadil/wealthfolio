@@ -132,13 +132,14 @@ export function HoldingCurrencyChart({
                     className="h-5 w-1.5 shrink-0 rounded-full"
                     style={{ backgroundColor: INDICATOR_COLORS[index % INDICATOR_COLORS.length] }}
                   />
-                  <span className="truncate text-sm font-medium">{currency.name}</span>
+                  <span className="text-sm font-medium">{currency.name}</span>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-sm font-medium">
                   <AmountDisplay
                     value={currency.value}
                     currency={baseCurrency}
                     isHidden={isBalanceHidden}
+                    displayCurrency={false}
                   />
                   <span className="text-muted-foreground text-xs">|</span>
                   <span className="text-muted-foreground">

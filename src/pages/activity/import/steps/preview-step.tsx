@@ -4,7 +4,7 @@ import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Account, ActivityImport, CsvRowData } from "@/lib/types";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { CSVFileViewer } from "../components/csv-file-viewer";
 import { ImportAlert } from "../components/import-alert";

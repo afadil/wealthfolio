@@ -6,14 +6,6 @@ import { useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { type NavigationProps, isPathActive } from "./app-navigation";
 
-type HapticsModule = typeof import("@tauri-apps/plugin-haptics");
-let hapticsModulePromise: Promise<HapticsModule> | null = null;
-
-async function loadHapticsModule(): Promise<HapticsModule> {
-  hapticsModulePromise ??= import("@tauri-apps/plugin-haptics");
-  return hapticsModulePromise;
-}
-
 interface MobileNavBarProps {
   navigation: NavigationProps;
 }
@@ -26,18 +18,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
 
   const triggerHaptic = useCallback(() => {
     if (!isMobilePlatform || !isTauri) return;
-    void (async () => {
-      try {
-        const haptics = await loadHapticsModule();
-        if (typeof haptics.selectionFeedback === "function") {
-          await haptics.selectionFeedback();
-        } else if (typeof haptics.impactFeedback === "function") {
-          await haptics.impactFeedback("medium");
-        }
-      } catch {
-        // Haptic feedback not available
-      }
-    })();
+    // optional: keep your lazy-import haptics here if desired
   }, [isMobilePlatform, isTauri]);
 
   const handleNavigation = useCallback(
@@ -52,18 +33,21 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const primaryItems = navigation?.primary ?? [];
   const secondaryItems = navigation?.secondary ?? [];
   const allItems = [...primaryItems, ...secondaryItems];
-
   const visibleItems = allItems.slice(0, 3);
   const menuItems = allItems.slice(3);
   const hasMenu = menuItems.length > 0;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 md:hidden">
-      <div className="flex justify-center px-4 pb-[max(1.2rem,env(safe-area-inset-bottom))]">
+      {/* Lift off bottom by the design gap while respecting safe area */}
+      <div className="flex justify-center px-4 pb-[max(var(--mobile-nav-gap),env(safe-area-inset-bottom))]">
         <LiquidGlass
           variant="floating"
           intensity="subtle"
-          className="pointer-events-auto w-full px-1 py-1"
+          className={cn(
+            "pointer-events-auto w-full px-1 py-1",
+            "h-[var(--mobile-nav-ui-height)]", // fixed UI height
+          )}
         >
           <nav
             aria-label="Primary navigation p-0"
@@ -79,16 +63,14 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   className={cn(
                     "text-foreground relative z-10 flex h-14 w-full items-center justify-center rounded-full border transition-colors",
                     isActive
-                      ? "border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/7"
+                      ? "border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/10"
                       : "border-0",
                   )}
                   key={item.href}
                   aria-current={isActive ? "page" : undefined}
                 >
                   <span
-                    className={cn(
-                      "relative flex size-7 shrink-0 items-center justify-center outline-none",
-                    )}
+                    className="relative flex size-7 shrink-0 items-center justify-center outline-none"
                     aria-hidden="true"
                   >
                     {item.icon ?? <Icons.ArrowRight className="size-6" />}
@@ -103,14 +85,10 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   <button
                     onClick={triggerHaptic}
                     aria-label="More options"
-                    className={cn(
-                      "text-foreground relative z-10 flex h-12 w-full items-center justify-center rounded-full",
-                    )}
+                    className="text-foreground relative z-10 flex h-12 w-full items-center justify-center rounded-full"
                   >
                     <span
-                      className={cn(
-                        "relative flex size-7 shrink-0 items-center justify-center outline-none",
-                      )}
+                      className="relative flex size-7 shrink-0 items-center justify-center outline-none"
                       aria-hidden="true"
                     >
                       <Icons.CirclesFour className="size-6" />
@@ -122,25 +100,12 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mr-0 mb-0 flex w-42 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0 "
+                  className="mr-0 mb-0 flex w-42 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
                 >
                   {menuItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);
                     return (
-                      <LiquidGlass
-                        key={item.href}
-                        variant="floating"
-                        intensity="subtle"
-                       
-                        style={
-                          isActive
-                            ? {
-                                background: "rgba(251, 146, 60, 0.15)",
-                                borderColor: "rgba(251, 146, 60, 0.3)",
-                              }
-                            : undefined
-                        }
-                      >
+                      <LiquidGlass key={item.href} variant="floating" intensity="subtle">
                         <Link
                           to={item.href}
                           onClick={() => {

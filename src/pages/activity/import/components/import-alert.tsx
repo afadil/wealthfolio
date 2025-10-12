@@ -1,8 +1,8 @@
-import type React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Icons, type Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
+import type React from "react";
 
 type AlertVariant = "warning" | "success" | "destructive";
 type AlertSize = "sm" | "lg" | "xl";

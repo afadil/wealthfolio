@@ -1,5 +1,6 @@
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
+import { ApplicationShell } from "@wealthfolio/ui";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarNav } from "./sidebar-nav";
 
@@ -77,7 +78,7 @@ export default function SettingsLayout() {
 
   // Mobile-first: show list view on main page, detail view on specific pages
   return (
-    <div className="settings-root min-h-screen w-full max-w-full overflow-x-hidden">
+    <ApplicationShell className="settings-root">
       {/* Mobile Layout */}
       <div className="lg:hidden">
         {isMainSettingsPage ? (
@@ -143,6 +144,6 @@ export default function SettingsLayout() {
           </div>
         </div>
       </div>
-    </div>
+    </ApplicationShell>
   );
 }
