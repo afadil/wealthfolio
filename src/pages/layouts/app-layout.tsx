@@ -42,7 +42,7 @@ const AppLayout = () => {
           <main className="relative flex min-h-0 w-full max-w-full flex-1 flex-col overflow-x-hidden">
             <div
               data-tauri-drag-region="true"
-              className="draggable pointer-events-auto absolute inset-x-0 top-0 h-6 opacity-0"
+              className="draggable pointer-events-auto absolute inset-x-0 top-0 h-6 cursor-grab opacity-0"
             ></div>
             {shouldUseMobileNavigation ? (
               <MobileNavigationContainer />

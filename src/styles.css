@@ -458,8 +458,8 @@
 /* Keep the core application layout pinned to the viewport so the sidebar stays fixed */
 .app-shell {
   min-height: 100dvh;
-  /* height: 100dvh; */
-  /* max-height: 100dvh; */
+  height: 100dvh;
+  max-height: 100dvh;
   /* Avoid vertical clipping that can interfere with sticky; prevent horizontal scroll only */
   overflow-x: hidden;
 }
