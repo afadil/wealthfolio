@@ -22,7 +22,7 @@ export function MobileNavigationContainer() {
       {(isRefreshing || ptr.isPulling) && (
         <div
           className="pointer-events-none absolute left-1/2 z-50 -translate-x-1/2"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
         >
           <div className="bg-background/80 text-muted-foreground flex items-center gap-2 rounded-full px-3 py-1 text-xs shadow-sm backdrop-blur-sm">
             <Icons.Loader className="size-4 animate-spin" />

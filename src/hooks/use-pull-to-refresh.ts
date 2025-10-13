@@ -6,6 +6,8 @@ interface UsePullToRefreshOptions {
   threshold?: number;
   onRefresh?: () => Promise<void>;
   disabled?: boolean;
+  activationThreshold?: number;
+  startPullDistance?: number;
 }
 
 interface PullToRefreshHandlers {
@@ -24,15 +26,18 @@ export function usePullToRefresh({
   threshold = 80,
   onRefresh,
   disabled = false,
+  activationThreshold,
+  startPullDistance = 48,
 }: UsePullToRefreshOptions = {}): [boolean, PullToRefreshHandlers, PullToRefreshState] {
   const queryClient = useQueryClient();
   const { mutateAsync: triggerPortfolioUpdate } = useUpdatePortfolioMutation();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [startY, setStartY] = useState(0);
-  const [currentY, setCurrentY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const containerRef = useRef<HTMLElement | null>(null);
+  const startYRef = useRef(0);
+  const currentYRef = useRef(0);
+  const activationDistance = activationThreshold ?? threshold + 80;
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || disabled) return;
@@ -58,12 +63,13 @@ export function usePullToRefresh({
       if (disabled || isRefreshing) return;
 
       const target = e.currentTarget as HTMLElement;
+      const touchY = e.touches[0]?.clientY ?? 0;
       containerRef.current = target;
 
       // Only trigger if we're at the top of the scroll container
       if (target.scrollTop === 0) {
-        setStartY(e.touches[0].clientY);
-        setCurrentY(e.touches[0].clientY);
+        startYRef.current = touchY;
+        currentYRef.current = touchY;
       }
     },
     [disabled, isRefreshing],
@@ -76,15 +82,16 @@ export function usePullToRefresh({
       const target = containerRef.current;
       const content = target.querySelector("[data-ptr-content]") ?? null;
       const touch = e.touches[0];
-      const deltaY = touch.clientY - startY;
+      const touchY = touch.clientY;
+      const deltaY = touchY - startYRef.current;
 
       // Only pull when at top and pulling down
       if (target.scrollTop === 0 && deltaY > 0) {
         e.preventDefault();
         // Lock UA scroll gestures so our preventDefault takes effect
         target.style.touchAction = "none";
-        setCurrentY(touch.clientY);
-        setIsPulling(deltaY > 10);
+        currentYRef.current = touchY;
+        setIsPulling(deltaY > startPullDistance);
 
         // Add visual feedback
         const distance = Math.min(deltaY * 0.5, threshold);
@@ -95,7 +102,7 @@ export function usePullToRefresh({
         }
       }
     },
-    [disabled, isRefreshing, startY, threshold],
+    [disabled, isRefreshing, startPullDistance, threshold],
   );
 
   const onTouchEnd = useCallback(
@@ -103,22 +110,22 @@ export function usePullToRefresh({
       if (disabled || !containerRef.current) return;
 
       const target = containerRef.current;
-      const deltaY = currentY - startY;
+      const deltaY = currentYRef.current - startYRef.current;
 
       // Reset any container styles (defensive)
       target.style.transform = "";
       target.style.transition = "";
 
       // Trigger refresh if pulled far enough
-      if (deltaY > threshold && isPulling) {
+      if (deltaY > activationDistance && isPulling) {
         handleRefresh();
       }
 
       // Reset state
       setIsPulling(false);
       setPullDistance(0);
-      setStartY(0);
-      setCurrentY(0);
+      startYRef.current = 0;
+      currentYRef.current = 0;
       // Restore UA gesture handling
       target.style.touchAction = "";
       containerRef.current = null;
@@ -133,7 +140,7 @@ export function usePullToRefresh({
         }, 220);
       }
     },
-    [disabled, currentY, startY, threshold, isPulling, handleRefresh],
+    [activationDistance, disabled, handleRefresh, isPulling],
   );
 
   return [
