@@ -93,8 +93,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden">
-      <div data-tauri-drag-region="true" className="draggable h-8 w-full"></div>
+    <div className="flex min-h-screen flex-col overflow-x-hidden pt-[var(--inset-top)] md:py-8">
       <div className="flex px-6 lg:px-10">
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
           <div className="flex items-start gap-2">

@@ -427,6 +427,26 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Safe area support for notched devices */
+  @supports (padding: max(0px)) {
+    .pt-safe {
+      padding-top: max(env(safe-area-inset-top), 0.75rem);
+    }
+    .pb-safe {
+      padding-bottom: max(env(safe-area-inset-bottom), 1.5rem);
+    }
+  }
+  /*
+   * Momentum scrolling class for smooth native-like scrolling.
+   * Used in conjunction with data-page-scroll-container attribute
+   * to mark the authoritative scroll container for each route.
+   */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+  }
 }
 
 .safe-area {
@@ -438,9 +458,10 @@
 /* Keep the core application layout pinned to the viewport so the sidebar stays fixed */
 .app-shell {
   min-height: 100dvh;
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
+  /* height: 100dvh; */
+  /* max-height: 100dvh; */
+  /* Avoid vertical clipping that can interfere with sticky; prevent horizontal scroll only */
+  overflow-x: hidden;
 }
 
 /* QR scanning transparency overrides */
@@ -468,6 +489,12 @@ body.qr-scan-active .scan-hide-target {
     -webkit-overflow-scrolling: touch;
   }
 
+  /* When the scroll container handles mobile bottom inset (nav height),
+     remove bottom padding from PageContent to avoid double spacing */
+  [data-page-scroll-container][data-with-mobile-nav-offset="true"] main[data-ptr-content] {
+    padding-bottom: 0 !important;
+  }
+
   .touch-manipulation {
     touch-action: manipulation;
   }
@@ -478,11 +505,7 @@ body.qr-scan-active .scan-hide-target {
     overflow-x: hidden;
   }
 
-  /* Better momentum scrolling */
-  .momentum-scroll {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-  }
+  /* Better momentum scrolling - consolidated above at line 445 */
 
   /* Native-like tap feedback */
   .tap-highlight-none {
@@ -511,7 +534,12 @@ body.qr-scan-active .scan-hide-target {
 
   /* Scroll-to/focus targets stop above the floating nav */
   .scroll-pb-nav {
-    scroll-padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-nav-gap));
+    scroll-padding-bottom: calc(var(--mobile-nav-ui-height) + var(--mobile-nav-gap));
+  }
+
+  /* Scroll-to/focus targets stop below sticky headers (typically ~72px) */
+  .scroll-pt-header {
+    scroll-padding-top: 5rem;
   }
 }
 

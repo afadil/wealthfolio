@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import NumberFlow from "@number-flow/react";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import NumberFlow from "@number-flow/react";
+import { useMemo } from "react";
 
 interface BalanceProps {
   targetValue: number;
@@ -57,7 +57,6 @@ const Balance: React.FC<BalanceProps> = ({
             minimumFractionDigits: displayDecimal ? 2 : 0,
             maximumFractionDigits: displayDecimal ? 2 : 0,
           }}
-          // locales={navigator.language || 'en-US'}
         />
       )}
     </h1>

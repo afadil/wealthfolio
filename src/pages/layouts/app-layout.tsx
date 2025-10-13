@@ -1,3 +1,4 @@
+import { PageScrollContainer } from "@/components/page/page";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
 import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
@@ -26,30 +27,29 @@ const AppLayout = () => {
   }
 
   return (
-    <ApplicationShell className="app-shells lg:pt-2">
+    <ApplicationShell className="app-shell">
       <div className="scan-hide-target">
         <AppSidebar navigation={navigation} />
       </div>
 
       <div
         className={cn(
-          "relative flex min-h-0 w-full max-w-full flex-1 overflow-hidden",
+          "relative flex min-h-0 w-full max-w-full flex-1 overflow-x-hidden",
           shouldUseMobileNavigation ? "overscroll-contain" : undefined,
         )}
       >
         <ErrorBoundary>
-          <main className="relative flex min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+          <main className="relative flex min-h-0 w-full max-w-full flex-1 flex-col overflow-x-hidden">
             <div
               data-tauri-drag-region="true"
               className="draggable pointer-events-auto absolute inset-x-0 top-0 h-6 opacity-0"
             ></div>
-
             {shouldUseMobileNavigation ? (
               <MobileNavigationContainer />
             ) : (
-              <div className="momentum-scroll scroll-pb-nav w-full max-w-full flex-1 overflow-auto">
+              <PageScrollContainer>
                 <Outlet />
-              </div>
+              </PageScrollContainer>
             )}
           </main>
         </ErrorBoundary>
