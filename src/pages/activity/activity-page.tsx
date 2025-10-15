@@ -1,5 +1,5 @@
 import { getAccounts } from "@/commands/account";
-import { ApplicationHeader } from "@/components/header";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -50,80 +50,82 @@ const ActivityPage = () => {
     setSelectedActivity(undefined);
   }, []);
 
-  return (
-    <div className="content-padding flex h-full min-h-0 w-full flex-1 flex-col space-y-6">
-      <div className="shrink-0">
-        <ApplicationHeader heading="Activity">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" title="Import" asChild>
-              <Link to={"/import"}>
-                <Icons.Import className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Import from CSV</span>
-                <span className="sm:hidden">Import</span>
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowBulkHoldingsForm(true)}>
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Add Holdings</span>
-              <span className="sm:hidden">Holdings</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Add Transaction</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
-          </div>
-        </ApplicationHeader>
-        <Separator className="my-6" />
-      </div>
-      <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
-        {showEditableTable ? (
-          <EditableActivityTable
-            accounts={accounts}
-            isEditable={showEditableTable}
-            onToggleEditable={setShowEditableTable}
-          />
-        ) : (
-          <ActivityTable
-            accounts={accounts}
-            handleEdit={handleEdit}
-            handleDelete={handleDelete}
-            isEditable={showEditableTable}
-            onToggleEditable={setShowEditableTable}
-          />
-        )}
-      </div>
-      <ActivityForm
-        accounts={
-          accounts
-            ?.filter((acc) => acc.isActive)
-            .map((account) => ({
-              value: account.id,
-              label: account.name,
-              currency: account.currency,
-            })) || []
-        }
-        activity={selectedActivity}
-        open={showForm}
-        onClose={handleFormClose}
-      />
-      <ActivityDeleteModal
-        isOpen={showDeleteAlert}
-        isDeleting={deleteActivityMutation.isPending}
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => {
-          setShowDeleteAlert(false);
-          setSelectedActivity(undefined);
-        }}
-      />
-      <BulkHoldingsModal
-        open={showBulkHoldingsForm}
-        onClose={() => setShowBulkHoldingsForm(false)}
-        onSuccess={() => {
-          setShowBulkHoldingsForm(false);
-        }}
-      />
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button size="sm" title="Import" asChild>
+        <Link to={"/import"}>
+          <Icons.Import className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Import from CSV</span>
+          <span className="sm:hidden">Import</span>
+        </Link>
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => setShowBulkHoldingsForm(true)}>
+        <Icons.PlusCircle className="mr-2 h-4 w-4" />
+        <span className="hidden sm:inline">Add Holdings</span>
+        <span className="sm:hidden">Holdings</span>
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
+        <Icons.PlusCircle className="mr-2 h-4 w-4" />
+        <span className="hidden sm:inline">Add Transaction</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
     </div>
+  );
+
+  return (
+    <Page>
+      <PageHeader heading="Activity" actions={headerActions} />
+      <PageContent>
+        <Separator className="my-4" />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {showEditableTable ? (
+            <EditableActivityTable
+              accounts={accounts}
+              isEditable={showEditableTable}
+              onToggleEditable={setShowEditableTable}
+            />
+          ) : (
+            <ActivityTable
+              accounts={accounts}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+              isEditable={showEditableTable}
+              onToggleEditable={setShowEditableTable}
+            />
+          )}
+        </div>
+        <ActivityForm
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) || []
+          }
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
+        <ActivityDeleteModal
+          isOpen={showDeleteAlert}
+          isDeleting={deleteActivityMutation.isPending}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => {
+            setShowDeleteAlert(false);
+            setSelectedActivity(undefined);
+          }}
+        />
+        <BulkHoldingsModal
+          open={showBulkHoldingsForm}
+          onClose={() => setShowBulkHoldingsForm(false)}
+          onSuccess={() => {
+            setShowBulkHoldingsForm(false);
+          }}
+        />
+      </PageContent>
+    </Page>
   );
 };
 

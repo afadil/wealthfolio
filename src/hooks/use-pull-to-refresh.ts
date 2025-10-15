@@ -38,6 +38,7 @@ export function usePullToRefresh({
   const startYRef = useRef(0);
   const currentYRef = useRef(0);
   const activationDistance = activationThreshold ?? threshold + 80;
+  const hasActivePullRef = useRef(false);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || disabled) return;
@@ -62,15 +63,16 @@ export function usePullToRefresh({
     (e: React.TouchEvent) => {
       if (disabled || isRefreshing) return;
 
-      const target = e.currentTarget as HTMLElement;
-      const touchY = e.touches[0]?.clientY ?? 0;
-      containerRef.current = target;
+      const touch = e.touches[0];
+      if (!touch) return;
 
-      // Only trigger if we're at the top of the scroll container
-      if (target.scrollTop === 0) {
-        startYRef.current = touchY;
-        currentYRef.current = touchY;
-      }
+      const target = e.currentTarget as HTMLElement;
+
+      containerRef.current = target;
+      const touchY = touch.clientY;
+      startYRef.current = touchY;
+      currentYRef.current = touchY;
+      hasActivePullRef.current = false;
     },
     [disabled, isRefreshing],
   );
@@ -80,21 +82,36 @@ export function usePullToRefresh({
       if (disabled || isRefreshing || !containerRef.current) return;
 
       const target = containerRef.current;
-      const content = target.querySelector("[data-ptr-content]") ?? null;
+      const content = target.querySelector<HTMLElement>("[data-ptr-content]") ?? null;
       const touch = e.touches[0];
-      const touchY = touch.clientY;
+      const touchY = touch?.clientY ?? startYRef.current;
       const deltaY = touchY - startYRef.current;
 
       // Only pull when at top and pulling down
       if (target.scrollTop === 0 && deltaY > 0) {
+        if (!hasActivePullRef.current && deltaY < startPullDistance) {
+          setIsPulling(false);
+          setPullDistance(0);
+          if (content) {
+            content.style.transition = "";
+            content.style.paddingTop = "";
+          }
+          return;
+        }
+
+        if (!hasActivePullRef.current) {
+          hasActivePullRef.current = true;
+        }
+
         e.preventDefault();
         // Lock UA scroll gestures so our preventDefault takes effect
         target.style.touchAction = "none";
         currentYRef.current = touchY;
         setIsPulling(deltaY > startPullDistance);
 
-        // Add visual feedback
-        const distance = Math.min(deltaY * 0.5, threshold);
+        // Add visual feedback (ignore the initial tap distance)
+        const effectiveDelta = Math.max(deltaY - startPullDistance, 0);
+        const distance = Math.min(effectiveDelta * 0.5, threshold);
         setPullDistance(distance);
         if (content) {
           content.style.transition = "none";
@@ -129,8 +146,9 @@ export function usePullToRefresh({
       // Restore UA gesture handling
       target.style.touchAction = "";
       containerRef.current = null;
+      hasActivePullRef.current = false;
 
-      const content = target.querySelector("[data-ptr-content]") ?? null;
+      const content = target.querySelector<HTMLElement>("[data-ptr-content]") ?? null;
       if (content) {
         content.style.transition = "padding-top 180ms ease-out";
         content.style.paddingTop = "0px";

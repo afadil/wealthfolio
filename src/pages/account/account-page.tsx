@@ -1,8 +1,6 @@
-import { ApplicationHeader } from "@/components/header";
 import { HistoryChart } from "@/components/history-chart";
-import {} from "@/components/ui/card";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
 import {
-  ApplicationShell,
   Card,
   CardContent,
   CardHeader,
@@ -115,75 +113,77 @@ const AccountPage = () => {
   }, [accountPerformance, selectedIntervalCode, frontendSimpleReturn]);
 
   return (
-    <ApplicationShell>
-      <ApplicationHeader
+    <Page>
+      <PageHeader
         heading={account?.name ?? "Account"}
         headingPrefix={account?.group ?? account?.currency}
         displayBack={true}
       />
-      <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
-        <Card className="col-span-1 md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-md">
-              <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-                <div className="flex items-start gap-2">
-                  <div>
-                    <p className="pt-3 text-xl font-bold">
-                      <PrivacyAmount
-                        value={currentValuation?.totalValue ?? 0}
-                        currency={account?.currency ?? "USD"}
-                      />
-                    </p>
-                    <div className="flex space-x-3 text-sm">
-                      <GainAmount
-                        className="text-sm font-light"
-                        value={frontendGainLossAmount}
-                        currency={account?.currency ?? "USD"}
-                        displayCurrency={false}
-                      />
-                      <div className="border-muted-foreground my-1 border-r pr-2" />
-                      <GainPercent
-                        className="text-sm font-light"
-                        value={percentageToDisplay}
-                        animated={true}
-                      />
+      <PageContent>
+        <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
+          <Card className="col-span-1 md:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-md">
+                <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
+                  <div className="flex items-start gap-2">
+                    <div>
+                      <p className="pt-3 text-xl font-bold">
+                        <PrivacyAmount
+                          value={currentValuation?.totalValue ?? 0}
+                          currency={account?.currency ?? "USD"}
+                        />
+                      </p>
+                      <div className="flex space-x-3 text-sm">
+                        <GainAmount
+                          className="text-sm font-light"
+                          value={frontendGainLossAmount}
+                          currency={account?.currency ?? "USD"}
+                          displayCurrency={false}
+                        />
+                        <div className="border-muted-foreground my-1 border-r pr-2" />
+                        <GainPercent
+                          className="text-sm font-light"
+                          value={percentageToDisplay}
+                          animated={true}
+                        />
+                      </div>
                     </div>
+                    <PrivacyToggle className="mt-3" />
                   </div>
-                  <PrivacyToggle className="mt-3" />
-                </div>
-              </PortfolioUpdateTrigger>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="w-full p-0">
-              <div className="flex w-full flex-col">
-                <div className="h-[480px] w-full">
-                  <HistoryChart data={chartData} isLoading={false} />
-                  <IntervalSelector
-                    className="relative right-0 bottom-10 left-0 z-10"
-                    onIntervalSelect={handleIntervalSelect}
-                    isLoading={isValuationHistoryLoading}
-                    initialSelection={INITIAL_INTERVAL_CODE}
-                  />
+                </PortfolioUpdateTrigger>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="w-full p-0">
+                <div className="flex w-full flex-col">
+                  <div className="h-[480px] w-full">
+                    <HistoryChart data={chartData} isLoading={false} />
+                    <IntervalSelector
+                      className="relative right-0 bottom-10 left-0 z-10"
+                      onIntervalSelect={handleIntervalSelect}
+                      isLoading={isValuationHistoryLoading}
+                      initialSelection={INITIAL_INTERVAL_CODE}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <div className="flex flex-col space-y-4">
-          <AccountMetrics
-            valuation={currentValuation}
-            performance={accountPerformance}
-            className="grow"
-            isLoading={isDetailsLoading || isPerformanceHistoryLoading}
-          />
-          <AccountContributionLimit accountId={id} />
+          <div className="flex flex-col space-y-4">
+            <AccountMetrics
+              valuation={currentValuation}
+              performance={accountPerformance}
+              className="grow"
+              isLoading={isDetailsLoading || isPerformanceHistoryLoading}
+            />
+            <AccountContributionLimit accountId={id} />
+          </div>
         </div>
-      </div>
 
-      <AccountHoldings accountId={id} />
-    </ApplicationShell>
+        <AccountHoldings accountId={id} />
+      </PageContent>
+    </Page>
   );
 };
 

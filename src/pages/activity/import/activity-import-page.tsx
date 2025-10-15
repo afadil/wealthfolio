@@ -1,6 +1,6 @@
 import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
-import { ApplicationHeader } from "@/components/header";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { QueryKeys } from "@/lib/query-keys";
@@ -173,35 +173,35 @@ const ActivityImportPage = () => {
   };
 
   return (
-    <div className="flex flex-col p-4 sm:p-6">
-      <ApplicationHeader heading="Import Activities">
-        <ImportHelpPopover />
-      </ApplicationHeader>
-      <Separator className="my-4" />
-      <ErrorBoundary>
-        <div className="flex-1 overflow-auto px-2 pb-6 sm:px-4 md:px-6">
-          <Card className="w-full">
-            <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
-              <StepIndicator steps={STEPS} currentStep={currentStep} />
-            </CardHeader>
-            <CardContent className="overflow-hidden p-0">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentStep}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="p-3 sm:p-6"
-                >
-                  {renderStep()}
-                </motion.div>
-              </AnimatePresence>
-            </CardContent>
-          </Card>
-        </div>
-      </ErrorBoundary>
-    </div>
+    <Page>
+      <PageHeader heading="Import Activities" actions={<ImportHelpPopover />} />
+      <PageContent>
+        <Separator />
+        <ErrorBoundary>
+          <div className="flex-1 overflow-auto px-2 pb-6 sm:px-4 md:px-6">
+            <Card className="w-full">
+              <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
+                <StepIndicator steps={STEPS} currentStep={currentStep} />
+              </CardHeader>
+              <CardContent className="overflow-hidden p-0">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentStep}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="p-3 sm:p-6"
+                  >
+                    {renderStep()}
+                  </motion.div>
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+          </div>
+        </ErrorBoundary>
+      </PageContent>
+    </Page>
   );
 };
 

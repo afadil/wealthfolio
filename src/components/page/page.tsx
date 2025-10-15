@@ -184,7 +184,7 @@ export function PageHeader({
       )}
 
       <div className="px-4 py-3 md:px-6 md:py-4 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {displayBack &&
@@ -244,7 +244,7 @@ export function PageContent({
       )}
       {...props}
     >
-      <div className="mx-auto max-w-7xl">{children}</div>
+      <div className="mx-auto space-y-6">{children}</div>
     </main>
   );
 }

@@ -6,7 +6,7 @@ import {
   TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
   VOLATILITY_INFO as volatilityInfo,
 } from "@/components/metric-display";
-import { Page, PageHeader } from "@/components/page/page";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { PerformanceChart } from "@/components/performance-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -322,58 +322,12 @@ export default function PerformancePage() {
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
         </div>
       </PageHeader>
-
-      {/* Mobile: Carousel + Plus button in same row */}
-      <div className="flex items-center gap-2 md:hidden">
-        {/* Selected items badges carousel */}
-        {selectedItems.length > 0 && (
-          <ScrollArea className="scrollbar-hide flex-1 rounded-md whitespace-nowrap">
-            <div className="flex items-center gap-2" style={{ scrollBehavior: "smooth" }}>
-              {selectedItems.map((item) => (
-                <SelectedItemBadge
-                  key={item.id}
-                  item={item}
-                  isSelected={selectedItemId === item.id}
-                  onSelect={() => handleBadgeSelect(item)}
-                  onDelete={(e) => handleBadgeDelete(e, item)}
-                />
-              ))}
-            </div>
-            <ScrollBar orientation="horizontal" className="hidden" />
-          </ScrollArea>
-        )}
-
-        {/* Mobile: Plus button with dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="bg-secondary/30 hover:bg-muted/80 h-9 w-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
-              aria-label="Add item"
-            >
-              <Icons.Plus className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)}>
-              <Icons.Briefcase className="mr-2 h-4 w-4" />
-              Add Account
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setBenchmarkSheetOpen(true)}>
-              <Icons.TrendingUp className="mr-2 h-4 w-4" />
-              Add Benchmark
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Desktop: Full layout with separator */}
-      <div className="hidden md:flex md:flex-row md:items-center">
-        {/* Selected items badges - horizontal scroll carousel */}
-        {selectedItems.length > 0 && (
-          <div className="flex items-center gap-3">
-            <ScrollArea className="scrollbar-hide w-full max-w-[calc(100vw-24rem)] rounded-md whitespace-nowrap md:max-w-[calc(100vw-28rem)]">
+      <PageContent>
+        {/* Mobile: Carousel + Plus button in same row */}
+        <div className="flex items-center gap-2 md:hidden">
+          {/* Selected items badges carousel */}
+          {selectedItems.length > 0 && (
+            <ScrollArea className="scrollbar-hide flex-1 rounded-md whitespace-nowrap">
               <div className="flex items-center gap-2" style={{ scrollBehavior: "smooth" }}>
                 {selectedItems.map((item) => (
                   <SelectedItemBadge
@@ -387,145 +341,192 @@ export default function PerformancePage() {
               </div>
               <ScrollBar orientation="horizontal" className="hidden" />
             </ScrollArea>
+          )}
 
-            {/* Separator */}
-            <Separator orientation="vertical" className="h-6 flex-shrink-0" />
-          </div>
-        )}
-
-        {/* Desktop: Full text buttons */}
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <AccountSelector
-            setSelectedAccount={handleAccountSelect}
-            variant="button"
-            buttonText="Add account"
-            includePortfolio={true}
-          />
-          <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
+          {/* Mobile: Plus button with dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="bg-secondary/30 hover:bg-muted/80 h-9 w-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
+                aria-label="Add item"
+              >
+                <Icons.Plus className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)}>
+                <Icons.Briefcase className="mr-2 h-4 w-4" />
+                Add Account
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setBenchmarkSheetOpen(true)}>
+                <Icons.TrendingUp className="mr-2 h-4 w-4" />
+                Add Benchmark
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
 
-      {/* Mobile sheets controlled by dropdown - rendered but hidden by Sheet component */}
-      <AccountSelectorMobile
-        setSelectedAccount={(account) => {
-          handleAccountSelect(account);
-          setAccountSheetOpen(false);
-        }}
-        includePortfolio={true}
-        open={accountSheetOpen}
-        onOpenChange={setAccountSheetOpen}
-        className="hidden"
-      />
-      <BenchmarkSymbolSelectorMobile
-        onSelect={(symbol) => {
-          handleSymbolSelect(symbol);
-          setBenchmarkSheetOpen(false);
-        }}
-        open={benchmarkSheetOpen}
-        onOpenChange={setBenchmarkSheetOpen}
-        className="hidden"
-      />
-
-      <div className="flex h-[calc(100vh-19rem)] flex-col md:h-[calc(100vh-12rem)]">
-        <Card className="flex min-h-0 flex-1 flex-col">
-          <CardHeader className="pb-1">
-            <div className="space-y-3 sm:space-y-4">
-              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                <div>
-                  <CardTitle className="text-lg sm:text-xl">Performance</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    {displayDateRange}
-                  </CardDescription>
+        {/* Desktop: Full layout with separator */}
+        <div className="hidden md:flex md:flex-row md:items-center">
+          {/* Selected items badges - horizontal scroll carousel */}
+          {selectedItems.length > 0 && (
+            <div className="flex items-center gap-3">
+              <ScrollArea className="scrollbar-hide w-full max-w-[calc(100vw-24rem)] rounded-md whitespace-nowrap md:max-w-[calc(100vw-28rem)]">
+                <div className="flex items-center gap-2" style={{ scrollBehavior: "smooth" }}>
+                  {selectedItems.map((item) => (
+                    <SelectedItemBadge
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedItemId === item.id}
+                      onSelect={() => handleBadgeSelect(item)}
+                      onDelete={(e) => handleBadgeDelete(e, item)}
+                    />
+                  ))}
                 </div>
-                {performanceData && performanceData.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
-                    <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                      <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
-                      <div className="flex items-baseline justify-center">
-                        <span
-                          className={`text-base sm:text-lg ${
-                            selectedItemData && selectedItemData.totalReturn >= 0
-                              ? "text-success"
-                              : "text-destructive"
-                          }`}
-                        >
-                          <GainPercent
-                            value={selectedItemData?.totalReturn ?? 0}
-                            animated={true}
-                            className="text-base sm:text-lg"
-                          />
-                        </span>
-                      </div>
-                    </div>
+                <ScrollBar orientation="horizontal" className="hidden" />
+              </ScrollArea>
 
-                    <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                      <MetricLabelWithInfo
-                        label="Annualized Return"
-                        infoText={annualizedReturnInfo}
-                      />
-                      <div className="flex items-baseline justify-center">
-                        <span
-                          className={`text-base sm:text-lg ${
-                            selectedItemData && selectedItemData.annualizedReturn >= 0
-                              ? "text-success"
-                              : "text-destructive"
-                          }`}
-                        >
-                          <GainPercent
-                            value={selectedItemData?.annualizedReturn ?? 0}
-                            animated={true}
-                            className="text-base sm:text-lg"
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                      <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
-                      <div className="flex items-baseline justify-center">
-                        <span className="text-foreground text-base sm:text-lg">
-                          <NumberFlow
-                            value={selectedItemData?.volatility ?? 0}
-                            animated={true}
-                            format={{
-                              style: "percent",
-                              maximumFractionDigits: 2,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                      <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
-                      <div className="flex items-baseline justify-center">
-                        <span className="text-destructive text-base sm:text-lg">
-                          <NumberFlow
-                            value={(selectedItemData?.maxDrawdown ?? 0) * -1}
-                            animated={true}
-                            format={{
-                              style: "percent",
-                              maximumFractionDigits: 2,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Separator */}
+              <Separator orientation="vertical" className="h-6 flex-shrink-0" />
             </div>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 p-3 sm:p-6">
-            <PerformanceContent
-              chartData={chartData}
-              isLoading={isLoadingPerformance}
-              hasErrors={hasErrors}
-              errorMessages={errorMessages}
+          )}
+
+          {/* Desktop: Full text buttons */}
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <AccountSelector
+              setSelectedAccount={handleAccountSelect}
+              variant="button"
+              buttonText="Add account"
+              includePortfolio={true}
             />
-          </CardContent>
-        </Card>
-      </div>
+            <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
+          </div>
+        </div>
+
+        {/* Mobile sheets controlled by dropdown - rendered but hidden by Sheet component */}
+        <AccountSelectorMobile
+          setSelectedAccount={(account) => {
+            handleAccountSelect(account);
+            setAccountSheetOpen(false);
+          }}
+          includePortfolio={true}
+          open={accountSheetOpen}
+          onOpenChange={setAccountSheetOpen}
+          className="hidden"
+        />
+        <BenchmarkSymbolSelectorMobile
+          onSelect={(symbol) => {
+            handleSymbolSelect(symbol);
+            setBenchmarkSheetOpen(false);
+          }}
+          open={benchmarkSheetOpen}
+          onOpenChange={setBenchmarkSheetOpen}
+          className="hidden"
+        />
+
+        <div className="flex h-[calc(100vh-19rem)] flex-col md:h-[calc(100vh-12rem)]">
+          <Card className="flex min-h-0 flex-1 flex-col">
+            <CardHeader className="pb-1">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                  <div>
+                    <CardTitle className="text-lg sm:text-xl">Performance</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      {displayDateRange}
+                    </CardDescription>
+                  </div>
+                  {performanceData && performanceData.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
+                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                        <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                        <div className="flex items-baseline justify-center">
+                          <span
+                            className={`text-base sm:text-lg ${
+                              selectedItemData && selectedItemData.totalReturn >= 0
+                                ? "text-success"
+                                : "text-destructive"
+                            }`}
+                          >
+                            <GainPercent
+                              value={selectedItemData?.totalReturn ?? 0}
+                              animated={true}
+                              className="text-base sm:text-lg"
+                            />
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                        <MetricLabelWithInfo
+                          label="Annualized Return"
+                          infoText={annualizedReturnInfo}
+                        />
+                        <div className="flex items-baseline justify-center">
+                          <span
+                            className={`text-base sm:text-lg ${
+                              selectedItemData && selectedItemData.annualizedReturn >= 0
+                                ? "text-success"
+                                : "text-destructive"
+                            }`}
+                          >
+                            <GainPercent
+                              value={selectedItemData?.annualizedReturn ?? 0}
+                              animated={true}
+                              className="text-base sm:text-lg"
+                            />
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                        <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                        <div className="flex items-baseline justify-center">
+                          <span className="text-foreground text-base sm:text-lg">
+                            <NumberFlow
+                              value={selectedItemData?.volatility ?? 0}
+                              animated={true}
+                              format={{
+                                style: "percent",
+                                maximumFractionDigits: 2,
+                              }}
+                            />
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                        <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                        <div className="flex items-baseline justify-center">
+                          <span className="text-destructive text-base sm:text-lg">
+                            <NumberFlow
+                              value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                              animated={true}
+                              format={{
+                                style: "percent",
+                                maximumFractionDigits: 2,
+                              }}
+                            />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="min-h-0 flex-1 p-3 sm:p-6">
+              <PerformanceContent
+                chartData={chartData}
+                isLoading={isLoadingPerformance}
+                hasErrors={hasErrors}
+                errorMessages={errorMessages}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </PageContent>
     </Page>
   );
 }

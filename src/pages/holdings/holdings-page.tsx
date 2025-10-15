@@ -1,12 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { AnimatedToggleGroup } from "@wealthfolio/ui";
-import { AmountDisplay } from "@wealthfolio/ui";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { AccountSelector } from "@/components/account-selector";
+import { AccountSelectorMobile } from "@/components/account-selector-mobile";
 import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Badge } from "@/components/ui/badge";
 import { useHoldings } from "@/hooks/use-holdings";
@@ -146,31 +154,43 @@ export const HoldingsPage = () => {
       <PageHeader
         heading="Holdings"
         actions={
-          <AnimatedToggleGroup
-            items={[
-              { value: "overview", label: "Analytics" },
-              { value: "positions", label: "Positions" },
-            ]}
-            value={view}
-            onValueChange={(next: HoldingsView) => {
-              setView(next);
-              const url = `${location.pathname}?tab=${next}`;
-              navigate(url, { replace: true });
-            }}
-            size="sm"
-            className="max-w-full"
-          />
+          <div className="flex items-center gap-2">
+            <div className="hidden md:block">
+              <AccountSelector
+                selectedAccount={selectedAccount}
+                setSelectedAccount={handleAccountSelect}
+                variant="dropdown"
+                includePortfolio={true}
+              />
+            </div>
+            <div className="md:hidden">
+              <AccountSelectorMobile
+                setSelectedAccount={handleAccountSelect}
+                iconOnly={true}
+                includePortfolio={true}
+                className="rounded-full"
+              />
+            </div>
+            <AnimatedToggleGroup
+              items={[
+                { value: "overview", label: "Analytics" },
+                { value: "positions", label: "Positions" },
+              ]}
+              value={view}
+              onValueChange={(next: HoldingsView) => {
+                setView(next);
+                const url = `${location.pathname}?tab=${next}`;
+                navigate(url, { replace: true });
+              }}
+              size="sm"
+              className="max-w-full"
+            />
+          </div>
         }
       />
 
-      <PageContent className="space-y-4">
+      <PageContent>
         <div className="space-y-3">
-          <AccountSelector
-            selectedAccount={selectedAccount}
-            setSelectedAccount={handleAccountSelect}
-            variant="dropdown"
-            includePortfolio={true}
-          />
           <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
         </div>
 
@@ -222,7 +242,11 @@ export const HoldingsPage = () => {
                   holdings={nonCashHoldings}
                   isLoading={isLoading}
                   onSectorSectionClick={(sectorName) =>
-                    handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
+                    handleChartSectionClick(
+                      "sector",
+                      sectorName,
+                      `Holdings in Sector: ${sectorName}`,
+                    )
                   }
                 />
               </div>

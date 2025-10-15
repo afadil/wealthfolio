@@ -1,5 +1,5 @@
 import { getIncomeSummary } from "@/commands/portfolio";
-import { ApplicationHeader } from "@/components/header";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -61,24 +61,24 @@ export default function IncomePage() {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <div className="content-padding h-full w-full">
-        <ApplicationHeader heading="Investment Income">
+      <Page>
+        <PageHeader heading="Investment Income">
           <div className="flex items-center space-x-2">
             <IncomePeriodSelector
               selectedPeriod={selectedPeriod}
               onPeriodSelect={setSelectedPeriod}
             />
           </div>
-        </ApplicationHeader>
-        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+        </PageHeader>
+        <PageContent>
           <EmptyPlaceholder
             className="mx-auto flex max-w-[420px] items-center justify-center"
             icon={<Icons.DollarSign className="h-10 w-10" />}
             title="No income data available"
             description="There is no income data for the selected period. Try selecting a different time range or check back later."
           />
-        </div>
-      </div>
+        </PageContent>
+      </Page>
     );
   }
 
@@ -146,16 +146,16 @@ export default function IncomePage() {
   const { isBalanceHidden } = useBalancePrivacy();
 
   return (
-    <div className="content-padding h-full w-full space-y-6">
-      <ApplicationHeader heading="Investment Income">
+    <Page>
+      <PageHeader heading="Investment Income">
         <div className="flex items-center space-x-2">
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
           />
         </div>
-      </ApplicationHeader>
-      <div className="space-y-6">
+      </PageHeader>
+      <PageContent>
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-success/10 bg-success/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -408,8 +408,8 @@ export default function IncomePage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+      </PageContent>
+    </Page>
   );
 }
 

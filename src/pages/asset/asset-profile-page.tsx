@@ -1,28 +1,27 @@
-import { useState, useMemo, useEffect } from "react";
-import { ApplicationHeader } from "@/components/header";
-import { ApplicationShell } from "@wealthfolio/ui";
+import { getAssetProfile } from "@/commands/market-data";
+import { getHolding } from "@/commands/portfolio";
+import { Page, PageContent, PageHeader } from "@/components/page/page";
+import { TickerAvatar } from "@/components/ticker-avatar";
 import { Badge } from "@/components/ui/badge";
-import { useLocation, useParams, Link } from "react-router-dom";
-import AssetHistoryCard from "./asset-history-card";
-import { Holding, Quote, Sector, Country, Asset } from "@/lib/types";
-import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
-import { useQuery } from "@tanstack/react-query";
-import { Separator } from "@/components/ui/separator";
-import { InputTags } from "@/components/ui/tag-input";
 import { Button } from "@/components/ui/button";
-import { useAssetProfileMutations } from "./use-asset-profile-mutations";
-import { useQuoteMutations } from "./use-quote-mutations";
 import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
-import { getHolding } from "@/commands/portfolio";
-import { QueryKeys } from "@/lib/query-keys";
-import { TickerAvatar } from "@/components/ticker-avatar";
-import { useQuoteHistory } from "@/hooks/use-quote-history";
-import AssetDetailCard from "./asset-detail-card";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import QuoteHistoryTable from "./quote-history-table";
+import { InputTags } from "@/components/ui/tag-input";
+import { useQuoteHistory } from "@/hooks/use-quote-history";
+import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { QueryKeys } from "@/lib/query-keys";
+import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import AssetDetailCard from "./asset-detail-card";
+import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
-import { getAssetProfile } from "@/commands/market-data";
+import QuoteHistoryTable from "./quote-history-table";
+import { useAssetProfileMutations } from "./use-asset-profile-mutations";
+import { useQuoteMutations } from "./use-quote-mutations";
 
 interface AssetProfileFormData {
   name: string;
@@ -236,365 +235,28 @@ export const AssetProfilePage = () => {
 
   if (isLoading)
     return (
-      <ApplicationShell className="flex items-center justify-center p-6">
-        <Icons.Spinner className="h-6 w-6 animate-spin" />
-      </ApplicationShell>
+      <Page>
+        <PageContent>
+          <Icons.Spinner className="h-6 w-6 animate-spin" />
+        </PageContent>
+      </Page>
     ); // Show loading spinner
 
   // Simplified view for quote-only symbols (like FX rates)
   if (assetProfile?.assetType === "FOREX") {
     return (
-      <ApplicationShell className="p-6">
-        <ApplicationHeader
+      <Page>
+        <PageHeader
           heading="Quote History"
           headingPrefix={symbol}
           displayBack={true}
-          backUrl={location.state?.from ?? "/holdings?tab=holdings"} // Use from state or default back
+          backUrl={location.state?.from ?? "/holdings?tab=holdings"}
         />
-        <QuoteHistoryTable
-          data={quoteHistory ?? []}
-          // Default to non-manual source, disable changing it as there's no profile context
-          isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
-          onSaveQuote={(quote: Quote) => {
-            const updatedQuote = { ...quote };
-            // Generate id if missing
-            if (!updatedQuote.id) {
-              const datePart = new Date(updatedQuote.timestamp)
-                .toISOString()
-                .slice(0, 10)
-                .replace(/-/g, "");
-              updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-            }
-            // Set currency if missing
-            if (!updatedQuote.currency) {
-              updatedQuote.currency = profile?.currency ?? "USD";
-            }
-            saveQuoteMutation.mutate(updatedQuote);
-          }}
-          onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-          onChangeDataSource={(isManual) => {
-            updateAssetDataSourceMutation.mutate({
-              symbol,
-              dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-            });
-            setFormData((prev) => ({
-              ...prev,
-              dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-            }));
-          }}
-        />
-      </ApplicationShell>
-    );
-  }
-
-  // Handle case where loading finished but we have neither profile/holding nor quote data
-  if (!profile && !holding && (!quoteHistory || quoteHistory.length === 0)) {
-    return (
-      <ApplicationShell className="p-6">
-        <ApplicationHeader
-          heading={`Error loading data for ${symbol}`}
-          displayBack={true}
-          backUrl={location.state?.from ?? "/holdings?tab=holdings"} // Use from state or default back
-        />
-        <p>
-          Could not load necessary information for this symbol. Please check the symbol or try again
-          later.
-        </p>
-        {isHoldingError && <p className="text-sm text-red-500">Holding fetch error.</p>}
-        {isQuotesError && <p className="text-sm text-red-500">Quote fetch error.</p>}
-        {isAssetProfileError && <p className="text-sm text-red-500">Asset profile fetch error.</p>}
-      </ApplicationShell>
-    );
-  }
-
-  // --- Original View (Tabs) ---
-  return (
-    <ApplicationShell className="p-6">
-      <Tabs defaultValue={defaultTab} className="space-y-4">
-        {/* Custom Header with Editable Title */}
-        <div className="flex w-full items-center justify-between">
-          <div className="flex flex-1 items-center gap-2">
-            <Link to={location.state?.from || "/holdings?tab=holdings"}>
-              <Button variant="ghost" size="icon">
-                <Icons.ArrowLeft />
-              </Button>
-            </Link>
-            <div
-              data-tauri-drag-region="true"
-              className="draggable flex flex-1 items-center space-x-4"
-            >
-              {(profile?.symbol ?? holding?.instrument?.symbol) && (
-                <>
-                  <TickerAvatar
-                    symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
-                    className="h-8 w-8"
-                  />
-                  <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight">
-                    {profile?.symbol ?? holding?.instrument?.symbol}
-                  </h1>
-                  <span className="h-6 border-l-2"></span>
-                </>
-              )}
-              <div className="group relative flex flex-1 items-center">
-                {isEditingTitle ? (
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter asset name"
-                    className="font-heading w-full max-w-md text-xl font-bold tracking-tight"
-                    onBlur={() => {
-                      setIsEditingTitle(false);
-                      handleSaveTitle();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setIsEditingTitle(false);
-                        handleSaveTitle();
-                      }
-                      if (e.key === "Escape") {
-                        setIsEditingTitle(false);
-                        // Reset the name to original value
-                        setFormData((prev) => ({
-                          ...prev,
-                          name: holding?.instrument?.name || "",
-                        }));
-                      }
-                    }}
-                    autoFocus
-                  />
-                ) : (
-                  <>
-                    <h1 className="font-heading text-xl font-bold tracking-tight">
-                      {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
-                    </h1>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsEditingTitle(true)}
-                      className="ml-2 h-6 w-6 opacity-0 group-hover:opacity-100"
-                    >
-                      <Icons.Pencil className="h-3 w-3" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
-              {/* Overview Tab: Requires profile */}
-              {profile && (
-                <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                  value="overview"
-                >
-                  Overview
-                </TabsTrigger>
-              )}
-              {/* Lots Tab: Requires holding with lots */}
-              {holding?.lots && holding.lots.length > 0 && (
-                <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                  value="lots"
-                >
-                  Lots
-                </TabsTrigger>
-              )}
-              {/* History/Quotes Tab: Requires quoteHistory */}
-              <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                value="history"
-              >
-                Quotes
-              </TabsTrigger>
-            </TabsList>
-          </div>
-        </div>
-
-        {/* Overview Content: Requires profile */}
-        {profile && (
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
-              <AssetHistoryCard
-                symbol={profile.symbol ?? ""}
-                currency={profile.currency ?? "USD"}
-                marketPrice={profile.marketPrice}
-                totalGainAmount={profile.totalGainAmount}
-                totalGainPercent={profile.totalGainPercent}
-                quoteHistory={quoteHistory ?? []}
-                className={`col-span-1 ${holding ? "md:col-span-2" : "md:col-span-3"}`}
-              />
-              {symbolHolding && (
-                <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
-              )}
-            </div>
-
-            <div className="group relative">
-              <h3 className="text-lg font-bold">About</h3>
-              <div className="flex flex-row items-center space-x-2 py-4">
-                {isEditing ? (
-                  <Input
-                    value={formData.assetClass}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
-                    }
-                    placeholder="Enter asset class"
-                    className="w-[180px]"
-                  />
-                ) : (
-                  formData.assetClass && (
-                    <Badge variant="secondary" className="flex-none uppercase">
-                      {formData.assetClass}
-                    </Badge>
-                  )
-                )}
-                {isEditing ? (
-                  <Input
-                    value={formData.assetSubClass}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
-                    }
-                    placeholder="Enter sub-class"
-                    className="w-[180px]"
-                  />
-                ) : (
-                  formData.assetSubClass && (
-                    <Badge variant="secondary" className="flex-none uppercase">
-                      {formData.assetSubClass}
-                    </Badge>
-                  )
-                )}
-                {(formData.assetClass || formData.assetSubClass) && formData.sectors.length > 0 && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <InputTags
-                    value={formData.sectors.map(
-                      (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
-                    )}
-                    placeholder="sector:weight"
-                    onChange={(values) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        sectors: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(":");
-                          // Keep original weight parsing logic, assuming input like 'Sector:75'
-                          return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                        }),
-                      }))
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap">
-                    {formData.sectors.map((sector) => (
-                      <Badge
-                        variant="secondary"
-                        key={sector.name}
-                        className="dark:text-primary-foreground m-1 cursor-help bg-indigo-100 uppercase"
-                        title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
-                      >
-                        {sector.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {formData.sectors.length > 0 && formData.countries.length > 0 && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <InputTags
-                    placeholder="country:weight"
-                    value={formData.countries.map(
-                      (c) => `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
-                    )}
-                    onChange={(values) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        countries: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(":");
-                          // Keep original weight parsing logic
-                          return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                        }),
-                      }))
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap">
-                    {formData.countries.map((country) => (
-                      <Badge
-                        variant="secondary"
-                        key={country.name}
-                        className="dark:text-primary-foreground m-1 bg-purple-100 uppercase"
-                        title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
-                      >
-                        {country.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {(formData.sectors.length > 0 || formData.countries.length > 0) && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <>
-                    <Button variant="default" size="icon" className="min-w-10" onClick={handleSave}>
-                      <Icons.Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="min-w-10"
-                      onClick={handleCancel}
-                    >
-                      <Icons.Close className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsEditing(true)}
-                    className="min-w-10 opacity-0 group-hover:opacity-100"
-                  >
-                    <Icons.Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              <div className="mt-2">
-                {isEditing ? (
-                  <textarea
-                    className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
-                    value={formData.notes}
-                    placeholder="Symbol/Company description"
-                    rows={6}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-sm font-light">
-                    {formData.notes || "No description available."}
-                  </p>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-        )}
-
-        {/* Lots Content: Requires profile and holding with lots */}
-        {profile && holding?.lots && holding.lots.length > 0 && (
-          <TabsContent value="lots" className="pt-6">
-            <AssetLotsTable
-              lots={holding.lots}
-              currency={profile.currency ?? "USD"}
-              marketPrice={profile.marketPrice}
-            />
-          </TabsContent>
-        )}
-
-        {/* History/Quotes Content: Requires quoteHistory */}
-        <TabsContent value="history" className="space-y-16 pt-6">
+        <PageContent>
           <QuoteHistoryTable
             data={quoteHistory ?? []}
-            isManualDataSource={formData.dataSource === DataSource.MANUAL}
+            // Default to non-manual source, disable changing it as there's no profile context
+            isManualDataSource={assetProfile?.dataSource === DataSource.MANUAL}
             onSaveQuote={(quote: Quote) => {
               const updatedQuote = { ...quote };
               // Generate id if missing
@@ -607,28 +269,381 @@ export const AssetProfilePage = () => {
               }
               // Set currency if missing
               if (!updatedQuote.currency) {
-                updatedQuote.currency = profile?.currency || "USD";
+                updatedQuote.currency = profile?.currency ?? "USD";
               }
               saveQuoteMutation.mutate(updatedQuote);
             }}
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
             onChangeDataSource={(isManual) => {
-              // Only allow changing data source if there's a profile/holding to update
-              if (profile) {
-                updateAssetDataSourceMutation.mutate({
-                  symbol,
-                  dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                });
-                setFormData((prev) => ({
-                  ...prev,
-                  dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
-                }));
-              }
+              updateAssetDataSourceMutation.mutate({
+                symbol,
+                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+              });
+              setFormData((prev) => ({
+                ...prev,
+                dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+              }));
             }}
           />
-        </TabsContent>
-      </Tabs>
-    </ApplicationShell>
+        </PageContent>
+      </Page>
+    );
+  }
+
+  // Handle case where loading finished but we have neither profile/holding nor quote data
+  if (!profile && !holding && (!quoteHistory || quoteHistory.length === 0)) {
+    return (
+      <Page>
+        <PageHeader
+          heading={`Error loading data for ${symbol}`}
+          displayBack={true}
+          backUrl={location.state?.from ?? "/holdings?tab=holdings"}
+        />
+        <PageContent>
+          <p>
+            Could not load necessary information for this symbol. Please check the symbol or try
+            again later.
+          </p>
+          {isHoldingError && <p className="text-sm text-red-500">Holding fetch error.</p>}
+          {isQuotesError && <p className="text-sm text-red-500">Quote fetch error.</p>}
+          {isAssetProfileError && (
+            <p className="text-sm text-red-500">Asset profile fetch error.</p>
+          )}
+        </PageContent>
+      </Page>
+    );
+  }
+
+  // --- Original View (Tabs) ---
+  return (
+    <Page>
+      <PageContent>
+        <Tabs defaultValue={defaultTab} className="space-y-4">
+          {/* Custom Header with Editable Title */}
+          <div className="flex w-full items-center justify-between">
+            <div className="flex flex-1 items-center gap-2">
+              <Link to={location.state?.from || "/holdings?tab=holdings"}>
+                <Button variant="ghost" size="icon">
+                  <Icons.ArrowLeft />
+                </Button>
+              </Link>
+              <div
+                data-tauri-drag-region="true"
+                className="draggable flex flex-1 items-center space-x-4"
+              >
+                {(profile?.symbol ?? holding?.instrument?.symbol) && (
+                  <>
+                    <TickerAvatar
+                      symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
+                      className="h-8 w-8"
+                    />
+                    <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight">
+                      {profile?.symbol ?? holding?.instrument?.symbol}
+                    </h1>
+                    <span className="h-6 border-l-2"></span>
+                  </>
+                )}
+                <div className="group relative flex flex-1 items-center">
+                  {isEditingTitle ? (
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter asset name"
+                      className="font-heading w-full max-w-md text-xl font-bold tracking-tight"
+                      onBlur={() => {
+                        setIsEditingTitle(false);
+                        handleSaveTitle();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setIsEditingTitle(false);
+                          handleSaveTitle();
+                        }
+                        if (e.key === "Escape") {
+                          setIsEditingTitle(false);
+                          // Reset the name to original value
+                          setFormData((prev) => ({
+                            ...prev,
+                            name: holding?.instrument?.name || "",
+                          }));
+                        }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <>
+                      <h1 className="font-heading text-xl font-bold tracking-tight">
+                        {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
+                      </h1>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsEditingTitle(true)}
+                        className="ml-2 h-6 w-6 opacity-0 group-hover:opacity-100"
+                      >
+                        <Icons.Pencil className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
+                {/* Overview Tab: Requires profile */}
+                {profile && (
+                  <TabsTrigger
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                    value="overview"
+                  >
+                    Overview
+                  </TabsTrigger>
+                )}
+                {/* Lots Tab: Requires holding with lots */}
+                {holding?.lots && holding.lots.length > 0 && (
+                  <TabsTrigger
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                    value="lots"
+                  >
+                    Lots
+                  </TabsTrigger>
+                )}
+                {/* History/Quotes Tab: Requires quoteHistory */}
+                <TabsTrigger
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                  value="history"
+                >
+                  Quotes
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
+
+          {/* Overview Content: Requires profile */}
+          {profile && (
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
+                <AssetHistoryCard
+                  symbol={profile.symbol ?? ""}
+                  currency={profile.currency ?? "USD"}
+                  marketPrice={profile.marketPrice}
+                  totalGainAmount={profile.totalGainAmount}
+                  totalGainPercent={profile.totalGainPercent}
+                  quoteHistory={quoteHistory ?? []}
+                  className={`col-span-1 ${holding ? "md:col-span-2" : "md:col-span-3"}`}
+                />
+                {symbolHolding && (
+                  <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
+                )}
+              </div>
+
+              <div className="group relative">
+                <h3 className="text-lg font-bold">About</h3>
+                <div className="flex flex-row items-center space-x-2 py-4">
+                  {isEditing ? (
+                    <Input
+                      value={formData.assetClass}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
+                      }
+                      placeholder="Enter asset class"
+                      className="w-[180px]"
+                    />
+                  ) : (
+                    formData.assetClass && (
+                      <Badge variant="secondary" className="flex-none uppercase">
+                        {formData.assetClass}
+                      </Badge>
+                    )
+                  )}
+                  {isEditing ? (
+                    <Input
+                      value={formData.assetSubClass}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
+                      }
+                      placeholder="Enter sub-class"
+                      className="w-[180px]"
+                    />
+                  ) : (
+                    formData.assetSubClass && (
+                      <Badge variant="secondary" className="flex-none uppercase">
+                        {formData.assetSubClass}
+                      </Badge>
+                    )
+                  )}
+                  {(formData.assetClass || formData.assetSubClass) &&
+                    formData.sectors.length > 0 && <Separator orientation="vertical" />}
+                  {isEditing ? (
+                    <InputTags
+                      value={formData.sectors.map(
+                        (s) =>
+                          `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
+                      )}
+                      placeholder="sector:weight"
+                      onChange={(values) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          sectors: (values as string[]).map((value) => {
+                            const [name, weightStr] = value.split(":");
+                            // Keep original weight parsing logic, assuming input like 'Sector:75'
+                            return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
+                          }),
+                        }))
+                      }
+                    />
+                  ) : (
+                    <div className="flex flex-wrap">
+                      {formData.sectors.map((sector) => (
+                        <Badge
+                          variant="secondary"
+                          key={sector.name}
+                          className="dark:text-primary-foreground m-1 cursor-help bg-indigo-100 uppercase"
+                          title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
+                        >
+                          {sector.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {formData.sectors.length > 0 && formData.countries.length > 0 && (
+                    <Separator orientation="vertical" />
+                  )}
+                  {isEditing ? (
+                    <InputTags
+                      placeholder="country:weight"
+                      value={formData.countries.map(
+                        (c) =>
+                          `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
+                      )}
+                      onChange={(values) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          countries: (values as string[]).map((value) => {
+                            const [name, weightStr] = value.split(":");
+                            // Keep original weight parsing logic
+                            return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
+                          }),
+                        }))
+                      }
+                    />
+                  ) : (
+                    <div className="flex flex-wrap">
+                      {formData.countries.map((country) => (
+                        <Badge
+                          variant="secondary"
+                          key={country.name}
+                          className="dark:text-primary-foreground m-1 bg-purple-100 uppercase"
+                          title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
+                        >
+                          {country.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {(formData.sectors.length > 0 || formData.countries.length > 0) && (
+                    <Separator orientation="vertical" />
+                  )}
+                  {isEditing ? (
+                    <>
+                      <Button
+                        variant="default"
+                        size="icon"
+                        className="min-w-10"
+                        onClick={handleSave}
+                      >
+                        <Icons.Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="min-w-10"
+                        onClick={handleCancel}
+                      >
+                        <Icons.Close className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsEditing(true)}
+                      className="min-w-10 opacity-0 group-hover:opacity-100"
+                    >
+                      <Icons.Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-2">
+                  {isEditing ? (
+                    <textarea
+                      className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
+                      value={formData.notes}
+                      placeholder="Symbol/Company description"
+                      rows={6}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                    />
+                  ) : (
+                    <p className="text-muted-foreground text-sm font-light">
+                      {formData.notes || "No description available."}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          )}
+
+          {/* Lots Content: Requires profile and holding with lots */}
+          {profile && holding?.lots && holding.lots.length > 0 && (
+            <TabsContent value="lots" className="pt-6">
+              <AssetLotsTable
+                lots={holding.lots}
+                currency={profile.currency ?? "USD"}
+                marketPrice={profile.marketPrice}
+              />
+            </TabsContent>
+          )}
+
+          {/* History/Quotes Content: Requires quoteHistory */}
+          <TabsContent value="history" className="space-y-16 pt-6">
+            <QuoteHistoryTable
+              data={quoteHistory ?? []}
+              isManualDataSource={formData.dataSource === DataSource.MANUAL}
+              onSaveQuote={(quote: Quote) => {
+                const updatedQuote = { ...quote };
+                // Generate id if missing
+                if (!updatedQuote.id) {
+                  const datePart = new Date(updatedQuote.timestamp)
+                    .toISOString()
+                    .slice(0, 10)
+                    .replace(/-/g, "");
+                  updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
+                }
+                // Set currency if missing
+                if (!updatedQuote.currency) {
+                  updatedQuote.currency = profile?.currency || "USD";
+                }
+                saveQuoteMutation.mutate(updatedQuote);
+              }}
+              onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+              onChangeDataSource={(isManual) => {
+                // Only allow changing data source if there's a profile/holding to update
+                if (profile) {
+                  updateAssetDataSourceMutation.mutate({
+                    symbol,
+                    dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+                  });
+                  setFormData((prev) => ({
+                    ...prev,
+                    dataSource: isManual ? DataSource.MANUAL : DataSource.YAHOO,
+                  }));
+                }
+              }}
+            />
+          </TabsContent>
+        </Tabs>
+      </PageContent>
+    </Page>
   );
 };
 
