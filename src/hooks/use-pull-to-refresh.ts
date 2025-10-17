@@ -79,7 +79,9 @@ export function usePullToRefresh({
 
   const onTouchMove = useCallback(
     (e: React.TouchEvent) => {
-      if (disabled || isRefreshing || !containerRef.current) return;
+      if (disabled || isRefreshing || !containerRef.current) {
+        return;
+      }
 
       const target = containerRef.current;
       const content = target.querySelector<HTMLElement>("[data-ptr-content]") ?? null;
@@ -87,36 +89,30 @@ export function usePullToRefresh({
       const touchY = touch?.clientY ?? startYRef.current;
       const deltaY = touchY - startYRef.current;
 
-      // Only pull when at top and pulling down
-      if (target.scrollTop === 0 && deltaY > 0) {
-        if (!hasActivePullRef.current && deltaY < startPullDistance) {
-          setIsPulling(false);
-          setPullDistance(0);
-          if (content) {
-            content.style.transition = "";
-            content.style.paddingTop = "";
-          }
-          return;
-        }
-
-        if (!hasActivePullRef.current) {
-          hasActivePullRef.current = true;
-        }
-
-        e.preventDefault();
-        // Lock UA scroll gestures so our preventDefault takes effect
-        target.style.touchAction = "none";
-        currentYRef.current = touchY;
-        setIsPulling(deltaY > startPullDistance);
-
-        // Add visual feedback (ignore the initial tap distance)
-        const effectiveDelta = Math.max(deltaY - startPullDistance, 0);
-        const distance = Math.min(effectiveDelta * 0.5, threshold);
-        setPullDistance(distance);
+      if (deltaY <= 0 || target.scrollTop > 0) {
         if (content) {
-          content.style.transition = "none";
-          content.style.paddingTop = `${distance}px`;
+          content.style.transition = "";
+          content.style.transform = "";
         }
+        setIsPulling(false);
+        setPullDistance(0);
+        return;
+      }
+
+      e.preventDefault();
+      target.style.touchAction = "none";
+      currentYRef.current = touchY;
+
+      const effectiveDelta = Math.max(deltaY - startPullDistance, 0);
+      const distance = Math.min(effectiveDelta * 0.5, threshold);
+      const isPastStartDistance = distance > 0;
+
+      setIsPulling(isPastStartDistance);
+      setPullDistance(distance);
+
+      if (content) {
+        content.style.transition = "none";
+        content.style.transform = `translateY(${distance}px)`;
       }
     },
     [disabled, isRefreshing, startPullDistance, threshold],
@@ -150,11 +146,11 @@ export function usePullToRefresh({
 
       const content = target.querySelector<HTMLElement>("[data-ptr-content]") ?? null;
       if (content) {
-        content.style.transition = "padding-top 180ms ease-out";
-        content.style.paddingTop = "0px";
+        content.style.transition = "transform 180ms ease-out";
+        content.style.transform = "translateY(0px)";
         setTimeout(() => {
           content.style.transition = "";
-          content.style.paddingTop = "";
+          content.style.transform = "";
         }, 220);
       }
     },

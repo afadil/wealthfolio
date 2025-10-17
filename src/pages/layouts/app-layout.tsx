@@ -27,7 +27,7 @@ const AppLayout = () => {
   }
 
   return (
-    <ApplicationShell className="app-shell">
+    <ApplicationShell className="app-shell h-[100dvh] overflow-x-hidden">
       <div className="scan-hide-target">
         <AppSidebar navigation={navigation} />
       </div>
