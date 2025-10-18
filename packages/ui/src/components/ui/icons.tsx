@@ -52,14 +52,17 @@ import {
   Link,
   ListChecks,
   ListCollapse,
+  ListFilter,
   Loader,
   Loader2,
   LucideProps,
   Menu,
   MinusCircle,
   Monitor,
+  Moon,
   MoreVertical,
   Package,
+  Palette,
   PanelLeftOpen,
   PauseCircle,
   Pencil,
@@ -82,6 +85,7 @@ import {
   Star,
   Store,
   StretchHorizontal,
+  Sun,
   Tag,
   Trash,
   TrendingDown,
@@ -197,7 +201,10 @@ export const Icons = {
   Link: Link,
   Eraser: Eraser,
   Sparkles: Sparkles,
-
+  Palette: Palette,
+  Moon: Moon,
+  Sun: Sun,
+  ListFilter: ListFilter,
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -4,7 +4,7 @@ import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { MobileNavigationContainer } from "@/pages/layouts/mobile-navigation-container";
-import { ApplicationShell, ErrorBoundary, Toaster } from "@wealthfolio/ui";
+import { ApplicationShell, ErrorBoundary } from "@wealthfolio/ui";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useNavigation } from "./navigation/app-navigation";
 import { AppSidebar } from "./navigation/app-sidebar";
@@ -27,7 +27,7 @@ const AppLayout = () => {
   }
 
   return (
-    <ApplicationShell className="app-shell h-[100dvh] overflow-x-hidden">
+    <ApplicationShell className="app-shell h-screen overflow-x-hidden">
       <div className="scan-hide-target">
         <AppSidebar navigation={navigation} />
       </div>
@@ -57,7 +57,7 @@ const AppLayout = () => {
 
       {shouldUseMobileNavigation && <MobileNavBar navigation={navigation} />}
 
-      <Toaster />
+      {/* <Toaster /> */}
     </ApplicationShell>
   );
 };

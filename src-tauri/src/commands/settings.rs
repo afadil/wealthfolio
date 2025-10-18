@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 

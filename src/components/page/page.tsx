@@ -232,10 +232,10 @@ export function PageContent({
   ...props
 }: PageContentProps) {
   return (
-    <main
+    <div
       data-ptr-content
       className={cn(
-        withPadding && "px-4 py-6 md:px-6 md:py-8 lg:px-8",
+        withPadding && "p-2 md:p-6 lg:p-8",
         // In containerMode, the scroll container handles bottom padding for mobile nav
         // In standalone mode, add extra bottom padding on desktop
         !containerMode && "pb-safe md:pb-6 lg:pb-8",
@@ -245,6 +245,6 @@ export function PageContent({
       {...props}
     >
       <div className="mx-auto space-y-6">{children}</div>
-    </main>
+    </div>
   );
 }

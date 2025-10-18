@@ -36,7 +36,7 @@ function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, str
 const handlePortfolioUpdateStart = () => {
   toast({
     description: "Calculating portfolio performance...",
-    duration: 15000,
+    duration: 2000,
     variant: "subtle",
   });
 };
@@ -57,11 +57,6 @@ const useGlobalEventListener = () => {
 
   const handlePortfolioUpdateComplete = useCallback(() => {
     queryClient.invalidateQueries();
-    toast({
-      description: "Portfolio Updated Successfully!",
-      variant: "subtle",
-      duration: 2000,
-    });
   }, [queryClient]);
 
   useEffect(() => {

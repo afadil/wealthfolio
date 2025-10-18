@@ -48,12 +48,12 @@ const sidebarNavItems = [
     subtitle: "Extend Wealthfolio with features",
     icon: <Icons.Package className="h-5 w-5" />,
   },
-  {
-    title: "Sync",
-    href: "sync",
-    subtitle: "Sync between devices",
-    icon: <Icons.Smartphone className="h-5 w-5" />,
-  },
+  // {
+  //   title: "Sync",
+  //   href: "sync",
+  //   subtitle: "Sync between devices",
+  //   icon: <Icons.Smartphone className="h-5 w-5" />,
+  // },
   {
     title: "Data Export",
     href: "exports",

@@ -5659,20 +5659,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-barcode-scanner"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3f79bba83da3c115ac248a658c5613db1325a7c7ba889e344287e373828a08b"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "tauri-plugin-dialog"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6705,7 +6691,6 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
- "tauri-plugin-barcode-scanner",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-haptics",

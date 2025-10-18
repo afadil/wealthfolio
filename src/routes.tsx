@@ -8,10 +8,10 @@ import SettingsLayout from "@/pages/settings/layout";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
+import StickyTestPage from "@/pages/dev/sticky-test-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
-import StickyTestPage from "@/pages/dev/sticky-test-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import AccountPage from "./pages/account/account-page";
@@ -23,7 +23,6 @@ import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
-import SyncSettingsPage from "./pages/settings/sync/sync-page";
 import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
@@ -100,7 +99,6 @@ export function AppRoutes() {
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
-            <Route path="sync" element={<SyncSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />
         </Route>

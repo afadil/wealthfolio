@@ -2,10 +2,10 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::market_data::market_data_model::DataSource;
 use crate::errors::Result;
-use crate::Error;
 use crate::errors::ValidationError;
+use crate::market_data::market_data_model::DataSource;
+use crate::Error;
 
 use super::assets_constants::*;
 
@@ -33,7 +33,6 @@ pub struct Asset {
     pub sectors: Option<String>,
     pub url: Option<String>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -202,7 +201,7 @@ impl UpdateAssetProfile {
     Deserialize,
     Debug,
     Clone,
-    Default
+    Default,
 )]
 #[diesel(table_name = crate::schema::assets)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -226,9 +225,6 @@ pub struct AssetDB {
     pub data_source: String,
     pub sectors: Option<String>,
     pub url: Option<String>,
-    pub updated_version: i32,
-    pub origin: String,
-    pub deleted: i32,
 }
 
 // Conversion implementations
@@ -281,13 +277,9 @@ impl From<NewAsset> for AssetDB {
             data_source: domain.data_source,
             sectors: domain.sectors,
             url: domain.url,
-            updated_version: 1,
-            origin: "manual".to_string(),
-            deleted: 0,
         }
     }
 }
-
 
 /// Domain model representing a quote summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -301,4 +293,4 @@ pub struct QuoteSummary {
     pub score: f64,
     pub type_display: String,
     pub long_name: String,
-} 
+}

@@ -28,6 +28,7 @@ import { PortfolioComposition } from "./components/composition-chart";
 import { CountryChart } from "./components/country-chart";
 import { HoldingCurrencyChart } from "./components/currency-chart";
 import { HoldingsTable } from "./components/holdings-table";
+import { HoldingsTableMobile } from "./components/holdings-table-mobile";
 import { SectorsChart } from "./components/sectors-chart";
 
 // Define a type for the filter criteria
@@ -196,7 +197,12 @@ export const HoldingsPage = () => {
 
         {view === "positions" ? (
           <div className="space-y-4 pt-2">
-            <HoldingsTable holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+            <div className="hidden md:block">
+              <HoldingsTable holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+            </div>
+            <div className="block md:hidden">
+              <HoldingsTableMobile holdings={nonCashHoldings ?? []} isLoading={isLoading} />
+            </div>
           </div>
         ) : (
           <div className="space-y-4 pt-2">

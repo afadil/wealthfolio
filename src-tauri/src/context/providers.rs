@@ -129,7 +129,6 @@ pub async fn initialize_context(
     Ok(ServiceContext {
         base_currency,
         instance_id,
-        db_pool: pool,
         settings_service,
         account_service,
         activity_service,
