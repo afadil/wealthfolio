@@ -241,7 +241,7 @@ export const HoldingsPage = () => {
                 <div className="relative">
                   <Icons.ListFilter className="h-4 w-4" />
                   {hasActiveFilters && (
-                    <span className="bg-primary border-background absolute -top-1 -left-[1.5px] h-2 w-2 rounded-full border-2" />
+                    <span className="bg-primary absolute -top-1 -left-[1.5px] h-2 w-2 rounded-full" />
                   )}
                 </div>
               </Button>
