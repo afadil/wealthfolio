@@ -6,6 +6,15 @@ use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use wealthfolio_core::db;
 
+/// Normalize file path by removing file:// URI prefix if present (iOS/Android compatibility)
+fn normalize_file_path(path: &str) -> String {
+    if path.starts_with("file://") {
+        path.strip_prefix("file://").unwrap_or(path).to_string()
+    } else {
+        path.to_string()
+    }
+}
+
 #[tauri::command]
 pub async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>), String> {
     let app_data_dir = app_handle
@@ -50,10 +59,13 @@ pub async fn backup_database_to_path(
 
     let db_path = db::get_db_path(&app_data_dir);
 
+    // Normalize the backup directory path (remove file:// prefix if present on iOS/Android)
+    let normalized_backup_dir = normalize_file_path(&backup_dir);
+
     // Create a custom backup path in the specified directory
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
     let backup_filename = format!("wealthfolio_backup_{}.db", timestamp);
-    let backup_path = Path::new(&backup_dir).join(&backup_filename);
+    let backup_path = Path::new(&normalized_backup_dir).join(&backup_filename);
 
     // Ensure the backup directory exists
     if let Some(parent) = backup_path.parent() {
@@ -99,6 +111,9 @@ pub async fn restore_database(
         .expect("failed to convert path to string")
         .to_string();
 
+    // Normalize the backup file path (remove file:// prefix if present on iOS/Android)
+    let normalized_backup_path = normalize_file_path(&backup_file_path);
+
     // Try to get the ServiceContext to perform graceful operations before restore
     if app_handle
         .try_state::<std::sync::Arc<crate::context::ServiceContext>>()
@@ -109,7 +124,7 @@ pub async fn restore_database(
     }
 
     // Use the safe restore function that handles Windows file locking issues
-    db::restore_database_safe(&app_data_dir, &backup_file_path).map_err(|e| e.to_string())?;
+    db::restore_database_safe(&app_data_dir, &normalized_backup_path).map_err(|e| e.to_string())?;
 
     // After successful restore, emit event and show restart dialog
     app_handle

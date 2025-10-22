@@ -106,9 +106,7 @@ export const openFolderDialogTauri = async (): Promise<string | null> => {
 };
 
 export const openDatabaseFileDialogTauri = async (): Promise<string | null> => {
-  const result = await open({
-    // filters: [{ name: "Database", extensions: ["db", "sqlite"] }], // Removed for better mobile compatibility
-  });
+  const result = await open();
   return Array.isArray(result) ? (result[0] ?? null) : result;
 };
 
