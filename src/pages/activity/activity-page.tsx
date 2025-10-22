@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
 import { ActivityForm } from "./components/activity-form";
 import ActivityTable from "./components/activity-table";
+import ActivityTableMobile from "./components/activity-table-mobile";
 import EditableActivityTable from "./components/editable-activity-table";
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
@@ -23,6 +24,10 @@ const ActivityPage = () => {
   const [showEditableTable, setShowEditableTable] = useState(false);
   const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
 
+  // Mobile filter state
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
+
   const isMobileViewport = useIsMobileViewport();
 
   const { data: accountsData } = useQuery<Account[], Error>({
@@ -31,7 +36,7 @@ const ActivityPage = () => {
   });
   const accounts = accountsData ?? [];
 
-  const { deleteActivityMutation } = useActivityMutations();
+  const { deleteActivityMutation, duplicateActivityMutation } = useActivityMutations();
 
   const handleEdit = useCallback((activity?: ActivityDetails, activityType?: ActivityType) => {
     setSelectedActivity(activity ?? { activityType });
@@ -42,6 +47,13 @@ const ActivityPage = () => {
     setSelectedActivity(activity);
     setShowDeleteAlert(true);
   }, []);
+
+  const handleDuplicate = useCallback(
+    async (activity: ActivityDetails) => {
+      await duplicateActivityMutation.mutateAsync(activity);
+    },
+    [duplicateActivityMutation],
+  );
 
   const handleDeleteConfirm = async () => {
     if (!selectedActivity?.id) return;
@@ -97,7 +109,18 @@ const ActivityPage = () => {
       <PageContent>
         <Separator className="my-4" />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {showEditableTable ? (
+          {isMobileViewport ? (
+            <ActivityTableMobile
+              accounts={accounts}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+              selectedAccounts={selectedAccounts}
+              setSelectedAccounts={setSelectedAccounts}
+              selectedActivityTypes={selectedActivityTypes}
+              setSelectedActivityTypes={setSelectedActivityTypes}
+            />
+          ) : showEditableTable ? (
             <EditableActivityTable
               accounts={accounts}
               isEditable={showEditableTable}
@@ -115,7 +138,7 @@ const ActivityPage = () => {
         </div>
         {isMobileViewport ? (
           <MobileActivityForm
-            key={selectedActivity?.id || "new"}
+            key={selectedActivity?.id ?? "new"}
             accounts={
               accounts
                 ?.filter((acc) => acc.isActive)
