@@ -5,7 +5,6 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
-import { Icons } from "@/components/ui/icons";
 import {
   DialogDescription,
   DialogFooter,
@@ -21,6 +20,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -175,7 +175,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             )}
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2">
           <DialogTrigger asChild>
             <Button variant="outline">Cancel</Button>
           </DialogTrigger>
@@ -185,9 +185,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             ) : (
               <Icons.Plus className="h-4 w-4" />
             )}
-            <span className="hidden sm:ml-2 sm:inline">
-              {defaultValues?.id ? "Update Account" : "Add Account"}
-            </span>
+            <span>{defaultValues?.id ? "Update Account" : "Add Account"}</span>
           </Button>
         </DialogFooter>
       </form>
