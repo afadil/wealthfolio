@@ -57,32 +57,35 @@ const ActivityPage = () => {
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" title="Import" asChild>
-        <Link to={"/import"}>
-          <Icons.Import className="mr-2 h-4 w-4" />
-          <span className="hidden sm:inline">Import from CSV</span>
-          <span className="sm:hidden">Import</span>
-        </Link>
-      </Button>
-
       {/* Desktop buttons */}
       <div className="hidden items-center gap-2 sm:flex">
+        <Button size="sm" title="Import" asChild>
+          <Link to={"/import"}>
+            <Icons.Import className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Import from CSV</span>
+          </Link>
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setShowBulkHoldingsForm(true)}>
-          <Icons.PlusCircle className="mr-2 h-4 w-4" />
+          <Icons.Plus className="mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Add Holdings</span>
           <span className="sm:hidden">Holdings</span>
         </Button>
         <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
-          <Icons.PlusCircle className="mr-2 h-4 w-4" />
+          <Icons.Plus className="mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Add Transaction</span>
           <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
       {/* Mobile add button */}
-      <div className="sm:hidden">
-        <Button variant="outline" size="sm" onClick={() => handleEdit(undefined)}>
-          <Icons.PlusCircle className="h-4 w-4" />
+      <div className="flex items-center gap-2 sm:hidden">
+        <Button size="icon" title="Import" variant="outline" asChild>
+          <Link to={"/import"}>
+            <Icons.Import className="size-4" />
+          </Link>
+        </Button>
+        <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
+          <Icons.Plus className="size-4" />
         </Button>
       </div>
     </div>

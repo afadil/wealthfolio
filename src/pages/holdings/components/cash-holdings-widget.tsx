@@ -1,9 +1,12 @@
-import { Holding } from "@/lib/types";
+import { Card } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
-import { AmountDisplay } from "@wealthfolio/ui";
-import { cn } from "@/lib/utils";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { Holding } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { useMemo } from "react";
 
 interface CashHoldingsWidgetProps {
   cashHoldings: Holding[];
@@ -17,20 +20,36 @@ export const CashHoldingsWidget = ({
   className,
 }: CashHoldingsWidgetProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { settings } = useSettingsContext();
+
+  const totalCashInBase = useMemo(() => {
+    return cashHoldings.reduce((sum, holding) => {
+      return sum + Number(holding.marketValue?.base ?? 0);
+    }, 0);
+  }, [cashHoldings]);
 
   if (isLoading) {
     return (
-      <div className={cn("text-muted-foreground flex items-center gap-4 text-sm", className)}>
-        <div className="flex items-center gap-1.5">
-          <Icons.Wallet className="h-3.5 w-3.5" />
-          <span className="font-medium">Cash:</span>
+      <Card className={cn("p-3 sm:p-3.5", className)}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-primary/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">
+              <Icons.Money className="text-primary h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div>
+              <p className="text-muted-foreground text-[10px] font-medium sm:text-xs">
+                Cash Balance
+              </p>
+              <Skeleton className="mt-0.5 h-4 w-20 sm:h-5 sm:w-24" />
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2.5">
+            <Skeleton className="h-6 w-[120px] sm:h-9 sm:w-[70px]" />
+            <div className="bg-border hidden h-9 w-px sm:block" />
+            <Skeleton className="h-6 w-[120px] sm:h-9 sm:w-[70px]" />
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-20" />
-        </div>
-      </div>
+      </Card>
     );
   }
 
@@ -39,26 +58,51 @@ export const CashHoldingsWidget = ({
   }
 
   return (
-    <div className={cn("text-muted-foreground flex items-center gap-4 text-sm", className)}>
-      <div className="flex items-center gap-1.5">
-        <Icons.Wallet className="h-3.5 w-3.5" />
-        <span className="font-medium">Cash:</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        {cashHoldings.map((holding) => (
-          <div key={holding.id} className="flex items-center gap-1.5">
-            <span>{holding.localCurrency}</span>
-            <span className="text-foreground font-medium">
+    <Card className={cn("p-3 sm:p-3.5", className)}>
+      <div className="flex items-center justify-between gap-3">
+        {/* Left: Total */}
+        <div className="flex items-center gap-2.5">
+          <div className="bg-primary/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">
+            <Icons.Money className="text-primary h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-muted-foreground text-[10px] font-medium sm:text-xs">Cash Balance</p>
+            <p className="text-foreground mt-0.5 text-sm font-semibold tracking-tight sm:text-base">
               <AmountDisplay
-                value={holding.marketValue?.local ?? 0}
-                currency={holding.localCurrency}
+                value={totalCashInBase}
+                currency={settings?.baseCurrency ?? "USD"}
                 isHidden={isBalanceHidden}
               />
-            </span>
+            </p>
           </div>
-        ))}
+        </div>
+
+        {/* Right: Currency breakdown */}
+        {cashHoldings.length > 1 && (
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2.5">
+            {cashHoldings.map((holding, index) => (
+              <div key={holding.id} className="flex items-center gap-2.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground text-[9px] font-medium tracking-wider uppercase sm:text-[10px]">
+                    {holding.localCurrency}
+                  </span>
+                  <span className="text-foreground text-xs sm:text-sm">
+                    <AmountDisplay
+                      value={holding.marketValue?.local ?? 0}
+                      currency={holding.localCurrency}
+                      isHidden={isBalanceHidden}
+                    />
+                  </span>
+                </div>
+                {index < cashHoldings.length - 1 && (
+                  <div className="bg-border hidden h-9 w-px sm:block" />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </Card>
   );
 };
 

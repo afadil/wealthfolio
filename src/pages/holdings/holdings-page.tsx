@@ -206,13 +206,9 @@ export const HoldingsPage = () => {
         }
       />
 
-      <PageContent>
-        <div className="space-y-3">
-          <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
-        </div>
-
+      <PageContent withPadding={false}>
         {view === "positions" ? (
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 p-2 lg:p-4">
             <div className="hidden md:block">
               <HoldingsTable holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
             </div>
@@ -229,7 +225,7 @@ export const HoldingsPage = () => {
             </div>
           </div>
         ) : (
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 p-2 lg:p-4">
             {/* Mobile Filter Button - Analytics View */}
             <div className="flex justify-end md:hidden">
               <Button
@@ -246,6 +242,9 @@ export const HoldingsPage = () => {
                 </div>
               </Button>
             </div>
+
+            {/* Cash Holdings Widget */}
+            <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
 
             {/* Top row: Summary widgets */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -278,8 +277,8 @@ export const HoldingsPage = () => {
             </div>
 
             {/* Second row: Composition and Sector */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div className="col-span-1 md:col-span-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+              <div className="col-span-1 lg:col-span-3">
                 <PortfolioComposition
                   holdings={filteredNonCashHoldings ?? []}
                   isLoading={isLoading}
