@@ -1,4 +1,5 @@
 import { HistoryChart } from "@/components/history-chart";
+import { Page, PageHeader, PageScrollContainer } from "@/components/page/page";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
@@ -93,11 +94,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div
-      data-ptr-content
-      className="flex min-h-screen flex-col overflow-x-hidden pt-[var(--inset-top)] md:pt-8"
-    >
-      <div className="flex px-6 lg:px-10">
+    <Page className="flex h-screen flex-col">
+      <PageHeader>
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
           <div className="flex items-start gap-2">
             <div>
@@ -132,34 +130,35 @@ export default function DashboardPage() {
             </div>
           </div>
         </PortfolioUpdateTrigger>
-      </div>
+      </PageHeader>
+      <PageScrollContainer data-ptr-content className="flex flex-col">
+        <div className="h-[300px]">
+          {valuationHistory && chartData.length > 0 ? (
+            <>
+              <HistoryChart data={chartData} />
+              <div className="flex w-full justify-center">
+                <IntervalSelector
+                  className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
+                  onIntervalSelect={handleIntervalSelect}
+                  isLoading={isValuationHistoryLoading}
+                  initialSelection={INITIAL_INTERVAL_CODE}
+                />
+              </div>
+            </>
+          ) : null}
+        </div>
 
-      <div className="h-[300px]">
-        {valuationHistory && chartData.length > 0 ? (
-          <>
-            <HistoryChart data={chartData} />
-            <div className="flex w-full justify-center">
-              <IntervalSelector
-                className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
-                onIntervalSelect={handleIntervalSelect}
-                isLoading={isValuationHistoryLoading}
-                initialSelection={INITIAL_INTERVAL_CODE}
-              />
+        <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-0 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+          <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
+            <div className="md:col-span-2">
+              <AccountsSummary />
             </div>
-          </>
-        ) : null}
-      </div>
-
-      <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-0 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
-        <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
-          <div className="md:col-span-2">
-            <AccountsSummary />
-          </div>
-          <div className="sm:col-span-1">
-            <SavingGoals />
+            <div className="sm:col-span-1">
+              <SavingGoals />
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </PageScrollContainer>
+    </Page>
   );
 }

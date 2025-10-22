@@ -1,21 +1,21 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import { listen } from "@tauri-apps/api/event";
-import { writeFile, BaseDirectory } from "@tauri-apps/plugin-fs";
-import { error, info, warn, trace, debug } from "@tauri-apps/plugin-log";
 import type { EventCallback, UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { BaseDirectory, writeFile } from "@tauri-apps/plugin-fs";
+import { debug, error, info, trace, warn } from "@tauri-apps/plugin-log";
 
 export type { EventCallback, UnlistenFn };
 
 import type {
-  AddonManifest,
   AddonInstallResult,
+  AddonManifest,
+  AddonUpdateCheckResult,
+  AddonUpdateInfo,
   AddonValidationResult,
   AddonFile as BaseAddonFile,
   FunctionPermission,
   Permission,
-  AddonUpdateInfo,
-  AddonUpdateCheckResult,
 } from "@wealthfolio/addon-sdk";
 
 // Tauri-specific types with camelCase serialization to match Rust
@@ -25,13 +25,13 @@ export interface AddonFile extends Omit<BaseAddonFile, "is_main"> {
 
 // Re-export SDK types directly
 export type {
-  AddonManifest,
   AddonInstallResult,
+  AddonManifest,
+  AddonUpdateCheckResult,
+  AddonUpdateInfo,
   AddonValidationResult,
   FunctionPermission,
   Permission,
-  AddonUpdateInfo,
-  AddonUpdateCheckResult,
 };
 
 export interface ExtractedAddon {
@@ -107,7 +107,7 @@ export const openFolderDialogTauri = async (): Promise<string | null> => {
 
 export const openDatabaseFileDialogTauri = async (): Promise<string | null> => {
   const result = await open({
-    filters: [{ name: "Database", extensions: ["db", "sqlite"] }],
+    // filters: [{ name: "Database", extensions: ["db", "sqlite"] }], // Removed for better mobile compatibility
   });
   return Array.isArray(result) ? (result[0] ?? null) : result;
 };

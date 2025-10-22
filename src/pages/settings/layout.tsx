@@ -84,7 +84,7 @@ export default function SettingsLayout() {
         {isMainSettingsPage ? (
           // Mobile Settings List View (carded list with dividers)
           <div className="scan-hide-target w-full max-w-full overflow-x-hidden">
-            <div className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
+            <div className="bg-background/95 supports-backdrop-filter:bg-background/60 pt-safe sticky top-0 z-10 border-b backdrop-blur">
               <div className="flex min-h-[60px] items-center justify-center px-4">
                 <h1 className="text-lg font-semibold">Settings</h1>
               </div>
@@ -119,7 +119,7 @@ export default function SettingsLayout() {
             </div>
           </div>
         ) : (
-          <div className="scan-hide-target w-full max-w-full overflow-x-hidden">
+          <div className="scan-hide-target pt-safe w-full max-w-full overflow-x-hidden">
             <div className="w-full max-w-full overflow-x-hidden scroll-smooth">
               <div className="p-2 lg:p-4">
                 <Outlet />

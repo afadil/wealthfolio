@@ -34,7 +34,7 @@ export interface AccountSelectOption {
 
 interface ActivityFormProps {
   accounts: AccountSelectOption[];
-  activity?: ActivityDetails;
+  activity?: Partial<ActivityDetails>;
   open?: boolean;
   onClose?: () => void;
 }
@@ -148,7 +148,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
     }
   };
 
-  const defaultTab = activity ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || "trade" : "trade";
+  const defaultTab = ACTIVITY_TYPE_TO_TAB[activity?.activityType ?? ""] || "trade";
 
   return (
     <Sheet open={open} onOpenChange={onClose}>

@@ -53,4 +53,5 @@ tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-barcode-scanner = "2"
 tauri-plugin-haptics = "2.0.0"
