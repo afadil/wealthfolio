@@ -48,7 +48,7 @@ export function usePullToRefresh({
       if (onRefresh) {
         await onRefresh();
       } else {
-        //await triggerPortfolioUpdate();
+        await triggerPortfolioUpdate();
         await queryClient.invalidateQueries();
       }
     } catch (error) {
