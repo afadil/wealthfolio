@@ -1,15 +1,15 @@
-import * as React from "react";
+import { CalendarDate, CalendarDateTime, getLocalTimeZone, parseDate, parseDateTime } from "@internationalized/date";
 import { CalendarIcon } from "lucide-react";
+import * as React from "react";
 import {
   Button,
-  DatePicker as RacDatePicker,
-  DatePickerProps as RacDatePickerProps,
   DateValue,
   Dialog,
   Group,
   Popover,
+  DatePicker as RacDatePicker,
+  DatePickerProps as RacDatePickerProps,
 } from "react-aria-components";
-import { parseDate, parseDateTime, CalendarDate, CalendarDateTime, getLocalTimeZone } from "@internationalized/date";
 
 import { Calendar } from "@/components/ui/calendar-rac";
 import { DateInput } from "@/components/ui/datefield-rac";
@@ -115,7 +115,7 @@ export function DatePickerInput({
     >
       <Group
         className={cn(
-          "border-input bg-background ring-offset-background flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm",
+          "border-input bg-background ring-offset-background mobile:h-14 mobile:rounded-xl mobile:text-base flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm",
           "focus-within:ring-ring focus-within:ring-2 focus-within:ring-offset-2 focus-within:outline-none",
           disabled && "cursor-not-allowed opacity-50",
         )}

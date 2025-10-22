@@ -168,20 +168,15 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
-        <SheetHeader className="border-b px-6 pt-6 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>
-              <SheetDescription className="mt-1">
-                {activity?.id ? "Update transaction details" : `Step ${currentStep} of 2`}
-              </SheetDescription>
-            </div>
+        <SheetHeader className="border-b px-6 py-4">
+          <div className="flex flex-col items-center space-y-2">
+            <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>
             {!activity?.id && (
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 {[1, 2].map((step) => (
                   <div
                     key={step}
-                    className={`h-2 w-8 rounded-full transition-colors ${
+                    className={`h-1.5 w-10 rounded-full transition-colors ${
                       step === currentStep
                         ? "bg-primary"
                         : step < currentStep
@@ -192,6 +187,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 ))}
               </div>
             )}
+            {activity?.id && <SheetDescription>Update transaction details</SheetDescription>}
           </div>
         </SheetHeader>
 
@@ -207,10 +203,16 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
           </Form>
         </div>
 
-        <SheetFooter className="mt-auto border-t px-6 py-4">
-          <div className="flex w-full gap-2">
+        <SheetFooter className="mt-auto border-t px-6 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="flex w-full gap-3">
             {currentStep > 1 && !activity?.id && (
-              <Button type="button" variant="outline" onClick={handleBack} className="flex-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={handleBack}
+                className="flex-1"
+              >
                 <Icons.ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
@@ -219,8 +221,9 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
             {currentStep < 2 ? (
               <Button
                 type="button"
+                size="default"
                 onClick={handleNext}
-                className="flex-1"
+                className="flex-1 font-medium"
                 disabled={!form.watch("activityType") && currentStep === 1}
               >
                 Next
@@ -229,8 +232,9 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
             ) : (
               <Button
                 type="button"
+                size="default"
                 onClick={form.handleSubmit(onSubmit)}
-                className="flex-1"
+                className="flex-1 font-medium"
                 disabled={isLoading}
               >
                 {isLoading ? (

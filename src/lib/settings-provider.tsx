@@ -2,6 +2,7 @@ import { getRunEnv, logger, RUN_ENV } from "@/adapters";
 import { getCurrentWindow, Theme } from "@tauri-apps/api/window";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
+import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
 import { Settings, SettingsContextType } from "@/lib/types";
@@ -22,6 +23,8 @@ const SettingsContext = createContext<ExtendedSettingsContextType | undefined>(u
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { data, isLoading, isError, refetch } = useSettings();
+  const { isMobile: isMobileDevice, loading: platformLoading } = usePlatform();
+  const isMobileViewport = useIsMobileViewport();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
 
@@ -51,6 +54,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       applySettingsToDocument(data);
     }
   }, [data]);
+
+  // Apply platform-specific theme tokens
+  // Consider both actual device type AND viewport size for responsive design
+  useEffect(() => {
+    if (platformLoading) return;
+
+    const root = document.documentElement;
+    const isMobile = isMobileDevice || isMobileViewport;
+
+    if (isMobile) {
+      root.setAttribute("data-platform", "mobile");
+    } else {
+      root.setAttribute("data-platform", "desktop");
+    }
+  }, [isMobileDevice, isMobileViewport, platformLoading]);
 
   // Cleanup any lingering listeners when provider unmounts
   useEffect(() => {

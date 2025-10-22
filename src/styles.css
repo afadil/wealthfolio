@@ -12,6 +12,9 @@
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Enable platform-based mobile variant (Tailwind v4 pattern) */
+@custom-variant mobile (&:where([data-platform="mobile"], [data-platform="mobile"] *));
+
 /* Tailwind v4 custom utilities for 3D rotation used in the sidebar logo */
 @utility transform-3d {
   transform-style: preserve-3d;
@@ -174,7 +177,36 @@
   --color-magenta-950: #24131d;
 }
 
+/* Mobile platform theme overrides */
+[data-platform="mobile"] {
+  /* Larger radius for mobile-native feel */
+  --radius: 0.75rem; /* rounded-xl base for mobile */
+
+  /* Larger touch targets for mobile */
+  --input-height: 3.5rem; /* h-14 */
+  --input-height-lg: 4rem; /* h-16 */
+
+  --button-height: 3rem; /* h-12 */
+  --button-height-sm: 2.75rem; /* h-11 */
+  --button-height-lg: 3.5rem; /* h-14 */
+
+  /* More generous spacing for mobile */
+  --card-padding: 1rem;
+  --sheet-padding: 1.5rem; /* p-6 */
+  --sheet-title-size: 1.25rem; /* text-xl */
+
+  /* Slightly larger text for mobile readability */
+  --font-size-base: 1rem; /* text-base instead of text-sm */
+}
+
 @theme inline {
+  /* Spacing/Sizing theme tokens - inherit from CSS variables */
+  --spacing-input-height: var(--input-height);
+  --spacing-button-height: var(--button-height);
+  --spacing-sheet-padding: var(--sheet-padding);
+  --font-size-sheet-title: var(--sheet-title-size);
+  --font-size-input: var(--font-size-base);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -319,8 +351,27 @@
 }
 
 :root {
-  /* Base radius */
+  /* Base radius - desktop default */
   --radius: 0.625rem;
+
+  /* Input heights - desktop default */
+  --input-height: 2.5rem; /* h-10 */
+  --input-height-lg: 2.75rem; /* h-11 */
+
+  /* Button heights - desktop default */
+  --button-height: 2.5rem; /* h-10 */
+  --button-height-sm: 2.25rem; /* h-9 */
+  --button-height-lg: 2.75rem; /* h-11 */
+
+  /* Card padding - desktop default */
+  --card-padding: 1rem; /* p-4 */
+
+  /* Sheet spacing - desktop default */
+  --sheet-padding: 1rem; /* p-4 */
+  --sheet-title-size: 1.125rem; /* text-lg */
+
+  /* Font size - desktop default */
+  --font-size-base: 0.875rem; /* text-sm */
 
   /* Flexoki Light Theme (HSL numeric components) */
   --flexoki-bg: 48 100% 97%;
@@ -531,6 +582,29 @@ body.qr-scan-active .scan-hide-target {
   /* Scroll-to/focus targets stop below sticky headers (typically ~72px) */
   .scroll-pt-header {
     scroll-padding-top: 5rem;
+  }
+
+  /* Mobile-optimized form field spacing */
+  .form-mobile-spacing > * + * {
+    margin-top: 1.25rem; /* space-y-5 */
+  }
+
+  /* Mobile-optimized card/panel styles */
+  .card-mobile {
+    border-radius: 0.75rem; /* rounded-xl */
+    padding: 1rem; /* p-4 */
+  }
+
+  /* Desktop responsive adjustments */
+  @media (width >= 640px) {
+    .form-mobile-spacing > * + * {
+      margin-top: 1rem; /* sm:space-y-4 */
+    }
+
+    .card-mobile {
+      border-radius: 0.5rem; /* sm:rounded-lg */
+      padding: 0.75rem; /* sm:p-3 */
+    }
   }
 }
 

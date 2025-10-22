@@ -3,6 +3,9 @@
 /* Package-scoped theme mapping: defer actual values to host app */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Enable platform-based mobile variant (Tailwind v4 pattern) */
+@custom-variant mobile (&:where([data-platform="mobile"], [data-platform="mobile"] *));
+
 @theme inline {
   /* Radius scale derived from host --radius */
   --radius-sm: calc(var(--radius) - 4px);
