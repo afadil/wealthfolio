@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   calculateActivityValue,
   isCashActivity,
@@ -51,6 +52,10 @@ export const ActivityTableMobile = ({
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isCompactView, setIsCompactView] = usePersistentState(
+    "activity-mobile-view-compact",
+    false,
+  );
 
   // Debounced search query update
   const debouncedSetSearchQuery = useCallback(
@@ -171,6 +176,19 @@ export const ActivityTableMobile = ({
           variant="outline"
           size="icon"
           className="h-9 w-9 flex-shrink-0"
+          onClick={() => setIsCompactView(!isCompactView)}
+          title={isCompactView ? "Detailed view" : "Compact view"}
+        >
+          {isCompactView ? (
+            <Icons.Rows3 className="h-4 w-4" />
+          ) : (
+            <Icons.ListCollapse className="h-4 w-4" />
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 flex-shrink-0"
           onClick={() => setIsFilterSheetOpen(true)}
         >
           <div className="relative">
@@ -210,6 +228,53 @@ export const ActivityTableMobile = ({
 
             const displayValue = calculateActivityValue(activity);
 
+            // Compact View
+            if (isCompactView) {
+              return (
+                <Card key={activity.id} className="p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold">{displaySymbol}</p>
+                          <Badge className="text-xs font-normal" variant={badgeVariant}>
+                            {ActivityTypeNames[activityType as ActivityType]}
+                          </Badge>
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                          <span>{formattedDate.date}</span>
+                          {!isCashActivity(activityType) &&
+                            !isIncomeActivity(activityType) &&
+                            !isSplitActivity(activityType) &&
+                            !isFeeActivity(activityType) && (
+                              <>
+                                <span>•</span>
+                                <span>{activity.quantity} shares</span>
+                              </>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      {activityType !== "SPLIT" && (
+                        <span className="text-sm font-semibold">
+                          {formatAmount(displayValue, activity.currency)}
+                        </span>
+                      )}
+                      <ActivityOperations
+                        row={{ original: activity } as { original: ActivityDetails }}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onDuplicate={onDuplicate}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
+
+            // Detailed View
             return (
               <Card key={activity.id} className="p-3">
                 <div className="space-y-2">
