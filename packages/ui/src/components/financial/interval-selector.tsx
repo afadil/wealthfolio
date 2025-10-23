@@ -139,7 +139,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       >
         <Button
           className={cn(
-            "relative h-7 min-h-0 overflow-hidden rounded-full px-3 py-0 text-sm leading-none transition-all duration-200 md:px-4",
+            "mobile:h-8 relative h-7 min-h-0 overflow-hidden rounded-full px-3 py-0 text-sm leading-none transition-all duration-200 md:px-4",
             isSelected
               ? "text-primary-foreground bg-transparent"
               : "text-muted-foreground hover:text-foreground border-0 bg-transparent shadow-none hover:bg-transparent",

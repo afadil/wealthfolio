@@ -197,6 +197,11 @@
 
   /* Slightly larger text for mobile readability */
   --font-size-base: 1rem; /* text-base instead of text-sm */
+
+  /* Ensure rounded-full stays truly full */
+  & .rounded-full {
+    border-radius: 9999px;
+  }
 }
 
 @theme inline {
