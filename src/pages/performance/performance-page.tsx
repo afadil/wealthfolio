@@ -8,6 +8,7 @@ import {
 } from "@/components/metric-display";
 import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { PerformanceChart } from "@/components/performance-chart";
+import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { Icons } from "@/components/ui/icons";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { DateRange, PerformanceMetrics, ReturnData, TrackedItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -58,17 +60,23 @@ function PerformanceContent({
   isLoading,
   hasErrors,
   errorMessages,
+  isMobile,
 }: {
   chartData: ChartDataItem[] | undefined;
   isLoading: boolean;
   hasErrors: boolean;
   errorMessages: string[];
+  isMobile: boolean;
 }) {
   return (
     <div className="relative flex h-full w-full flex-col">
       {chartData && chartData.length > 0 && (
         <div className="min-h-0 w-full flex-1">
-          <PerformanceChart data={chartData} />
+          {isMobile ? (
+            <PerformanceChartMobile data={chartData} />
+          ) : (
+            <PerformanceChart data={chartData} />
+          )}
         </div>
       )}
 
@@ -169,7 +177,7 @@ const SelectedItemBadge = ({
         variant="ghost"
         size="icon"
         className={cn(
-          "ml-2 h-5 w-5 transition-all duration-150",
+          "mobile:size-5 ml-2 size-5 transition-all duration-150",
           "hover:bg-destructive/10 hover:text-destructive hover:scale-110",
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
@@ -183,6 +191,7 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
+  const isMobile = useIsMobileViewport();
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
     "performance:selectedItems",
     [PORTFOLIO_TOTAL],
@@ -317,11 +326,10 @@ export default function PerformancePage() {
 
   return (
     <Page>
-      <PageHeader heading="Performance">
-        <div className="flex items-center">
-          <DateRangeSelector value={dateRange} onChange={setDateRange} />
-        </div>
-      </PageHeader>
+      <PageHeader
+        heading="Performance"
+        actions={<DateRangeSelector value={dateRange} onChange={setDateRange} />}
+      />
       <PageContent>
         {/* Mobile: Carousel + Plus button in same row */}
         <div className="flex items-center gap-2 md:hidden">
@@ -349,7 +357,7 @@ export default function PerformancePage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="bg-secondary/30 hover:bg-muted/80 h-9 w-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
+                className="bg-secondary/30 hover:bg-muted/80 mobile:size-9 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
                 aria-label="Add item"
               >
                 <Icons.Plus className="h-4 w-4" />
@@ -428,100 +436,188 @@ export default function PerformancePage() {
 
         <div className="flex h-[calc(100vh-19rem)] flex-col md:h-[calc(100vh-12rem)]">
           <Card className="flex min-h-0 flex-1 flex-col">
-            <CardHeader className="pb-1">
-              <div className="space-y-3 sm:space-y-4">
+            <CardHeader className={cn("pb-2", isMobile ? "px-3 py-3" : "pb-1")}>
+              <div className={cn("space-y-3", isMobile ? "space-y-2" : "sm:space-y-4")}>
                 <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                   <div>
-                    <CardTitle className="text-lg sm:text-xl">Performance</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
+                    <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
+                      Performance
+                    </CardTitle>
+                    <CardDescription
+                      className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
+                    >
                       {displayDateRange}
                     </CardDescription>
                   </div>
                   {performanceData && performanceData.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
-                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                        <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
-                        <div className="flex items-baseline justify-center">
-                          <span
-                            className={`text-base sm:text-lg ${
-                              selectedItemData && selectedItemData.totalReturn >= 0
-                                ? "text-success"
-                                : "text-destructive"
-                            }`}
-                          >
-                            <GainPercent
-                              value={selectedItemData?.totalReturn ?? 0}
-                              animated={true}
-                              className="text-base sm:text-lg"
-                            />
-                          </span>
-                        </div>
-                      </div>
+                    <>
+                      {/* Mobile compact metrics - horizontal scroll */}
+                      {isMobile ? (
+                        <ScrollArea className="w-full">
+                          <div className="flex gap-3 pb-1">
+                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
+                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                Total Return
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-base font-bold",
+                                  selectedItemData && selectedItemData.totalReturn >= 0
+                                    ? "text-success"
+                                    : "text-destructive",
+                                )}
+                              >
+                                <GainPercent
+                                  value={selectedItemData?.totalReturn ?? 0}
+                                  animated={true}
+                                  className="text-base"
+                                />
+                              </span>
+                            </div>
 
-                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                        <MetricLabelWithInfo
-                          label="Annualized Return"
-                          infoText={annualizedReturnInfo}
-                        />
-                        <div className="flex items-baseline justify-center">
-                          <span
-                            className={`text-base sm:text-lg ${
-                              selectedItemData && selectedItemData.annualizedReturn >= 0
-                                ? "text-success"
-                                : "text-destructive"
-                            }`}
-                          >
-                            <GainPercent
-                              value={selectedItemData?.annualizedReturn ?? 0}
-                              animated={true}
-                              className="text-base sm:text-lg"
-                            />
-                          </span>
-                        </div>
-                      </div>
+                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
+                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                Annualized
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-base font-bold",
+                                  selectedItemData && selectedItemData.annualizedReturn >= 0
+                                    ? "text-success"
+                                    : "text-destructive",
+                                )}
+                              >
+                                <GainPercent
+                                  value={selectedItemData?.annualizedReturn ?? 0}
+                                  animated={true}
+                                  className="text-base"
+                                />
+                              </span>
+                            </div>
 
-                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                        <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
-                        <div className="flex items-baseline justify-center">
-                          <span className="text-foreground text-base sm:text-lg">
-                            <NumberFlow
-                              value={selectedItemData?.volatility ?? 0}
-                              animated={true}
-                              format={{
-                                style: "percent",
-                                maximumFractionDigits: 2,
-                              }}
-                            />
-                          </span>
-                        </div>
-                      </div>
+                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
+                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                Volatility
+                              </span>
+                              <span className="text-foreground text-base font-bold">
+                                <NumberFlow
+                                  value={selectedItemData?.volatility ?? 0}
+                                  animated={true}
+                                  format={{
+                                    style: "percent",
+                                    maximumFractionDigits: 2,
+                                  }}
+                                />
+                              </span>
+                            </div>
 
-                      <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                        <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
-                        <div className="flex items-baseline justify-center">
-                          <span className="text-destructive text-base sm:text-lg">
-                            <NumberFlow
-                              value={(selectedItemData?.maxDrawdown ?? 0) * -1}
-                              animated={true}
-                              format={{
-                                style: "percent",
-                                maximumFractionDigits: 2,
-                              }}
+                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
+                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                Max Drawdown
+                              </span>
+                              <span className="text-destructive text-base font-bold">
+                                <NumberFlow
+                                  value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                                  animated={true}
+                                  format={{
+                                    style: "percent",
+                                    maximumFractionDigits: 2,
+                                  }}
+                                />
+                              </span>
+                            </div>
+                          </div>
+                          <ScrollBar orientation="horizontal" className="h-1.5" />
+                        </ScrollArea>
+                      ) : (
+                        /* Desktop metrics */
+                        <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                            <div className="flex items-baseline justify-center">
+                              <span
+                                className={`text-base sm:text-lg ${
+                                  selectedItemData && selectedItemData.totalReturn >= 0
+                                    ? "text-success"
+                                    : "text-destructive"
+                                }`}
+                              >
+                                <GainPercent
+                                  value={selectedItemData?.totalReturn ?? 0}
+                                  animated={true}
+                                  className="text-base sm:text-lg"
+                                />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo
+                              label="Annualized Return"
+                              infoText={annualizedReturnInfo}
                             />
-                          </span>
+                            <div className="flex items-baseline justify-center">
+                              <span
+                                className={`text-base sm:text-lg ${
+                                  selectedItemData && selectedItemData.annualizedReturn >= 0
+                                    ? "text-success"
+                                    : "text-destructive"
+                                }`}
+                              >
+                                <GainPercent
+                                  value={selectedItemData?.annualizedReturn ?? 0}
+                                  animated={true}
+                                  className="text-base sm:text-lg"
+                                />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                            <div className="flex items-baseline justify-center">
+                              <span className="text-foreground text-base sm:text-lg">
+                                <NumberFlow
+                                  value={selectedItemData?.volatility ?? 0}
+                                  animated={true}
+                                  format={{
+                                    style: "percent",
+                                    maximumFractionDigits: 2,
+                                  }}
+                                />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                            <div className="flex items-baseline justify-center">
+                              <span className="text-destructive text-base sm:text-lg">
+                                <NumberFlow
+                                  value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                                  animated={true}
+                                  format={{
+                                    style: "percent",
+                                    maximumFractionDigits: 2,
+                                  }}
+                                />
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 p-3 sm:p-6">
+            <CardContent className={cn("min-h-0 flex-1", isMobile ? "p-2" : "p-3 sm:p-6")}>
               <PerformanceContent
                 chartData={chartData}
                 isLoading={isLoadingPerformance}
                 hasErrors={hasErrors}
                 errorMessages={errorMessages}
+                isMobile={isMobile}
               />
             </CardContent>
           </Card>

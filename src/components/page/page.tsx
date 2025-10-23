@@ -185,7 +185,7 @@ export function PageHeader({
 
       <div className="px-4 py-3 md:px-6 md:py-4 lg:px-8">
         <div className="mx-auto">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {displayBack &&
                 (backUrl ? (
@@ -208,9 +208,11 @@ export function PageHeader({
                     <Icons.ArrowLeft className="h-5 w-5 md:h-6 md:w-6" />
                   </Button>
                 ))}
-              {titleContent || children}
+              {titleContent ?? children}
             </div>
-            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+            {actions && (
+              <div className="flex shrink-0 items-center gap-2 sm:justify-end">{actions}</div>
+            )}
           </div>
         </div>
       </div>
