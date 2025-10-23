@@ -1,95 +1,124 @@
+"use client";
+
 import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { Sheet, SheetContent } from "./sheet";
+import {
+  SimpleDialog,
+  SimpleDialogClose,
+  SimpleDialogContent,
+  SimpleDialogDescription,
+  SimpleDialogFooter,
+  SimpleDialogHeader,
+  SimpleDialogOverlay,
+  SimpleDialogPortal,
+  SimpleDialogTitle,
+  SimpleDialogTrigger,
+} from "./simple-dialog";
 
-import { cn } from "@/lib/utils";
+// Default mobile detection hook (can be overridden)
+function defaultUseIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(false);
 
-const Dialog = DialogPrimitive.Root;
+  React.useEffect(() => {
+    const checkViewport = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
 
-const DialogTrigger = DialogPrimitive.Trigger;
+    checkViewport();
+    window.addEventListener("resize", checkViewport);
 
-const DialogPortal = DialogPrimitive.Portal;
+    return () => window.removeEventListener("resize", checkViewport);
+  }, []);
 
-const DialogClose = DialogPrimitive.Close;
+  return isMobile;
+}
 
-const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80",
-      className,
-    )}
-    {...props}
-  />
-));
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+// Context for passing mobile detection and open state
+interface DialogContextValue {
+  useIsMobile?: () => boolean;
+  isMobile: boolean;
+}
 
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
-DialogContent.displayName = DialogPrimitive.Content.displayName;
+const DialogContext = React.createContext<DialogContextValue>({
+  isMobile: false,
+});
 
-const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
+// Export all the simple components for direct use if needed
+export const DialogTrigger = SimpleDialogTrigger;
+export const DialogClose = SimpleDialogClose;
+export const DialogPortal = SimpleDialogPortal;
+export const DialogOverlay = SimpleDialogOverlay;
+export const DialogHeader = SimpleDialogHeader;
+export const DialogFooter = SimpleDialogFooter;
+export const DialogTitle = SimpleDialogTitle;
+export const DialogDescription = SimpleDialogDescription;
+
+// Responsive Dialog that switches between Sheet and SimpleDialog at the root level
+interface DialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
+  /**
+   * Custom hook to determine if mobile view
+   */
+  useIsMobile?: () => boolean;
+}
+
+export function Dialog({ open, onOpenChange, children, useIsMobile }: DialogProps) {
+  const useIsMobileHook = useIsMobile || defaultUseIsMobile;
+  const isMobile = useIsMobileHook();
+
+  const contextValue = React.useMemo(() => ({ useIsMobile, isMobile }), [useIsMobile, isMobile]);
+
+  if (isMobile) {
+    return (
+      <DialogContext.Provider value={contextValue}>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          {children}
+        </Sheet>
+      </DialogContext.Provider>
+    );
+  }
+
+  return (
+    <DialogContext.Provider value={contextValue}>
+      <SimpleDialog open={open} onOpenChange={onOpenChange}>
+        {children}
+      </SimpleDialog>
+    </DialogContext.Provider>
+  );
+}
+
+interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof SimpleDialogContent> {
+  /**
+   * Custom className for mobile sheet content
+   */
+  mobileClassName?: string;
+  /**
+   * Side to show the sheet from on mobile (default: "bottom")
+   */
+  side?: "top" | "bottom" | "left" | "right";
+}
+
+export const DialogContent = React.forwardRef<React.ElementRef<typeof SimpleDialogContent>, DialogContentProps>(
+  ({ children, className, mobileClassName = "h-[90vh] overflow-y-auto", side = "bottom", ...props }, ref) => {
+    const context = React.useContext(DialogContext);
+    const isMobile = context.isMobile;
+
+    if (isMobile) {
+      return (
+        <SheetContent side={side} className={mobileClassName}>
+          {children}
+        </SheetContent>
+      );
+    }
+
+    return (
+      <SimpleDialogContent ref={ref} className={className} {...props}>
+        {children}
+      </SimpleDialogContent>
+    );
+  },
 );
-DialogHeader.displayName = "DialogHeader";
 
-const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />
-);
-DialogFooter.displayName = "DialogFooter";
-
-const DialogTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
-    ref={ref}
-    className={cn("text-lg leading-none font-semibold tracking-tight", className)}
-    {...props}
-  />
-));
-DialogTitle.displayName = DialogPrimitive.Title.displayName;
-
-const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description ref={ref} className={cn("text-muted-foreground text-sm", className)} {...props} />
-));
-DialogDescription.displayName = DialogPrimitive.Description.displayName;
-
-export {
-  Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogClose,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-};
+DialogContent.displayName = "DialogContent";

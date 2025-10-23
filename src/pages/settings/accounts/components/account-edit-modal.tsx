@@ -1,7 +1,8 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { AccountForm } from "./account-form";
-import type { Account } from "@/lib/types";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
+import type { Account } from "@/lib/types";
+import { AccountForm } from "./account-form";
 
 export interface AccountEditModalProps {
   account?: Account;
@@ -23,7 +24,7 @@ export function AccountEditModal({ account, open, onClose }: AccountEditModalPro
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onClose} useIsMobile={useIsMobileViewport}>
       <DialogContent className="sm:max-w-[625px]">
         <AccountForm defaultValues={defaultValues} onSuccess={onClose} />
       </DialogContent>
