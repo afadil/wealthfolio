@@ -191,7 +191,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto p-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
               <MobileActivitySteps

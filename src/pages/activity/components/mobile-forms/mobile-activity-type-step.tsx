@@ -118,12 +118,9 @@ export function MobileActivityTypeStep() {
     <div className="flex h-full flex-col">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">Select Transaction Type</h3>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Choose the type of activity you want to record
-        </p>
       </div>
 
-      <ScrollArea className="-mx-6 flex-1 px-6">
+      <ScrollArea>
         <FormField
           control={control}
           name="activityType"

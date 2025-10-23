@@ -75,7 +75,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
 
   return (
     <div className="flex h-full flex-col">
-      <ScrollArea className="-mx-6 flex-1 px-6">
+      <ScrollArea>
         <div className="form-mobile-spacing pb-4">
           {/* Account */}
           <FormField

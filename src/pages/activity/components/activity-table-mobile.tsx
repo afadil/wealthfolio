@@ -84,7 +84,7 @@ export const ActivityTableMobile = ({
   }, [selectedAccounts, selectedActivityTypes]);
 
   const columnFilters = useMemo(() => {
-    const filters: Array<{ id: string; value: unknown }> = [];
+    const filters: { id: string; value: unknown }[] = [];
     if (selectedAccounts.length > 0) {
       filters.push({ id: "accountId", value: selectedAccounts });
     }
@@ -109,7 +109,10 @@ export const ActivityTableMobile = ({
         {} as Record<string, unknown>,
       );
 
-      return searchActivities(pageParam, fetchSize, columnFiltersObj, searchQuery, undefined);
+      return searchActivities(pageParam, fetchSize, columnFiltersObj, searchQuery, {
+        id: "date",
+        desc: true,
+      });
     },
     getNextPageParam: (_lastGroup, groups) => groups.length,
     initialPageParam: 0,
@@ -125,32 +128,7 @@ export const ActivityTableMobile = ({
     }, [data]);
 
   const totalFetched = flatData.length;
-
-  const fetchMoreOnBottomReached = React.useCallback(
-    (containerRefElement?: HTMLDivElement | null) => {
-      if (containerRefElement) {
-        const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
-        if (
-          scrollHeight - scrollTop - clientHeight < 300 &&
-          !isFetching &&
-          !isLoading &&
-          totalFetched < totalDBRowCount
-        ) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, isFetching, isLoading, totalFetched, totalDBRowCount],
-  );
-
-  const fetchMoreOnBottomReachedDebounced = React.useMemo(
-    () => debounce(fetchMoreOnBottomReached, 300),
-    [fetchMoreOnBottomReached],
-  );
-
-  React.useEffect(() => {
-    return () => fetchMoreOnBottomReachedDebounced.cancel();
-  }, [fetchMoreOnBottomReachedDebounced]);
+  const hasMore = totalFetched < totalDBRowCount;
 
   if (isLoading) {
     return (
@@ -200,10 +178,7 @@ export const ActivityTableMobile = ({
         </Button>
       </div>
 
-      <div
-        className="min-h-0 flex-1 space-y-2 overflow-auto"
-        onScroll={(e) => fetchMoreOnBottomReachedDebounced(e.target as HTMLDivElement)}
-      >
+      <div className="min-h-0 flex-1 space-y-2 overflow-auto">
         {flatData.length > 0 ? (
           flatData.map((activity) => {
             const symbol = activity.assetSymbol;
@@ -230,45 +205,40 @@ export const ActivityTableMobile = ({
 
             // Compact View
             if (isCompactView) {
+              const activityTypeLabel = ActivityTypeNames[activityType];
               return (
-                <Card key={activity.id} className="p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold">{displaySymbol}</p>
-                          <Badge className="text-xs font-normal" variant={badgeVariant}>
-                            {ActivityTypeNames[activityType as ActivityType]}
-                          </Badge>
-                        </div>
-                        <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                          <span>{formattedDate.date}</span>
-                          {!isCashActivity(activityType) &&
-                            !isIncomeActivity(activityType) &&
-                            !isSplitActivity(activityType) &&
-                            !isFeeActivity(activityType) && (
-                              <>
-                                <span>•</span>
-                                <span>{activity.quantity} shares</span>
-                              </>
-                            )}
-                        </div>
+                <Card key={activity.id} className="p-3">
+                  <div className="flex items-center gap-3">
+                    <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate font-semibold">{displaySymbol}</p>
+                        {activityType !== "SPLIT" && (
+                          <span className="shrink-0 text-sm font-semibold">
+                            {formatAmount(displayValue, activity.currency)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
+                      <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
+                        <span>{formattedDate.date}</span>
+                        {!isCashActivity(activityType) &&
+                          !isIncomeActivity(activityType) &&
+                          !isSplitActivity(activityType) &&
+                          !isFeeActivity(activityType) && (
+                            <>
+                              <span>•</span>
+                              <span>{activity.quantity} shares</span>
+                            </>
+                          )}
                       </div>
                     </div>
-                    <div className="flex flex-shrink-0 items-center gap-2">
-                      {activityType !== "SPLIT" && (
-                        <span className="text-sm font-semibold">
-                          {formatAmount(displayValue, activity.currency)}
-                        </span>
-                      )}
-                      <ActivityOperations
-                        row={{ original: activity } as { original: ActivityDetails }}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        onDuplicate={onDuplicate}
-                      />
-                    </div>
+                    <ActivityOperations
+                      activity={activity}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onDuplicate={onDuplicate}
+                    />
                   </div>
                 </Card>
               );
@@ -290,7 +260,7 @@ export const ActivityTableMobile = ({
                       </div>
                     </div>
                     <ActivityOperations
-                      row={{ original: activity } as { original: ActivityDetails }}
+                      activity={activity}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onDuplicate={onDuplicate}
@@ -313,7 +283,7 @@ export const ActivityTableMobile = ({
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Type</span>
                       <Badge className="text-xs font-normal" variant={badgeVariant}>
-                        {ActivityTypeNames[activityType as ActivityType]}
+                        {ActivityTypeNames[activityType]}
                       </Badge>
                     </div>
 
@@ -394,10 +364,24 @@ export const ActivityTableMobile = ({
           </div>
         )}
 
-        {/* Loading indicator */}
-        {isFetching && (
-          <div className="flex justify-center py-4">
-            <Icons.Spinner className="h-6 w-6 animate-spin" />
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="flex justify-center py-2">
+            <Button
+              variant="outline"
+              onClick={() => fetchNextPage()}
+              disabled={isFetching}
+              className="w-full"
+            >
+              {isFetching ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>Load More</>
+              )}
+            </Button>
           </div>
         )}
       </div>

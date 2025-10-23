@@ -11,19 +11,21 @@ import type { Activity, ActivityDetails } from "@/lib/types";
 import { Row } from "@tanstack/react-table";
 
 export interface ActivityOperationsProps<TData> {
-  row: Row<TData>;
+  row?: Row<TData>;
+  activity?: ActivityDetails;
   onEdit: (activity: ActivityDetails) => void | undefined;
   onDelete: (activity: ActivityDetails) => void | undefined;
-  onDuplicate: (activity: ActivityDetails) => void | undefined | Promise<Activity>;
+  onDuplicate: (activity: ActivityDetails) => void | undefined | Promise<void> | Promise<Activity>;
 }
 
 export function ActivityOperations<TData>({
   row,
+  activity: activityProp,
   onEdit,
   onDelete,
   onDuplicate,
 }: ActivityOperationsProps<TData>) {
-  const activity = row.original as ActivityDetails;
+  const activity = activityProp ?? (row?.original as ActivityDetails);
 
   return (
     <>
