@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 const animatedToggleVariants = cva("relative inline-flex items-center scrollbar-hide overflow-x-auto touch-pan-x", {
   variants: {
@@ -58,6 +58,7 @@ interface AnimatedToggleGroupProps<T extends string = string> extends VariantPro
 export function AnimatedToggleGroup<T extends string = string>(props: AnimatedToggleGroupProps<T>) {
   const { items, defaultValue, value: controlledValue, onValueChange, variant, size, className } = props;
   const [internalValue, setInternalValue] = useState<T | undefined>(defaultValue ?? items[0]?.value);
+  const uniqueId = useId();
 
   const isControlled = controlledValue !== undefined;
   const selected = controlledValue ?? internalValue;
@@ -84,8 +85,9 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
         >
           {selected === item.value && (
             <motion.div
-              layoutId="toggle-indicator"
+              layoutId={`toggle-indicator-${uniqueId}`}
               className="bg-background absolute inset-0 -z-10 rounded-full shadow-sm"
+              initial={false}
               transition={{
                 type: "spring",
                 stiffness: 400,
