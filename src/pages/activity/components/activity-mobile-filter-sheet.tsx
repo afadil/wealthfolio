@@ -52,7 +52,7 @@ export const ActivityMobileFilterSheet = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex h-[80vh] flex-col rounded-t-xl">
+      <SheetContent side="bottom" className="flex h-[80vh] flex-col rounded-t-3xl">
         <SheetHeader className="text-left">
           <SheetTitle>Filter Activities</SheetTitle>
         </SheetHeader>

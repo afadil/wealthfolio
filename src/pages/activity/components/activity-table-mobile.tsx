@@ -54,7 +54,7 @@ export const ActivityTableMobile = ({
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isCompactView, setIsCompactView] = usePersistentState(
     "activity-mobile-view-compact",
-    false,
+    true,
   );
 
   // Debounced search query update
