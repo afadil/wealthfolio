@@ -185,7 +185,7 @@ export function PageHeader({
 
       <div className="px-4 py-3 md:px-6 md:py-4 lg:px-8">
         <div className="mx-auto">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {displayBack &&
                 (backUrl ? (
@@ -210,9 +210,7 @@ export function PageHeader({
                 ))}
               {titleContent ?? children}
             </div>
-            {actions && (
-              <div className="flex shrink-0 items-center gap-2 sm:justify-end">{actions}</div>
-            )}
+            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
           </div>
         </div>
       </div>
