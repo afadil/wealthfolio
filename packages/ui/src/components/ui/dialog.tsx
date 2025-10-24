@@ -101,7 +101,10 @@ interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof Simpl
 }
 
 export const DialogContent = React.forwardRef<React.ElementRef<typeof SimpleDialogContent>, DialogContentProps>(
-  ({ children, className, mobileClassName = "h-[90vh] overflow-y-auto", side = "bottom", ...props }, ref) => {
+  (
+    { children, className, mobileClassName = "h-[90vh] overflow-y-auto rounded-t-3xl", side = "bottom", ...props },
+    ref,
+  ) => {
     const context = React.useContext(DialogContext);
     const isMobile = context.isMobile;
 
