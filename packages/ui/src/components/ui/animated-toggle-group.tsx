@@ -11,7 +11,7 @@ const animatedToggleVariants = cva("relative inline-flex items-center scrollbar-
     },
     size: {
       default: "gap-1 rounded-full p-1",
-      xs: "gap-0.5 rounded-full p-0.5",
+      xs: "gap-0.5 md:gap-0.5 rounded-full p-0.5",
       sm: "gap-0.5 rounded-full p-0.5",
       md: "gap-1 rounded-full p-1",
       lg: "gap-1.5 rounded-full p-1.5",
@@ -29,7 +29,7 @@ const animatedToggleItemVariants = cva(
     variants: {
       size: {
         default: "px-6 py-2 text-sm",
-        xs: "px-4 py-1.5 text-xs",
+        xs: "px-3.5 md:px-4 py-1.5 text-xs",
         sm: "px-5 py-2 text-xs",
         md: "px-7 py-2 text-sm",
         lg: "px-8 py-2.5 text-base",
