@@ -8,39 +8,13 @@ import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatAmount, formatPercent } from "@wealthfolio/ui";
+import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthfolio/ui";
 import { useMemo, type FC } from "react";
 import { Link } from "react-router-dom";
 import { Tooltip as ChartTooltip, ResponsiveContainer, Treemap } from "recharts";
 
 type ReturnType = "daily" | "total";
 type DisplayMode = "symbol" | "name";
-
-const ReturnTypeSelector: React.FC<{
-  selectedType: ReturnType;
-  onTypeSelect: (type: ReturnType) => void;
-}> = ({ selectedType, onTypeSelect }) => (
-  <div className="flex justify-end">
-    <div className="bg-secondary flex space-x-1 rounded-full p-1">
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedType === "daily" ? "outline" : "ghost"}
-        onClick={() => onTypeSelect("daily")}
-      >
-        Daily Return
-      </Button>
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedType === "total" ? "outline" : "ghost"}
-        onClick={() => onTypeSelect("total")}
-      >
-        Total Return
-      </Button>
-    </div>
-  </div>
-);
 
 const DisplayModeToggle: React.FC<{
   displayMode: DisplayMode;
@@ -349,10 +323,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           </div>
           <div className="flex items-center space-x-3">
             <Skeleton className="h-8 w-8 rounded-full" />
-            <div className="bg-secondary flex space-x-1 rounded-full p-1">
-              <Skeleton className="h-8 w-24 rounded-full" />
-              <Skeleton className="h-8 w-24 rounded-full" />
-            </div>
+            <Skeleton className="h-8 w-32 rounded-full" />
           </div>
         </CardHeader>
         <CardContent>
@@ -368,7 +339,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
             <Icons.LayoutDashboard className="text-muted-foreground h-4 w-4" />
-            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+            <CardTitle className="text-md font-medium">Composition</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="flex h-[500px] items-center justify-center">
@@ -387,12 +358,20 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center space-x-2">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Holding Composition
+            Composition
           </CardTitle>
         </div>
         <div className="flex items-center space-x-3">
           <DisplayModeToggle displayMode={displayMode} onToggle={toggleDisplayMode} />
-          <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />
+          <AnimatedToggleGroup
+            items={[
+              { value: "daily", label: "Daily" },
+              { value: "total", label: "Total" },
+            ]}
+            value={returnType}
+            onValueChange={(value: ReturnType) => setReturnType(value)}
+            size="sm"
+          />
         </div>
       </CardHeader>
       <CardContent className="pl-2">

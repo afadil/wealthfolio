@@ -1,12 +1,11 @@
-import { Holding, Sector } from "@/lib/types";
-import { useMemo } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { PrivacyAmount } from "@wealthfolio/ui";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatPercent } from "@wealthfolio/ui";
+import { Holding, Sector } from "@/lib/types";
+import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
+import { useMemo } from "react";
 
 function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
@@ -48,7 +47,7 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
   const total = sectors.reduce((sum, s) => sum + s.value, 0);
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
@@ -56,7 +55,7 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="relative h-full w-full">
+      <CardContent className="relative w-full">
         <TooltipProvider>
           {isLoading ? (
             <div className="space-y-2">

@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Icons } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -33,14 +32,11 @@ export const CashHoldingsWidget = ({
       <Card className={cn("p-3 sm:p-3.5", className)}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="bg-primary/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">
-              <Icons.Money className="text-primary h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
             <div>
-              <p className="text-muted-foreground text-[10px] font-medium sm:text-xs">
+              <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase sm:text-xs">
                 Cash Balance
               </p>
-              <Skeleton className="mt-0.5 h-4 w-20 sm:h-5 sm:w-24" />
+              <Skeleton className="mt-0.5 h-5 w-24 sm:h-5 sm:w-24" />
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2.5">
@@ -62,12 +58,11 @@ export const CashHoldingsWidget = ({
       <div className="flex items-center justify-between gap-3">
         {/* Left: Total */}
         <div className="flex items-center gap-2.5">
-          <div className="bg-primary/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">
-            <Icons.Money className="text-primary h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
           <div className="min-w-0">
-            <p className="text-muted-foreground text-[10px] font-medium sm:text-xs">Cash Balance</p>
-            <p className="text-foreground mt-0.5 text-sm font-semibold tracking-tight sm:text-base">
+            <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase sm:text-xs">
+              Cash Balance
+            </p>
+            <p className="text-foreground mt-0.5 text-base font-semibold tracking-tight sm:text-base">
               <AmountDisplay
                 value={totalCashInBase}
                 currency={settings?.baseCurrency ?? "USD"}
@@ -83,10 +78,10 @@ export const CashHoldingsWidget = ({
             {cashHoldings.map((holding, index) => (
               <div key={holding.id} className="flex items-center gap-2.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground text-[9px] font-medium tracking-wider uppercase sm:text-[10px]">
+                  <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase sm:text-[10px]">
                     {holding.localCurrency}
                   </span>
-                  <span className="text-foreground text-xs sm:text-sm">
+                  <span className="text-foreground text-sm sm:text-sm">
                     <AmountDisplay
                       value={holding.marketValue?.local ?? 0}
                       currency={holding.localCurrency}
