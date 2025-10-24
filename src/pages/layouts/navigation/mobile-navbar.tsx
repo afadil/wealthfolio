@@ -6,6 +6,15 @@ import { useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { type NavigationProps, isPathActive } from "./app-navigation";
 
+type HapticsModule = typeof import("@tauri-apps/plugin-haptics");
+
+let hapticsModulePromise: Promise<HapticsModule> | null = null;
+
+async function loadHapticsModule(): Promise<HapticsModule> {
+  hapticsModulePromise ??= import("@tauri-apps/plugin-haptics");
+  return hapticsModulePromise;
+}
+
 interface MobileNavBarProps {
   navigation: NavigationProps;
 }
@@ -17,8 +26,27 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const { isMobile: isMobilePlatform, isTauri } = usePlatform();
 
   const triggerHaptic = useCallback(() => {
-    if (!isMobilePlatform || !isTauri) return;
-    // optional: keep your lazy-import haptics here if desired
+    if (!isMobilePlatform || !isTauri) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const haptics = await loadHapticsModule();
+        if (typeof haptics.selectionFeedback === "function") {
+          await haptics.selectionFeedback();
+          return;
+        }
+
+        if (typeof haptics.impactFeedback === "function") {
+          await haptics.impactFeedback("medium");
+        }
+      } catch (unknownError) {
+        if (import.meta.env.DEV) {
+          console.warn("Haptic feedback unavailable:", unknownError);
+        }
+      }
+    })();
   }, [isMobilePlatform, isTauri]);
 
   const handleNavigation = useCallback(
