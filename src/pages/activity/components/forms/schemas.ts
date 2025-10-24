@@ -128,7 +128,7 @@ export const otherActivitySchema = baseActivitySchema.extend({
   ]),
   assetId: z.string().min(1, { message: 'Please select a security' }).optional(),
   amount: z.coerce.number().min(0).optional(),
-  quantity: z.coerce.number().positive().optional(),
+  quantity: z.coerce.number().nonnegative().optional(),
   fee: z.coerce
     .number({
       invalid_type_error: 'Fee must be a positive number.',
