@@ -1,5 +1,5 @@
 import { HistoryChart } from "@/components/history-chart";
-import { Page, PageHeader, PageScrollContainer } from "@/components/page/page";
+import { Page, PageScrollContainer } from "@/components/page/page";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
@@ -95,43 +95,44 @@ export default function DashboardPage() {
 
   return (
     <Page className="flex h-screen flex-col">
-      <PageHeader>
-        <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-          <div className="flex items-start gap-2">
-            <div>
-              <div className="flex items-center gap-3">
-                <Balance
-                  isLoading={isHoldingsLoading}
-                  targetValue={totalValue}
-                  currency={baseCurrency}
-                  displayCurrency={true}
-                />
-                <PrivacyToggle />
-              </div>
-              <div className="text-md flex space-x-3">
-                <GainAmount
-                  className="lg:text-md text-sm font-light"
-                  value={gainLossAmount}
-                  currency={baseCurrency}
-                  displayCurrency={false}
-                ></GainAmount>
-                <div className="border-secondary my-1 border-r pr-2" />
-                <GainPercent
-                  className="lg:text-md text-sm font-light"
-                  value={simpleReturn}
-                  animated={true}
-                ></GainPercent>
-                {selectedIntervalDescription && (
-                  <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
-                    {selectedIntervalDescription}
-                  </span>
-                )}
+      <PageScrollContainer data-ptr-content className="flex flex-col">
+        <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
+          <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
+            <div className="flex items-start gap-2">
+              <div>
+                <div className="flex items-center gap-3">
+                  <Balance
+                    isLoading={isHoldingsLoading}
+                    targetValue={totalValue}
+                    currency={baseCurrency}
+                    displayCurrency={true}
+                  />
+                  <PrivacyToggle />
+                </div>
+                <div className="text-md flex space-x-3">
+                  <GainAmount
+                    className="lg:text-md text-sm font-light"
+                    value={gainLossAmount}
+                    currency={baseCurrency}
+                    displayCurrency={false}
+                  ></GainAmount>
+                  <div className="border-secondary my-1 border-r pr-2" />
+                  <GainPercent
+                    className="lg:text-md text-sm font-light"
+                    value={simpleReturn}
+                    animated={true}
+                  ></GainPercent>
+                  {selectedIntervalDescription && (
+                    <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
+                      {selectedIntervalDescription}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </PortfolioUpdateTrigger>
-      </PageHeader>
-      <PageScrollContainer data-ptr-content className="flex flex-col">
+          </PortfolioUpdateTrigger>
+        </div>
+
         <div className="h-[300px]">
           {valuationHistory && chartData.length > 0 ? (
             <>
@@ -148,8 +149,8 @@ export default function DashboardPage() {
           ) : null}
         </div>
 
-        <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-0 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
-          <div className="grid gap-12 sm:grid-cols-1 md:grid-cols-3">
+        <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             <div className="md:col-span-2">
               <AccountsSummary />
             </div>

@@ -130,90 +130,82 @@ export function SavingGoals() {
   return (
     <TooltipProvider>
       <div className="flex flex-wrap gap-4">
-        <Card className="w-full border-0 bg-transparent shadow-none">
-          <CardHeader className="py-2">
-            <CardTitle className="text-md">Saving Goals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Card className="w-full shadow-none">
-              <CardContent className="pt-6">
-                {goals && goals.length > 0 ? (
-                  [...goals]
-                    .sort((a, b) => a.targetAmount - b.targetAmount)
-                    .map((goal) => {
-                      const progressData = goalsProgress.find((p) => p.name === goal.title);
+        <h2 className="text-md font-semibold">Saving Goals</h2>
+        <Card className="w-full shadow-none">
+          <CardContent className="px-4 pt-6">
+            {goals && goals.length > 0 ? (
+              [...goals]
+                .sort((a, b) => a.targetAmount - b.targetAmount)
+                .map((goal) => {
+                  const progressData = goalsProgress.find((p) => p.name === goal.title);
 
-                      const currentProgress = progressData?.progress ?? 0;
-                      const currentValue = progressData?.currentValue ?? 0;
-                      const currency =
-                        progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? "USD";
+                  const currentProgress = progressData?.progress ?? 0;
+                  const currentValue = progressData?.currentValue ?? 0;
+                  const currency =
+                    progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? "USD";
 
-                      return (
-                        <Tooltip key={goal.id}>
-                          <TooltipTrigger asChild>
-                            <div className="mb-4 cursor-help items-center">
-                              <CardDescription className="text-muted-foreground mb-2 flex items-center text-sm font-light">
-                                {goal.title}
-                                {currentProgress >= 100 ? (
-                                  <Icons.CheckCircle className="text-success ml-1 h-4 w-4" />
-                                ) : null}
-                              </CardDescription>
+                  return (
+                    <Tooltip key={goal.id}>
+                      <TooltipTrigger asChild>
+                        <div className="mb-4 cursor-help items-center">
+                          <CardDescription className="text-muted-foreground mb-2 flex items-center text-sm font-light">
+                            {goal.title}
+                            {currentProgress >= 100 ? (
+                              <Icons.CheckCircle className="text-success ml-1 h-4 w-4" />
+                            ) : null}
+                          </CardDescription>
 
-                              <Progress
-                                value={currentProgress * 100}
-                                className="[&>div]:bg-success h-2.5 w-full"
+                          <Progress
+                            value={currentProgress * 100}
+                            className="[&>div]:bg-success h-2.5 w-full"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="space-y-2">
+                        <h3 className="text-md text-muted-foreground font-bold">{goal.title}</h3>
+                        <ul className="list-inside list-disc text-xs">
+                          <li>
+                            Progress: <b>{formatPercent(currentProgress)}</b>
+                          </li>
+                          <li>
+                            Current Value:{" "}
+                            <b>
+                              <AmountDisplay
+                                value={currentValue}
+                                currency={currency}
+                                isHidden={isBalanceHidden}
                               />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent className="space-y-2">
-                            <h3 className="text-md text-muted-foreground font-bold">
-                              {goal.title}
-                            </h3>
-                            <ul className="list-inside list-disc text-xs">
-                              <li>
-                                Progress: <b>{formatPercent(currentProgress)}</b>
-                              </li>
-                              <li>
-                                Current Value:{" "}
-                                <b>
-                                  <AmountDisplay
-                                    value={currentValue}
-                                    currency={currency}
-                                    isHidden={isBalanceHidden}
-                                  />
-                                </b>
-                              </li>
-                              <li>
-                                Target Value:{" "}
-                                <b>
-                                  <AmountDisplay
-                                    value={goal.targetAmount}
-                                    currency={currency}
-                                    isHidden={isBalanceHidden}
-                                  />
-                                </b>
-                              </li>
-                            </ul>
-                            {!progressData && (
-                              <p className="text-muted-foreground text-xs italic">
-                                Progress calculation pending or not applicable.
-                              </p>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <Icons.Goal className="text-muted-foreground mb-2 h-12 w-12" />
-                    <p className="text-muted-foreground text-sm">No saving goals set</p>
-                    <p className="text-muted-foreground text-xs">
-                      Create a goal to start tracking your progress
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                            </b>
+                          </li>
+                          <li>
+                            Target Value:{" "}
+                            <b>
+                              <AmountDisplay
+                                value={goal.targetAmount}
+                                currency={currency}
+                                isHidden={isBalanceHidden}
+                              />
+                            </b>
+                          </li>
+                        </ul>
+                        {!progressData && (
+                          <p className="text-muted-foreground text-xs italic">
+                            Progress calculation pending or not applicable.
+                          </p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Icons.Goal className="text-muted-foreground mb-2 h-12 w-12" />
+                <p className="text-muted-foreground text-sm">No saving goals set</p>
+                <p className="text-muted-foreground text-xs">
+                  Create a goal to start tracking your progress
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
