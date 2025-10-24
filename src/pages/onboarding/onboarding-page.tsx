@@ -118,13 +118,7 @@ const OnboardingPage = () => {
             {/* Left side - Back button */}
             <div className="flex items-center gap-3">
               {currentStep > 1 && (
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                  type="button"
-                  size="lg"
-                  className="shrink-0"
-                >
+                <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
                   <Icons.ArrowLeft className="mr-2 h-4 w-4" />
                   Back
                 </Button>
@@ -136,7 +130,6 @@ const OnboardingPage = () => {
               onClick={handleContinue}
               disabled={!isStepValid}
               type="button"
-              size="lg"
               className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
             >
               {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
