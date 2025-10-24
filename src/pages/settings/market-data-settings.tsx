@@ -17,21 +17,17 @@ import {
 } from './use-market-data-settings';
 import { MarketDataProviderSetting } from '@/commands/market-data';
 import { cn } from '@/lib/utils';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getSecret } from '@/commands/secrets';
 import { QueryKeys } from '@/lib/query-keys';
-import { useRecalculatePortfolioMutation, useUpdatePortfolioMutation } from '@/hooks/use-calculate-portfolio';
+import {
+  useRecalculatePortfolioMutation,
+  useUpdatePortfolioMutation,
+} from '@/hooks/use-calculate-portfolio';
 import { ActionConfirm } from '@wealthfolio/ui';
+import { ImportQuotesSection } from '@/components/quote-import/ImportQuotesSection';
 
 const useApiKeyStatus = (providerId: string) => {
   const queryClient = useQueryClient();
@@ -109,7 +105,7 @@ function ProviderSettings({
         'group rounded-lg border transition-all duration-200',
         provider.enabled
           ? 'bg-card hover:bg-accent/30 hover:shadow-md'
-          : 'bg-muted/30 border-dashed opacity-75 hover:opacity-90'
+          : 'border-dashed bg-muted/30 opacity-75 hover:opacity-90',
       )}
     >
       <CardHeader>
@@ -127,14 +123,19 @@ function ProviderSettings({
                     />
                   </div>
                 )}
-                <CardTitle className={`truncate text-lg font-semibold ${
-                  provider.enabled ? '' : 'text-muted-foreground'
-                }`}>
+                <CardTitle
+                  className={`truncate text-lg font-semibold ${
+                    provider.enabled ? '' : 'text-muted-foreground'
+                  }`}
+                >
                   {provider.name}
                 </CardTitle>
               </div>
               {!provider.enabled && (
-                <Badge variant="secondary" className="shrink-0 text-xs bg-warning/10 text-warning border-warning/20">
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 border-warning/20 bg-warning/10 text-xs text-warning"
+                >
                   <Icons.AlertCircle className="mr-1 h-3 w-3" />
                   Disabled
                 </Badge>
@@ -153,12 +154,13 @@ function ProviderSettings({
                   <PopoverContent className="w-80">
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <h4 className="font-medium flex items-center gap-2">
+                        <h4 className="flex items-center gap-2 font-medium">
                           <Icons.AlertTriangle className="h-4 w-4 text-amber-500" />
                           Configuration Required
                         </h4>
                         <p className="text-sm text-muted-foreground">
-                          This provider requires an API key to function properly. Configure the API key in the settings below to start fetching market data.
+                          This provider requires an API key to function properly. Configure the API
+                          key in the settings below to start fetching market data.
                         </p>
                       </div>
                     </div>
@@ -169,9 +171,11 @@ function ProviderSettings({
 
             {/* Description */}
             {provider.description && (
-              <CardDescription className={`text-sm leading-relaxed ${
-                provider.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
-              }`}>
+              <CardDescription
+                className={`text-sm leading-relaxed ${
+                  provider.enabled ? 'text-muted-foreground' : 'text-muted-foreground/70'
+                }`}
+              >
                 {provider.description}
                 {provider.url && (
                   <div className="mt-1">
@@ -295,7 +299,8 @@ export default function MarketDataSettingsPage() {
   const { data: providers, isLoading, error } = useMarketDataProviderSettings();
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
   const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
-  const { mutate: recalculatePortfolio, isPending: isRecalculating } = useRecalculatePortfolioMutation();
+  const { mutate: recalculatePortfolio, isPending: isRecalculating } =
+    useRecalculatePortfolioMutation();
 
   const [priorityInputs, setPriorityInputs] = useState<{ [providerId: string]: number }>({});
 
@@ -401,6 +406,10 @@ export default function MarketDataSettingsPage() {
           </div>
         )}
       </div>
+
+      <Separator />
+
+      <ImportQuotesSection />
     </div>
   );
 }

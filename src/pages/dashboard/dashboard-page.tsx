@@ -14,6 +14,7 @@ import { subMonths } from 'date-fns';
 import { calculatePerformanceMetrics } from '@/lib/utils';
 import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
 import { useHoldings } from '@/hooks/use-holdings';
+import { useLatestValuations } from '@/hooks/use-latest-valuations';
 
 
 function DashboardSkeleton() {
@@ -46,10 +47,20 @@ export default function DashboardPage() {
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+  
+  // Get latest portfolio valuation for accurate total value including cash and excluding loans
+  const { latestValuations, isLoading: isLatestValuationLoading } = useLatestValuations([PORTFOLIO_ACCOUNT_ID]);
 
   const totalValue = useMemo(() => {
+    // Use portfolio equity from latest valuation for most accurate balance
+    const portfolioValuation = latestValuations?.find(v => v.accountId === PORTFOLIO_ACCOUNT_ID);
+    if (portfolioValuation) {
+      // Use portfolio equity (excludes loans) for main dashboard balance
+      return portfolioValuation.portfolioEquity ?? portfolioValuation.totalValue ?? 0;
+    }
+    // Fallback to holdings calculation if valuation not available
     return holdings?.reduce((acc, holding) => acc + (holding.marketValue?.base || 0), 0) ?? 0;
-  }, [holdings]);
+  }, [latestValuations, holdings]);
 
   const { valuationHistory, isLoading: isValuationHistoryLoading } = useValuationHistory(dateRange);
 
@@ -73,6 +84,8 @@ export default function DashboardPage() {
         date: item.valuationDate,
         totalValue: item.totalValue,
         netContribution: item.netContribution,
+        portfolioEquity: item.portfolioEquity,
+        outstandingLoans: -item.outstandingLoans, // Show as negative for chart visualization
         currency: item.baseCurrency || baseCurrency,
       })) || []
     );
@@ -102,7 +115,7 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-3">
                 <Balance
-                  isLoading={isHoldingsLoading}
+                  isLoading={isHoldingsLoading || isLatestValuationLoading}
                   targetValue={totalValue}
                   currency={baseCurrency}
                   displayCurrency={true}
