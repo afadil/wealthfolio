@@ -61,6 +61,8 @@ export function ImportHelpPopover() {
                 <pre className="mt-2 overflow-x-auto bg-muted p-4 text-xs">
                   <ul className="list-inside list-disc space-y-1">
                     <li>BUY</li>
+                    <li>SELL_SHORT (Opens a short position)</li>
+                    <li>BUY_COVER (Closes a short position)</li>
                     <li>SELL</li>
                     <li>DIVIDEND</li>
                     <li>INTEREST</li>

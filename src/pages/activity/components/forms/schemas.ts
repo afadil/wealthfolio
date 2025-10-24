@@ -53,7 +53,7 @@ export const bulkHoldingsFormSchema = baseActivitySchema.extend({
 });
 
 export const tradeActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum([ActivityType.BUY, ActivityType.SELL]),
+  activityType: z.enum([ActivityType.BUY, ActivityType.SELL, ActivityType.SELL_SHORT, ActivityType.BUY_COVER]),
   assetId: z.string().min(1, { message: 'Please select a security' }),
   quantity: z.coerce
     .number({

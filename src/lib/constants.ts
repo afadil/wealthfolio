@@ -109,6 +109,8 @@ export const exportedFileFormatSchema = z.enum([
 export const ActivityType = {
   BUY: 'BUY',
   SELL: 'SELL',
+  SELL_SHORT: 'SELL_SHORT',
+  BUY_COVER: 'BUY_COVER',
   DIVIDEND: 'DIVIDEND',
   INTEREST: 'INTEREST',
   DEPOSIT: 'DEPOSIT',
@@ -127,6 +129,8 @@ export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
 export const TRADING_ACTIVITY_TYPES = [
   ActivityType.BUY,
   ActivityType.SELL,
+  ActivityType.SELL_SHORT,
+  ActivityType.BUY_COVER,
   ActivityType.SPLIT,
   ActivityType.ADD_HOLDING,
   ActivityType.REMOVE_HOLDING,
@@ -151,6 +155,8 @@ export const INCOME_ACTIVITY_TYPES = [
 export const activityTypeSchema = z.enum([
   ActivityType.BUY,
   ActivityType.SELL,
+  ActivityType.SELL_SHORT,
+  ActivityType.BUY_COVER,
   ActivityType.DIVIDEND,
   ActivityType.INTEREST,
   ActivityType.DEPOSIT,
@@ -167,6 +173,8 @@ export const activityTypeSchema = z.enum([
 export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.BUY]: 'Buy',
   [ActivityType.SELL]: 'Sell',
+  [ActivityType.SELL_SHORT]: 'Sell Short',
+  [ActivityType.BUY_COVER]: 'Buy to Cover',
   [ActivityType.DIVIDEND]: 'Dividend',
   [ActivityType.INTEREST]: 'Interest',
   [ActivityType.DEPOSIT]: 'Deposit',

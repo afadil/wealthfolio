@@ -274,7 +274,7 @@ impl HoldingsServiceTrait for HoldingsService {
             .map(|holding_view| holding_view.market_value.base)
             .sum();
 
-        if total_portfolio_value_base > dec!(0) {
+        if total_portfolio_value_base != dec!(0) {
             for holding_view in &mut holdings {
                 holding_view.weight =
                     (holding_view.market_value.base / total_portfolio_value_base).round_dp(4);

@@ -450,6 +450,15 @@ const EditableActivityTable = ({
       if (activityToSave.hasOwnProperty('amount')) payloadForBackend.amount = amount;
       if (activityToSave.hasOwnProperty('fee')) payloadForBackend.fee = fee;
 
+      // For SELL_SHORT, ensure quantity is negative before sending to backend
+      if (
+        payloadForBackend.activityType === ActivityType.SELL_SHORT &&
+        payloadForBackend.quantity &&
+        payloadForBackend.quantity > 0
+      ) {
+        payloadForBackend.quantity = -payloadForBackend.quantity;
+      }
+
       try {
         let mutationPromise;
 

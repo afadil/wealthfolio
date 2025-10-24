@@ -42,6 +42,8 @@ interface ActivityFormProps {
 const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   BUY: 'trade',
   SELL: 'trade',
+  SELL_SHORT: 'trade',
+  BUY_COVER: 'trade',
   DEPOSIT: 'cash',
   WITHDRAWAL: 'cash',
   INTEREST: 'income',
@@ -118,6 +120,18 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
         if (account) {
           submitData.assetId = `$CASH-${account.currency}`;
         }
+      }
+
+      // Ensure quantity is negative for short activities
+      if (
+        ['SELL_SHORT'].includes(
+          submitData.activityType,
+        ) &&
+        'quantity' in submitData &&
+        submitData.quantity &&
+        submitData.quantity > 0
+      ) {
+        submitData.quantity = -submitData.quantity;
       }
 
       if ('assetDataSource' in submitData && submitData.assetDataSource === DataSource.MANUAL && account) {
