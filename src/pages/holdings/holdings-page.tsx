@@ -38,13 +38,13 @@ type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" |
 
 // Deprecated local sticky wrapper removed — PageHeader handles stickiness.
 
-type HoldingsView = "overview" | "positions";
+type HoldingsView = "positions" | "analytics";
 
 export const HoldingsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = (queryParams.get("tab") as HoldingsView) ?? "overview";
+  const defaultTab = (queryParams.get("tab") as HoldingsView) ?? "positions";
   const [view, setView] = useState<HoldingsView>(defaultTab);
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
@@ -190,8 +190,8 @@ export const HoldingsPage = () => {
             </div>
             <AnimatedToggleGroup
               items={[
-                { value: "overview", label: "Analytics" },
                 { value: "positions", label: "Positions" },
+                { value: "analytics", label: "Analytics" },
               ]}
               value={view}
               onValueChange={(next: HoldingsView) => {
