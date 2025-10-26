@@ -18,6 +18,7 @@ export interface SwipableViewProps {
   dotClassName?: string;
   labelClassName?: string;
   onViewChange?: (index: number, name: string) => void;
+  onInit?: (api: CarouselApi) => void;
 }
 
 export function SwipableView({
@@ -27,6 +28,7 @@ export function SwipableView({
   dotClassName,
   labelClassName,
   onViewChange,
+  onInit: onInitProp,
 }: SwipableViewProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
@@ -56,10 +58,14 @@ export function SwipableView({
     [items, onViewChange],
   );
 
-  const onInit = React.useCallback((api: CarouselApi) => {
-    if (!api) return;
-    setScrollSnaps(api.scrollSnapList());
-  }, []);
+  const onInit = React.useCallback(
+    (api: CarouselApi) => {
+      if (!api) return;
+      setScrollSnaps(api.scrollSnapList());
+      onInitProp?.(api);
+    },
+    [onInitProp],
+  );
 
   React.useEffect(() => {
     if (!emblaApi) return;

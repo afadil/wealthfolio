@@ -5,7 +5,7 @@ import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Icons, Separator } from "@wealthfolio/ui";
+import { Button, Icons } from "@wealthfolio/ui";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
@@ -107,7 +107,7 @@ const ActivityPage = () => {
     <Page>
       <PageHeader heading="Activity" actions={headerActions} />
       <PageContent>
-        <Separator className="my-4" />
+        {/* <Separator className="my-4" /> */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {isMobileViewport ? (
             <ActivityTableMobile

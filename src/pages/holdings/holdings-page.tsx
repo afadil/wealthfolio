@@ -10,12 +10,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { AmountDisplay, AnimatedToggleGroup, SwipableView } from "@wealthfolio/ui";
-import { useCallback, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
+import { useMemo, useState } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
+import type { SwipablePageView } from "@/components/page";
+import { SwipablePage } from "@/components/page";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useHoldings } from "@/hooks/use-holdings";
 import { usePlatform } from "@/hooks/use-platform";
@@ -36,26 +36,7 @@ import { SectorsChart } from "./components/sectors-chart";
 // Define a type for the filter criteria
 type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
 
-// Deprecated local sticky wrapper removed — PageHeader handles stickiness.
-
-type HoldingsView = "holdings" | "analytics";
-
-type HapticsModule = typeof import("@tauri-apps/plugin-haptics");
-
-let hapticsModulePromise: Promise<HapticsModule> | null = null;
-
-async function loadHapticsModule(): Promise<HapticsModule> {
-  hapticsModulePromise ??= import("@tauri-apps/plugin-haptics");
-  return hapticsModulePromise;
-}
-
 export const HoldingsPage = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const queryParams = new URLSearchParams(location.search);
-  const defaultTab = (queryParams.get("tab") as HoldingsView) ?? "holdings";
-  const [view, setView] = useState<HoldingsView>(defaultTab);
-
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
     name: "All Portfolio",
@@ -72,7 +53,7 @@ export const HoldingsPage = () => {
 
   const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
   const { accounts } = useAccounts();
-  const { isMobile: isMobilePlatform, isTauri } = usePlatform();
+  const { isMobile: isMobilePlatform } = usePlatform();
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState("");
@@ -81,35 +62,10 @@ export const HoldingsPage = () => {
   const [sheetCompositionFilter, setSheetCompositionFilter] = useState<Instrument["id"] | null>(
     null,
   );
-  // Removed unused sheetAccountIdsFilter state
 
   // Mobile filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-
-  const triggerHaptic = useCallback(() => {
-    if (!isMobilePlatform || !isTauri) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const haptics = await loadHapticsModule();
-        if (typeof haptics.selectionFeedback === "function") {
-          await haptics.selectionFeedback();
-          return;
-        }
-
-        if (typeof haptics.impactFeedback === "function") {
-          await haptics.impactFeedback("medium");
-        }
-      } catch (unknownError) {
-        if (import.meta.env.DEV) {
-          console.warn("Haptic feedback unavailable:", unknownError);
-        }
-      }
-    })();
-  }, [isMobilePlatform, isTauri]);
 
   const handleChartSectionClick = (
     type: SheetFilterType,
@@ -222,6 +178,8 @@ export const HoldingsPage = () => {
           selectedAccount={selectedAccount}
           accounts={accounts ?? []}
           onAccountChange={handleAccountSelect}
+          showSearch={true}
+          showFilterButton={false}
         />
       </div>
     </div>
@@ -229,23 +187,6 @@ export const HoldingsPage = () => {
 
   const renderAnalyticsView = () => (
     <div className="space-y-4 p-2 lg:p-4">
-      {/* Mobile Filter Button - Analytics View */}
-      <div className="flex justify-end md:hidden">
-        <Button
-          variant="outline"
-          size="icon"
-          className="mobile:size-9 flex-shrink-0"
-          onClick={() => setIsFilterSheetOpen(true)}
-        >
-          <div className="relative">
-            <Icons.ListFilter className="h-4 w-4" />
-            {hasActiveFilters && (
-              <span className="bg-primary absolute -top-1 -left-[1.5px] h-2 w-2 rounded-full" />
-            )}
-          </div>
-        </Button>
-      </div>
-
       {/* Cash Holdings Widget */}
       <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
 
@@ -299,68 +240,59 @@ export const HoldingsPage = () => {
     </div>
   );
 
-  return (
-    <Page>
-      <PageHeader
-        heading={!isMobilePlatform ? "Holdings" : undefined}
-        actions={
-          <div className="hidden items-center gap-2 md:flex">
-            <div>
-              <AccountSelector
-                selectedAccount={selectedAccount}
-                setSelectedAccount={handleAccountSelect}
-                variant="dropdown"
-                includePortfolio={true}
-              />
-            </div>
-            <AnimatedToggleGroup
-              items={[
-                { value: "holdings", label: "Holdings" },
-                { value: "analytics", label: "Insights" },
-              ]}
-              value={view}
-              onValueChange={(next: HoldingsView) => {
-                if (next === view) {
-                  return;
-                }
-                triggerHaptic();
-                setView(next);
-                const url = `${location.pathname}?tab=${next}`;
-                navigate(url, { replace: true });
-              }}
-              size="sm"
-              className="max-w-full"
-            />
-          </div>
-        }
-      />
+  const views: SwipablePageView[] = [
+    { value: "holdings", label: "Holdings", content: renderHoldingsView() },
+    { value: "analytics", label: "Insights", content: renderAnalyticsView() },
+  ];
 
-      <PageContent withPadding={false}>
-        <div className="md:hidden">
-          <SwipableView
-            items={[
-              { name: "Holdings", content: renderHoldingsView() },
-              { name: "Insights", content: renderAnalyticsView() },
-            ]}
-            displayToggle={true}
-            onViewChange={(_index: number, name: string) => {
-              const normalizedName = name.toLowerCase();
-              const nextView: HoldingsView =
-                normalizedName === "analytics" ? "analytics" : "holdings";
-              if (nextView === view) {
-                return;
-              }
-              triggerHaptic();
-              setView(nextView);
-              const url = `${location.pathname}?tab=${nextView}`;
-              navigate(url, { replace: true });
-            }}
-          />
-        </div>
-        <div className="hidden md:block">
-          {view === "holdings" ? renderHoldingsView() : renderAnalyticsView()}
-        </div>
-      </PageContent>
+  const filterButton = (
+    <Button
+      variant="outline"
+      size="icon"
+      className="mobile:size-9 relative flex-shrink-0"
+      onClick={() => setIsFilterSheetOpen(true)}
+    >
+      <Icons.ListFilter className="h-4 w-4" />
+      {hasActiveFilters && (
+        <span className="bg-destructive absolute top-0.5 right-0 h-2 w-2 rounded-full" />
+      )}
+    </Button>
+  );
+
+  const renderActions = (currentView: string, onViewChange: (view: string) => void) => (
+    <div className="flex items-center gap-2">
+      {/* Mobile: Only show filter button */}
+      <div className="md:hidden">{filterButton}</div>
+
+      {/* Desktop: Show account selector + toggle */}
+      <div className="hidden md:flex md:items-center md:gap-2">
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={handleAccountSelect}
+          variant="dropdown"
+          includePortfolio={true}
+        />
+        <AnimatedToggleGroup
+          items={views.map((v) => ({ value: v.value, label: v.label }))}
+          value={currentView}
+          onValueChange={onViewChange}
+          size="sm"
+          className="max-w-full"
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <SwipablePage
+        views={views}
+        heading="Holdings"
+        defaultView="holdings"
+        isMobile={isMobilePlatform}
+        actions={renderActions}
+        withPadding={false}
+      />
 
       {/* Mobile Filter Sheet */}
       <HoldingsMobileFilterSheet
@@ -434,7 +366,7 @@ export const HoldingsPage = () => {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </Page>
+    </>
   );
 };
 

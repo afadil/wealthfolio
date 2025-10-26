@@ -22,6 +22,8 @@ interface HoldingsTableMobileProps {
   accounts: Account[];
   onAccountChange: (account: Account) => void;
   showAccountFilter?: boolean;
+  showSearch?: boolean;
+  showFilterButton?: boolean;
 }
 
 export const HoldingsTableMobile = ({
@@ -33,6 +35,8 @@ export const HoldingsTableMobile = ({
   accounts,
   onAccountChange,
   showAccountFilter = true,
+  showSearch = true,
+  showFilterButton = true,
 }: HoldingsTableMobileProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
@@ -89,27 +93,31 @@ export const HoldingsTableMobile = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Input
-          placeholder="Search..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-secondary/30 mobile:h-10 flex-1 rounded-full border-none"
-        />
-        <Button
-          variant="outline"
-          size="icon"
-          className="mobile:size-9 flex-shrink-0"
-          onClick={() => setIsFilterSheetOpen(true)}
-        >
-          <div className="relative">
-            <Icons.ListFilter className="h-4 w-4" />
-            {hasActiveFilters && (
-              <span className="bg-primary absolute -top-1 -left-[1.5px] h-2 w-2 rounded-full" />
-            )}
-          </div>
-        </Button>
-      </div>
+      {(showSearch || showFilterButton) && (
+        <div className="flex items-center gap-2">
+          {showSearch && (
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-secondary/30 mobile:h-10 flex-1 rounded-full border-none"
+            />
+          )}
+          {showFilterButton && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="mobile:size-9 relative flex-shrink-0"
+              onClick={() => setIsFilterSheetOpen(true)}
+            >
+              <Icons.ListFilter className="h-4 w-4" />
+              {hasActiveFilters && (
+                <span className="bg-destructive absolute top-0.5 right-0 h-2 w-2 rounded-full" />
+              )}
+            </Button>
+          )}
+        </div>
+      )}
       <div className="space-y-2">
         {filteredHoldings.length > 0 ? (
           filteredHoldings.map((holding) => {

@@ -66,7 +66,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   return (
     <Card className="md:col-span-2">
       <CardHeader className="pb-4 md:pb-6">
-        <CardTitle className="text-lg md:text-xl">Income History</CardTitle>
+        <CardTitle className="text-sm font-medium">Income History</CardTitle>
         <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
       </CardHeader>
       <CardContent className="px-2 pt-0 md:px-6">

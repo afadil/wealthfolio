@@ -315,7 +315,7 @@ export default function IncomePage() {
           />
           <Card className="flex flex-col">
             <CardHeader>
-              <CardTitle className="text-xl">Top 10 Dividend Sources</CardTitle>
+              <CardTitle className="text-sm font-medium">Top 10 Dividend Sources</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
               {topDividendStocks.length === 0 ? (
