@@ -6,19 +6,19 @@ import {
   Sheet,
   SheetClose,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
+import { AmountDisplay, AnimatedToggleGroup, SwipableView } from "@wealthfolio/ui";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { AccountSelector } from "@/components/account-selector";
 import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useHoldings } from "@/hooks/use-holdings";
+import { usePlatform } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Account, Holding, HoldingType, Instrument } from "@/lib/types";
@@ -39,6 +39,15 @@ type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" |
 // Deprecated local sticky wrapper removed — PageHeader handles stickiness.
 
 type HoldingsView = "holdings" | "analytics";
+
+type HapticsModule = typeof import("@tauri-apps/plugin-haptics");
+
+let hapticsModulePromise: Promise<HapticsModule> | null = null;
+
+async function loadHapticsModule(): Promise<HapticsModule> {
+  hapticsModulePromise ??= import("@tauri-apps/plugin-haptics");
+  return hapticsModulePromise;
+}
 
 export const HoldingsPage = () => {
   const location = useLocation();
@@ -63,6 +72,7 @@ export const HoldingsPage = () => {
 
   const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
   const { accounts } = useAccounts();
+  const { isMobile: isMobilePlatform, isTauri } = usePlatform();
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState("");
@@ -76,6 +86,30 @@ export const HoldingsPage = () => {
   // Mobile filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const triggerHaptic = useCallback(() => {
+    if (!isMobilePlatform || !isTauri) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const haptics = await loadHapticsModule();
+        if (typeof haptics.selectionFeedback === "function") {
+          await haptics.selectionFeedback();
+          return;
+        }
+
+        if (typeof haptics.impactFeedback === "function") {
+          await haptics.impactFeedback("medium");
+        }
+      } catch (unknownError) {
+        if (import.meta.env.DEV) {
+          console.warn("Haptic feedback unavailable:", unknownError);
+        }
+      }
+    })();
+  }, [isMobilePlatform, isTauri]);
 
   const handleChartSectionClick = (
     type: SheetFilterType,
@@ -174,13 +208,104 @@ export const HoldingsPage = () => {
     return hasAccountFilter || hasTypeFilter;
   }, [selectedAccount, selectedTypes]);
 
+  const renderHoldingsView = () => (
+    <div className="space-y-4 p-2 lg:p-4">
+      <div className="hidden md:block">
+        <HoldingsTable holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
+      </div>
+      <div className="block md:hidden">
+        <HoldingsTableMobile
+          holdings={nonCashHoldings ?? []}
+          isLoading={isLoading}
+          selectedTypes={selectedTypes}
+          setSelectedTypes={setSelectedTypes}
+          selectedAccount={selectedAccount}
+          accounts={accounts ?? []}
+          onAccountChange={handleAccountSelect}
+        />
+      </div>
+    </div>
+  );
+
+  const renderAnalyticsView = () => (
+    <div className="space-y-4 p-2 lg:p-4">
+      {/* Mobile Filter Button - Analytics View */}
+      <div className="flex justify-end md:hidden">
+        <Button
+          variant="outline"
+          size="icon"
+          className="mobile:size-9 flex-shrink-0"
+          onClick={() => setIsFilterSheetOpen(true)}
+        >
+          <div className="relative">
+            <Icons.ListFilter className="h-4 w-4" />
+            {hasActiveFilters && (
+              <span className="bg-primary absolute -top-1 -left-[1.5px] h-2 w-2 rounded-full" />
+            )}
+          </div>
+        </Button>
+      </div>
+
+      {/* Cash Holdings Widget */}
+      <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
+
+      {/* Top row: Summary widgets */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <HoldingCurrencyChart
+          holdings={[...cashHoldings, ...filteredNonCashHoldings]}
+          baseCurrency={settings?.baseCurrency ?? "USD"}
+          isLoading={isLoading}
+          onCurrencySectionClick={(currencyName) =>
+            handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
+          }
+        />
+
+        <AccountAllocationChart isLoading={isLoading} />
+
+        <ClassesChart
+          holdings={[...cashHoldings, ...filteredNonCashHoldings]}
+          isLoading={isLoading}
+          onClassSectionClick={(className) =>
+            handleChartSectionClick("class", className, `Asset Class: ${className}`)
+          }
+        />
+
+        <CountryChart
+          holdings={filteredNonCashHoldings}
+          isLoading={isLoading}
+          onCountrySectionClick={(countryName) =>
+            handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
+          }
+        />
+      </div>
+
+      {/* Second row: Composition and Sector */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <div className="col-span-1 lg:col-span-3">
+          <PortfolioComposition holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
+        </div>
+
+        {/* Sectors Chart - Now self-contained */}
+        <div className="col-span-1">
+          <SectorsChart
+            holdings={filteredNonCashHoldings}
+            isLoading={isLoading}
+            onSectorSectionClick={(sectorName) =>
+              handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Page>
       <PageHeader
-        heading="Holdings"
+        heading={!isMobilePlatform ? "Holdings" : undefined}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="hidden md:block">
+          <div className="hidden items-center gap-2 md:flex">
+            <div>
               <AccountSelector
                 selectedAccount={selectedAccount}
                 setSelectedAccount={handleAccountSelect}
@@ -195,6 +320,10 @@ export const HoldingsPage = () => {
               ]}
               value={view}
               onValueChange={(next: HoldingsView) => {
+                if (next === view) {
+                  return;
+                }
+                triggerHaptic();
                 setView(next);
                 const url = `${location.pathname}?tab=${next}`;
                 navigate(url, { replace: true });
@@ -207,101 +336,30 @@ export const HoldingsPage = () => {
       />
 
       <PageContent withPadding={false}>
-        {view === "holdings" ? (
-          <div className="space-y-4 p-2 lg:p-4">
-            <div className="hidden md:block">
-              <HoldingsTable holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
-            </div>
-            <div className="block md:hidden">
-              <HoldingsTableMobile
-                holdings={nonCashHoldings ?? []}
-                isLoading={isLoading}
-                selectedTypes={selectedTypes}
-                setSelectedTypes={setSelectedTypes}
-                selectedAccount={selectedAccount}
-                accounts={accounts ?? []}
-                onAccountChange={handleAccountSelect}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 p-2 lg:p-4">
-            {/* Mobile Filter Button - Analytics View */}
-            <div className="flex justify-end md:hidden">
-              <Button
-                variant="outline"
-                size="icon"
-                className="mobile:size-9 flex-shrink-0"
-                onClick={() => setIsFilterSheetOpen(true)}
-              >
-                <div className="relative">
-                  <Icons.ListFilter className="h-4 w-4" />
-                  {hasActiveFilters && (
-                    <span className="bg-primary absolute -top-1 -left-[1.5px] h-2 w-2 rounded-full" />
-                  )}
-                </div>
-              </Button>
-            </div>
-
-            {/* Cash Holdings Widget */}
-            <CashHoldingsWidget cashHoldings={cashHoldings ?? []} isLoading={isLoading} />
-
-            {/* Top row: Summary widgets */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <HoldingCurrencyChart
-                holdings={[...cashHoldings, ...filteredNonCashHoldings]}
-                baseCurrency={settings?.baseCurrency ?? "USD"}
-                isLoading={isLoading}
-                onCurrencySectionClick={(currencyName) =>
-                  handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
-                }
-              />
-
-              <AccountAllocationChart isLoading={isLoading} />
-
-              <ClassesChart
-                holdings={[...cashHoldings, ...filteredNonCashHoldings]}
-                isLoading={isLoading}
-                onClassSectionClick={(className) =>
-                  handleChartSectionClick("class", className, `Asset Class: ${className}`)
-                }
-              />
-
-              <CountryChart
-                holdings={filteredNonCashHoldings}
-                isLoading={isLoading}
-                onCountrySectionClick={(countryName) =>
-                  handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
-                }
-              />
-            </div>
-
-            {/* Second row: Composition and Sector */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-              <div className="col-span-1 lg:col-span-3">
-                <PortfolioComposition
-                  holdings={filteredNonCashHoldings ?? []}
-                  isLoading={isLoading}
-                />
-              </div>
-
-              {/* Sectors Chart - Now self-contained */}
-              <div className="col-span-1">
-                <SectorsChart
-                  holdings={filteredNonCashHoldings}
-                  isLoading={isLoading}
-                  onSectorSectionClick={(sectorName) =>
-                    handleChartSectionClick(
-                      "sector",
-                      sectorName,
-                      `Holdings in Sector: ${sectorName}`,
-                    )
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="md:hidden">
+          <SwipableView
+            items={[
+              { name: "Holdings", content: renderHoldingsView() },
+              { name: "Insights", content: renderAnalyticsView() },
+            ]}
+            displayToggle={true}
+            onViewChange={(_index: number, name: string) => {
+              const normalizedName = name.toLowerCase();
+              const nextView: HoldingsView =
+                normalizedName === "analytics" ? "analytics" : "holdings";
+              if (nextView === view) {
+                return;
+              }
+              triggerHaptic();
+              setView(nextView);
+              const url = `${location.pathname}?tab=${nextView}`;
+              navigate(url, { replace: true });
+            }}
+          />
+        </div>
+        <div className="hidden md:block">
+          {view === "holdings" ? renderHoldingsView() : renderAnalyticsView()}
+        </div>
       </PageContent>
 
       {/* Mobile Filter Sheet */}
@@ -317,12 +375,14 @@ export const HoldingsPage = () => {
 
       {/* Details Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-          <SheetHeader>
+        <SheetContent
+          className="w-full overflow-y-auto sm:max-w-lg [&>button]:top-[max(calc(env(safe-area-inset-top,0px)+1rem),2.5rem)]"
+          style={{
+            paddingTop: "max(env(safe-area-inset-top, 0px), 1.5rem)",
+          }}
+        >
+          <SheetHeader className="mt-8">
             <SheetTitle>{sheetTitle}</SheetTitle>
-            <SheetDescription>
-              View a breakdown of your holdings filtered by this category.
-            </SheetDescription>
           </SheetHeader>
           <div className="py-8">
             {holdingsForSheet.length > 0 ? (

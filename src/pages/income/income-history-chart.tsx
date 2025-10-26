@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/chart";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
+import { cn } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
 import React from "react";
@@ -28,6 +29,17 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   currency,
   isBalanceHidden,
 }) => {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   const chartData = monthlyIncomeData.map(([month, income], index) => {
     const cumulative = monthlyIncomeData.slice(0, index + 1).reduce((sum, [, value]) => {
       const numericValue = Number(value) || 0;
@@ -52,16 +64,16 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         : "Last Year";
 
   return (
-    <Card className="col-span-2">
-      <CardHeader>
-        <CardTitle className="text-xl">Income History</CardTitle>
-        <CardDescription>{periodDescription}</CardDescription>
+    <Card className="md:col-span-2">
+      <CardHeader className="pb-4 md:pb-6">
+        <CardTitle className="text-lg md:text-xl">Income History</CardTitle>
+        <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-2 pt-0 md:px-6">
         {chartData.length === 0 ? (
           <EmptyPlaceholder
-            className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
-            icon={<Icons.Activity className="h-10 w-10" />}
+            className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
+            icon={<Icons.Activity className="h-8 w-8 md:h-10 md:w-10" />}
             title="No income history available"
             description="There is no income history for the selected period. Try selecting a different time range or check back later."
           />
@@ -81,21 +93,44 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 color: "var(--chart-5)",
               },
             }}
+            className={cn("h-[250px] w-full md:h-[350px]")}
           >
-            <ComposedChart data={chartData}>
-              <CartesianGrid vertical={false} />
+            <ComposedChart
+              data={chartData}
+              margin={{ left: isMobile ? -20 : 0, right: isMobile ? 10 : 0 }}
+            >
+              <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
               <XAxis
                 dataKey="month"
                 tickLine={false}
-                tickMargin={10}
+                tickMargin={8}
                 axisLine={false}
-                tickFormatter={(value) => format(parseISO(`${value}-01`), "MMM yy")}
+                tick={{ fontSize: isMobile ? 11 : 12 }}
+                tickFormatter={(value) => {
+                  const date = parseISO(`${value}-01`);
+                  return isMobile ? format(date, "MMM") : format(date, "MMM yy");
+                }}
               />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
+              <YAxis
+                yAxisId="left"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: isMobile ? 10 : 12 }}
+                width={isMobile ? 40 : 60}
+                tickFormatter={(value: number) => {
+                  if (value >= 1000) {
+                    return `${(value / 1000).toFixed(0)}k`;
+                  }
+                  return value.toString();
+                }}
+              />
+              {!isMobile && (
+                <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
+              )}
               <ChartTooltip
                 content={
                   <ChartTooltipContent
+                    className="min-w-[150px] md:min-w-[180px]"
                     formatter={(value, name, entry) => {
                       const formattedValue = isBalanceHidden
                         ? "••••"
@@ -111,17 +146,19 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                               } as React.CSSProperties
                             }
                           />
-                          <div className="flex flex-1 items-center justify-between">
-                            <span className="text-muted-foreground">
+                          <div className="flex flex-1 items-center justify-between gap-2">
+                            <span className="text-muted-foreground text-xs md:text-sm">
                               {name === "income"
-                                ? "Monthly Income"
+                                ? isMobile
+                                  ? "Monthly"
+                                  : "Monthly Income"
                                 : name === "previousIncome"
-                                  ? "Previous Period"
+                                  ? "Previous"
                                   : name === "cumulative"
-                                    ? "Cumulative Income"
+                                    ? "Cumulative"
                                     : name}
                             </span>
-                            <span className="text-foreground ml-2 font-mono font-medium tabular-nums">
+                            <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">
                               {formattedValue}
                             </span>
                           </div>
@@ -129,35 +166,36 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                       );
                     }}
                     labelFormatter={(label) => {
-                      return format(parseISO(`${label}-01`), "MMMM yyyy");
+                      return format(parseISO(`${label}-01`), isMobile ? "MMM yyyy" : "MMMM yyyy");
                     }}
                   />
                 }
               />
-              <ChartLegend content={<ChartLegendContent payload={[]} />} />
+              {!isMobile && <ChartLegend content={<ChartLegendContent payload={[]} />} />}
               <Bar
                 yAxisId="left"
                 dataKey="income"
                 fill="var(--color-income)"
-                radius={[8, 8, 0, 0]}
-                barSize={25}
+                radius={[isMobile ? 4 : 8, isMobile ? 4 : 8, 0, 0]}
+                barSize={isMobile ? 16 : 25}
               />
               <Line
-                yAxisId="right"
+                yAxisId={isMobile ? "left" : "right"}
                 type="monotone"
                 dataKey="cumulative"
                 stroke="var(--color-cumulative)"
-                strokeWidth={2}
+                strokeWidth={isMobile ? 1.5 : 2}
                 dot={false}
               />
               <Line
-                yAxisId="right"
+                yAxisId={isMobile ? "left" : "right"}
                 type="monotone"
                 dataKey="previousIncome"
                 stroke="var(--color-previousIncome)"
-                strokeWidth={2}
+                strokeWidth={isMobile ? 1.5 : 2}
                 dot={false}
                 strokeDasharray="3 3"
+                opacity={0.6}
               />
             </ComposedChart>
           </ChartContainer>

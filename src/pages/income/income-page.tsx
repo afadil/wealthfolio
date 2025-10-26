@@ -38,6 +38,7 @@ const IncomePeriodSelector: React.FC<{
 
 export default function IncomePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
+  const { isBalanceHidden } = useBalancePrivacy();
 
   const {
     data: incomeData,
@@ -142,8 +143,6 @@ export default function IncomePage() {
     currency,
     amount: Number(amount) || 0,
   }));
-
-  const { isBalanceHidden } = useBalancePrivacy();
 
   return (
     <Page>
@@ -273,24 +272,35 @@ export default function IncomePage() {
                     ),
                     percentage: interestPercentage,
                   },
-                ].map((source, index) => (
-                  <div key={index} className="flex items-center">
-                    <div className="w-full">
-                      <div className="mb-0 flex justify-between">
-                        <span className="text-xs">{source.name}</span>
-                        <span className="text-muted-foreground text-xs">{source.amount}</span>
-                      </div>
-                      <div className="bg-primary/20 relative h-4 w-full rounded-full">
+                ].map((source, index) => {
+                  const chartColor = `var(--chart-${index + 1})`;
+                  return (
+                    <div key={index} className="flex items-center">
+                      <div className="w-full">
+                        <div className="mb-0 flex justify-between">
+                          <span className="text-xs">{source.name}</span>
+                          <span className="text-muted-foreground text-xs">{source.amount}</span>
+                        </div>
                         <div
-                          className="bg-primary text-background flex h-4 items-center justify-center rounded-full text-xs"
-                          style={{ width: `${source.percentage}%` }}
+                          className="relative h-4 w-full rounded-full"
+                          style={{
+                            backgroundColor: `color-mix(in srgb, ${chartColor} 20%, transparent)`,
+                          }}
                         >
-                          {source.percentage > 0 ? `${source.percentage.toFixed(1)}%` : ""}
+                          <div
+                            className="text-background flex h-4 items-center justify-center rounded-full text-xs"
+                            style={{
+                              width: `${source.percentage}%`,
+                              backgroundColor: chartColor,
+                            }}
+                          >
+                            {source.percentage > 0 ? `${source.percentage.toFixed(1)}%` : ""}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -303,11 +313,11 @@ export default function IncomePage() {
             currency={currency}
             isBalanceHidden={isBalanceHidden}
           />
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader>
               <CardTitle className="text-xl">Top 10 Dividend Sources</CardTitle>
             </CardHeader>
-            <CardContent className="h-full">
+            <CardContent className="flex-1 overflow-auto">
               {topDividendStocks.length === 0 ? (
                 <EmptyPlaceholder
                   className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"

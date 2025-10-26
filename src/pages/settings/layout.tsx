@@ -89,7 +89,6 @@ export default function SettingsLayout() {
                 <h1 className="text-lg font-semibold">Settings</h1>
               </div>
             </div>
-
             <div className="p-3 lg:p-4">
               <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
                 {sidebarNavItems.map((item) => (
