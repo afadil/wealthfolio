@@ -38,13 +38,13 @@ type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" |
 
 // Deprecated local sticky wrapper removed — PageHeader handles stickiness.
 
-type HoldingsView = "positions" | "analytics";
+type HoldingsView = "holdings" | "analytics";
 
 export const HoldingsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = (queryParams.get("tab") as HoldingsView) ?? "positions";
+  const defaultTab = (queryParams.get("tab") as HoldingsView) ?? "holdings";
   const [view, setView] = useState<HoldingsView>(defaultTab);
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
@@ -190,8 +190,8 @@ export const HoldingsPage = () => {
             </div>
             <AnimatedToggleGroup
               items={[
-                { value: "positions", label: "Positions" },
-                { value: "analytics", label: "Analytics" },
+                { value: "holdings", label: "Holdings" },
+                { value: "analytics", label: "Insights" },
               ]}
               value={view}
               onValueChange={(next: HoldingsView) => {
@@ -207,7 +207,7 @@ export const HoldingsPage = () => {
       />
 
       <PageContent withPadding={false}>
-        {view === "positions" ? (
+        {view === "holdings" ? (
           <div className="space-y-4 p-2 lg:p-4">
             <div className="hidden md:block">
               <HoldingsTable holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
@@ -231,7 +231,7 @@ export const HoldingsPage = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 flex-shrink-0"
+                className="mobile:size-9 flex-shrink-0"
                 onClick={() => setIsFilterSheetOpen(true)}
               >
                 <div className="relative">

@@ -21,6 +21,7 @@ interface HoldingsTableMobileProps {
   selectedAccount: Account | null;
   accounts: Account[];
   onAccountChange: (account: Account) => void;
+  showAccountFilter?: boolean;
 }
 
 export const HoldingsTableMobile = ({
@@ -31,6 +32,7 @@ export const HoldingsTableMobile = ({
   selectedAccount,
   accounts,
   onAccountChange,
+  showAccountFilter = true,
 }: HoldingsTableMobileProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
@@ -38,10 +40,10 @@ export const HoldingsTableMobile = ({
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   const hasActiveFilters = useMemo(() => {
-    const hasAccountFilter = selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID;
+    const hasAccountFilter = showAccountFilter && selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID;
     const hasTypeFilter = selectedTypes.length > 0;
     return hasAccountFilter || hasTypeFilter;
-  }, [selectedAccount, selectedTypes]);
+  }, [selectedAccount, selectedTypes, showAccountFilter]);
 
   const filteredHoldings = useMemo(() => {
     let result = holdings;
@@ -92,12 +94,12 @@ export const HoldingsTableMobile = ({
           placeholder="Search..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-secondary/30 flex-1 rounded-full border-none"
+          className="bg-secondary/30 mobile:h-10 flex-1 rounded-full border-none"
         />
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 flex-shrink-0"
+          className="mobile:size-9 flex-shrink-0"
           onClick={() => setIsFilterSheetOpen(true)}
         >
           <div className="relative">
@@ -180,6 +182,7 @@ export const HoldingsTableMobile = ({
         onAccountChange={onAccountChange}
         selectedTypes={selectedTypes}
         setSelectedTypes={setSelectedTypes}
+        showAccountFilter={showAccountFilter}
       />
     </div>
   );

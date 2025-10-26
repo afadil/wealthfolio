@@ -1,15 +1,15 @@
-import React from "react";
+import {
+  MAX_DRAWDOWN_INFO,
+  MetricDisplay,
+  MONEY_WEIGHTED_RETURN_INFO,
+  TIME_WEIGHTED_RETURN_INFO,
+  VOLATILITY_INFO,
+} from "@/components/metric-display";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PerformanceMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import {
-  MetricDisplay,
-  TIME_WEIGHTED_RETURN_INFO,
-  MONEY_WEIGHTED_RETURN_INFO,
-  VOLATILITY_INFO,
-  MAX_DRAWDOWN_INFO,
-} from "@/components/metric-display";
+import React from "react";
 
 export interface PerformanceGridProps {
   performance?: PerformanceMetrics | null;
@@ -27,7 +27,7 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
       <div className={cn("w-full", className)}>
         <Card className="border-none p-0 shadow-none">
           <CardContent className="p-0">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-5">
               {[...Array(4)].map((_, index) => (
                 <div
                   key={index}
@@ -59,7 +59,7 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
     <div className={cn("w-full", className)}>
       <Card className="border-none p-0 shadow-none">
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-5">
             <MetricDisplay
               label="Time Weighted Return"
               value={cumulativeTwr}

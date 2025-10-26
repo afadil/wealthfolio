@@ -53,7 +53,7 @@ const AccountSummarySkeleton = () => (
         <Skeleton className="h-5 w-20 rounded" />
         <Skeleton className="h-4 w-28 rounded" />
       </div>
-      <Skeleton className="ml-2 h-5 w-5 rounded-full" />
+      <Skeleton className="ml-2 h-6 w-6 rounded-full md:h-5 md:w-5" />
     </div>
   </div>
 );
@@ -80,10 +80,10 @@ const AccountSummaryComponent = React.memo(
     if (!isGroup && isLoadingValuation) {
       // Show basic info but skeleton for values
       return (
-        <div key={item.accountId} className="flex w-full items-center justify-between">
-          <div className="flex flex-col">
-            <span className="leading-none font-medium">{item.accountName}</span>
-            <span className="text-muted-foreground text-sm">
+        <div key={item.accountId} className="flex w-full items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="truncate text-base leading-tight font-medium">{item.accountName}</span>
+            <span className="text-muted-foreground truncate text-sm">
               {`${item.accountGroup ? `${item.accountGroup} | ` : ""}${item.accountCurrency}`}
             </span>
           </div>
@@ -121,25 +121,20 @@ const AccountSummaryComponent = React.memo(
     const gainDisplayCurrency = currency;
     const gainPercentToDisplay = item.totalGainLossPercent;
 
-    return (
-      <div
-        key={isGroup ? name : accountId}
-        className="flex w-full items-center justify-between"
-        onClick={isGroup ? onToggle : undefined}
-        style={{ cursor: isGroup ? "pointer" : "default" }}
-      >
-        <div className="flex flex-col">
-          <span className="leading-none font-medium">{name}</span>
-          <span className="text-muted-foreground text-sm">{subText}</span>
+    const content = (
+      <>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate text-base leading-tight font-medium">{name}</span>
+          <span className="text-muted-foreground truncate text-sm">{subText}</span>
         </div>
-        <div className="flex items-center">
-          <div className="flex flex-col items-end">
-            <p className="leading-none font-medium">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <div className="flex flex-col items-end gap-1">
+            <p className="text-base leading-tight font-medium">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
             {(gainAmountToDisplay !== null || gainPercentToDisplay !== null) &&
               !(gainAmountToDisplay === 0 && gainPercentToDisplay === 0) && (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5 md:space-x-2">
                   {gainAmountToDisplay !== null && (
                     <GainAmount
                       className="text-sm font-light"
@@ -160,19 +155,47 @@ const AccountSummaryComponent = React.memo(
           </div>
           {isGroup ? (
             <Icons.ChevronDown
-              className={`text-muted-foreground ml-2 h-5 w-5 transition-transform ${
+              className={`text-muted-foreground h-6 w-6 shrink-0 transition-transform md:h-5 md:w-5 ${
                 isExpanded ? "rotate-180 transform" : ""
               }`}
             />
           ) : (
             !isLoadingValuation &&
             accountId && (
-              <Link to={`/accounts/${accountId}`} className="ml-2 p-0">
-                <Icons.ChevronRight className="text-muted-foreground h-5 w-5" />
-              </Link>
+              <Icons.ChevronRight className="text-muted-foreground h-6 w-6 shrink-0 md:h-5 md:w-5" />
             )
           )}
         </div>
+      </>
+    );
+
+    if (isGroup) {
+      return (
+        <div
+          key={name}
+          className="flex w-full cursor-pointer items-center justify-between gap-3"
+          onClick={onToggle}
+        >
+          {content}
+        </div>
+      );
+    }
+
+    if (!isLoadingValuation && accountId) {
+      return (
+        <Link
+          key={accountId}
+          to={`/accounts/${accountId}`}
+          className="flex w-full cursor-pointer items-center justify-between gap-3"
+        >
+          {content}
+        </Link>
+      );
+    }
+
+    return (
+      <div key={accountId} className="flex w-full items-center justify-between gap-3">
+        {content}
       </div>
     );
   },
@@ -193,11 +216,7 @@ export const AccountsSummary = React.memo(() => {
 
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
 
-  const {
-    latestValuations,
-    isLoading: isLoadingValuations,
-    error: errorValuations,
-  } = useLatestValuations(accountIds);
+  const { latestValuations, isLoading: isLoadingValuations } = useLatestValuations(accountIds);
 
   // --- Data Processing ---
   const combinedAccountViews = useMemo((): AccountSummaryDisplayData[] => {
@@ -262,7 +281,7 @@ export const AccountsSummary = React.memo(() => {
     if (isLoadingAccounts) {
       return Array.from({ length: 4 }).map((_, index) => (
         <Card key={`skeleton-${index}`} className="border-none shadow-sm">
-          <CardHeader className="py-6">
+          <CardHeader className="py-3 md:py-6">
             <AccountSummarySkeleton />
           </CardHeader>
         </Card>
@@ -284,7 +303,7 @@ export const AccountsSummary = React.memo(() => {
       const standaloneAccounts: AccountSummaryDisplayData[] = [];
 
       combinedAccountViews.forEach((account) => {
-        const groupName = account.accountGroup || "Uncategorized";
+        const groupName = account.accountGroup ?? "Uncategorized";
         if (groupName === "Uncategorized") {
           standaloneAccounts.push(account);
         } else {
@@ -356,7 +375,7 @@ export const AccountsSummary = React.memo(() => {
 
             return (
               <Card key={group.accountName} className="shadow-none">
-                <CardHeader>
+                <CardHeader className="py-3 md:py-6">
                   <AccountSummaryComponent
                     item={group}
                     isExpanded={isExpanded}
@@ -364,9 +383,9 @@ export const AccountsSummary = React.memo(() => {
                   />
                 </CardHeader>
                 {isExpanded && (
-                  <CardContent className="border-t pt-4">
+                  <CardContent className="border-t px-4 pt-3 md:px-6 md:pt-4">
                     {sortedAccounts.map((account) => (
-                      <div key={account.accountId} className="py-4">
+                      <div key={account.accountId} className="py-3 md:py-4">
                         <AccountSummaryComponent
                           item={account}
                           isLoadingValuation={isLoadingPerformance}
@@ -381,7 +400,7 @@ export const AccountsSummary = React.memo(() => {
           })}
           {standaloneAccounts.map((account) => (
             <Card key={account.accountId} className="shadow-none">
-              <CardHeader className="py-6">
+              <CardHeader className="py-3 md:py-6">
                 <AccountSummaryComponent
                   item={account}
                   isLoadingValuation={isLoadingPerformance}
@@ -399,7 +418,7 @@ export const AccountsSummary = React.memo(() => {
 
       return sortedAccounts.map((account) => (
         <Card key={account.accountId} className="border-none shadow-sm">
-          <CardHeader className="py-6">
+          <CardHeader className="py-3 md:py-6">
             <AccountSummaryComponent
               item={account}
               isLoadingValuation={isLoadingPerformance}
@@ -418,7 +437,7 @@ export const AccountsSummary = React.memo(() => {
     isLoadingValuations,
     isErrorAccounts,
     errorAccounts,
-    errorValuations,
+    settings?.baseCurrency,
   ]);
 
   return (
@@ -442,7 +461,7 @@ export const AccountsSummary = React.memo(() => {
         </Button>
       </CardHeader>
       <CardContent className="px-0">
-        <div className="space-y-4">{renderedContent}</div>
+        <div className="space-y-2 md:space-y-4">{renderedContent}</div>
       </CardContent>
     </Card>
   );

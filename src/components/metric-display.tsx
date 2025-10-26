@@ -1,10 +1,10 @@
-import React from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
-import { GainPercent } from "@wealthfolio/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { GainPercent } from "@wealthfolio/ui";
+import React, { useState } from "react";
 
 // Explanatory texts for info popovers
 export const TIME_WEIGHTED_RETURN_INFO =
@@ -39,6 +39,8 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
   valueClassName,
   labelComponent,
 }) => {
+  const [mobilePopoverOpen, setMobilePopoverOpen] = useState(false);
+
   const displayValue =
     value !== undefined ? (
       <GainPercent
@@ -50,11 +52,15 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
     ) : null;
 
   const labelContent = labelComponent ?? (
-    <div className="text-muted-foreground flex items-center text-xs">
-      <span>{label}</span>
+    <div className="text-muted-foreground flex w-full items-center justify-center text-xs">
+      <span className="text-center">{label}</span>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" className="ml-1 h-4 w-4 rounded-full p-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-1 hidden h-4 w-4 rounded-full p-0 md:inline-flex"
+          >
             <Icons.Info className="h-3 w-3" />
             <span className="sr-only">More info about {label}</span>
           </Button>
@@ -66,13 +72,8 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
     </div>
   );
 
-  return (
-    <div
-      className={cn(
-        "flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:p-4",
-        className,
-      )}
-    >
+  const content = (
+    <>
       {labelContent}
 
       {displayValue && annualizedValue !== undefined && annualizedValue !== null ? (
@@ -91,7 +92,26 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
       ) : (
         displayValue && <div>{displayValue}</div>
       )}
-    </div>
+    </>
+  );
+
+  return (
+    <Popover open={mobilePopoverOpen} onOpenChange={setMobilePopoverOpen}>
+      <PopoverTrigger asChild>
+        <div
+          className={cn(
+            "flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:cursor-default md:p-4",
+            "cursor-pointer md:cursor-auto",
+            className,
+          )}
+        >
+          {content}
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 text-xs md:hidden" side="top" align="center">
+        {infoText}
+      </PopoverContent>
+    </Popover>
   );
 };
 

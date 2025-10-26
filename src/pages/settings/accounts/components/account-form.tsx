@@ -22,24 +22,16 @@ import {
 } from "@/components/ui/form";
 import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { newAccountSchema } from "@/lib/schemas";
+import { CurrencyInput, ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
 
 import { useAccountMutations } from "./use-account-mutations";
 
-const accountTypes = [
+const accountTypes: ResponsiveSelectOption[] = [
   { label: "Securities", value: "SECURITIES" },
   { label: "Cash", value: "CASH" },
   { label: "Crypto", value: "CRYPTOCURRENCY" },
-] as const;
-
-import { newAccountSchema } from "@/lib/schemas";
-import { CurrencyInput } from "@wealthfolio/ui";
+];
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -111,20 +103,16 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Account Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an account type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {accountTypes.map((type) => (
-                      <SelectItem value={type.value} key={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ResponsiveSelect
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={accountTypes}
+                    placeholder="Select an account type"
+                    sheetTitle="Select Account Type"
+                    sheetDescription="Choose the account type that best matches."
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

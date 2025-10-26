@@ -195,7 +195,7 @@ export function PageHeader({
                       size="icon"
                       className="h-9 w-9 shrink-0 md:h-10 md:w-10"
                     >
-                      <Icons.ArrowLeft className="h-5 w-5 md:h-6 md:w-6" />
+                      <Icons.ArrowLeft className="h-6 w-6 md:h-7 md:w-7" />
                     </Button>
                   </Link>
                 ) : (
@@ -205,7 +205,7 @@ export function PageHeader({
                     className="h-9 w-9 shrink-0 md:h-10 md:w-10"
                     onClick={() => navigate(-1)}
                   >
-                    <Icons.ArrowLeft className="h-5 w-5 md:h-6 md:w-6" />
+                    <Icons.ArrowLeft className="h-6 w-6 md:h-7 md:w-7" />
                   </Button>
                 ))}
               {titleContent ?? children}

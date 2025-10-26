@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { InputTags } from "@/components/ui/tag-input";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatedToggleGroup } from "@wealthfolio/ui";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import AssetDetailCard from "./asset-detail-card";
 import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
@@ -54,12 +55,16 @@ interface AssetDetailData {
   } | null;
 }
 
+type AssetTab = "overview" | "lots" | "history";
+
 export const AssetProfilePage = () => {
   const { symbol: encodedSymbol = "" } = useParams<{ symbol: string }>();
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
+  const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const defaultTab = queryParams.get("tab") ?? "overview";
+  const defaultTab = (queryParams.get("tab") as AssetTab) ?? "overview";
+  const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [formData, setFormData] = useState<AssetProfileFormData>({
@@ -199,10 +204,27 @@ export const AssetProfilePage = () => {
       todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
       totalReturn: Number(holding.totalGain?.local ?? 0),
       totalReturnPercent: Number(holding.totalGainPct ?? 0),
-      currency: holding.localCurrency || holding.instrument?.currency || "USD",
+      currency: holding.localCurrency ?? holding.instrument?.currency ?? "USD",
       quote: quoteData?.quote ?? null,
     };
   }, [holding, quote]);
+
+  // Build toggle items dynamically based on available data
+  const toggleItems = useMemo(() => {
+    const items: { value: AssetTab; label: string }[] = [];
+
+    if (profile) {
+      items.push({ value: "overview", label: "Overview" });
+    }
+
+    if (holding?.lots && holding.lots.length > 0) {
+      items.push({ value: "lots", label: "Lots" });
+    }
+
+    items.push({ value: "history", label: "Quotes" });
+
+    return items;
+  }, [profile, holding]);
 
   const handleSave = () => {
     if (!holding) return;
@@ -248,7 +270,7 @@ export const AssetProfilePage = () => {
       <Page>
         <PageHeader
           heading="Quote History"
-          headingPrefix={symbol}
+          text={symbol}
           displayBack={true}
           backUrl={location.state?.from ?? "/holdings?tab=holdings"}
         />
@@ -295,7 +317,8 @@ export const AssetProfilePage = () => {
     return (
       <Page>
         <PageHeader
-          heading={`Error loading data for ${symbol}`}
+          heading={symbol}
+          text={`Error loading data for ${symbol}`}
           displayBack={true}
           backUrl={location.state?.from ?? "/holdings?tab=holdings"}
         />
@@ -314,111 +337,104 @@ export const AssetProfilePage = () => {
     );
   }
 
-  // --- Original View (Tabs) ---
   return (
     <Page>
-      <PageContent>
-        <Tabs defaultValue={defaultTab} className="space-y-4">
-          {/* Custom Header with Editable Title */}
-          <div className="flex w-full items-center justify-between">
-            <div className="flex flex-1 items-center gap-2">
-              <Link to={location.state?.from || "/holdings?tab=holdings"}>
-                <Button variant="ghost" size="icon">
-                  <Icons.ArrowLeft />
-                </Button>
-              </Link>
-              <div
-                data-tauri-drag-region="true"
-                className="draggable flex flex-1 items-center space-x-4"
-              >
-                {(profile?.symbol ?? holding?.instrument?.symbol) && (
-                  <>
-                    <TickerAvatar
-                      symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
-                      className="h-8 w-8"
-                    />
-                    <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight">
-                      {profile?.symbol ?? holding?.instrument?.symbol}
-                    </h1>
-                    <span className="h-6 border-l-2"></span>
-                  </>
-                )}
-                <div className="group relative flex flex-1 items-center">
-                  {isEditingTitle ? (
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                      placeholder="Enter asset name"
-                      className="font-heading w-full max-w-md text-xl font-bold tracking-tight"
-                      onBlur={() => {
-                        setIsEditingTitle(false);
-                        handleSaveTitle();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          setIsEditingTitle(false);
-                          handleSaveTitle();
-                        }
-                        if (e.key === "Escape") {
-                          setIsEditingTitle(false);
-                          // Reset the name to original value
-                          setFormData((prev) => ({
-                            ...prev,
-                            name: holding?.instrument?.name || "",
-                          }));
-                        }
-                      }}
-                      autoFocus
-                    />
-                  ) : (
-                    <>
-                      <h1 className="font-heading text-xl font-bold tracking-tight">
-                        {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
-                      </h1>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsEditingTitle(true)}
-                        className="ml-2 h-6 w-6 opacity-0 group-hover:opacity-100"
-                      >
-                        <Icons.Pencil className="h-3 w-3" />
-                      </Button>
-                    </>
+      <PageHeader>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <Link to={location.state?.from ?? "/holdings?tab=holdings"}>
+              <Button variant="ghost" size="icon" className="mobile:size-10">
+                <Icons.ArrowLeft className="h-8 w-8 md:h-9 md:w-9" />
+              </Button>
+            </Link>
+            {(profile?.symbol ?? holding?.instrument?.symbol) && (
+              <TickerAvatar
+                symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}
+                className="size-8"
+              />
+            )}
+            {isEditingTitle ? (
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter asset name"
+                className="font-heading text-xl font-bold tracking-tight"
+                onBlur={() => {
+                  setIsEditingTitle(false);
+                  handleSaveTitle();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setIsEditingTitle(false);
+                    handleSaveTitle();
+                  }
+                  if (e.key === "Escape") {
+                    setIsEditingTitle(false);
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: holding?.instrument?.name ?? "",
+                    }));
+                  }
+                }}
+                autoFocus
+              />
+            ) : (
+              <div className="group flex min-w-0 flex-1 items-center gap-3">
+                <div className="flex min-w-0 flex-col">
+                  <h1 className="text-md truncate font-semibold md:text-xl">
+                    <span
+                      onClick={() => setIsEditingTitle(true)}
+                      className="cursor-pointer md:cursor-default"
+                    >
+                      {formData.name ?? holding?.instrument?.symbol ?? symbol ?? "-"}
+                    </span>
+                  </h1>
+                  {formData.name && (holding?.instrument?.symbol || symbol) && (
+                    <span className="text-muted-foreground truncate text-xs md:text-sm">
+                      {holding?.instrument?.symbol ?? symbol}
+                    </span>
                   )}
                 </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
-                {/* Overview Tab: Requires profile */}
-                {profile && (
-                  <TabsTrigger
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                    value="overview"
-                  >
-                    Overview
-                  </TabsTrigger>
-                )}
-                {/* Lots Tab: Requires holding with lots */}
-                {holding?.lots && holding.lots.length > 0 && (
-                  <TabsTrigger
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                    value="lots"
-                  >
-                    Lots
-                  </TabsTrigger>
-                )}
-                {/* History/Quotes Tab: Requires quoteHistory */}
-                <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
-                  value="history"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditingTitle(true)}
+                  className="hidden h-6 w-6 flex-shrink-0 md:inline-flex md:opacity-0 md:group-hover:opacity-100"
                 >
-                  Quotes
-                </TabsTrigger>
-              </TabsList>
-            </div>
+                  <Icons.Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
           </div>
-
+          <div className="hidden md:flex">
+            <AnimatedToggleGroup
+              items={toggleItems}
+              value={activeTab}
+              onValueChange={(next: AssetTab) => {
+                setActiveTab(next);
+                const url = `${location.pathname}?tab=${next}`;
+                navigate(url, { replace: true });
+              }}
+              size="sm"
+              className="md:text-base"
+            />
+          </div>
+        </div>
+      </PageHeader>
+      <PageContent>
+        <div className="flex justify-center md:hidden">
+          <AnimatedToggleGroup
+            items={toggleItems}
+            value={activeTab}
+            onValueChange={(next: AssetTab) => {
+              setActiveTab(next);
+              const url = `${location.pathname}?tab=${next}`;
+              navigate(url, { replace: true });
+            }}
+            size="sm"
+          />
+        </div>
+        <Tabs value={activeTab} className="space-y-4">
           {/* Overview Content: Requires profile */}
           {profile && (
             <TabsContent value="overview" className="space-y-4">
@@ -438,7 +454,19 @@ export const AssetProfilePage = () => {
               </div>
 
               <div className="group relative">
-                <h3 className="text-lg font-bold">About</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold">About</h3>
+                  {!isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsEditing(true)}
+                      className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100"
+                    >
+                      <Icons.Pencil className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
                 <div className="flex flex-row items-center space-x-2 py-4">
                   {isEditing ? (
                     <Input
@@ -544,7 +572,7 @@ export const AssetProfilePage = () => {
                   {(formData.sectors.length > 0 || formData.countries.length > 0) && (
                     <Separator orientation="vertical" />
                   )}
-                  {isEditing ? (
+                  {isEditing && (
                     <>
                       <Button
                         variant="default"
@@ -563,15 +591,6 @@ export const AssetProfilePage = () => {
                         <Icons.Close className="h-4 w-4" />
                       </Button>
                     </>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsEditing(true)}
-                      className="min-w-10 opacity-0 group-hover:opacity-100"
-                    >
-                      <Icons.Pencil className="h-4 w-4" />
-                    </Button>
                   )}
                 </div>
                 <div className="mt-2">
@@ -621,7 +640,7 @@ export const AssetProfilePage = () => {
                 }
                 // Set currency if missing
                 if (!updatedQuote.currency) {
-                  updatedQuote.currency = profile?.currency || "USD";
+                  updatedQuote.currency = profile?.currency ?? "USD";
                 }
                 saveQuoteMutation.mutate(updatedQuote);
               }}

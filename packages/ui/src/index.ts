@@ -31,6 +31,7 @@ export * from "./components/ui/progress-indicator";
 export * from "./components/ui/radio-group";
 export * from "./components/ui/scroll-area";
 export * from "./components/ui/select";
+export * from "./components/ui/responsive-select";
 export * from "./components/ui/separator";
 export * from "./components/ui/sheet";
 export * from "./components/ui/shell";

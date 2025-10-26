@@ -21,6 +21,7 @@ interface HoldingsMobileFilterSheetProps {
   onAccountChange: (account: Account) => void;
   selectedTypes: string[];
   setSelectedTypes: (types: string[]) => void;
+  showAccountFilter?: boolean;
 }
 
 export const HoldingsMobileFilterSheet = ({
@@ -31,6 +32,7 @@ export const HoldingsMobileFilterSheet = ({
   onAccountChange,
   selectedTypes,
   setSelectedTypes,
+  showAccountFilter = true,
 }: HoldingsMobileFilterSheetProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -41,54 +43,56 @@ export const HoldingsMobileFilterSheet = ({
         <ScrollArea className="flex-1 py-4">
           <div className="space-y-6 pr-4">
             {/* Account Filter Section */}
-            <div>
-              <h4 className="mb-3 font-medium">Account</h4>
-              <ul className="space-y-1">
-                <li
-                  className={cn(
-                    "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
-                    selectedAccount?.id === PORTFOLIO_ACCOUNT_ID
-                      ? "bg-accent"
-                      : "hover:bg-accent/50",
-                  )}
-                  onClick={() => {
-                    onAccountChange({
-                      id: PORTFOLIO_ACCOUNT_ID,
-                      name: "All Portfolio",
-                      accountType: "PORTFOLIO" as unknown as Account["accountType"],
-                      balance: 0,
-                      currency: "USD",
-                      isDefault: false,
-                      isActive: true,
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    } as Account);
-                    onOpenChange(false);
-                  }}
-                >
-                  <span>All Portfolio</span>
-                  {selectedAccount?.id === PORTFOLIO_ACCOUNT_ID && (
-                    <Icons.Check className="h-4 w-4" />
-                  )}
-                </li>
-                {accounts.map((account) => (
+            {showAccountFilter && (
+              <div>
+                <h4 className="mb-3 font-medium">Account</h4>
+                <ul className="space-y-1">
                   <li
-                    key={account.id}
                     className={cn(
                       "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
-                      selectedAccount?.id === account.id ? "bg-accent" : "hover:bg-accent/50",
+                      selectedAccount?.id === PORTFOLIO_ACCOUNT_ID
+                        ? "bg-accent"
+                        : "hover:bg-accent/50",
                     )}
                     onClick={() => {
-                      onAccountChange(account);
+                      onAccountChange({
+                        id: PORTFOLIO_ACCOUNT_ID,
+                        name: "All Portfolio",
+                        accountType: "PORTFOLIO" as unknown as Account["accountType"],
+                        balance: 0,
+                        currency: "USD",
+                        isDefault: false,
+                        isActive: true,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                      } as Account);
                       onOpenChange(false);
                     }}
                   >
-                    <span>{account.name}</span>
-                    {selectedAccount?.id === account.id && <Icons.Check className="h-4 w-4" />}
+                    <span>All Portfolio</span>
+                    {selectedAccount?.id === PORTFOLIO_ACCOUNT_ID && (
+                      <Icons.Check className="h-4 w-4" />
+                    )}
                   </li>
-                ))}
-              </ul>
-            </div>
+                  {accounts.map((account) => (
+                    <li
+                      key={account.id}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
+                        selectedAccount?.id === account.id ? "bg-accent" : "hover:bg-accent/50",
+                      )}
+                      onClick={() => {
+                        onAccountChange(account);
+                        onOpenChange(false);
+                      }}
+                    >
+                      <span>{account.name}</span>
+                      {selectedAccount?.id === account.id && <Icons.Check className="h-4 w-4" />}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Asset Type Filter Section */}
             <div>
