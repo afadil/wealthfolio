@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
 use crate::market_data::market_data_model::{MarketDataProviderSetting, UpdateMarketDataProviderSetting};
-use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo};
+use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo, QuoteDb, QuoteImport, QuoteImportPreview};
 use super::providers::models::AssetProfile;
 
 #[async_trait]
@@ -55,6 +55,10 @@ pub trait MarketDataServiceTrait: Send + Sync {
         enabled: bool,
     ) -> Result<MarketDataProviderSetting>;
 
+    // --- Quote Import Methods ---
+    async fn validate_csv_quotes(&self, file_path: &str) -> Result<QuoteImportPreview>;
+    async fn import_quotes_from_csv(&self, quotes: Vec<QuoteImport>, overwrite: bool) -> Result<Vec<QuoteImport>>;
+    async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize>;
 }
 
 #[async_trait]
@@ -98,4 +102,11 @@ pub trait MarketDataRepositoryTrait {
         provider_id: String,
         changes: UpdateMarketDataProviderSetting,
     ) -> Result<MarketDataProviderSetting>;
+
+    // --- Quote Import Methods ---
+    async fn bulk_insert_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
+    async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
+    async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize>;
+    fn quote_exists(&self, symbol_param: &str, date: &str) -> Result<bool>;
+    fn get_existing_quotes_for_period(&self, symbol_param: &str, start_date: &str, end_date: &str) -> Result<Vec<Quote>>;
 }
