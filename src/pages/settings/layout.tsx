@@ -78,9 +78,9 @@ export default function SettingsLayout() {
 
   // Mobile-first: show list view on main page, detail view on specific pages
   return (
-    <ApplicationShell className="settings-root">
+    <ApplicationShell className="settings-root app-shell h-screen overflow-x-hidden">
       {/* Mobile Layout */}
-      <div className="lg:hidden">
+      <div className="w-full lg:hidden">
         {isMainSettingsPage ? (
           // Mobile Settings List View (carded list with dividers)
           <div className="scan-hide-target w-full max-w-full overflow-x-hidden">

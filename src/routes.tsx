@@ -8,7 +8,6 @@ import SettingsLayout from "@/pages/settings/layout";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
-import StickyTestPage from "@/pages/dev/sticky-test-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
@@ -73,7 +72,6 @@ export function AppRoutes() {
           <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
-          <Route path="sticky-test" element={<StickyTestPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route

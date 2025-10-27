@@ -37,7 +37,7 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
     return null;
   }
 
-  const handleAccountChange = (account: Account) => {
+  const handleAccountChange = (_account: Account) => {
     // No-op for account page since we're already on a specific account
   };
 
