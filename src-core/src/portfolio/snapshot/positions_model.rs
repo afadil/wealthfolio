@@ -122,18 +122,18 @@ impl Position {
         self.quantity = total_quantity;
         self.total_cost_basis = total_cost_basis; // Already in asset currency
 
-        if self.quantity.is_sign_positive() && is_quantity_significant(&self.quantity) {
+        if is_quantity_significant(&self.quantity) {
             // Calculate average cost (in asset currency) using unrounded values
             self.average_cost = self.total_cost_basis / self.quantity;
         } else {
-            // Zero, negative, or insignificant quantity
-            if !self.quantity.is_zero() && !self.quantity.is_sign_negative() {
+            // Zero, or insignificant quantity
+            if !self.quantity.is_zero() {
                 warn!("Position {} quantity ({}) became insignificant after recalculation. Average cost zeroed.", self.id, self.quantity);
             }
-            if self.quantity.is_zero() || self.quantity.is_sign_negative() {
+            if self.quantity.is_zero() {
                 if !self.lots.is_empty() {
                     warn!(
-                        "Position {} quantity became zero or negative ({}). Aggregates zeroed, but lots retained.",
+                        "Position {} quantity became zero ({}). Aggregates zeroed, but lots retained.",
                         self.id, self.quantity
                     );
                 }
@@ -268,6 +268,174 @@ impl Position {
             }
 
             let qty_from_this_lot = std::cmp::min(lot.quantity, quantity_to_reduce);
+
+            // Calculate cost basis removed (in asset currency) proportionally
+            let cost_basis_removed = if lot.quantity.is_zero() {
+                Decimal::ZERO
+            } else {
+                // Proportional cost basis removal (asset currency)
+                lot.cost_basis * qty_from_this_lot / lot.quantity
+            };
+
+            actual_quantity_reduced += qty_from_this_lot;
+            cost_basis_of_sold_lots_asset_currency += cost_basis_removed;
+            quantity_to_reduce -= qty_from_this_lot;
+
+            let remaining_lot_qty = lot.quantity - qty_from_this_lot;
+
+            if remaining_lot_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_lot_qty) {
+                lot_indices_to_remove.push(index);
+            } else {
+                // Calculate remaining cost basis (asset currency)
+                let remaining_lot_basis = lot.cost_basis - cost_basis_removed;
+                lot_updates.push((index, remaining_lot_qty, remaining_lot_basis));
+            }
+        }
+
+        // Apply updates to the Vec
+        for (index, new_quantity, new_cost_basis) in lot_updates {
+            if let Some(lot) = vec_lots.get_mut(index) {
+                lot.quantity = new_quantity;
+                lot.cost_basis = new_cost_basis; // Update with asset currency value
+            } else {
+                error!(
+                    "Failed to get mutable lot at index {} for position {} during update",
+                    index, self.id
+                );
+            }
+        }
+
+        // Remove marked lots from the Vec efficiently
+        let mut i = 0;
+        vec_lots.retain(|_| {
+            let keep = !lot_indices_to_remove.contains(&i);
+            i += 1;
+            keep
+        });
+
+        // Convert the final Vec back to VecDeque and assign to self.lots
+        self.lots = vec_lots.into();
+
+        self.recalculate_aggregates();
+
+        Ok((
+            actual_quantity_reduced, // Keep original precision from calculation
+            cost_basis_of_sold_lots_asset_currency, // Return cost basis in asset currency
+        ))
+    }
+    /// Adds a new lot based on a short sale activity.
+    pub fn add_short_lot(
+        &mut self,
+        activity: &Activity,
+    ) -> Result<Decimal> {
+        if activity.quantity.is_sign_positive() {
+            warn!(
+                "Skipping add_lot for activity {} with positive quantity: {}",
+                activity.id, activity.quantity
+            );
+            // Return zero cost basis if skipped
+            return Ok(Decimal::ZERO);
+        }
+
+        // --- Currency Check ---
+        if self.currency.is_empty() {
+            // First lot addition, set the position's currency
+            debug!(
+                "Setting position {} currency to {} based on first activity {}",
+                self.id, activity.currency, activity.id
+            );
+            self.currency = activity.currency.clone();
+        } else if self.currency != activity.currency {
+            error!(
+                "Currency mismatch for position {} ({}): Activity {} has currency {}. Requires currency conversion activity first.",
+                self.id, self.currency, activity.id, activity.currency
+            );
+            return Err(CalculatorError::CurrencyMismatch {
+                position_id: self.id.clone(),
+                position_currency: self.currency.clone(),
+                activity_id: activity.id.clone(),
+                activity_currency: activity.currency.clone(),
+            }
+            .into());
+        }
+
+        // --- Cost Calculation (in Position/Activity Currency) ---
+        let acquisition_price = activity.unit_price;
+        let quantity = activity.quantity;
+        let acquisition_fees = activity.fee; // Store the fee in activity currency
+
+        // Cost basis ONLY includes fees for BUY activities
+        let cost_basis = quantity * acquisition_price + acquisition_fees;
+
+        let new_lot = Lot {
+            id: activity.id.clone(), // Use activity ID as Lot ID
+            position_id: self.id.clone(),
+            acquisition_date: activity.activity_date,
+            quantity,
+            cost_basis: cost_basis,                           // Store unrounded in position currency
+            acquisition_price: acquisition_price, // Store unrounded in position currency
+            acquisition_fees: acquisition_fees,   // Store unrounded in position currency
+        };
+
+        self.lots.push_back(new_lot);
+        // Convert to Vec, sort, convert back to VecDeque
+        let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
+        vec_lots.sort_by_key(|lot| lot.acquisition_date);
+        self.lots = vec_lots.into();
+
+        self.recalculate_aggregates();
+        // Return the calculated cost basis (in position currency)
+        Ok(cost_basis)
+    }
+    /// Reduces short position quantity using FIFO lot relief.
+    pub fn cover_short_lots_fifo(
+        &mut self,
+        quantity_to_reduce_input: Decimal,
+    ) -> Result<(Decimal, Decimal)> {
+        if !quantity_to_reduce_input.is_sign_positive() {
+            return Err(CalculatorError::InvalidActivity(
+                "Quantity to reduce must be positive".to_string(),
+            )
+            .into());
+        }
+
+        let mut available_quantity: Decimal = self.lots.iter().map(|lot| lot.quantity).sum();
+        available_quantity = available_quantity.abs(); // Make positive for comparison
+
+        if !is_quantity_significant(&available_quantity) || available_quantity <= Decimal::ZERO {
+            warn!("Attempting to reduce position {} which has zero/insignificant quantity {}. Skipping reduction.", self.id, available_quantity);
+            return Ok((Decimal::ZERO, Decimal::ZERO));
+        }
+
+        let mut quantity_to_reduce = quantity_to_reduce_input;
+        if available_quantity < quantity_to_reduce {
+            warn!(
+                "Reduce quantity {} exceeds available {} for position {}. Reducing by available amount.",
+                quantity_to_reduce, available_quantity, self.id
+            );
+            quantity_to_reduce = available_quantity;
+        }
+
+        // Convert to Vec, sort, operate, convert back later
+        let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
+        vec_lots.sort_by_key(|lot| lot.acquisition_date); // Ensure FIFO order
+
+        let mut lot_indices_to_remove = Vec::new();
+        let mut lot_updates = Vec::new(); // (index, new_quantity, new_cost_basis)
+        let mut actual_quantity_reduced = Decimal::ZERO;
+        // Cost basis sum will be in the Position's currency
+        let mut cost_basis_of_sold_lots_asset_currency = Decimal::ZERO;
+
+        // Iterate over the sorted Vec
+        for (index, lot) in vec_lots.iter().enumerate() {
+            if quantity_to_reduce <= Decimal::ZERO {
+                break;
+            }
+            // if lot.quantity <= Decimal::ZERO {
+            //     continue; // Skip empty or negative lots (shouldn't happen with proper add/split)
+            // }
+
+            let qty_from_this_lot = std::cmp::min(lot.quantity.abs(), quantity_to_reduce);
 
             // Calculate cost basis removed (in asset currency) proportionally
             let cost_basis_removed = if lot.quantity.is_zero() {

@@ -34,7 +34,12 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
 
 // Helper to check if activity is a trade type
 export const isTradeActivity = (type: string): boolean => {
-  return type === ActivityType.BUY || type === ActivityType.SELL;
+  return (
+    type === ActivityType.BUY ||
+    type === ActivityType.SELL ||
+    type === ActivityType.SELL_SHORT ||
+    type === ActivityType.BUY_COVER
+  );
 }
 
 // Helper to check if activity is a fee type
@@ -133,7 +138,15 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
   if (activityType === ActivityType.SELL) {
     return Number(activityAmount) - Number(fee); // Net proceeds after fees
   }
-  
+
+  if (activityType === ActivityType.SELL_SHORT) {
+    
+    return Number(activityAmount) - Number(fee); // Net proceeds after fees
+  }
+
+  if (activityType === ActivityType.BUY_COVER) {
+    return Number(activityAmount) + Number(fee); // Total cost including fees
+  }
   // Default case - just return the activity amount
   return Number(activityAmount);
 };

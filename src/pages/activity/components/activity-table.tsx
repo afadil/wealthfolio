@@ -132,6 +132,7 @@ export const ActivityTable = ({
           const activityType = row.getValue('activityType') as string;
           const badgeVariant =
             activityType === 'BUY' ||
+            activityType === 'BUY_COVER' ||
             activityType === 'DEPOSIT' ||
             activityType === 'DIVIDEND' ||
             activityType === 'INTEREST' ||

@@ -47,7 +47,12 @@ export class TradeMatcher {
     const parsedActivities = this.parseActivities(activities)
     
     // Separate trading activities from dividends
-    const tradingActivities = parsedActivities.filter(a => a.activityType === "BUY" || a.activityType === "SELL")
+    const tradingActivities = parsedActivities.filter(
+      a => a.activityType === "BUY" || 
+           a.activityType === "SELL" || 
+           a.activityType === "SELL_SHORT" || 
+           a.activityType === "BUY_COVER"
+    )
     const dividendActivities = parsedActivities.filter(a => a.activityType === "DIVIDEND")
     
     // Group activities by symbol

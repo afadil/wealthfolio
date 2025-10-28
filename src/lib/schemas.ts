@@ -81,7 +81,6 @@ export const importActivitySchema = z.object({
       required_error: 'Please enter a valid quantity.',
       invalid_type_error: 'Quantity must be a number.',
     })
-    .min(0, { message: 'Quantity must be a non-negative number.' })
     .optional(),
   unitPrice: z.coerce
     .number({
@@ -176,6 +175,21 @@ export const importActivitySchema = z.object({
     message: "Quantity must be positive for non-cash activities",
     path: ["quantity"]
   }
+).refine(
+  (data) => {
+    //check activityType if other than SELL_SHORT 'Quantity must be a non-negative number.'
+    const isShortSell = data.activityType === ActivityType.SELL_SHORT;
+    const tradeActivity = isTradeActivity(data.activityType as string);
+
+    if (tradeActivity && !isShortSell) {
+      return data.quantity !== undefined && data.quantity >= 0;
+    }
+    return true;
+  },
+  {
+    message: "Quantity must be a non-negative number.",
+    path: ["quantity"]
+  },
 );
 
 export const newContributionLimitSchema = z.object({

@@ -175,6 +175,8 @@ pub struct HoldingsCalculator {
         match activity_type {
             ActivityType::Buy => self.handle_buy(activity, state, account_currency, fee_acct),
             ActivityType::Sell => self.handle_sell(activity, state, account_currency, fee_acct),
+            ActivityType::SellShort => self.handle_short_sell(activity, state, account_currency, fee_acct),
+            ActivityType::BuyCover => self.handle_buy_cover(activity, state, account_currency, fee_acct),
             ActivityType::Deposit => self.handle_deposit(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::Withdrawal => self.handle_withdrawal(activity, state, account_currency, amount_acct, fee_acct),
             ActivityType::Dividend | ActivityType::Interest => self.handle_income(state, account_currency, amount_acct, fee_acct),
@@ -300,6 +302,121 @@ pub struct HoldingsCalculator {
                 .cash_balances
                 .entry(account_currency.to_string())
                 .or_insert(Decimal::ZERO) += total_proceeds_acct;
+        }
+        Ok(())
+    }
+
+    fn handle_short_sell(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        fee_acct: Decimal, // Already converted using activity date
+    ) -> Result<()> {
+        let activity_currency = &activity.currency;
+        let activity_date = activity.activity_date.naive_utc().date();
+
+        let position = self.get_or_create_position_mut(
+            state,
+            &activity.asset_id,
+            activity_currency, 
+            activity.activity_date,
+        )?;
+
+        // Check if currency conversion is needed and handle accordingly
+        let converted_activity;
+        let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+            // No conversion needed, use original activity directly
+            activity
+        } else {
+            // Conversion needed, convert and store in local variable
+            converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::Buy)?;
+            &converted_activity
+        };
+
+        let _cost_basis_sold_asset_curr = position.add_short_lot(activity_to_use)?;
+
+        // Calculate total cost in Account Currency for cash adjustment
+        let unit_price_acct = match self.fx_service.convert_currency_for_date(
+            activity.unit_price, 
+            activity_currency, 
+            account_currency, 
+            activity_date
+        ) {
+             Ok(converted) => converted,
+             Err(e) => {
+                  warn!(
+                    "Holdings Calc (Buy Unit Price {}): Failed conversion {} {}->{} on {}: {}. Using original price.",
+                    activity.id, activity.unit_price, activity_currency, account_currency, activity_date, e
+                 );
+                 activity.unit_price // Fallback
+             }
+        };
+        
+        let total_proceed_acct = activity.quantity.abs() * unit_price_acct - fee_acct;
+        
+        *state
+            .cash_balances
+            .entry(account_currency.to_string())
+            .or_insert(Decimal::ZERO) += total_proceed_acct;
+        
+        Ok(())
+    }
+
+    fn handle_buy_cover(
+        &self,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+        fee_acct: Decimal, // Already converted using activity date
+    ) -> Result<()> {
+        let activity_currency = &activity.currency;
+        let activity_date = activity.activity_date.naive_utc().date();
+
+        let unit_price_acct = match self.fx_service.convert_currency_for_date(
+            activity.unit_price, 
+            activity_currency, 
+            account_currency, 
+            activity_date
+        ) {
+            Ok(converted) => converted,
+            Err(e) => {
+                 warn!(
+                    "Holdings Calc (Sell Unit Price {}): Failed conversion {} {}->{} on {}: {}. Using original price.",
+                    activity.id, activity.unit_price, activity_currency, account_currency, activity_date, e
+                 );
+                 activity.unit_price // Fallback
+            }
+        };
+
+        let total_cost_acct = activity.quantity * unit_price_acct + fee_acct;
+
+        if let Some(position) = state.positions.get_mut(&activity.asset_id) {
+            // Check if currency conversion is needed and handle accordingly
+            let converted_activity;
+            let activity_to_use = if position.currency.is_empty() || position.currency == activity.currency {
+                // No conversion needed, use original activity directly
+                activity
+            } else {
+                // Conversion needed, convert and store in local variable
+                converted_activity = self.convert_activity_to_position_currency(activity, position, &ActivityType::Sell)?;
+                &converted_activity
+            };
+
+            let (_qty_reduced, _cost_basis_asset_curr) = 
+                position.cover_short_lots_fifo(activity_to_use.quantity)?;
+            
+            *state
+                .cash_balances
+                .entry(account_currency.to_string())
+                .or_insert(Decimal::ZERO) -= total_cost_acct;
+        } else {
+            warn!("Attempted to Sell non-existent/zero position {} via activity {}. Applying cash effect.",
+                     activity.asset_id, activity.id);
+            *state
+                .cash_balances
+                .entry(account_currency.to_string())
+                .or_insert(Decimal::ZERO) -= total_cost_acct;
         }
         Ok(())
     }
