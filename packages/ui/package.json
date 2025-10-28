@@ -10,6 +10,10 @@
       "import": "./dist/index.js",
       "types": "./dist/src/index.d.ts"
     },
+    "./chart": {
+      "import": "./dist/chart.js",
+      "types": "./dist/src/chart.d.ts"
+    },
     "./styles": {
       "import": "./dist/styles.css"
     }
@@ -91,7 +95,7 @@
     "react-day-picker": "^9.10.0",
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.62.0",
-    "recharts": "^3.2.1",
+    "recharts": "^3.3.0",
     "zod": "^3.25.76"
   },
   "peerDependencies": {

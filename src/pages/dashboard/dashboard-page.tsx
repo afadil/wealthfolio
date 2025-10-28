@@ -1,5 +1,4 @@
 import { HistoryChart } from "@/components/history-chart";
-import { Page, PageScrollContainer } from "@/components/page/page";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
@@ -9,7 +8,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
-import { GainAmount, GainPercent, IntervalSelector } from "@wealthfolio/ui";
+import { GainAmount, GainPercent, IntervalSelector, Page } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { AccountsSummary } from "./accounts-summary";
@@ -95,7 +94,7 @@ export default function DashboardPage() {
 
   return (
     <Page className="flex h-screen flex-col">
-      <PageScrollContainer data-ptr-content className="flex flex-col" withMobileNavOffset>
+      <div data-ptr-content className="flex flex-col">
         <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
           <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
             <div className="flex items-start gap-2">
@@ -150,7 +149,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-20">
             <div className="md:col-span-2">
               <AccountsSummary />
             </div>
@@ -159,7 +158,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </PageScrollContainer>
+      </div>
     </Page>
   );
 }

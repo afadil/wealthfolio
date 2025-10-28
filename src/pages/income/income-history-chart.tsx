@@ -69,7 +69,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         <CardTitle className="text-sm font-medium">Income History</CardTitle>
         <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
       </CardHeader>
-      <CardContent className="px-2 pt-0 md:px-6">
+      <CardContent className="px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (
           <EmptyPlaceholder
             className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
@@ -93,11 +93,16 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 color: "var(--chart-5)",
               },
             }}
-            className={cn("h-[250px] w-full md:h-[350px]")}
+            className={cn("h-[280px] w-full md:h-[380px]")}
           >
             <ComposedChart
               data={chartData}
-              margin={{ left: isMobile ? -20 : 0, right: isMobile ? 10 : 0 }}
+              margin={{
+                left: isMobile ? -16 : 0,
+                right: isMobile ? 4 : 8,
+                top: 12,
+                bottom: 4,
+              }}
             >
               <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
               <XAxis
@@ -116,7 +121,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 tickLine={false}
                 axisLine={false}
                 tick={{ fontSize: isMobile ? 10 : 12 }}
-                width={isMobile ? 40 : 60}
+                width={isMobile ? 45 : 60}
                 tickFormatter={(value: number) => {
                   if (value >= 1000) {
                     return `${(value / 1000).toFixed(0)}k`;

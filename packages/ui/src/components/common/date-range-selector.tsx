@@ -103,9 +103,8 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
             onChange(selectedRange.getValue());
           }
         }}
-        size="xs"
+        size="sm"
         variant="secondary"
-        className="h-8"
       />
 
       <Popover>

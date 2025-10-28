@@ -28,11 +28,11 @@ const animatedToggleItemVariants = cva(
   {
     variants: {
       size: {
-        default: "px-6 py-2 text-sm",
-        xs: "px-3.5 md:px-4 py-1.5 text-xs",
-        sm: "px-5 py-2 text-xs",
-        md: "px-7 py-2 text-sm",
-        lg: "px-8 py-2.5 text-base",
+        default: "h-8 px-4 text-sm",
+        xs: "h-7 px-2.5 md:px-3 text-xs",
+        sm: "h-8 px-3.5 text-xs",
+        md: "h-9 px-4.5 text-sm",
+        lg: "h-10 px-5 text-base",
       },
     },
     defaultVariants: {

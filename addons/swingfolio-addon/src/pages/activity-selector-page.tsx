@@ -1,21 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import {
-  ApplicationShell,
+  Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Button,
-  Input,
   Checkbox,
-  Badge,
-  Skeleton,
   Icons,
+  Input,
+  Page,
+  PageContent,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
 } from '@wealthfolio/ui';
 import type { AddonContext } from '@wealthfolio/addon-sdk';
 import { useSwingActivities } from '../hooks/use-swing-activities';
@@ -110,56 +112,67 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
     return <ActivitySelectorSkeleton />;
   }
 
+  const pageDescription =
+    'Choose which trading activities to include in your swing portfolio analysis';
+
   if (error || !activities) {
     return (
-      <ApplicationShell className="p-6">
-        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
-          <div className="text-center">
-            <Icons.AlertCircle className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-            <h3 className="mb-2 text-lg font-semibold">Failed to load activities</h3>
-            <p className="text-muted-foreground mb-4">
-              {error?.message || 'Unable to load trading activities'}
-            </p>
-            <Button onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
+      <Page>
+        <PageHeader
+          heading="Select Activities"
+          text={pageDescription}
+          actions={
+            <Button
+              variant="outline"
+              onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
+            >
+              <Icons.ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </Button>
+          }
+        />
+        <PageContent>
+          <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+            <div className="text-center">
+              <Icons.AlertCircle className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+              <h3 className="mb-2 text-lg font-semibold">Failed to load activities</h3>
+              <p className="text-muted-foreground mb-4">
+                {error?.message || 'Unable to load trading activities'}
+              </p>
+              <Button onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
+                Back to Dashboard
+              </Button>
+            </div>
           </div>
-        </div>
-      </ApplicationShell>
+        </PageContent>
+      </Page>
     );
   }
 
-  return (
-    <ApplicationShell className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Select Activities</h1>
-          <p className="text-muted-foreground">
-            Choose which trading activities to include in your swing portfolio analysis
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
-          >
-            <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-          </Button>
-          <Button onClick={handleSaveSelection} disabled={isUpdating}>
-            {isUpdating ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Icons.Save className="mr-2 h-4 w-4" />
-            )}
-            Save Selection
-          </Button>
-        </div>
-      </div>
+  const headerActions = (
+    <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+      <Button
+        variant="outline"
+        onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
+      >
+        <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Dashboard
+      </Button>
+      <Button onClick={handleSaveSelection} disabled={isUpdating}>
+        {isUpdating ? (
+          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Icons.Save className="mr-2 h-4 w-4" />
+        )}
+        Save Selection
+      </Button>
+    </div>
+  );
 
-      <div className="space-y-6">
-        {/* Auto-selection Options */}
+  return (
+    <Page>
+      <PageHeader heading="Select Activities" text={pageDescription} actions={headerActions} />
+      <PageContent>
         <Card>
           <CardHeader>
             <CardTitle>Auto-Selection Options</CardTitle>
@@ -181,7 +194,6 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
           </CardContent>
         </Card>
 
-        {/* Filters and Selection */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -196,8 +208,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Filters */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-4 lg:flex-row">
               <div className="flex-1">
                 <Input
                   placeholder="Search by symbol or name..."
@@ -206,33 +217,34 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                   className="max-w-sm"
                 />
               </div>
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="All Accounts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Accounts</SelectItem>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.name}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="BUY">Buy</SelectItem>
-                  <SelectItem value="SELL">Sell</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="All Accounts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Accounts</SelectItem>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.name}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="BUY">Buy</SelectItem>
+                    <SelectItem value="SELL">Sell</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Bulk Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleSelectAll}>
                 Select All Filtered
               </Button>
@@ -241,7 +253,6 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
               </Button>
             </div>
 
-            {/* Activities Table */}
             <div className="rounded-lg border">
               <div className="max-h-[600px] overflow-auto">
                 <table className="w-full">
@@ -334,26 +345,29 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
             )}
           </CardContent>
         </Card>
-      </div>
-    </ApplicationShell>
+      </PageContent>
+    </Page>
   );
 }
 
 function ActivitySelectorSkeleton() {
   return (
-    <ApplicationShell className="p-6">
-      <div className="flex items-center justify-between pb-6">
-        <div>
+    <Page>
+      <PageHeader
+        actions={
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <Skeleton className="h-10 w-[150px]" />
+            <Skeleton className="h-10 w-[140px]" />
+          </div>
+        }
+      >
+        <div className="space-y-2">
           <Skeleton className="h-8 w-[250px]" />
-          <Skeleton className="mt-2 h-5 w-[400px]" />
+          <Skeleton className="h-5 w-[320px]" />
         </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-10 w-[150px]" />
-          <Skeleton className="h-10 w-[120px]" />
-        </div>
-      </div>
+      </PageHeader>
 
-      <div className="space-y-6">
+      <PageContent>
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-[200px]" />
@@ -369,16 +383,18 @@ function ActivitySelectorSkeleton() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-4 lg:flex-row">
                 <Skeleton className="h-10 max-w-sm flex-1" />
-                <Skeleton className="h-10 w-[200px]" />
-                <Skeleton className="h-10 w-[150px]" />
+                <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                  <Skeleton className="h-10 w-[200px]" />
+                  <Skeleton className="h-10 w-[150px]" />
+                </div>
               </div>
               <Skeleton className="h-[400px] w-full" />
             </div>
           </CardContent>
         </Card>
-      </div>
-    </ApplicationShell>
+      </PageContent>
+    </Page>
   );
 }

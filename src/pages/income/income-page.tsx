@@ -1,5 +1,4 @@
 import { getIncomeSummary } from "@/commands/portfolio";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -10,7 +9,15 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
+import {
+  AmountDisplay,
+  AnimatedToggleGroup,
+  GainPercent,
+  Page,
+  PageContent,
+  PageHeader,
+  PrivacyAmount,
+} from "@wealthfolio/ui";
 import React, { useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
@@ -156,7 +163,7 @@ export default function IncomePage() {
       </PageHeader>
       <PageContent>
         <div className="grid gap-6 md:grid-cols-3">
-          <Card className="border-success/10 bg-success/10">
+          <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {selectedPeriod === "TOTAL"
@@ -223,7 +230,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-blue-500/10 bg-blue-500/10">
+          <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Monthly Average</CardTitle>
               <Icons.DollarSign className="text-muted-foreground h-4 w-4" />
@@ -242,7 +249,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-purple-500/10 bg-purple-500/10">
+          <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Income Sources</CardTitle>
               <Icons.PieChart className="text-muted-foreground h-4 w-4" />

@@ -35,8 +35,7 @@
     "@wealthfolio/addon-sdk": "workspace:*",
     "@wealthfolio/ui": "workspace:*",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
-    "recharts": "^3.2.1"
+    "date-fns": "^4.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",

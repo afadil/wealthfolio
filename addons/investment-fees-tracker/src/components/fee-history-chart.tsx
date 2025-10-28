@@ -1,16 +1,21 @@
-import React from "react";
-import { format, parseISO } from "date-fns";
-import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
+  EmptyPlaceholder,
+  formatAmount,
+  Icons,
 } from "@wealthfolio/ui";
-import { EmptyPlaceholder, Icons } from "@wealthfolio/ui";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@wealthfolio/ui";
-import { formatAmount } from "@wealthfolio/ui";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "@wealthfolio/ui/chart";
+import { format, parseISO } from "date-fns";
+import React from "react";
 
 interface FeeHistoryChartProps {
   monthlyFeeData: [string, number][];
@@ -83,12 +88,10 @@ export function FeeHistoryChart({
               cumulative: {
                 label: "Cumulative Fees",
                 color: "var(--chart-5)",
-                lineStyle: "solid",
               },
               previousCumulative: {
                 label: "Previous Period Cumulative",
                 color: "var(--chart-3)",
-                lineStyle: "dashed",
               },
             }}
           >

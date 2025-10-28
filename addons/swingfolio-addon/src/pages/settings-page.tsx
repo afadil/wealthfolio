@@ -1,18 +1,20 @@
 import {
-  ApplicationShell,
+  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Button,
+  Checkbox,
+  Icons,
+  Label,
+  Page,
+  PageContent,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Checkbox,
-  Label,
-  Icons,
 } from '@wealthfolio/ui';
 import type { AddonContext } from '@wealthfolio/addon-sdk';
 import { useSwingPreferences } from '../hooks/use-swing-preferences';
@@ -40,22 +42,25 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
     updatePreferences({ includeDividends: checked });
   };
 
-  return (
-    <ApplicationShell className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Swingfolio Settings</h1>
-          <p className="text-muted-foreground">Configure your swing trading analysis preferences</p>
-        </div>
-        <Button variant="outline" onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
-          <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
-      </div>
+  const pageDescription = 'Configure your swing trading analysis preferences';
 
-      <div className="max-w-2xl space-y-6">
-        {/* Trade Matching Settings */}
+  return (
+    <Page>
+      <PageHeader
+        heading="Swingfolio Settings"
+        text={pageDescription}
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
+          >
+            <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        }
+      />
+
+      <PageContent className="max-w-2xl">
         <Card>
           <CardHeader>
             <CardTitle>Trade Matching</CardTitle>
@@ -85,7 +90,6 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
           </CardContent>
         </Card>
 
-        {/* Display Settings */}
         <Card>
           <CardHeader>
             <CardTitle>Display Settings</CardTitle>
@@ -116,7 +120,6 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
           </CardContent>
         </Card>
 
-        {/* Calculation Settings */}
         <Card>
           <CardHeader>
             <CardTitle>Calculation Settings</CardTitle>
@@ -147,14 +150,14 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
             </p>
           </CardContent>
         </Card>
-        {/* Save Status */}
+
         {isUpdating && (
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <Icons.Spinner className="h-4 w-4 animate-spin" />
             Saving settings...
           </div>
         )}
-      </div>
-    </ApplicationShell>
+      </PageContent>
+    </Page>
   );
 }

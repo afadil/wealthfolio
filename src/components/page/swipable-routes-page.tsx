@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { SwipableView } from "@wealthfolio/ui";
 import * as React from "react";
 import { Outlet, matchPath, useLocation, useNavigate } from "react-router-dom";
-import { Page, PageContent, PageHeader } from "./page";
+import { Page, PageContent, PageHeader } from "@wealthfolio/ui";
 
 export interface SwipableRoute {
   path: string;
@@ -18,8 +18,8 @@ interface SwipableRoutesPageProps {
   actions?:
     | React.ReactNode
     | ((currentPath: string, onNavigate: (path: string) => void) => React.ReactNode);
-  displayBack?: boolean;
-  backUrl?: string;
+  showBackButton?: boolean;
+  onBack?: () => void;
   showBorderOnScroll?: boolean;
   dragRegion?: boolean;
   isMobile?: boolean;
@@ -34,8 +34,8 @@ export function SwipableRoutesPage({
   heading,
   headingPrefix,
   actions,
-  displayBack,
-  backUrl,
+  showBackButton = false,
+  onBack,
   showBorderOnScroll = true,
   dragRegion = true,
   isMobile = false,
@@ -47,6 +47,14 @@ export function SwipableRoutesPage({
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const emblaApiRef = React.useRef<any>(null);
+
+  const handleBackClick = React.useCallback(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    navigate(-1);
+  }, [navigate, onBack]);
 
   // Track which routes have been swiped to (for lazy mounting)
   const [visitedIndices, setVisitedIndices] = React.useState<Set<number>>(() => new Set([0]));
@@ -163,8 +171,7 @@ export function SwipableRoutesPage({
       <PageHeader
         heading={!isMobile ? heading : undefined}
         headingPrefix={headingPrefix}
-        displayBack={displayBack}
-        backUrl={backUrl}
+        onBack={showBackButton ? handleBackClick : undefined}
         showBorderOnScroll={showBorderOnScroll}
         dragRegion={dragRegion}
         actions={headerActions}

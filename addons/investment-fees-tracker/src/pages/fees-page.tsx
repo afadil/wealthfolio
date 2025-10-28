@@ -1,52 +1,17 @@
 import React, { useState } from "react";
-import { Skeleton } from "@wealthfolio/ui";
-import { Card, CardContent, CardHeader, Icons } from "@wealthfolio/ui";
-import { useBalancePrivacy } from "@wealthfolio/ui";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  EmptyPlaceholder,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Skeleton,
+  useBalancePrivacy,
+} from "@wealthfolio/ui";
 import type { AddonContext } from "@wealthfolio/addon-sdk";
-
-// Simple ApplicationShell replacement since it's not exported from UI package
-function ApplicationShell({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`bg-background min-h-full ${className || ""}`}>
-      <main className="flex-1">{children}</main>
-    </div>
-  );
-}
-
-// Simple EmptyPlaceholder component since it's not exported from UI package
-function EmptyPlaceholder({
-  className,
-  icon,
-  title,
-  description,
-}: {
-  className?: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div
-      className={`flex min-h-[400px] flex-col items-center justify-center rounded-md border border-dashed p-8 text-center ${className || ""}`}
-    >
-      <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-        <div className="bg-muted mb-4 flex h-20 w-20 items-center justify-center rounded-full">
-          {icon}
-        </div>
-        <h2 className="mt-2 text-xl font-semibold">{title}</h2>
-        <p className="text-muted-foreground mt-2 text-center text-sm leading-6 font-normal">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
 import {
   FeePeriodSelector,
   FeeOverviewCards,
@@ -72,8 +37,13 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 
   const { isBalanceHidden } = useBalancePrivacy();
 
+  const headerSubtitle = "Track and analyze your investment fees and their impact on returns";
+  const headerActions = (
+    <FeePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+  );
+
   if (isLoadingFees || isLoadingAnalytics) {
-    return <FeesDashboardSkeleton />;
+    return <FeesDashboardSkeleton actions={headerActions} />;
   }
 
   if (feeError) {
@@ -84,17 +54,27 @@ export default function FeesPage({ ctx }: FeesPageProps) {
   }
 
   if (feeError || analyticsError || !feeData || !analyticsData) {
+    const errorMessage =
+      feeError?.message || analyticsError?.message || "Unable to load fee information.";
+
     return (
-      <ApplicationShell className="p-6">
-        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
-          <EmptyPlaceholder
-            className="mx-auto flex max-w-[420px] items-center justify-center"
-            icon={<Icons.CreditCard className="h-10 w-10" />}
-            title="Failed to load fee data"
-            description={`Unable to load fee information: ${feeError?.message || analyticsError?.message || "Unknown error"}`}
-          />
-        </div>
-      </ApplicationShell>
+      <Page>
+        <PageHeader
+          heading="Investment Fees Tracker"
+          text={headerSubtitle}
+          actions={headerActions}
+        />
+        <PageContent>
+          <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+            <EmptyPlaceholder
+              className="border-border/50 w-full max-w-[420px] border border-dashed"
+              icon={<Icons.CreditCard className="h-10 w-10" />}
+              title="Failed to load fee data"
+              description={errorMessage}
+            />
+          </div>
+        </PageContent>
+      </Page>
     );
   }
 
@@ -103,16 +83,23 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 
   if (!periodSummary || !totalSummary) {
     return (
-      <ApplicationShell className="p-6">
-        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
-          <EmptyPlaceholder
-            className="mx-auto flex max-w-[420px] items-center justify-center"
-            icon={<Icons.CreditCard className="h-10 w-10" />}
-            title="No fee data available"
-            description="There is no fee data for the selected period. Try selecting a different time range or check back later."
-          />
-        </div>
-      </ApplicationShell>
+      <Page>
+        <PageHeader
+          heading="Investment Fees Tracker"
+          text={headerSubtitle}
+          actions={headerActions}
+        />
+        <PageContent>
+          <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+            <EmptyPlaceholder
+              className="border-border/50 w-full max-w-[420px] border border-dashed"
+              icon={<Icons.CreditCard className="h-10 w-10" />}
+              title="No fee data available"
+              description="There is no fee data for the selected period. Try selecting a different time range or check back later."
+            />
+          </div>
+        </PageContent>
+      </Page>
     );
   }
 
@@ -145,26 +132,19 @@ export default function FeesPage({ ctx }: FeesPageProps) {
   ]);
 
   return (
-    <ApplicationShell className="p-6">
-      <div className="flex items-center justify-between pb-6">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Investment Fees Tracker</h1>
-          <p className="text-muted-foreground text-sm">
-            Track and analyze your investment fees and their impact on returns
-          </p>
-        </div>
-        <FeePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
-      </div>
-
-      <div className="space-y-6">
-        {/* Overview Cards */}
+    <Page>
+      <PageHeader
+        heading="Investment Fees Tracker"
+        text={headerSubtitle}
+        actions={headerActions}
+      />
+      <PageContent>
         <FeeOverviewCards
           feeSummary={periodSummary}
           feeAnalytics={analyticsData}
           isBalanceHidden={isBalanceHidden}
         />
 
-        {/* Charts Section */}
         <div className="grid gap-6 md:grid-cols-3">
           <FeeHistoryChart
             monthlyFeeData={monthlyFeeData}
@@ -180,24 +160,22 @@ export default function FeesPage({ ctx }: FeesPageProps) {
             isBalanceHidden={isBalanceHidden}
           />
         </div>
-      </div>
-    </ApplicationShell>
+      </PageContent>
+    </Page>
   );
 }
 
-function FeesDashboardSkeleton() {
+function FeesDashboardSkeleton({ actions }: { actions: React.ReactNode }) {
   return (
-    <ApplicationShell className="p-6">
-      <div className="flex items-center justify-between pb-6">
-        <div>
-          <Skeleton className="h-9 w-[300px]" />
-          <Skeleton className="mt-2 h-5 w-[400px]" />
+    <Page>
+      <PageHeader actions={actions}>
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-[240px]" />
+          <Skeleton className="h-5 w-[320px]" />
         </div>
-        <Skeleton className="h-10 w-[200px]" />
-      </div>
+      </PageHeader>
 
-      <div className="space-y-6">
-        {/* Overview Cards Skeleton */}
+      <PageContent>
         <div className="grid gap-6 md:grid-cols-3">
           {[...Array(3)].map((_, index) => (
             <Card key={index}>
@@ -213,7 +191,6 @@ function FeesDashboardSkeleton() {
           ))}
         </div>
 
-        {/* Charts Skeleton */}
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="md:col-span-2">
             <CardHeader>
@@ -240,7 +217,7 @@ function FeesDashboardSkeleton() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </ApplicationShell>
+      </PageContent>
+    </Page>
   );
 }

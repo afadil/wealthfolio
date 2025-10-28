@@ -26,6 +26,7 @@ export * from "./components/ui/hover-card";
 export * from "./components/ui/icons";
 export * from "./components/ui/input";
 export * from "./components/ui/label";
+export * from "./components/ui/page";
 export * from "./components/ui/popover";
 export * from "./components/ui/progress";
 export * from "./components/ui/progress-indicator";

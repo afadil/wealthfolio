@@ -6,21 +6,11 @@ import {
   TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
   VOLATILITY_INFO as volatilityInfo,
 } from "@/components/metric-display";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { PerformanceChart } from "@/components/performance-chart";
 import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
+import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
-import { Icons } from "@/components/ui/icons";
-import { Separator } from "@/components/ui/separator";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
@@ -29,11 +19,27 @@ import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
 import {
   AlertFeedback,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Carousel,
   CarouselContent,
   CarouselItem,
   DateRangeSelector,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   GainPercent,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Separator,
 } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
@@ -55,7 +61,7 @@ interface ChartDataItem {
   returns: ReturnData[];
 }
 
-// Define the actual structure returned by the hook (assuming it includes name/type)
+// Define the actual structure returned by the hook
 interface PerformanceDataFromHook extends PerformanceMetrics {
   name: string;
   type: "account" | "symbol";
@@ -140,11 +146,13 @@ const SelectedItemBadge = ({
   isSelected,
   onSelect,
   onDelete,
+  color,
 }: {
   item: TrackedItem;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
+  color?: string;
 }) => {
   return (
     <Badge
@@ -169,11 +177,14 @@ const SelectedItemBadge = ({
       <div className="flex items-center space-x-2 sm:space-x-3">
         <div
           className={cn(
-            "h-3 w-1 rounded-full transition-colors sm:h-4",
-            item.type === "account"
-              ? "bg-muted-foreground group-hover:bg-foreground"
-              : "bg-orange-500 group-hover:bg-orange-600 dark:bg-orange-400",
+            "h-3 w-1 rounded-full sm:h-4",
+            color
+              ? "transition-opacity group-hover:opacity-80"
+              : item.type === "account"
+                ? "bg-muted-foreground group-hover:bg-foreground transition-colors"
+                : "bg-orange-500 transition-colors group-hover:bg-orange-600 dark:bg-orange-400",
           )}
+          style={color ? { backgroundColor: color } : undefined}
         />
         <span className="group-hover:text-foreground text-xs font-medium transition-colors sm:text-sm">
           {item.name}
@@ -181,7 +192,7 @@ const SelectedItemBadge = ({
       </div>
       <Button
         variant="ghost"
-        size="icon"
+        size="icon-xs"
         className={cn(
           "ml-2 size-5 transition-all duration-150",
           "hover:bg-destructive/10 hover:text-destructive hover:scale-110",
@@ -262,6 +273,14 @@ export default function PerformancePage() {
         )
     );
   }, [performanceData, selectedItems]);
+
+  const chartColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    chartData.forEach((series, index) => {
+      map.set(series.id, PERFORMANCE_CHART_COLORS[index % PERFORMANCE_CHART_COLORS.length]);
+    });
+    return map;
+  }, [chartData]);
 
   // Calculate selected item data
   const selectedItemData = useMemo(() => {
@@ -356,6 +375,7 @@ export default function PerformancePage() {
                       isSelected={selectedItemId === item.id}
                       onSelect={() => handleBadgeSelect(item)}
                       onDelete={(e) => handleBadgeDelete(e, item)}
+                      color={chartColorMap.get(item.id)}
                     />
                   </CarouselItem>
                 ))}
@@ -411,6 +431,7 @@ export default function PerformancePage() {
                         isSelected={selectedItemId === item.id}
                         onSelect={() => handleBadgeSelect(item)}
                         onDelete={(e) => handleBadgeDelete(e, item)}
+                        color={chartColorMap.get(item.id)}
                       />
                     </CarouselItem>
                   ))}

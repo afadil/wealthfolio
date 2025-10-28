@@ -1,11 +1,10 @@
 import { getAccounts } from "@/commands/account";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Icons } from "@wealthfolio/ui";
+import { Button, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";

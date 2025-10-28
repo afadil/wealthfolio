@@ -6,6 +6,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
 import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
@@ -75,22 +76,10 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     return format(date, "yyyy"); // e.g., "2023"
   };
 
-  // Chart colors
-  const CHART_COLORS = [
-    "#4385BE", // blue-400
-    "#CE5D97", // magenta-400
-    "#3AA99F", // cyan-400
-    "#8B7EC8", // purple-400
-    "#879A39", // green-400
-    "#D0A215", // yellow-500
-    "#DA702C", // orange-400
-    "#D14D41", // red-400
-  ];
-
   const chartConfig = data.reduce((config, series, index) => {
     config[series.id] = {
       label: series.name,
-      color: CHART_COLORS[index % CHART_COLORS.length],
+      color: PERFORMANCE_CHART_COLORS[index % PERFORMANCE_CHART_COLORS.length],
     };
     return config;
   }, {} as ChartConfig);
@@ -144,7 +133,9 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
                 key={series.id}
                 type="linear"
                 dataKey={series.id}
-                stroke={CHART_COLORS[seriesIndex % CHART_COLORS.length]}
+                stroke={
+                  PERFORMANCE_CHART_COLORS[seriesIndex % PERFORMANCE_CHART_COLORS.length]
+                }
                 strokeWidth={2}
                 dot={false}
                 name={series.name}

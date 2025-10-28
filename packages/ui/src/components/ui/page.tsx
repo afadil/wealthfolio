@@ -1,8 +1,8 @@
+import * as React from "react";
+
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
-import * as React from "react";
-import { Link, useNavigate } from "react-router-dom";
 
 interface PageContextValue {
   scrollY: number;
@@ -24,10 +24,7 @@ const MOBILE_NAV_SCROLL_OFFSET =
   "calc(var(--mobile-nav-ui-height) + max(var(--mobile-nav-gap), env(safe-area-inset-bottom)))";
 
 export const PageScrollContainer = React.forwardRef<HTMLDivElement, PageScrollContainerProps>(
-  function PageScrollContainer(
-    { className, children, withMobileNavOffset = false, style, ...props },
-    ref,
-  ) {
+  function PageScrollContainer({ className, children, withMobileNavOffset = false, style, ...props }, ref) {
     const computedStyle = withMobileNavOffset
       ? {
           paddingBottom: MOBILE_NAV_SCROLL_OFFSET,
@@ -86,11 +83,7 @@ export function Page({ children, className, containerMode = false, ...props }: P
   if (containerMode) {
     return (
       <PageContext.Provider value={{ scrollY, isScrolled }}>
-        <div
-          ref={scrollContainerRef}
-          className={cn("relative w-full", "bg-background", className)}
-          {...props}
-        >
+        <div ref={scrollContainerRef} className={cn("relative w-full", "bg-background", className)} {...props}>
           {children}
         </div>
       </PageContext.Provider>
@@ -99,11 +92,7 @@ export function Page({ children, className, containerMode = false, ...props }: P
 
   return (
     <PageContext.Provider value={{ scrollY, isScrolled }}>
-      <div
-        ref={scrollContainerRef}
-        className={cn("relative w-full", "bg-background", className)}
-        {...props}
-      >
+      <div ref={scrollContainerRef} className={cn("relative w-full", "bg-background", className)} {...props}>
         {children}
       </div>
     </PageContext.Provider>
@@ -115,8 +104,7 @@ interface PageHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   heading?: string;
   headingPrefix?: string;
   text?: string;
-  displayBack?: boolean;
-  backUrl?: string;
+  onBack?: () => void;
   showBorderOnScroll?: boolean;
   actions?: React.ReactNode;
   dragRegion?: boolean;
@@ -127,8 +115,7 @@ export function PageHeader({
   heading,
   headingPrefix,
   text,
-  displayBack,
-  backUrl,
+  onBack,
   className,
   showBorderOnScroll = true,
   actions,
@@ -136,23 +123,17 @@ export function PageHeader({
   ...props
 }: PageHeaderProps) {
   const { isScrolled } = usePage();
-  const navigate = useNavigate();
 
   const titleContent = heading ? (
-    <div
-      data-tauri-drag-region={dragRegion ? "true" : undefined}
-      className="flex items-center gap-3"
-    >
+    <div data-tauri-drag-region={dragRegion ? "true" : undefined} className="flex items-center gap-3">
       {headingPrefix && (
         <>
-          <h1 className="text-muted-foreground text-lg font-semibold md:text-xl lg:text-2xl">
-            {headingPrefix}
-          </h1>
+          <h1 className="text-muted-foreground text-lg font-semibold md:text-xl lg:text-2xl">{headingPrefix}</h1>
           <div className="bg-border h-5 w-px md:h-6" />
         </>
       )}
       <div className="flex flex-col">
-        <h1 className="text-lg font-semibold md:text-xl lg:text-2xl">{heading}</h1>
+        <h1 className="text-lg font-semibold md:text-xl">{heading}</h1>
         {text && <p className="text-muted-foreground text-sm md:text-base">{text}</p>}
       </div>
     </div>
@@ -167,47 +148,25 @@ export function PageHeader({
         // Smooth transitions
         "transition-all duration-300 ease-out",
         // Border animation on scroll
-        showBorderOnScroll && [
-          "border-b",
-          isScrolled ? "border-border shadow-sm" : "border-transparent shadow-none",
-        ],
-        "pt-safe md:pt-0",
+        showBorderOnScroll && ["border-b", isScrolled ? "border-border shadow-sm" : "border-transparent shadow-none"],
+        "pt-safe md:pt-2",
         className,
       )}
       {...props}
     >
       {dragRegion && (
-        <div
-          data-tauri-drag-region="true"
-          className="pointer-events-auto absolute inset-x-0 top-0 h-6 opacity-0"
-        />
+        <div data-tauri-drag-region="true" className="pointer-events-auto absolute inset-x-0 top-0 h-6 opacity-0" />
       )}
 
       <div className="px-4 py-3 md:px-6 md:py-4 lg:px-8">
         <div className="mx-auto">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              {displayBack &&
-                (backUrl ? (
-                  <Link to={backUrl}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 shrink-0 md:h-10 md:w-10"
-                    >
-                      <Icons.ArrowLeft className="h-6 w-6 md:h-7 md:w-7" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 md:h-10 md:w-10"
-                    onClick={() => navigate(-1)}
-                  >
-                    <Icons.ArrowLeft className="h-6 w-6 md:h-7 md:w-7" />
-                  </Button>
-                ))}
+              {onBack && (
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 md:h-10 md:w-10" onClick={onBack}>
+                  <Icons.ArrowLeft className="h-6 w-6 md:h-7 md:w-7" />
+                </Button>
+              )}
               {titleContent ?? children}
             </div>
             {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

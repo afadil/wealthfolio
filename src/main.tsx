@@ -1,11 +1,11 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
 import * as ReactDOMLegacy from "react-dom";
-import App from "./App";
-import "./styles.css";
+import ReactDOM from "react-dom/client";
+import { debugAddonState, loadAllAddons } from "./addons/addons-loader";
 import "./addons/addons-runtime-context";
+import App from "./App";
 import { installLockdown } from "./lockdown";
-import { loadAllAddons, debugAddonState } from "./addons/addons-loader";
+import "./styles.css";
 
 // Initialize development mode only in development
 if (import.meta.env.DEV) {

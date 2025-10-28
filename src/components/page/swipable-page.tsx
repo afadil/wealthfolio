@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { SwipableView } from "@wealthfolio/ui";
 import * as React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Page, PageContent, PageHeader } from "./page";
+import { Page, PageContent, PageHeader } from "@wealthfolio/ui";
 
 export interface SwipablePageView {
   value: string;
@@ -19,8 +19,8 @@ interface SwipablePageProps {
   actions?:
     | React.ReactNode
     | ((currentView: string, onViewChange: (view: string) => void) => React.ReactNode);
-  displayBack?: boolean;
-  backUrl?: string;
+  showBackButton?: boolean;
+  onBack?: () => void;
   showBorderOnScroll?: boolean;
   dragRegion?: boolean;
   isMobile?: boolean;
@@ -36,8 +36,8 @@ export function SwipablePage({
   defaultView,
   onViewChange,
   actions,
-  displayBack,
-  backUrl,
+  showBackButton = false,
+  onBack,
   showBorderOnScroll = true,
   dragRegion = true,
   isMobile = false,
@@ -53,6 +53,14 @@ export function SwipablePage({
   const [currentView, setCurrentView] = React.useState<string>(initialView);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const emblaApiRef = React.useRef<any>(null);
+
+  const handleBackClick = React.useCallback(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    navigate(-1);
+  }, [navigate, onBack]);
 
   const handleViewChange = React.useCallback(
     (nextView: string) => {
@@ -134,8 +142,7 @@ export function SwipablePage({
       <PageHeader
         heading={!isMobile ? heading : undefined}
         headingPrefix={headingPrefix}
-        displayBack={displayBack}
-        backUrl={backUrl}
+        onBack={showBackButton ? handleBackClick : undefined}
         showBorderOnScroll={showBorderOnScroll}
         dragRegion={dragRegion}
         actions={headerActions}

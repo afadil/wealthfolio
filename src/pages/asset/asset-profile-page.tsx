@@ -1,6 +1,5 @@
 import { getAssetProfile } from "@/commands/market-data";
 import { getHolding } from "@/commands/portfolio";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AnimatedToggleGroup, SwipableView } from "@wealthfolio/ui";
+import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import AssetDetailCard from "./asset-detail-card";
@@ -72,6 +71,7 @@ export const AssetProfilePage = () => {
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
   const navigate = useNavigate();
+  const backTarget = location.state?.from ?? "/holdings?tab=holdings";
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = (queryParams.get("tab") as AssetTab) ?? "overview";
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
@@ -549,8 +549,7 @@ export const AssetProfilePage = () => {
         <PageHeader
           heading="Quote History"
           text={symbol}
-          displayBack={true}
-          backUrl={location.state?.from ?? "/holdings?tab=holdings"}
+          onBack={() => navigate(backTarget)}
         />
         <PageContent>
           <QuoteHistoryTable
@@ -597,8 +596,7 @@ export const AssetProfilePage = () => {
         <PageHeader
           heading={symbol}
           text={`Error loading data for ${symbol}`}
-          displayBack={true}
-          backUrl={location.state?.from ?? "/holdings?tab=holdings"}
+          onBack={() => navigate(backTarget)}
         />
         <PageContent>
           <p>

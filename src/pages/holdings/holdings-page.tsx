@@ -276,7 +276,6 @@ export const HoldingsPage = () => {
           items={views.map((v) => ({ value: v.value, label: v.label }))}
           value={currentView}
           onValueChange={onViewChange}
-          size="sm"
           className="max-w-full"
         />
       </div>

@@ -1,6 +1,5 @@
-import { PageScrollContainer } from "@/components/page/page";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, PageScrollContainer } from "@wealthfolio/ui";
 import { AnimatePresence } from "motion/react";
 import { Outlet } from "react-router-dom";
 

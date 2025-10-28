@@ -1,5 +1,4 @@
 import { HistoryChart } from "@/components/history-chart";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
 import {
   Card,
   CardContent,
@@ -8,6 +7,9 @@ import {
   GainAmount,
   GainPercent,
   IntervalSelector,
+  Page,
+  PageContent,
+  PageHeader,
   PrivacyAmount,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
@@ -20,7 +22,7 @@ import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { subMonths } from "date-fns";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
@@ -43,6 +45,7 @@ const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 const AccountPage = () => {
   const { id = "" } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalCode, setSelectedIntervalCode] =
     useState<TimePeriod>(INITIAL_INTERVAL_CODE);
@@ -117,7 +120,7 @@ const AccountPage = () => {
       <PageHeader
         heading={account?.name ?? "Account"}
         headingPrefix={account?.group ?? account?.currency}
-        displayBack={true}
+        onBack={() => navigate(-1)}
       />
       <PageContent>
         <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">

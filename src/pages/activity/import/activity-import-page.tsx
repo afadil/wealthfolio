@@ -1,12 +1,11 @@
 import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
-import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AlertFeedback } from "@wealthfolio/ui";
+import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -177,8 +176,7 @@ const ActivityImportPage = () => {
     <Page>
       <PageHeader
         heading="Import Activities"
-        displayBack={isMobile}
-        backUrl="/activities"
+        onBack={isMobile ? () => navigate("/activities") : undefined}
         actions={
           <>
             {isMobile && <ImportHelpPopover />}

@@ -115,7 +115,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           items={items}
           defaultValue={initialSelection}
           onValueChange={handleValueChange}
-          size="xs"
+          size="sm"
           variant="default"
           className="bg-transparent"
         />

@@ -1,5 +1,3 @@
-import { format, parseISO } from 'date-fns';
-import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis, Cell } from 'recharts';
 import {
   ChartContainer,
   ChartLegend,
@@ -10,6 +8,8 @@ import {
   Icons,
   formatAmount,
 } from '@wealthfolio/ui';
+import { Bar, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from '@wealthfolio/ui/chart';
+import { format, parseISO } from 'date-fns';
 import type { EquityPoint } from '../types';
 
 interface EquityCurveChartProps {
@@ -63,12 +63,11 @@ export function EquityCurveChart({
         config={{
           periodPL: {
             label: `${periodLabel} P/L`,
-            color: 'hsl(var(--chart-1))',
+            color: 'var(--chart-1)',
           },
           cumulativeRealizedPL: {
             label: 'Cumulative Equity',
-            color: 'hsl(var(--primary))',
-            lineStyle: 'solid',
+            color: 'var(--primary)',
           },
         }}
         className="h-full w-full"
@@ -92,7 +91,7 @@ export function EquityCurveChart({
                   return (
                     <>
                       <div
-                        className="h-2.5 w-2.5 shrink-0 rounded-[2px] border-border bg-(--color-bg)"
+                        className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
                         style={
                           {
                             '--color-bg': entry.color,
@@ -125,14 +124,14 @@ export function EquityCurveChart({
           <Bar
             yAxisId="left"
             dataKey="periodPL"
-            fill="hsl(var(--chart-1))"
+            fill="var(--chart-1)"
             radius={[4, 4, 0, 0]}
             barSize={20}
           >
             {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={entry.periodPL >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                fill={entry.periodPL >= 0 ? 'var(--success)' : 'var(--destructive)'}
                 fillOpacity={0.6}
               />
             ))}
