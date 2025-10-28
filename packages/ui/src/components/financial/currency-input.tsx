@@ -1,16 +1,16 @@
-import { forwardRef, useRef, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { forwardRef, useRef, useState } from "react";
+import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
+import { worldCurrencies } from "../../lib/currencies";
+import { cn } from "../../lib/utils";
 import type { ButtonProps } from "../ui/button";
 import { Button } from "../ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { Icons } from "../ui/icons";
+import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ScrollArea } from "../ui/scroll-area";
-import { Input } from "../ui/input";
-import { Icons } from "../ui/icons";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../ui/sheet";
-import { cn } from "../../lib/utils";
-import { worldCurrencies } from "../../lib/currencies";
-import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
 
 interface CurrencyInputCustomProps {
   value?: string;
@@ -73,7 +73,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "w-full justify-between truncate rounded-md font-normal",
+              "h-11 w-full justify-between truncate rounded-md font-normal",
               !value && "text-muted-foreground",
               className,
             )}
@@ -160,9 +160,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                             </div>
                             <div className="text-muted-foreground mt-0.5 truncate text-sm">{curr.label}</div>
                           </div>
-                          {value === curr.value && (
-                            <Icons.Check className="text-primary h-5 w-5 flex-shrink-0" />
-                          )}
+                          {value === curr.value && <Icons.Check className="text-primary h-5 w-5 flex-shrink-0" />}
                         </button>
                       ))}
                     </div>
@@ -189,7 +187,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn("w-full justify-between rounded-md", !value && "text-muted-foreground", className)}
+            className={cn("h-11 w-full justify-between rounded-md", !value && "text-muted-foreground", className)}
             {...props}
           >
             {buttonLabel}

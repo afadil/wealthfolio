@@ -57,7 +57,7 @@ const SettingsAccountsPage = () => {
             >
               <Icons.Plus className="h-4 w-4" />
             </Button>
-            <Button className="hidden sm:inline-flex" onClick={() => handleAddAccount()}>
+            <Button size="sm" className="hidden sm:inline-flex" onClick={() => handleAddAccount()}>
               <Icons.Plus className="mr-2 h-4 w-4" />
               Add account
             </Button>
