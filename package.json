@@ -1,7 +1,7 @@
 {
   "name": "wealthfolio-app",
   "private": true,
-  "version": "1.2.3",
+  "version": "2.0.0",
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -39,7 +39,7 @@
     "@internationalized/date": "^3.9.0",
     "@number-flow/react": "^0.5.10",
     "@tailwindcss/vite": "^4.1.13",
-    "@tanstack/react-query": "^5.89.0",
+    "@tanstack/react-query": "^5.90.5",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.12",
     "@tauri-apps/api": "^2.8.0",

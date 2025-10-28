@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio_core"
-version = "1.2.3"
+version = "2.0.0"
 description = "An Open Source Desktop Portfolio tracker"
 authors = ["Aziz Fadil"]
 license = "AGPL-3.0"
