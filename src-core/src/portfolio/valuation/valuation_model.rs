@@ -19,6 +19,8 @@ pub struct DailyAccountValuation {
     pub total_value: Decimal,
     pub cost_basis: Decimal,
     pub net_contribution: Decimal,
+    pub outstanding_loans: Decimal,
+    pub portfolio_equity: Decimal,
     pub calculated_at: DateTime<Utc>,
 }
 
@@ -37,6 +39,8 @@ pub struct DailyAccountValuationDb {
     pub total_value: String,
     pub cost_basis: String,
     pub net_contribution: String,
+    pub outstanding_loans: String,
+    pub portfolio_equity: String,
     pub calculated_at: String,
 }
 
@@ -60,6 +64,14 @@ impl From<DailyAccountValuation> for DailyAccountValuationDb {
                 .net_contribution
                 .round_dp(DECIMAL_PRECISION)
                 .to_string(),
+            outstanding_loans: value
+                .outstanding_loans
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            portfolio_equity: value
+                .portfolio_equity
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
             calculated_at: value.calculated_at.to_rfc3339(),
         }
     }
@@ -80,6 +92,8 @@ impl From<DailyAccountValuationDb> for DailyAccountValuation {
             total_value: Decimal::from_str(&value.total_value).unwrap_or_default(),
             cost_basis: Decimal::from_str(&value.cost_basis).unwrap_or_default(),
             net_contribution: Decimal::from_str(&value.net_contribution).unwrap_or_default(),
+            outstanding_loans: Decimal::from_str(&value.outstanding_loans).unwrap_or_default(),
+            portfolio_equity: Decimal::from_str(&value.portfolio_equity).unwrap_or_default(),
             calculated_at: DateTime::parse_from_rfc3339(&value.calculated_at)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|_| Utc::now()),

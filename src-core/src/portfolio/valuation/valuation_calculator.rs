@@ -83,7 +83,20 @@ pub fn calculate_valuation(
     // Base currency values like market_value_base, book_cost_base are not part of it.
     // Gain/Loss calculations are also not part of DailyAccountValuation.
 
-    // --- 3. Construct Result using DailyAccountValuation structure ---
+    // --- 3. Calculate Loan Balance and Portfolio Equity ---
+    let outstanding_loans_acct_ccy = holdings_snapshot.outstanding_loans;
+    let portfolio_equity_acct_ccy = total_market_value_acct_ccy - outstanding_loans_acct_ccy;
+    
+    // Debug logging to identify the data transfer issue
+    if !outstanding_loans_acct_ccy.is_zero() {
+        debug!("Valuation Calculator - Account {}: outstanding_loans = {}, portfolio_equity = {}, total_value = {}", 
+               holdings_snapshot.account_id, outstanding_loans_acct_ccy, portfolio_equity_acct_ccy, total_market_value_acct_ccy);
+    } else if holdings_snapshot.account_id != "TOTAL" {
+        debug!("Valuation Calculator - Account {}: WARNING - outstanding_loans is ZERO but should check snapshot data", 
+               holdings_snapshot.account_id);
+    }
+
+    // --- 4. Construct Result using DailyAccountValuation structure ---
     let metrics = DailyAccountValuation {
         id: format!("{}_{}", holdings_snapshot.account_id, target_date),
         account_id: holdings_snapshot.account_id.clone(),
@@ -96,6 +109,8 @@ pub fn calculate_valuation(
         total_value: total_market_value_acct_ccy,
         cost_basis: cost_basis_acct_ccy,
         net_contribution: net_contribution_acct_ccy,
+        outstanding_loans: outstanding_loans_acct_ccy,
+        portfolio_equity: portfolio_equity_acct_ccy,
         calculated_at: Utc::now(),
     };
 
