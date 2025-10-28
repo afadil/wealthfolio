@@ -12,9 +12,6 @@
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Enable platform-based mobile variant (Tailwind v4 pattern) */
-@custom-variant mobile (&:where([data-platform="mobile"], [data-platform="mobile"] *));
-
 /* Tailwind v4 custom utilities for 3D rotation used in the sidebar logo */
 @utility transform-3d {
   transform-style: preserve-3d;
@@ -175,33 +172,6 @@
   --color-magenta-850: #4f1b39;
   --color-magenta-900: #39172b;
   --color-magenta-950: #24131d;
-}
-
-/* Mobile platform theme overrides */
-[data-platform="mobile"] {
-  /* Larger radius for mobile-native feel */
-  --radius: 0.75rem; /* rounded-xl base for mobile */
-
-  /* Larger touch targets for mobile */
-  --input-height: 3.5rem; /* h-14 */
-  --input-height-lg: 4rem; /* h-16 */
-
-  --button-height: 3rem; /* h-12 */
-  --button-height-sm: 2.75rem; /* h-11 */
-  --button-height-lg: 3.5rem; /* h-14 */
-
-  /* More generous spacing for mobile */
-  --card-padding: 1rem;
-  --sheet-padding: 1.5rem; /* p-6 */
-  --sheet-title-size: 1.25rem; /* text-xl */
-
-  /* Slightly larger text for mobile readability */
-  --font-size-base: 1rem; /* text-base instead of text-sm */
-
-  /* Ensure rounded-full stays truly full */
-  & .rounded-full {
-    border-radius: 9999px;
-  }
 }
 
 @theme inline {

@@ -89,7 +89,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
           </Button>
         </SheetTrigger>
         <SheetContent side="bottom" className="h-[85vh] p-0">
-          <SheetHeader className="border-border border-b">
+          <SheetHeader className="border-border border-b py-2">
             <SheetTitle>Select Symbol</SheetTitle>
             <SheetDescription>Search for a stock, ETF, crypto, or other asset</SheetDescription>
           </SheetHeader>
@@ -104,7 +104,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                   placeholder="Search symbols..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mobile:h-14 mobile:rounded-xl mobile:text-base h-10 w-full rounded-md border px-4 py-3 pl-12 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                  className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                   autoFocus
                 />
               </div>
