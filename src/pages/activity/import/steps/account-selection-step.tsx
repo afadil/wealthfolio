@@ -1,11 +1,13 @@
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
+import { ProgressIndicator } from "@/components/ui/progress-indicator";
+import { usePlatform } from "@/hooks/use-platform";
+import { Account, CsvRowError } from "@/lib/types";
+import { AccountSelector } from "../../../../components/account-selector";
+import { AccountSelectorMobile } from "../../../../components/account-selector-mobile";
+import { CSVFileViewer } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
 import { HelpTooltip } from "../components/help-tooltip";
-import { Button } from "@/components/ui/button";
-import { Account, CsvRowError } from "@/lib/types";
-import { CSVFileViewer } from "../components/csv-file-viewer";
-import { AccountSelector } from "../../../../components/account-selector";
-import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import { Icons } from "@/components/ui/icons";
 import { ImportAlert } from "../components/import-alert";
 
 interface AccountSelectionStepProps {
@@ -31,6 +33,8 @@ export const AccountSelectionStep = ({
   onNext,
   onBack,
 }: AccountSelectionStepProps) => {
+  const { isMobile } = usePlatform();
+
   // Check if there are any errors
   const hasErrors =
     errors &&
@@ -45,9 +49,9 @@ export const AccountSelectionStep = ({
         const criticalErrorObj = errors.find(
           (error) => error && (error.row === 0 || error.row === 1),
         );
-        return criticalErrorObj?.message || null;
+        return criticalErrorObj?.message ?? null;
       }
-      return errors[0]?.[0] || errors[1]?.[0] || null;
+      return errors[0]?.[0] ?? errors[1]?.[0] ?? null;
     })();
 
   // Simplified file validation status
@@ -106,14 +110,14 @@ export const AccountSelectionStep = ({
 
   // Error message to display in the UI
   const displayError =
-    criticalError ||
+    criticalError ??
     (errorMessages.length > 0
       ? errorMessages[0] +
         (errorMessages.length > 1 ? ` (and ${errorMessages.length - 1} more errors)` : "")
       : null);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {/* Row 1: Account and file selection */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
@@ -122,10 +126,41 @@ export const AccountSelectionStep = ({
             <HelpTooltip content="Make sure to select the account you want to import activities for" />
           </div>
           <div className="h-[120px]">
-            <AccountSelector
-              selectedAccount={selectedAccount}
-              setSelectedAccount={setSelectedAccount}
-            />
+            {isMobile ? (
+              <div className="border-border bg-background/50 hover:border-muted-foreground/50 hover:bg-background/80 flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-4 transition-colors">
+                {selectedAccount ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Icons.Briefcase className="text-primary h-5 w-5" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium">{selectedAccount.name}</p>
+                        <p className="text-muted-foreground text-xs">{selectedAccount.currency}</p>
+                      </div>
+                    </div>
+                    <AccountSelectorMobile
+                      setSelectedAccount={setSelectedAccount}
+                      includePortfolio={false}
+                      iconOnly={false}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Icons.Briefcase className="text-muted-foreground h-8 w-8" />
+                    <p className="text-muted-foreground text-center text-sm">No account selected</p>
+                    <AccountSelectorMobile
+                      setSelectedAccount={setSelectedAccount}
+                      includePortfolio={false}
+                      iconOnly={false}
+                    />
+                  </>
+                )}
+              </div>
+            ) : (
+              <AccountSelector
+                selectedAccount={selectedAccount}
+                setSelectedAccount={setSelectedAccount}
+              />
+            )}
           </div>
         </div>
 
@@ -148,10 +183,10 @@ export const AccountSelectionStep = ({
       </div>
 
       {/* Row 2: CSV Viewer or Error Display */}
-      <div className="min-h-[200px] pt-4">
+      <div className="min-h-[150px]">
         {/* Always show CSV viewer when data is available (with or without errors) */}
         {csvFile && formattedData.length > 0 && !isParsing && (
-          <CSVFileViewer data={formattedData} className="w-full" maxHeight="40vh" />
+          <CSVFileViewer data={formattedData} className="w-full" maxHeight="30vh" />
         )}
 
         {/* Show error alert when there's an error but no parsable data */}
@@ -159,14 +194,14 @@ export const AccountSelectionStep = ({
           <ImportAlert
             variant="destructive"
             title="Invalid CSV Format"
-            description={displayError || "Unknown error"}
+            description={displayError ?? "Unknown error"}
             icon={Icons.FileX}
           />
         )}
       </div>
 
-      {/* Row 4: Next button */}
-      <div className="flex justify-between">
+      {/* Row 3: Action buttons */}
+      <div className="flex justify-between pt-2">
         <Button variant="outline" onClick={onBack} disabled={isParsing}>
           Cancel
         </Button>

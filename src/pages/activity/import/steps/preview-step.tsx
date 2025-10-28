@@ -210,15 +210,15 @@ export const DataPreviewStep = ({
         <Card className="border-none shadow-none">
           <Tabs defaultValue="preview" className="w-full">
             <div className="relative mb-2">
-              <TabsList className="bg-secondary absolute top-3 right-0 z-50 flex space-x-1 rounded-full p-1">
+              <TabsList className="bg-secondary absolute -top-5 right-0 z-50 flex space-x-1 rounded-full p-1 md:top-3">
                 <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="preview"
                 >
                   Activity Preview
                 </TabsTrigger>
                 <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="raw"
                 >
                   File Preview
@@ -248,12 +248,18 @@ export const DataPreviewStep = ({
         />
       </div>
 
-      <div className="flex justify-between pt-4">
-        <motion.div whileHover="hover" whileTap="tap" variants={buttonVariants}>
+      <div className="flex flex-col-reverse justify-between gap-3 pt-4 md:flex-row">
+        <motion.div
+          whileHover="hover"
+          whileTap="tap"
+          variants={buttonVariants}
+          className="w-full md:w-auto"
+        >
           <Button
             variant="outline"
             onClick={confirmationState === "confirm" ? handleCancelConfirmation : onBack}
             disabled={isProcessing}
+            className="w-full md:w-auto"
           >
             {confirmationState === "confirm" ? (
               <>
@@ -280,10 +286,12 @@ export const DataPreviewStep = ({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.15 }}
+              className="w-full md:w-auto"
             >
               <Button
                 onClick={handleInitialClick}
                 disabled={activities.length === 0 || validActivitiesCount === 0 || isProcessing}
+                className="w-full md:w-auto"
               >
                 <div className="relative flex items-center">
                   {validActivitiesCount === activities.length
@@ -304,6 +312,7 @@ export const DataPreviewStep = ({
                 setConfirmationState("initial");
               }}
               onMouseEnter={() => {}}
+              className="w-full md:w-auto"
             >
               <motion.div variants={pulseVariants} animate="pulse">
                 <Button
@@ -321,8 +330,9 @@ export const DataPreviewStep = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              className="w-full md:w-auto"
             >
-              <Button disabled className="bg-primary font-medium shadow-md">
+              <Button disabled className="bg-primary w-full font-medium shadow-md md:w-auto">
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
                 Importing Activities...
               </Button>

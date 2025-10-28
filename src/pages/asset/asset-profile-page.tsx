@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { InputTags } from "@/components/ui/tag-input";
-import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { usePlatform } from "@/hooks/use-platform";
+import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
@@ -621,7 +621,7 @@ export const AssetProfilePage = () => {
         <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <Link to={location.state?.from ?? "/holdings?tab=holdings"}>
-              <Button variant="ghost" size="icon" className="mobile:size-10">
+              <Button variant="ghost" size="icon">
                 <Icons.ArrowLeft className="h-8 w-8 md:h-9 md:w-9" />
               </Button>
             </Link>

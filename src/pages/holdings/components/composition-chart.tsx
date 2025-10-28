@@ -22,12 +22,7 @@ const DisplayModeToggle: React.FC<{
 }> = ({ displayMode, onToggle }) => (
   <Tooltip>
     <TooltipTrigger asChild>
-      <Button
-        variant="secondary"
-        size="icon"
-        className="mobile:size-8 size-8 rounded-full"
-        onClick={onToggle}
-      >
+      <Button variant="secondary" size="icon" className="size-9 rounded-full" onClick={onToggle}>
         {displayMode === "symbol" ? (
           <Icons.Hash className="h-4 w-4" />
         ) : (

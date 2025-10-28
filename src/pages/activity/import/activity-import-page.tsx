@@ -2,7 +2,7 @@ import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
 import { Page, PageContent, PageHeader } from "@/components/page/page";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +29,7 @@ const STEPS = [
 
 const ActivityImportPage = () => {
   const navigate = useNavigate();
+  const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [activities, setActivities] = useState<ActivityImport[]>([]);
@@ -38,7 +39,7 @@ const ActivityImportPage = () => {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
   });
-  const accounts = accountsData || [];
+  const accounts = accountsData ?? [];
 
   // 1. CSV Parsing Hook - Focus on parsing and structure validation
   const {
@@ -109,7 +110,7 @@ const ActivityImportPage = () => {
       // Move to the next step
       goToNextStep();
     } catch (error) {
-      logger.error(`Validation error: ${error}`);
+      logger.error(`Validation error: ${String(error)}`);
     }
   };
 
@@ -174,11 +175,20 @@ const ActivityImportPage = () => {
 
   return (
     <Page>
-      <PageHeader heading="Import Activities" actions={<ImportHelpPopover />} />
-      <PageContent>
-        <Separator />
+      <PageHeader
+        heading="Import Activities"
+        displayBack={isMobile}
+        backUrl="/activities"
+        actions={
+          <>
+            {isMobile && <ImportHelpPopover />}
+            {!isMobile && <ImportHelpPopover />}
+          </>
+        }
+      />
+      <PageContent withPadding={false}>
         <ErrorBoundary>
-          <div className="flex-1 overflow-auto px-2 pb-6 sm:px-4 md:px-6">
+          <div className="px-2 pt-2 pb-6 sm:px-4 sm:pt-4 md:px-6 md:pt-6">
             <Card className="w-full">
               <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
                 <StepIndicator steps={STEPS} currentStep={currentStep} />

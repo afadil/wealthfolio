@@ -95,7 +95,7 @@ export default function DashboardPage() {
 
   return (
     <Page className="flex h-screen flex-col">
-      <PageScrollContainer data-ptr-content className="flex flex-col">
+      <PageScrollContainer data-ptr-content className="flex flex-col" withMobileNavOffset>
         <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
           <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
             <div className="flex items-start gap-2">

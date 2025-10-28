@@ -1,11 +1,11 @@
-import { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from "@/lib/types";
+import { Account, ActivityType, CsvRowData, ImportFormat, ImportMappingData } from "@/lib/types";
+import { useMemo } from "react";
 
-import { MappingTable } from "./mapping-table";
 import { CardContent } from "@/components/ui/card";
-import { CSVFileViewer } from "./csv-file-viewer";
 import { validateTickerSymbol } from "../utils/validation-utils";
+import { CSVFileViewer } from "./csv-file-viewer";
+import { MappingTable } from "./mapping-table";
 
 interface CsvMappingEditorProps {
   mapping: ImportMappingData;
@@ -228,18 +228,18 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
       <Tabs defaultValue="preview" className="flex flex-1 flex-col">
         <div className="py-2">
           <div className="flex items-center justify-between">
-            <div className="text-muted-foreground px-3 text-sm">
+            <div className="text-muted-foreground hidden px-3 text-sm md:block">
               <span className="font-medium">{totalRows} </span>total row{totalRows !== 1 ? "s" : ""}
             </div>
             <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
               <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="preview"
               >
                 Activity Preview
               </TabsTrigger>
               <TabsTrigger
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="raw"
               >
                 File Preview

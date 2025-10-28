@@ -249,7 +249,7 @@ export const HoldingsPage = () => {
     <Button
       variant="outline"
       size="icon"
-      className="mobile:size-9 relative flex-shrink-0"
+      className="relative size-9 flex-shrink-0"
       onClick={() => setIsFilterSheetOpen(true)}
     >
       <Icons.ListFilter className="h-4 w-4" />

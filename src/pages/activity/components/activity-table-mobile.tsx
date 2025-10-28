@@ -148,12 +148,12 @@ export const ActivityTableMobile = ({
           placeholder="Search..."
           value={searchInput}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="bg-secondary/30 mobile:h-10 flex-1 rounded-full border-none"
+          className="bg-secondary/30 h-10 flex-1 rounded-full border-none md:h-12"
         />
         <Button
           variant="outline"
           size="icon"
-          className="mobile:size-9 flex-shrink-0"
+          className="size-9 flex-shrink-0"
           onClick={() => setIsCompactView(!isCompactView)}
           title={isCompactView ? "Detailed view" : "Compact view"}
         >
@@ -166,7 +166,7 @@ export const ActivityTableMobile = ({
         <Button
           variant="outline"
           size="icon"
-          className="mobile:size-9 flex-shrink-0"
+          className="size-9 flex-shrink-0"
           onClick={() => setIsFilterSheetOpen(true)}
         >
           <div className="relative">

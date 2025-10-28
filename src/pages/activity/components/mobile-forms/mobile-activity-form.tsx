@@ -115,9 +115,14 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       }
 
       if (id) {
-        return await updateActivityMutation.mutateAsync({ id, ...submitData });
+        await updateActivityMutation.mutateAsync({ id, ...submitData });
+      } else {
+        await addActivityMutation.mutateAsync(submitData);
       }
-      return await addActivityMutation.mutateAsync(submitData);
+
+      // Reset form and step after successful submission
+      form.reset(defaultValues);
+      setCurrentStep(1);
     } catch (error) {
       logger.error(
         `Mobile Activity Form Submit Error: ${JSON.stringify({ error, formValues: form.getValues() })}`,
@@ -128,6 +133,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
 
   const handleNext = async () => {
     const fields = getFieldsForStep(currentStep);
+    // @ts-expect-error - field names are validated dynamically based on activity type
     const isValid = await form.trigger(fields);
 
     if (isValid) {
@@ -139,7 +145,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const getFieldsForStep = (step: number): any[] => {
+  const getFieldsForStep = (step: number): string[] => {
     switch (step) {
       case 1:
         return ["activityType"];
@@ -191,16 +197,18 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
-              <MobileActivitySteps
-                currentStep={currentStep}
-                accounts={accounts}
-                isEditing={!!activity?.id}
-              />
-            </form>
-          </Form>
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
+                <MobileActivitySteps
+                  currentStep={currentStep}
+                  accounts={accounts}
+                  isEditing={!!activity?.id}
+                />
+              </form>
+            </Form>
+          </div>
         </div>
 
         <SheetFooter className="mt-auto border-t px-6 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">

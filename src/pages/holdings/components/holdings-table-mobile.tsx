@@ -100,14 +100,14 @@ export const HoldingsTableMobile = ({
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-secondary/30 mobile:h-10 flex-1 rounded-full border-none"
+              className="bg-secondary/30 flex-1 rounded-full border-none"
             />
           )}
           {showFilterButton && (
             <Button
               variant="outline"
               size="icon"
-              className="mobile:size-9 relative flex-shrink-0"
+              className="relative size-9 flex-shrink-0"
               onClick={() => setIsFilterSheetOpen(true)}
             >
               <Icons.ListFilter className="h-4 w-4" />

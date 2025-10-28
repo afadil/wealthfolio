@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
@@ -28,7 +27,14 @@ import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { DateRange, PerformanceMetrics, ReturnData, TrackedItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
-import { AlertFeedback, DateRangeSelector, GainPercent } from "@wealthfolio/ui";
+import {
+  AlertFeedback,
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  DateRangeSelector,
+  GainPercent,
+} from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { AccountSelector } from "../../components/account-selector";
@@ -177,7 +183,7 @@ const SelectedItemBadge = ({
         variant="ghost"
         size="icon"
         className={cn(
-          "mobile:size-5 ml-2 size-5 transition-all duration-150",
+          "ml-2 size-5 transition-all duration-150",
           "hover:bg-destructive/10 hover:text-destructive hover:scale-110",
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
@@ -335,20 +341,26 @@ export default function PerformancePage() {
         <div className="flex items-center gap-2 md:hidden">
           {/* Selected items badges carousel */}
           {selectedItems.length > 0 && (
-            <ScrollArea className="scrollbar-hide flex-1 rounded-md whitespace-nowrap">
-              <div className="flex items-center gap-2" style={{ scrollBehavior: "smooth" }}>
+            <Carousel
+              opts={{
+                align: "start",
+                loop: false,
+              }}
+              className="flex-1"
+            >
+              <CarouselContent className="-ml-2">
                 {selectedItems.map((item) => (
-                  <SelectedItemBadge
-                    key={item.id}
-                    item={item}
-                    isSelected={selectedItemId === item.id}
-                    onSelect={() => handleBadgeSelect(item)}
-                    onDelete={(e) => handleBadgeDelete(e, item)}
-                  />
+                  <CarouselItem key={item.id} className="basis-auto pl-2">
+                    <SelectedItemBadge
+                      item={item}
+                      isSelected={selectedItemId === item.id}
+                      onSelect={() => handleBadgeSelect(item)}
+                      onDelete={(e) => handleBadgeDelete(e, item)}
+                    />
+                  </CarouselItem>
                 ))}
-              </div>
-              <ScrollBar orientation="horizontal" className="hidden" />
-            </ScrollArea>
+              </CarouselContent>
+            </Carousel>
           )}
 
           {/* Mobile: Plus button with dropdown */}
@@ -357,18 +369,21 @@ export default function PerformancePage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="bg-secondary/30 hover:bg-muted/80 mobile:size-9 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
+                className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
                 aria-label="Add item"
               >
                 <Icons.Plus className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)}>
+              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
                 <Icons.Briefcase className="mr-2 h-4 w-4" />
                 Add Account
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setBenchmarkSheetOpen(true)}>
+              <DropdownMenuItem
+                onSelect={() => setBenchmarkSheetOpen(true)}
+                className="py-4 md:py-2"
+              >
                 <Icons.TrendingUp className="mr-2 h-4 w-4" />
                 Add Benchmark
               </DropdownMenuItem>
@@ -381,20 +396,26 @@ export default function PerformancePage() {
           {/* Selected items badges - horizontal scroll carousel */}
           {selectedItems.length > 0 && (
             <div className="flex items-center gap-3">
-              <ScrollArea className="scrollbar-hide w-full max-w-[calc(100vw-24rem)] rounded-md whitespace-nowrap md:max-w-[calc(100vw-28rem)]">
-                <div className="flex items-center gap-2" style={{ scrollBehavior: "smooth" }}>
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: false,
+                }}
+                className="w-full max-w-[calc(100vw-24rem)] md:max-w-[calc(100vw-28rem)]"
+              >
+                <CarouselContent className="-ml-2">
                   {selectedItems.map((item) => (
-                    <SelectedItemBadge
-                      key={item.id}
-                      item={item}
-                      isSelected={selectedItemId === item.id}
-                      onSelect={() => handleBadgeSelect(item)}
-                      onDelete={(e) => handleBadgeDelete(e, item)}
-                    />
+                    <CarouselItem key={item.id} className="basis-auto pl-2">
+                      <SelectedItemBadge
+                        item={item}
+                        isSelected={selectedItemId === item.id}
+                        onSelect={() => handleBadgeSelect(item)}
+                        onDelete={(e) => handleBadgeDelete(e, item)}
+                      />
+                    </CarouselItem>
                   ))}
-                </div>
-                <ScrollBar orientation="horizontal" className="hidden" />
-              </ScrollArea>
+                </CarouselContent>
+              </Carousel>
 
               {/* Separator */}
               <Separator orientation="vertical" className="h-6 flex-shrink-0" />
@@ -453,82 +474,95 @@ export default function PerformancePage() {
                     <>
                       {/* Mobile compact metrics - horizontal scroll */}
                       {isMobile ? (
-                        <ScrollArea className="w-full">
-                          <div className="flex gap-3 pb-1">
-                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
-                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                Total Return
-                              </span>
-                              <span
-                                className={cn(
-                                  "text-base font-bold",
-                                  selectedItemData && selectedItemData.totalReturn >= 0
-                                    ? "text-success"
-                                    : "text-destructive",
-                                )}
-                              >
-                                <GainPercent
-                                  value={selectedItemData?.totalReturn ?? 0}
-                                  animated={true}
-                                  className="text-base"
-                                />
-                              </span>
-                            </div>
+                        <Carousel
+                          opts={{
+                            align: "start",
+                            loop: false,
+                          }}
+                          className="w-full"
+                        >
+                          <CarouselContent className="-ml-2 md:-ml-4">
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Total Return
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-base font-bold",
+                                    selectedItemData && selectedItemData.totalReturn >= 0
+                                      ? "text-success"
+                                      : "text-destructive",
+                                  )}
+                                >
+                                  <GainPercent
+                                    value={selectedItemData?.totalReturn ?? 0}
+                                    animated={true}
+                                    className="text-base"
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
 
-                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
-                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                Annualized
-                              </span>
-                              <span
-                                className={cn(
-                                  "text-base font-bold",
-                                  selectedItemData && selectedItemData.annualizedReturn >= 0
-                                    ? "text-success"
-                                    : "text-destructive",
-                                )}
-                              >
-                                <GainPercent
-                                  value={selectedItemData?.annualizedReturn ?? 0}
-                                  animated={true}
-                                  className="text-base"
-                                />
-                              </span>
-                            </div>
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Annualized
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-base font-bold",
+                                    selectedItemData && selectedItemData.annualizedReturn >= 0
+                                      ? "text-success"
+                                      : "text-destructive",
+                                  )}
+                                >
+                                  <GainPercent
+                                    value={selectedItemData?.annualizedReturn ?? 0}
+                                    animated={true}
+                                    className="text-base"
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
 
-                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
-                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                Volatility
-                              </span>
-                              <span className="text-foreground text-base font-bold">
-                                <NumberFlow
-                                  value={selectedItemData?.volatility ?? 0}
-                                  animated={true}
-                                  format={{
-                                    style: "percent",
-                                    maximumFractionDigits: 2,
-                                  }}
-                                />
-                              </span>
-                            </div>
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Volatility
+                                </span>
+                                <span className="text-foreground text-base font-bold">
+                                  <NumberFlow
+                                    value={selectedItemData?.volatility ?? 0}
+                                    animated={true}
+                                    format={{
+                                      style: "percent",
+                                      maximumFractionDigits: 2,
+                                    }}
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
 
-                            <div className="bg-muted/30 flex min-w-[140px] flex-1 flex-col gap-0.5 rounded-lg px-3 py-2">
-                              <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                Max Drawdown
-                              </span>
-                              <span className="text-destructive text-base font-bold">
-                                <NumberFlow
-                                  value={(selectedItemData?.maxDrawdown ?? 0) * -1}
-                                  animated={true}
-                                  format={{
-                                    style: "percent",
-                                    maximumFractionDigits: 2,
-                                  }}
-                                />
-                              </span>
-                            </div>
-                          </div>
-                          <ScrollBar orientation="horizontal" className="h-1.5" />
-                        </ScrollArea>
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Max Drawdown
+                                </span>
+                                <span className="text-destructive text-base font-bold">
+                                  <NumberFlow
+                                    value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                                    animated={true}
+                                    format={{
+                                      style: "percent",
+                                      maximumFractionDigits: 2,
+                                    }}
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
+                          </CarouselContent>
+                        </Carousel>
                       ) : (
                         /* Desktop metrics */
                         <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
