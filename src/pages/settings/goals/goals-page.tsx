@@ -76,7 +76,7 @@ const SettingsGoalsPage = () => {
           </>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8">
+        <div className="w-full pt-8">
           {goals?.length ? (
             <>
               <h3 className="p-2 text-xl font-bold">Goals</h3>

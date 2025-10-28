@@ -64,7 +64,7 @@ const SettingsAccountsPage = () => {
           </>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8">
+        <div className="w-full pt-8">
           {accounts?.length ? (
             <div className="divide-border divide-y rounded-md border">
               {accounts.map((account: Account) => (

@@ -1,74 +1,10 @@
-import { useState } from "react";
-import { Area, AreaChart, Tooltip, YAxis, TooltipProps } from "recharts";
-import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
-import { formatDate } from "@/lib/utils";
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { AmountDisplay } from "@wealthfolio/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-
-type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
-  isBalanceHidden: boolean;
-};
-
-const CustomTooltip = ({
-  active,
-  payload,
-  isBalanceHidden,
-  isChartHovered,
-}: CustomTooltipProps & { isChartHovered: boolean }) => {
-  if (active && payload?.length) {
-    const totalValueData = payload.find((p) => p.dataKey === "totalValue");
-    const netContributionData = payload.find((p) => p.dataKey === "netContribution");
-
-    const tvPayload = totalValueData?.payload as
-      | { date: string; totalValue: number; currency: string }
-      | undefined;
-    const ncPayload = netContributionData?.payload as
-      | { netContribution: number; currency: string }
-      | undefined;
-
-    if (tvPayload) {
-      return (
-        <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
-          <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
-
-          <div className="flex items-center justify-between space-x-2">
-            <div className="flex items-center space-x-1.5">
-              <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
-              <span className="text-muted-foreground text-xs">Total Value:</span>
-            </div>
-            <AmountDisplay
-              value={tvPayload.totalValue}
-              currency={tvPayload.currency}
-              isHidden={isBalanceHidden}
-              className="text-xs font-semibold"
-            />
-          </div>
-          {isChartHovered && ncPayload && (
-            <div className="flex items-center justify-between space-x-2">
-              <div className="flex items-center space-x-1.5">
-                <span
-                  className="block h-0 w-3 border-b-2 border-dashed"
-                  style={{ borderColor: "var(--muted-foreground)" }}
-                />
-                <span className="text-muted-foreground text-xs">Net Deposit:</span>
-              </div>
-              <AmountDisplay
-                value={ncPayload.netContribution}
-                currency={ncPayload.currency}
-                isHidden={isBalanceHidden}
-                className="text-xs font-semibold"
-              />
-            </div>
-          )}
-        </div>
-      );
-    }
-  }
-
-  return null;
-};
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { formatDate } from "@/lib/utils";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { useState } from "react";
+import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 
 interface HistoryChartData {
   date: string;
@@ -76,6 +12,84 @@ interface HistoryChartData {
   netContribution: number;
   currency: string;
 }
+
+interface TooltipEntry {
+  dataKey?: string | number;
+  payload?: HistoryChartData;
+}
+
+interface TooltipBaseProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+}
+
+interface CustomTooltipProps extends TooltipBaseProps {
+  isBalanceHidden: boolean;
+  isChartHovered: boolean;
+}
+
+const CustomTooltip = ({
+  active,
+  payload,
+  isBalanceHidden,
+  isChartHovered,
+}: CustomTooltipProps) => {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const totalValueData = payload.find(
+    (item): item is TooltipEntry & { dataKey: "totalValue"; payload: HistoryChartData } =>
+      item?.dataKey === "totalValue" && item.payload !== undefined,
+  );
+  const netContributionData = payload.find(
+    (item): item is TooltipEntry & { dataKey: "netContribution"; payload: HistoryChartData } =>
+      item?.dataKey === "netContribution" && item.payload !== undefined,
+  );
+
+  const tvPayload = totalValueData?.payload;
+  const ncPayload = netContributionData?.payload;
+
+  if (!tvPayload) {
+    return null;
+  }
+
+  return (
+    <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
+      <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
+
+      <div className="flex items-center justify-between space-x-2">
+        <div className="flex items-center space-x-1.5">
+          <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
+          <span className="text-muted-foreground text-xs">Total Value:</span>
+        </div>
+        <AmountDisplay
+          value={tvPayload.totalValue}
+          currency={tvPayload.currency}
+          isHidden={isBalanceHidden}
+          className="text-xs font-semibold"
+        />
+      </div>
+      {isChartHovered && ncPayload && (
+        <div className="flex items-center justify-between space-x-2">
+          <div className="flex items-center space-x-1.5">
+            <span
+              className="block h-0 w-3 border-b-2 border-dashed"
+              style={{ borderColor: "var(--muted-foreground)" }}
+            />
+            <span className="text-muted-foreground text-xs">Net Deposit:</span>
+          </div>
+          <AmountDisplay
+            value={ncPayload.netContribution}
+            currency={ncPayload.currency}
+            isHidden={isBalanceHidden}
+            className="text-xs font-semibold"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function HistoryChart({
   data,
@@ -96,7 +110,6 @@ export function HistoryChart({
     },
   } satisfies ChartConfig;
 
-  // Conditional rendering for loading state
   if (isLoading && data.length === 0) {
     return <Skeleton className="h-full w-full" />;
   }
@@ -125,13 +138,12 @@ export function HistoryChart({
           position={{ y: -20 }}
           content={(props) => (
             <CustomTooltip
-              {...props}
+              {...(props as TooltipBaseProps)}
               isBalanceHidden={isBalanceHidden}
               isChartHovered={isChartHovered}
             />
           )}
         />
-        {/* <YAxis hide type="number" domain={[minValue, maxValue]} /> */}
         <YAxis hide type="number" domain={["auto", "auto"]} />
         <Area
           isAnimationActive={true}

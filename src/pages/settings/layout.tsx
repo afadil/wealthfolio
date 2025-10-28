@@ -129,17 +129,19 @@ export default function SettingsLayout() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="mx-2 hidden lg:block">
-        <div className="space-y-0.5">
-          <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-        </div>
-        <Separator className="my-6" />
-        <div className="flex flex-col space-y-8 lg:grid lg:grid-cols-[220px_1fr] lg:gap-10 lg:space-y-0">
-          <aside className="lg:w-sidebar lg:sticky lg:top-20 lg:self-start lg:pr-4">
-            <SidebarNav items={sidebarNavItems} />
-          </aside>
-          <div className="mx-12 min-w-0 flex-1 lg:max-w-4xl">
-            <Outlet />
+      <div className="hidden lg:flex lg:w-full lg:justify-start">
+        <div className="flex w-full max-w-6xl flex-col px-2 py-8">
+          <div className="space-y-0.5">
+            <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+          </div>
+          <Separator className="my-6" />
+          <div className="flex gap-10">
+            <aside className="hidden w-[240px] shrink-0 lg:sticky lg:top-24 lg:flex lg:flex-col lg:self-start">
+              <SidebarNav items={sidebarNavItems} />
+            </aside>
+            <div className="min-w-0 flex-1">
+              <Outlet />
+            </div>
           </div>
         </div>
       </div>

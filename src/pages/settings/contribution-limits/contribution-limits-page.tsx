@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from "@wealthfolio/ui";
-import type { ContributionLimit } from "@/lib/types";
-import { SettingsHeader } from "../header";
 import { getContributionLimit } from "@/commands/contribution-limits";
-import { useQuery } from "@tanstack/react-query";
-import { QueryKeys } from "@/lib/query-keys";
-import { useContributionLimitMutations } from "./use-contribution-limit-mutations";
-import { ContributionLimitItem } from "./components/contribution-limit-item";
-import { ContributionLimitEditModal } from "./components/contribution-limit-edit-modal";
 import { useAccounts } from "@/hooks/use-accounts";
+import { QueryKeys } from "@/lib/query-keys";
+import type { ContributionLimit } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import { useState } from "react";
+import { SettingsHeader } from "../header";
+import { ContributionLimitEditModal } from "./components/contribution-limit-edit-modal";
+import { ContributionLimitItem } from "./components/contribution-limit-item";
+import { useContributionLimitMutations } from "./use-contribution-limit-mutations";
 
 const SettingsContributionLimitPage = () => {
   const [visibleModal, setVisibleModal] = useState(false);
@@ -64,19 +64,19 @@ const SettingsContributionLimitPage = () => {
             >
               <Icons.Plus className="size-4" />
             </Button>
-            <Button className="hidden sm:inline-flex" onClick={() => handleAddLimit()}>
+            <Button size="sm" className="hidden sm:inline-flex" onClick={() => handleAddLimit()}>
               <Icons.Plus className="mr-2 size-4" />
               Add limit
             </Button>
           </>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8">
+        <div className="w-full pt-8">
           <h2 className="text-md text-muted-foreground mb-3 font-semibold">
             Current Year ({currentYear})
           </h2>
           {currentYearLimits.length ? (
-            <>
+            <div className="w-full space-y-4">
               {currentYearLimits.map((limit: ContributionLimit) => (
                 <ContributionLimitItem
                   key={limit.id}
@@ -86,7 +86,7 @@ const SettingsContributionLimitPage = () => {
                   onDelete={handleDeleteLimit}
                 />
               ))}
-            </>
+            </div>
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="CircleGauge" />
@@ -121,15 +121,17 @@ const SettingsContributionLimitPage = () => {
               {showPreviousYears && (
                 <div className="mt-8">
                   <h2 className="text-md text-muted-foreground mb-3">Previous Years</h2>
-                  {previousYearsLimits.map((limit: ContributionLimit) => (
-                    <ContributionLimitItem
-                      key={limit.id}
-                      limit={limit}
-                      accounts={accounts || []}
-                      onEdit={handleEditLimit}
-                      onDelete={handleDeleteLimit}
-                    />
-                  ))}
+                  <div className="w-full space-y-4">
+                    {previousYearsLimits.map((limit: ContributionLimit) => (
+                      <ContributionLimitItem
+                        key={limit.id}
+                        limit={limit}
+                        accounts={accounts || []}
+                        onEdit={handleEditLimit}
+                        onDelete={handleDeleteLimit}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

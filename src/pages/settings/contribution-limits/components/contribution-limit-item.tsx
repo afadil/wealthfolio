@@ -1,8 +1,4 @@
-import { useState, useEffect } from "react";
 import { Account, ContributionLimit } from "@/lib/types";
-import { useContributionLimitProgress } from "../use-contribution-limit-mutations";
-import { AccountSelection } from "./account-selection";
-import { ContributionLimitOperations } from "./contribution-limit-operations";
 import {
   Button,
   Card,
@@ -14,6 +10,10 @@ import {
   Skeleton,
   formatAmount,
 } from "@wealthfolio/ui";
+import { useEffect, useState } from "react";
+import { useContributionLimitProgress } from "../use-contribution-limit-mutations";
+import { AccountSelection } from "./account-selection";
+import { ContributionLimitOperations } from "./contribution-limit-operations";
 
 interface ContributionLimitItemProps {
   limit: ContributionLimit;
@@ -59,7 +59,7 @@ export function ContributionLimitItem({
 
   return (
     <Card
-      className={`mb-4 ${progressPercentageNumber === 100 ? "border-success/20 bg-success/10 shadow-sm" : isOverLimit ? "border-destructive/20 bg-destructive/10 shadow-sm" : ""} last:mb-0`}
+      className={`w-full ${progressPercentageNumber === 100 ? "border-success/20 bg-success/10 shadow-sm" : isOverLimit ? "border-destructive/20 bg-destructive/10 shadow-sm" : ""}`}
     >
       <CardHeader className="cursor-pointer pb-3" onClick={toggleExpanded}>
         <div className="flex items-center justify-between">
