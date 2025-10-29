@@ -1,5 +1,5 @@
+import { importManualQuotes } from "@/commands/market-data";
 import { useCallback, useState } from "react";
-import { invokeTauri } from "../adapters";
 import { parseCsvContent, validateCsvFile } from "../lib/quote-import-utils";
 import {
   QuoteImport,
@@ -7,6 +7,43 @@ import {
   QuoteImportPreview,
   QuoteImportState,
 } from "../lib/types/quote-import";
+
+function prepareQuotesForImport(quotes: QuoteImport[]): QuoteImport[] {
+  return quotes.map((quote) => ({
+    ...quote,
+    validationStatus: "valid" as QuoteImport["validationStatus"],
+    errorMessage: undefined,
+  }));
+}
+
+function normalizeQuoteImport(quote: QuoteImport): QuoteImport {
+  const rawStatus = (quote as unknown as { validationStatus: unknown }).validationStatus;
+  let validationStatus: QuoteImport["validationStatus"] = "valid";
+  let errorMessage = quote.errorMessage;
+
+  if (typeof rawStatus === "string") {
+    if (rawStatus === "valid" || rawStatus === "warning" || rawStatus === "error") {
+      validationStatus = rawStatus;
+    }
+  } else if (rawStatus && typeof rawStatus === "object") {
+    const warning = (rawStatus as { warning?: unknown }).warning;
+    const error = (rawStatus as { error?: unknown }).error;
+
+    if (typeof warning === "string") {
+      validationStatus = "warning";
+      errorMessage = warning;
+    } else if (typeof error === "string") {
+      validationStatus = "error";
+      errorMessage = error;
+    }
+  }
+
+  return {
+    ...quote,
+    validationStatus,
+    errorMessage,
+  };
+}
 
 export function useQuoteImport(): QuoteImportState & QuoteImportActions {
   const [file, setFile] = useState<File | null>(null);
@@ -42,6 +79,13 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
       const fileContent = await file.text();
 
       const parsedQuotes = parseCsvContent(fileContent);
+      const detectedColumns = (validation.detectedHeaders ?? []).reduce(
+        (acc, header) => {
+          acc[header] = header;
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
 
       if (parsedQuotes.length === 0) {
         setError("No valid quotes found in file");
@@ -57,7 +101,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         validRows: validQuotes.length,
         invalidRows: invalidQuotes.length,
         sampleQuotes: parsedQuotes.slice(0, 10), // Show sample in UI
-        detectedColumns: {},
+        detectedColumns,
         duplicateCount: 0,
       };
 
@@ -105,10 +149,11 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         });
       }, 200);
 
-      const result = await invokeTauri<QuoteImport[]>("import_quotes_csv", {
-        quotes: allQuotes, // Import ALL quotes, not just samples
+      const result = await importManualQuotes(
+        prepareQuotesForImport(allQuotes),
         overwriteExisting,
-      });
+      );
+      const normalizedResult = result.map(normalizeQuoteImport);
 
       clearInterval(progressInterval);
 
@@ -119,7 +164,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         prev
           ? {
               ...prev,
-              sampleQuotes: result,
+              sampleQuotes: normalizedResult,
             }
           : null,
       );

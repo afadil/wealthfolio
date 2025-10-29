@@ -1,5 +1,6 @@
 import { Icons } from "@/components/ui/icons";
 import { motion } from "motion/react";
+import { Fragment } from "react";
 
 interface Step {
   id: number;
@@ -16,53 +17,52 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
     <div className="w-full">
       {/* Mobile: compact, scrollable rail with current title */}
       <div className="md:hidden">
-        <div className="flex items-center justify-center px-1 py-2">
-          <div className="flex items-center justify-between" style={{ width: "min(100%, 300px)" }}>
-            {steps.map((step, index) => {
-              const isCompleted = step.id < currentStep;
-              const isCurrent = step.id === currentStep;
-              const isLast = index === steps.length - 1;
+        <div className="mx-auto flex w-full max-w-[340px] items-center px-5 py-3">
+          {steps.map((step, index) => {
+            const isCompleted = step.id < currentStep;
+            const isCurrent = step.id === currentStep;
+            const isLast = index === steps.length - 1;
 
-              return (
-                <div key={`m-${step.id}`} className="flex flex-1 items-center">
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0.8 }}
-                    animate={{
-                      scale: isCurrent ? 1.1 : 1,
-                      opacity: 1,
-                    }}
-                    transition={{ type: "spring", stiffness: 400, damping: 20, duration: 0.25 }}
-                    className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                      isCompleted
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : isCurrent
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-muted-foreground/30 text-muted-foreground"
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <Icons.Check className="h-3.5 w-3.5" />
-                    ) : (
-                      <span className="text-xs font-medium">{step.id}</span>
-                    )}
-                  </motion.div>
-
-                  {!isLast && (
-                    <div className="bg-muted-foreground/30 relative mx-1 h-[2px] flex-1 overflow-hidden">
-                      <motion.div
-                        initial={{ width: "0%" }}
-                        animate={{ width: isCompleted ? "100%" : "0%" }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="bg-primary absolute inset-0 h-full"
-                      />
-                    </div>
+            return (
+              <Fragment key={`m-${step.id}`}>
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0.8 }}
+                  animate={{
+                    scale: 1,
+                    opacity: 1,
+                  }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20, duration: 0.25 }}
+                  style={{ boxShadow: isCurrent ? "0 0 0 3px rgba(var(--primary), 0.2)" : "none" }}
+                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                    isCompleted
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : isCurrent
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-muted-foreground/30 text-muted-foreground"
+                  }`}
+                >
+                  {isCompleted ? (
+                    <Icons.Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <span className="text-xs font-medium">{step.id}</span>
                   )}
-                </div>
-              );
-            })}
-          </div>
+                </motion.div>
+
+                {!isLast && (
+                  <div className="relative mx-2 h-[2px] flex-1 overflow-hidden rounded-full bg-muted-foreground/20">
+                    <motion.div
+                      initial={{ width: "0%" }}
+                      animate={{ width: isCompleted ? "100%" : "0%" }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="bg-primary absolute inset-0 h-full"
+                    />
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
         </div>
-        <div className="text-foreground px-2 pb-2 text-center text-sm font-medium">
+        <div className="px-3 pb-3 text-center text-xs font-medium text-muted-foreground">
           {steps[currentStep - 1]?.title}
         </div>
       </div>

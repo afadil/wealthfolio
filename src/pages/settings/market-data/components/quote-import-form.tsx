@@ -109,7 +109,7 @@ export function QuoteImportForm({
       opacity: 1,
       rotate: 0,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         stiffness: 260,
         damping: 20,
         duration: 0.5,
@@ -131,7 +131,7 @@ export function QuoteImportForm({
       opacity: 1,
       transition: {
         delay: 0.1,
-        type: "spring",
+        type: "spring" as const,
         stiffness: 300,
       },
     },
@@ -140,10 +140,7 @@ export function QuoteImportForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Icons.Import className="h-5 w-5" />
-          Select CSV File
-        </CardTitle>
+        <CardTitle className="flex items-center gap-2 text-lg">Select CSV File</CardTitle>
         <CardDescription>
           Choose a CSV file containing historical quote data to import
         </CardDescription>
@@ -316,6 +313,7 @@ export function QuoteImportForm({
               id="overwrite"
               checked={overwriteExisting}
               onCheckedChange={onOverwriteChange}
+              className="h-6 w-6"
             />
             <Label htmlFor="overwrite" className="text-sm">
               Overwrite existing quotes with the same symbol and date

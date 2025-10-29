@@ -238,12 +238,6 @@ mod tests {
         ) -> Result<MarketDataProviderSetting> {
             unimplemented!()
         }
-        async fn validate_csv_quotes(
-            &self,
-            _file_path: &str,
-        ) -> Result<crate::market_data::market_data_model::QuoteImportPreview> {
-            unimplemented!()
-        }
         async fn import_quotes_from_csv(
             &self,
             _quotes: Vec<crate::market_data::market_data_model::QuoteImport>,

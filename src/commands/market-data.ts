@@ -1,3 +1,4 @@
+import type { QuoteImport } from "@/lib/types/quote-import";
 import {
   QuoteSummary,
   Asset,
@@ -216,6 +217,25 @@ export const updateMarketDataProviderSettings = async (payload: {
     }
   } catch (error) {
     logger.error("Error updating market data provider settings.");
+    throw error;
+  }
+};
+
+export const importManualQuotes = async (
+  quotes: QuoteImport[],
+  overwriteExisting: boolean,
+): Promise<QuoteImport[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("import_quotes_csv", { quotes, overwriteExisting });
+      case RUN_ENV.WEB:
+        throw new Error("Manual quote import is only available on desktop.");
+      default:
+        throw new Error("Manual quote import is not supported in this environment.");
+    }
+  } catch (error) {
+    logger.error("Error importing manual quotes.");
     throw error;
   }
 };

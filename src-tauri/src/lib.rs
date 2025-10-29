@@ -341,6 +341,7 @@ pub fn run() {
             commands::market_data::delete_quote,
             commands::market_data::get_quote_history,
             commands::market_data::get_market_data_providers,
+            commands::market_data::import_quotes_csv,
             commands::platform::get_platform,
             commands::platform::is_mobile,
             commands::platform::is_desktop,

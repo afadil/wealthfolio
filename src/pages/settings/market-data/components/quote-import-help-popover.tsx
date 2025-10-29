@@ -1,19 +1,19 @@
-import { Icons } from '@/components/ui/icons';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
+import { Icons } from "@/components/ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 export function QuoteImportHelpPopover() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button type="button" variant="link" className="flex items-center">
+        <Button type="button" variant="link" className="flex items-center gap-1 text-sm">
           <Icons.HelpCircle className="mr-1 h-5 w-5" />
           How to Import Quotes?
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="m-4 w-[900px] p-6 text-sm">
+      <PopoverContent className="m-3 w-[min(90vw,900px)] max-h-[min(80vh,520px)] overflow-y-auto rounded-lg p-4 text-sm sm:m-4 sm:p-6">
         <h4 className="text-lg font-semibold">Importing Historical Quotes</h4>
-        <div className="mt-4 grid grid-cols-2 gap-6">
+        <div className="mt-4 grid gap-6 sm:grid-cols-2">
           {/* Left Column - Instructions */}
           <div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -27,7 +27,7 @@ export function QuoteImportHelpPopover() {
               <li>Import quotes with optional duplicate handling</li>
             </ol>
             <div className="mt-4 space-y-3">
-              <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
+              <div className="rounded-md border border-blue-500 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-900/40">
                 <p className="text-sm">
                   <strong className="text-blue-700 dark:text-blue-300">💡 Tip:</strong> Use this
                   feature when external data providers only have quotes from recent years, but you
@@ -35,7 +35,7 @@ export function QuoteImportHelpPopover() {
                 </p>
               </div>
 
-              <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
+              <div className="rounded-md border border-green-500 bg-green-50 p-3 dark:border-green-500/40 dark:bg-green-900/40">
                 <p className="text-sm">
                   <strong className="text-green-700 dark:text-green-300">
                     📊 Required fields:
@@ -45,7 +45,7 @@ export function QuoteImportHelpPopover() {
                 </p>
               </div>
 
-              <div className="border-purple-500 bg-purple-50 p-3 dark:bg-purple-900/50">
+              <div className="rounded-md border border-purple-500 bg-purple-50 p-3 dark:border-purple-500/40 dark:bg-purple-900/40">
                 <p className="text-sm">
                   <strong className="text-purple-700 dark:text-purple-300">
                     ⚡ Auto-formatting:
@@ -62,7 +62,7 @@ export function QuoteImportHelpPopover() {
             <div className="space-y-4">
               <div>
                 <p className="font-semibold">Required CSV Format:</p>
-                <pre className="mt-2 select-all overflow-x-auto bg-muted p-3 text-xs leading-relaxed">
+                <pre className="mt-2 select-all overflow-x-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
                   <span className="text-muted-foreground">
                     # Required columns: symbol, date, close
                   </span>
@@ -111,7 +111,7 @@ export function QuoteImportHelpPopover() {
                 </ul>
               </div>
 
-              <div className="border-yellow-500 bg-yellow-50 p-3 dark:bg-yellow-900/50">
+              <div className="rounded-md border border-yellow-500 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-900/40">
                 <p className="text-sm">
                   <strong className="text-yellow-700 dark:text-yellow-300">⚠️ Important:</strong>{' '}
                   Large imports may take time. The system will show progress and handle errors
