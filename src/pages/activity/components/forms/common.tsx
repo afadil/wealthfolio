@@ -90,7 +90,13 @@ export const ConfigurationCheckbox = ({
   );
 };
 
-export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+export const CommonFields = ({
+  accounts,
+  isTransfer = false,
+}: {
+  accounts: AccountSelectOption[];
+  isTransfer?: boolean;
+}) => {
   const { control, watch } = useFormContext();
   const showCurrency = watch('showCurrencySelect');
 
@@ -101,7 +107,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
         name="accountId"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Account</FormLabel>
+            <FormLabel>{isTransfer ? 'From Account' : 'Account'}</FormLabel>
             <FormControl>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <SelectTrigger>
@@ -160,7 +166,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
           <FormItem>
             <FormLabel>Description</FormLabel>
             <FormControl>
-              <Textarea 
+              <Textarea
                 placeholder="Add an optional description or comment for this transaction..."
                 className="resize-none"
                 rows={3}
@@ -195,4 +201,4 @@ export function AssetSymbolInput({ field, isManualAsset }: { field: any; isManua
       <FormMessage className="text-xs" />
     </FormItem>
   );
-} 
+}

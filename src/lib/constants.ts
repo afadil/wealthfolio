@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-
 export const PORTFOLIO_ACCOUNT_ID = 'TOTAL';
 
 export const HoldingType = {
@@ -74,7 +73,7 @@ export const IMPORT_REQUIRED_FIELDS = [
   ImportFormat.AMOUNT,
 ] as const;
 
-export type ImportRequiredField = typeof IMPORT_REQUIRED_FIELDS[number];
+export type ImportRequiredField = (typeof IMPORT_REQUIRED_FIELDS)[number];
 
 export const ExportDataType = {
   ACCOUNTS: 'accounts',
@@ -117,6 +116,7 @@ export const ActivityType = {
   REMOVE_HOLDING: 'REMOVE_HOLDING',
   TRANSFER_IN: 'TRANSFER_IN',
   TRANSFER_OUT: 'TRANSFER_OUT',
+  TRANSFER: 'TRANSFER',
   FEE: 'FEE',
   TAX: 'TAX',
   SPLIT: 'SPLIT',
@@ -138,6 +138,7 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.INTEREST,
   ActivityType.TRANSFER_IN,
   ActivityType.TRANSFER_OUT,
+  ActivityType.TRANSFER,
   ActivityType.TAX,
   ActivityType.FEE,
 ] as const;
@@ -157,6 +158,7 @@ export const activityTypeSchema = z.enum([
   ActivityType.WITHDRAWAL,
   ActivityType.TRANSFER_IN,
   ActivityType.TRANSFER_OUT,
+  ActivityType.TRANSFER,
   ActivityType.ADD_HOLDING,
   ActivityType.REMOVE_HOLDING,
   ActivityType.FEE,
@@ -175,7 +177,8 @@ export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.REMOVE_HOLDING]: 'Remove Holding',
   [ActivityType.TRANSFER_IN]: 'Transfer In',
   [ActivityType.TRANSFER_OUT]: 'Transfer Out',
+  [ActivityType.TRANSFER]: 'Transfer',
   [ActivityType.FEE]: 'Fee',
   [ActivityType.TAX]: 'Tax',
   [ActivityType.SPLIT]: 'Split',
-}; 
+};
