@@ -1,6 +1,6 @@
+import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 
 export function QuoteImportHelpPopover() {
   return (
@@ -11,12 +11,12 @@ export function QuoteImportHelpPopover() {
           How to Import Quotes?
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="m-3 w-[min(90vw,900px)] max-h-[min(80vh,520px)] overflow-y-auto rounded-lg p-4 text-sm sm:m-4 sm:p-6">
+      <PopoverContent className="m-3 max-h-[min(80vh,520px)] w-[min(90vw,900px)] overflow-y-auto rounded-lg p-4 text-sm sm:m-4 sm:p-6">
         <h4 className="text-lg font-semibold">Importing Historical Quotes</h4>
         <div className="mt-4 grid gap-6 sm:grid-cols-2">
           {/* Left Column - Instructions */}
           <div>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-sm">
               Import historical market data from CSV files to fill gaps in your portfolio data for
               assets where external data sources only provide recent quotes.
             </p>
@@ -39,7 +39,7 @@ export function QuoteImportHelpPopover() {
                 <p className="text-sm">
                   <strong className="text-green-700 dark:text-green-300">
                     📊 Required fields:
-                  </strong>{' '}
+                  </strong>{" "}
                   Only symbol and close price are required. Open, high, low, volume, and currency
                   are optional but recommended for complete data.
                 </p>
@@ -49,7 +49,7 @@ export function QuoteImportHelpPopover() {
                 <p className="text-sm">
                   <strong className="text-purple-700 dark:text-purple-300">
                     ⚡ Auto-formatting:
-                  </strong>{' '}
+                  </strong>{" "}
                   Multiple date formats are supported (YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY). Currency
                   symbols are automatically handled.
                 </p>
@@ -62,7 +62,7 @@ export function QuoteImportHelpPopover() {
             <div className="space-y-4">
               <div>
                 <p className="font-semibold">Required CSV Format:</p>
-                <pre className="mt-2 select-all overflow-x-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+                <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 text-xs leading-relaxed select-all">
                   <span className="text-muted-foreground">
                     # Required columns: symbol, date, close
                   </span>
@@ -113,7 +113,7 @@ export function QuoteImportHelpPopover() {
 
               <div className="rounded-md border border-yellow-500 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-900/40">
                 <p className="text-sm">
-                  <strong className="text-yellow-700 dark:text-yellow-300">⚠️ Important:</strong>{' '}
+                  <strong className="text-yellow-700 dark:text-yellow-300">⚠️ Important:</strong>{" "}
                   Large imports may take time. The system will show progress and handle errors
                   gracefully.
                 </p>

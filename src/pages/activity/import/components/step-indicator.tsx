@@ -49,7 +49,7 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
                 </motion.div>
 
                 {!isLast && (
-                  <div className="relative mx-2 h-[2px] flex-1 overflow-hidden rounded-full bg-muted-foreground/20">
+                  <div className="bg-muted-foreground/20 relative mx-2 h-[2px] flex-1 overflow-hidden rounded-full">
                     <motion.div
                       initial={{ width: "0%" }}
                       animate={{ width: isCompleted ? "100%" : "0%" }}
@@ -62,7 +62,7 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
             );
           })}
         </div>
-        <div className="px-3 pb-3 text-center text-xs font-medium text-muted-foreground">
+        <div className="text-muted-foreground px-3 pb-3 text-center text-xs font-medium">
           {steps[currentStep - 1]?.title}
         </div>
       </div>
