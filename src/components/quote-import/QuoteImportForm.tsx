@@ -1,18 +1,18 @@
-import React, { useRef, useState } from 'react';
-import { Button } from '@wealthfolio/ui/components/ui/button';
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@wealthfolio/ui/components/ui/card';
-import { Input } from '@wealthfolio/ui/components/ui/input';
-import { Label } from '@wealthfolio/ui/components/ui/label';
-import { Checkbox } from '@wealthfolio/ui/components/ui/checkbox';
-import { Icons } from '@wealthfolio/ui/components/ui/icons';
-import { Alert, AlertDescription } from '@wealthfolio/ui/components/ui/alert';
-import { motion, AnimatePresence } from 'framer-motion';
+} from "@wealthfolio/ui/components/ui/card";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { Label } from "@wealthfolio/ui/components/ui/label";
+import { AnimatePresence, motion } from "motion/react";
+import React, { useRef, useState } from "react";
 
 interface QuoteImportFormProps {
   file: File | null;
@@ -47,7 +47,7 @@ export function QuoteImportForm({
     setIsDragging(false);
 
     const droppedFile = event.dataTransfer.files?.[0];
-    if (droppedFile && droppedFile.type === 'text/csv') {
+    if (droppedFile && droppedFile.type === "text/csv") {
       onFileSelect(droppedFile);
     }
   };
@@ -74,27 +74,27 @@ export function QuoteImportForm({
     e.stopPropagation();
     onFileSelect(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   // Determine the border and background colors based on state
   const getBorderClasses = () => {
     if (isDragging) {
-      return 'border-primary bg-primary/5';
+      return "border-primary bg-primary/5";
     }
 
     if (file) {
       if (isValidating) {
-        return 'border-blue-500 bg-blue-50 dark:bg-blue-900/10';
+        return "border-blue-500 bg-blue-50 dark:bg-blue-900/10";
       }
       if (error) {
-        return 'border-red-500 bg-red-50 dark:bg-red-900/10';
+        return "border-red-500 bg-red-50 dark:bg-red-900/10";
       }
-      return 'border-green-500 bg-green-50 dark:bg-green-900/10';
+      return "border-green-500 bg-green-50 dark:bg-green-900/10";
     }
 
-    return 'border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50';
+    return "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50";
   };
 
   // Animation variants for icon containers
@@ -109,7 +109,7 @@ export function QuoteImportForm({
       opacity: 1,
       rotate: 0,
       transition: {
-        type: 'spring',
+        type: "spring",
         stiffness: 260,
         damping: 20,
         duration: 0.5,
@@ -131,7 +131,7 @@ export function QuoteImportForm({
       opacity: 1,
       transition: {
         delay: 0.1,
-        type: 'spring',
+        type: "spring",
         stiffness: 300,
       },
     },
@@ -151,7 +151,7 @@ export function QuoteImportForm({
       <CardContent className="space-y-4">
         {/* File Drop Zone */}
         <div
-          className={`group relative flex h-full flex-col justify-center rounded-lg border border-dashed p-4 transition-colors ${getBorderClasses()} ${!file && !isValidating ? 'cursor-pointer' : ''}`}
+          className={`group relative flex h-full flex-col justify-center rounded-lg border border-dashed p-4 transition-colors ${getBorderClasses()} ${!file && !isValidating ? "cursor-pointer" : ""}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -159,7 +159,7 @@ export function QuoteImportForm({
         >
           {file && !isValidating && (
             <div
-              className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/90 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-90 dark:bg-background/95"
+              className="bg-background/90 dark:bg-background/95 pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-90"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col items-center gap-3">
@@ -223,10 +223,10 @@ export function QuoteImportForm({
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-muted shadow-sm"
+                  className="bg-muted flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
                 >
                   <motion.div variants={iconVariants} initial="initial" animate="animate">
-                    <Icons.Import className="h-5 w-5 text-muted-foreground" />
+                    <Icons.Import className="text-muted-foreground h-5 w-5" />
                   </motion.div>
                 </motion.div>
               )}
@@ -269,7 +269,7 @@ export function QuoteImportForm({
                     className="space-y-0"
                   >
                     <p className="text-xs font-medium">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       {(file.size / 1024).toFixed(2)} KB
                     </p>
                   </motion.div>
@@ -284,7 +284,7 @@ export function QuoteImportForm({
                     <p className="text-xs font-medium">
                       <span className="text-primary">Click to upload</span> or drop
                     </p>
-                    <p className="text-xs text-muted-foreground">CSV only</p>
+                    <p className="text-muted-foreground text-xs">CSV only</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -325,7 +325,7 @@ export function QuoteImportForm({
 
         {/* Validate Button */}
         <Button onClick={onValidate} disabled={!file || isValidating} className="w-full">
-          {isValidating ? 'Validating...' : 'Validate File'}
+          {isValidating ? "Validating..." : "Validate File"}
         </Button>
       </CardContent>
     </Card>

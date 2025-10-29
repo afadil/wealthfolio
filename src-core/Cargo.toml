@@ -32,6 +32,7 @@ rust_decimal_macros = "1.37"
 serde_with = "3.4"
 keyring = "2"
 urlencoding = "2"
+csv = "1.4.0"
 
 # SQLite / Diesel
 rusqlite = { version = "0.34", features = ["bundled"] }
@@ -48,6 +49,7 @@ rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
 # Optional: pro-only sync engine
 wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
+
 
 [features]
 default = ["p2p", "tls"]          # For Tauri app builds
