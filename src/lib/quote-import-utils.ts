@@ -1,4 +1,4 @@
-import { QuoteImport, ImportValidationStatus } from './types/quote-import';
+import { ImportValidationStatus, QuoteImport } from "./types/quote-import";
 
 /**
  * Validates a CSV file for quote import
@@ -15,25 +15,25 @@ export async function validateCsvFile(file: File): Promise<{
     reader.onload = (e) => {
       try {
         const csv = e.target?.result as string;
-        const lines = csv.split('\n').filter((line) => line.trim());
+        const lines = csv.split("\n").filter((line) => line.trim());
 
         if (lines.length < 2) {
           resolve({
             isValid: false,
-            error: 'CSV file must contain at least a header row and one data row',
+            error: "CSV file must contain at least a header row and one data row",
           });
           return;
         }
 
-        const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-        const requiredHeaders = ['symbol', 'date', 'close'];
+        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+        const requiredHeaders = ["symbol", "date", "close"];
 
         const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
 
         if (missingHeaders.length > 0) {
           resolve({
             isValid: false,
-            error: `Missing required columns: ${missingHeaders.join(', ')}`,
+            error: `Missing required columns: ${missingHeaders.join(", ")}`,
           });
           return;
         }
@@ -45,12 +45,12 @@ export async function validateCsvFile(file: File): Promise<{
       } catch (error) {
         resolve({
           isValid: false,
-          error: `Failed to parse CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          error: `Failed to parse CSV file: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       }
     };
     reader.onerror = () => {
-      resolve({ isValid: false, error: 'Failed to read file' });
+      resolve({ isValid: false, error: "Failed to read file" });
     };
     reader.readAsText(file);
   });
@@ -62,22 +62,22 @@ export async function validateCsvFile(file: File): Promise<{
  * @returns Array of QuoteImport objects
  */
 export function parseCsvContent(csvContent: string): QuoteImport[] {
-  const lines = csvContent.split('\n').filter((line) => line.trim());
+  const lines = csvContent.split("\n").filter((line) => line.trim());
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
   const quotes: QuoteImport[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map((v) => v.trim());
+    const values = lines[i].split(",").map((v) => v.trim());
     if (values.length !== headers.length) continue;
 
     const quote: QuoteImport = {
-      symbol: '',
-      date: '',
+      symbol: "",
+      date: "",
       close: 0,
-      currency: 'USD',
-      validationStatus: 'valid' as ImportValidationStatus,
+      currency: "USD",
+      validationStatus: "valid" as ImportValidationStatus,
     };
 
     headers.forEach((header, index) => {
@@ -85,28 +85,28 @@ export function parseCsvContent(csvContent: string): QuoteImport[] {
       if (!value) return;
 
       switch (header) {
-        case 'symbol':
+        case "symbol":
           quote.symbol = value;
           break;
-        case 'date':
+        case "date":
           quote.date = value;
           break;
-        case 'open':
+        case "open":
           quote.open = parseFloat(value) || undefined;
           break;
-        case 'high':
+        case "high":
           quote.high = parseFloat(value) || undefined;
           break;
-        case 'low':
+        case "low":
           quote.low = parseFloat(value) || undefined;
           break;
-        case 'close':
+        case "close":
           quote.close = parseFloat(value) || 0;
           break;
-        case 'volume':
+        case "volume":
           quote.volume = parseFloat(value) || undefined;
           break;
-        case 'currency':
+        case "currency":
           quote.currency = value;
           break;
       }
@@ -129,12 +129,12 @@ export function formatValidationStatus(
   errorMessage?: string,
 ): string {
   switch (status) {
-    case 'valid':
-      return '✓ Valid';
-    case 'warning':
-      return `⚠ Warning: ${errorMessage || 'Check data'}`;
-    case 'error':
-      return `✗ Error: ${errorMessage || 'Invalid data'}`;
+    case "valid":
+      return "✓ Valid";
+    case "warning":
+      return `⚠ Warning: ${errorMessage || "Check data"}`;
+    case "error":
+      return `✗ Error: ${errorMessage || "Invalid data"}`;
     default:
       return status;
   }
@@ -147,14 +147,14 @@ export function formatValidationStatus(
  */
 export function getStatusColor(status: ImportValidationStatus): string {
   switch (status) {
-    case 'valid':
-      return 'text-green-500';
-    case 'warning':
-      return 'text-yellow-500';
-    case 'error':
-      return 'text-red-500';
+    case "valid":
+      return "text-green-500";
+    case "warning":
+      return "text-yellow-500";
+    case "error":
+      return "text-red-500";
     default:
-      return 'text-gray-500';
+      return "text-gray-500";
   }
 }
 
@@ -177,36 +177,36 @@ MSFT,2023-01-02,252.00,258.00,250.00,255.50,900000,USD`;
  */
 export function validateQuoteImport(quote: QuoteImport): { isValid: boolean; error?: string } {
   if (!quote.symbol.trim()) {
-    return { isValid: false, error: 'Symbol is required' };
+    return { isValid: false, error: "Symbol is required" };
   }
 
   if (!quote.date) {
-    return { isValid: false, error: 'Date is required' };
+    return { isValid: false, error: "Date is required" };
   }
 
   // Validate date format
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(quote.date)) {
-    return { isValid: false, error: 'Date must be in YYYY-MM-DD format' };
+    return { isValid: false, error: "Date must be in YYYY-MM-DD format" };
   }
 
   if (quote.close <= 0) {
-    return { isValid: false, error: 'Close price must be greater than 0' };
+    return { isValid: false, error: "Close price must be greater than 0" };
   }
 
   // Validate OHLC logic
   if (quote.high !== undefined && quote.low !== undefined) {
     if (quote.high < quote.low) {
-      return { isValid: false, error: 'High price cannot be less than low price' };
+      return { isValid: false, error: "High price cannot be less than low price" };
     }
   }
 
   if (quote.open !== undefined && quote.high !== undefined && quote.low !== undefined) {
     if (quote.open > quote.high || quote.open < quote.low) {
-      return { isValid: false, error: 'Open price is outside high-low range' };
+      return { isValid: false, error: "Open price is outside high-low range" };
     }
     if (quote.close > quote.high || quote.close < quote.low) {
-      return { isValid: false, error: 'Close price is outside high-low range' };
+      return { isValid: false, error: "Close price is outside high-low range" };
     }
   }
 

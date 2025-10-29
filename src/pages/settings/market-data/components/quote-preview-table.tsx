@@ -1,10 +1,14 @@
+import { formatValidationStatus } from "@/lib/quote-import-utils";
+import { QuoteImport } from "@/lib/types/quote-import";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@wealthfolio/ui/components/ui/card';
+} from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -12,11 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@wealthfolio/ui/components/ui/table';
-import { Badge } from '@wealthfolio/ui/components/ui/badge';
-import { Icons } from '@wealthfolio/ui/components/ui/icons';
-import { QuoteImport } from '@/lib/types/quote-import';
-import { formatValidationStatus, getStatusColor } from '@/lib/quote-import-utils';
+} from "@wealthfolio/ui/components/ui/table";
 
 interface QuotePreviewTableProps {
   quotes: QuoteImport[];
@@ -56,16 +56,16 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
                 <TableRow key={index}>
                   <TableCell className="font-medium">{quote.symbol}</TableCell>
                   <TableCell>{quote.date}</TableCell>
-                  <TableCell>{quote.open || '-'}</TableCell>
-                  <TableCell>{quote.high || '-'}</TableCell>
-                  <TableCell>{quote.low || '-'}</TableCell>
+                  <TableCell>{quote.open || "-"}</TableCell>
+                  <TableCell>{quote.high || "-"}</TableCell>
+                  <TableCell>{quote.low || "-"}</TableCell>
                   <TableCell className="font-medium">{quote.close}</TableCell>
-                  <TableCell>{quote.volume || '-'}</TableCell>
+                  <TableCell>{quote.volume || "-"}</TableCell>
                   <TableCell>{quote.currency}</TableCell>
                   <TableCell>
                     <Badge
-                      variant={quote.validationStatus === 'valid' ? 'default' : 'destructive'}
-                      className={`whitespace-nowrap ${getStatusColor(quote.validationStatus)}`}
+                      variant={quote.validationStatus === "valid" ? "success" : "destructive"}
+                      className="whitespace-nowrap"
                     >
                       {formatValidationStatus(quote.validationStatus)}
                     </Badge>
@@ -76,7 +76,7 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
           </Table>
         </div>
         {quotes.length > maxRows && (
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-2 text-sm">
             Showing first {maxRows} of {quotes.length} rows
           </p>
         )}

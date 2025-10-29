@@ -3,7 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { AppLayout } from "@/pages/layouts/app-layout";
 import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
-import SettingsLayout from "@/pages/settings/layout";
+import SettingsLayout from "@/pages/settings/settings-layout";
 
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
@@ -21,6 +21,7 @@ import ContributionLimitPage from "./pages/settings/contribution-limits/contribu
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
+import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
@@ -96,6 +97,7 @@ export function AppRoutes() {
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
+            <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />

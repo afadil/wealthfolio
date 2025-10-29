@@ -1,5 +1,6 @@
 import { Separator } from "@/components/ui/separator";
-import { useQuoteImport } from "@/hooks/useQuoteImport";
+import { useQuoteImport } from "@/hooks/use-quote-import";
+import { cn } from "@/lib/utils";
 import { StepIndicator } from "@/pages/activity/import/components/step-indicator";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -12,10 +13,10 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { QuoteImportForm } from "./QuoteImportForm";
-import { QuoteImportHelpPopover } from "./QuoteImportHelpPopover";
-import { QuoteImportProgress } from "./QuoteImportProgress";
-import { QuotePreviewTable } from "./QuotePreviewTable";
+import { QuoteImportForm } from "./quote-import-form";
+import { QuoteImportHelpPopover } from "./quote-import-help-popover";
+import { QuoteImportProgress } from "./quote-import-progress";
+import { QuotePreviewTable } from "./quote-preview-table";
 
 // Define the steps in the wizard
 const STEPS = [
@@ -24,7 +25,11 @@ const STEPS = [
   { id: 3, title: "Import Results" },
 ];
 
-export function ImportQuotesSection() {
+interface ImportQuotesSectionProps {
+  showTitle?: boolean;
+}
+
+export function ImportQuotesSection({ showTitle = true }: ImportQuotesSectionProps) {
   const {
     file,
     preview,
@@ -134,9 +139,9 @@ export function ImportQuotesSection() {
           <QuoteImportProgress
             isImporting={isImporting}
             progress={importProgress}
-            totalRows={preview?.totalRows || 0}
-            successfulRows={preview?.validRows || 0}
-            failedRows={preview?.invalidRows || 0}
+            totalRows={preview?.totalRows ?? 0}
+            successfulRows={preview?.validRows ?? 0}
+            failedRows={preview?.invalidRows ?? 0}
           />
         );
       default:
@@ -146,13 +151,17 @@ export function ImportQuotesSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Import Historical Quotes</h3>
-          <p className="text-muted-foreground text-sm">
-            Import historical market data from CSV files to fill gaps in your portfolio data
-          </p>
-        </div>
+      <div
+        className={cn("flex items-center justify-between", showTitle ? undefined : "justify-end")}
+      >
+        {showTitle && (
+          <div>
+            <h3 className="text-lg font-semibold">Import Historical Quotes</h3>
+            <p className="text-muted-foreground text-sm">
+              Import historical market data from CSV files to fill gaps in your portfolio data
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <QuoteImportHelpPopover />
           <Button variant="outline" size="sm" onClick={handleStartOver}>
@@ -162,7 +171,7 @@ export function ImportQuotesSection() {
         </div>
       </div>
 
-      <Separator />
+      {showTitle && <Separator />}
 
       <Card className="w-full">
         <CardHeader className="border-b">

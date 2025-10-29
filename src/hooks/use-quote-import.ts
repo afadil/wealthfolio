@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react';
-import { invokeTauri } from '../adapters';
+import { useCallback, useState } from "react";
+import { invokeTauri } from "../adapters";
+import { parseCsvContent, validateCsvFile } from "../lib/quote-import-utils";
 import {
   QuoteImport,
+  QuoteImportActions,
   QuoteImportPreview,
   QuoteImportState,
-  QuoteImportActions,
-} from '../lib/types/quote-import';
-import { parseCsvContent, validateCsvFile } from '../lib/quote-import-utils';
+} from "../lib/types/quote-import";
 
 export function useQuoteImport(): QuoteImportState & QuoteImportActions {
   const [file, setFile] = useState<File | null>(null);
@@ -18,59 +18,39 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
   const [overwriteExisting, setOverwriteExisting] = useState(false);
 
   const validateFile = useCallback(async () => {
-    console.log('🔍 validateFile called with file:', file?.name);
-    console.log(
-      '🔍 Current state - isValidating:',
-      isValidating,
-      'preview:',
-      !!preview,
-      'error:',
-      error,
-    );
-
     if (!file) {
-      console.error('❌ No file selected');
-      setError('No file selected');
+      setError("No file selected");
       return false;
     }
 
     if (isValidating) {
-      console.log('⚠️ Already validating, skipping...');
       return false;
     }
 
-    console.log('✅ Starting validation...');
     setIsValidating(true);
     setError(null);
 
     try {
-      console.log('📁 Validating CSV file format...');
       // First validate the file format
       const validation = await validateCsvFile(file);
-      console.log('✅ File validation result:', validation);
       if (!validation.isValid) {
-        setError(validation.error || 'Invalid file format');
+        setError(validation.error || "Invalid file format");
         return false;
       }
 
       // Read file content
-      console.log('📖 Reading file content...');
       const fileContent = await file.text();
-      console.log('📄 File content length:', fileContent.length);
 
       const parsedQuotes = parseCsvContent(fileContent);
-      console.log('🔢 Parsed quotes count:', parsedQuotes.length);
-      console.log('🎯 First few parsed quotes:', parsedQuotes.slice(0, 3));
 
       if (parsedQuotes.length === 0) {
-        setError('No valid quotes found in file');
+        setError("No valid quotes found in file");
         return false;
       }
 
       // Validate all quotes but show only sample in preview
-      const validQuotes = parsedQuotes.filter((q) => q.validationStatus === 'valid');
-      const invalidQuotes = parsedQuotes.filter((q) => q.validationStatus !== 'valid');
-      console.log(`✅ Valid quotes: ${validQuotes.length}, ❌ Invalid: ${invalidQuotes.length}`);
+      const validQuotes = parsedQuotes.filter((q) => q.validationStatus === "valid");
+      const invalidQuotes = parsedQuotes.filter((q) => q.validationStatus !== "valid");
 
       const mockPreview: QuoteImportPreview = {
         totalRows: parsedQuotes.length,
@@ -81,14 +61,12 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         duplicateCount: 0,
       };
 
-      console.log('📋 Created preview:', mockPreview);
       setPreview(mockPreview);
 
       // Return success indicator for UI flow
       return true;
     } catch (err) {
-      console.error('❌ validateFile error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to validate file');
+      setError(err instanceof Error ? err.message : "Failed to validate file");
       return false;
     } finally {
       setIsValidating(false);
@@ -96,13 +74,9 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
   }, [file]);
 
   const importQuotes = useCallback(async () => {
-    console.log('🚀 importQuotes called');
-    console.log('📁 File:', file?.name);
-    console.log('🔄 Overwrite existing:', overwriteExisting);
-
     if (!file) {
-      console.error('❌ No file selected');
-      setError('No file selected');
+      console.error("❌ No file selected");
+      setError("No file selected");
       return false;
     }
 
@@ -111,28 +85,17 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
     setError(null);
 
     try {
-      console.log('📖 Reading file content for import...');
       // Read and parse ALL quotes from file, not just samples
       const fileContent = await file.text();
       const allQuotes = parseCsvContent(fileContent);
-      console.log(`📊 Parsed ${allQuotes.length} quotes for import`);
-      console.log('🎯 Sample quotes to import:', allQuotes.slice(0, 3));
       if (allQuotes.length === 0) {
-        console.error('❌ No valid quotes found');
-        setError('No valid quotes found in file');
+        console.error("❌ No valid quotes found");
+        setError("No valid quotes found in file");
 
         return false;
       }
 
-      console.log('⏳ Setting progress to 25%');
       setImportProgress(25);
-
-      console.log('🔧 Calling Tauri command: import_quotes_csv');
-      console.log('📦 Command payload:', {
-        quotesCount: allQuotes.length,
-        overwriteExisting,
-        firstQuote: allQuotes[0],
-      });
 
       // Simulate progress during import since Tauri command doesn't provide updates
       const progressInterval = setInterval(() => {
@@ -142,16 +105,12 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         });
       }, 200);
 
-      const result = await invokeTauri<QuoteImport[]>('import_quotes_csv', {
+      const result = await invokeTauri<QuoteImport[]>("import_quotes_csv", {
         quotes: allQuotes, // Import ALL quotes, not just samples
         overwriteExisting,
       });
 
       clearInterval(progressInterval);
-
-      console.log('✅ Tauri command completed successfully');
-      console.log('📤 Import result:', result);
-      console.log(`📊 Result count: ${result?.length || 0}`);
 
       setImportProgress(100);
 
@@ -165,18 +124,11 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
           : null,
       );
 
-      console.log('🎉 Import process completed successfully');
       return true;
     } catch (err) {
-      console.error('❌ importQuotes error:', err);
-      console.error('❌ Error details:', {
-        message: err instanceof Error ? err.message : 'Unknown error',
-        stack: err instanceof Error ? err.stack : undefined,
-      });
-      setError(err instanceof Error ? err.message : 'Failed to import quotes');
+      setError(err instanceof Error ? err.message : "Failed to import quotes");
       return false;
     } finally {
-      console.log('🔄 Cleaning up import state');
       setIsImporting(false);
       setImportProgress(0);
     }

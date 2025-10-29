@@ -19,7 +19,7 @@ import {
   useToast,
 } from "@wealthfolio/ui";
 import { useState } from "react";
-import { SettingsHeader } from "../header";
+import { SettingsHeader } from "../settings-header";
 import { useAddonActions } from "./hooks/use-addon-actions";
 import { useAddonUpdates } from "./hooks/use-addon-updates";
 

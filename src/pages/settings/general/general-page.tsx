@@ -1,8 +1,8 @@
 import { Separator } from "@/components/ui/separator";
-import { BaseCurrencySettings } from "./currency-settings";
-import { SettingsHeader } from "../header";
-import { ExchangeRatesSettings } from "./exchange-rates/exchange-rates-settings";
+import { SettingsHeader } from "../settings-header";
 import { AutoUpdateSettings } from "./auto-update-settings";
+import { BaseCurrencySettings } from "./currency-settings";
+import { ExchangeRatesSettings } from "./exchange-rates/exchange-rates-settings";
 
 export default function GeneralSettingsPage() {
   return (

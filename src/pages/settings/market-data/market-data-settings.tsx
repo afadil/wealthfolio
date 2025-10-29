@@ -3,12 +3,12 @@ import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
-import { SettingsHeader } from "../header";
+import { SettingsHeader } from "../settings-header";
 
 import { MarketDataProviderSetting } from "@/commands/market-data";
 import { getSecret } from "@/commands/secrets";
-import { ImportQuotesSection } from "@/components/quote-import/ImportQuotesSection";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -349,6 +349,29 @@ export default function MarketDataSettingsPage() {
     <div className="text-foreground space-y-6">
       <SettingsHeader heading="Market Data" text="Manage settings for your market data providers.">
         <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="outline"
+            size="icon"
+            className="sm:hidden"
+            aria-label="Import quotes"
+          >
+            <Link to="/settings/market-data/import">
+              <Icons.Import className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex"
+            aria-label="Import historical quotes"
+          >
+            <Link to="/settings/market-data/import">
+              <Icons.Import className="mr-2 h-4 w-4" />
+              Import
+            </Link>
+          </Button>
           {/* Mobile icon-only actions */}
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
@@ -458,10 +481,6 @@ export default function MarketDataSettingsPage() {
           </div>
         )}
       </div>
-
-      <Separator />
-
-      <ImportQuotesSection />
     </div>
   );
 }

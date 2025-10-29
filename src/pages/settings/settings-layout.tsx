@@ -139,7 +139,7 @@ export default function SettingsLayout() {
             <aside className="hidden w-[240px] shrink-0 lg:sticky lg:top-24 lg:flex lg:flex-col lg:self-start">
               <SidebarNav items={sidebarNavItems} />
             </aside>
-            <div className="min-w-0 flex-1">
+            <div className="mb-8 min-w-0 flex-1">
               <Outlet />
             </div>
           </div>

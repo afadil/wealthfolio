@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir, appLogDir } from "@tauri-apps/api/path";
 import { check } from "@tauri-apps/plugin-updater";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { SettingsHeader } from "../header";
-import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "@/components/ui/use-toast";
+import { SettingsHeader } from "../settings-header";
 
 export default function AboutSettingsPage() {
   const [version, setVersion] = useState<string>("");

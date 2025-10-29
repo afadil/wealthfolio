@@ -1,8 +1,8 @@
-import { ExportForm } from "./exports-form";
-import { BackupRestoreForm } from "./backup-restore-form";
-import { SettingsHeader } from "../header";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SettingsHeader } from "../settings-header";
+import { BackupRestoreForm } from "./backup-restore-form";
+import { ExportForm } from "./exports-form";
 
 const ExportSettingsPage = () => {
   return (

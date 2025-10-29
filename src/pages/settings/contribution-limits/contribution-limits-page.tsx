@@ -5,7 +5,7 @@ import type { ContributionLimit } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
 import { useState } from "react";
-import { SettingsHeader } from "../header";
+import { SettingsHeader } from "../settings-header";
 import { ContributionLimitEditModal } from "./components/contribution-limit-edit-modal";
 import { ContributionLimitItem } from "./components/contribution-limit-item";
 import { useContributionLimitMutations } from "./use-contribution-limit-mutations";

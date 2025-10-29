@@ -4,7 +4,7 @@ import type { Account } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
 import { useState } from "react";
-import { SettingsHeader } from "../header";
+import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
