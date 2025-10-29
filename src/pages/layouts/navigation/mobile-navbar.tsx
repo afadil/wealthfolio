@@ -1,20 +1,11 @@
 import { LiquidGlass } from "@/components/navigation/liquid-glass";
-import { usePlatform } from "@/hooks/use-platform";
+import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, Icons } from "@wealthfolio/ui";
 import { motion } from "motion/react";
 import { useCallback, useId, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { type NavigationProps, isPathActive } from "./app-navigation";
-
-type HapticsModule = typeof import("@tauri-apps/plugin-haptics");
-
-let hapticsModulePromise: Promise<HapticsModule> | null = null;
-
-async function loadHapticsModule(): Promise<HapticsModule> {
-  hapticsModulePromise ??= import("@tauri-apps/plugin-haptics");
-  return hapticsModulePromise;
-}
 
 interface MobileNavBarProps {
   navigation: NavigationProps;
@@ -24,32 +15,8 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { isMobile: isMobilePlatform, isTauri } = usePlatform();
+  const triggerHaptic = useHapticFeedback();
   const uniqueId = useId();
-
-  const triggerHaptic = useCallback(() => {
-    if (!isMobilePlatform || !isTauri) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const haptics = await loadHapticsModule();
-        if (typeof haptics.selectionFeedback === "function") {
-          await haptics.selectionFeedback();
-          return;
-        }
-
-        if (typeof haptics.impactFeedback === "function") {
-          await haptics.impactFeedback("medium");
-        }
-      } catch (unknownError) {
-        if (import.meta.env.DEV) {
-          console.warn("Haptic feedback unavailable:", unknownError);
-        }
-      }
-    })();
-  }, [isMobilePlatform, isTauri]);
 
   const handleNavigation = useCallback(
     (href: string, isActive: boolean) => {

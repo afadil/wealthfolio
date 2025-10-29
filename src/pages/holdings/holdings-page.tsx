@@ -17,6 +17,7 @@ import { AccountSelector } from "@/components/account-selector";
 import type { SwipablePageView } from "@/components/page";
 import { SwipablePage } from "@/components/page";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { useHoldings } from "@/hooks/use-holdings";
 import { usePlatform } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
@@ -54,6 +55,7 @@ export const HoldingsPage = () => {
   const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
   const { accounts } = useAccounts();
   const { isMobile: isMobilePlatform } = usePlatform();
+  const triggerHaptic = useHapticFeedback();
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState("");
@@ -291,6 +293,7 @@ export const HoldingsPage = () => {
         isMobile={isMobilePlatform}
         actions={renderActions}
         withPadding={false}
+        onViewChange={triggerHaptic}
       />
 
       {/* Mobile Filter Sheet */}
