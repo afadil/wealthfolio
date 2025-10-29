@@ -20,7 +20,7 @@ export interface QuoteImportPreview {
   duplicateCount: number;
 }
 
-export type ImportValidationStatus = 'valid' | 'warning' | 'error';
+export type ImportValidationStatus = "valid" | "warning" | "error";
 
 export interface QuoteImportState {
   file: File | null;

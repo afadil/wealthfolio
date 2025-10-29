@@ -513,11 +513,7 @@ export const AssetProfilePage = () => {
   if (assetProfile?.assetType === "FOREX") {
     return (
       <Page>
-        <PageHeader
-          heading="Quote History"
-          text={symbol}
-          onBack={() => navigate(backTarget)}
-        />
+        <PageHeader heading="Quote History" text={symbol} onBack={() => navigate(backTarget)} />
         <PageContent>
           <QuoteHistoryTable
             data={quoteHistory ?? []}

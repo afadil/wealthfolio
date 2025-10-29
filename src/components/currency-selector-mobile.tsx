@@ -5,7 +5,10 @@ import { CurrencyInput } from "@wealthfolio/ui";
 type CurrencyInputComponentProps = ComponentPropsWithoutRef<typeof CurrencyInput>;
 
 interface CurrencySelectorMobileProps
-  extends Omit<CurrencyInputComponentProps, "value" | "onChange" | "displayMode" | "placeholder" | "onSelect"> {
+  extends Omit<
+    CurrencyInputComponentProps,
+    "value" | "onChange" | "displayMode" | "placeholder" | "onSelect"
+  > {
   onSelect: (currency: string) => void;
   value?: string;
   placeholder?: string;

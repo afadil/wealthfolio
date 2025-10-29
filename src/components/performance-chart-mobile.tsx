@@ -133,9 +133,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
                 key={series.id}
                 type="linear"
                 dataKey={series.id}
-                stroke={
-                  PERFORMANCE_CHART_COLORS[seriesIndex % PERFORMANCE_CHART_COLORS.length]
-                }
+                stroke={PERFORMANCE_CHART_COLORS[seriesIndex % PERFORMANCE_CHART_COLORS.length]}
                 strokeWidth={2}
                 dot={false}
                 name={series.name}

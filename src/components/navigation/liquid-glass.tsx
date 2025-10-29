@@ -46,14 +46,12 @@ export function LiquidGlass({
     }
   };
 
-
   return (
     <div
       ref={elementRef}
       className={` ${getVariantClasses()} ${getIntensityClasses()} ${className} `}
       style={{ ...style }}
     >
-    
       <div className="relative z-10">{children}</div>
       <div className="pointer-events-none absolute inset-0 z-5 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
     </div>

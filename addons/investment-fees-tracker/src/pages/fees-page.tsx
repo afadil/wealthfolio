@@ -133,11 +133,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
 
   return (
     <Page>
-      <PageHeader
-        heading="Investment Fees Tracker"
-        text={headerSubtitle}
-        actions={headerActions}
-      />
+      <PageHeader heading="Investment Fees Tracker" text={headerSubtitle} actions={headerActions} />
       <PageContent>
         <FeeOverviewCards
           feeSummary={periodSummary}
