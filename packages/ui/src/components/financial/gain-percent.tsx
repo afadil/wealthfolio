@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { cn, formatPercent } from '../../lib/utils';
+import * as React from "react";
+import { cn, formatPercent } from "../../lib/utils";
 
-type GainPercentVariant = 'text' | 'badge';
+type GainPercentVariant = "text" | "badge";
 
 interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
@@ -11,12 +11,12 @@ interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 function AnimatedNumber({ value }: { value: number }) {
-  const [NumberFlow, setNumberFlow] = React.useState<any>(null);
+  const [NumberFlow, setNumberFlow] = React.useState<React.ComponentType<any> | null>(null);
 
   const absValue = Math.abs(value * 100);
   React.useEffect(() => {
-    import('@number-flow/react').then((module) => {
-      setNumberFlow(() => module.default);
+    import("@number-flow/react").then((module) => {
+      setNumberFlow(module.default);
     });
   }, []);
 
@@ -24,9 +24,8 @@ function AnimatedNumber({ value }: { value: number }) {
     return <span>{formatPercent(absValue)}</span>;
   }
 
-  const Component = NumberFlow;
   return (
-    <Component
+    <NumberFlow
       value={absValue}
       animated={true}
       format={{
@@ -40,7 +39,7 @@ function AnimatedNumber({ value }: { value: number }) {
 export function GainPercent({
   value,
   animated = false,
-  variant = 'text',
+  variant = "text",
   showSign = true,
   className,
   ...props
@@ -48,11 +47,11 @@ export function GainPercent({
   return (
     <div
       className={cn(
-        'amount inline-flex items-center justify-end text-right text-sm',
-        value > 0 ? 'text-success' : value < 0 ? 'text-destructive' : 'text-foreground',
-        variant === 'badge' && [
-          'rounded-md py-[1px] pl-[9px] pr-[12px] font-light',
-          value > 0 ? 'bg-success/10' : value < 0 ? 'bg-destructive/10' : 'bg-foreground/10',
+        "amount inline-flex items-center justify-end text-right text-sm",
+        value > 0 ? "text-success" : value < 0 ? "text-destructive" : "text-foreground",
+        variant === "badge" && [
+          "rounded-md py-px pr-[12px] pl-[9px] font-light",
+          value > 0 ? "bg-success/10" : value < 0 ? "bg-destructive/10" : "bg-foreground/10",
         ],
         className,
       )}
@@ -60,12 +59,12 @@ export function GainPercent({
     >
       {animated ? (
         <>
-          {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
+          {showSign && (value > 0 ? "+" : value < 0 ? "-" : null)}
           <AnimatedNumber value={value} /> %
         </>
       ) : (
         <>
-          {showSign && (value > 0 ? '+' : value < 0 ? '-' : null)}
+          {showSign && (value > 0 ? "+" : value < 0 ? "-" : null)}
           {formatPercent(Math.abs(value))}
         </>
       )}

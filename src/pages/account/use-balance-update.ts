@@ -1,22 +1,21 @@
-import { useMutation } from '@tanstack/react-query';
-import { createActivity } from '@/commands/activity';
-import { ActivityCreate, AccountValuation } from '@/lib/types';
-import { toast } from '@/components/ui/use-toast';
+import { useMutation } from "@tanstack/react-query";
+import { createActivity } from "@/commands/activity";
+import { ActivityCreate, AccountValuation } from "@/lib/types";
+import { toast } from "@/components/ui/use-toast";
 
 export const useBalanceUpdate = (account?: AccountValuation | null) => {
-
   const mutation = useMutation({
     mutationFn: (newActivity: ActivityCreate) => createActivity(newActivity),
     onError: () => {
       toast({
-        title: '🔴 Error updating balance',
-        variant: 'destructive',
+        title: "🔴 Error updating balance",
+        variant: "destructive",
       });
     },
     onSuccess: () => {
       toast({
-        title: '✅ Balance updated',
-        variant: 'default',
+        title: "✅ Balance updated",
+        variant: "default",
       });
     },
   });
@@ -29,7 +28,7 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
 
     if (difference === 0) return;
 
-    const activityType = difference > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+    const activityType = difference > 0 ? "DEPOSIT" : "WITHDRAWAL";
     const amount = parseFloat(Math.abs(difference).toFixed(2));
 
     const newActivity: ActivityCreate = {
@@ -40,7 +39,7 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
       currency: account.accountCurrency,
       amount: amount,
       isDraft: false,
-      comment: 'Balance updated manually',
+      comment: "Balance updated manually",
     };
 
     mutation.mutate(newActivity);

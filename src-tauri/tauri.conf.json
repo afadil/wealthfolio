@@ -16,12 +16,12 @@
       "icons/icon.ico"
     ],
     "copyright": "2025 Teymz Inc.",
-    "category": "Finance",
-    "createUpdaterArtifacts": "v1Compatible"
+  "category": "Finance",
+  "createUpdaterArtifacts": "v1Compatible"
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
-  "version": "1.2.3",
+  "version": "2.0.0",
   "identifier": "com.teymz.wealthfolio",
   "plugins": {
     "updater": {
@@ -52,6 +52,6 @@
     ],
     "security": {
       "csp": null
-    }
+  }
   }
 }

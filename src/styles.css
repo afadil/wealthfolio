@@ -1,111 +1,623 @@
-@import '@fontsource/ibm-plex-mono';
-@import '@fontsource/ibm-plex-mono/200.css';
-@import '@fontsource/ibm-plex-mono/300.css';
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
-@import '@fontsource/ibm-plex-mono/600.css';
-@import '@fontsource/ibm-plex-mono/700.css';
-@import '@fontsource/ibm-plex-mono/400-italic.css';
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource/ibm-plex-mono";
+@import "@fontsource/ibm-plex-mono/200.css";
+@import "@fontsource/ibm-plex-mono/300.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+@import "@fontsource/ibm-plex-mono/400-italic.css";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
+@custom-variant dark (&:where(.dark, .dark *));
 
-@layer base {
-  :root {
-    /* Flexoki Light Theme Variables */
-    --flexoki-bg: 48 100% 97%;
-    --flexoki-bg-2: 51 59% 95%;
-    --flexoki-ui: 51 21% 88%;
-    --flexoki-ui-2: 50 14% 83%;
-    --flexoki-ui-3: 55 10% 79%;
-    --flexoki-tx: 0 3% 6%;
-    --flexoki-tx-2: 50 3% 42%;
-    --flexoki-tx-3: 49 7% 70%;
-    --flexoki-re: 3 62% 42%;
-    --flexoki-gr: 73 84% 27%;
-    --flexoki-ye: 45 99% 34%;
+/* Tailwind v4 custom utilities for 3D rotation used in the sidebar logo */
+@utility transform-3d {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
 
-    /* Shadcn Theme Mapping */
-    --background: var(--flexoki-bg);
-    --foreground: var(--flexoki-tx);
-    --card: var(--flexoki-bg-2);
-    --card-foreground: var(--flexoki-tx);
-    --popover: var(--flexoki-bg);
-    --popover-foreground: var(--flexoki-tx);
-    --primary: var(--flexoki-tx);
-    --primary-foreground: var(--flexoki-bg);
-    --secondary: var(--flexoki-ui-2);
-    --secondary-foreground: var(--flexoki-tx-2);
-    --muted: var(--flexoki-ui);
-    --muted-foreground: var(--flexoki-tx-2);
-    --accent: var(--flexoki-ui);
-    --accent-foreground: var(--flexoki-tx-2);
-    --destructive: var(--flexoki-re);
-    --destructive-foreground: var(--flexoki-bg);
-    --success: var(--flexoki-gr);
-    --success-foreground: var(--flexoki-bg);
-    --warning: var(--flexoki-ye);
-    --warning-foreground: var(--flexoki-bg);
-    --border: var(--flexoki-ui);
-    --input: var(--flexoki-ui-2);
-    --ring: var(--flexoki-ui-3);
-    --radius: 0.5rem;
+@utility rotate-y-0 {
+  transform: rotateY(0deg);
+}
 
-    /* Chart Colors */
-    --chart-1: 40 3% 20%; /* #1C1B1A - Darkest */
-    --chart-2: 45 2% 33%; /* #575653 - More distinct from 2 */
-    --chart-3: 50 3% 42%; /* #6F6E6B */
-    --chart-4: 43 3% 52%; /* #878580 */
-    --chart-5: 47 4% 61%; /* #9F9D96 */
-    --chart-6: 49 7% 70%; /* #B7B5AC */
-    --chart-7: 55 10% 79%; /* #CECDC3 */
-    --chart-8: 50 14% 83%; /* #E6E4D9 */
-    --chart-9: 51 21% 88%; /* #F2F0E5 */
+@utility rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
+}
 
-  .dark {
-    /* Flexoki Dark Theme Variables */
-    --flexoki-bg: 0 3% 6%;
-    --flexoki-bg-2: 30 4% 11%;
-    --flexoki-ui: 30 3% 15%;
-    --flexoki-ui-2: 40 3% 20%;
-    --flexoki-ui-3: 30 3% 24%;
-    --flexoki-tx: 55 10% 79%;
-    --flexoki-tx-2: 43 3% 52%;
-    --flexoki-tx-3: 45 2% 33%;
-    --flexoki-re: 5 61% 54%;
-    --flexoki-gr: 72 46% 41%;
-    --flexoki-ye: 45 82% 45%;
+@theme {
+  /* Disable default colors to prevent their use; feel free to re-enable as needed. */
+  --color-amber-*: initial;
+  --color-lime-*: initial;
+  --color-emerald-*: initial;
+  --color-teal-*: initial;
+  --color-sky-*: initial;
+  --color-indigo-*: initial;
+  --color-violet-*: initial;
+  --color-fuchsia-*: initial;
+  --color-pink-*: initial;
+  --color-rose-*: initial;
+  --color-slate-*: initial;
+  --color-zinc-*: initial;
+  --color-neutral-*: initial;
+  --color-stone-*: initial;
 
-    /* Chart Colors */
-    --chart-1: 25 92% 72%;
-    --chart-2: 24 81% 61%;
-    --chart-3: 23 70% 51%;
-    --chart-4: 23 73% 46%;
-    --chart-5: 22 80% 41%;
-    --chart-6: 22 82% 34%;
-    --chart-7: 22 79% 25%;
-    --chart-8: 22 75% 20%;
-    --chart-9: 22 70% 15%;
-  }
+  /* Specify new default colors. */
+  --color-black: #100f0f;
+  --color-paper: #fffcf0;
+  --color-base-50: #f2f0e5;
+  --color-base-100: #e6e4d9;
+  --color-base-150: #dad8ce;
+  --color-base-200: #cecdc3;
+  --color-base-300: #b7b5ac;
+  --color-base-400: #9f9d96;
+  --color-base-500: #878580;
+  --color-base-600: #6f6e69;
+  --color-base-700: #575653;
+  --color-base-800: #403e3c;
+  --color-base-850: #343331;
+  --color-base-900: #282726;
+  --color-base-950: #1c1b1a;
+  --color-red-50: #ffe1d5;
+  --color-red-100: #ffcabb;
+  --color-red-150: #fdb2a2;
+  --color-red-200: #f89a8a;
+  --color-red-300: #e8705f;
+  --color-red-400: #d14d41;
+  --color-red-500: #c03e35;
+  --color-red-600: #af3029;
+  --color-red-700: #942822;
+  --color-red-800: #6c201c;
+  --color-red-850: #551b18;
+  --color-red-900: #3e1715;
+  --color-red-950: #261312;
+  --color-orange-50: #ffe7ce;
+  --color-orange-100: #fed3af;
+  --color-orange-150: #fcc192;
+  --color-orange-200: #f9ae77;
+  --color-orange-300: #ec8b49;
+  --color-orange-400: #da702c;
+  --color-orange-500: #cb6120;
+  --color-orange-600: #bc5215;
+  --color-orange-700: #9d4310;
+  --color-orange-800: #71320d;
+  --color-orange-850: #59290d;
+  --color-orange-900: #40200d;
+  --color-orange-950: #27180e;
+  --color-yellow-50: #faeec6;
+  --color-yellow-100: #f6e2a0;
+  --color-yellow-150: #f1d67e;
+  --color-yellow-200: #eccb60;
+  --color-yellow-300: #dfb431;
+  --color-yellow-400: #d0a215;
+  --color-yellow-500: #be9207;
+  --color-yellow-600: #ad8301;
+  --color-yellow-700: #8e6b01;
+  --color-yellow-800: #664d01;
+  --color-yellow-850: #503d02;
+  --color-yellow-900: #3a2d04;
+  --color-yellow-950: #241e08;
+  --color-green-50: #edeecf;
+  --color-green-100: #dde2b2;
+  --color-green-150: #cdd597;
+  --color-green-200: #bec97e;
+  --color-green-300: #a0af54;
+  --color-green-400: #879a39;
+  --color-green-500: #768d21;
+  --color-green-600: #66800b;
+  --color-green-700: #536907;
+  --color-green-800: #3d4c07;
+  --color-green-850: #313d07;
+  --color-green-900: #252d09;
+  --color-green-950: #1a1e0c;
+  --color-cyan-50: #ddf1e4;
+  --color-cyan-100: #bfe8d9;
+  --color-cyan-150: #a2dece;
+  --color-cyan-200: #87d3c3;
+  --color-cyan-300: #5abdac;
+  --color-cyan-400: #3aa99f;
+  --color-cyan-500: #2f968d;
+  --color-cyan-600: #24837b;
+  --color-cyan-700: #1c6c66;
+  --color-cyan-800: #164f4a;
+  --color-cyan-850: #143f3c;
+  --color-cyan-900: #122f2c;
+  --color-cyan-950: #101f1d;
+  --color-blue-50: #e1eceb;
+  --color-blue-100: #c6dde8;
+  --color-blue-150: #abcfe2;
+  --color-blue-200: #92bfdb;
+  --color-blue-300: #66a0c8;
+  --color-blue-400: #4385be;
+  --color-blue-500: #3171b2;
+  --color-blue-600: #205ea6;
+  --color-blue-700: #1a4f8c;
+  --color-blue-800: #163b66;
+  --color-blue-850: #133051;
+  --color-blue-900: #12253b;
+  --color-blue-950: #101a24;
+  --color-purple-50: #f0eaec;
+  --color-purple-100: #e2d9e9;
+  --color-purple-150: #d3cae6;
+  --color-purple-200: #c4b9e0;
+  --color-purple-300: #a699d0;
+  --color-purple-400: #8b7ec8;
+  --color-purple-500: #735eb5;
+  --color-purple-600: #5e409d;
+  --color-purple-700: #4f3685;
+  --color-purple-800: #3c2a62;
+  --color-purple-850: #31234e;
+  --color-purple-900: #261c39;
+  --color-purple-950: #1a1623;
+  --color-magenta-50: #fee4e5;
+  --color-magenta-100: #fccfda;
+  --color-magenta-150: #f9b9cf;
+  --color-magenta-200: #f4a4c2;
+  --color-magenta-300: #e47da8;
+  --color-magenta-400: #ce5d97;
+  --color-magenta-500: #b74583;
+  --color-magenta-600: #a02f6f;
+  --color-magenta-700: #87285e;
+  --color-magenta-800: #641f46;
+  --color-magenta-850: #4f1b39;
+  --color-magenta-900: #39172b;
+  --color-magenta-950: #24131d;
+}
+
+@theme inline {
+  /* Spacing/Sizing theme tokens - inherit from CSS variables */
+  --spacing-input-height: var(--input-height);
+  --spacing-button-height: var(--button-height);
+  --spacing-sheet-padding: var(--sheet-padding);
+  --font-size-sheet-title: var(--sheet-title-size);
+  --font-size-input: var(--font-size-base);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Semantic colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Chart colors */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+  --color-chart-9: var(--chart-9);
+
+  /* Sidebar colors */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Custom color palettes */
+  --color-blue-50: #e1eceb;
+  --color-blue-100: #c6dde8;
+  --color-blue-150: #abcfe2;
+  --color-blue-200: #92bfdb;
+  --color-blue-300: #66a0c8;
+  --color-blue-400: #4385be;
+  --color-blue-500: #3171b2;
+  --color-blue-600: #205ea6;
+  --color-blue-700: #1a4f8c;
+  --color-blue-800: #163b66;
+  --color-blue-850: #133051;
+  --color-blue-900: #12253b;
+  --color-blue-950: #101a24;
+
+  --color-cyan-50: #ddf1e4;
+  --color-cyan-100: #bfe8d9;
+  --color-cyan-150: #a2dece;
+  --color-cyan-200: #87d3c3;
+  --color-cyan-300: #5abdac;
+  --color-cyan-400: #3aa99f;
+  --color-cyan-500: #2f968d;
+  --color-cyan-600: #24837b;
+  --color-cyan-700: #1c6c66;
+  --color-cyan-800: #164f4a;
+  --color-cyan-850: #143f3c;
+  --color-cyan-900: #122f2c;
+  --color-cyan-950: #101f1d;
+
+  --color-green-50: #edeecf;
+  --color-green-100: #dde2b2;
+  --color-green-150: #cdd597;
+  --color-green-200: #bec97e;
+  --color-green-300: #a0af54;
+  --color-green-400: #879a39;
+  --color-green-500: #768d21;
+  --color-green-600: #66800b;
+  --color-green-700: #536907;
+  --color-green-800: #3d4c07;
+  --color-green-850: #313d07;
+  --color-green-900: #252d09;
+  --color-green-950: #1a1e0c;
+
+  --color-red-50: #ffe1d5;
+  --color-red-100: #ffcabb;
+  --color-red-150: #fdb2a2;
+  --color-red-200: #f89a8a;
+  --color-red-300: #e8705f;
+  --color-red-400: #d14d41;
+  --color-red-500: #c03e35;
+  --color-red-600: #af3029;
+  --color-red-700: #942822;
+  --color-red-800: #6c201c;
+  --color-red-850: #551b18;
+  --color-red-900: #3e1715;
+  --color-red-950: #261312;
+
+  --color-orange-50: #ffe7ce;
+  --color-orange-100: #fed3af;
+  --color-orange-150: #fcc192;
+  --color-orange-200: #f9ae77;
+  --color-orange-300: #ec8b49;
+  --color-orange-400: #da702c;
+  --color-orange-500: #cb6120;
+  --color-orange-600: #bc5215;
+  --color-orange-700: #9d4310;
+  --color-orange-800: #71320d;
+  --color-orange-850: #59290d;
+  --color-orange-900: #40200d;
+  --color-orange-950: #27180e;
+
+  --color-purple-50: #f0eaec;
+  --color-purple-100: #e2d9e9;
+  --color-purple-150: #d3cae6;
+  --color-purple-200: #c4b9e0;
+  --color-purple-300: #a699d0;
+  --color-purple-400: #8b7ec8;
+  --color-purple-500: #735eb5;
+  --color-purple-600: #5e409d;
+  --color-purple-700: #4f3685;
+  --color-purple-800: #3c2a62;
+  --color-purple-850: #31234e;
+  --color-purple-900: #261c39;
+  --color-purple-950: #1a1623;
+
+  /* Custom sizes */
+  --spacing-sidebar: 220px;
+  --spacing-sidebar-collapsed: 70px;
+  --grid-template-columns-sidebar: 200px auto;
+  --grid-template-columns-sidebar-collapsed: 70px auto;
+}
+
+:root {
+  /* Base radius - desktop default */
+  --radius: 0.625rem;
+
+  /* Input heights - desktop default */
+  --input-height: 2.5rem; /* h-10 */
+  --input-height-lg: 2.75rem; /* h-11 */
+
+  /* Button heights - desktop default */
+  --button-height: 2.5rem; /* h-10 */
+  --button-height-sm: 2.25rem; /* h-9 */
+  --button-height-lg: 2.75rem; /* h-11 */
+
+  /* Card padding - desktop default */
+  --card-padding: 1rem; /* p-4 */
+
+  /* Sheet spacing - desktop default */
+  --sheet-padding: 1rem; /* p-4 */
+  --sheet-title-size: 1.125rem; /* text-lg */
+
+  /* Font size - desktop default */
+  --font-size-base: 0.875rem; /* text-sm */
+
+  /* Flexoki Light Theme (HSL numeric components) */
+  --flexoki-bg: 48 100% 97%;
+  --flexoki-bg-2: 51 59% 95%;
+  --flexoki-ui: 51 21% 88%;
+  --flexoki-ui-2: 50 14% 83%;
+  --flexoki-ui-3: 55 10% 79%;
+  --flexoki-tx: 0 3% 6%;
+  --flexoki-tx-2: 50 3% 42%;
+  --flexoki-tx-3: 49 7% 70%;
+  --flexoki-re: 3 62% 42%;
+  --flexoki-gr: 73 84% 27%;
+  --flexoki-ye: 45 99% 34%;
+
+  /* Shadcn tokens as full HSL colors */
+  --background: hsl(var(--flexoki-bg));
+  --foreground: hsl(var(--flexoki-tx));
+  --card: hsl(var(--flexoki-bg-2));
+  --card-foreground: hsl(var(--flexoki-tx));
+  --popover: hsl(var(--flexoki-bg));
+  --popover-foreground: hsl(var(--flexoki-tx));
+  --primary: hsl(var(--flexoki-tx));
+  --primary-foreground: hsl(var(--flexoki-bg));
+  --secondary: hsl(var(--flexoki-ui-2));
+  --secondary-foreground: hsl(var(--flexoki-tx-2));
+  --muted: hsl(var(--flexoki-ui));
+  --muted-foreground: hsl(var(--flexoki-tx-2));
+  --accent: hsl(var(--flexoki-ui));
+  --accent-foreground: hsl(var(--flexoki-tx-2));
+  --destructive: hsl(var(--flexoki-re));
+  --destructive-foreground: hsl(var(--flexoki-bg));
+  --success: hsl(var(--flexoki-gr));
+  --success-foreground: hsl(var(--flexoki-bg));
+  --warning: hsl(var(--flexoki-ye));
+  --warning-foreground: hsl(var(--flexoki-bg));
+  --border: hsl(var(--flexoki-ui));
+  --input: hsl(var(--flexoki-ui-2));
+  --ring: hsl(var(--flexoki-ui-3));
+
+  /* Charts (full hsl colors) */
+  --chart-1: hsl(40 3% 20%);
+  --chart-2: hsl(45 2% 33%);
+  --chart-3: hsl(50 3% 42%);
+  --chart-4: hsl(43 3% 52%);
+  --chart-5: hsl(47 4% 61%);
+  --chart-6: hsl(49 7% 70%);
+  --chart-7: hsl(55 10% 79%);
+  --chart-8: hsl(50 14% 83%);
+  --chart-9: hsl(51 21% 88%);
+
+  /* Sidebar (full hsl colors) */
+  --sidebar: hsl(var(--flexoki-bg));
+  --sidebar-foreground: hsl(var(--flexoki-tx));
+  --sidebar-primary: hsl(var(--flexoki-tx));
+  --sidebar-primary-foreground: hsl(var(--flexoki-bg));
+  --sidebar-accent: hsl(var(--flexoki-ui));
+  --sidebar-accent-foreground: hsl(var(--flexoki-tx-2));
+  --sidebar-border: hsl(var(--flexoki-ui));
+  --sidebar-ring: hsl(var(--flexoki-ui-3));
+
+  --liquid-glass-bg: rgba(255, 255, 255, 0.05);
+  --liquid-glass-border: rgba(255, 255, 255, 0.1);
+
+  --inset-top: env(safe-area-inset-top, 0px);
+  --inset-right: env(safe-area-inset-right, 0px);
+  --inset-bottom: env(safe-area-inset-bottom, 0px);
+  --inset-left: env(safe-area-inset-left, 0px);
+
+  --mobile-nav-ui-height: 64px; /* nav bar height */
+  --mobile-nav-gap: 12px; /* space between nav and bottom */
+}
+
+.dark {
+  /* Flexoki Dark Theme (HSL numeric components) */
+  --flexoki-bg: 0 3% 6%;
+  --flexoki-bg-2: 30 4% 11%;
+  --flexoki-ui: 30 3% 15%;
+  --flexoki-ui-2: 40 3% 20%;
+  --flexoki-ui-3: 30 3% 24%;
+  --flexoki-tx: 55 10% 79%;
+  --flexoki-tx-2: 43 3% 52%;
+  --flexoki-tx-3: 45 2% 33%;
+  --flexoki-re: 5 61% 54%;
+  --flexoki-gr: 72 46% 41%;
+  --flexoki-ye: 45 82% 45%;
+
+  /* Dark chart palette (full hsl colors) */
+  --chart-1: hsl(25 92% 72%);
+  --chart-2: hsl(24 81% 61%);
+  --chart-3: hsl(23 70% 51%);
+  --chart-4: hsl(23 73% 46%);
+  --chart-5: hsl(22 80% 41%);
+  --chart-6: hsl(22 82% 34%);
+  --chart-7: hsl(22 79% 25%);
+  --chart-8: hsl(22 75% 20%);
+  --chart-9: hsl(22 70% 15%);
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
-  html, body, #root {
-    height: 100%;
+
+  /* Safe area support for notched devices */
+  @supports (padding: max(0px)) {
+    .pt-safe {
+      padding-top: max(env(safe-area-inset-top), 0.75rem);
+    }
+    .pb-safe {
+      padding-bottom: max(env(safe-area-inset-bottom), 1.5rem);
+    }
   }
-  html, body {
-    overflow: hidden;
+  /*
+   * Momentum scrolling class for smooth native-like scrolling.
+   * Used in conjunction with data-page-scroll-container attribute
+   * to mark the authoritative scroll container for each route.
+   */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
   }
 }
 
+.safe-area {
+  padding-top: var(--inset-top);
+  padding-right: var(--inset-right);
+  padding-left: var(--inset-left);
+}
+
+/* QR scanning transparency overrides */
+body.qr-scan-active,
+body.qr-scan-active #root,
+body.qr-scan-active .app-shell {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+body.qr-scan-active .app-shell > ** {
+  background: transparent !important;
+}
+body.qr-scan-active .qr-overlay {
+  backdrop-filter: none;
+}
+body.qr-scan-active .scan-hide-target {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Mobile optimizations for native feel */
+@layer utilities {
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* When the scroll container handles mobile bottom inset (nav height),
+     remove bottom padding from PageContent to avoid double spacing */
+  [data-page-scroll-container][data-with-mobile-nav-offset="true"] main[data-ptr-content] {
+    padding-bottom: 0 !important;
+  }
+
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Prevent horizontal scrolling */
+  .prevent-horizontal-scroll {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Better momentum scrolling - consolidated above at line 445 */
+
+  /* Native-like tap feedback */
+  .tap-highlight-none {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Safe area support for iOS */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* Safe area left/right to pair with your existing top/bottom classes */
+  .safe-area-inset-x {
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* Dynamic viewport height to avoid mobile address bar issues */
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  /* Scroll-to/focus targets stop above the floating nav */
+  .scroll-pb-nav {
+    scroll-padding-bottom: calc(var(--mobile-nav-ui-height) + var(--mobile-nav-gap));
+  }
+
+  /* Scroll-to/focus targets stop below sticky headers (typically ~72px) */
+  .scroll-pt-header {
+    scroll-padding-top: 5rem;
+  }
+
+  /* Mobile-optimized form field spacing */
+  .form-mobile-spacing > * + * {
+    margin-top: 1.25rem; /* space-y-5 */
+  }
+
+  /* Mobile-optimized card/panel styles */
+  .card-mobile {
+    border-radius: 0.75rem; /* rounded-xl */
+    padding: 1rem; /* p-4 */
+  }
+
+  /* Desktop responsive adjustments */
+  @media (width >= 640px) {
+    .form-mobile-spacing > * + * {
+      margin-top: 1rem; /* sm:space-y-4 */
+    }
+
+    .card-mobile {
+      border-radius: 0.5rem; /* sm:rounded-lg */
+      padding: 0.75rem; /* sm:p-3 */
+    }
+  }
+}
+
+/* Global mobile styles */
+@media (max-width: 1024px) {
+  body {
+    @apply overflow-x-hidden;
+  }
+
+  /* Ensure all containers respect viewport width */
+  *,
+  *::before,
+  *::after {
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  /* Smooth transitions for better feel */
+  button,
+  [role="button"] {
+    transition: all 200ms ease-in-out;
+  }
+
+  /* Prevent text from causing horizontal overflow */
+  p,
+  span,
+  div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Ensure grid and flex containers don't overflow */
+  .grid,
+  .flex {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
 
 number-flow-react::part(left),
 number-flow-react::part(right),
@@ -115,10 +627,66 @@ number-flow-react::part(symbol) {
   padding: calc(var(--number-flow-mask-height, 0.25em) / 2) 0;
 }
 
-
 number-flow-react.muted-fraction::part(decimal),
 number-flow-react.muted-fraction::part(fraction) {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
+}
+
+/* v3 -> v4: ported custom animations (keyframes + utilities) */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes progress-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes subtle-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@utility animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+@utility animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
+}
+
+@utility animate-progress-border {
+  animation: progress-bar 1.5s ease-in-out infinite;
+}
+
+@utility animate-subtle-pulse {
+  animation: subtle-pulse 1.2s ease-in-out infinite;
 }
 
 /* app.css */
@@ -135,4 +703,40 @@ textarea,
 .allow-select {
   -webkit-user-select: text;
   user-select: text;
+}
+
+* Prevent zoom on double tap */ * {
+  touch-action: manipulation;
+}
+
+.liquid-glass {
+  background: var(--liquid-glass-bg);
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--liquid-glass-border);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 0 20px rgba(255, 255, 255, 0.1);
+  transition: all var(--liquid-flow-duration) cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+  transform-origin: center center;
+}
+
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.2) 0.6%,
+    rgba(255, 255, 255, 0.05) 20.56%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
 }

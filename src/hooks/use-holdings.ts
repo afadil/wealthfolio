@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { Holding } from '@/lib/types';
-import { getHoldings } from '@/commands/portfolio';
-import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from "@tanstack/react-query";
+import { Holding } from "@/lib/types";
+import { getHoldings } from "@/commands/portfolio";
+import { QueryKeys } from "@/lib/query-keys";
 
 export function useHoldings(accountId: string) {
   const {

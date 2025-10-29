@@ -5,13 +5,16 @@ import {
   AlignLeft,
   ArrowDown,
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   ArrowRightLeft,
   ArrowUp,
+  BarChart,
   Bitcoin,
-  Briefcase,
   Blocks,
+  Briefcase,
   CalendarDays,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -22,73 +25,82 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Circle,
+  CircleGauge,
   Clock,
+  Copy,
   CreditCard,
   DollarSign,
   Download,
+  Eraser,
+  ExternalLink,
   Eye,
   EyeOff,
   FileText,
   FileUp,
+  FileX,
   GaugeCircle,
+  Globe2,
+  Goal,
+  Grid3x3,
   Group,
+  HandCoins,
   Hash,
-  Home,
   HelpCircle,
+  Home,
+  Info,
+  LayoutDashboard,
+  Link,
+  ListChecks,
+  ListCollapse,
+  ListFilter,
   Loader,
   Loader2,
+  LucideProps,
+  Menu,
+  MinusCircle,
+  Monitor,
+  Moon,
   MoreVertical,
+  Package,
+  Palette,
   PanelLeftOpen,
+  PauseCircle,
+  Pencil,
+  Percent,
+  PieChart,
   Plus,
   PlusCircle,
-  MinusCircle,
+  QrCode,
+  Receipt,
+  ReceiptText,
+  RefreshCcw,
+  Rows3,
+  Save,
   ScrollText,
   Search,
+  Shield,
+  Smartphone,
+  Sparkles,
+  Split,
+  Star,
+  Store,
   StretchHorizontal,
-  TableProperties,
-  Goal,
+  Sun,
+  Tag,
   Trash,
+  TrendingDown,
+  TrendingUp,
   Type,
   Ungroup,
   Upload,
-  PieChart,
-  BarChart,
-  RefreshCcw,
   Users,
-  ListCollapse,
   Wallet,
   WalletCards,
-  HandCoins,
+  Wifi,
   X,
   XCircle,
   type LucideIcon,
-  LucideProps,
-  Pencil,
-  Info,
-  Globe2,
-  Rows3,
-  CircleGauge,
-  Receipt,
-  Percent,
-  Split,
-  ArrowLeftRight,
-  FileX,
-  ListChecks,
-  Tag,
-  Save,
-  Copy,
-  Grid3x3,
-  LayoutDashboard,
-  Store,
-  Package,
-  Star,
-  Shield,
-  ExternalLink,
-  PauseCircle,
-  ReceiptText,
-  TrendingUp,
-  TrendingDown,
-} from 'lucide-react';
+} from "lucide-react";
 
 export type Icon = LucideIcon;
 
@@ -144,6 +156,11 @@ export const Icons = {
   PlusCircle: PlusCircle,
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
+  Monitor: Monitor,
+  QrCode: QrCode,
+  Camera: Camera,
+  Wifi: Wifi,
+  Smartphone: Smartphone,
   PieChart: PieChart,
   BarChart: BarChart,
   Spinner: Loader2,
@@ -158,7 +175,7 @@ export const Icons = {
   Wallet: Wallet,
   WalletCards: WalletCards,
   StretchHorizontal: StretchHorizontal,
-  Menu: TableProperties,
+  Menu: Menu,
   Import: Upload,
   FileText: FileText,
   FileX: FileX,
@@ -181,12 +198,18 @@ export const Icons = {
   ExternalLink: ExternalLink,
   TrendingUp: TrendingUp,
   TrendingDown: TrendingDown,
-
-  Dashboard: ({ ...props }: LucideProps) => (
+  Link: Link,
+  Eraser: Eraser,
+  Sparkles: Sparkles,
+  Palette: Palette,
+  Moon: Moon,
+  Sun: Sun,
+  ListFilter: ListFilter,
+  Dashboard: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -199,11 +222,11 @@ export const Icons = {
     </svg>
   ),
 
-  Performance: ({ ...props }: LucideProps) => (
+  Performance: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -213,11 +236,11 @@ export const Icons = {
     </svg>
   ),
 
-  Goals: ({ ...props }: LucideProps) => (
+  Goals: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -227,28 +250,25 @@ export const Icons = {
     </svg>
   ),
 
-  Database: ({ ...props }: LucideProps) => (
+  Database: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
     >
-      <path
-        d="M216,80c0,26.51-39.4,48-88,48S40,106.51,40,80s39.4-48,88-48S216,53.49,216,80Z"
-        opacity="0.2"
-      ></path>
+      <path d="M216,80c0,26.51-39.4,48-88,48S40,106.51,40,80s39.4-48,88-48S216,53.49,216,80Z" opacity="0.2"></path>
       <path d="M128,24C74.17,24,32,48.6,32,80v96c0,31.4,42.17,56,96,56s96-24.6,96-56V80C224,48.6,181.83,24,128,24Zm80,104c0,9.62-7.88,19.43-21.61,26.92C170.93,163.35,150.19,168,128,168s-42.93-4.65-58.39-13.08C55.88,147.43,48,137.62,48,128V111.36c17.06,15,46.23,24.64,80,24.64s62.94-9.68,80-24.64ZM69.61,53.08C85.07,44.65,105.81,40,128,40s42.93,4.65,58.39,13.08C200.12,60.57,208,70.38,208,80s-7.88,19.43-21.61,26.92C170.93,115.35,150.19,120,128,120s-42.93-4.65-58.39-13.08C55.88,99.43,48,89.62,48,80S55.88,60.57,69.61,53.08ZM186.39,202.92C170.93,211.35,150.19,216,128,216s-42.93-4.65-58.39-13.08C55.88,195.43,48,185.62,48,176V159.36c17.06,15,46.23,24.64,80,24.64s62.94-9.68,80-24.64V176C208,185.62,200.12,195.43,186.39,202.92Z"></path>
     </svg>
   ),
 
-  FileCsv: ({ ...props }: LucideProps) => (
+  FileCsv: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
+      width={size ?? 24}
+      height={size ?? 24}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -267,11 +287,11 @@ export const Icons = {
     </svg>
   ),
 
-  FileJson: ({ ...props }: LucideProps) => (
+  FileJson: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
+      width={size ?? 24}
+      height={size ?? 24}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -288,28 +308,25 @@ export const Icons = {
     </svg>
   ),
 
-  Files: ({ ...props }: LucideProps) => (
+  Files: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
     >
-      <path
-        d="M208,72V184a8,8,0,0,1-8,8H176V104L136,64H80V40a8,8,0,0,1,8-8h80Z"
-        opacity="0.2"
-      ></path>
+      <path d="M208,72V184a8,8,0,0,1-8,8H176V104L136,64H80V40a8,8,0,0,1,8-8h80Z" opacity="0.2"></path>
       <path d="M213.66,66.34l-40-40A8,8,0,0,0,168,24H88A16,16,0,0,0,72,40V56H56A16,16,0,0,0,40,72V216a16,16,0,0,0,16,16H168a16,16,0,0,0,16-16V200h16a16,16,0,0,0,16-16V72A8,8,0,0,0,213.66,66.34ZM168,216H56V72h76.69L168,107.31v84.53c0,.06,0,.11,0,.16s0,.1,0,.16V216Zm32-32H184V104a8,8,0,0,0-2.34-5.66l-40-40A8,8,0,0,0,136,56H88V40h76.69L200,75.31Zm-56-32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,152Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,184Z"></path>
     </svg>
   ),
 
-  Holdings: ({ ...props }: LucideProps) => (
+  Holdings: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -322,11 +339,11 @@ export const Icons = {
     </svg>
   ),
 
-  Activity: ({ ...props }: LucideProps) => (
+  Activity: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -336,11 +353,11 @@ export const Icons = {
     </svg>
   ),
 
-  Settings: ({ ...props }: LucideProps) => (
+  Settings: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -353,11 +370,11 @@ export const Icons = {
     </svg>
   ),
 
-  Invoice: ({ ...props }: LucideProps) => (
+  Invoice: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -367,11 +384,11 @@ export const Icons = {
     </svg>
   ),
 
-  Income: ({ ...props }: LucideProps) => (
+  Income: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
@@ -384,11 +401,11 @@ export const Icons = {
     </svg>
   ),
 
-  Logo: ({ ...props }: LucideProps) => (
+  Logo: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="65"
-      height="65"
+      width={size ?? 65}
+      height={size ?? 65}
       fill="none"
       viewBox="0 0 65 65"
       {...props}
@@ -408,17 +425,63 @@ export const Icons = {
     </svg>
   ),
 
-  ChartBar: ({ ...props }: LucideProps) => (
+  ChartBar: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
+      width={size ?? 32}
+      height={size ?? 32}
       fill="currentColor"
       viewBox="0 0 256 256"
       {...props}
     >
       <path d="M208,40V208H152V40Z" opacity="0.2"></path>
       <path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"></path>
+    </svg>
+  ),
+
+  InfoCircle: ({ size, ...props }: LucideProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size ?? 80}
+      height={size ?? 80}
+      fill="currentColor"
+      viewBox="0 0 80 80"
+      {...props}
+    >
+      <path d="M39.8202 79.1504C61.5976 79.1504 79.2734 61.5234 79.2734 39.7461C79.2734 17.9688 61.5976 0.341797 39.8202 0.341797C18.0917 0.341797 0.415894 17.9688 0.415894 39.7461C0.415894 61.5234 18.0917 79.1504 39.8202 79.1504ZM39.8202 71.7285C22.1445 71.7285 7.88655 57.4219 7.88655 39.7461C7.88655 22.0703 22.1445 7.7637 39.8202 7.7637C57.496 7.7637 71.8027 22.0703 71.8027 39.7461C71.8027 57.4219 57.496 71.7285 39.8202 71.7285Z" />
+      <path d="M33.2284 61.377H48.7558C50.5136 61.377 51.9296 60.1074 51.9296 58.3008C51.9296 56.5918 50.5136 55.2734 48.7558 55.2734H44.4589V37.0117C44.4589 34.6191 43.287 33.1055 41.0898 33.1055H33.9609C32.203 33.1055 30.8359 34.4238 30.8359 36.084C30.8359 37.8906 32.203 39.1602 33.9609 39.1602H37.5253V55.2734H33.2284C31.4706 55.2734 30.0546 56.5918 30.0546 58.3008C30.0546 60.1074 31.4706 61.377 33.2284 61.377ZM39.4296 27.0996C42.5058 27.0996 44.8984 24.6582 44.8984 21.582C44.8984 18.5059 42.5058 16.1133 39.4296 16.1133C36.4023 16.1133 33.9609 18.5059 33.9609 21.582C33.9609 24.6582 36.4023 27.0996 39.4296 27.0996Z" />
+    </svg>
+  ),
+  CirclesFour: ({ size, ...props }: LucideProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size ?? 32}
+      height={size ?? 32}
+      fill="currentColor"
+      viewBox="0 0 256 256"
+      {...props}
+    >
+      <path
+        d="M112,80A32,32,0,1,1,80,48,32,32,0,0,1,112,80Zm64,32a32,32,0,1,0-32-32A32,32,0,0,0,176,112ZM80,144a32,32,0,1,0,32,32A32,32,0,0,0,80,144Zm96,0a32,32,0,1,0,32,32A32,32,0,0,0,176,144Z"
+        opacity="0.2"
+      ></path>
+      <path d="M80,40a40,40,0,1,0,40,40A40,40,0,0,0,80,40Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,104Zm96,16a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56ZM80,136a40,40,0,1,0,40,40A40,40,0,0,0,80,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,200Zm96-64a40,40,0,1,0,40,40A40,40,0,0,0,176,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,176,200Z"></path>
+    </svg>
+  ),
+  Money: ({ size, ...props }: LucideProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      width={size ?? 32}
+      height={size ?? 32}
+      fill="currentColor"
+      viewBox="0 0 256 256"
+    >
+      <path
+        d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Zm40-64a48.85,48.85,0,0,0,40,40V64Zm0,128h40V152A48.85,48.85,0,0,0,200,192ZM16,152v40H56A48.85,48.85,0,0,0,16,152Zm0-48A48.85,48.85,0,0,0,56,64H16Z"
+        opacity="0.2"
+      ></path>
+      <path d="M128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152ZM240,56H16a8,8,0,0,0-8,8V192a8,8,0,0,0,8,8H240a8,8,0,0,0,8-8V64A8,8,0,0,0,240,56ZM24,72H45.37A40.81,40.81,0,0,1,24,93.37Zm0,112V162.63A40.81,40.81,0,0,1,45.37,184Zm208,0H210.63A40.81,40.81,0,0,1,232,162.63Zm0-38.35A56.78,56.78,0,0,0,193.65,184H62.35A56.78,56.78,0,0,0,24,145.65v-35.3A56.78,56.78,0,0,0,62.35,72h131.3A56.78,56.78,0,0,0,232,110.35Zm0-52.28A40.81,40.81,0,0,1,210.63,72H232Z"></path>
     </svg>
   ),
 };

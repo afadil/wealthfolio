@@ -1,4 +1,4 @@
-import { formatQuantity } from '../../lib/utils';
+import { formatQuantity } from "../../lib/utils";
 
 interface QuantityDisplayProps {
   value: number;
@@ -6,5 +6,5 @@ interface QuantityDisplayProps {
 }
 
 export function QuantityDisplay({ value, isHidden }: QuantityDisplayProps) {
-  return <span>{isHidden ? '••••' : formatQuantity(value)}</span>;
+  return <span>{isHidden ? "••••" : formatQuantity(value)}</span>;
 }

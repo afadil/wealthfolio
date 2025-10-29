@@ -1,34 +1,63 @@
-import type React from 'react';
-import { PieChart, Pie, Cell, Sector } from 'recharts';
-import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
-import { AmountDisplay } from '../financial/amount-display';
-import { useBalancePrivacy } from '../../hooks/use-balance-privacy';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../ui/chart';
-import { formatPercent } from '../../lib/utils';
+import type React from "react";
+import type { ComponentProps } from "react";
+import { Cell, Pie, PieChart, Sector } from "recharts";
+import type { NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
+import { formatPercent } from "../../lib/utils";
+import { AmountDisplay } from "../financial/amount-display";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../ui/chart";
 
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-6))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-8))',
-  'hsl(var(--chart-9))',
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
 ];
 
-const renderActiveShape = (props: any) => {
+interface ActiveShapeProps {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+  fill: string;
+  payload: { name: string; currency?: string };
+  value: number;
+  percent: number;
+}
+
+type InactiveShapeProps = {
+  cx: number;
+  cy: number;
+  innerRadius: number;
+  outerRadius: number;
+  startAngle: number;
+  endAngle: number;
+  fill: string;
+};
+
+const renderActiveShape = (props: unknown): React.JSX.Element => {
+  const typedProps = props as ActiveShapeProps;
   const { isBalanceHidden } = useBalancePrivacy();
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } =
-    props;
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } = typedProps;
 
   const amountToDisplay = isBalanceHidden
-    ? '••••••'
-    : value.toLocaleString('en-US', { style: 'currency', currency: payload.currency || 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    ? "••••••"
+    : value.toLocaleString("en-US", {
+        style: "currency",
+        currency: payload.currency || "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       {/* Main sector */}
       <Sector
         cx={cx}
@@ -57,7 +86,7 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 35}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs font-medium"
@@ -69,17 +98,17 @@ const renderActiveShape = (props: any) => {
         x={cx}
         y={cy - 20}
         textAnchor="middle"
-        fill="hsl(var(--foreground))"
+        fill="var(--foreground)"
         dominantBaseline="central"
-        className="text-xs font-bold "
+        className="text-xs font-bold"
       >
-        {isBalanceHidden ? '••••••' : amountToDisplay}
+        {isBalanceHidden ? "••••••" : amountToDisplay}
       </text>
 
       <text
         x={cx}
         y={cy - 5}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs"
@@ -90,11 +119,12 @@ const renderActiveShape = (props: any) => {
   );
 };
 
-const renderInactiveShape = (props: any) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+const renderInactiveShape = (props: unknown): React.JSX.Element => {
+  const typedProps = props as InactiveShapeProps;
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = typedProps;
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       <Sector
         cx={cx}
         cy={cy}
@@ -132,54 +162,55 @@ export const DonutChart: React.FC<DonutChartProps> = ({
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const tooltipFormatter = (
-    value: ValueType,
-    name: NameType,
-    entry: any,
-  ) => {
+  const tooltipFormatter = (value: ValueType, name: NameType, entry: Payload<ValueType, NameType>) => {
+    const payload = entry.payload as { currency: string };
     return (
       <div className="flex flex-col">
-        <span className="text-[0.70rem] uppercase text-muted-foreground">{name}</span>
+        <span className="text-muted-foreground text-[0.70rem] uppercase">{name}</span>
         <span className="font-bold">
-          <AmountDisplay value={Number(value)} currency={entry.payload.currency} isHidden={isBalanceHidden} />
+          <AmountDisplay value={Number(value)} currency={payload.currency} isHidden={isBalanceHidden} />
         </span>
       </div>
     );
   };
+
+  type PieComponentProps = ComponentProps<typeof Pie>;
+
+  const pieProps = {
+    data,
+    cy: "80%",
+    innerRadius: "110%",
+    outerRadius: "140%",
+    paddingAngle: 4,
+    cornerRadius: 6,
+    animationDuration: 100,
+    dataKey: "value",
+    nameKey: "name",
+    activeIndex: activeIndex !== -1 ? activeIndex : undefined,
+    activeShape: renderActiveShape,
+    inactiveShape: renderInactiveShape,
+    onMouseEnter: onPieEnter,
+    onMouseLeave: onPieLeave,
+    onClick: (_event, index) => {
+      if (onSectionClick && data[index]) {
+        onSectionClick(data[index], index);
+      }
+    },
+    startAngle,
+    endAngle,
+  } as PieComponentProps;
 
   return (
     <ChartContainer config={{}} className="h-[160px] w-full p-0">
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         {displayTooltip && (
           <ChartTooltip
-            cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+            cursor={{ fill: "var(--muted)", opacity: 0.3 }}
             content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
             position={{ y: 0 }}
           />
         )}
-        <Pie
-          data={data}
-          cy="80%"
-          innerRadius="110%"
-          outerRadius="140%"
-          paddingAngle={4}
-          cornerRadius={6}
-          animationDuration={100}
-          dataKey="value"
-          nameKey="name"
-          activeIndex={activeIndex !== -1 ? activeIndex : undefined}
-          activeShape={renderActiveShape}
-          inactiveShape={renderInactiveShape}
-          onMouseEnter={onPieEnter}
-          onMouseLeave={onPieLeave}
-          onClick={(_event, index) => {
-            if (onSectionClick && data[index]) {
-              onSectionClick(data[index], index);
-            }
-          }}
-          startAngle={startAngle}
-          endAngle={endAngle}
-        >
+        <Pie {...pieProps}>
           {data.map((_, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}

@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { ExchangeRate } from '@/lib/types';
-import { Icons } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
+import { useState } from "react";
+import { ExchangeRate } from "@/lib/types";
+import { Icons } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 
 interface RateCellProps {
   rate: ExchangeRate;
@@ -13,14 +13,14 @@ interface RateCellProps {
 export function RateCell({ rate, onUpdate }: RateCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedRate, setEditedRate] = useState(rate.rate.toString());
-  const isManual = rate.source === 'MANUAL';
+  const isManual = rate.source === "MANUAL";
 
   const handleEdit = () => {
     if (!isManual) {
       toast({
-        title: 'Cannot edit this rate',
-        description: 'Only manual rates can be edited.',
-        variant: 'destructive',
+        title: "Cannot edit this rate",
+        description: "Only manual rates can be edited.",
+        variant: "destructive",
       });
       return;
     }
@@ -37,9 +37,9 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
     const newRate = parseFloat(editedRate);
     if (isNaN(newRate) || newRate <= 0) {
       toast({
-        title: 'Invalid rate',
-        description: 'Please enter a valid positive number.',
-        variant: 'destructive',
+        title: "Invalid rate",
+        description: "Please enter a valid positive number.",
+        variant: "destructive",
       });
       return;
     }
@@ -58,7 +58,7 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
             className="w-full"
           />
         ) : (
-          <span>{rate.rate ? rate.rate : '-'}</span>
+          <span>{rate.rate ? rate.rate : "-"}</span>
         )}
       </div>
       {isManual && (

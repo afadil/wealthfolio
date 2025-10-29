@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    // Target and module settings
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    // Module resolution
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+
+    // Strict type checking
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": false,
+    "noImplicitOverride": true,
+
+    // Additional checks (exactOptionalPropertyTypes disabled for better library compatibility)
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "alwaysStrict": true,
+
+    // Path mapping (will be overridden in workspace configs)
+    "baseUrl": ".",
+    "paths": {},
+
+    // Enable composite builds for project references
+    "composite": true
+  },
+  "exclude": ["node_modules", "dist", "build", "coverage"]
+}

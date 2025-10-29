@@ -1,4 +1,11 @@
-import { useMemo, useState } from 'react';
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { DataTableFacetedFilterProps } from "@/components/ui/data-table/data-table-faceted-filter";
+import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar";
+import { Icons } from "@/components/ui/icons";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -12,21 +19,9 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
-import { Icons } from '@/components/ui/icons';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-} from '@/components/ui/table';
-import { DataTableToolbar } from '@/components/ui/data-table/data-table-toolbar';
-import { DataTablePagination } from '@/components/ui/data-table/data-table-pagination';
-import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { DataTableFacetedFilterProps } from '@/components/ui/data-table/data-table-faceted-filter';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+} from "@tanstack/react-table";
+import { motion } from "motion/react";
+import { useMemo, useState } from "react";
 
 export interface CSVLine {
   id: number; // Line number
@@ -41,23 +36,17 @@ interface CSVFileViewerProps {
   maxHeight?: string;
 }
 
-export function CSVFileViewer({ 
-  data,
-  className,
-  maxHeight = '400px'
-}: CSVFileViewerProps) {
+export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileViewerProps) {
   // Determine initial column filters based on whether lines have errors
   const initialColumnFilters = useMemo<ColumnFiltersState>(() => {
-    const hasErrors = data.some(row => !row.isValid);
-    return hasErrors ? [{ id: 'isValid', value: ['false'] }] : [];
+    const hasErrors = data.some((row) => !row.isValid);
+    return hasErrors ? [{ id: "isValid", value: ["false"] }] : [];
   }, [data]);
 
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: 'id', desc: false }
-  ]);
-  
+  const [sorting, setSorting] = useState<SortingState>([{ id: "id", desc: false }]);
+
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(initialColumnFilters);
-  
+
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -65,57 +54,57 @@ export function CSVFileViewer({
 
   const filters = [
     {
-      id: 'isValid',
-      title: 'Status',
+      id: "isValid",
+      title: "Status",
       options: [
-        { label: 'Error', value: 'false' },
-        { label: 'Valid', value: 'true' },
+        { label: "Error", value: "false" },
+        { label: "Valid", value: "true" },
       ],
-    }
+    },
   ] satisfies DataTableFacetedFilterProps<CSVLine, string>[];
 
   const columns: ColumnDef<CSVLine>[] = [
     {
-      id: 'id',
-      accessorKey: 'id',
+      id: "id",
+      accessorKey: "id",
       header: () => <span className="sr-only">Line Number</span>,
       enableSorting: true,
     },
     {
-      id: 'isValid',
-      accessorKey: 'isValid',
+      id: "isValid",
+      accessorKey: "isValid",
       header: () => <span className="sr-only">Status</span>,
       cell: ({ row }) => {
-        const isValid = row.getValue('isValid') as boolean;
+        const isValid = row.getValue("isValid");
         const errors = row.original.errors || [];
         const lineNumber = row.original.id + 1;
 
         return isValid ? (
           <div className="flex w-[60px] items-center gap-1 text-xs">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-success/20 text-success">
+            <div className="bg-success/20 text-success flex h-5 w-5 items-center justify-center rounded-full">
               <Icons.CheckCircle className="h-3.5 w-3.5" />
             </div>
-            <span className="text-xs text-muted-foreground">
-              {String(lineNumber).padStart(2, '0')}
+            <span className="text-muted-foreground text-xs">
+              {String(lineNumber).padStart(2, "0")}
             </span>
           </div>
         ) : (
           <TooltipProvider>
-            <Tooltip delayDuration={30} >
+            <Tooltip delayDuration={30}>
               <TooltipTrigger asChild>
                 <div className="flex w-[60px] cursor-help items-center gap-1 text-xs">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                  <div className="bg-destructive/20 text-destructive flex h-5 w-5 items-center justify-center rounded-full">
                     <Icons.XCircle className="h-3.5 w-3.5" />
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {String(lineNumber).padStart(2, '0')}
+                  <span className="text-muted-foreground text-xs">
+                    {String(lineNumber).padStart(2, "0")}
                   </span>
                 </div>
               </TooltipTrigger>
               <TooltipContent
                 side="right"
                 sideOffset={10}
-                className="max-w-xs border-none bg-destructive p-3 text-destructive-foreground"
+                className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
               >
                 <h4 className="mb-2 font-medium">Validation Errors</h4>
                 <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
@@ -129,31 +118,28 @@ export function CSVFileViewer({
         );
       },
       filterFn: (row, id, filterValue: string[]) => {
-        const isValid = row.getValue(id) as boolean;
-        const filterBoolean = filterValue[0] === 'true';
+        const isValid = row.getValue(id);
+        const filterBoolean = filterValue[0] === "true";
         return isValid === filterBoolean;
       },
     },
     {
-      id: 'content',
-      accessorKey: 'content',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="CSV Content" />
-      ),
+      id: "content",
+      accessorKey: "content",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="CSV Content" />,
       cell: ({ row }) => {
-        const content = row.getValue('content') as string;
+        const content = row.getValue("content");
         const isHeader = row.original.id === 0;
-        
+
         return (
-          <div className={cn(
-            "font-mono text-xs whitespace-nowrap",
-            isHeader && "font-semibold"
-          )}>
-            {content || <span className="italic text-muted-foreground">empty line</span>}
+          <div className={cn("font-mono text-xs whitespace-nowrap", isHeader && "font-semibold")}>
+            {(content as React.ReactNode) || (
+              <span className="text-muted-foreground italic">empty line</span>
+            )}
           </div>
         );
       },
-    }
+    },
   ];
 
   const table = useReactTable({
@@ -179,18 +165,18 @@ export function CSVFileViewer({
   });
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn("space-y-2", className)}>
       <DataTableToolbar table={table} searchBy="content" filters={filters} />
-      
+
       <div className="overflow-hidden rounded-md border">
         {/* Header bar similar to a code editor */}
-        <div className="flex items-center justify-between border-b border-border bg-muted px-3 py-2">
-          <span className="text-xs text-muted-foreground">CSV File</span>
-          <span className="text-xs text-muted-foreground">
-            {data.length > 0 ? `${data.length} lines` : 'Empty file'}
+        <div className="border-border bg-muted flex items-center justify-between border-b px-3 py-2">
+          <span className="text-muted-foreground text-xs">CSV File</span>
+          <span className="text-muted-foreground text-xs">
+            {data.length > 0 ? `${data.length} lines` : "Empty file"}
           </span>
         </div>
-        
+
         <div style={{ maxHeight }} className="overflow-auto">
           <Table>
             <TableBody className="text-xs">
@@ -202,21 +188,21 @@ export function CSVFileViewer({
                     transition={{ duration: 0.2, delay: index * 0.03 }}
                     key={row.id}
                     className={cn(
-                      'group border-0',
-                      'hover:bg-muted/40',
-                      row.getValue('isValid')
-                        ? 'bg-transparent'
-                        : 'bg-destructive/5 dark:bg-destructive/10',
-                      row.original.id === 0 && 'bg-primary/5 font-semibold',
+                      "group border-0",
+                      "hover:bg-muted/40",
+                      row.getValue("isValid")
+                        ? "bg-transparent"
+                        : "bg-destructive/5 dark:bg-destructive/10",
+                      row.original.id === 0 && "bg-primary/5 font-semibold",
                     )}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
                         className={cn(
-                          'py-1.5 border-0',
-                          cell.column.id === 'isValid' &&
-                            'sticky left-0 bg-background border-r border-border p-2 w-[60px] group-hover:bg-muted/40'
+                          "border-0 py-1.5",
+                          cell.column.id === "isValid" &&
+                            "bg-background border-border group-hover:bg-muted/40 sticky left-0 w-[60px] border-r p-2",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -228,8 +214,8 @@ export function CSVFileViewer({
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center space-y-2 py-8">
-                      <Icons.FileText className="h-10 w-10 text-muted-foreground opacity-40" />
-                      <p className="text-sm text-muted-foreground">No content found</p>
+                      <Icons.FileText className="text-muted-foreground h-10 w-10 opacity-40" />
+                      <p className="text-muted-foreground text-sm">No content found</p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -238,7 +224,7 @@ export function CSVFileViewer({
           </Table>
         </div>
       </div>
-      
+
       <DataTablePagination table={table} />
     </div>
   );

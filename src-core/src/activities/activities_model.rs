@@ -1,12 +1,11 @@
-use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate, TimeZone};
+use crate::activities::activities_errors::ActivityError;
+use crate::Result;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use rust_decimal::Decimal;
-use rust_decimal::prelude::FromPrimitive;
-use crate::accounts::Account;
-use crate::Result;
-use crate::activities::activities_errors::ActivityError;
 
 /// Helper function to parse a string into a Decimal,
 /// with a fallback for scientific notation by parsing as f64 first.
@@ -18,18 +17,18 @@ fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
             // If direct parsing fails, try parsing as f64 (to handle scientific notation)
             // and then convert to Decimal
             match f64::from_str(value_str) {
-                Ok(f_val) => {
-                    match Decimal::from_f64(f_val) {
-                        Some(dec_val) => dec_val,
-                        None => {
-                            log::error!(
-                                "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
-                                field_name, value_str, f_val
-                            );
-                            Decimal::ZERO
-                        }
+                Ok(f_val) => match Decimal::from_f64(f_val) {
+                    Some(dec_val) => dec_val,
+                    None => {
+                        log::error!(
+                            "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
+                            field_name,
+                            value_str,
+                            f_val
+                        );
+                        Decimal::ZERO
                     }
-                }
+                },
                 Err(e_f64) => {
                     // If both attempts fail, log the original decimal error and the f64 error.
                     log::error!(
@@ -69,14 +68,16 @@ pub struct Activity {
 /// Database model for activities
 #[derive(
     Queryable,
-    Selectable,
     Identifiable,
-    Associations,
     Insertable,
     AsChangeset,
+    Selectable,
     PartialEq,
+    Serialize,
+    Deserialize,
     Debug,
     Clone,
+    Default,
 )]
 #[diesel(table_name = crate::schema::activities)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -135,15 +136,16 @@ impl NewActivity {
                 "Activity type cannot be empty".to_string(),
             ));
         }
-        
+
         // Validate date format
-        if DateTime::parse_from_rfc3339(&self.activity_date).is_err() 
-            && NaiveDate::parse_from_str(&self.activity_date, "%Y-%m-%d").is_err() {
+        if DateTime::parse_from_rfc3339(&self.activity_date).is_err()
+            && NaiveDate::parse_from_str(&self.activity_date, "%Y-%m-%d").is_err()
+        {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Invalid date format. Expected ISO 8601/RFC3339 or YYYY-MM-DD".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 }
@@ -172,22 +174,26 @@ impl ActivityUpdate {
         if self.id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity ID is required for updates".to_string(),
-            ).into());
+            )
+            .into());
         }
         if self.account_id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Account ID cannot be empty".to_string(),
-            ).into());
+            )
+            .into());
         }
         if self.asset_id.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Asset ID cannot be empty".to_string(),
-            ).into());
+            )
+            .into());
         }
         if self.activity_type.trim().is_empty() {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Activity type cannot be empty".to_string(),
-            ).into());
+            )
+            .into());
         }
         Ok(())
     }
@@ -252,7 +258,9 @@ impl ActivityDetails {
     }
 
     pub fn get_amount(&self) -> Option<Decimal> {
-        self.amount.as_ref().map(|s| parse_decimal_string_tolerant(s, "amount"))
+        self.amount
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "amount"))
     }
 
     // Helper to parse the date string
@@ -360,7 +368,6 @@ impl Default for ImportMappingData {
         field_mappings.insert("fee".to_string(), "fee".to_string());
         field_mappings.insert("account".to_string(), "account".to_string());
 
-
         let mut activity_mappings = std::collections::HashMap::new();
         activity_mappings.insert("BUY".to_string(), vec!["BUY".to_string()]);
         activity_mappings.insert("SELL".to_string(), vec!["SELL".to_string()]);
@@ -371,7 +378,10 @@ impl Default for ImportMappingData {
         activity_mappings.insert("TRANSFER_IN".to_string(), vec!["TRANSFER_IN".to_string()]);
         activity_mappings.insert("TRANSFER_OUT".to_string(), vec!["TRANSFER_OUT".to_string()]);
         activity_mappings.insert("ADD_HOLDING".to_string(), vec!["ADD_HOLDING".to_string()]);
-        activity_mappings.insert("REMOVE_HOLDING".to_string(), vec!["REMOVE_HOLDING".to_string()]);
+        activity_mappings.insert(
+            "REMOVE_HOLDING".to_string(),
+            vec!["REMOVE_HOLDING".to_string()],
+        );
         activity_mappings.insert("SPLIT".to_string(), vec!["SPLIT".to_string()]);
         activity_mappings.insert("FEE".to_string(), vec!["FEE".to_string()]);
         activity_mappings.insert("TAX".to_string(), vec!["TAX".to_string()]);
@@ -397,7 +407,9 @@ impl ImportMapping {
         })
     }
 
-    pub fn from_mapping_data(data: &ImportMappingData) -> std::result::Result<Self, serde_json::Error> {
+    pub fn from_mapping_data(
+        data: &ImportMappingData,
+    ) -> std::result::Result<Self, serde_json::Error> {
         Ok(Self {
             account_id: data.account_id.clone(),
             field_mappings: serde_json::to_string(&data.field_mappings)?,
@@ -475,7 +487,7 @@ impl FromStr for ActivityType {
 
 // Custom serialization for timestamps to ensure consistent ISO 8601 formatting
 mod timestamp_format {
-    use chrono::{DateTime, Utc, TimeZone, NaiveDate};
+    use chrono::{DateTime, NaiveDate, TimeZone, Utc};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
@@ -491,18 +503,18 @@ mod timestamp_format {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        
+
         // First try parsing as RFC3339/ISO8601
         if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
             return Ok(dt.with_timezone(&Utc));
         }
-        
+
         // Then try as date-only format
         if let Ok(date) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
             // Use midnight UTC for date-only values
             return Ok(Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default()));
         }
-        
+
         Err(serde::de::Error::custom(format!(
             "Invalid timestamp format: {}. Expected ISO 8601/RFC3339 or YYYY-MM-DD",
             s
@@ -521,14 +533,20 @@ impl From<ActivityDB> for Activity {
             activity_date: DateTime::parse_from_rfc3339(&db.activity_date)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|e| {
-                    log::error!("Failed to parse activity_date '{}': {}", db.activity_date, e);
+                    log::error!(
+                        "Failed to parse activity_date '{}': {}",
+                        db.activity_date,
+                        e
+                    );
                     Utc::now() // Fallback to now
                 }),
             quantity: parse_decimal_string_tolerant(&db.quantity, "quantity"),
             unit_price: parse_decimal_string_tolerant(&db.unit_price, "unit_price"),
             currency: db.currency,
             fee: parse_decimal_string_tolerant(&db.fee, "fee"),
-            amount: db.amount.map(|s| parse_decimal_string_tolerant(&s, "amount")),
+            amount: db
+                .amount
+                .map(|s| parse_decimal_string_tolerant(&s, "amount")),
             is_draft: db.is_draft,
             comment: db.comment,
             created_at: DateTime::parse_from_rfc3339(&db.created_at)
@@ -550,46 +568,58 @@ impl From<ActivityDB> for Activity {
 impl From<NewActivity> for ActivityDB {
     fn from(domain: NewActivity) -> Self {
         let now = Utc::now();
-        
+
         // Parse the date and normalize to UTC
         let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
             .map(|dt| dt.with_timezone(&Utc))
             .or_else(|_| {
                 // If date-only format, use midnight UTC
-                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d")
-                    .map(|date| Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default()))
+                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d").map(|date| {
+                    Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default())
+                })
             })
             .unwrap_or_else(|e| {
-                log::error!("Failed to parse activity date '{}': {}", domain.activity_date, e);
+                log::error!(
+                    "Failed to parse activity date '{}': {}",
+                    domain.activity_date,
+                    e
+                );
                 // If parsing fails, use midnight UTC today
-                Utc.from_utc_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap_or_else(|| now.naive_utc()))
+                Utc.from_utc_datetime(
+                    &now.date_naive()
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap_or_else(|| now.naive_utc()),
+                )
             });
 
         // Handle cash activities and splits
         let activity_type = domain.activity_type.as_str();
-        let is_cash_or_split = activity_type == "DEPOSIT" || 
-                              activity_type == "WITHDRAWAL" || 
-                              activity_type == "FEE" || 
-                              activity_type == "INTEREST" ||
-                              activity_type == "DIVIDEND" ||
-                              activity_type == "SPLIT" ||
-                              activity_type == "TRANSFER_IN" ||
-                              activity_type == "TRANSFER_OUT";
+        let is_cash_or_split = activity_type == "DEPOSIT"
+            || activity_type == "WITHDRAWAL"
+            || activity_type == "FEE"
+            || activity_type == "INTEREST"
+            || activity_type == "DIVIDEND"
+            || activity_type == "SPLIT"
+            || activity_type == "TRANSFER_IN"
+            || activity_type == "TRANSFER_OUT";
 
         let (quantity, unit_price, amount) = if is_cash_or_split {
             // For cash activities and splits, set quantity and unit_price to 0
             // Use amount if provided, otherwise use quantity
             let amount_str = match &domain.amount {
                 Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string()
+                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
         } else {
             // For other activities, use the provided values
             (
                 domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or_else(|| Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string())
+                domain
+                    .unit_price
+                    .unwrap_or_else(|| Decimal::ZERO)
+                    .to_string(),
+                domain.amount.as_ref().map(|a| a.to_string()),
             )
         };
 
@@ -615,44 +645,56 @@ impl From<NewActivity> for ActivityDB {
 impl From<ActivityUpdate> for ActivityDB {
     fn from(domain: ActivityUpdate) -> Self {
         let now = Utc::now();
-        
+
         // Use the same date parsing logic as NewActivity for consistency
         let activity_datetime = DateTime::parse_from_rfc3339(&domain.activity_date)
             .map(|dt| dt.with_timezone(&Utc))
             .or_else(|_| {
-                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d")
-                    .map(|date| Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default()))
+                NaiveDate::parse_from_str(&domain.activity_date, "%Y-%m-%d").map(|date| {
+                    Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap_or_default())
+                })
             })
             .unwrap_or_else(|e| {
-                log::error!("Failed to parse activity date '{}': {}", domain.activity_date, e);
-                Utc.from_utc_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap_or_else(|| now.naive_utc()))
+                log::error!(
+                    "Failed to parse activity date '{}': {}",
+                    domain.activity_date,
+                    e
+                );
+                Utc.from_utc_datetime(
+                    &now.date_naive()
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap_or_else(|| now.naive_utc()),
+                )
             });
 
         // Handle cash activities and splits
         let activity_type = domain.activity_type.as_str();
-        let is_cash_or_split = activity_type == "DEPOSIT" || 
-                              activity_type == "WITHDRAWAL" || 
-                              activity_type == "FEE" || 
-                              activity_type == "INTEREST" ||
-                              activity_type == "DIVIDEND" ||
-                              activity_type == "SPLIT" ||
-                              activity_type == "TRANSFER_IN" ||
-                              activity_type == "TRANSFER_OUT";
+        let is_cash_or_split = activity_type == "DEPOSIT"
+            || activity_type == "WITHDRAWAL"
+            || activity_type == "FEE"
+            || activity_type == "INTEREST"
+            || activity_type == "DIVIDEND"
+            || activity_type == "SPLIT"
+            || activity_type == "TRANSFER_IN"
+            || activity_type == "TRANSFER_OUT";
 
         let (quantity, unit_price, amount) = if is_cash_or_split {
             // For cash activities and splits, set quantity and unit_price to 0
             // Use amount if provided, otherwise use quantity
             let amount_str = match &domain.amount {
                 Some(amount) => amount.to_string(),
-                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string()
+                None => domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
             };
             ("0".to_string(), "0".to_string(), Some(amount_str))
         } else {
             // For other activities, use the provided values
             (
                 domain.quantity.unwrap_or_else(|| Decimal::ZERO).to_string(),
-                domain.unit_price.unwrap_or_else(|| Decimal::ZERO).to_string(),
-                domain.amount.as_ref().map(|a| a.to_string())
+                domain
+                    .unit_price
+                    .unwrap_or_else(|| Decimal::ZERO)
+                    .to_string(),
+                domain.amount.as_ref().map(|a| a.to_string()),
             )
         };
 
@@ -673,7 +715,8 @@ impl From<ActivityUpdate> for ActivityDB {
             updated_at: now.to_rfc3339(),
         }
     }
-}#[derive(Debug, Serialize, QueryableByName)]
+}
+#[derive(Debug, Serialize, QueryableByName)]
 #[serde(rename_all = "camelCase")]
 #[diesel(table_name = crate::schema::activities)]
 pub struct IncomeData {
@@ -690,5 +733,3 @@ pub struct IncomeData {
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub amount: Decimal,
 }
-
-

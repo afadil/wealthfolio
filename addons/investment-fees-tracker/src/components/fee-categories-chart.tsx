@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { DonutChart, EmptyPlaceholder, Skeleton } from '@wealthfolio/ui';
-import { Card, CardContent, CardHeader, CardTitle } from '@wealthfolio/ui';
+import { useMemo, useState } from "react";
+import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
 
 interface FeeCategoryData {
   category: string;
@@ -16,11 +16,11 @@ interface FeeCategoriesChartProps {
   onCategorySectionClick?: (categoryName: string) => void;
 }
 
-export const FeeCategoriesChart = ({ 
-  feeCategories, 
-  currency, 
-  isLoading, 
-  onCategorySectionClick 
+export const FeeCategoriesChart = ({
+  feeCategories,
+  currency,
+  isLoading,
+  onCategorySectionClick,
 }: FeeCategoriesChartProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -28,7 +28,7 @@ export const FeeCategoriesChart = ({
     if (!feeCategories || feeCategories.length === 0) return [];
 
     return feeCategories
-      .map(category => ({
+      .map((category) => ({
         name: category.category,
         value: category.amount,
         currency,
@@ -58,13 +58,17 @@ export const FeeCategoriesChart = ({
     setActiveIndex(index);
   };
 
-  const handleInternalSectionClick = (sectionData: { name: string; value: number; currency: string }) => {
+  const handleInternalSectionClick = (sectionData: {
+    name: string;
+    value: number;
+    currency: string;
+  }) => {
     if (onCategorySectionClick) {
       onCategorySectionClick(sectionData.name);
     }
-    const clickedIndex = data.findIndex(d => d.name === sectionData.name);
+    const clickedIndex = data.findIndex((d) => d.name === sectionData.name);
     if (clickedIndex !== -1) {
-        setActiveIndex(clickedIndex);
+      setActiveIndex(clickedIndex);
     }
   };
 
@@ -72,7 +76,7 @@ export const FeeCategoriesChart = ({
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
             Fee Categories
           </CardTitle>
         </div>

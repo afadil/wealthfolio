@@ -1,21 +1,21 @@
-import { Command as CommandPrimitive } from 'cmdk';
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
-import { CommandGroup, CommandItem, CommandList, CommandInput } from '@/components/ui/command';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { Icons } from '@/components/ui/icons';
+import { Command as CommandPrimitive } from "cmdk";
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
+import { CommandGroup, CommandItem, CommandList, CommandInput } from "@/components/ui/command";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { Icons } from "@/components/ui/icons";
 
-export type Option = Record<'value' | 'label', string> & Record<string, string>;
+export type Option = Record<"value" | "label", string> & Record<string, string>;
 
-type AutoCompleteProps = {
+interface AutoCompleteProps {
   emptyMessage: string;
   value?: Option;
   onValueChange?: (value: Option) => void;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
-  search: any;
-};
+  search: (query: string) => Promise<{ items?: { symbol: string; name: string }[] }>;
+}
 
 export const AutoComplete = ({
   placeholder,
@@ -29,26 +29,29 @@ export const AutoComplete = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [isOpen, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Option>(value as Option);
-  const [inputValue, setInputValue] = useState<string>(value?.label || '');
+  const [selected, setSelected] = useState<Option | undefined>(value);
+  const [inputValue, setInputValue] = useState<string>(value?.label ?? "");
   const [options, setOptions] = useState<Option[]>([]);
 
   // Function to fetch options from backend
-  const fetchOptions = async (searchValue: string) => {
-    const response = await search(searchValue);
-    const data = response?.items?.map((item: any) => ({
-      label: item.symbol + ' - ' + item.name,
-      value: item.symbol,
-    }));
+  const fetchOptions = useCallback(
+    async (searchValue: string) => {
+      const response = await search(searchValue);
+      const data = response?.items?.map((item) => ({
+        label: item.symbol + " - " + item.name,
+        value: item.symbol,
+      }));
 
-    setOptions(data || []);
-  };
+      setOptions(data ?? []);
+    },
+    [search],
+  );
 
   useEffect(() => {
     if (inputValue) {
-      fetchOptions(inputValue);
+      void fetchOptions(inputValue);
     }
-  }, [inputValue]);
+  }, [inputValue, fetchOptions]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -63,7 +66,7 @@ export const AutoComplete = ({
       }
 
       // This is not a default behaviour of the <input /> field
-      if (event.key === 'Enter' && input.value !== '') {
+      if (event.key === "Enter" && input.value !== "") {
         const optionToSelect = options.find((option) => option.label === input.value);
         if (optionToSelect) {
           setSelected(optionToSelect);
@@ -73,7 +76,7 @@ export const AutoComplete = ({
         setOpen(false);
       }
 
-      if (event.key === 'Escape' || event.key === 'Tab') {
+      if (event.key === "Escape" || event.key === "Tab") {
         //input.blur();
         setOpen(false);
       }
@@ -104,7 +107,7 @@ export const AutoComplete = ({
 
   return (
     <CommandPrimitive onKeyDown={handleKeyDown}>
-      <div className="flex h-10 w-full rounded-md border border-input bg-background  py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+      <div className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50">
         <CommandInput
           ref={inputRef}
           value={inputValue}
@@ -113,12 +116,12 @@ export const AutoComplete = ({
           //onFocus={() => setOpen(true)}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full border-0 border-transparent bg-transparent focus:outline-none focus:ring-0 focus:ring-transparent"
+          className="w-full border-0 border-transparent bg-transparent focus:ring-0 focus:ring-transparent focus:outline-none"
         />
       </div>
       <div className="relative mt-1">
         {isOpen ? (
-          <div className="absolute top-0 z-10 w-full rounded-xl bg-background outline-none animate-in fade-in-0 zoom-in-95">
+          <div className="bg-background animate-in fade-in-0 zoom-in-95 absolute top-0 z-10 w-full rounded-xl outline-none">
             <CommandList className="rounded-lg ring-1 ring-slate-200">
               {isLoading ? (
                 <CommandPrimitive.Loading>
@@ -140,10 +143,7 @@ export const AutoComplete = ({
                           event.stopPropagation();
                         }}
                         onSelect={() => handleSelectOption(option)}
-                        className={cn(
-                          'flex w-full items-center gap-2',
-                          !isSelected ? 'pl-8' : null,
-                        )}
+                        className={cn("flex w-full items-center gap-2", !isSelected ? "pl-8" : null)}
                       >
                         {isSelected ? <Icons.Check className="w-4" /> : null}
                         {option.label}
@@ -153,7 +153,7 @@ export const AutoComplete = ({
                 </CommandGroup>
               ) : null}
               {!isLoading ? (
-                <CommandPrimitive.Empty className="select-none rounded-sm px-2 py-3 text-center text-sm">
+                <CommandPrimitive.Empty className="rounded-sm px-2 py-3 text-center text-sm select-none">
                   {emptyMessage}
                 </CommandPrimitive.Empty>
               ) : null}

@@ -1,15 +1,15 @@
-import { TimePeriod } from '@/lib/types';
-import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
-import { formatAmount } from '@wealthfolio/ui';
-import { formatDate } from '@/lib/utils';
+import { TimePeriod } from "@/lib/types";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
+import { formatAmount } from "@wealthfolio/ui";
+import { formatDate } from "@/lib/utils";
 
-type CustomTooltipProps = {
+interface CustomTooltipProps<TPayload = { timestamp: string; currency: string }> {
   active: boolean;
-  payload: { value: number; payload: any }[];
-};
+  payload: { value: number; payload: TPayload }[];
+}
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
-  if (active && payload && payload.length) {
+  if (active && payload?.length) {
     const data = payload[0].payload;
     return (
       <div className="center-items">
@@ -39,7 +39,7 @@ export default function HistoryChart({
 }) {
   return (
     <div className="relative flex h-full flex-col">
-      <div className="flex-grow">
+      <div className="grow">
         <ResponsiveContainer width="100%" height={height}>
           <AreaChart
             data={data}
@@ -53,14 +53,14 @@ export default function HistoryChart({
           >
             <defs>
               <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.1} />
+                <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--success)" stopOpacity={0.1} />
               </linearGradient>
             </defs>
-            {/* @ts-ignore */}
+            {/* @ts-expect-error - Recharts Tooltip content typing mismatch */}
             <Tooltip content={<CustomTooltip />} />
-            {interval !== 'ALL' && interval !== '1Y' ? (
-              <YAxis hide={true} type="number" domain={['auto', 'auto']} />
+            {interval !== "ALL" && interval !== "1Y" ? (
+              <YAxis hide={true} type="number" domain={["auto", "auto"]} />
             ) : null}
             <Area
               isAnimationActive={true}
@@ -69,7 +69,7 @@ export default function HistoryChart({
               connectNulls={true}
               type="monotone"
               dataKey="totalValue"
-              stroke="hsl(var(--success))"
+              stroke="var(--success)"
               fillOpacity={1}
               fill="url(#colorUv)"
             />

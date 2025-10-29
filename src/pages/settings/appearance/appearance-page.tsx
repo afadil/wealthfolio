@@ -1,6 +1,6 @@
-import { Separator } from '@/components/ui/separator';
-import { AppearanceForm } from './appearance-form';
-import { SettingsHeader } from '../header';
+import { Separator } from "@/components/ui/separator";
+import { SettingsHeader } from "../settings-header";
+import { AppearanceForm } from "./appearance-form";
 
 export default function SettingsAppearancePage() {
   return (

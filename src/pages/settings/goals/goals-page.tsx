@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
-import { GoalItem } from './components/goal-item';
-import { GoalEditModal } from './components/goal-edit-modal';
-import type { Goal, GoalAllocation } from '@/lib/types';
-import { SettingsHeader } from '../header';
-import { getGoals, getGoalsAllocation } from '@/commands/goal';
-import { useQuery } from '@tanstack/react-query';
-import GoalsAllocations from './components/goal-allocations';
-import { useAccounts } from '@/hooks/use-accounts';
-import { QueryKeys } from '@/lib/query-keys';
-import { useGoalMutations } from './use-goal-mutations';
+import { getGoals, getGoalsAllocation } from "@/commands/goal";
+import { useAccounts } from "@/hooks/use-accounts";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Goal, GoalAllocation } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import { useState } from "react";
+import { SettingsHeader } from "../settings-header";
+import GoalsAllocations from "./components/goal-allocations";
+import { GoalEditModal } from "./components/goal-edit-modal";
+import { GoalItem } from "./components/goal-item";
+import { useGoalMutations } from "./use-goal-mutations";
 
 const SettingsGoalsPage = () => {
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
@@ -25,7 +25,7 @@ const SettingsGoalsPage = () => {
   const { accounts } = useAccounts();
 
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState<any>(null);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 
   const { deleteGoalMutation, saveAllocationsMutation } = useGoalMutations();
 
@@ -60,18 +60,28 @@ const SettingsGoalsPage = () => {
     <>
       <div className="space-y-6">
         <SettingsHeader heading="Goals" text=" Manage your investment and saving goals.">
-          <Button onClick={() => handleAddGoal()}>
-            <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add goal
-          </Button>
+          <>
+            <Button
+              size="icon"
+              className="sm:hidden"
+              onClick={() => handleAddGoal()}
+              aria-label="Add goal"
+            >
+              <Icons.Plus className="h-4 w-4" />
+            </Button>
+            <Button className="hidden sm:inline-flex" onClick={() => handleAddGoal()}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Add goal
+            </Button>
+          </>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8">
+        <div className="w-full pt-8">
           {goals?.length ? (
             <>
               <h3 className="p-2 text-xl font-bold">Goals</h3>
 
-              <div className="divide-y divide-border rounded-md border">
+              <div className="divide-border divide-y rounded-md border">
                 {goals.map((goal: Goal) => (
                   <GoalItem
                     key={goal.id}
@@ -82,7 +92,7 @@ const SettingsGoalsPage = () => {
                 ))}
               </div>
               <h3 className="p-2 pt-12 text-xl font-bold">Allocations</h3>
-              <h5 className="p-2 pb-4 pt-0 text-sm font-light text-muted-foreground">
+              <h5 className="text-muted-foreground p-2 pt-0 pb-4 text-sm font-light">
                 Click on a cell to specify the percentage of each account's allocation to your
                 goals.
               </h5>
@@ -109,7 +119,7 @@ const SettingsGoalsPage = () => {
         </div>
       </div>
       <GoalEditModal
-        goal={selectedGoal}
+        goal={selectedGoal || undefined}
         open={visibleModal}
         onClose={() => setVisibleModal(false)}
       />

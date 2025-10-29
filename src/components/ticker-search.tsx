@@ -1,15 +1,15 @@
-import { useState, forwardRef, useRef, useMemo, useCallback, memo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Command as CommandPrimitive } from 'cmdk';
-import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { searchTicker } from '@/commands/market-data';
-import { cn } from '@/lib/utils';
-import { QuoteSummary } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Icons } from '@/components/ui/icons';
-import { debounce } from 'lodash';
+import { searchTicker } from "@/commands/market-data";
+import { Button } from "@/components/ui/button";
+import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Icons } from "@/components/ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QuoteSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Command as CommandPrimitive } from "cmdk";
+import { debounce } from "lodash";
+import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react";
 
 interface SearchProps {
   selectedResult?: QuoteSummary;
@@ -25,7 +25,7 @@ interface SearchResultsProps {
   query: string;
   isLoading: boolean;
   isError?: boolean;
-  selectedResult: SearchProps['selectedResult'];
+  selectedResult: SearchProps["selectedResult"];
   onSelect: (symbol: QuoteSummary) => void;
 }
 
@@ -57,8 +57,8 @@ const SearchResults = memo(
             >
               <Icons.Check
                 className={cn(
-                  'mr-2 h-4 w-4',
-                  selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
+                  "mr-2 h-4 w-4",
+                  selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
                 )}
               />
               {ticker.symbol} - {ticker.longName} ({ticker.exchange})
@@ -70,7 +70,7 @@ const SearchResults = memo(
   },
 );
 
-SearchResults.displayName = 'SearchResults';
+SearchResults.displayName = "SearchResults";
 
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
@@ -78,15 +78,15 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       selectedResult,
       defaultValue,
       value,
-      placeholder = 'Select symbol...',
+      placeholder = "Select symbol...",
       onSelectResult,
       className,
     },
     ref,
   ) => {
     const [open, setOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState(defaultValue || value || '');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(defaultValue ?? value ?? "");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
     const [selected, setSelected] = useState(() => {
       if (selectedResult) {
         return `${selectedResult.symbol} - ${selectedResult.longName}`;
@@ -97,7 +97,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       if (value) {
         return value;
       }
-      return '';
+      return "";
     });
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +122,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const handleSelectResult = useCallback(
       (ticker: QuoteSummary) => {
         onSelectResult(ticker?.symbol);
-        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
+        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : "";
         setSearchQuery(displayText);
         setSelected(displayText);
         setOpen(false);
@@ -133,7 +133,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
-      queryKey: ['ticker-search', debouncedQuery],
+      queryKey: ["ticker-search", debouncedQuery],
       queryFn: () => searchTicker(debouncedQuery),
       enabled:
         debouncedQuery?.length > 1 &&
@@ -181,7 +181,11 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <Button
             variant="outline"
             role="combobox"
-            className={cn('w-full rounded-md justify-between truncate', open && 'ring-ring ring-2', className)}
+            className={cn(
+              "w-full justify-between truncate rounded-md",
+              open && "ring-ring ring-2",
+              className,
+            )}
             ref={ref}
             aria-expanded={open}
             aria-haspopup="listbox"
@@ -194,7 +198,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         <PopoverContent
           side="bottom"
           align="start"
-          className="h-auto w-[var(--radix-popover-trigger-width)] p-0"
+          className="h-auto w-(--radix-popover-trigger-width) p-0"
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
@@ -221,6 +225,6 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   },
 );
 
-TickerSearchInput.displayName = 'TickerSearchInput';
+TickerSearchInput.displayName = "TickerSearchInput";
 
 export default TickerSearchInput;

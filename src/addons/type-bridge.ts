@@ -3,8 +3,8 @@
  * These utilities help convert between the main app's internal types and the SDK's public types
  */
 
-import type { HostAPI as SDKHostAPI } from '@wealthfolio/addon-sdk';
-import type { EventCallback, UnlistenFn } from '@/adapters';
+import type { HostAPI as SDKHostAPI } from "@wealthfolio/addon-sdk";
+import type { EventCallback, UnlistenFn } from "@/adapters";
 import type {
   Holding,
   Activity,
@@ -31,7 +31,7 @@ import type {
   SimplePerformanceMetrics,
   Settings,
   ImportMappingData,
-} from '@/lib/types';
+} from "@/lib/types";
 
 /**
  * Internal HostAPI interface that matches the actual command function signatures
@@ -46,17 +46,20 @@ export interface InternalHostAPI {
   // Exchange rates
   getExchangeRates(): Promise<ExchangeRate[]>;
   updateExchangeRate(updatedRate: ExchangeRate): Promise<ExchangeRate>;
-  addExchangeRate(newRate: Omit<ExchangeRate, 'id'>): Promise<ExchangeRate>;
+  addExchangeRate(newRate: Omit<ExchangeRate, "id">): Promise<ExchangeRate>;
 
   // Contribution limits
   getContributionLimit(): Promise<ContributionLimit[]>;
   createContributionLimit(newLimit: NewContributionLimit): Promise<ContributionLimit>;
-  updateContributionLimit(id: string, updatedLimit: NewContributionLimit): Promise<ContributionLimit>;
+  updateContributionLimit(
+    id: string,
+    updatedLimit: NewContributionLimit,
+  ): Promise<ContributionLimit>;
   calculateDepositsForLimit(limitId: string): Promise<DepositsCalculation>;
 
   // Goals
   getGoals(): Promise<Goal[]>;
-  createGoal(goal: any): Promise<Goal>;
+  createGoal(goal: unknown): Promise<Goal>;
   updateGoal(goal: Goal): Promise<Goal>;
   updateGoalsAllocations(allocations: GoalAllocation[]): Promise<void>;
   getGoalsAllocation(): Promise<GoalAllocation[]>;
@@ -76,10 +79,24 @@ export interface InternalHostAPI {
   updatePortfolio(): Promise<void>;
   recalculatePortfolio(): Promise<void>;
   getIncomeSummary(): Promise<IncomeSummary[]>;
-  getHistoricalValuations(accountId?: string, startDate?: string, endDate?: string): Promise<AccountValuation[]>;
+  getHistoricalValuations(
+    accountId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AccountValuation[]>;
   getLatestValuations(accountIds: string[]): Promise<AccountValuation[]>;
-  calculatePerformanceHistory(itemType: 'account' | 'symbol', itemId: string, startDate: string, endDate: string): Promise<PerformanceMetrics>;
-  calculatePerformanceSummary(args: { itemType: 'account' | 'symbol'; itemId: string; startDate?: string | null; endDate?: string | null; }): Promise<PerformanceMetrics>;
+  calculatePerformanceHistory(
+    itemType: "account" | "symbol",
+    itemId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<PerformanceMetrics>;
+  calculatePerformanceSummary(args: {
+    itemType: "account" | "symbol";
+    itemId: string;
+    startDate?: string | null;
+    endDate?: string | null;
+  }): Promise<PerformanceMetrics>;
   calculateAccountsSimplePerformance(accountIds: string[]): Promise<SimplePerformanceMetrics[]>;
   getHolding(accountId: string, assetId: string): Promise<Holding | null>;
 
@@ -89,18 +106,24 @@ export interface InternalHostAPI {
   backupDatabase(): Promise<{ filename: string; data: Uint8Array }>;
 
   // Account management
-  createAccount(account: any): Promise<Account>;
-  updateAccount(account: any): Promise<Account>;
+  createAccount(account: unknown): Promise<Account>;
+  updateAccount(account: unknown): Promise<Account>;
 
   // Activity management
-  searchActivities(page: number, pageSize: number, filters: any, searchKeyword: string, sort: any): Promise<ActivitySearchResponse>;
+  searchActivities(
+    page: number,
+    pageSize: number,
+    filters: { accountId?: string; activityType?: string; symbol?: string },
+    searchKeyword: string,
+    sort: { id: string; desc: boolean },
+  ): Promise<ActivitySearchResponse>;
   createActivity(activity: ActivityCreate): Promise<Activity>;
   updateActivity(activity: ActivityUpdate): Promise<Activity>;
   saveActivities(activities: ActivityUpdate[]): Promise<Activity[]>;
 
   // File operations
   openCsvFileDialog(): Promise<null | string | string[]>;
-  openFileSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>;
+  openFileSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<unknown>;
 
   // Event listeners - Import
   listenImportFileDropHover<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
@@ -116,7 +139,10 @@ export interface InternalHostAPI {
 
   // Activity import
   importActivities(params: { activities: ActivityImport[] }): Promise<ActivityImport[]>;
-  checkActivitiesImport(params: { account_id: string; activities: ActivityImport[] }): Promise<ActivityImport[]>;
+  checkActivitiesImport(params: {
+    account_id: string;
+    activities: ActivityImport[];
+  }): Promise<ActivityImport[]>;
   getAccountImportMapping(accountId: string): Promise<ImportMappingData>;
   saveAccountImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>;
 
@@ -131,7 +157,7 @@ export interface InternalHostAPI {
   navigateToRoute(route: string): Promise<void>;
 
   // Query functions
-  getQueryClient(): any;
+  getQueryClient(): unknown;
   invalidateQueries(queryKey: string | string[]): void;
   refetchQueries(queryKey: string | string[]): void;
 }
@@ -172,7 +198,8 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       update: internalAPI.updateActivity,
       saveMany: internalAPI.saveActivities,
       import: (activities: ActivityImport[]) => internalAPI.importActivities({ activities }),
-      checkImport: (accountId: string, activities: ActivityImport[]) => internalAPI.checkActivitiesImport({ account_id: accountId, activities }),
+      checkImport: (accountId: string, activities: ActivityImport[]) =>
+        internalAPI.checkActivitiesImport({ account_id: accountId, activities }),
       getImportMapping: internalAPI.getAccountImportMapping,
       saveImportMapping: internalAPI.saveAccountImportMapping,
     },
@@ -224,7 +251,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
 
-    logger: createAddonLogger(addonId || 'unknown-addon'),
+    logger: createAddonLogger(addonId ?? "unknown-addon"),
 
     events: {
       import: {
@@ -252,7 +279,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       invalidateQueries: internalAPI.invalidateQueries,
       refetchQueries: internalAPI.refetchQueries,
     },
-  } as any as SDKHostAPI;
+  } as unknown as SDKHostAPI;
 }
 
 /**

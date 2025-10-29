@@ -1,4 +1,4 @@
-import type { EventCallback, UnlistenFn } from '@/adapters';
+import type { EventCallback, UnlistenFn } from "@/adapters";
 import {
   getRunEnv,
   RUN_ENV,
@@ -6,7 +6,7 @@ import {
   listenFileDropHoverTauri,
   listenFileDropTauri,
   logger,
-} from '@/adapters';
+} from "@/adapters";
 
 // listenImportFileDropHover
 export const listenImportFileDropHover = async <T>(
@@ -16,11 +16,13 @@ export const listenImportFileDropHover = async <T>(
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenFileDropHoverTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen tauri://file-drop-hover.');
+    logger.error("Error listen tauri://file-drop-hover.");
     throw error;
   }
 };
@@ -31,11 +33,13 @@ export const listenImportFileDrop = async <T>(handler: EventCallback<T>): Promis
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenFileDropTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen tauri://file-drop.');
+    logger.error("Error listen tauri://file-drop.");
     throw error;
   }
 };
@@ -48,11 +52,13 @@ export const listenImportFileDropCancelled = async <T>(
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenFileDropCancelledTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen tauri://file-drop-cancelled.');
+    logger.error("Error listen tauri://file-drop-cancelled.");
     throw error;
   }
 };

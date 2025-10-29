@@ -1,13 +1,13 @@
-import React from 'react';
+import React from "react";
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Icons } from "@/components/ui/icons";
 
 interface ValidationAlertProps {
   success: boolean;
   warnings: number;
-  error: String | null;
+  error: string | null;
   isConfirming: boolean;
   onConfirm: () => void;
   onCancel: () => void;

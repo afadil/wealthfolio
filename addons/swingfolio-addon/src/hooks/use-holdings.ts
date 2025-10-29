@@ -6,17 +6,16 @@ interface UseHoldingsOptions {
   enabled?: boolean;
 }
 
-
 const TOTAL_PORTFOLIO_ACCOUNT_ID = 'TOTAL';
 
-export function useHoldings({ctx, enabled = true }: UseHoldingsOptions) {
+export function useHoldings({ ctx, enabled = true }: UseHoldingsOptions) {
   return useQuery({
     queryKey: ['holdings'],
     queryFn: async (): Promise<Holding[]> => {
       if (!ctx.api) {
         throw new Error('API context are required');
       }
-      
+
       // The API supports "TOTAL" accountId to get aggregated holdings from all accounts
       const data = await ctx.api.portfolio.getHoldings(TOTAL_PORTFOLIO_ACCOUNT_ID);
       return data || [];

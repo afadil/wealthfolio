@@ -17,7 +17,9 @@ pub async fn get_settings(state: State<'_, Arc<ServiceContext>>) -> Result<Setti
 }
 
 #[tauri::command]
-pub async fn is_auto_update_check_enabled(state: State<'_, Arc<ServiceContext>>) -> Result<bool, String> {
+pub async fn is_auto_update_check_enabled(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<bool, String> {
     debug!("Checking if auto-update check is enabled...");
     state
         .settings_service()
@@ -27,7 +29,7 @@ pub async fn is_auto_update_check_enabled(state: State<'_, Arc<ServiceContext>>)
 
 #[tauri::command]
 pub async fn update_settings(
-    settings_update: SettingsUpdate,
+    mut settings_update: SettingsUpdate,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
 ) -> Result<Settings, String> {
@@ -47,6 +49,26 @@ pub async fn update_settings(
         }
     }
 
+    // Check onboarding state and sync_enabled change
+    let existing_settings = service
+        .get_settings()
+        .map_err(|e| format!("Failed to load settings: {}", e))?;
+
+    // Check if sync_enabled is being toggled and track the new value
+    #[cfg(feature = "wealthfolio-pro")]
+    let mut sync_change = settings_update.sync_enabled;
+    #[cfg(not(feature = "wealthfolio-pro"))]
+    let sync_change: Option<bool> = None;
+
+    // During onboarding, ignore sync_enabled changes to avoid restart prompts and toggling
+    if !existing_settings.onboarding_completed {
+        settings_update.sync_enabled = None;
+        #[cfg(feature = "wealthfolio-pro")]
+        {
+            sync_change = None;
+        }
+    }
+
     // Update settings in the database (this applies all changes in settings_update)
     service
         .update_settings(&settings_update)
@@ -54,23 +76,32 @@ pub async fn update_settings(
         .map_err(|e| format!("Failed to update settings: {}", e))?;
 
     if let Some(menu_visible) = settings_update.menu_bar_visible {
-        if menu_visible {
-            // Create and set the menu
-            match crate::menu::create_menu(&handle) {
-                Ok(menu) => {
-                    if let Err(e) = handle.set_menu(menu) {
-                        debug!("Failed to set menu: {}", e);
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            if menu_visible {
+                // Create and set the menu on desktop platforms
+                match crate::menu::create_menu(&handle) {
+                    Ok(menu) => {
+                        if let Err(e) = handle.set_menu(menu) {
+                            debug!("Failed to set menu: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        debug!("Failed to create menu: {}", e);
                     }
                 }
-                Err(e) => {
-                    debug!("Failed to create menu: {}", e);
+            } else {
+                // Remove the menu entirely by setting it to None
+                if let Err(e) = handle.remove_menu() {
+                    debug!("Failed to remove menu: {}", e);
                 }
             }
-        } else {
-            // Remove the menu entirely by setting it to None
-            if let Err(e) = handle.remove_menu() {
-                debug!("Failed to remove menu: {}", e);
-            }
+        }
+
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        {
+            let _ = menu_visible;
+            debug!("Menu bar visibility toggling is not supported on mobile runtimes.");
         }
     }
 
@@ -99,6 +130,36 @@ pub async fn update_settings(
             });
         }
     }
+
+    // If sync_enabled was changed by the user in Settings UI, hot start/stop engine instead of restart.
+    #[cfg(feature = "wealthfolio-pro")]
+    if let Some(new_sync_state) = sync_change {
+        debug!(
+            "Sync {} setting changed",
+            if new_sync_state {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+
+        // Hot start/stop engine (desktop and mobile)
+        if let Some(sync_handles) = handle.try_state::<crate::SyncHandles>() {
+            if new_sync_state {
+                let engine = sync_handles.engine.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = engine.start().await;
+                });
+            } else {
+                let engine = sync_handles.engine.clone();
+                tauri::async_runtime::spawn(async move {
+                    engine.stop_server().await;
+                });
+            }
+        }
+    }
+    #[allow(unused_variables)]
+    let _ = sync_change;
 
     // Return the latest settings from the database
     service

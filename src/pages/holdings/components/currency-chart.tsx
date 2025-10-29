@@ -1,19 +1,13 @@
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { useBalancePrivacy } from '@/context/privacy-context';
-import { formatPercent } from '@wealthfolio/ui';
-import type { Holding } from '@/lib/types';
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import type { Holding } from "@/lib/types";
+import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
+import { motion } from "motion/react";
+import { useMemo } from "react";
 
 // Using theme chart colors
-const INDICATOR_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-9))',
-];
+const INDICATOR_COLORS = ["var(--chart-1)", "var(--chart-5)", "var(--chart-7)", "var(--chart-9)"];
 
 interface CurrencyData {
   name: string;
@@ -27,7 +21,8 @@ interface CurrencyChartData {
 }
 
 function getCurrencyData(holdings: Holding[] = [], baseCurrency: string): CurrencyChartData {
-  if (!Array.isArray(holdings) || !holdings.length || !baseCurrency) return { data: [], totalBase: 0 };
+  if (!Array.isArray(holdings) || !holdings.length || !baseCurrency)
+    return { data: [], totalBase: 0 };
 
   // Aggregate holdings by currency using local value, calculate total base value
   const aggregation = holdings.reduce<{ currencies: Record<string, number>; totalBase: number }>(
@@ -83,11 +78,14 @@ interface HoldingCurrencyChartProps {
 
 export function HoldingCurrencyChart({
   holdings = [],
-  baseCurrency = 'USD',
+  baseCurrency = "USD",
   isLoading = false,
   onCurrencySectionClick,
 }: HoldingCurrencyChartProps) {
-  const { data, totalBase } = useMemo(() => getCurrencyData(holdings, baseCurrency), [holdings, baseCurrency]);
+  const { data, totalBase } = useMemo(
+    () => getCurrencyData(holdings, baseCurrency),
+    [holdings, baseCurrency],
+  );
   const { isBalanceHidden } = useBalancePrivacy();
 
   if (isLoading) {
@@ -100,7 +98,7 @@ export function HoldingCurrencyChart({
         <div className="space-y-6">
           {/* Title */}
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
               Currency Allocation
             </h3>
           </div>
@@ -119,37 +117,40 @@ export function HoldingCurrencyChart({
             {data.map((currency, index) => (
               <div
                 key={currency.name}
-                className="flex items-center justify-between gap-4 rounded-md py-1 transition-colors hover:bg-muted/50 cursor-pointer"
-                onClick={() => onCurrencySectionClick && onCurrencySectionClick(currency.name)}
+                className="hover:bg-muted/50 flex cursor-pointer items-center justify-between gap-4 rounded-md py-1 transition-colors"
+                onClick={() => onCurrencySectionClick?.(currency.name)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    onCurrencySectionClick && onCurrencySectionClick(currency.name);
+                  if (e.key === "Enter" || e.key === " ") {
+                    onCurrencySectionClick?.(currency.name);
                   }
                 }}
               >
                 <div className="flex min-w-0 items-center gap-2.5">
                   <div
-                    className="h-5 w-1.5 flex-shrink-0 rounded-full"
+                    className="h-5 w-1.5 shrink-0 rounded-full"
                     style={{ backgroundColor: INDICATOR_COLORS[index % INDICATOR_COLORS.length] }}
                   />
-                  <span className="truncate text-sm font-medium">{currency.name}</span>
+                  <span className="text-sm font-medium">{currency.name}</span>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2 text-sm font-medium">
-                    <AmountDisplay
-                      value={currency.value}
-                      currency={baseCurrency}
-                      isHidden={isBalanceHidden}
-                    />
-                  <span className="text-xs text-muted-foreground">|</span>
-                  <span className="text-muted-foreground">{formatPercent(currency.percent/100)}</span>
+                <div className="flex shrink-0 items-center gap-2 text-sm font-medium">
+                  <AmountDisplay
+                    value={currency.value}
+                    currency={baseCurrency}
+                    isHidden={isBalanceHidden}
+                    displayCurrency={false}
+                  />
+                  <span className="text-muted-foreground text-xs">|</span>
+                  <span className="text-muted-foreground">
+                    {formatPercent(currency.percent / 100)}
+                  </span>
                 </div>
               </div>
             ))}
 
             {data.length === 0 && (
-              <div className="rounded-md bg-muted/20 py-4 text-center text-sm text-muted-foreground">
+              <div className="bg-muted/20 text-muted-foreground rounded-md py-4 text-center text-sm">
                 No currency data available
               </div>
             )}
@@ -164,11 +165,11 @@ export function HoldingCurrencyChart({
 
 function LoadingState() {
   return (
-    <Card className="overflow-hidden border-muted bg-card/80 backdrop-blur-sm">
+    <Card className="border-muted bg-card/80 overflow-hidden backdrop-blur-sm">
       <CardContent className="p-6">
         <div className="space-y-6">
           <Skeleton className="h-5 w-[180px]" />
-          <Skeleton className="h-12 w-[220px]" />
+          <Skeleton className="w-sidebar h-12" />
           <Skeleton className="h-8 w-full" />
           <div className="space-y-3">
             <Skeleton className="h-6 w-full" />
@@ -214,11 +215,11 @@ function ProgressBar({ data }: { data: CurrencyData[] }) {
   }, [data]);
 
   return (
-    <div className="flex h-6 w-full items-center justify-between gap-[1px]">
+    <div className="flex h-6 w-full items-center justify-between gap-px">
       {segments.map((segment, index) => (
         <motion.div
           key={segment.key}
-          className={`h-full w-1 rounded-full origin-left ${segment.isEmpty ? 'bg-muted' : ''}`}
+          className={`h-full w-1 origin-left rounded-full ${segment.isEmpty ? "bg-muted" : ""}`}
           style={segment.color ? { backgroundColor: segment.color } : undefined}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}

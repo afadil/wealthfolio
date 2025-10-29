@@ -29,6 +29,7 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let result = assets::table
+            .select(AssetDB::as_select())
             .find(asset_id)
             .first::<AssetDB>(&mut conn)?;
 
@@ -40,6 +41,7 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
+            .select(AssetDB::as_select())
             .load::<AssetDB>(&mut conn)?;
 
         Ok(results.into_iter().map(Asset::from).collect())
@@ -50,6 +52,7 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
+            .select(AssetDB::as_select())
             .filter(assets::asset_type.eq("CASH"))
             .filter(assets::symbol.like(format!("{}%", base_currency)))
             .load::<AssetDB>(&mut conn)?;
@@ -61,6 +64,7 @@ impl AssetRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let results = assets::table
+            .select(AssetDB::as_select())
             .filter(assets::id.eq_any(symbols))
             .load::<AssetDB>(&mut conn)?;
 

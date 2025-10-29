@@ -1,26 +1,26 @@
-import { useState, useMemo } from 'react';
+import type { AddonStoreListing } from "@/lib/types";
 import {
+  Badge,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
+  EmptyPlaceholder,
+  Icons,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Badge,
-  Icons,
-  EmptyPlaceholder,
   Separator,
   Skeleton,
-  Card,
-  CardContent,
-  CardHeader,
-} from '@wealthfolio/ui';
-import { AddonStoreCard } from './addon-store-card';
-import { PermissionDialog } from './addon-permission-dialog';
-import { useAddonStore } from '../hooks/use-addon-store';
-import { useAddonActions } from '../hooks/use-addon-actions';
-import type { AddonStoreListing } from '@/lib/types';
+} from "@wealthfolio/ui";
+import { useMemo, useState } from "react";
+import { useAddonActions } from "../hooks/use-addon-actions";
+import { useAddonStore } from "../hooks/use-addon-store";
+import { PermissionDialog } from "./addon-permission-dialog";
+import { AddonStoreCard } from "./addon-store-card";
 
 interface AddonStoreBrowserProps {
   installedAddonIds: string[];
@@ -29,7 +29,7 @@ interface AddonStoreBrowserProps {
 
 // Helper function to check if an addon should be displayed
 const isAddonDisplayable = (listing: AddonStoreListing) => {
-  const allowedStatuses = ['active', 'deprecated', 'coming-soon'];
+  const allowedStatuses = ["active", "deprecated", "coming-soon"];
   return !listing.status || allowedStatuses.includes(listing.status);
 };
 
@@ -47,37 +47,36 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
   const addonActions = useAddonActions();
   const { permissionDialog, setPermissionDialog } = addonActions;
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'recent' | 'name'>('popular');
-  const [filterBy, setFilterBy] = useState<'all' | 'uninstalled'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"popular" | "rating" | "recent" | "name">("popular");
+  const [filterBy, setFilterBy] = useState<"all" | "uninstalled">("all");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // TanStack Query automatically fetches store listings on component mount
 
   const filteredAndSortedListings = useMemo(() => {
-    let filtered = storeListings.filter((listing) => {
+    const filtered = storeListings.filter((listing) => {
       // Only show active, deprecated, and coming-soon addons (exclude inactive)
       if (!isAddonDisplayable(listing)) return false;
 
       // Search filter
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch =
+        searchQuery === "" ||
         listing.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         listing.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (listing.tags && listing.tags.some(tag => 
-          tag.toLowerCase().includes(searchQuery.toLowerCase())
-        ));
+        listing.tags?.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (!matchesSearch) return false;
 
       // Tag filter
-      if (selectedTag && (!listing.tags || !listing.tags.includes(selectedTag))) {
+      if (selectedTag && !listing.tags?.includes(selectedTag)) {
         return false;
       }
 
       // Category filter
       switch (filterBy) {
-        case 'uninstalled':
+        case "uninstalled":
           return !installedAddonIds.includes(listing.id);
         default:
           return true;
@@ -87,22 +86,22 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
     // Sort
     filtered.sort((a, b) => {
       // Always prioritize coming-soon addons first
-      if (a.status === 'coming-soon' && b.status !== 'coming-soon') {
+      if (a.status === "coming-soon" && b.status !== "coming-soon") {
         return -1;
       }
-      if (b.status === 'coming-soon' && a.status !== 'coming-soon') {
+      if (b.status === "coming-soon" && a.status !== "coming-soon") {
         return 1;
       }
-      
+
       // If both or neither are coming-soon, apply regular sorting
       switch (sortBy) {
-        case 'popular':
+        case "popular":
           return b.downloads - a.downloads;
-        case 'rating':
+        case "rating":
           return b.rating - a.rating;
-        case 'recent':
+        case "recent":
           return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
-        case 'name':
+        case "name":
           return a.name.localeCompare(b.name);
         default:
           return 0;
@@ -116,7 +115,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
     try {
       await installFromStore(listing, true, addonActions.handleShowPermissionDialog);
       onInstallSuccess?.();
-    } catch (error) {
+    } catch (_error) {
       // Error handling is done in the hook
     }
   };
@@ -124,9 +123,9 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
   const getFilterCounts = () => {
     // Only count addons that would be displayed (exclude inactive)
     const displayableAddons = storeListings.filter(isAddonDisplayable);
-    
+
     const total = displayableAddons.length;
-    const uninstalled = displayableAddons.filter(l => !installedAddonIds.includes(l.id)).length;
+    const uninstalled = displayableAddons.filter((l) => !installedAddonIds.includes(l.id)).length;
     return { total, uninstalled };
   };
 
@@ -135,17 +134,15 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
   // Get popular tags from all displayable addons
   const getPopularTags = () => {
     const tagCounts = new Map<string, number>();
-    
-    storeListings
-      .filter(isAddonDisplayable)
-      .forEach(listing => {
-        if (listing.tags) {
-          listing.tags.forEach(tag => {
-            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-          });
-        }
-      });
-    
+
+    storeListings.filter(isAddonDisplayable).forEach((listing) => {
+      if (listing.tags) {
+        listing.tags.forEach((tag: string) => {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        });
+      }
+    });
+
     // Sort by count and return top 8 tags
     return Array.from(tagCounts.entries())
       .sort(([, a], [, b]) => b - a)
@@ -212,7 +209,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Search */}
         <div className="relative flex-1">
-          <Icons.Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Search addons..."
             value={searchQuery}
@@ -222,7 +219,12 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         </div>
 
         {/* Sort */}
-        <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+        <Select
+          value={sortBy}
+          onValueChange={(value: string) =>
+            setSortBy(value as "popular" | "rating" | "recent" | "name")
+          }
+        >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
@@ -235,7 +237,10 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         </Select>
 
         {/* Filter */}
-        <Select value={filterBy} onValueChange={(value: any) => setFilterBy(value)}>
+        <Select
+          value={filterBy}
+          onValueChange={(value: string) => setFilterBy(value as "all" | "uninstalled")}
+        >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Filter by..." />
           </SelectTrigger>
@@ -246,8 +251,8 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         </Select>
 
         {/* Refresh Button */}
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           size="icon"
           onClick={() => fetchStoreListings()}
           disabled={isLoadingStore}
@@ -261,20 +266,21 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       <div className="space-y-4">
         {/* Results summary */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Showing {filteredAndSortedListings.length} of {storeListings.length} addons
             {searchQuery && (
               <>
-                {' '}for "<span className="font-medium">{searchQuery}</span>"
+                {" "}
+                for "<span className="font-medium">{searchQuery}</span>"
               </>
             )}
           </p>
-          
+
           {searchQuery && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSearchQuery('')}
+              onClick={() => setSearchQuery("")}
               className="h-auto p-1 text-xs"
             >
               <Icons.Close className="mr-1 h-3 w-3" />
@@ -289,24 +295,23 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
             <EmptyPlaceholder.Icon name="Search" />
             <EmptyPlaceholder.Title>No addons found</EmptyPlaceholder.Title>
             <EmptyPlaceholder.Description>
-              {searchQuery 
+              {searchQuery
                 ? `No addons match your search for "${searchQuery}". Try different keywords or clear your search.`
-                : 'No addons match your current filters. Try adjusting your filters or refreshing the store.'
-              }
+                : "No addons match your current filters. Try adjusting your filters or refreshing the store."}
             </EmptyPlaceholder.Description>
             <div className="flex gap-2">
               {searchQuery && (
-                <Button variant="outline" onClick={() => setSearchQuery('')}>
+                <Button variant="outline" onClick={() => setSearchQuery("")}>
                   Clear Search
                 </Button>
               )}
-              <Button variant="outline" onClick={() => setFilterBy('all')}>
+              <Button variant="outline" onClick={() => setFilterBy("all")}>
                 Show All Addons
               </Button>
             </div>
           </EmptyPlaceholder>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 ">
+          <div className="grid gap-6 sm:grid-cols-2">
             {filteredAndSortedListings.map((listing) => (
               <AddonStoreCard
                 key={listing.id}
@@ -324,7 +329,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       </div>
 
       {/* Popular Categories */}
-      {searchQuery === '' && filterBy === 'all' && !selectedTag && popularTags.length > 0 && (
+      {searchQuery === "" && filterBy === "all" && !selectedTag && popularTags.length > 0 && (
         <div className="space-y-4">
           <Separator />
           <div>
@@ -334,7 +339,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
                 <Badge
                   key={tag}
                   variant="secondary"
-                  className="cursor-pointer hover:bg-primary hover:text-primary-foreground capitalize"
+                  className="hover:bg-primary hover:text-primary-foreground cursor-pointer capitalize"
                   onClick={() => setSelectedTag(tag)}
                 >
                   {tag}
@@ -368,8 +373,8 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         onOpenChange={(open) => setPermissionDialog({ ...permissionDialog, open })}
         manifest={permissionDialog.manifest}
         declaredPermissions={permissionDialog.permissions || []}
-        riskLevel={permissionDialog.riskLevel || 'low'}
-        onApprove={permissionDialog.onApprove || (() => {})}
+        riskLevel={permissionDialog.riskLevel || "low"}
+        onApprove={permissionDialog.onApprove || (() => undefined)}
         onDeny={() => setPermissionDialog({ open: false })}
       />
     </div>

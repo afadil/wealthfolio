@@ -40,7 +40,7 @@ export interface AddonManifest {
   keywords?: string[];
   /** Addon icon (base64 or relative path) */
   icon?: string;
-  
+
   // Runtime fields (only present after installation)
   /** Installation timestamp in ISO format */
   installedAt?: string;
@@ -55,19 +55,32 @@ export interface AddonManifest {
 /**
  * Type guard to check if a manifest has been installed (has runtime fields)
  */
-export function isInstalledManifest(manifest: AddonManifest): manifest is Required<Pick<AddonManifest, 'main' | 'enabled' | 'installedAt'>> & AddonManifest {
-  return !!(manifest.installedAt && manifest.main !== undefined && manifest.enabled !== undefined);
+export function isInstalledManifest(
+  manifest: AddonManifest,
+): manifest is Required<Pick<AddonManifest, 'main' | 'enabled' | 'installedAt'>> &
+  AddonManifest {
+  return !!(
+    manifest.installedAt &&
+    manifest.main !== undefined &&
+    manifest.enabled !== undefined
+  );
 }
 
 /**
  * Helper type for development manifests (without runtime fields)
  */
-export type DevelopmentManifest = Omit<AddonManifest, 'installedAt' | 'updatedAt' | 'source' | 'size'>;
+export type DevelopmentManifest = Omit<
+  AddonManifest,
+  'installedAt' | 'updatedAt' | 'source' | 'size'
+>;
 
 /**
  * Helper type for installed manifests (with runtime fields)
  */
-export type InstalledManifest = Required<Pick<AddonManifest, 'main' | 'enabled' | 'installedAt'>> & AddonManifest;
+export type InstalledManifest = Required<
+  Pick<AddonManifest, 'main' | 'enabled' | 'installedAt'>
+> &
+  AddonManifest;
 
 /**
  * Addon file information

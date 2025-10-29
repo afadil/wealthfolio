@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -15,12 +15,12 @@ import {
   TooltipTrigger,
   Separator,
   Skeleton,
-} from '@wealthfolio/ui';
-import { AccountValuation, PerformanceMetrics } from '@/lib/types';
-import { PerformanceGrid } from '@/pages/account/performance-grid';
-import { formatDate } from '@/lib/utils';
+} from "@wealthfolio/ui";
+import { AccountValuation, PerformanceMetrics } from "@/lib/types";
+import { PerformanceGrid } from "@/pages/account/performance-grid";
+import { formatDate } from "@/lib/utils";
 
-import { useBalanceUpdate } from './use-balance-update';
+import { useBalanceUpdate } from "./use-balance-update";
 
 interface EditableBalanceProps {
   account: AccountValuation;
@@ -69,11 +69,11 @@ const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalan
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className="flex items-center gap-2 text-lg font-extrabold cursor-pointer"
+            className="flex cursor-pointer items-center gap-2 text-lg font-extrabold"
             onClick={() => setIsEditing(true)}
           >
             <PrivacyAmount value={initialBalance} currency={currency} />
-            <Icons.Pencil className="h-4 w-4 cursor-pointer text-muted-foreground" />
+            <Icons.Pencil className="text-muted-foreground h-4 w-4 cursor-pointer" />
           </div>
         </TooltipTrigger>
         <TooltipContent>
@@ -133,23 +133,23 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
 
   const rows = [
     {
-      label: 'Investments',
+      label: "Investments",
       value: (
         <PrivacyAmount value={valuation?.investmentMarketValue || 0} currency={displayCurrency} />
       ),
     },
     {
-      label: 'Net Contribution',
+      label: "Net Contribution",
       value: <PrivacyAmount value={valuation?.netContribution || 0} currency={displayCurrency} />,
     },
     {
-      label: 'Cost Basis',
+      label: "Cost Basis",
       value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
     },
   ];
 
-  const formattedStartDate = formatDate(performance?.periodStartDate || '');
-  const formattedEndDate = formatDate(performance?.periodEndDate || '');
+  const formattedStartDate = formatDate(performance?.periodStartDate || "");
+  const formattedEndDate = formatDate(performance?.periodEndDate || "");
 
   return (
     <Card className={className}>
@@ -177,7 +177,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
         <PerformanceGrid performance={performance} isLoading={isLoading} />
       </CardContent>
       <CardFooter className="flex justify-end pb-0">
-        <p className="m-0 p-0 text-xs text-muted-foreground">
+        <p className="text-muted-foreground m-0 p-0 text-xs">
           from {formattedStartDate} to {formattedEndDate}
         </p>
       </CardFooter>

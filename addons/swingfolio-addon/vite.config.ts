@@ -1,9 +1,10 @@
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import externalGlobals from "rollup-plugin-external-globals"
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import externalGlobals from "rollup-plugin-external-globals";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   define: {
     // Define process.env.NODE_ENV to remove development-only code
     "process.env.NODE_ENV": JSON.stringify("production"),
@@ -34,4 +35,4 @@ export default defineConfig({
     minify: false, // Keep readable for debugging
     sourcemap: true,
   },
-})
+});

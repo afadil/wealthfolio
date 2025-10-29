@@ -1,21 +1,26 @@
-import { useState, useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ContributionLimitOperations } from './contribution-limit-operations';
-import { Icons } from '@/components/ui/icons';
-import { formatAmount } from '@wealthfolio/ui';
-import { AccountSelection } from './account-selection';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Account, ContributionLimit } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useContributionLimitProgress } from '../use-contribution-limit-mutations';
+import { Account, ContributionLimit } from "@/lib/types";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Icons,
+  Progress,
+  Skeleton,
+  formatAmount,
+} from "@wealthfolio/ui";
+import { useEffect, useState } from "react";
+import { useContributionLimitProgress } from "../use-contribution-limit-mutations";
+import { AccountSelection } from "./account-selection";
+import { ContributionLimitOperations } from "./contribution-limit-operations";
 
-type ContributionLimitItemProps = {
+interface ContributionLimitItemProps {
   limit: ContributionLimit;
   accounts: Account[];
   onEdit: (limit: ContributionLimit) => void;
   onDelete: (limit: ContributionLimit) => void;
-};
+}
 
 export function ContributionLimitItem({
   limit,
@@ -41,7 +46,7 @@ export function ContributionLimitItem({
   const progressValue = progress ? progress.total : 0;
   const progressPercentageNumber =
     limit.limitAmount > 0 ? (progressValue / limit.limitAmount) * 100 : 0;
-  const baseCurrency = progress?.baseCurrency || 'USD';
+  const baseCurrency = progress?.baseCurrency || "USD";
   const isOverLimit = progressPercentageNumber > 100;
   const isComplete = progressPercentageNumber === 100;
   const remainingAmount = limit.limitAmount - progressValue;
@@ -54,29 +59,30 @@ export function ContributionLimitItem({
 
   return (
     <Card
-      className={`mb-4 ${progressPercentageNumber === 100 ? 'border-success/20 bg-success/10 shadow-sm' : isOverLimit ? 'border-destructive/20 bg-destructive/10 shadow-sm' : ''} last:mb-0`}
+      className={`w-full ${progressPercentageNumber === 100 ? "border-success/20 bg-success/10 shadow-sm" : isOverLimit ? "border-destructive/20 bg-destructive/10 shadow-sm" : ""}`}
     >
       <CardHeader className="cursor-pointer pb-3" onClick={toggleExpanded}>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center">
-              {isComplete && <Icons.CheckCircle className="mr-2 h-5 w-5 text-success" />}
-              {isOverLimit && <Icons.AlertTriangle className="mr-2 h-5 w-5 text-destructive" />}
+              {isComplete && <Icons.CheckCircle className="text-success mr-2 h-5 w-5" />}
+              {isOverLimit && <Icons.AlertTriangle className="text-destructive mr-2 h-5 w-5" />}
               <CardTitle className="text-lg">{limit.groupName}</CardTitle>
             </div>
 
             {limit.startDate && limit.endDate && (
-              <div className="flex items-center text-xs text-muted-foreground">
+              <div className="text-muted-foreground flex items-center text-xs">
                 <Icons.Calendar className="mr-1 h-3 w-3" />
                 <span>
-                  {new Date(limit.startDate).toLocaleDateString()} → {new Date(limit.endDate).toLocaleDateString()}
+                  {new Date(limit.startDate).toLocaleDateString()} →{" "}
+                  {new Date(limit.endDate).toLocaleDateString()}
                 </span>
                 {daysRemaining !== null && daysRemaining <= 60 && (
                   <span
                     className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
                       daysRemaining <= 30
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-blue-50 text-blue-700'
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-blue-50 text-blue-700"
                     }`}
                   >
                     {daysRemaining} days left
@@ -92,7 +98,7 @@ export function ContributionLimitItem({
                 <div className="flex items-baseline space-x-1">
                   <span
                     className={`text-lg font-bold ${
-                      isOverLimit ? 'text-destructive' : isComplete ? 'text-success' : ''
+                      isOverLimit ? "text-destructive" : isComplete ? "text-success" : ""
                     }`}
                   >
                     {isComplete
@@ -101,13 +107,13 @@ export function ContributionLimitItem({
                         ? `${formatAmount(progressValue, baseCurrency)}`
                         : `${formatAmount(progressValue, baseCurrency)}`}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     / {formatAmount(limit.limitAmount, baseCurrency)}
                   </span>
                 </div>
-                <span className="text-right text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-right text-xs">
                   {isComplete
-                    ? 'completed'
+                    ? "completed"
                     : isOverLimit
                       ? `+${formatAmount(overLimitAmount, baseCurrency)} over limit`
                       : `${limit.contributionYear}`}
@@ -118,7 +124,7 @@ export function ContributionLimitItem({
             <div className="flex items-center space-x-1">
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleExpanded}>
                 <Icons.ChevronDown
-                  className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
                 />
               </Button>
 
@@ -133,8 +139,7 @@ export function ContributionLimitItem({
         ) : (
           <Progress
             value={progressPercentageNumber > 100 ? 100 : progressPercentageNumber}
-            className={`w-full ${isOverLimit ? 'bg-destructive/20' : ''}`}
-            showPercentage
+            className={`w-full ${isOverLimit ? "bg-destructive/20" : ""}`}
           />
         )}
         {isExpanded && (
