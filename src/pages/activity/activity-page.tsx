@@ -11,7 +11,7 @@ import { ActivityDeleteModal } from "./components/activity-delete-modal";
 import { ActivityForm } from "./components/activity-form";
 import ActivityTable from "./components/activity-table";
 import ActivityTableMobile from "./components/activity-table-mobile";
-import EditableActivityTable from "./components/editable-activity-table";
+import EditableActivityTable from "./components/editable-activity-table/editable-activity-table";
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";

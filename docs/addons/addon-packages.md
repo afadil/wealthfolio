@@ -115,8 +115,8 @@ All addons must use React 18:
 ```json
 {
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   }
 }
 ```
@@ -147,7 +147,7 @@ TypeScript support with proper types:
   "devDependencies": {
     "typescript": "^5.8.3",
     "@types/node": "^22.14.0",
-    "@types/react": "^18.3.11",
+    "@types/react": "^19.1.11",
     "@types/react-dom": "^18.3.0"
   }
 }
@@ -305,7 +305,7 @@ You can add other npm packages to your addon:
   "dependencies": {
     "@wealthfolio/addon-sdk": "1.0.0",
     "@wealthfolio/ui": "1.0.0",
-    "react": "^18.3.1"
+    "react": "^19.1.1"
   }
 }
 ```
@@ -340,13 +340,13 @@ Template for addon package.json:
   "dependencies": {
     "@wealthfolio/addon-sdk": "1.0.0",
     "@wealthfolio/ui": "1.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@wealthfolio/addon-dev-tools": "^1.0.0",
     "@types/node": "^22.14.0",
-    "@types/react": "^18.3.11",
+    "@types/react": "^19.1.11",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.4.1",
     "rollup-plugin-external-globals": "^0.13.0",
@@ -400,7 +400,7 @@ Always use compatible versions:
 
 | SDK Version | Wealthfolio Version | React Version |
 | ----------- | ------------------- | ------------- |
-| 1.0.0       | 1.0.0+              | ^18.3.1       |
+| 1.0.0       | 1.0.0+              | ^19.1.1       |
 
 ### Breaking Changes
 
@@ -652,7 +652,7 @@ const debug = import.meta.env.VITE_DEBUG;
 
 ```bash
 npm ls react  # Check React version
-npm install react@^18.3.1  # Fix version
+npm install react@^19.1.1  # Fix version
 ```
 
 **Missing peer dependencies:**

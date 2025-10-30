@@ -42,13 +42,13 @@ import {
 import { formatAmount } from "@wealthfolio/ui";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useActivityMutations } from "../hooks/use-activity-mutations";
+import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import {
   baseActivitySchema,
   cashActivitySchema,
   NewActivityFormValues,
   tradeActivitySchema,
-} from "./forms/schemas";
+} from "../forms/schemas";
 
 import {
   Button,
@@ -75,13 +75,13 @@ import {
   MoneyCellEditor,
   QuantityCellEditor,
   TextCellEditor,
-} from "./editable-activity-table/cell-editors";
+} from "./cell-editors";
 import type {
   CellEditingState,
   EditableActivityTableProps,
   ExtendedColumnDef,
   LocalActivityDetails,
-} from "./editable-activity-table/types";
+} from "./types";
 
 // Simple Skeleton component (can be replaced with shadcn/ui Skeleton if available)
 const Skeleton = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
@@ -126,7 +126,7 @@ import {
   handlePaste,
   isRowDisabled,
   parseAndValidate,
-} from "./editable-activity-table/editable-activity-table-helpers";
+} from "./editable-activity-table-helpers";
 
 const fetchSize = 15;
 
