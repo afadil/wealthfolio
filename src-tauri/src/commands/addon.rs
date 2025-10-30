@@ -1,9 +1,9 @@
 use std::fs;
 use std::sync::Arc;
-use tauri::{AppHandle, State};
 use tauri::Manager;
+use tauri::{AppHandle, State};
 
-// Import addon modules  
+// Import addon modules
 use crate::addons::*;
 use crate::context::ServiceContext;
 
@@ -23,7 +23,7 @@ pub async fn install_addon_zip(
 
     let extracted = extract_addon_zip_internal(zip_data)?;
     let addon_id = extracted.metadata.id.clone();
-    
+
     // Create addon directory
     let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
     if addon_dir.exists() {
@@ -45,8 +45,10 @@ pub async fn install_addon_zip(
     }
 
     // Convert to installed manifest with runtime fields and use the merged permissions
-    let metadata = extracted.metadata.to_installed(enable_after_install.unwrap_or(true))?;
-    
+    let metadata = extracted
+        .metadata
+        .to_installed(enable_after_install.unwrap_or(true))?;
+
     let manifest_path = addon_dir.join("manifest.json");
     let manifest_json = serde_json::to_string_pretty(&metadata)
         .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
@@ -57,9 +59,7 @@ pub async fn install_addon_zip(
 }
 
 #[tauri::command]
-pub async fn list_installed_addons(
-    app_handle: AppHandle,
-) -> Result<Vec<InstalledAddon>, String> {
+pub async fn list_installed_addons(app_handle: AppHandle) -> Result<Vec<InstalledAddon>, String> {
     let app_data_dir = app_handle
         .path()
         .app_data_dir()
@@ -76,13 +76,13 @@ pub async fn list_installed_addons(
     }
 
     // Read addon directories
-    let entries = fs::read_dir(&addons_dir)
-        .map_err(|e| format!("Failed to read addons directory: {}", e))?;
+    let entries =
+        fs::read_dir(&addons_dir).map_err(|e| format!("Failed to read addons directory: {}", e))?;
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
         let addon_dir = entry.path();
-        
+
         if !addon_dir.is_dir() {
             continue;
         }
@@ -100,7 +100,7 @@ pub async fn list_installed_addons(
                 continue;
             }
         };
-        
+
         let metadata: AddonManifest = match serde_json::from_str(&manifest_content) {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -142,7 +142,7 @@ pub async fn toggle_addon(
 
     let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
     let manifest_path = addon_dir.join("manifest.json");
-    
+
     if !manifest_path.exists() {
         return Err("Addon not found".to_string());
     }
@@ -166,10 +166,7 @@ pub async fn toggle_addon(
 }
 
 #[tauri::command]
-pub async fn uninstall_addon(
-    app_handle: AppHandle,
-    addon_id: String,
-) -> Result<(), String> {
+pub async fn uninstall_addon(app_handle: AppHandle, addon_id: String) -> Result<(), String> {
     let app_data_dir = app_handle
         .path()
         .app_data_dir()
@@ -179,7 +176,7 @@ pub async fn uninstall_addon(
         .to_string();
 
     let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
-    
+
     if !addon_dir.exists() {
         return Err("Addon not found".to_string());
     }
@@ -205,7 +202,7 @@ pub async fn load_addon_for_runtime(
 
     let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
     let manifest_path = addon_dir.join("manifest.json");
-    
+
     if !manifest_path.exists() {
         return Err("Addon not found".to_string());
     }
@@ -230,10 +227,10 @@ pub async fn load_addon_for_runtime(
         // Normalize path separators for comparison (convert backslashes to forward slashes)
         let normalized_file_name = file.name.replace('\\', "/");
         let normalized_main_file = main_file.replace('\\', "/");
-        
-        file.is_main = normalized_file_name == normalized_main_file || 
-                      normalized_file_name.ends_with(&normalized_main_file) ||
-                      (normalized_main_file.contains('/') && normalized_file_name == normalized_main_file);
+
+        file.is_main = normalized_file_name == normalized_main_file
+            || normalized_file_name.ends_with(&normalized_main_file)
+            || (normalized_main_file.contains('/') && normalized_file_name == normalized_main_file);
     }
 
     // Verify that we found the main file
@@ -242,7 +239,11 @@ pub async fn load_addon_for_runtime(
         return Err(format!(
             "Main addon file '{}' not found. Available files: {}",
             main_file,
-            files.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(", ")
+            files
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
 
@@ -295,7 +296,11 @@ pub async fn check_addon_update(
             Ok(update_check_result)
         }
         Err(error) => {
-            log::error!("Failed to fetch addon store info for {}: {}", addon_id, error);
+            log::error!(
+                "Failed to fetch addon store info for {}: {}",
+                addon_id,
+                error
+            );
             Ok(AddonUpdateCheckResult {
                 addon_id,
                 update_info: AddonUpdateInfo {
@@ -325,12 +330,22 @@ pub async fn check_all_addon_updates(
     let installed_addons = list_installed_addons(app_handle.clone()).await?;
     let mut results = Vec::new();
     let instance_id = state.instance_id.as_str();
-    
+
     for addon in installed_addons {
-        match check_addon_update_from_api(&addon.metadata.id, &addon.metadata.version, Some(instance_id)).await {
+        match check_addon_update_from_api(
+            &addon.metadata.id,
+            &addon.metadata.version,
+            Some(instance_id),
+        )
+        .await
+        {
             Ok(result) => results.push(result),
             Err(error) => {
-                log::error!("Failed to check update for addon {}: {}", addon.metadata.id, error);
+                log::error!(
+                    "Failed to check update for addon {}: {}",
+                    addon.metadata.id,
+                    error
+                );
                 // Create a fallback result with error
                 results.push(AddonUpdateCheckResult {
                     addon_id: addon.metadata.id,
@@ -351,7 +366,7 @@ pub async fn check_all_addon_updates(
             }
         }
     }
-    
+
     Ok(results)
 }
 
@@ -363,9 +378,10 @@ pub async fn update_addon_from_store_by_id(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<AddonManifest, String> {
     let instance_id = state.instance_id.as_str();
-    
+
     // Download the addon package using the new download API
-    let zip_data = download_addon_from_store(&addon_id, instance_id).await
+    let zip_data = download_addon_from_store(&addon_id, instance_id)
+        .await
         .map_err(|e| format!("Failed to download addon: {}", e))?;
 
     // Get the current addon state before updating
@@ -378,15 +394,16 @@ pub async fn update_addon_from_store_by_id(
         .to_string();
 
     let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
-    let was_enabled = if let Ok(manifest_content) = fs::read_to_string(addon_dir.join("manifest.json")) {
-        if let Ok(metadata) = serde_json::from_str::<AddonManifest>(&manifest_content) {
-            metadata.enabled.unwrap_or(false)
+    let was_enabled =
+        if let Ok(manifest_content) = fs::read_to_string(addon_dir.join("manifest.json")) {
+            if let Ok(metadata) = serde_json::from_str::<AddonManifest>(&manifest_content) {
+                metadata.enabled.unwrap_or(false)
+            } else {
+                false
+            }
         } else {
             false
-        }
-    } else {
-        false
-    };
+        };
 
     // Uninstall the old version first
     uninstall_addon(app_handle.clone(), addon_id.clone()).await?;
@@ -422,9 +439,10 @@ pub async fn download_addon_to_staging(
         .to_string();
 
     let instance_id = state.instance_id.as_str();
-    
+
     // Download addon data
-    let zip_data = download_addon_from_store(&addon_id, instance_id).await
+    let zip_data = download_addon_from_store(&addon_id, instance_id)
+        .await
         .map_err(|e| {
             // Clean up any partial staging on download failure
             let _ = remove_addon_from_staging(&addon_id, &app_data_dir);
@@ -456,13 +474,13 @@ pub async fn install_addon_from_staging(
 
     // Load addon from staging
     let zip_data = load_addon_from_staging(&addon_id, &app_data_dir)?;
-    
+
     // Install the addon
     let result = install_addon_zip(app_handle, zip_data, enable_after_install).await;
-    
+
     // Clean up staging regardless of install success/failure
     let _ = remove_addon_from_staging(&addon_id, &app_data_dir);
-    
+
     result
 }
 

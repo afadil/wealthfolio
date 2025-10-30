@@ -1,12 +1,4 @@
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import React, { useEffect, useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { motion } from 'framer-motion';
-import { useSettingsContext } from '@/lib/settings-provider';
-import { cn } from '@/lib/utils';
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -14,283 +6,323 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { CurrencyInput } from '@wealthfolio/ui';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Card, CardContent } from '@/components/ui/card';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Icons } from "@wealthfolio/ui";
+import { worldCurrencies } from "@wealthfolio/ui/lib/currencies";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-// Simplified schema for onboarding - removed 'system' theme option for direct selection
 const onboardingSettingsSchema = z.object({
-  baseCurrency: z.string({ required_error: 'Please select a base currency.' }),
-  theme: z.enum(['light', 'dark'], { required_error: 'Please select a theme.' }),
+  baseCurrency: z
+    .string({ required_error: "Please select a base currency." })
+    .min(1, "Please select a base currency."),
+  theme: z.enum(["light", "dark", "system"], { required_error: "Please select a theme." }),
 });
 
-// Helper for locale detection (simple example)
-function detectDefaultCurrency(): string {
-  if (typeof navigator === 'undefined') return 'USD'; // Default SSR/Node
+function detectDefaultCurrency(): string | undefined {
+  if (typeof navigator === "undefined") return undefined; // Default SSR/Node
   const lang = navigator.language || navigator.languages[0];
-  if (lang.startsWith('en-GB')) return 'GBP';
-  if (lang.startsWith('en-US')) return 'USD';
-  if (lang.startsWith('en-CA')) return 'CAD';
-  if (lang.startsWith('en-AU')) return 'AUD';
-  if (lang.startsWith('de')) return 'EUR'; // Simplified German -> EUR
-  if (lang.startsWith('fr')) return 'EUR'; // Simplified French -> EUR
-  if (lang.startsWith('es')) return 'EUR'; // Simplified Spanish -> EUR
-  if (lang.startsWith('it')) return 'EUR'; // Simplified Italian -> EUR
-  if (lang.startsWith('ja')) return 'JPY'; // Simplified Japanese -> JPY
-  if (lang.startsWith('zh')) return 'CNY'; // Simplified Chinese -> CNY
-  if (lang.startsWith('ko')) return 'KRW'; // Simplified Korean -> KRW
-  if (lang.startsWith('ru')) return 'RUB'; // Simplified Russian -> RUB
-  if (lang.startsWith('nl')) return 'EUR'; // Simplified Dutch -> EUR
-  if (lang.startsWith('pl')) return 'EUR'; // Simplified Polish -> EUR
-  if (lang.startsWith('pt')) return 'EUR'; // Simplified Portuguese -> EUR
-  if (lang.startsWith('sv')) return 'EUR'; // Simplified Swedish -> EUR
-  if (lang.startsWith('tr')) return 'EUR'; // Simplified Turkish -> EUR
-  if (lang.startsWith('ar')) return 'USD'; // Simplified Arabic -> USD
-  if (lang.startsWith('hi')) return 'INR'; // Simplified Hindi -> INR
-  return 'USD'; // Fallback
+  if (lang.startsWith("en-GB")) return "GBP";
+  if (lang.startsWith("en-US")) return "USD";
+  if (lang.startsWith("en-CA")) return "CAD";
+  if (lang.startsWith("en-AU")) return "AUD";
+  if (lang.startsWith("de")) return "EUR";
+  if (lang.startsWith("fr")) return "EUR";
+  if (lang.startsWith("es")) return "EUR";
+  if (lang.startsWith("it")) return "EUR";
+  if (lang.startsWith("ja")) return "JPY";
+  if (lang.startsWith("zh")) return "CNY";
+  if (lang.startsWith("ko")) return "KRW";
+  if (lang.startsWith("ru")) return "RUB";
+  if (lang.startsWith("nl")) return "EUR";
+  if (lang.startsWith("pl")) return "EUR";
+  if (lang.startsWith("pt")) return "EUR";
+  if (lang.startsWith("sv")) return "EUR";
+  if (lang.startsWith("tr")) return "EUR";
+  if (lang.startsWith("ar")) return "USD";
+  if (lang.startsWith("hi")) return "INR";
+  return undefined;
 }
 
-// Helper for OS theme detection
-function detectDefaultTheme(): 'light' | 'dark' {
-  if (
-    typeof window !== 'undefined' &&
-    window.matchMedia &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  ) {
-    return 'dark';
-  }
-  return 'light';
-}
+const popularCurrencies = ["USD", "CAD", "EUR", "GBP", "AUD", "CHF", "JPY"];
 
 type OnboardingSettingsValues = z.infer<typeof onboardingSettingsSchema>;
 
-interface OnboardingStep2Props {
-  onNext: () => void;
-  onBack: () => void;
+export interface OnboardingStep2Handle {
+  submitForm: () => void;
 }
 
-export const OnboardingStep2: React.FC<OnboardingStep2Props> = ({ onNext, onBack }) => {
-  const { settings, updateSettings } = useSettingsContext();
-  const [initialValuesSet, setInitialValuesSet] = useState(false);
+interface OnboardingStep2Props {
+  onNext: () => void;
+  onValidityChange: (isValid: boolean) => void;
+}
 
-  // Use detected values for initial form state
-  const form = useForm<OnboardingSettingsValues>({
-    resolver: zodResolver(onboardingSettingsSchema),
-  });
+export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2Props>(
+  ({ onNext, onValidityChange }, ref) => {
+    const { settings, updateSettings } = useSettingsContext();
+    const [initialValuesSet, setInitialValuesSet] = useState(false);
+    const [showCurrencySearch, setShowCurrencySearch] = useState(false);
+    const [currencySearch, setCurrencySearch] = useState("");
 
-  // Set defaults based on detection after mount
-  useEffect(() => {
-    if (!initialValuesSet) {
-      form.reset({
-        baseCurrency: settings?.baseCurrency || detectDefaultCurrency(),
-        theme: (settings?.theme as OnboardingSettingsValues['theme']) || detectDefaultTheme(),
-      });
-      setInitialValuesSet(true);
+    const form = useForm<OnboardingSettingsValues>({
+      resolver: zodResolver(onboardingSettingsSchema),
+    });
+
+    const filteredCurrencies = worldCurrencies.filter(
+      (curr) =>
+        curr.value.toLowerCase().includes(currencySearch.toLowerCase()) ||
+        curr.label.toLowerCase().includes(currencySearch.toLowerCase()),
+    );
+
+    const currentCurrency = form.watch("baseCurrency");
+
+    function handleCurrencySelect(currencyCode: string) {
+      form.setValue("baseCurrency", currencyCode, { shouldValidate: true, shouldDirty: true });
+      setShowCurrencySearch(false);
+      setCurrencySearch("");
     }
-  }, [form, settings, initialValuesSet]);
 
-  async function onSubmit(data: OnboardingSettingsValues) {
-    try {
-      await updateSettings({
-        baseCurrency: data.baseCurrency,
-        theme: data.theme,
-        onboardingCompleted: true,
-      });
-      onNext();
-    } catch (error) {
-      console.error('Failed to save onboarding settings:', error);
+    useEffect(() => {
+      onValidityChange(form.formState.isValid);
+    }, [form.formState.isValid, onValidityChange]);
+
+    useImperativeHandle(ref, () => ({
+      submitForm() {
+        form.handleSubmit(onSubmit)();
+      },
+    }));
+
+    useEffect(() => {
+      if (!initialValuesSet) {
+        form.reset({
+          baseCurrency: settings?.baseCurrency ?? detectDefaultCurrency() ?? "",
+          theme: (settings?.theme as OnboardingSettingsValues["theme"]) ?? undefined,
+        });
+        setInitialValuesSet(true);
+      }
+    }, [form, settings, initialValuesSet]);
+
+    async function onSubmit(data: OnboardingSettingsValues) {
+      try {
+        await updateSettings({ baseCurrency: data.baseCurrency, theme: data.theme });
+        await updateSettings({ onboardingCompleted: true });
+        onNext();
+      } catch (error) {
+        console.error("Failed to save onboarding settings:", error);
+      }
     }
-  }
 
-  return (
-    <div className="space-y-2 px-12 md:px-16 lg:px-20">
-      <h1 className="mb-2 text-3xl font-bold">Settings</h1>
-      <p className="pb-6 text-base text-muted-foreground">
-        Just a couple preferences to get you started
-      </p>
-      <Card>
-        <CardContent className="p-8">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
-              {/* --- Base Currency Field --- */}
-              <FormField
-                control={form.control}
-                name="baseCurrency"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Setup your base currency</FormLabel>
-                    <FormControl className="mt-2 w-[300px]">
-                      <CurrencyInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        autoFocus
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* --- Theme Field --- */}
-              <FormField
-                control={form.control}
-                name="theme"
-                render={({ field }) => (
-                  <FormItem className="space-y-1" id="theme-selection-label">
-                    <FormLabel>Select your preferred theme</FormLabel>
-                    <FormMessage />
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      aria-labelledby="theme-selection-label"
-                      className="grid max-w-md grid-cols-2 gap-8 pt-2"
-                    >
-                      {[
-                        { value: 'light', labelText: 'Light' },
-                        { value: 'dark', labelText: 'Dark' },
-                      ].map((themeOption) => (
-                        <FormItem key={themeOption.value}>
-                          <FormLabel
-                            className={cn(
-                              'block cursor-pointer rounded-md border-2 p-1',
-                              'min-h-[44px] min-w-[44px]',
-                              field.value === themeOption.value ? 'border-primary' : 'border-muted',
-                              'focus-within:border-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:border-accent',
-                              'motion-safe:transition-all motion-safe:duration-150 motion-safe:ease-out',
-                              field.value === themeOption.value && 'motion-safe:scale-105',
-                            )}
-                          >
-                            <FormControl>
-                              <RadioGroupItem value={themeOption.value} className="sr-only" />
-                            </FormControl>
-                            <div
-                              className={cn(
-                                'items-center rounded-md p-1',
-                                themeOption.value === 'dark' && 'dark bg-popover',
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  'space-y-2 rounded-sm p-2',
-                                  themeOption.value === 'light'
-                                    ? 'bg-[hsl(51_59%_95%)]'
-                                    : 'dark bg-[hsl(var(--flexoki-bg))]',
-                                )}
+    return (
+      <>
+        <div className="space-y-3 sm:space-y-4">
+          <div className="text-center">
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Just a couple preferences to get you started
+            </p>
+          </div>
+          <Card className="border-none bg-transparent">
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-16">
+                  <FormField
+                    control={form.control}
+                    name="baseCurrency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="bg-muted rounded-lg p-2">
+                            <Icons.DollarSign className="text-muted-foreground h-5 w-5" />
+                          </div>
+                          <FormLabel className="text-xl font-semibold">Currency</FormLabel>
+                        </div>
+                        <FormControl>
+                          <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+                            {popularCurrencies.map((curr) => (
+                              <button
+                                key={curr}
+                                type="button"
+                                onClick={() => field.onChange(curr)}
+                                className={`rounded-lg border-2 p-4 font-semibold transition-all ${
+                                  field.value === curr
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50 hover:bg-accent"
+                                }`}
                               >
+                                {curr}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => setShowCurrencySearch(true)}
+                              className="border-border hover:border-primary/50 hover:bg-accent ring-offset-background focus-visible:ring-ring inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+                            >
+                              <Icons.Search className="size-5" />
+                              Other
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="theme"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="bg-muted rounded-lg p-2">
+                            <Icons.Palette className="text-muted-foreground h-5 w-5" />
+                          </div>
+                          <FormLabel className="text-xl font-semibold">Theme</FormLabel>
+                        </div>
+                        <FormControl>
+                          <div className="grid grid-cols-3 gap-4">
+                            <button
+                              type="button"
+                              onClick={() => field.onChange("dark")}
+                              className={`rounded-lg border-2 p-4 transition-all ${
+                                field.value === "dark"
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:border-primary/50 hover:bg-accent"
+                              }`}
+                            >
+                              <div className="flex flex-col items-center gap-3">
                                 <div
-                                  className={cn(
-                                    'space-y-2 rounded-md p-2 shadow-sm',
-                                    themeOption.value === 'light'
-                                      ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
-                                  )}
+                                  className={`rounded-full p-3 ${
+                                    field.value === "dark"
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted"
+                                  }`}
                                 >
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[80px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[100px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
+                                  <Icons.Moon className="h-6 w-6" />
                                 </div>
-                                <div
-                                  className={cn(
-                                    'flex items-center space-x-2 rounded-md p-2 shadow-sm',
-                                    themeOption.value === 'light'
-                                      ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      'h-4 w-4 rounded-full',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[100px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                </div>
-                                <div
-                                  className={cn(
-                                    'flex items-center space-x-2 rounded-md p-2 shadow-sm',
-                                    themeOption.value === 'light'
-                                      ? 'bg-[hsl(48_100%_97%)]'
-                                      : 'bg-[hsl(var(--flexoki-bg-2))]',
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      'h-4 w-4 rounded-full',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                  <div
-                                    className={cn(
-                                      'h-2 w-[100px] rounded-lg',
-                                      themeOption.value === 'light'
-                                        ? 'bg-[hsl(50_14%_83%)]'
-                                        : 'bg-[hsl(var(--flexoki-ui-2))]',
-                                    )}
-                                  />
-                                </div>
+                                <span className="font-semibold">Dark</span>
                               </div>
-                            </div>
-                            <span className="block w-full p-2 text-center font-normal">
-                              {themeOption.labelText}
-                            </span>
-                          </FormLabel>
-                        </FormItem>
-                      ))}
-                    </RadioGroup>
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack} type="button">
-          <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <div className="flex items-center space-x-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: form.formState.isValid ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Button
-              onClick={form.handleSubmit(onSubmit)}
-              type="button"
-              disabled={!form.formState.isValid}
-            >
-              Next: Final Steps
-              <Icons.ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </motion.div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => field.onChange("light")}
+                              className={`rounded-lg border-2 p-4 transition-all ${
+                                field.value === "light"
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:border-primary/50 hover:bg-accent"
+                              }`}
+                            >
+                              <div className="flex flex-col items-center gap-3">
+                                <div
+                                  className={`rounded-full p-3 ${
+                                    field.value === "light"
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted"
+                                  }`}
+                                >
+                                  <Icons.Sun className="h-6 w-6" />
+                                </div>
+                                <span className="font-semibold">Light</span>
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => field.onChange("system")}
+                              className={`rounded-lg border-2 p-4 transition-all ${
+                                field.value === "system"
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:border-primary/50 hover:bg-accent"
+                              }`}
+                            >
+                              <div className="flex flex-col items-center gap-3">
+                                <div
+                                  className={`rounded-full p-3 ${
+                                    field.value === "system"
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted"
+                                  }`}
+                                >
+                                  <Icons.Monitor className="h-6 w-6" />
+                                </div>
+                                <span className="font-semibold">System</span>
+                              </div>
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-    </div>
-  );
-};
+
+        {showCurrencySearch && (
+          <div className="bg-background/80 animate-in fade-in fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm duration-200">
+            <Card className="w-full max-w-md border shadow-lg">
+              <div className="p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-xl font-bold">Select Currency</h3>
+                  <button
+                    onClick={() => {
+                      setShowCurrencySearch(false);
+                      setCurrencySearch("");
+                    }}
+                    className="hover:bg-accent rounded-lg p-2 transition-colors"
+                  >
+                    <Icons.Close className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="relative mb-4">
+                  <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
+                  <Input
+                    type="text"
+                    placeholder="Search currencies..."
+                    value={currencySearch}
+                    onChange={(e) => setCurrencySearch(e.target.value)}
+                    className="pl-10"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="max-h-96 space-y-1 overflow-y-auto pr-2">
+                  {filteredCurrencies.map((curr) => (
+                    <button
+                      key={curr.value}
+                      onClick={() => handleCurrencySelect(curr.value)}
+                      className={`flex w-full items-center justify-between rounded-lg p-3 transition-all ${
+                        currentCurrency === curr.value ? "bg-primary/10" : "hover:bg-accent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-left">
+                          <div className="font-semibold">{curr.value}</div>
+                          <div className="text-muted-foreground text-sm">{curr.label}</div>
+                        </div>
+                      </div>
+                      {currentCurrency === curr.value && (
+                        <Icons.CheckCircle className="text-primary h-5 w-5" />
+                      )}
+                    </button>
+                  ))}
+                  {filteredCurrencies.length === 0 && (
+                    <div className="text-muted-foreground py-8 text-center">
+                      No currencies found
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+      </>
+    );
+  },
+);
+
+OnboardingStep2.displayName = "OnboardingStep2";

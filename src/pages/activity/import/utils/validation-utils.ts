@@ -5,13 +5,13 @@ import {
   ActivityType,
   CsvRowData,
   ImportValidationResult,
-} from '@/lib/types';
-import { importActivitySchema } from '@/lib/schemas';
-import { tryParseDate } from '@/lib/utils';
-import { logger } from '@/adapters';
+} from "@/lib/types";
+import { importActivitySchema } from "@/lib/schemas";
+import { tryParseDate } from "@/lib/utils";
+import { logger } from "@/adapters";
 
 // Ticker symbol validation regex
-const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([\.-][A-Z0-9]+){0,2})$/;
+const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
 
 // Helper to validate ticker symbol format
 export function validateTickerSymbol(symbol: string): boolean {
@@ -21,38 +21,38 @@ export function validateTickerSymbol(symbol: string): boolean {
 /**
  * Normalizes and cleans numeric values from CSV data
  * Handles currency symbols, commas, spaces, and other formatting characters
- * 
+ *
  * @param value The raw string value from CSV
  * @returns Cleaned numeric value or undefined if invalid
  */
 export function normalizeNumericValue(value: string | undefined): number | undefined {
-  if (!value || typeof value !== 'string') {
+  if (!value || typeof value !== "string") {
     return undefined;
   }
 
   // Trim whitespace
   let cleaned = value.trim();
-  
+
   // Handle empty strings
-  if (cleaned === '' || cleaned === '-' || cleaned === 'N/A' || cleaned.toLowerCase() === 'null') {
+  if (cleaned === "" || cleaned === "-" || cleaned === "N/A" || cleaned.toLowerCase() === "null") {
     return undefined;
   }
 
   // Remove common currency symbols and formatting
   cleaned = cleaned
-    .replace(/[$£€¥₹₦₹₽¢]/g, '') // Remove currency symbols
-    .replace(/[,\s]/g, '') // Remove commas and spaces
-    .replace(/[()]/g, '') // Remove parentheses (sometimes used for negative values)
+    .replace(/[$£€¥₹₦₹₽¢]/g, "") // Remove currency symbols
+    .replace(/[,\s]/g, "") // Remove commas and spaces
+    .replace(/[()]/g, "") // Remove parentheses (sometimes used for negative values)
     .trim();
 
   // Handle empty string after cleaning
-  if (cleaned === '') {
+  if (cleaned === "") {
     return undefined;
   }
 
   // Parse as float
   const parsed = parseFloat(cleaned);
-  
+
   // Return undefined if parsing resulted in NaN
   return isNaN(parsed) ? undefined : parsed;
 }
@@ -60,7 +60,7 @@ export function normalizeNumericValue(value: string | undefined): number | undef
 /**
  * Safely parses a numeric value and returns its absolute value
  * Uses normalization to handle currency symbols and formatting
- * 
+ *
  * @param value The raw string value from CSV
  * @returns Absolute numeric value or undefined if invalid
  */
@@ -138,7 +138,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
       }
       return activity.amount ? Math.abs(activity.amount) : activity.amount; // Fallback to provided amount with absolute value
     },
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0, // Use absolute value of provided fee or 0
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0), // Use absolute value of provided fee or 0
   },
   [ActivityType.SELL]: {
     // Similar logic to BUY
@@ -154,34 +154,42 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
       }
       return activity.amount ? Math.abs(activity.amount) : activity.amount;
     },
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.DEPOSIT]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
-      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+      activity.amount
+        ? Math.abs(activity.amount)
+        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.WITHDRAWAL]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
-      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+      activity.amount
+        ? Math.abs(activity.amount)
+        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.INTEREST]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) =>
-      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+      activity.amount
+        ? Math.abs(activity.amount)
+        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.DIVIDEND]: {
     calculateSymbol: (activity) => activity.symbol, // Usually associated with a stock
     calculateAmount: (activity) =>
-      activity.amount ? Math.abs(activity.amount) : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+      activity.amount
+        ? Math.abs(activity.amount)
+        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.FEE]: {
     calculateSymbol: (activity, accountCurrency) =>
@@ -204,20 +212,20 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
   [ActivityType.TAX]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+    calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.TRANSFER_IN]: {
     calculateSymbol: (activity, accountCurrency) =>
       activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+    calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.TRANSFER_OUT]: {
     calculateSymbol: (activity, accountCurrency) =>
       activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : 0, // Amount is mandatory for cash activities
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+    calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.ADD_HOLDING]: {
     calculateSymbol: (activity) => activity.symbol,
@@ -233,7 +241,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
       }
       return activity.amount ? Math.abs(activity.amount) : activity.amount;
     },
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.REMOVE_HOLDING]: {
     calculateSymbol: (activity) => activity.symbol,
@@ -249,7 +257,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
       }
       return activity.amount ? Math.abs(activity.amount) : activity.amount;
     },
-    calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
   },
   [ActivityType.SPLIT]: {
     calculateSymbol: (activity) => activity.symbol,
@@ -262,8 +270,8 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
 // Default logic if type-specific logic isn't found
 const defaultLogic: ActivityLogicConfig = {
   calculateSymbol: (activity) => activity.symbol,
-  calculateAmount: (activity) => activity.amount ? Math.abs(activity.amount) : activity.amount,
-  calculateFee: (activity) => activity.fee ? Math.abs(activity.fee) : 0,
+  calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : activity.amount),
+  calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
 };
 
 // Helper function to transform a CSV row into an Activity object
@@ -280,14 +288,15 @@ function transformRowToActivity(
     const headerName = mapping.fieldMappings[field];
     if (!headerName) return undefined;
     const value = row[headerName];
-    return typeof value === 'string' ? value.trim() : undefined;
+    return typeof value === "string" ? value.trim() : undefined;
   };
 
   // Handle account ID mapping
   const csvAccountId = getMappedValue(ImportFormat.ACCOUNT);
-  activity.accountId = csvAccountId && mapping.accountMappings?.[csvAccountId.trim()]
-    ? mapping.accountMappings[csvAccountId.trim()] // Use mapped account ID if available
-    : accountId; // Fall back to default account ID 
+  activity.accountId =
+    csvAccountId && mapping.accountMappings?.[csvAccountId.trim()]
+      ? mapping.accountMappings[csvAccountId.trim()] // Use mapped account ID if available
+      : accountId; // Fall back to default account ID
 
   // 1. Map Raw Values & Basic Parsing
   const rawDate = getMappedValue(ImportFormat.DATE);
@@ -381,11 +390,11 @@ export function validateActivityImport(
   accountCurrency: string,
 ): ValidationResult {
   if (!data || data.length === 0) {
-    throw new Error('CSV data is required and must have at least one row');
+    throw new Error("CSV data is required and must have at least one row");
   }
 
   if (!accountId) {
-    throw new Error('Account ID is required for validation');
+    throw new Error("Account ID is required for validation");
   }
 
   try {
@@ -407,8 +416,8 @@ export function validateActivityImport(
         const schemaValidation = importActivitySchema.safeParse(transformedActivity);
 
         if (schemaValidation.success) {
-          const activity = schemaValidation.data as ActivityImport;
-          activity.accountId = transformedActivity.accountId ?? accountId
+          const activity = schemaValidation.data;
+          activity.accountId = transformedActivity.accountId ?? accountId;
           activity.isValid = true;
           allActivities.push(activity);
         } else {
@@ -416,7 +425,7 @@ export function validateActivityImport(
           const allValidationErrors: Record<string, string[]> = {};
 
           schemaValidation.error.issues.forEach((issue) => {
-            const field = issue.path.join('.') || 'general';
+            const field = issue.path.join(".") || "general";
             if (!allValidationErrors[field]) {
               allValidationErrors[field] = [];
             }
@@ -444,7 +453,7 @@ export function validateActivityImport(
           isValid: false,
           lineNumber,
           errors: {
-            general: ['Failed to process row data'],
+            general: ["Failed to process row data"],
           },
         } as unknown as ActivityImport;
 

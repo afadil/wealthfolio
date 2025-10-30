@@ -1,6 +1,7 @@
-import NumberFlow from '@number-flow/react';
-import { useBalancePrivacy } from '@/context/privacy-context';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from "@/components/ui/skeleton";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import NumberFlow from "@number-flow/react";
+import { useMemo } from "react";
 
 interface BalanceProps {
   targetValue: number;
@@ -12,22 +13,36 @@ interface BalanceProps {
 
 const Balance: React.FC<BalanceProps> = ({
   targetValue,
-  currency = 'USD',
+  currency = "USD",
   displayCurrency = false,
   displayDecimal = true,
   isLoading = false,
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const currencySymbol = useMemo(() => {
+    const formatter = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+
+    const parts = formatter.formatToParts(0);
+    const symbolPart = parts.find((part) => part.type === "currency");
+
+    return symbolPart?.value ?? currency;
+  }, [currency]);
 
   if (isLoading) {
     return <Skeleton className="h-9 w-48" />;
   }
 
   return (
-    <h1 className="font-heading font-bold text-3xl tracking-tight">
+    <h1 className="font-heading text-3xl font-bold tracking-tight">
       {isBalanceHidden ? (
         <span>
-          {displayCurrency ? `${currency}` : ''}
+          {displayCurrency ? currencySymbol : ""}
           ••••••
         </span>
       ) : (
@@ -37,12 +52,11 @@ const Balance: React.FC<BalanceProps> = ({
           isolate={false}
           format={{
             currency: currency,
-            style: displayCurrency ? 'currency' : 'decimal',
-            currencyDisplay: 'narrowSymbol',
+            style: displayCurrency ? "currency" : "decimal",
+            currencyDisplay: "narrowSymbol",
             minimumFractionDigits: displayDecimal ? 2 : 0,
             maximumFractionDigits: displayDecimal ? 2 : 0,
           }}
-          // locales={navigator.language || 'en-US'}
         />
       )}
     </h1>

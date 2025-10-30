@@ -1,31 +1,36 @@
+import * as tauri from "./tauri";
+import * as web from "./web";
+
 export enum RUN_ENV {
-  DESKTOP = 'desktop',
-  MOBILE = 'mobile',
-  BROWSER = 'browser',
-  UNSUPPORTED = 'unsupported',
+  DESKTOP = "desktop",
+  WEB = "web",
+  UNSUPPORTED = "unsupported",
 }
 
 declare global {
   interface Window {
-    __TAURI__?: any;
+    __TAURI__?: unknown;
   }
 }
 
 export const getRunEnv = (): RUN_ENV => {
-  if (typeof window !== 'undefined' && window.__TAURI__) {
+  if (typeof window !== "undefined" && window.__TAURI__) {
     return RUN_ENV.DESKTOP;
   }
-  if (typeof window !== 'undefined' && window.indexedDB) {
-    return RUN_ENV.BROWSER;
+  if (typeof window !== "undefined") {
+    return RUN_ENV.WEB;
   }
   return RUN_ENV.UNSUPPORTED;
 };
 
-export type { EventCallback, UnlistenFn } from './tauri';
+export const invokeTauri = tauri.invokeTauri;
+export const invokeWeb = web.invokeWeb;
 
+export const logger = getRunEnv() === RUN_ENV.DESKTOP ? tauri.logger : web.logger;
+
+export type { EventCallback, UnlistenFn } from "./tauri";
 
 export {
-  invokeTauri,
   openCsvFileDialogTauri,
   openFolderDialogTauri,
   openDatabaseFileDialogTauri,
@@ -37,7 +42,9 @@ export {
   listenDatabaseRestoredTauri,
   listenPortfolioUpdateErrorTauri,
   openFileSaveDialogTauri,
-  logger,
-} from './tauri';
+  listenMarketSyncCompleteTauri,
+  listenMarketSyncStartTauri,
+  listenNavigateToRouteTauri,
+} from "./tauri";
 
-export * from './tauri';
+export * from "./web";

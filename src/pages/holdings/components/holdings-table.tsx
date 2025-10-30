@@ -1,20 +1,20 @@
-import { Icons } from '@/components/ui/icons';
-import { Button } from '@/components/ui/button';
-import { DataTable } from '@/components/ui/data-table';
-import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header';
-import { safeDivide } from '@/lib/utils';
-import type { ColumnDef } from '@tanstack/react-table';
-import { GainPercent } from '@wealthfolio/ui';
+import { Icons } from "@/components/ui/icons";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { safeDivide } from "@/lib/utils";
+import type { ColumnDef } from "@tanstack/react-table";
+import { GainPercent } from "@wealthfolio/ui";
 
-import { Skeleton } from '@/components/ui/skeleton';
-import { Holding } from '@/lib/types';
-import { useNavigate } from 'react-router-dom';
-import { useBalancePrivacy } from '@/context/privacy-context';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { QuantityDisplay } from '@wealthfolio/ui';
-import { useState } from 'react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TickerAvatar } from '@/components/ticker-avatar';
+import { Skeleton } from "@/components/ui/skeleton";
+import { Holding } from "@/lib/types";
+import { useNavigate } from "react-router-dom";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { QuantityDisplay } from "@wealthfolio/ui";
+import { useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TickerAvatar } from "@/components/ticker-avatar";
 
 // Helper function to get display value and currency based on toggle state
 const getDisplayValueAndCurrency = (
@@ -76,14 +76,14 @@ export const HoldingsTable = ({
 
   const filters = [
     {
-      id: 'holdingType',
-      title: 'Type',
+      id: "holdingType",
+      title: "Type",
       options: assetsTypes,
     },
   ];
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full flex-col">
       <DataTable
         data={holdings}
         columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
@@ -96,7 +96,7 @@ export const HoldingsTable = ({
           holdingType: false,
           bookValue: false,
         }}
-        defaultSorting={[{ id: 'symbol', desc: false }]}
+        defaultSorting={[{ id: "symbol", desc: false }]}
         scrollable={true}
       />
     </div>
@@ -111,46 +111,44 @@ const getColumns = (
   setShowConvertedValues: (value: boolean) => void,
 ): ColumnDef<Holding>[] => [
   {
-    id: 'symbol',
-    accessorKey: 'instrument.symbol',
+    id: "symbol",
+    accessorKey: "instrument.symbol",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
     meta: {
-      label: 'Position',
+      label: "Position",
     },
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
       const symbol = holding.instrument?.symbol ?? holding.id;
-      const displaySymbol = symbol.startsWith('$CASH') ? symbol.split('-')[0] : symbol;
+      const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
       // For TickerAvatar, use the full symbol for cash (including $CASH) to get the proper icon
-      const avatarSymbol = symbol.startsWith('$CASH') ? '$CASH' : symbol;
+      const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
 
       const handleNavigate = () => {
         const navSymbol = holding.instrument?.symbol ?? holding.id;
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
 
-      const isCash = symbol.startsWith('$CASH');
+      const isCash = symbol.startsWith("$CASH");
       const content = (
         <div className="flex items-center">
-          <TickerAvatar symbol={avatarSymbol} className="w-8 h-8 mr-2" />
+          <TickerAvatar symbol={avatarSymbol} className="mr-2 h-8 w-8" />
           <div className="flex flex-col">
             <span className="font-medium">{displaySymbol}</span>
-            <span className="text-xs text-muted-foreground line-clamp-1">{holding.instrument?.name || holding.id}</span>
+            <span className="text-muted-foreground line-clamp-1 text-xs">
+              {holding.instrument?.name || holding.id}
+            </span>
           </div>
         </div>
       );
 
       if (isCash) {
-        return (
-          <div className="flex items-center p-2">
-            {content}
-          </div>
-        );
+        return <div className="flex items-center p-2">{content}</div>;
       }
 
       return (
-        <div className="cursor-pointer p-1 -m-1" onClick={handleNavigate}>
+        <div className="-m-1 cursor-pointer p-1" onClick={handleNavigate}>
           {content}
         </div>
       );
@@ -164,29 +162,31 @@ const getColumns = (
       const holding = row.original;
       const searchTerm = filterValue as string;
       const nameMatch = holding.instrument?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const symbolMatch = holding.instrument?.symbol?.toLowerCase().includes(searchTerm.toLowerCase());
+      const symbolMatch = holding.instrument?.symbol
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
       const idMatch = holding.id.toLowerCase().includes(searchTerm.toLowerCase());
       return !!(symbolMatch || nameMatch || idMatch);
     },
     enableHiding: false,
   },
   {
-    id: 'symbolName',
+    id: "symbolName",
     accessorFn: (row) => row.instrument?.name || row.id,
     meta: {
-      label: 'Symbol Name',
+      label: "Symbol Name",
     },
     enableHiding: false,
   },
   {
-    id: 'quantity',
-    accessorKey: 'quantity',
+    id: "quantity",
+    accessorKey: "quantity",
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
     ),
     meta: {
-      label: 'Shares',
+      label: "Shares",
     },
     cell: ({ row }) => (
       <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
@@ -197,7 +197,7 @@ const getColumns = (
     sortingFn: (rowA, rowB) => rowA.original.quantity - rowB.original.quantity,
   },
   {
-    id: 'marketPrice',
+    id: "marketPrice",
     accessorFn: (row) => row.price ?? 0,
     enableHiding: true,
     enableSorting: true,
@@ -218,23 +218,20 @@ const getColumns = (
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={price} currency={currency} />
-          <GainPercent
-            className="text-xs"
-            value={holding.dayChangePct || 0}
-          />
+          <GainPercent className="text-xs" value={holding.dayChangePct || 0} />
         </div>
       );
     },
   },
   {
-    id: 'bookValue',
+    id: "bookValue",
     accessorFn: (row) => row.costBasis?.local ?? 0,
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
     ),
     meta: {
-      label: 'Book Cost',
+      label: "Book Cost",
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -255,14 +252,14 @@ const getColumns = (
     },
   },
   {
-    id: 'marketValue',
+    id: "marketValue",
     accessorFn: (row) => row.marketValue.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
     ),
     meta: {
-      label: 'Total Value',
+      label: "Total Value",
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -275,7 +272,7 @@ const getColumns = (
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
-          <div className="text-xs text-muted-foreground">{currency}</div>
+          <div className="text-muted-foreground text-xs">{currency}</div>
         </div>
       );
     },
@@ -291,14 +288,14 @@ const getColumns = (
     },
   },
   {
-    id: 'performance',
+    id: "performance",
     accessorFn: (row) => row.totalGain?.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title="Total Gain/Loss" />
     ),
     meta: {
-      label: 'Total Gain/Loss',
+      label: "Total Gain/Loss",
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -311,10 +308,7 @@ const getColumns = (
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
-          <GainPercent
-            className="text-xs"
-            value={holding.totalGainPct || 0}
-          />
+          <GainPercent className="text-xs" value={holding.totalGainPct || 0} />
         </div>
       );
     },
@@ -330,20 +324,20 @@ const getColumns = (
     },
   },
   {
-    id: 'holdingType',
+    id: "holdingType",
     accessorFn: (row) => row.instrument?.assetSubclass,
     meta: {
-      label: 'Asset Type',
+      label: "Asset Type",
     },
     header: ({ column }) => <DataTableColumnHeader column={column} title="Asset Type" />,
-    filterFn: 'arrIncludesSome',
+    filterFn: "arrIncludesSome",
   },
   {
-    id: 'currency',
-    accessorKey: 'localCurrency',
+    id: "currency",
+    accessorKey: "localCurrency",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
     meta: {
-      label: 'Currency',
+      label: "Currency",
     },
     cell: ({ row }) => <div className="text-muted-foreground">{row.original.localCurrency}</div>,
     filterFn: (row, id, value) => {
@@ -351,7 +345,7 @@ const getColumns = (
     },
   },
   {
-    id: 'actions',
+    id: "actions",
     enableHiding: false,
     header: () => (
       <div className="flex items-center">
@@ -372,7 +366,7 @@ const getColumns = (
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>Show values in {showConvertedValues ? 'Asset Currency' : 'Base Currency'}</p>
+              <p>Show values in {showConvertedValues ? "Asset Currency" : "Base Currency"}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -382,7 +376,9 @@ const getColumns = (
       const navigate = useNavigate();
       const handleNavigate = () => {
         const navSymbol = row.original.instrument?.symbol ?? row.original.id;
-        navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding: row.original } });
+        navigate(`/holdings/${encodeURIComponent(navSymbol)}`, {
+          state: { holding: row.original },
+        });
       };
 
       return (

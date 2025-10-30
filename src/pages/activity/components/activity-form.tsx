@@ -1,9 +1,8 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { logger } from '@/adapters';
-import { Icons } from '@/components/ui/icons';
-import { Button } from '@/components/ui/button';
+import { logger } from "@/adapters";
+import { Button } from "@/components/ui/button";
+import { Form } from "@/components/ui/form";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Icons } from "@/components/ui/icons";
 import {
   Sheet,
   SheetContent,
@@ -12,19 +11,20 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet';
-import { Form } from '@/components/ui/form';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { DataSource } from '@/lib/constants';
-import type { ActivityDetails } from '@/lib/types';
-import { useActivityMutations } from '../hooks/use-activity-mutations';
-import { TradeForm } from './forms/trade-form';
-import { CashForm } from './forms/cash-form';
-import { IncomeForm } from './forms/income-form';
-import { OtherForm } from './forms/other-form';
-import { HoldingsForm } from './forms/holdings-form';
-import { newActivitySchema, type NewActivityFormValues } from './forms/schemas';
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DataSource } from "@/lib/constants";
+import type { ActivityDetails } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
+import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useActivityMutations } from "../hooks/use-activity-mutations";
+import { CashForm } from "./forms/cash-form";
+import { HoldingsForm } from "./forms/holdings-form";
+import { IncomeForm } from "./forms/income-form";
+import { OtherForm } from "./forms/other-form";
+import { newActivitySchema, type NewActivityFormValues } from "./forms/schemas";
+import { TradeForm } from "./forms/trade-form";
 
 export interface AccountSelectOption {
   value: string;
@@ -34,24 +34,25 @@ export interface AccountSelectOption {
 
 interface ActivityFormProps {
   accounts: AccountSelectOption[];
-  activity?: ActivityDetails;
+  activity?: Partial<ActivityDetails>;
   open?: boolean;
   onClose?: () => void;
 }
 
 const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
-  BUY: 'trade',
-  SELL: 'trade',
-  DEPOSIT: 'cash',
-  WITHDRAWAL: 'cash',
-  INTEREST: 'income',
-  DIVIDEND: 'income',
-  SPLIT: 'other',
-  TRANSFER: 'cash',
-  FEE: 'other',
-  TAX: 'other',
-  ADD_HOLDING: 'holdings',
-  REMOVE_HOLDING: 'holdings',
+  BUY: "trade",
+  SELL: "trade",
+  DEPOSIT: "cash",
+  WITHDRAWAL: "cash",
+  INTEREST: "income",
+  DIVIDEND: "income",
+  SPLIT: "other",
+  TRANSFER_IN: "cash",
+  TRANSFER_OUT: "cash",
+  FEE: "other",
+  TAX: "other",
+  ADD_HOLDING: "holdings",
+  REMOVE_HOLDING: "holdings",
 };
 
 export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
@@ -59,19 +60,19 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const isValidActivityType = (
     type: string | undefined,
-  ): type is NewActivityFormValues['activityType'] => {
+  ): type is NewActivityFormValues["activityType"] => {
     return type ? Object.keys(ACTIVITY_TYPE_TO_TAB).includes(type) : false;
   };
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
-    accountId: activity?.accountId || '',
+    accountId: activity?.accountId || "",
     activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
     amount: activity?.amount,
     quantity: activity?.quantity,
     unitPrice: activity?.unitPrice,
-    fee: activity?.fee || 0,
-    isDraft: activity?.isDraft || false,
-    comment: activity?.comment || null,
+    fee: activity?.fee ?? 0,
+    isDraft: activity?.isDraft ?? false,
+    comment: activity?.comment ?? null,
     assetId: activity?.assetId,
     activityDate: activity?.date
       ? (() => {
@@ -82,13 +83,14 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
           date.setHours(16, 0, 0, 0); // Set to 4:00 PM which is market close time
           return date;
         })(),
-    currency: activity?.currency || '',
+
+    currency: activity?.currency || "",
     assetDataSource: activity?.assetDataSource || DataSource.YAHOO,
     showCurrencySelect: false,
   };
 
   const form = useForm<NewActivityFormValues>({
-    resolver: zodResolver(newActivitySchema),
+    resolver: zodResolver(newActivitySchema) as Resolver<NewActivityFormValues>,
     defaultValues,
   });
 
@@ -105,7 +107,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
 
-  async function onSubmit(data: NewActivityFormValues) {
+  const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
       const { showCurrencySelect, id, toAccountId, ...submitData } = {
         ...data,
@@ -167,7 +169,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       const account = accounts.find((a) => a.value === submitData.accountId);
       // For cash activities and fees, set assetId to $CASH-accountCurrency
       if (
-        ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'TAX', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(
+        ["DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "TRANSFER_IN", "TRANSFER_OUT"].includes(
           submitData.activityType,
         )
       ) {
@@ -177,7 +179,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       }
 
       if (
-        'assetDataSource' in submitData &&
+        "assetDataSource" in submitData &&
         submitData.assetDataSource === DataSource.MANUAL &&
         account
       ) {
@@ -191,8 +193,9 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       logger.error(
         `Activity Form Submit Error: ${JSON.stringify({ error, formValues: form.getValues() })}`,
       );
+      return; // Explicit return for catch block
     }
-  }
+  };
 
   const defaultTab = activity ? ACTIVITY_TYPE_TO_TAB[activity.activityType] || 'trade' : 'trade';
 
@@ -201,21 +204,21 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       <SheetContent className="space-y-8 overflow-y-auto sm:max-w-[625px]">
         <SheetHeader>
           <div className="flex items-center gap-2">
-            <SheetTitle>{activity?.id ? 'Update Activity' : 'Add Activity'}</SheetTitle>
+            <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>
             {Object.keys(form.formState.errors).length > 0 && (
               <HoverCard>
                 <HoverCardTrigger>
-                  <Icons.AlertCircle className="h-5 w-5 text-destructive" />
+                  <Icons.AlertCircle className="text-destructive h-5 w-5" />
                 </HoverCardTrigger>
-                <HoverCardContent className="w-[600px] border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive">
+                <HoverCardContent className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive w-[600px]">
                   <div className="space-y-2">
                     <h4 className="font-medium">Please Review Your Entry</h4>
                     <ul className="list-disc space-y-1 pl-4 text-sm">
                       {Object.entries(form.formState.errors).map(([field, error]) => (
                         <li key={field}>
-                          {field === 'activityType' ? 'Transaction Type' : field}
-                          {': '}
-                          {error?.message?.toString() || 'Invalid value'}
+                          {field === "activityType" ? "Transaction Type" : field}
+                          {": "}
+                          {error?.message?.toString() || "Invalid value"}
                         </li>
                       ))}
                     </ul>
@@ -226,9 +229,9 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
           </div>
           <SheetDescription>
             {activity?.id
-              ? 'Update the details of your transaction'
-              : 'Record a new transaction in your account.'}
-            {'→ '}
+              ? "Update the details of your transaction"
+              : "Record a new transaction in your account."}
+            {"→ "}
             <a
               href="https://wealthfolio.app/docs/concepts/activity-types"
               target="_blank"
@@ -300,7 +303,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                     <Icons.Plus className="h-4 w-4" />
                   )}
                   <span className="hidden sm:ml-2 sm:inline">
-                    {activity?.id ? 'Update Activity' : 'Add Activity'}
+                    {activity?.id ? "Update Activity" : "Add Activity"}
                   </span>
                 </Button>
               </SheetFooter>

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
 use crate::market_data::market_data_model::{MarketDataProviderSetting, UpdateMarketDataProviderSetting};
-use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo, QuoteDb, QuoteImport, QuoteImportPreview};
+use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo, QuoteDb, QuoteImport};
 use super::providers::models::AssetProfile;
 
 #[async_trait]
@@ -56,7 +56,6 @@ pub trait MarketDataServiceTrait: Send + Sync {
     ) -> Result<MarketDataProviderSetting>;
 
     // --- Quote Import Methods ---
-    async fn validate_csv_quotes(&self, file_path: &str) -> Result<QuoteImportPreview>;
     async fn import_quotes_from_csv(&self, quotes: Vec<QuoteImport>, overwrite: bool) -> Result<Vec<QuoteImport>>;
     async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize>;
 }

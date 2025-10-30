@@ -8,7 +8,6 @@ use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use std::collections::HashMap;
 use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API};
 
 #[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -224,17 +223,6 @@ pub struct QuoteImport {
     pub currency: String,
     pub validation_status: ImportValidationStatus,
     pub error_message: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct QuoteImportPreview {
-    pub total_rows: usize,
-    pub valid_rows: usize,
-    pub invalid_rows: usize,
-    pub sample_quotes: Vec<QuoteImport>,
-    pub detected_columns: HashMap<String, String>,
-    pub duplicate_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

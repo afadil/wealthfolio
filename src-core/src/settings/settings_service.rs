@@ -1,10 +1,10 @@
 use super::settings_repository::SettingsRepositoryTrait;
+use crate::errors::{DatabaseError, Error, Result};
 use crate::fx::fx_traits::FxServiceTrait;
-use crate::errors::{Error, Result, DatabaseError};
 use crate::settings::{Settings, SettingsUpdate};
+use async_trait::async_trait;
 use log::{debug, error};
 use std::sync::Arc;
-use async_trait::async_trait;
 
 // Define the trait for SettingsService
 #[async_trait]
@@ -18,6 +18,8 @@ pub trait SettingsServiceTrait: Send + Sync {
     async fn update_base_currency(&self, new_base_currency: &str) -> Result<()>;
 
     fn is_auto_update_check_enabled(&self) -> Result<bool>;
+
+    fn is_sync_enabled(&self) -> Result<bool>;
 }
 
 pub struct SettingsService {
@@ -37,18 +39,23 @@ impl SettingsServiceTrait for SettingsService {
 
         if let Some(ref new_base_currency_val) = new_settings.base_currency {
             if current_base_currency.as_deref() != Some(new_base_currency_val.as_str()) {
-                 self.update_base_currency(new_base_currency_val.as_str()).await?;
+                self.update_base_currency(new_base_currency_val.as_str())
+                    .await?;
             }
         }
-        
-        self.settings_repository.update_settings(new_settings).await?;
+
+        self.settings_repository
+            .update_settings(new_settings)
+            .await?;
         Ok(())
     }
 
     fn get_base_currency(&self) -> Result<Option<String>> {
         match self.settings_repository.get_setting("base_currency") {
             Ok(value) => Ok(Some(value)),
-            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => Ok(None),
+            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => {
+                Ok(None)
+            }
             Err(e) => Err(e),
         }
     }
@@ -78,14 +85,30 @@ impl SettingsServiceTrait for SettingsService {
         }
 
         self.settings_repository
-            .update_setting("base_currency", new_base_currency).await?;
+            .update_setting("base_currency", new_base_currency)
+            .await?;
         Ok(())
     }
 
     fn is_auto_update_check_enabled(&self) -> Result<bool> {
-        match self.settings_repository.get_setting("auto_update_check_enabled") {
+        match self
+            .settings_repository
+            .get_setting("auto_update_check_enabled")
+        {
             Ok(value) => Ok(value.parse().unwrap_or(true)),
-            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => Ok(true),
+            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => {
+                Ok(true)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn is_sync_enabled(&self) -> Result<bool> {
+        match self.settings_repository.get_setting("sync_enabled") {
+            Ok(value) => Ok(value.parse().unwrap_or(false)),
+            Err(Error::Database(DatabaseError::QueryFailed(diesel::result::Error::NotFound))) => {
+                Ok(false)
+            }
             Err(e) => Err(e),
         }
     }

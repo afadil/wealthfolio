@@ -1,8 +1,8 @@
-import { Skeleton } from '@/components/ui/skeleton';
-import { GoalOperations } from './goal-operations';
-import type { Goal } from '@/lib/types';
-import { Icons } from '@/components/ui/icons';
-import { formatAmount } from '@wealthfolio/ui';
+import { Skeleton } from "@/components/ui/skeleton";
+import { GoalOperations } from "./goal-operations";
+import type { Goal } from "@/lib/types";
+import { Icons } from "@/components/ui/icons";
+import { formatAmount } from "@wealthfolio/ui";
 
 export interface GoalItemProps {
   goal: Goal;
@@ -16,17 +16,17 @@ export function GoalItem({ goal, onEdit, onDelete }: GoalItemProps) {
       <div className="grid gap-1">
         <h3 className="font-semibold">{goal.title}</h3>
         <div>
-          <p className="text-sm text-muted-foreground">{goal.description}</p>
+          <p className="text-muted-foreground text-sm">{goal.description}</p>
         </div>
       </div>
       <div className="flex items-center space-x-4">
         <div className="flex items-center">
           {goal.isAchieved ? (
-            <Icons.CheckCircle className="h5 mr-1 text-success" />
+            <Icons.CheckCircle className="h5 text-success mr-1" />
           ) : (
-            <Icons.Goal className="mr-1 h-5 text-success" />
+            <Icons.Goal className="text-success mr-1 h-5" />
           )}
-          <span className="text-md">{formatAmount(goal.targetAmount, 'USD', false)}</span>
+          <span className="text-md">{formatAmount(goal.targetAmount, "USD", false)}</span>
         </div>
 
         <GoalOperations goal={goal} onEdit={onEdit} onDelete={onDelete} />

@@ -1,1 +1,1 @@
-export * from './components/ui/skeleton';
+export * from "./components/ui/skeleton";

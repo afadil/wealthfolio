@@ -30,7 +30,7 @@ export const DeleteConfirm = ({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+            className="text-destructive hover:text-destructive h-7 w-7 p-0"
             onClick={(e) => {
               e.stopPropagation(); // Prevent accordion from toggling
             }}
@@ -42,10 +42,8 @@ export const DeleteConfirm = ({
       <PopoverContent className="w-80" align="end">
         <div className="space-y-4">
           <div className="space-y-2">
-            <h4 className="font-medium leading-none">{deleteConfirmTitle}</h4>
-            <p className="text-sm text-muted-foreground">
-              {deleteConfirmMessage}
-            </p>
+            <h4 className="leading-none font-medium">{deleteConfirmTitle}</h4>
+            <p className="text-muted-foreground text-sm">{deleteConfirmMessage}</p>
           </div>
           <div className="flex justify-end gap-2">
             <Button
@@ -58,12 +56,7 @@ export const DeleteConfirm = ({
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isPending}
-              onClick={handleDeleteConfirm}
-            >
+            <Button variant="destructive" size="sm" disabled={isPending} onClick={handleDeleteConfirm}>
               {isPending ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { format } from 'date-fns';
-import { Quote } from '@/lib/types';
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { format } from "date-fns";
+import { Quote } from "@/lib/types";
 
 import {
   Button,
@@ -21,10 +21,12 @@ import {
   Switch,
   Label,
   MoneyInput,
-  Popover, PopoverContent, PopoverTrigger, PopoverClose,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   formatAmount,
-} from '@wealthfolio/ui';
-import { formatQuantity } from '@/lib/utils';
+} from "@wealthfolio/ui";
+import { formatQuantity } from "@/lib/utils";
 import {
   useReactTable,
   getCoreRowModel,
@@ -33,8 +35,7 @@ import {
   createColumnHelper,
   flexRender,
   SortingState,
-  ColumnDef,
-} from '@tanstack/react-table';
+} from "@tanstack/react-table";
 
 interface QuoteHistoryTableProps {
   data: Quote[];
@@ -67,9 +68,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   const [editedValues, setEditedValues] = useState<Partial<Quote>>({});
   const [isAddingQuote, setIsAddingQuote] = useState(false);
   const [newQuote, setNewQuote] = useState<Partial<Quote>>(emptyQuote);
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: 'timestamp', desc: true },
-  ]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "timestamp", desc: true }]);
 
   useEffect(() => {
     if (isAddingQuote) {
@@ -96,21 +95,24 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     setEditedValues({});
   }, []);
 
-  const handleInputChange = useCallback((field: keyof Quote, value: string | Date, isNew = false) => {
-    const setValue = field === 'timestamp' ? (value as Date).toISOString() : value;
+  const handleInputChange = useCallback(
+    (field: keyof Quote, value: string | Date, isNew = false) => {
+      const setValue = field === "timestamp" ? (value as Date).toISOString() : value;
 
-    if (isNew) {
-      setNewQuote((prev) => ({
-        ...prev,
-        [field]: setValue,
-      }));
-    } else {
-      setEditedValues((prev) => ({
-        ...prev,
-        [field]: setValue,
-      }));
-    }
-  }, []);
+      if (isNew) {
+        setNewQuote((prev) => ({
+          ...prev,
+          [field]: setValue,
+        }));
+      } else {
+        setEditedValues((prev) => ({
+          ...prev,
+          [field]: setValue,
+        }));
+      }
+    },
+    [],
+  );
 
   const handleAddNew = useCallback(() => {
     if (onSaveQuote) {
@@ -120,187 +122,205 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
     }
   }, [onSaveQuote, newQuote]);
 
-  const handleDelete = useCallback((quoteId: string) => {
-    if (onDeleteQuote) {
-      onDeleteQuote(quoteId);
-    }
-  }, [onDeleteQuote]);
+  const handleDelete = useCallback(
+    (quoteId: string) => {
+      if (onDeleteQuote) {
+        onDeleteQuote(quoteId);
+      }
+    },
+    [onDeleteQuote],
+  );
 
   // Define columns using ColumnHelper
   const columnHelper = createColumnHelper<Quote>();
 
-  const columns = useMemo<ColumnDef<Quote, any>[]>(() => [
-    columnHelper.accessor('timestamp', {
-      header: 'Date',
-      cell: (info) => {
-        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
-        const value = info.getValue();
-        return editingId === info.row.original.id ? (
-          <DatePickerInput
-            value={new Date(editedValues.timestamp || '')}
-            onChange={(date: Date | undefined) =>
-              date && handleInputChange('timestamp', date)
-            }
-          />
-        ) : (
-          format(new Date(value), 'yyyy-MM-dd')
-        );
-      },
-      enableSorting: true,
-    }),
-    columnHelper.accessor('open', {
-      header: 'Open',
-      cell: (info) => {
-        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
-        const value = info.getValue();
-        return editingId === info.row.original.id ? (
-          <MoneyInput
-            value={editedValues.open}
-            onChange={(e) => handleInputChange('open', e.target.value)}
-          />
-        ) : (
-          formatAmount(value, info.row.original.currency, false)
-        );
-      },
-      enableSorting: false,
-    }),
-    columnHelper.accessor('high', {
-      header: 'High',
-      cell: (info) => {
-        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
-        const value = info.getValue();
-        return editingId === info.row.original.id ? (
-          <MoneyInput
-            value={editedValues.high}
-            onChange={(e) => handleInputChange('high', e.target.value)}
-            autoFocus={true}
-          />
-        ) : (
-          formatAmount(value, info.row.original.currency, false)
-        );
-      },
-      enableSorting: false,
-    }),
-    columnHelper.accessor('low', {
-      header: 'Low',
-      cell: (info) => {
-        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
-        const value = info.getValue();
-        return editingId === info.row.original.id ? (
-          <MoneyInput
-            value={editedValues.low}
-            onChange={(e) => handleInputChange('low', e.target.value)}
-          />
-        ) : (
-          formatAmount(value, info.row.original.currency, false)
-        );
-      },
-      enableSorting: false,
-    }),
-    columnHelper.accessor('close', {
-      header: 'Close',
-      cell: (info) => {
-        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
-        const value = info.getValue();
-        return editingId === info.row.original.id ? (
-          <MoneyInput
-            value={editedValues.close}
-            onChange={(e) => handleInputChange('close', e.target.value)}
-          />
-        ) : (
-          formatAmount(value, info.row.original.currency, false)
-        );
-      },
-      enableSorting: false,
-    }),
-    columnHelper.accessor('volume', {
-      header: 'Volume',
-      cell: (info) => {
-        const { editingId, editedValues, handleInputChange } = info.table.options.meta as any;
-        const value = info.getValue();
-        return editingId === info.row.original.id ? (
-          <MoneyInput
-            value={editedValues.volume}
-            onChange={(e) => handleInputChange('volume', e.target.value)}
-          />
-        ) : (
-          formatQuantity(value)
-        );
-      },
-      enableSorting: false,
-    }),
-    ...(isManualDataSource ? [
-      columnHelper.display({ 
-        id: 'actions',
-        header: 'Actions',
+  interface QuoteTableMeta {
+    editingId: string | null;
+    editedValues: Record<string, unknown> & {
+      timestamp?: string | Date;
+      open?: number | string;
+      high?: number | string;
+      low?: number | string;
+      close?: number | string;
+      volume?: number | string;
+    };
+    handleInputChange: (key: keyof Quote | "timestamp", value: unknown, isNewRow?: boolean) => void;
+    handleEdit: (quote: Quote) => void;
+    handleSave: () => void;
+    handleCancel: () => void;
+    handleDelete: (quoteId: string) => void;
+  }
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("timestamp", {
+        header: "Date",
         cell: (info) => {
-          const { editingId, handleEdit, handleSave, handleCancel, handleDelete } = info.table.options.meta as any;
-          const quote = info.row.original;
-          return editingId === quote.id ? (
-            <div className="flex space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleSave}
-                className="h-8 w-8"
-              >
-                <Icons.Check className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCancel}
-                className="h-8 w-8"
-              >
-                <Icons.Close className="h-4 w-4" />
-              </Button>
-            </div>
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
+          const value = info.getValue();
+          return editingId === info.row.original.id ? (
+            <DatePickerInput
+              value={new Date(editedValues.timestamp || "")}
+              onChange={(date: Date | undefined) => date && handleInputChange("timestamp", date)}
+            />
           ) : (
-            <div className="flex space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleEdit(quote)}
-                className="h-8 w-8"
-              >
-                <Icons.Pencil className="h-4 w-4" />
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Icons.Trash className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <div className="flex flex-col items-center space-y-2">
-                    <h4 className="font-medium">Delete Quote</h4>
-                    <p className="text-center text-sm text-muted-foreground">
-                      Are you sure you want to delete this historical quote? This action
-                      cannot be undone.
-                    </p>
-                    <div className="flex space-x-2">
-                      <PopoverClose asChild>
-                        <Button variant="ghost" size="sm">
-                          Cancel
-                        </Button>
-                      </PopoverClose>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(quote.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+            format(new Date(value), "yyyy-MM-dd")
           );
         },
+        enableSorting: true,
       }),
-    ] : []),
-  ], [isManualDataSource]);
+      columnHelper.accessor("open", {
+        header: "Open",
+        cell: (info) => {
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
+          const value = info.getValue();
+          return editingId === info.row.original.id ? (
+            <MoneyInput
+              value={editedValues.open}
+              onChange={(e) => handleInputChange("open", e.target.value)}
+            />
+          ) : (
+            formatAmount(value, info.row.original.currency, false)
+          );
+        },
+        enableSorting: false,
+      }),
+      columnHelper.accessor("high", {
+        header: "High",
+        cell: (info) => {
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
+          const value = info.getValue();
+          return editingId === info.row.original.id ? (
+            <MoneyInput
+              value={editedValues.high}
+              onChange={(e) => handleInputChange("high", e.target.value)}
+              autoFocus={true}
+            />
+          ) : (
+            formatAmount(value, info.row.original.currency, false)
+          );
+        },
+        enableSorting: false,
+      }),
+      columnHelper.accessor("low", {
+        header: "Low",
+        cell: (info) => {
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
+          const value = info.getValue();
+          return editingId === info.row.original.id ? (
+            <MoneyInput
+              value={editedValues.low}
+              onChange={(e) => handleInputChange("low", e.target.value)}
+            />
+          ) : (
+            formatAmount(value, info.row.original.currency, false)
+          );
+        },
+        enableSorting: false,
+      }),
+      columnHelper.accessor("close", {
+        header: "Close",
+        cell: (info) => {
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
+          const value = info.getValue();
+          return editingId === info.row.original.id ? (
+            <MoneyInput
+              value={editedValues.close}
+              onChange={(e) => handleInputChange("close", e.target.value)}
+            />
+          ) : (
+            formatAmount(value, info.row.original.currency, false)
+          );
+        },
+        enableSorting: false,
+      }),
+      columnHelper.accessor("volume", {
+        header: "Volume",
+        cell: (info) => {
+          const { editingId, editedValues, handleInputChange } = info.table.options
+            .meta as QuoteTableMeta;
+          const value = info.getValue();
+          return editingId === info.row.original.id ? (
+            <MoneyInput
+              value={editedValues.volume}
+              onChange={(e) => handleInputChange("volume", e.target.value)}
+            />
+          ) : (
+            formatQuantity(value)
+          );
+        },
+        enableSorting: false,
+      }),
+      ...(isManualDataSource
+        ? [
+            columnHelper.display({
+              id: "actions",
+              header: "Actions",
+              cell: (info) => {
+                const { editingId, handleEdit, handleSave, handleCancel, handleDelete } = info.table
+                  .options.meta as QuoteTableMeta;
+                const quote = info.row.original;
+                return editingId === quote.id ? (
+                  <div className="flex space-x-2">
+                    <Button variant="ghost" size="icon" onClick={handleSave} className="h-8 w-8">
+                      <Icons.Check className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={handleCancel} className="h-8 w-8">
+                      <Icons.Close className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(quote)}
+                      className="h-8 w-8"
+                    >
+                      <Icons.Pencil className="h-4 w-4" />
+                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Icons.Trash className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent>
+                        <div className="flex flex-col items-center space-y-2">
+                          <h4 className="font-medium">Delete Quote</h4>
+                          <p className="text-muted-foreground text-center text-sm">
+                            Are you sure you want to delete this historical quote? This action
+                            cannot be undone.
+                          </p>
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm">
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(quote.id)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                );
+              },
+            }),
+          ]
+        : []),
+    ],
+    [isManualDataSource, handleInputChange, handleEdit, handleSave, handleCancel, handleDelete],
+  );
 
   const table = useReactTable({
     data,
@@ -352,7 +372,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                   <h4 className="font-medium">Change Tracking Mode</h4>
                   {isManualDataSource ? (
                     <>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         Switching to automatic tracking will enable data fetching from Market Data
                         Provider. Please note that this will override any manually entered quotes on
                         the next sync.
@@ -363,7 +383,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     </>
                   ) : (
                     <>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         Switching to manual tracking will stop automatic data fetching from Market
                         Data Provider. You'll need to enter and maintain price data manually.
                       </p>
@@ -373,11 +393,9 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     </>
                   )}
                   <div className="flex justify-end space-x-2">
-                    <PopoverClose asChild>
-                      <Button variant="ghost" size="sm">
-                        Cancel
-                      </Button>
-                    </PopoverClose>
+                    <Button variant="ghost" size="sm">
+                      Cancel
+                    </Button>
                     <Button
                       variant="default"
                       size="sm"
@@ -411,10 +429,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     <TableHead key={header.id} colSpan={header.colSpan}>
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -425,9 +440,9 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                 <TableRow>
                   <TableCell>
                     <DatePickerInput
-                      value={new Date(newQuote.timestamp || '')}
+                      value={new Date(newQuote.timestamp || "")}
                       onChange={(date: Date | undefined) =>
-                        date && handleInputChange('timestamp', date, true)
+                        date && handleInputChange("timestamp", date, true)
                       }
                     />
                   </TableCell>
@@ -435,35 +450,35 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     <Input
                       type="number"
                       value={newQuote.open}
-                      onChange={(e) => handleInputChange('open', e.target.value, true)}
+                      onChange={(e) => handleInputChange("open", e.target.value, true)}
                     />
                   </TableCell>
                   <TableCell>
                     <Input
                       type="number"
                       value={newQuote.high}
-                      onChange={(e) => handleInputChange('high', e.target.value, true)}
+                      onChange={(e) => handleInputChange("high", e.target.value, true)}
                     />
                   </TableCell>
                   <TableCell>
                     <Input
                       type="number"
                       value={newQuote.low}
-                      onChange={(e) => handleInputChange('low', e.target.value, true)}
+                      onChange={(e) => handleInputChange("low", e.target.value, true)}
                     />
                   </TableCell>
                   <TableCell>
                     <Input
                       type="number"
                       value={newQuote.close}
-                      onChange={(e) => handleInputChange('close', e.target.value, true)}
+                      onChange={(e) => handleInputChange("close", e.target.value, true)}
                     />
                   </TableCell>
                   <TableCell>
                     <Input
                       type="number"
                       value={newQuote.volume}
-                      onChange={(e) => handleInputChange('volume', e.target.value, true)}
+                      onChange={(e) => handleInputChange("volume", e.target.value, true)}
                     />
                   </TableCell>
                   <TableCell>
@@ -489,7 +504,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                 </TableRow>
               )}
               {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -503,7 +518,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground text-sm">
           Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
         </div>
         <div className="flex items-center space-x-2">

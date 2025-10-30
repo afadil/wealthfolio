@@ -1,6 +1,7 @@
 # Addon Development Packages
 
-A comprehensive guide to the packages available for developing Wealthfolio addons.
+A comprehensive guide to the packages available for developing Wealthfolio
+addons.
 
 ## Core Packages
 
@@ -13,6 +14,7 @@ npm install @wealthfolio/addon-sdk
 ```
 
 **What it provides:**
+
 - `AddonContext` interface and types
 - `HostAPI` interface for all financial APIs
 - Permission system types and utilities
@@ -20,18 +22,18 @@ npm install @wealthfolio/addon-sdk
 - Event system types
 
 **Key exports:**
+
 ```typescript
-import type { 
-  AddonContext, 
+import type {
+  AddonContext,
   AddonEnableFunction,
   HostAPI,
   Permission,
-  RiskLevel 
-} from '@wealthfolio/addon-sdk';
+  RiskLevel,
+} from "@wealthfolio/addon-sdk";
 ```
 
-**Version:** 1.0.0
-**Peer Dependencies:** React ^18.0.0
+**Version:** 1.0.0 **Peer Dependencies:** React ^18.0.0
 
 ### @wealthfolio/ui
 
@@ -42,26 +44,29 @@ npm install @wealthfolio/ui
 ```
 
 **What it provides:**
+
 - Pre-built UI components consistent with Wealthfolio's design
 - Radix UI primitives
 - Tailwind CSS utilities
 - Financial-specific components
 
 **Key components:**
+
 ```typescript
-import { 
-  Button, 
-  Card, 
-  Dialog, 
-  Input, 
+import {
+  Button,
+  Card,
+  Dialog,
+  Input,
   Table,
   Badge,
   Progress,
-  Tabs 
-} from '@wealthfolio/ui';
+  Tabs,
+} from "@wealthfolio/ui";
 ```
 
 **Included libraries:**
+
 - All Radix UI components
 - Lucide React icons
 - React Query integration
@@ -79,12 +84,14 @@ npm install -D @wealthfolio/addon-dev-tools
 ```
 
 **What it provides:**
+
 - `wealthfolio` CLI command
 - Hot-reload development server
 - Project scaffolding templates
 - Build and package utilities
 
 **CLI commands:**
+
 ```bash
 # Create new addon
 wealthfolio create my-addon
@@ -114,7 +121,8 @@ All addons must use React 18:
 }
 ```
 
-**Note:** React and ReactDOM are externalized during build and provided by the host application.
+**Note:** React and ReactDOM are externalized during build and provided by the
+host application.
 
 ### Build Tools
 
@@ -153,16 +161,16 @@ All Radix UI components are available through `@wealthfolio/ui`:
 
 ```typescript
 // Dialog components
-import { Dialog, DialogContent, DialogTrigger } from '@wealthfolio/ui';
+import { Dialog, DialogContent, DialogTrigger } from "@wealthfolio/ui";
 
-// Form components  
-import { Input, Label, Checkbox, Select } from '@wealthfolio/ui';
+// Form components
+import { Input, Label, Checkbox, Select } from "@wealthfolio/ui";
 
 // Navigation
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@wealthfolio/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
 
 // Feedback
-import { Alert, AlertDescription, Toast } from '@wealthfolio/ui';
+import { Alert, AlertDescription, Toast } from "@wealthfolio/ui";
 ```
 
 ### Icons
@@ -297,13 +305,13 @@ You can add other npm packages to your addon:
   "dependencies": {
     "@wealthfolio/addon-sdk": "1.0.0",
     "@wealthfolio/ui": "1.0.0",
-    "react": "^18.3.1",
+    "react": "^18.3.1"
   }
 }
 ```
 
-**Important:** External dependencies are bundled with your addon, increasing size.
-
+**Important:** External dependencies are bundled with your addon, increasing
+size.
 
 ## Package Configuration
 
@@ -353,31 +361,31 @@ Template for addon package.json:
 Standard vite.config.ts:
 
 ```typescript
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import externalGlobals from 'rollup-plugin-external-globals';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import externalGlobals from "rollup-plugin-external-globals";
 
 export default defineConfig({
   plugins: [react()],
   define: {
-    'process.env.NODE_ENV': JSON.stringify('production'),
+    "process.env.NODE_ENV": JSON.stringify("production"),
   },
   build: {
     lib: {
-      entry: 'src/addon.tsx',
-      fileName: () => 'addon.js',
-      formats: ['es'],
+      entry: "src/addon.tsx",
+      fileName: () => "addon.js",
+      formats: ["es"],
     },
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: ["react", "react-dom"],
       plugins: [
         externalGlobals({
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        })
+          react: "React",
+          "react-dom": "ReactDOM",
+        }),
       ],
     },
-    outDir: 'dist',
+    outDir: "dist",
     minify: false,
     sourcemap: true,
   },
@@ -391,12 +399,13 @@ export default defineConfig({
 Always use compatible versions:
 
 | SDK Version | Wealthfolio Version | React Version |
-|-------------|-------------------|---------------|
-| 1.0.0       | 1.0.0+           | ^18.3.1       |
+| ----------- | ------------------- | ------------- |
+| 1.0.0       | 1.0.0+              | ^18.3.1       |
 
 ### Breaking Changes
 
 Major version increments indicate breaking changes:
+
 - **1.x.x**: Current stable API
 - **2.x.x**: Future breaking changes (when available)
 
@@ -435,16 +444,19 @@ For monorepo development:
 
 ### @wealthfolio/addon-dev-tools Development Server
 
-The addon development tools provide a built-in development server with hot reload capabilities for seamless addon development.
+The addon development tools provide a built-in development server with hot
+reload capabilities for seamless addon development.
 
 #### Starting the Development Server
 
 Using npm scripts (recommended):
+
 ```bash
 npm run dev:server
 ```
 
 Using CLI directly:
+
 ```bash
 npx wealthfolio dev
 # or if installed globally
@@ -461,6 +473,7 @@ The development server automatically:
 4. **Preserves application state** where possible
 
 **Supported file types:**
+
 - `.tsx`, `.ts` - TypeScript/React components
 - `.json` - Manifest and configuration files
 - `.css` - Stylesheets
@@ -496,11 +509,13 @@ Standard development scripts setup:
 #### Hot Reload Features
 
 **Instant Feedback:**
+
 - Component changes reflect immediately
 - No need to manually reload Wealthfolio
 - Preserves addon state when possible
 
 **Error Handling:**
+
 - Build errors shown in terminal
 - Runtime errors displayed in Wealthfolio dev console
 - Graceful fallback on reload failures
@@ -509,14 +524,15 @@ Standard development scripts setup:
 
 ```javascript
 // Available in browser console during development
-__ADDON_DEV__.getStatus()        // Check development mode status
-__ADDON_DEV__.reloadAddons()     // Manual addon reload
-__ADDON_DEV__.discoverAddons()   // Force addon discovery
+__ADDON_DEV__.getStatus(); // Check development mode status
+__ADDON_DEV__.reloadAddons(); // Manual addon reload
+__ADDON_DEV__.discoverAddons(); // Force addon discovery
 ```
 
 #### Development Workflow
 
 1. **Start development server:**
+
    ```bash
    npm run dev:server
    ```
@@ -545,6 +561,7 @@ The development server provides detailed logging:
 #### Troubleshooting Development Server
 
 **Server won't start:**
+
 ```bash
 # Check if ports are available
 lsof -i :3001
@@ -556,6 +573,7 @@ kill -9 <PID>
 ```
 
 **Hot reload not working:**
+
 ```bash
 # Check Wealthfolio console for discovery logs
 # Verify addon manifest is valid
@@ -566,6 +584,7 @@ discoverAddons()  # In browser console
 ```
 
 **Build errors:**
+
 ```bash
 # Check TypeScript errors
 npm run lint
@@ -576,23 +595,24 @@ npm run clean && npm run build
 
 #### Production vs Development
 
-| Feature | Development | Production |
-|---------|-------------|------------|
-| Source Maps | ✅ Enabled | ❌ Disabled |
-| Minification | ❌ Disabled | ✅ Enabled |
-| Hot Reload | ✅ Active | ❌ N/A |
-| File Watching | ✅ Active | ❌ N/A |
-| Dev Server | ✅ Required | ❌ N/A |
-| Bundle Size | Larger | Optimized |
+| Feature       | Development | Production  |
+| ------------- | ----------- | ----------- |
+| Source Maps   | ✅ Enabled  | ❌ Disabled |
+| Minification  | ❌ Disabled | ✅ Enabled  |
+| Hot Reload    | ✅ Active   | ❌ N/A      |
+| File Watching | ✅ Active   | ❌ N/A      |
+| Dev Server    | ✅ Required | ❌ N/A      |
+| Bundle Size   | Larger      | Optimized   |
 
 #### Advanced Development Setup
 
 **Multiple Addons:**
+
 ```bash
 # Terminal 1
 cd addon-1 && npm run dev:server
 
-# Terminal 2  
+# Terminal 2
 cd addon-2 && npm run dev:server
 
 # Terminal 3
@@ -600,17 +620,19 @@ cd addon-3 && npm run dev:server
 ```
 
 **Custom Port Configuration:**
+
 ```typescript
 // vite.config.ts
 export default defineConfig({
   server: {
-    port: 3001  // Specify exact port
+    port: 3001, // Specify exact port
   },
   // ... rest of config
 });
 ```
 
 **Environment Variables:**
+
 ```bash
 # .env.development
 VITE_DEBUG=true
@@ -627,17 +649,20 @@ const debug = import.meta.env.VITE_DEBUG;
 ### Common Issues
 
 **Version conflicts:**
+
 ```bash
 npm ls react  # Check React version
 npm install react@^18.3.1  # Fix version
 ```
 
 **Missing peer dependencies:**
+
 ```bash
 npm install --peer-deps  # Install peer dependencies
 ```
 
 **Build errors:**
+
 ```bash
 npm run clean && npm run build  # Clean rebuild
 ```

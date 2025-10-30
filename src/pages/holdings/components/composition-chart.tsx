@@ -1,50 +1,20 @@
-import { useSettingsContext } from '@/lib/settings-provider';
-import { Holding } from '@/lib/types';
-import { formatPercent, formatAmount } from '@wealthfolio/ui';
-import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
-import { ResponsiveContainer, Treemap, Tooltip as ChartTooltip } from 'recharts';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { Icons } from '@/components/ui/icons';
-import {
-  Tooltip as Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { usePersistentState } from '@/hooks/use-persistent-state';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { Icons } from "@/components/ui/icons";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { Holding } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthfolio/ui";
+import { useMemo, type FC } from "react";
+import { Link } from "react-router-dom";
+import { Tooltip as ChartTooltip, ResponsiveContainer, Treemap } from "recharts";
 
-type ReturnType = 'daily' | 'total';
-type DisplayMode = 'symbol' | 'name';
-
-const ReturnTypeSelector: React.FC<{
-  selectedType: ReturnType;
-  onTypeSelect: (type: ReturnType) => void;
-}> = ({ selectedType, onTypeSelect }) => (
-  <div className="flex justify-end">
-    <div className="flex space-x-1 rounded-full bg-secondary p-1">
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedType === 'daily' ? 'outline' : 'ghost'}
-        onClick={() => onTypeSelect('daily')}
-      >
-        Daily Return
-      </Button>
-      <Button
-        size="sm"
-        className="h-8 rounded-full px-2 text-xs"
-        variant={selectedType === 'total' ? 'outline' : 'ghost'}
-        onClick={() => onTypeSelect('total')}
-      >
-        Total Return
-      </Button>
-    </div>
-  </div>
-);
+type ReturnType = "daily" | "total";
+type DisplayMode = "symbol" | "name";
 
 const DisplayModeToggle: React.FC<{
   displayMode: DisplayMode;
@@ -52,8 +22,8 @@ const DisplayModeToggle: React.FC<{
 }> = ({ displayMode, onToggle }) => (
   <Tooltip>
     <TooltipTrigger asChild>
-      <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full" onClick={onToggle}>
-        {displayMode === 'symbol' ? (
+      <Button variant="secondary" size="icon-sm" className="rounded-full" onClick={onToggle}>
+        {displayMode === "symbol" ? (
           <Icons.Hash className="h-4 w-4" />
         ) : (
           <Icons.Type className="h-4 w-4" />
@@ -61,7 +31,7 @@ const DisplayModeToggle: React.FC<{
       </Button>
     </TooltipTrigger>
     <TooltipContent>
-      <p>{displayMode === 'symbol' ? 'Show full names' : 'Show symbols'}</p>
+      <p>{displayMode === "symbol" ? "Show full names" : "Show symbols"}</p>
     </TooltipContent>
   </Tooltip>
 );
@@ -78,7 +48,7 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
   if (isNaN(gain) || isNaN(maxGain) || isNaN(minGain)) {
     return {
       opacity: 0.4,
-      className: isGain ? 'fill-success' : 'fill-destructive',
+      className: isGain ? "fill-success" : "fill-destructive",
     };
   }
 
@@ -95,13 +65,13 @@ function getColorScale(gain: number, maxGain: number, minGain: number): ColorSca
 
   return {
     opacity,
-    className: isGain ? 'fill-success' : 'fill-destructive',
+    className: isGain ? "fill-success" : "fill-destructive",
   };
 }
 
 // Function to truncate text based on available width
 function truncateText(text: string, maxWidth: number, fontSize: number): string {
-  if (!text) return '';
+  if (!text) return "";
 
   // Approximate character width based on fontSize (rough estimate)
   const charWidth = fontSize * 0.6;
@@ -111,22 +81,47 @@ function truncateText(text: string, maxWidth: number, fontSize: number): string 
 
   // If we need to truncate, leave space for "..."
   const truncatedLength = Math.max(1, maxChars - 3);
-  return text.substring(0, truncatedLength) + '...';
+  return text.substring(0, truncatedLength) + "...";
 }
 
-const CustomizedContent = (props: any) => {
-  const { depth, x, y, width, height, symbol, name, gain, maxGain, minGain, displayMode } = props;
+interface CustomizedContentProps {
+  depth?: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  symbol?: string;
+  name?: string;
+  gain?: number;
+  maxGain?: number;
+  minGain?: number;
+  displayMode?: DisplayMode;
+}
+
+const CustomizedContent: FC<CustomizedContentProps> = ({
+  depth = 0,
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  symbol,
+  name,
+  gain = 0,
+  maxGain = 0,
+  minGain = 0,
+  displayMode = "symbol",
+}) => {
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
   const colorScale = getColorScale(gain, maxGain, minGain);
 
   // Determine what text to display based on mode
-  const displayText = displayMode === 'name' && name ? name : symbol;
+  const displayText = displayMode === "name" && name ? name : symbol;
   // Truncate text to fit within the available width (with some padding)
-  const truncatedText = truncateText(displayText, width - 16, fontSize + 1);
+  const truncatedText = truncateText(displayText || "", width - 16, fontSize + 1);
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       <rect
         x={x}
         y={y}
@@ -134,9 +129,9 @@ const CustomizedContent = (props: any) => {
         height={height}
         rx={10}
         ry={10}
-        className={cn('stroke-card', {
-          'stroke-[4px]': depth === 1,
-          'fill-none stroke-0': depth === 0,
+        className={cn("stroke-card", {
+          "stroke-[4px]": depth === 1,
+          "fill-none stroke-0": depth === 0,
           [colorScale.className]: depth === 1,
         })}
         style={{
@@ -145,7 +140,7 @@ const CustomizedContent = (props: any) => {
       />
       {depth === 1 ? (
         <>
-          <Link to={`/holdings/${encodeURIComponent(symbol)}`}>
+          <Link to={`/holdings/${encodeURIComponent(symbol || "")}`}>
             <text
               x={x + width / 2}
               y={y + height / 2}
@@ -170,7 +165,7 @@ const CustomizedContent = (props: any) => {
               fontSize: fontSize2,
             }}
           >
-            {gain > 0 ? '+' + formatPercent(gain) : formatPercent(gain)}
+            {gain > 0 ? "+" + formatPercent(gain) : formatPercent(gain)}
           </text>
         </>
       ) : null}
@@ -183,8 +178,25 @@ interface PortfolioCompositionProps {
   isLoading?: boolean;
 }
 
-const CompositionTooltip = ({ active, payload, settings }: any) => {
-  if (active && payload && payload.length) {
+interface TooltipProps {
+  active?: boolean;
+  payload?: {
+    value: number;
+    payload: {
+      symbol: string;
+      name?: string;
+      gain: number;
+      asOfDate?: string;
+    };
+  }[];
+  settings?: {
+    baseCurrency?: string;
+    theme?: string;
+  };
+}
+
+const CompositionTooltip = ({ active, payload, settings }: TooltipProps) => {
+  if (active && payload?.length) {
     const data = payload[0].payload;
     const value = payload[0].value;
     const gain = data.gain || 0;
@@ -196,12 +208,12 @@ const CompositionTooltip = ({ active, payload, settings }: any) => {
           {/* Header with symbol and name */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-primary">{data.symbol}</span>
-              <span className="text-xs text-muted-foreground">
-                {data.asOfDate ? new Date(data.asOfDate).toLocaleDateString() : ''}
+              <span className="text-primary text-sm font-bold">{data.symbol}</span>
+              <span className="text-muted-foreground text-xs">
+                {data.asOfDate ? new Date(data.asOfDate).toLocaleDateString() : ""}
               </span>
             </div>
-            <p className="text-xs leading-tight text-muted-foreground">{data.name}</p>
+            <p className="text-muted-foreground text-xs leading-tight">{data.name}</p>
           </div>
 
           {/* Divider */}
@@ -210,24 +222,24 @@ const CompositionTooltip = ({ active, payload, settings }: any) => {
           {/* Market Value */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="pr-6 text-sm text-muted-foreground">Market Value</span>
+              <span className="text-muted-foreground pr-6 text-sm">Market Value</span>
               <span className="text-sm font-semibold">
-                {formatAmount(value, settings?.baseCurrency || 'USD')}
+                {formatAmount(value, settings?.baseCurrency ?? "USD")}
               </span>
             </div>
 
             {/* Gain/Loss */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Return</span>
+              <span className="text-muted-foreground text-sm">Return</span>
               <span
                 className={cn(
-                  'flex items-center gap-1 text-sm font-semibold',
-                  isPositive ? 'text-success' : 'text-destructive',
+                  "flex items-center gap-1 text-sm font-semibold",
+                  isPositive ? "text-success" : "text-destructive",
                 )}
               >
-                {isPositive ? '+' : ''}
+                {isPositive ? "+" : ""}
                 {formatPercent(gain)}
-                <span className="text-xs">{isPositive ? '↗' : '↘'}</span>
+                <span className="text-xs">{isPositive ? "↗" : "↘"}</span>
               </span>
             </div>
           </div>
@@ -240,17 +252,17 @@ const CompositionTooltip = ({ active, payload, settings }: any) => {
 
 export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositionProps) {
   const [returnType, setReturnType] = usePersistentState<ReturnType>(
-    'composition-return-type',
-    'daily',
+    "composition-return-type",
+    "daily",
   );
   const [displayMode, setDisplayMode] = usePersistentState<DisplayMode>(
-    'composition-display-mode',
-    'symbol',
+    "composition-display-mode",
+    "symbol",
   );
   const { settings } = useSettingsContext();
 
   const toggleDisplayMode = () => {
-    setDisplayMode((prev) => (prev === 'symbol' ? 'name' : 'symbol'));
+    setDisplayMode((prev) => (prev === "symbol" ? "name" : "symbol"));
   };
   const data = useMemo(() => {
     let maxGain = -Infinity;
@@ -263,7 +275,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         if (!symbol) return null; // Skip if no symbol
 
         const gain =
-          returnType === 'daily'
+          returnType === "daily"
             ? Number(holding.dayChangePct) || 0
             : Number(holding.totalGainPct) || 0;
 
@@ -304,17 +316,14 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
-            <Icons.LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Holding Composition
+            <Icons.LayoutDashboard className="text-muted-foreground h-4 w-4" />
+            <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+              Composition
             </CardTitle>
           </div>
           <div className="flex items-center space-x-3">
             <Skeleton className="h-8 w-8 rounded-full" />
-            <div className="flex space-x-1 rounded-full bg-secondary p-1">
-              <Skeleton className="h-8 w-24 rounded-full" />
-              <Skeleton className="h-8 w-24 rounded-full" />
-            </div>
+            <Skeleton className="h-8 w-32 rounded-full" />
           </div>
         </CardHeader>
         <CardContent>
@@ -329,8 +338,8 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
-            <Icons.LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-md font-medium">Holding Composition</CardTitle>
+            <Icons.LayoutDashboard className="text-muted-foreground h-4 w-4" />
+            <CardTitle className="text-md font-medium">Composition</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="flex h-[500px] items-center justify-center">
@@ -348,13 +357,21 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center space-x-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-            Holding Composition
+          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            Composition
           </CardTitle>
         </div>
         <div className="flex items-center space-x-3">
           <DisplayModeToggle displayMode={displayMode} onToggle={toggleDisplayMode} />
-          <ReturnTypeSelector selectedType={returnType} onTypeSelect={setReturnType} />
+          <AnimatedToggleGroup
+            items={[
+              { value: "daily", label: "Daily" },
+              { value: "total", label: "Total" },
+            ]}
+            value={returnType}
+            onValueChange={(value: ReturnType) => setReturnType(value)}
+            size="sm"
+          />
         </div>
       </CardHeader>
       <CardContent className="pl-2">
@@ -365,11 +382,9 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             data={data}
             dataKey="marketValueConverted"
             animationDuration={100}
-            content={
-              <CustomizedContent theme={settings?.theme || 'light'} displayMode={displayMode} />
-            }
+            content={<CustomizedContent displayMode={displayMode} />}
           >
-            <ChartTooltip content={<CompositionTooltip settings={settings} />} />
+            <ChartTooltip content={<CompositionTooltip settings={settings ?? undefined} />} />
           </Treemap>
         </ResponsiveContainer>
       </CardContent>

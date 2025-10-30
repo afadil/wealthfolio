@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
-import { ImportFormat, ActivityType, ImportMappingData } from '@/lib/types';
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAccountImportMapping, saveAccountImportMapping } from '@/commands/activity-import';
-import { QueryKeys } from '@/lib/query-keys';
-import { toast } from '@/components/ui/use-toast';
-import { logger } from '@/adapters';
+import { useState, useCallback, useEffect } from "react";
+import { ImportFormat, ActivityType, ImportMappingData } from "@/lib/types";
+import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getAccountImportMapping, saveAccountImportMapping } from "@/commands/activity-import";
+import { QueryKeys } from "@/lib/query-keys";
+import { toast } from "@/components/ui/use-toast";
+import { logger } from "@/adapters";
 
 export function initializeColumnMapping(
   headerRow: string[],
@@ -23,7 +23,7 @@ export function initializeColumnMapping(
 }
 
 const initialMapping: ImportMappingData = {
-  accountId: '',
+  accountId: "",
   fieldMappings: {},
   activityMappings: {},
   symbolMappings: {},
@@ -45,9 +45,7 @@ export function useImportMapping({
   accountId,
   onSaveSuccess,
 }: UseImportMappingProps = {}) {
-  const [mapping, setMapping] = useState<ImportMappingData>(
-    defaultMapping ?? initialMapping,
-  );
+  const [mapping, setMapping] = useState<ImportMappingData>(defaultMapping ?? initialMapping);
   const [hasInitializedFromHeaders, setHasInitializedFromHeaders] = useState(false);
   const queryClient = useQueryClient();
 
@@ -70,9 +68,9 @@ export function useImportMapping({
     onError: (error) => {
       logger.error(`Error saving import mapping: ${error}`);
       toast({
-        title: 'Error saving mapping',
-        description: 'There was a problem saving your import mapping.',
-        variant: 'destructive',
+        title: "Error saving mapping",
+        description: "There was a problem saving your import mapping.",
+        variant: "destructive",
       });
     },
   });
@@ -90,7 +88,10 @@ export function useImportMapping({
         ...prev,
         ...fetchedMappingData,
         fieldMappings: { ...prev.fieldMappings, ...(fetchedMappingData.fieldMappings || {}) },
-        activityMappings: { ...prev.activityMappings, ...(fetchedMappingData.activityMappings || {}) },
+        activityMappings: {
+          ...prev.activityMappings,
+          ...(fetchedMappingData.activityMappings || {}),
+        },
         symbolMappings: { ...prev.symbolMappings, ...(fetchedMappingData.symbolMappings || {}) },
         accountMappings: { ...prev.accountMappings, ...(fetchedMappingData.accountMappings || {}) },
       }));
@@ -111,7 +112,7 @@ export function useImportMapping({
       setHasInitializedFromHeaders(true);
     }
     if (!headers || headers.length === 0) {
-       setHasInitializedFromHeaders(false);
+      setHasInitializedFromHeaders(false);
     }
   }, [headers, hasInitializedFromHeaders, fetchedMapping]);
 
@@ -142,7 +143,7 @@ export function useImportMapping({
           updatedMappings[activityType] = [];
         }
         if (!updatedMappings[activityType]?.includes(compareValue)) {
-            updatedMappings[activityType]?.push(compareValue);
+          updatedMappings[activityType]?.push(compareValue);
         }
         return { ...prev, activityMappings: updatedMappings };
       });
@@ -163,8 +164,8 @@ export function useImportMapping({
   const handleAccountIdMapping = useCallback((csvAccountId: string, accountId: string) => {
     setMapping((prev) => {
       const updatedMappings = { ...prev.accountMappings };
-      
-      if (accountId.trim() === '') {
+
+      if (accountId.trim() === "") {
         // Remove mapping if accountId is empty
         delete updatedMappings[csvAccountId.trim()];
       } else {

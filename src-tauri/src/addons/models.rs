@@ -52,7 +52,7 @@ pub struct AddonManifest {
     pub min_wealthfolio_version: Option<String>,
     pub keywords: Option<Vec<String>>,
     pub icon: Option<String>,
-    
+
     // Runtime fields (only present after installation)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installed_at: Option<String>,
@@ -82,7 +82,9 @@ impl AddonManifest {
 
     /// Get the main file path, returning an error if not set
     pub fn get_main(&self) -> Result<&str, String> {
-        self.main.as_deref().ok_or("Main file not specified".to_string())
+        self.main
+            .as_deref()
+            .ok_or("Main file not specified".to_string())
     }
 
     /// Get the enabled status, defaulting to true if not set
@@ -149,7 +151,8 @@ pub struct AddonUpdateCheckResult {
 /// Get all declared functions from a permission
 #[allow(dead_code)]
 pub fn get_declared_functions(permission: &AddonPermission) -> Vec<String> {
-    permission.functions
+    permission
+        .functions
         .iter()
         .filter(|func| func.is_declared)
         .map(|func| func.name.clone())
@@ -159,7 +162,8 @@ pub fn get_declared_functions(permission: &AddonPermission) -> Vec<String> {
 /// Get all detected functions from a permission
 #[allow(dead_code)]
 pub fn get_detected_functions(permission: &AddonPermission) -> Vec<String> {
-    permission.functions
+    permission
+        .functions
         .iter()
         .filter(|func| func.is_detected)
         .map(|func| func.name.clone())
@@ -169,7 +173,8 @@ pub fn get_detected_functions(permission: &AddonPermission) -> Vec<String> {
 /// Get functions that were detected but not declared (potential security concern)
 #[allow(dead_code)]
 pub fn get_undeclared_detected_functions(permission: &AddonPermission) -> Vec<String> {
-    permission.functions
+    permission
+        .functions
         .iter()
         .filter(|func| func.is_detected && !func.is_declared)
         .map(|func| func.name.clone())
@@ -179,7 +184,8 @@ pub fn get_undeclared_detected_functions(permission: &AddonPermission) -> Vec<St
 /// Check if a permission has any undeclared detected functions
 #[allow(dead_code)]
 pub fn has_undeclared_detected_functions(permission: &AddonPermission) -> bool {
-    permission.functions
+    permission
+        .functions
         .iter()
         .any(|func| func.is_detected && !func.is_declared)
 }

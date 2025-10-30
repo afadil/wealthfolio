@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { format, subMonths } from 'date-fns';
+import React, { useState, useMemo } from "react";
+import { format, subMonths } from "date-fns";
 import {
   Button,
   Card,
@@ -14,11 +14,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
   formatPercent,
-} from '@wealthfolio/ui';
-import HistoryChart from '@/components/history-chart-symbol';
-import { Quote, TimePeriod, DateRange } from '@/lib/types';
-import { useSyncMarketDataMutation } from '@/hooks/use-sync-market-data';
-import { useBalancePrivacy } from '@/context/privacy-context';
+} from "@wealthfolio/ui";
+import HistoryChart from "@/components/history-chart-symbol";
+import { Quote, TimePeriod, DateRange } from "@/lib/types";
+import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 
 interface AssetHistoryProps {
   marketPrice: number;
@@ -42,8 +42,8 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const syncMarketDataMutation = useSyncMarketDataMutation();
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>('3M');
-  const [selectedIntervalDesc, setSelectedIntervalDesc] = useState<string>('past 3 months');
+  const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>("3M");
+  const [selectedIntervalDesc, setSelectedIntervalDesc] = useState<string>("past 3 months");
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subMonths(new Date(), 3),
     to: new Date(),
@@ -52,7 +52,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const filteredData = useMemo(() => {
     if (!quoteHistory) return [];
 
-    if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === 'ALL') {
+    if (!dateRange?.from || !dateRange?.to || selectedIntervalCode === "ALL") {
       return quoteHistory.map((quote) => ({
         timestamp: quote.timestamp,
         totalValue: quote.close,
@@ -77,7 +77,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const { ganAmount, percentage, calculatedAt } = useMemo(() => {
     const lastFilteredDate = filteredData.at(-1)?.timestamp;
 
-    if (selectedIntervalCode === 'ALL') {
+    if (selectedIntervalCode === "ALL") {
       const lastQuoteDate =
         quoteHistory.length > 0 ? quoteHistory[quoteHistory.length - 1].timestamp : undefined;
       return {
@@ -89,13 +89,13 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
 
     const startValue = filteredData[0]?.totalValue;
     const endValue = filteredData.at(-1)?.totalValue;
-    const isValidStartValue = typeof startValue === 'number' && startValue !== 0;
+    const isValidStartValue = typeof startValue === "number" && startValue !== 0;
 
     return {
       ganAmount:
-        typeof startValue === 'number' && typeof endValue === 'number' ? endValue - startValue : 0,
+        typeof startValue === "number" && typeof endValue === "number" ? endValue - startValue : 0,
       percentage:
-        isValidStartValue && typeof endValue === 'number'
+        isValidStartValue && typeof endValue === "number"
           ? (endValue - startValue) / startValue
           : 0,
       calculatedAt: lastFilteredDate,
@@ -126,8 +126,8 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                     isHidden={isBalanceHidden}
                   />
                 </p>
-                <p className={`text-sm ${ganAmount > 0 ? 'text-success' : 'text-destructive'}`}>
-                  <AmountDisplay value={ganAmount} currency={currency} isHidden={isBalanceHidden} />{' '}
+                <p className={`text-sm ${ganAmount > 0 ? "text-success" : "text-destructive"}`}>
+                  <AmountDisplay value={ganAmount} currency={currency} isHidden={isBalanceHidden} />{" "}
                   ({formatPercent(percentage)}) {selectedIntervalDesc}
                 </p>
               </div>
@@ -137,9 +137,9 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                 <div className="space-y-2">
                   <h4 className="flex text-sm font-light">
                     <Icons.Calendar className="mr-2 h-4 w-4" />
-                    As of:{' '}
+                    As of:{" "}
                     <Badge className="ml-1 font-medium" variant="secondary">
-                      {calculatedAt ? `${format(new Date(calculatedAt), 'PPpp')}` : '-'}
+                      {calculatedAt ? `${format(new Date(calculatedAt), "PPpp")}` : "-"}
                     </Badge>
                   </h4>
                 </div>
@@ -155,7 +155,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                   ) : (
                     <Icons.Refresh className="mr-2 h-4 w-4" />
                   )}
-                  {syncMarketDataMutation.isPending ? 'Refreshing quotes...' : 'Refresh Quotes'}
+                  {syncMarketDataMutation.isPending ? "Refreshing quotes..." : "Refresh Quotes"}
                 </Button>
               </div>
             </HoverCardContent>

@@ -1,6 +1,6 @@
 {
   "name": "investment-fees-tracker-addon",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "An addon for tracking and analyzing investment fees across your portfolio",
   "type": "module",
   "main": "dist/addon.js",
@@ -29,16 +29,19 @@
   "dependencies": {
     "@wealthfolio/addon-sdk": "workspace:*",
     "@wealthfolio/ui": "workspace:*",
-    "@tanstack/react-query": "^5.62.7",
-    "react": "^18.2.0"
+    "@tanstack/react-query": "^5.90.5",
+    "react": "^19.1.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
     "@wealthfolio/addon-dev-tools": "workspace:*",
     "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.1.1",
+    "@types/react-dom": "^19.1.1",
     "rollup-plugin-external-globals": "^0.13.0",
-    "typescript": "^5.0.0",
-    "vite": "^5.0.0"
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
   },
   "files": [
     "dist/",

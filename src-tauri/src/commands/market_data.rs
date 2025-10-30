@@ -7,7 +7,7 @@ use crate::{
 
 use log::{debug, error};
 use tauri::{AppHandle, State};
-use wealthfolio_core::market_data::{MarketDataProviderInfo, Quote, QuoteSummary, QuoteImport, QuoteImportPreview};
+use wealthfolio_core::market_data::{MarketDataProviderInfo, Quote, QuoteImport, QuoteSummary};
 
 #[tauri::command]
 pub async fn search_symbol(
@@ -115,31 +115,17 @@ pub async fn get_market_data_providers(
 }
 
 #[tauri::command]
-pub async fn validate_quotes_csv(
-    file_path: String,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<QuoteImportPreview, String> {
-    debug!("Validating CSV quotes file: {}", file_path);
-    state
-        .market_data_service()
-        .validate_csv_quotes(&file_path)
-        .await
-        .map_err(|e| format!("Failed to validate CSV quotes: {}", e))
-}
-
-#[tauri::command]
 pub async fn import_quotes_csv(
     quotes: Vec<QuoteImport>,
     overwrite_existing: bool,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
 ) -> Result<Vec<QuoteImport>, String> {
-    debug!("🚀 TAURI COMMAND: import_quotes_csv called");
-    debug!("📊 Received {} quotes for import", quotes.len());
-    debug!("🔄 Overwrite existing: {}", overwrite_existing);
-    debug!("🎯 First quote sample: {:?}", quotes.first());
-    debug!("🎯 Last quote sample: {:?}", quotes.last());
-    
+    debug!(
+        "Importing {} quotes from CSV (overwrite_existing={})",
+        quotes.len(),
+        overwrite_existing
+    );
     let result = state
         .market_data_service()
         .import_quotes_from_csv(quotes, overwrite_existing)
@@ -148,9 +134,6 @@ pub async fn import_quotes_csv(
             error!("❌ TAURI COMMAND: import_quotes_csv failed: {}", e);
             format!("Failed to import CSV quotes: {}", e)
         })?;
-
-    debug!("✅ TAURI COMMAND: import_quotes_csv completed successfully");
-    debug!("📤 Returning {} processed quotes", result.len());
 
     // Trigger portfolio update after import
     let handle = handle.clone();
@@ -165,13 +148,4 @@ pub async fn import_quotes_csv(
     });
 
     Ok(result)
-}
-
-#[tauri::command]
-pub async fn get_quote_import_template() -> Result<String, String> {
-    let template = r#"symbol,date,open,high,low,close,volume,currency
-SE0004297927,2013-01-15,10.25,10.30,10.20,10.28,1000,SEK
-SE0004297927,2013-01-16,10.28,10.35,10.25,10.32,1200,SEK
-"#;
-    Ok(template.to_string())
 }

@@ -1,133 +1,96 @@
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import React from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card } from "@/components/ui/card";
+import { Icons } from "@/components/ui/icons";
+import React from "react";
 
-interface OnboardingStep1Props {
-  onNext: () => void;
-}
-
-export const OnboardingStep1: React.FC<OnboardingStep1Props> = ({ onNext }) => {
+export const OnboardingStep1: React.FC = () => {
   return (
-    <div className="space-y-4 px-12 md:px-16 lg:px-20">
-      <h1 className="mb-2 text-3xl font-bold">Welcome to Wealthfolio!</h1>
-      <p className="text-base text-muted-foreground">
-        Let's start by understanding how you can track your assets.
-      </p>
-      <div className="grid grid-cols-1 gap-16 pt-4 md:grid-cols-2">
-        <Card className="flex h-full flex-col border-none shadow-none">
-          <CardHeader className="min-h-[110px]">
-            <CardTitle className="flex items-center pb-2 text-lg">Simple Tracking</CardTitle>
-            <CardDescription className="font-normal">
-              <strong>Focus:</strong> Quickly get started by adding your current holdings.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <ul className="ml-1 space-y-6 text-sm [&>li]:mt-1">
-              <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span>
-                  Use <code className="font-semibold">Add Holding</code> to increase an asset's
-                  position
-                </span>
-              </li>
-              <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span>
-                  Use <code className="font-semibold">Remove Holding</code> to reduce an asset's
-                  position
-                </span>
-              </li>
-              <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span>
-                  Use <code className="font-semibold">Deposit/Withdrawal</code> to update your
-                  account's cash balance
-                </span>
-              </li>
-              <li className="flex items-start">
-                <Icons.AlertCircle className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-warning" />
-                <span>Unlike Buy/Sell, Add/Remove holdings don't affect cash balance.</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <p className="mt-4 text-xs text-muted-foreground">
-              <strong>Best For:</strong> Quick setup, simple overview.
+    <div className="space-y-3">
+      <div className="text-center">
+        <p className="text-muted-foreground text-sm">Two ways to track your portfolio.</p>
+      </div>
+
+      <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2">
+        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-linear-to-br p-4 transition-all duration-300 hover:shadow-lg">
+          <div className="absolute inset-0 bg-linear-to-br from-green-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="relative mb-3 flex items-center gap-3">
+            <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+              <Icons.Plus className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">Simple Tracking</h3>
+              <p className="text-muted-foreground text-xs">No transaction history needed</p>
+            </div>
+          </div>
+
+          <div className="relative mb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Icons.Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              <p className="text-sm">Add/remove holdings instantly</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icons.Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              <p className="text-sm">Simple cash deposits/withdrawals</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icons.Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              <p className="text-sm">Perfect for portfolio snapshots</p>
+            </div>
+          </div>
+
+          <div className="relative rounded-md border border-green-200 bg-green-50 px-2.5 py-2 dark:border-green-800 dark:bg-green-900/20">
+            <p className="text-xs text-green-800 dark:text-green-200">
+              Holdings don&apos;t affect cash balance
             </p>
-          </CardFooter>
+          </div>
         </Card>
-        <Card className="bordeer-muted flex h-full flex-col border-none shadow-none">
-          <CardHeader className="min-h-[110px]">
-            <CardTitle className="flex items-center pb-2 text-lg">Full Tracking</CardTitle>
-            <CardDescription className="font-normal">
-              <strong>Focus:</strong> Track every deposit, trade, and dividend for exact
-              performance.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <ul className="ml-1 space-y-6 text-sm [&>li]:mt-1">
-              <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span>
-                  Start with a <code className="font-semibold">Deposit</code> to fund your account.
-                </span>
-              </li>
-              <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span>
-                  Use <code className="font-semibold">Buy</code> /{' '}
-                  <code className="font-semibold">Sell</code> actions for trades.
-                </span>
-              </li>
-              <li className="flex items-start">
-                <Icons.Check className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-green-600" />
-                <span>
-                  Use{' '}
-                  <code className="font-semibold">
-                    Deposit, Withdrawal, Transfer In, Transfer Out
-                  </code>{' '}
-                  actions to track cash flows.
-                </span>
-              </li>
-              <li className="flex items-start">
-                <Icons.AlertCircle className="mr-2 mt-1 h-4 w-4 flex-shrink-0 text-warning" />
-                <span>Buy/Sell actions update cash balance; always record deposits first.</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <p className="mt-4 text-xs text-muted-foreground">
-              <strong>Best For:</strong> Detailed analysis, accurate cash flow.
+
+        <Card className="group border-border/50 from-card to-card/80 hover:border-primary/50 relative overflow-hidden border-2 bg-linear-to-br p-4 transition-all duration-300 hover:shadow-lg">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="relative mb-3 flex items-center gap-3">
+            <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+              <Icons.BarChart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">Complete Tracking</h3>
+              <p className="text-muted-foreground text-xs">Full transaction history</p>
+            </div>
+          </div>
+
+          <div className="relative mb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Icons.Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm">Track every buy and sell</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icons.Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm">Deposits, withdrawals, transfers</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icons.Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm">Precise performance analytics</p>
+            </div>
+          </div>
+
+          <div className="relative rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 dark:border-blue-800 dark:bg-blue-900/20">
+            <p className="text-xs text-blue-800 dark:text-blue-200">
+              Trades update cash balance automatically
             </p>
-          </CardFooter>
+          </div>
         </Card>
       </div>
 
-      <p className="pt-4 text-xs text-muted-foreground">
-        You can mix both transaction types whenever you need them. For more details,{' '}
-        <a
-          href="https://wealthfolio.app/docs/concepts/activity-types"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline"
-        >
-          → View quick guide
-        </a>
-      </p>
-
-      <div className="flex justify-end pt-4">
-        <Button onClick={onNext}>
-          Got it, Next: Set Preferences
-          <Icons.ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+      <div className="text-center">
+        <p className="text-muted-foreground text-xs">
+          Mix both types as needed.{" "}
+          <a
+            href="https://wealthfolio.app/docs/concepts/activity-types"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground underline transition-colors"
+          >
+            Learn more
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -222,7 +222,9 @@ export interface ImportValidationResult {
   };
 }
 
-export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
+export type ValidationResult =
+  | { status: 'success' }
+  | { status: 'error'; errors: string[] };
 
 // Holding types
 export interface Sector {
@@ -411,10 +413,10 @@ export interface IncomeSummary {
   yoyGrowth: number | null;
 }
 
-export type DateRange = {
+export interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-};
+}
 
 export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
 
@@ -491,7 +493,10 @@ export interface ContributionLimit {
   updatedAt?: string;
 }
 
-export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewContributionLimit = Omit<
+  ContributionLimit,
+  'id' | 'createdAt' | 'updatedAt'
+>;
 
 export interface AccountDeposit {
   amount: number;
@@ -539,8 +544,8 @@ export interface UpdateAssetProfile {
   assetSubClass: string;
 }
 
-export type TrackedItem = {
+export interface TrackedItem {
   id: string;
   type: 'account' | 'symbol';
   name: string;
-};
+}

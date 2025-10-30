@@ -3,6 +3,8 @@ pub mod constants;
 pub mod accounts;
 pub mod activities;
 pub mod assets;
+#[cfg(feature = "wealthfolio-pro")]
+pub use wealthfolio_sync as sync;
 
 pub mod errors;
 pub mod fx;

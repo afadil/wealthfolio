@@ -1,27 +1,29 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/components/ui/use-toast';
-import { createActivity, updateActivity, deleteActivity } from '@/commands/activity';
-import { logger } from '@/adapters';
-import { NewActivityFormValues } from '../components/forms/schemas';
-import { ActivityDetails, Quote, ActivityCreate, ActivityUpdate } from '@/lib/types';
-import { DataSource } from '@/lib/constants';
-import { updateQuote } from '@/commands/market-data';
-import { QueryKeys } from '@/lib/query-keys';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/ui/use-toast";
+import { createActivity, updateActivity, deleteActivity } from "@/commands/activity";
+import { logger } from "@/adapters";
+import { NewActivityFormValues } from "../components/forms/schemas";
+import { ActivityDetails, Quote, ActivityCreate, ActivityUpdate } from "@/lib/types";
+import { DataSource } from "@/lib/constants";
+import { updateQuote } from "@/commands/market-data";
+import { QueryKeys } from "@/lib/query-keys";
 
-export function useActivityMutations(onSuccess?: (activity: { accountId?: string | null }) => void) {
+export function useActivityMutations(
+  onSuccess?: (activity: { accountId?: string | null }) => void,
+) {
   const queryClient = useQueryClient();
 
   const createQuoteFromActivity = async (data: ActivityCreate | ActivityUpdate) => {
     if (
-      'assetDataSource' in data &&
+      "assetDataSource" in data &&
       data.assetDataSource === DataSource.MANUAL &&
       data.assetId &&
-      'unitPrice' in data &&
+      "unitPrice" in data &&
       data.unitPrice &&
-      'quantity' in data &&
+      "quantity" in data &&
       data.quantity
     ) {
-      const quote: Omit<Quote, 'id' | 'createdAt'> & { id?: string; createdAt?: string } = {
+      const quote: Omit<Quote, "id" | "createdAt"> & { id?: string; createdAt?: string } = {
         symbol: data.assetId,
         timestamp: new Date(data.activityDate).toISOString(),
         open: data.unitPrice,
@@ -30,11 +32,11 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
         close: data.unitPrice,
         adjclose: data.unitPrice,
         volume: data.quantity,
-        currency: data.currency || '',
+        currency: data.currency || "",
         dataSource: DataSource.MANUAL,
       };
 
-      const datePart = new Date(quote.timestamp).toISOString().slice(0, 10).replace(/-/g, '');
+      const datePart = new Date(quote.timestamp).toISOString().slice(0, 10).replace(/-/g, "");
       const fullQuote: Quote = {
         ...quote,
         id: `${datePart}_${quote.symbol.toUpperCase()}`,
@@ -45,15 +47,15 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
         await updateQuote(fullQuote.symbol, fullQuote);
         queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, fullQuote.symbol] });
         toast({
-          title: 'Quote added successfully.',
-          variant: 'success',
+          title: "Quote added successfully.",
+          variant: "success",
         });
       } catch (error) {
-        logger.error(`Error saving quote from activity: ${error}`);
+        logger.error(`Error saving quote from activity: ${String(error)}`);
         toast({
-          title: 'Uh oh! Something went wrong.',
+          title: "Uh oh! Something went wrong.",
           description: `There was a problem saving the quote from the activity.`,
-          variant: 'destructive',
+          variant: "destructive",
         });
       }
     }
@@ -65,11 +67,13 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
       if (onSuccess) onSuccess(activity);
     },
     onError: (error: string) => {
-      logger.error(`Error ${action} activity: ${error}`);
+      logger.error(`Error ${action} activity: ${String(error)}`);
       toast({
         title: `Uh oh! Something went wrong ${action} this activity.`,
-        description: `Please try again or report an issue if the problem persists. Error: ${error}`,
-        variant: 'destructive',
+        description: `Please try again or report an issue if the problem persists. Error: ${String(
+          error,
+        )}`,
+        variant: "destructive",
       });
     },
   });
@@ -81,7 +85,7 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
       await createQuoteFromActivity(data);
       return activity;
     },
-    ...createMutationOptions('adding'),
+    ...createMutationOptions("adding"),
   });
 
   const updateActivityMutation = useMutation({
@@ -90,21 +94,28 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
       await createQuoteFromActivity(data);
       return activity;
     },
-    ...createMutationOptions('updating'),
+    ...createMutationOptions("updating"),
   });
 
   const deleteActivityMutation = useMutation({
     mutationFn: deleteActivity,
-    ...createMutationOptions('deleting'),
+    ...createMutationOptions("deleting"),
   });
 
   const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
-    const { id, createdAt, updatedAt, date, comment, ...restOfActivityData } = activityToDuplicate;
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      comment: _comment,
+      date,
+      ...restOfActivityData
+    } = activityToDuplicate;
 
     const newActivityData: NewActivityFormValues = {
       ...restOfActivityData,
       activityDate: date,
-      comment: 'Duplicated',
+      comment: "Duplicated",
     } as NewActivityFormValues;
 
     return await createActivity(newActivityData);
@@ -112,7 +123,7 @@ export function useActivityMutations(onSuccess?: (activity: { accountId?: string
 
   const duplicateActivityMutation = useMutation({
     mutationFn: duplicateActivity,
-    ...createMutationOptions('duplicating'),
+    ...createMutationOptions("duplicating"),
   });
 
   return {

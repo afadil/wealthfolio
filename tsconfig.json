@@ -1,40 +1,24 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+    // Main app specific settings
     "types": ["@tauri-apps/api", "vitest/globals"],
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
+    "noEmit": true,
+    "composite": false, // Main app doesn't need to be composite
 
-     /* Resolve paths */
-    "baseUrl": ".",
+    // Path mapping for main app
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
+      "@/*": ["./src/*"],
       "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"],
       "@wealthfolio/ui": ["packages/ui/src"],
       "@wealthfolio/ui/*": ["packages/ui/src/*"],
       "@/components/ui/*": ["packages/ui/src/components/ui/*"]
-    },
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
-    
+    }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/addon-sdk" }
+  ]
 }

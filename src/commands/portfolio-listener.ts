@@ -1,4 +1,4 @@
-import type { EventCallback, UnlistenFn } from '@/adapters';
+import type { EventCallback, UnlistenFn } from "@/adapters";
 import {
   getRunEnv,
   RUN_ENV,
@@ -8,19 +8,23 @@ import {
   logger,
   listenMarketSyncCompleteTauri,
   listenMarketSyncStartTauri,
-} from '@/adapters';
+} from "@/adapters";
 
 // listenPortfolioUpdateStart
-export const listenPortfolioUpdateStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateStart = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenPortfolioUpdateStartTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen portfolio:update-start.');
+    logger.error("Error listen portfolio:update-start.");
     throw error;
   }
 };
@@ -33,26 +37,32 @@ export const listenPortfolioUpdateComplete = async <T>(
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenPortfolioUpdateCompleteTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen portfolio:update-complete.');
+    logger.error("Error listen portfolio:update-complete.");
     throw error;
   }
 };
 
 // listenPortfolioUpdateError
-export const listenPortfolioUpdateError = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateError = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenPortfolioUpdateErrorTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen portfolio:update-error.');
+    logger.error("Error listen portfolio:update-error.");
     throw error;
   }
 };
@@ -63,26 +73,32 @@ export const listenMarketSyncStart = async <T>(handler: EventCallback<T>): Promi
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenMarketSyncStartTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen market:sync-start.');
+    logger.error("Error listen market:sync-start.");
     throw error;
   }
 };
 
 // listenMarketSyncComplete
-export const listenMarketSyncComplete = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenMarketSyncComplete = async <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
         return listenMarketSyncCompleteTauri<T>(handler);
+      case RUN_ENV.WEB:
+        throw new Error(`Unsupported`);
       default:
         throw new Error(`Unsupported`);
     }
   } catch (error) {
-    logger.error('Error listen market:sync-complete.');
+    logger.error("Error listen market:sync-complete.");
     throw error;
   }
 };

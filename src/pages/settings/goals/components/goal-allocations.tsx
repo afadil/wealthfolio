@@ -1,9 +1,9 @@
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { toast } from '@/components/ui/use-toast';
-import { Account, Goal, GoalAllocation } from '@/lib/types';
-import { formatAmount } from '@wealthfolio/ui';
-import React, { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
+import { Account, Goal, GoalAllocation } from "@/lib/types";
+import { formatAmount } from "@wealthfolio/ui";
+import React, { useState, useEffect } from "react";
 
 interface GoalsAllocationsProps {
   goals: Goal[];
@@ -19,7 +19,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
   onSubmit,
 }) => {
   const [allocations, setAllocations] = useState<GoalAllocation[]>(existingAllocations || []);
-  const [totalAllocations, setTotalAllocations] = useState<{ [accountId: string]: number }>({});
+  const [totalAllocations, setTotalAllocations] = useState<Record<string, number>>({});
   const [isExceeding, setIsExceeding] = useState<boolean>(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
         }, 0);
         return acc;
       },
-      {} as { [accountId: string]: number },
+      {} as Record<string, number>,
     );
 
     setTotalAllocations(totals);
@@ -63,7 +63,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
     if (isExceeding) {
       toast({
         title: "Total allocation for an account can't exceed 100%.",
-        className: 'bg-red-500 text-white border-none',
+        className: "bg-red-500 text-white border-none",
       });
       return;
     }
@@ -76,7 +76,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
         <table className="min-w-full table-auto">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-muted px-4 py-2 text-sm font-normal">
+              <th className="bg-muted sticky left-0 z-10 px-4 py-2 text-sm font-normal">
                 Goals \ Accounts
               </th>
               {accounts.map((account) => (
@@ -86,14 +86,14 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
               ))}
             </tr>
             <tr>
-              <td className="sticky left-0 z-10 border-r border-t bg-muted px-4 py-2 text-xs text-muted-foreground">
+              <td className="bg-muted text-muted-foreground sticky left-0 z-10 border-t border-r px-4 py-2 text-xs">
                 Total
               </td>
               {accounts.map((account) => (
                 <td
                   key={account.id}
-                  className={`border-l border-t px-4 py-2 text-right text-xs text-muted-foreground ${
-                    totalAllocations[account.id] > 100 ? 'text-destructive' : ''
+                  className={`text-muted-foreground border-t border-l px-4 py-2 text-right text-xs ${
+                    totalAllocations[account.id] > 100 ? "text-destructive" : ""
                   }`}
                 >
                   {totalAllocations[account.id]}%
@@ -104,11 +104,11 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
           <tbody>
             {goals.map((goal) => (
               <tr key={goal.id} className="border-t">
-                <td className="border-nones sticky left-0 z-10 border-r bg-muted p-0 text-xs font-semibold">
+                <td className="border-nones bg-muted sticky left-0 z-10 border-r p-0 text-xs font-semibold">
                   <div className="p-2">
                     <span>{goal.title}</span>
-                    <p className="text-xs font-light text-muted-foreground">
-                      {formatAmount(goal.targetAmount, 'USD', false)}
+                    <p className="text-muted-foreground text-xs font-light">
+                      {formatAmount(goal.targetAmount, "USD", false)}
                     </p>
                   </div>
                 </td>
@@ -120,7 +120,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
                     <td key={account.id} className="border-r px-1 py-0">
                       <Input
                         className="m-0 h-full w-full rounded-none border-none px-2 text-right text-xs"
-                        value={existingAllocation ? existingAllocation.percentAllocation : ''}
+                        value={existingAllocation ? existingAllocation.percentAllocation : ""}
                         onChange={(e) =>
                           handleAllocationChange(goal.id, account.id, Number(e.target.value))
                         }

@@ -1,35 +1,37 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import { AppLayout } from '@/pages/layouts/app-layout';
-import SettingsLayout from '@/pages/settings/layout';
+import { AppLayout } from "@/pages/layouts/app-layout";
+import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
+import SettingsLayout from "@/pages/settings/settings-layout";
 
-import DashboardPage from '@/pages/dashboard/dashboard-page';
-import AccountPage from './pages/account/account-page';
-import SettingsAppearancePage from '@/pages/settings/appearance/appearance-page';
-import SettingsAccountsPage from '@/pages/settings/accounts/accounts-page';
-import ActivityPage from '@/pages/activity/activity-page';
-import ActivityImportPage from '@/pages/activity/import/activity-import-page';
-import HoldingsPage from '@/pages/holdings/holdings-page';
-import AssetProfilePage from './pages/asset/asset-profile-page';
-import useGlobalEventListener from './use-global-event-listener';
-import GeneralSettingsPage from './pages/settings/general/general-page';
-import OnboardingPage from './pages/onboarding/onboarding-page';
-import SettingsGoalsPage from './pages/settings/goals/goals-page';
-import IncomePage from '@/pages/income/income-page';
-import ExportSettingsPage from './pages/settings/exports/exports-page';
-import ContributionLimitPage from './pages/settings/contribution-limits/contribution-limits-page';
-import PerformancePage from '@/pages/performance/performance-page';
-import MarketDataSettingsPage from './pages/settings/market-data-settings';
-import AddonSettingsPage from './pages/settings/addons/addon-settings';
-
-import AboutSettingsPage from './pages/settings/about/about-page';
-import { getDynamicRoutes, subscribeToNavigationUpdates } from '@/addons/addons-runtime-context';
+import ActivityPage from "@/pages/activity/activity-page";
+import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import DashboardPage from "@/pages/dashboard/dashboard-page";
+import HoldingsPage from "@/pages/holdings/holdings-page";
+import IncomePage from "@/pages/income/income-page";
+import PerformancePage from "@/pages/performance/performance-page";
+import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
+import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
+import AccountPage from "./pages/account/account-page";
+import AssetProfilePage from "./pages/asset/asset-profile-page";
+import OnboardingPage from "./pages/onboarding/onboarding-page";
+import AddonSettingsPage from "./pages/settings/addons/addon-settings";
+import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
+import ExportSettingsPage from "./pages/settings/exports/exports-page";
+import GeneralSettingsPage from "./pages/settings/general/general-page";
+import SettingsGoalsPage from "./pages/settings/goals/goals-page";
+import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
+import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
+import useGlobalEventListener from "./use-global-event-listener";
+// import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
+import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
+import AboutSettingsPage from "./pages/settings/about/about-page";
 
 export function AppRoutes() {
   useGlobalEventListener();
   const [dynamicRoutes, setDynamicRoutes] = useState<
-    Array<{ path: string; component: React.LazyExoticComponent<React.ComponentType<any>> }>
+    { path: string; component: React.LazyExoticComponent<React.ComponentType<unknown>> }[]
   >([]);
 
   // Subscribe to dynamic route updates
@@ -52,6 +54,15 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* QR Scanner - No layout for fullscreen camera access */}
+        {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}
+
+        {/* Onboarding with dedicated layout */}
+        <Route path="/onboarding" element={<OnboardingLayout />}>
+          <Route index element={<OnboardingPage />} />
+        </Route>
+
+        {/* Main app with sidebar */}
         <Route path="/" element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -59,8 +70,7 @@ export function AppRoutes() {
           <Route path="holdings" element={<HoldingsPage />} />
           <Route path="holdings/:symbol" element={<AssetProfilePage />} />
           <Route path="import" element={<ActivityImportPage />} />
-          <Route path="accounts/:id" element={<AccountPage />} />;
-          <Route path="onboarding" element={<OnboardingPage />} />;
+          <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           {/* Dynamic addon routes */}
@@ -87,7 +97,7 @@ export function AppRoutes() {
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
-
+            <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="addons" element={<AddonSettingsPage />} />
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />

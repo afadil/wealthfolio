@@ -38,7 +38,7 @@ export interface RouteConfig {
   /** Route path pattern */
   path: string;
   /** Lazy-loaded React component */
-  component: React.LazyExoticComponent<React.ComponentType<any>>;
+  component: React.LazyExoticComponent<React.ComponentType<unknown>>;
 }
 
 /**
@@ -91,4 +91,6 @@ export interface AddonContext {
 /**
  * Addon enable function signature
  */
-export type AddonEnableFunction = (context: AddonContext) => void | { disable?: () => void };
+export type AddonEnableFunction = (
+  context: AddonContext,
+) => void | { disable?: () => void };

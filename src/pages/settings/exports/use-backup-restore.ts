@@ -1,10 +1,9 @@
-import { useMutation } from '@tanstack/react-query';
-import { toast } from '@/components/ui/use-toast';
-import { logger, listenDatabaseRestoredTauri } from '@/adapters';
-import { backupDatabaseToPath, restoreDatabase } from '@/commands/settings';
-import { openFolderDialog, openDatabaseFileDialog } from '@/commands/file';
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { listenDatabaseRestoredTauri, logger } from "@/adapters";
+import { openDatabaseFileDialog, openFolderDialog } from "@/commands/file";
+import { backupDatabaseToPath, restoreDatabase } from "@/commands/settings";
+import { toast } from "@/components/ui/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 export function useBackupRestore() {
   const queryClient = useQueryClient();
@@ -17,17 +16,17 @@ export function useBackupRestore() {
       unlistenFn = await listenDatabaseRestoredTauri(() => {
         // Invalidate all queries to force a complete refresh
         queryClient.invalidateQueries();
-        
+
         // Note: The restart dialog is now handled by the backend
         toast({
-          title: 'Database restored successfully',
-          description: 'Application data has been restored.',
-          variant: 'success',
+          title: "Database restored successfully",
+          description: "Application data has been restored.",
+          variant: "success",
         });
       });
     };
 
-    setupListener();
+    void setupListener();
 
     return () => {
       if (unlistenFn) {
@@ -40,7 +39,7 @@ export function useBackupRestore() {
     mutationFn: async () => {
       // Open folder dialog to let user choose backup location
       const selectedDir = await openFolderDialog();
-      
+
       if (!selectedDir) {
         // User cancelled the dialog, return null to indicate cancellation
         return null;
@@ -55,19 +54,19 @@ export function useBackupRestore() {
         // User cancelled the operation, don't show any message
         return;
       }
-      
+
       toast({
-        title: 'Backup completed successfully',
+        title: "Backup completed successfully",
         description: `Database backed up to: ${backupPath}`,
-        variant: 'success',
+        variant: "success",
       });
     },
     onError: (error) => {
-      logger.error(`Error during backup: ${error}`);
+      logger.error(`Error during backup: ${String(error)}`);
       toast({
-        title: 'Backup failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
-        variant: 'destructive',
+        title: "Backup failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
       });
     },
   });
@@ -76,7 +75,7 @@ export function useBackupRestore() {
     mutationFn: async () => {
       // Open file dialog to let user choose backup file
       const selectedFile = await openDatabaseFileDialog();
-      
+
       if (!selectedFile) {
         // User cancelled the dialog, return null to indicate cancellation
         return null;
@@ -91,19 +90,19 @@ export function useBackupRestore() {
         // User cancelled the operation, don't show any message
         return;
       }
-      
+
       toast({
-        title: 'Database restore initiated',
+        title: "Database restore initiated",
         description: `Restoring from: ${filePath}`,
-        variant: 'success',
+        variant: "success",
       });
     },
     onError: (error) => {
-      logger.error(`Error during restore: ${error}`);
+      logger.error(`Error during restore: ${String(error)}`);
       toast({
-        title: 'Restore failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
-        variant: 'destructive',
+        title: "Restore failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
       });
     },
   });
@@ -112,7 +111,7 @@ export function useBackupRestore() {
     try {
       await backupWithDirectorySelection();
     } catch (error) {
-      logger.error(`Backup error: ${error}`);
+      logger.error(`Backup error: ${String(error)}`);
     }
   };
 
@@ -120,7 +119,7 @@ export function useBackupRestore() {
     try {
       await restoreFromBackup();
     } catch (error) {
-      logger.error(`Restore error: ${error}`);
+      logger.error(`Restore error: ${String(error)}`);
     }
   };
 

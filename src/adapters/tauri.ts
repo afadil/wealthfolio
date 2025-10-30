@@ -1,37 +1,37 @@
-import { invoke } from '@tauri-apps/api/core';
-import { open, save } from '@tauri-apps/plugin-dialog';
-import { listen } from '@tauri-apps/api/event';
-import { writeFile, BaseDirectory } from '@tauri-apps/plugin-fs';
-import { error, info, warn, trace, debug } from '@tauri-apps/plugin-log';
-import type { EventCallback, UnlistenFn } from '@tauri-apps/api/event';
+import { invoke } from "@tauri-apps/api/core";
+import type { EventCallback, UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { BaseDirectory, writeFile } from "@tauri-apps/plugin-fs";
+import { debug, error, info, trace, warn } from "@tauri-apps/plugin-log";
 
 export type { EventCallback, UnlistenFn };
 
-import type { 
-  AddonManifest,
+import type {
   AddonInstallResult,
+  AddonManifest,
+  AddonUpdateCheckResult,
+  AddonUpdateInfo,
   AddonValidationResult,
   AddonFile as BaseAddonFile,
   FunctionPermission,
   Permission,
-  AddonUpdateInfo,
-  AddonUpdateCheckResult
-} from '@wealthfolio/addon-sdk';
+} from "@wealthfolio/addon-sdk";
 
 // Tauri-specific types with camelCase serialization to match Rust
-export interface AddonFile extends Omit<BaseAddonFile, 'is_main'> {
+export interface AddonFile extends Omit<BaseAddonFile, "is_main"> {
   isMain: boolean;
 }
 
 // Re-export SDK types directly
-export type { 
-  AddonManifest, 
-  AddonInstallResult, 
-  AddonValidationResult, 
-  FunctionPermission, 
-  Permission,
+export type {
+  AddonInstallResult,
+  AddonManifest,
+  AddonUpdateCheckResult,
   AddonUpdateInfo,
-  AddonUpdateCheckResult 
+  AddonValidationResult,
+  FunctionPermission,
+  Permission,
 };
 
 export interface ExtractedAddon {
@@ -52,53 +52,53 @@ export const invokeTauri = async <T>(command: string, payload?: Record<string, u
 };
 
 export const extractAddonZip = async (zipData: Uint8Array): Promise<ExtractedAddon> => {
-  return await invoke<ExtractedAddon>('extract_addon_zip', { zipData: Array.from(zipData) });
+  return await invoke<ExtractedAddon>("extract_addon_zip", { zipData: Array.from(zipData) });
 };
 
 export const installAddonZip = async (
-  zipData: Uint8Array, 
-  enableAfterInstall?: boolean
+  zipData: Uint8Array,
+  enableAfterInstall?: boolean,
 ): Promise<AddonManifest> => {
-  return await invoke<AddonManifest>('install_addon_zip', { 
+  return await invoke<AddonManifest>("install_addon_zip", {
     zipData: Array.from(zipData),
-    enableAfterInstall
+    enableAfterInstall,
   });
 };
 
 export const installAddonFile = async (
   fileName: string,
   fileContent: string,
-  enableAfterInstall?: boolean
+  enableAfterInstall?: boolean,
 ): Promise<AddonManifest> => {
-  return await invoke<AddonManifest>('install_addon_file', { 
+  return await invoke<AddonManifest>("install_addon_file", {
     fileName,
     fileContent,
-    enableAfterInstall
+    enableAfterInstall,
   });
 };
 
 export const listInstalledAddons = async (): Promise<InstalledAddon[]> => {
-  return await invoke<InstalledAddon[]>('list_installed_addons');
+  return await invoke<InstalledAddon[]>("list_installed_addons");
 };
 
 export const toggleAddon = async (addonId: string, enabled: boolean): Promise<void> => {
-  return await invoke<void>('toggle_addon', { addonId, enabled });
+  return await invoke<void>("toggle_addon", { addonId, enabled });
 };
 
 export const uninstallAddon = async (addonId: string): Promise<void> => {
-  return await invoke<void>('uninstall_addon', { addonId });
+  return await invoke<void>("uninstall_addon", { addonId });
 };
 
 export const loadAddonForRuntime = async (addonId: string): Promise<ExtractedAddon> => {
-  return await invoke<ExtractedAddon>('load_addon_for_runtime', { addonId });
+  return await invoke<ExtractedAddon>("load_addon_for_runtime", { addonId });
 };
 
 export const getEnabledAddonsOnStartup = async (): Promise<ExtractedAddon[]> => {
-  return await invoke<ExtractedAddon[]>('get_enabled_addons_on_startup');
+  return await invoke<ExtractedAddon[]>("get_enabled_addons_on_startup");
 };
 
 export const openCsvFileDialogTauri = async (): Promise<null | string | string[]> => {
-  return open({ filters: [{ name: 'CSV', extensions: ['csv'] }] });
+  return open({ filters: [{ name: "CSV", extensions: ["csv"] }] });
 };
 
 export const openFolderDialogTauri = async (): Promise<string | null> => {
@@ -106,70 +106,67 @@ export const openFolderDialogTauri = async (): Promise<string | null> => {
 };
 
 export const openDatabaseFileDialogTauri = async (): Promise<string | null> => {
-  const result = await open({ 
-    filters: [{ name: 'Database', extensions: ['db', 'sqlite'] }] 
-  });
-  return Array.isArray(result) ? result[0] || null : result;
+  const result = await open();
+  return Array.isArray(result) ? (result[0] ?? null) : result;
 };
 
 export const listenFileDropHoverTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('tauri://file-drop-hover', handler);
+  return listen<T>("tauri://file-drop-hover", handler);
 };
 
 export const listenFileDropTauri = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
-  return listen<T>('tauri://file-drop', handler);
+  return listen<T>("tauri://file-drop", handler);
 };
 
 export const listenFileDropCancelledTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('tauri://file-drop-cancelled', handler);
+  return listen<T>("tauri://file-drop-cancelled", handler);
 };
 
 export const listenPortfolioUpdateStartTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('portfolio:update-start', handler);
+  return listen<T>("portfolio:update-start", handler);
 };
 
 export const listenPortfolioUpdateCompleteTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('portfolio:update-complete', handler);
+  return listen<T>("portfolio:update-complete", handler);
 };
 
 export const listenDatabaseRestoredTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('database-restored', handler);
+  return listen<T>("database-restored", handler);
 };
 
 export const listenPortfolioUpdateErrorTauri = async <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
-  return listen<T>('portfolio:update-error', handler);
+  return listen<T>("portfolio:update-error", handler);
 };
 
 export async function listenMarketSyncCompleteTauri<T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> {
-  return listen('market:sync-complete', handler);
+  return listen("market:sync-complete", handler);
 }
 
 export async function listenMarketSyncStartTauri<T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> {
-  return listen('market:sync-start', handler);
+  return listen("market:sync-start", handler);
 }
 
 export async function listenNavigateToRouteTauri<T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> {
-  return listen('navigate-to-route', handler);
+  return listen("navigate-to-route", handler);
 }
-
 
 export const openFileSaveDialogTauri = async (
   fileContent: string | Blob | Uint8Array,
@@ -180,7 +177,7 @@ export const openFileSaveDialogTauri = async (
     filters: [
       {
         name: fileName,
-        extensions: [fileName.split('.').pop() ?? ''],
+        extensions: [fileName.split(".").pop() ?? ""],
       },
     ],
   });
@@ -190,7 +187,7 @@ export const openFileSaveDialogTauri = async (
   }
 
   let contentToSave: Uint8Array;
-  if (typeof fileContent === 'string') {
+  if (typeof fileContent === "string") {
     contentToSave = new TextEncoder().encode(fileContent);
   } else if (fileContent instanceof Blob) {
     const arrayBuffer = await fileContent.arrayBuffer();
@@ -211,4 +208,3 @@ export const logger = {
   trace,
   debug,
 };
-

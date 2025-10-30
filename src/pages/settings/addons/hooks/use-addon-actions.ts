@@ -1,11 +1,9 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/components/ui/use-toast';
-import { open } from '@tauri-apps/plugin-dialog';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
+import { getRunEnv, RUN_ENV, logger as envLogger } from "@/adapters";
 
-
-import { reloadAllAddons } from '@/addons/addons-core';
+import { reloadAllAddons } from "@/addons/addons-core";
 import {
   installAddon,
   getInstalledAddons,
@@ -13,10 +11,10 @@ import {
   uninstallAddon,
   extractAddon,
   clearAddonStaging,
-} from '@/commands/addon';
-import { type InstalledAddon, type Permission, type ExtractedAddon, logger } from '@/adapters/tauri';
-import type { RiskLevel, AddonManifest } from '@wealthfolio/addon-sdk';
-import { QueryKeys } from '@/lib/query-keys';
+} from "@/commands/addon";
+import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters/tauri";
+import type { RiskLevel, AddonManifest } from "@wealthfolio/addon-sdk";
+import { QueryKeys } from "@/lib/query-keys";
 
 interface PermissionDialogState {
   open: boolean;
@@ -65,40 +63,83 @@ export function useAddonActions() {
 
   // Helper function to calculate risk level from permissions
   const calculateRiskLevel = (permissions: Permission[]): RiskLevel => {
-    const hasHighRiskCategories = permissions.some(perm => 
-      ['accounts', 'activities', 'settings'].includes(perm.category)
+    const hasHighRiskCategories = permissions.some((perm) =>
+      ["accounts", "activities", "settings"].includes(perm.category),
     );
-    const hasMediumRiskCategories = permissions.some(perm => 
-      ['portfolio', 'files', 'financial-planning'].includes(perm.category)
+    const hasMediumRiskCategories = permissions.some((perm) =>
+      ["portfolio", "files", "financial-planning"].includes(perm.category),
     );
-    
-    return hasHighRiskCategories ? 'high' : 
-           hasMediumRiskCategories ? 'medium' : 'low';
+
+    return hasHighRiskCategories ? "high" : hasMediumRiskCategories ? "medium" : "low";
   };
 
   const handleLoadAddon = async () => {
     try {
       setIsLoading(true);
+      if (getRunEnv() === RUN_ENV.DESKTOP) {
+        // Dynamically import Tauri APIs in desktop to avoid bundling in web
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const { readFile } = await import("@tauri-apps/plugin-fs");
 
-      // Open file dialog for ZIP files only
-      const filePath = await open({
-        filters: [{ name: 'Addon Packages', extensions: ['zip'] }],
-        multiple: false,
-      });
+        // Open file dialog for ZIP files only
+        const filePath = await open({
+          filters: [{ name: "Addon Packages", extensions: ["zip"] }],
+          multiple: false,
+        });
 
-      if (!filePath || Array.isArray(filePath)) {
+        if (!filePath || Array.isArray(filePath)) {
+          return;
+        }
+
+        // Read the ZIP file (desktop)
+        const fileData = await readFile(filePath);
+        await handleInstallZipAddon(filePath, fileData);
         return;
       }
 
-      // Read the ZIP file
-      const fileData = await readFile(filePath);
-      await handleInstallZipAddon(filePath, fileData);
+      // Web: use a hidden file input to pick a .zip and read it
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".zip,application/zip";
+      input.style.display = "none";
+
+      const filePromise = new Promise<File | null>((resolve) => {
+        input.onchange = () => {
+          const file = input.files && input.files[0] ? input.files[0] : null;
+          resolve(file);
+          // Cleanup
+          if (input.parentNode) {
+            input.parentNode.removeChild(input);
+          }
+        };
+        document.body.appendChild(input);
+        input.click();
+      });
+
+      const file = await filePromise;
+      if (!file) {
+        return;
+      }
+      // Ensure it's a zip by extension or MIME (best effort)
+      const isZip = file.name.toLowerCase().endsWith(".zip") || file.type === "application/zip";
+      if (!isZip) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a .zip addon package.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const fileData = new Uint8Array(arrayBuffer);
+      await handleInstallZipAddon(file.name, fileData);
     } catch (error) {
-      logger.error('Error loading addon: ' + (error as Error).message);
+      envLogger.error("Error loading addon: " + (error as Error).message);
       toast({
-        title: 'Error loading addon',
-        description: error instanceof Error ? error.message : 'Failed to load addon',
-        variant: 'destructive',
+        title: "Error loading addon",
+        description: error instanceof Error ? error.message : "Failed to load addon",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -127,12 +168,12 @@ export function useAddonActions() {
         },
       });
     } catch (error) {
-      console.error('Error analyzing addon permissions:', error);
+      console.error("Error analyzing addon permissions:", error);
       // If permission analysis fails, show warning and allow user to proceed
       toast({
-        title: 'Permission analysis failed',
-        description: 'Could not analyze addon permissions. Install at your own risk.',
-        variant: 'destructive',
+        title: "Permission analysis failed",
+        description: "Could not analyze addon permissions. Install at your own risk.",
+        variant: "destructive",
       });
 
       // Still allow installation but with warning
@@ -140,7 +181,10 @@ export function useAddonActions() {
     }
   };
 
-  const handleShowPermissionDialog = (extractedAddon: ExtractedAddon, onApprove: () => Promise<void>) => {
+  const handleShowPermissionDialog = (
+    extractedAddon: ExtractedAddon,
+    onApprove: () => Promise<void>,
+  ) => {
     // Calculate risk level based on permissions
     const permissions = extractedAddon.metadata.permissions || [];
     const riskLevel = calculateRiskLevel(permissions);
@@ -159,7 +203,7 @@ export function useAddonActions() {
           queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
           await reloadAllAddons();
           toast({
-            title: 'Addon installed successfully',
+            title: "Addon installed successfully",
             description: `${extractedAddon.metadata.name} has been installed and is now active.`,
           });
         } catch (error) {
@@ -167,7 +211,7 @@ export function useAddonActions() {
           try {
             await clearAddonStaging(extractedAddon.metadata.id);
           } catch (cleanupError) {
-            console.error('Failed to clear staging after installation failure:', cleanupError);
+            console.error("Failed to clear staging after installation failure:", cleanupError);
           }
           throw error;
         }
@@ -178,7 +222,7 @@ export function useAddonActions() {
         try {
           await clearAddonStaging(extractedAddon.metadata.id);
         } catch (error) {
-          console.error('Failed to clear staging directory:', error);
+          console.error("Failed to clear staging directory:", error);
         }
       },
     });
@@ -196,11 +240,11 @@ export function useAddonActions() {
       await reloadAllAddons();
 
       toast({
-        title: 'Addon installed successfully',
+        title: "Addon installed successfully",
         description: `${metadata.name} has been installed and is now active.`,
       });
     } catch (error) {
-      console.error('Error installing ZIP addon:', error);
+      console.error("Error installing ZIP addon:", error);
       throw error;
     }
   };
@@ -217,19 +261,19 @@ export function useAddonActions() {
       const addon = installedAddons.find((a) => a.metadata.id === addonId);
       if (addon) {
         toast({
-          title: `Addon ${newEnabled ? 'enabled' : 'disabled'}`,
-          description: `${addon.metadata.name} has been ${newEnabled ? 'enabled' : 'disabled'}.`,
+          title: `Addon ${newEnabled ? "enabled" : "disabled"}`,
+          description: `${addon.metadata.name} has been ${newEnabled ? "enabled" : "disabled"}.`,
         });
       }
 
       // Reload all addons to apply the changes immediately
       await reloadAllAddons();
     } catch (error) {
-      console.error('Error toggling addon:', error);
+      console.error("Error toggling addon:", error);
       toast({
-        title: 'Error toggling addon',
-        description: error instanceof Error ? error.message : 'Failed to toggle addon',
-        variant: 'destructive',
+        title: "Error toggling addon",
+        description: error instanceof Error ? error.message : "Failed to toggle addon",
+        variant: "destructive",
       });
     } finally {
       setTogglingAddonId(null);
@@ -247,27 +291,27 @@ export function useAddonActions() {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
 
       toast({
-        title: 'Addon uninstalled',
+        title: "Addon uninstalled",
         description: `${addon.metadata.name} has been completely removed.`,
       });
 
       // Reload all addons to remove the uninstalled addon from runtime
       await reloadAllAddons();
     } catch (error) {
-      console.error('Error uninstalling addon:', error);
+      console.error("Error uninstalling addon:", error);
       toast({
-        title: 'Error uninstalling addon',
-        description: error instanceof Error ? error.message : 'Failed to uninstall addon',
-        variant: 'destructive',
+        title: "Error uninstalling addon",
+        description: error instanceof Error ? error.message : "Failed to uninstall addon",
+        variant: "destructive",
       });
     }
   };
 
-  const handleViewPermissions = async (addon: InstalledAddon) => {
+  const handleViewPermissions = (addon: InstalledAddon) => {
     try {
       // Use the stored permissions from the addon metadata
       const storedPermissions = addon.metadata.permissions || [];
-      
+
       // Calculate risk level based on stored permissions
       const riskLevel = calculateRiskLevel(storedPermissions);
 
@@ -278,11 +322,11 @@ export function useAddonActions() {
         riskLevel,
       });
     } catch (error) {
-      console.error('Error loading addon permissions:', error);
+      console.error("Error loading addon permissions:", error);
       toast({
-        title: 'Error loading permissions',
-        description: 'Could not load addon permissions.',
-        variant: 'destructive',
+        title: "Error loading permissions",
+        description: "Could not load addon permissions.",
+        variant: "destructive",
       });
     }
   };
@@ -295,7 +339,7 @@ export function useAddonActions() {
     togglingAddonId,
     permissionDialog,
     viewPermissionDialog,
-    
+
     // Actions
     loadInstalledAddons,
     handleLoadAddon,
@@ -304,7 +348,7 @@ export function useAddonActions() {
     handleToggleAddon,
     handleUninstallAddon,
     handleViewPermissions,
-    
+
     // Dialog setters
     setPermissionDialog,
     setViewPermissionDialog,

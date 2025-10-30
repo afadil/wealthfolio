@@ -1,11 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { Account } from '@/lib/types';
-import { getAccounts } from '@/commands/account';
-import { QueryKeys } from '@/lib/query-keys';
+import { useQuery } from "@tanstack/react-query";
+import { Account } from "@/lib/types";
+import { getAccounts } from "@/commands/account";
+import { QueryKeys } from "@/lib/query-keys";
 
-
-export function useAccounts(filterActive: boolean = true) {
-  const { data: fetchedAccounts = [], isLoading, isError, error } = useQuery<Account[], Error>({
+export function useAccounts(filterActive = true) {
+  const {
+    data: fetchedAccounts = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS, filterActive],
     queryFn: getAccounts,
   });

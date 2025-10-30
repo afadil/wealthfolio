@@ -47,8 +47,7 @@ export interface AccountsAPI {
    * @param account New account data
    * @returns Promise resolving to created account
    */
-  create(account: any): Promise<Account>;
-
+  create(account: unknown): Promise<Account>;
 }
 
 /**
@@ -95,7 +94,11 @@ export interface PortfolioAPI {
    * @param endDate Optional end date
    * @returns Promise resolving to array of account valuations
    */
-  getHistoricalValuations(accountId?: string, startDate?: string, endDate?: string): Promise<AccountValuation[]>;
+  getHistoricalValuations(
+    accountId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AccountValuation[]>;
 
   /**
    * Get latest valuations for a set of accounts
@@ -125,7 +128,13 @@ export interface ActivitiesAPI {
    * @param sort Sort criteria
    * @returns Promise resolving to search response
    */
-  search(page: number, pageSize: number, filters: any, searchKeyword: string, sort: any): Promise<ActivitySearchResponse>;
+  search(
+    page: number,
+    pageSize: number,
+    filters: unknown,
+    searchKeyword: string,
+    sort: unknown,
+  ): Promise<ActivitySearchResponse>;
 
   /**
    * Create a new activity
@@ -147,7 +156,6 @@ export interface ActivitiesAPI {
    * @returns Promise resolving to array of saved activities
    */
   saveMany(activities: ActivityUpdate[]): Promise<Activity[]>;
-
 
   /**
    * Import activities from parsed data
@@ -250,7 +258,6 @@ export interface QuotesAPI {
    */
   update(symbol: string, quote: Quote): Promise<void>;
 
-
   /**
    * Get quote history for a symbol
    * @param symbol Asset symbol
@@ -271,18 +278,23 @@ export interface PerformanceAPI {
    * @param endDate End date for calculation
    * @returns Promise resolving to performance metrics
    */
-  calculateHistory(itemType: 'account' | 'symbol', itemId: string, startDate: string, endDate: string): Promise<PerformanceMetrics>;
+  calculateHistory(
+    itemType: 'account' | 'symbol',
+    itemId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<PerformanceMetrics>;
 
   /**
    * Calculate performance summary
    * @param args Performance calculation arguments
    * @returns Promise resolving to performance metrics
    */
-  calculateSummary(args: { 
-    itemType: 'account' | 'symbol'; 
-    itemId: string; 
-    startDate?: string | null; 
-    endDate?: string | null; 
+  calculateSummary(args: {
+    itemType: 'account' | 'symbol';
+    itemId: string;
+    startDate?: string | null;
+    endDate?: string | null;
   }): Promise<PerformanceMetrics>;
 
   /**
@@ -316,7 +328,6 @@ export interface ExchangeRatesAPI {
    * @returns Promise resolving to created exchange rate
    */
   add(newRate: Omit<ExchangeRate, 'id'>): Promise<ExchangeRate>;
-
 }
 
 /**
@@ -344,7 +355,6 @@ export interface ContributionLimitsAPI {
    */
   update(id: string, updatedLimit: NewContributionLimit): Promise<ContributionLimit>;
 
-
   /**
    * Calculate deposits for a specific contribution limit
    * @param limitId Contribution limit identifier
@@ -368,7 +378,7 @@ export interface GoalsAPI {
    * @param goal New goal data
    * @returns Promise resolving to created goal
    */
-  create(goal: any): Promise<Goal>;
+  create(goal: unknown): Promise<Goal>;
 
   /**
    * Update an existing goal
@@ -376,7 +386,6 @@ export interface GoalsAPI {
    * @returns Promise resolving to updated goal
    */
   update(goal: Goal): Promise<Goal>;
-
 
   /**
    * Update goal allocations
@@ -432,7 +441,10 @@ export interface FilesAPI {
    * @param fileName Default file name
    * @returns Promise resolving to save result
    */
-  openSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>;
+  openSaveDialog(
+    fileContent: Uint8Array | Blob | string,
+    fileName: string,
+  ): Promise<unknown>;
 }
 
 /**
@@ -597,7 +609,7 @@ export interface QueryAPI {
    * Get the shared QueryClient instance from the main application
    * @returns The shared QueryClient instance
    */
-  getClient(): any; // QueryClient from @tanstack/react-query
+  getClient(): unknown; // QueryClient from @tanstack/react-query
 
   /**
    * Invalidate queries by key
@@ -619,52 +631,52 @@ export interface QueryAPI {
 export interface HostAPI {
   /** Account management operations */
   accounts: AccountsAPI;
-  
+
   /** Portfolio and holdings operations */
   portfolio: PortfolioAPI;
-  
+
   /** Activity management operations */
   activities: ActivitiesAPI;
-  
+
   /** Market data operations */
   market: MarketDataAPI;
-  
+
   /** Asset management operations */
   assets: AssetsAPI;
-  
+
   /** Quote management operations */
   quotes: QuotesAPI;
-  
+
   /** Performance calculation operations */
   performance: PerformanceAPI;
-  
+
   /** Exchange rates operations */
   exchangeRates: ExchangeRatesAPI;
-  
+
   /** Contribution limits operations */
   contributionLimits: ContributionLimitsAPI;
-  
+
   /** Goals management operations */
   goals: GoalsAPI;
-  
+
   /** Application settings operations */
   settings: SettingsAPI;
-  
+
   /** File operations */
   files: FilesAPI;
-  
+
   /** Secrets management */
   secrets: SecretsAPI;
-  
+
   /** Logger operations */
   logger: LoggerAPI;
-  
+
   /** Event listeners */
   events: EventsAPI;
-  
+
   /** Navigation operations */
   navigation: NavigationAPI;
-  
+
   /** React Query operations */
   query: QueryAPI;
 }

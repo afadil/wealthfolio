@@ -1,6 +1,6 @@
-import { useFormContext } from 'react-hook-form';
+import { useFormContext } from "react-hook-form";
 import {
-  Card, 
+  Card,
   CardContent,
   FormField,
   FormItem,
@@ -9,22 +9,34 @@ import {
   FormMessage,
   MoneyInput,
   QuantityInput,
-} from '@wealthfolio/ui';
-import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from './common';
-import { AccountSelectOption } from '../activity-form';
+} from "@wealthfolio/ui";
+import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
+import { AccountSelectOption } from "../activity-form";
 import {
   ActivityTypeSelector,
   type ActivityType as ActivityTypeUI,
-} from '../activity-type-selector';
-import { CashBalanceWarning } from '../cash-balance-warning';
+} from "../activity-type-selector";
+import { CashBalanceWarning } from "../cash-balance-warning";
 
 export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
-  const isManualAsset = watch('assetDataSource') === 'MANUAL';
+  const isManualAsset = watch("assetDataSource") === "MANUAL";
 
   const tradeTypes: ActivityTypeUI[] = [
-    { value: 'BUY', label: 'Buy', icon: 'ArrowDown', description: 'Purchase an asset. This increases your holding quantity and decreases your cash balance.' },
-    { value: 'SELL', label: 'Sell', icon: 'ArrowUp', description: 'Sell an asset. This decreases your holding quantity and increases your cash balance.' },
+    {
+      value: "BUY",
+      label: "Buy",
+      icon: "ArrowDown",
+      description:
+        "Purchase an asset. This increases your holding quantity and decreases your cash balance.",
+    },
+    {
+      value: "SELL",
+      label: "Sell",
+      icon: "ArrowUp",
+      description:
+        "Sell an asset. This decreases your holding quantity and increases your cash balance.",
+    },
   ];
 
   return (
@@ -89,4 +101,4 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
       </Card>
     </div>
   );
-}; 
+};

@@ -1,6 +1,6 @@
-import * as React from 'react';
-import { cn } from '../../lib/utils';
-import { Input } from '../ui/input';
+import * as React from "react";
+import { cn } from "../../lib/utils";
+import { Input } from "../ui/input";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   currency?: string;
@@ -9,15 +9,15 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, maxDecimalPlaces = 6, value, onChange, ...props }, ref) => {
-    const { placeholder = '0.00' } = props;
+    const { placeholder = "0.00" } = props;
 
     // Ensure value is always a string
-    const controlledValue = value === undefined || value === null ? '' : value.toString();
+    const controlledValue = value === undefined || value === null ? "" : value.toString();
 
     const formatCurrency = (value: string): string => {
       const numericValue = parseFloat(value);
       return isNaN(numericValue)
-        ? ''
+        ? ""
         : numericValue.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: maxDecimalPlaces,
@@ -26,13 +26,12 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const cursorPos = e.target.selectionStart;
-      let rawValue = e.target.value.replace(/[^\d.]/g, '');
+      let rawValue = e.target.value.replace(/[^\d.]/g, "");
 
       // Ensure only one decimal point
-      const decimalIndex = rawValue.indexOf('.');
+      const decimalIndex = rawValue.indexOf(".");
       if (decimalIndex !== -1) {
-        rawValue =
-          rawValue.slice(0, decimalIndex + 1) + rawValue.slice(decimalIndex + 1).replace(/\./g, '');
+        rawValue = rawValue.slice(0, decimalIndex + 1) + rawValue.slice(decimalIndex + 1).replace(/\./g, "");
       }
 
       const formattedValue = formatCurrency(rawValue);
@@ -50,7 +49,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
         const numericValue = parseFloat(rawValue);
         const syntheticEvent = {
           ...e,
-          target: { ...e.target, value: isNaN(numericValue) ? '' : rawValue },
+          target: { ...e.target, value: isNaN(numericValue) ? "" : rawValue },
         };
         onChange(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
       }
@@ -58,7 +57,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <Input
-        className={cn('text-right', className)}
+        className={cn("text-right", className)}
         ref={ref}
         {...props}
         value={controlledValue}
@@ -68,6 +67,6 @@ const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
     );
   },
 );
-MoneyInput.displayName = 'MoneyInput';
+MoneyInput.displayName = "MoneyInput";
 
 export { MoneyInput };
