@@ -1,16 +1,16 @@
-use async_trait::async_trait;
-use reqwest::Client;
-use std::time::SystemTime;
-use crate::market_data::{MarketDataError, Quote as ModelQuote, AssetProfiler, QuoteSummary};
+use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::market_data_provider::MarketDataProvider;
-use chrono::{Utc, NaiveDate};
+use crate::market_data::providers::models::AssetProfile;
+use crate::market_data::{AssetProfiler, MarketDataError, Quote as ModelQuote, QuoteSummary};
+use async_trait::async_trait;
+use chrono::{NaiveDate, Utc};
+use futures;
+use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use crate::market_data::providers::models::AssetProfile;
-use crate::market_data::market_data_model::DataSource;
-use futures;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 const BASE_URL: &str = "https://www.alphavantage.co/query";
 
@@ -25,7 +25,11 @@ impl AlphaVantageProvider {
         AlphaVantageProvider { client, token }
     }
 
-    async fn fetch_data(&self, function: &str, params: Vec<(&str, &str)>) -> Result<String, MarketDataError> {
+    async fn fetch_data(
+        &self,
+        function: &str,
+        params: Vec<(&str, &str)>,
+    ) -> Result<String, MarketDataError> {
         let mut query_params = params;
         query_params.push(("function", function));
         query_params.push(("apikey", &self.token));
@@ -33,17 +37,28 @@ impl AlphaVantageProvider {
         let url = reqwest::Url::parse_with_params(BASE_URL, &query_params)
             .map_err(|e| MarketDataError::ProviderError(format!("Failed to build URL: {}", e)))?;
 
-        let response = self.client.get(url)
+        let response = self
+            .client
+            .get(url)
             .send()
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
-        
+
         if !response.status().is_success() {
-            let error_body = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(MarketDataError::ProviderError(format!("AlphaVantage API error: {}", error_body)));
+            let error_body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(MarketDataError::ProviderError(format!(
+                "AlphaVantage API error: {}",
+                error_body
+            )));
         }
 
-        let text = response.text().await.map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        let text = response
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
         Ok(text)
     }
 }
@@ -78,15 +93,21 @@ impl MarketDataProvider for AlphaVantageProvider {
         3
     }
 
-    async fn get_latest_quote(&self, symbol: &str, fallback_currency: String) -> Result<ModelQuote, MarketDataError> {
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
         let params = vec![("symbol", symbol), ("outputsize", "compact")];
         let response_text = self.fetch_data("TIME_SERIES_DAILY", params).await?;
-        let response_json: TimeSeriesDaily = serde_json::from_str(&response_text)
-            .map_err(|e| MarketDataError::ProviderError(format!("Failed to parse latest quote: {}", e)))?;
+        let response_json: TimeSeriesDaily = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse latest quote: {}", e))
+        })?;
 
-        let (date, quote) = response_json.time_series.iter().next()
-            .ok_or_else(|| MarketDataError::ProviderError("No time series data found".to_string()))?;
-        
+        let (date, quote) = response_json.time_series.iter().next().ok_or_else(|| {
+            MarketDataError::ProviderError("No time series data found".to_string())
+        })?;
+
         let quote_timestamp = NaiveDate::parse_from_str(date, "%Y-%m-%d")
             .map_err(|_| MarketDataError::ProviderError("Invalid date format".to_string()))?
             .and_hms_opt(0, 0, 0)
@@ -111,56 +132,83 @@ impl MarketDataProvider for AlphaVantageProvider {
         Ok(model_quote)
     }
 
-    async fn get_historical_quotes(&self, symbol: &str, _start: SystemTime, _end: SystemTime, fallback_currency: String) -> Result<Vec<ModelQuote>, MarketDataError> {
+    async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        _start: SystemTime,
+        _end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
         let params = vec![("symbol", symbol), ("outputsize", "full")];
         let response_text = self.fetch_data("TIME_SERIES_DAILY", params).await?;
-        let response_json: TimeSeriesDaily = serde_json::from_str(&response_text)
-            .map_err(|e| MarketDataError::ProviderError(format!("Failed to parse historical quotes: {}", e)))?;
+        let response_json: TimeSeriesDaily = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse historical quotes: {}", e))
+        })?;
 
-        let quotes = response_json.time_series.into_iter().map(|(date, quote)| {
-            let quote_timestamp = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-                .unwrap()
-                .and_hms_opt(0, 0, 0)
-                .unwrap()
-                .and_local_timezone(Utc)
-                .unwrap();
+        let quotes = response_json
+            .time_series
+            .into_iter()
+            .map(|(date, quote)| {
+                let quote_timestamp = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Utc)
+                    .unwrap();
 
-            ModelQuote {
-                id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
-                created_at: Utc::now(),
-                data_source: DataSource::AlphaVantage,
-                timestamp: quote_timestamp,
-                symbol: symbol.to_string(),
-                open: quote.open.parse::<Decimal>().unwrap_or_default(),
-                high: quote.high.parse::<Decimal>().unwrap_or_default(),
-                low: quote.low.parse::<Decimal>().unwrap_or_default(),
-                volume: quote.volume.parse::<Decimal>().unwrap_or_default(),
-                close: quote.close.parse::<Decimal>().unwrap_or_default(),
-                adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
-                currency: fallback_currency.clone(),
-            }
-        }).collect();
+                ModelQuote {
+                    id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
+                    created_at: Utc::now(),
+                    data_source: DataSource::AlphaVantage,
+                    timestamp: quote_timestamp,
+                    symbol: symbol.to_string(),
+                    open: quote.open.parse::<Decimal>().unwrap_or_default(),
+                    high: quote.high.parse::<Decimal>().unwrap_or_default(),
+                    low: quote.low.parse::<Decimal>().unwrap_or_default(),
+                    volume: quote.volume.parse::<Decimal>().unwrap_or_default(),
+                    close: quote.close.parse::<Decimal>().unwrap_or_default(),
+                    adjclose: quote.close.parse::<Decimal>().unwrap_or_default(),
+                    currency: fallback_currency.clone(),
+                }
+            })
+            .collect();
 
         Ok(quotes)
     }
 
-    async fn get_historical_quotes_bulk(&self, symbols_with_currencies: &[(String, String)], start: SystemTime, end: SystemTime) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         const BATCH_SIZE: usize = 5; // Alpha Vantage has a low rate limit on the free tier
         let mut all_quotes = Vec::new();
         let mut failed_symbols: Vec<(String, String)> = Vec::new();
         let mut errors_for_logging: Vec<(String, String)> = Vec::new();
 
         for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
-            let futures: Vec<_> = chunk.iter().map(|(symbol, currency)| {
-                let symbol_clone = symbol.clone();
-                let currency_clone = currency.clone();
-                async move {
-                    match self.get_historical_quotes(&symbol_clone, start, end, currency_clone.clone()).await {
-                        Ok(quotes) => Ok(quotes),
-                        Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|(symbol, currency)| {
+                    let symbol_clone = symbol.clone();
+                    let currency_clone = currency.clone();
+                    async move {
+                        match self
+                            .get_historical_quotes(
+                                &symbol_clone,
+                                start,
+                                end,
+                                currency_clone.clone(),
+                            )
+                            .await
+                        {
+                            Ok(quotes) => Ok(quotes),
+                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+                        }
                     }
-                }
-            }).collect();
+                })
+                .collect();
 
             let results = futures::future::join_all(futures).await;
 
@@ -173,7 +221,7 @@ impl MarketDataProvider for AlphaVantageProvider {
                     }
                 }
             }
-            
+
             // Add delay between chunks to respect rate limits
             if chunk.len() == BATCH_SIZE {
                 tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
@@ -181,7 +229,11 @@ impl MarketDataProvider for AlphaVantageProvider {
         }
 
         if !errors_for_logging.is_empty() {
-            log::warn!("Failed to fetch history for {} symbols from AlphaVantage: {:?}", errors_for_logging.len(), errors_for_logging);
+            log::warn!(
+                "Failed to fetch history for {} symbols from AlphaVantage: {:?}",
+                errors_for_logging.len(),
+                errors_for_logging
+            );
         }
 
         Ok((all_quotes, failed_symbols))
@@ -299,9 +351,10 @@ impl AssetProfiler for AlphaVantageProvider {
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
         let params = vec![("symbol", symbol)];
         let response_text = self.fetch_data("OVERVIEW", params).await?;
-        let overview: CompanyOverview = serde_json::from_str(&response_text)
-            .map_err(|e| MarketDataError::ProviderError(format!("Failed to parse asset profile: {}", e)))?;
-        
+        let overview: CompanyOverview = serde_json::from_str(&response_text).map_err(|e| {
+            MarketDataError::ProviderError(format!("Failed to parse asset profile: {}", e))
+        })?;
+
         let profile = AssetProfile {
             id: Some(overview.symbol.clone()),
             name: Some(overview.name),
@@ -320,12 +373,15 @@ impl AssetProfiler for AlphaVantageProvider {
         log::debug!("Searching AlphaVantage for ticker with query: {}", query);
         let params = vec![("keywords", query)];
         let response_text = self.fetch_data("SYMBOL_SEARCH", params).await?;
-        let search_response: SymbolSearchResponse = serde_json::from_str(&response_text)
-            .map_err(|e| MarketDataError::ProviderError(format!("Failed to parse search results: {}", e)))?;
+        let search_response: SymbolSearchResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                MarketDataError::ProviderError(format!("Failed to parse search results: {}", e))
+            })?;
 
-       
-        let summaries = search_response.best_matches.into_iter().map(|m| {
-            QuoteSummary {
+        let summaries = search_response
+            .best_matches
+            .into_iter()
+            .map(|m| QuoteSummary {
                 symbol: m.symbol,
                 long_name: m.name.clone(),
                 short_name: m.name,
@@ -334,9 +390,9 @@ impl AssetProfiler for AlphaVantageProvider {
                 score: m.match_score.parse::<f64>().unwrap_or(0.0),
                 type_display: "".to_string(),
                 index: "".to_string(),
-            }
-        }).collect();
+            })
+            .collect();
 
         Ok(summaries)
     }
-} 
+}

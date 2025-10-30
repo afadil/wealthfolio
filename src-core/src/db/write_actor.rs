@@ -1,7 +1,7 @@
-use tokio::sync::{mpsc, oneshot};
 use crate::db::{DbPool, Result};
-use diesel::SqliteConnection; 
-use std::any::Any; 
+use diesel::SqliteConnection;
+use std::any::Any;
+use tokio::sync::{mpsc, oneshot};
 
 // Type alias for the job to be executed by the writer actor.
 // It takes a mutable reference to a SqliteConnection and returns a Result.
@@ -13,7 +13,10 @@ pub struct WriteHandle {
     // Sender part of the MPSC channel to send jobs.
     // Each job is a boxed closure, and a oneshot sender is used for the reply.
     // The Box<dyn Any + Send> is used for type erasure of the job's return type.
-    tx: mpsc::Sender<(Job<Box<dyn Any + Send + 'static>>, oneshot::Sender<Result<Box<dyn Any + Send + 'static>>>)>,
+    tx: mpsc::Sender<(
+        Job<Box<dyn Any + Send + 'static>>,
+        oneshot::Sender<Result<Box<dyn Any + Send + 'static>>>,
+    )>,
 }
 
 impl WriteHandle {
@@ -49,7 +52,11 @@ impl WriteHandle {
         ret_rx
             .await
             .expect("Writer actor dropped the reply sender without sending a result.")
-            .map(|boxed: Box<dyn Any + Send + 'static>| *boxed.downcast::<T>().unwrap_or_else(|_| panic!("Failed to downcast writer actor result.")))
+            .map(|boxed: Box<dyn Any + Send + 'static>| {
+                *boxed
+                    .downcast::<T>()
+                    .unwrap_or_else(|_| panic!("Failed to downcast writer actor result."))
+            })
     }
 }
 
@@ -79,7 +86,7 @@ pub fn spawn_writer(pool: DbPool) -> WriteHandle {
             // Execute the job within an immediate database transaction.
             // This ensures atomicity for each job.
             let result = conn.immediate_transaction(|c| job(c));
-            
+
             // Send the result back to the requester.
             // Ignore error if the receiver has dropped (e.g., request timed out or was cancelled).
             let _ = reply_tx.send(result);
@@ -92,5 +99,4 @@ pub fn spawn_writer(pool: DbPool) -> WriteHandle {
 }
 
 // Note: DbConnection (PooledConnection) derefs to SqliteConnection.
-// The immediate_transaction method is on SqliteConnection via the Connection trait. 
-
+// The immediate_transaction method is on SqliteConnection via the Connection trait.

@@ -1,20 +1,22 @@
+use crate::constants::DISPLAY_DECIMAL_PRECISION;
 use crate::{
-    activities::{activities_errors::ActivityError, activities_model::IncomeData, activities_traits::ActivityRepositoryTrait}, Error, Result
+    activities::{
+        activities_errors::ActivityError, activities_model::IncomeData,
+        activities_traits::ActivityRepositoryTrait,
+    },
+    Error, Result,
 };
 use chrono::{Datelike, NaiveDate, Utc};
-use crate::constants::DISPLAY_DECIMAL_PRECISION;
 
+use super::IncomeSummary;
+use crate::fx::fx_traits::FxServiceTrait;
 use log::{debug, error};
 use num_traits::Zero;
 use rust_decimal::Decimal;
 use std::sync::{Arc, RwLock};
-use crate::fx::fx_traits::FxServiceTrait;
-use super::IncomeSummary;
 // Define the trait for the income service
 pub trait IncomeServiceTrait: Send + Sync {
-    fn get_income_summary(
-        &self,
-    ) -> Result<Vec<IncomeSummary>>;
+    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>>;
 }
 
 pub struct IncomeService {
@@ -47,9 +49,7 @@ impl IncomeService {
 
 // Implement the trait for IncomeService
 impl IncomeServiceTrait for IncomeService {
-    fn get_income_summary(
-        &self,
-    ) -> Result<Vec<IncomeSummary>> {
+    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>> {
         debug!("Getting income summary...");
 
         let activities = match self.activity_repository.get_income_activities_data() {
@@ -98,7 +98,6 @@ impl IncomeServiceTrait for IncomeService {
         let mut ytd_summary = IncomeSummary::new("YTD", base_currency.clone());
         let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
-
 
         for activity in activities {
             let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")
@@ -151,8 +150,10 @@ impl IncomeServiceTrait for IncomeService {
         two_years_ago_summary.calculate_monthly_average(Some(months_two_years_ago as u32));
 
         // Calculate Year-over-Year Growth using the static helper method
-        let ytd_yoy_growth =
-            IncomeService::calculate_yoy_growth(ytd_summary.total_income, last_year_summary.total_income);
+        let ytd_yoy_growth = IncomeService::calculate_yoy_growth(
+            ytd_summary.total_income,
+            last_year_summary.total_income,
+        );
         let last_year_yoy_growth = IncomeService::calculate_yoy_growth(
             last_year_summary.total_income,
             two_years_ago_summary.total_income,
@@ -176,7 +177,8 @@ impl IncomeServiceTrait for IncomeService {
             .into_iter()
             .map(|mut summary| {
                 summary.total_income = summary.total_income.round_dp(DISPLAY_DECIMAL_PRECISION);
-                summary.monthly_average = summary.monthly_average.round_dp(DISPLAY_DECIMAL_PRECISION);
+                summary.monthly_average =
+                    summary.monthly_average.round_dp(DISPLAY_DECIMAL_PRECISION);
                 if let Some(growth) = summary.yoy_growth {
                     summary.yoy_growth = Some(growth.round_dp(DISPLAY_DECIMAL_PRECISION));
                 }

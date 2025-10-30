@@ -408,7 +408,13 @@ impl FxRepositoryTrait for FxRepository {
         self.delete_exchange_rate(rate_id).await
     }
 
-    async fn create_fx_asset(&self, from_currency: &str, to_currency: &str, source: &str) -> Result<()> {
-        self.create_fx_asset(from_currency, to_currency, source).await
+    async fn create_fx_asset(
+        &self,
+        from_currency: &str,
+        to_currency: &str,
+        source: &str,
+    ) -> Result<()> {
+        self.create_fx_asset(from_currency, to_currency, source)
+            .await
     }
 }

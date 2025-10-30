@@ -1,13 +1,13 @@
+use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use log::debug;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 use crate::db::{get_connection, WriteHandle};
-use crate::schema::assets;
 use crate::errors::Result;
+use crate::schema::assets;
 
 use super::assets_model::{Asset, AssetDB, NewAsset, UpdateAssetProfile};
 use super::assets_traits::AssetRepositoryTrait;
@@ -20,7 +20,10 @@ pub struct AssetRepository {
 
 impl AssetRepository {
     /// Creates a new AssetRepository instance
-    pub fn new(pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+    pub fn new(
+        pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
+        writer: WriteHandle,
+    ) -> Self {
         Self { pool, writer }
     }
 
@@ -78,7 +81,7 @@ impl AssetRepositoryTrait for AssetRepository {
     async fn create(&self, new_asset: NewAsset) -> Result<Asset> {
         new_asset.validate()?;
         let asset_db: AssetDB = new_asset.into();
-       
+
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::insert_into(assets::table)
@@ -114,7 +117,10 @@ impl AssetRepositoryTrait for AssetRepository {
 
     /// Updates the data source of an asset
     async fn update_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
-        debug!("Updating data source for asset {} to {}", asset_id, data_source);
+        debug!(
+            "Updating data source for asset {} to {}",
+            asset_id, data_source
+        );
         let asset_id_owned = asset_id.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
@@ -145,4 +151,4 @@ impl AssetRepositoryTrait for AssetRepository {
     fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
         self.list_by_symbols_impl(symbols)
     }
-} 
+}

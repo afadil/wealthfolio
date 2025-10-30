@@ -1,7 +1,7 @@
 use crate::fx::fx_errors::FxError;
 use crate::fx::fx_model::ExchangeRate;
-use rust_decimal::Decimal;
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 
 /// A calculator for currency conversions, supporting historical rates based on the latest rate per day.
@@ -27,9 +27,11 @@ impl CurrencyConverter {
     /// For each day, only the latest available rate for a given pair is considered.
     fn add_historical_rates(&mut self, rates: Vec<ExchangeRate>) -> Result<(), FxError> {
         // Group rates by date and select the latest timestamp for each pair within that date.
-        let mut latest_rates_by_date: HashMap<NaiveDate, HashMap<(String, String), ExchangeRate>> = HashMap::new();
+        let mut latest_rates_by_date: HashMap<NaiveDate, HashMap<(String, String), ExchangeRate>> =
+            HashMap::new();
 
-        for rate in rates { // No longer mutable, no normalization
+        for rate in rates {
+            // No longer mutable, no normalization
             // Preserve original case
             // let from_currency = rate.from_currency.clone();
             // let to_currency = rate.to_currency.clone();
@@ -40,7 +42,7 @@ impl CurrencyConverter {
             }
 
             let date = rate.timestamp.date_naive(); // Group by NaiveDate
-            // Use original case for the pair key
+                                                    // Use original case for the pair key
             let pair = (rate.from_currency.clone(), rate.to_currency.clone());
 
             let date_map = latest_rates_by_date.entry(date).or_default();
@@ -67,7 +69,7 @@ impl CurrencyConverter {
 
         // Now process the latest rates selected for each date
         for (date, chosen_rates_for_date) in latest_rates_by_date {
-             // The chosen_rates_for_date map now contains only the latest rate per pair for this date.
+            // The chosen_rates_for_date map now contains only the latest rate per pair for this date.
             let mut rate_map: HashMap<(String, String), Decimal> = HashMap::new();
             let mut currencies: HashSet<String> = HashSet::new();
 
@@ -78,13 +80,17 @@ impl CurrencyConverter {
                 currencies.insert(rate.to_currency.clone());
 
                 let forward_rate = rate.rate;
-                 // Check for zero rate before division
+                // Check for zero rate before division
                 if forward_rate.is_zero() {
-                     // Decide how to handle zero rate (e.g., log error, skip inverse)
-                     log::error!("Zero exchange rate encountered for {}/{} on {}. Cannot calculate inverse.",
-                                rate.from_currency, rate.to_currency, date);
-                     // Insert forward rate but skip inverse
-                     rate_map.insert(
+                    // Decide how to handle zero rate (e.g., log error, skip inverse)
+                    log::error!(
+                        "Zero exchange rate encountered for {}/{} on {}. Cannot calculate inverse.",
+                        rate.from_currency,
+                        rate.to_currency,
+                        date
+                    );
+                    // Insert forward rate but skip inverse
+                    rate_map.insert(
                         (rate.from_currency.clone(), rate.to_currency.clone()),
                         forward_rate,
                     );
@@ -108,7 +114,10 @@ impl CurrencyConverter {
                 for j in 0..currencies_vec.len() {
                     if i == j {
                         // Add identity rate
-                        rate_map.insert((currencies_vec[i].clone(), currencies_vec[j].clone()), Decimal::ONE);
+                        rate_map.insert(
+                            (currencies_vec[i].clone(), currencies_vec[j].clone()),
+                            Decimal::ONE,
+                        );
                         continue;
                     }
                     let from = &currencies_vec[i];
@@ -130,9 +139,12 @@ impl CurrencyConverter {
                                 rate_map.insert((from.clone(), to.clone()), transitive_rate);
                                 // Add inverse transitive rate as well
                                 if !transitive_rate.is_zero() {
-                                     rate_map.insert((to.clone(), from.clone()), Decimal::ONE / transitive_rate);
+                                    rate_map.insert(
+                                        (to.clone(), from.clone()),
+                                        Decimal::ONE / transitive_rate,
+                                    );
                                 } else {
-                                     log::warn!("Zero transitive rate calculated for {}->{} via {} on {}. Cannot store inverse.", from, to, via, date);
+                                    log::warn!("Zero transitive rate calculated for {}->{} via {} on {}. Cannot store inverse.", from, to, via, date);
                                 }
                                 // Found *a* path, break inner loop to avoid redundant calculations for this pair?
                                 // Or let it run to potentially find a more direct path later? Current logic allows override.
@@ -142,11 +154,12 @@ impl CurrencyConverter {
                     }
                 }
             }
-             // Add identity rates again just in case they were missed
+            // Add identity rates again just in case they were missed
             for currency in &currencies_vec {
-                rate_map.entry((currency.clone(), currency.clone())).or_insert(Decimal::ONE);
+                rate_map
+                    .entry((currency.clone(), currency.clone()))
+                    .or_insert(Decimal::ONE);
             }
-
 
             self.historical_rates.insert(date, rate_map);
             // Add date in sorted insert (logic remains the same)
@@ -274,7 +287,12 @@ mod tests {
     fn test_exchange_rates() -> Vec<ExchangeRate> {
         // Helper to create DateTime<Utc> from NaiveDate
         let dt = |y, m, d, h, min, s| {
-            Utc.from_utc_datetime(&NaiveDate::from_ymd_opt(y, m, d).unwrap().and_hms_opt(h, min, s).unwrap())
+            Utc.from_utc_datetime(
+                &NaiveDate::from_ymd_opt(y, m, d)
+                    .unwrap()
+                    .and_hms_opt(h, min, s)
+                    .unwrap(),
+            )
         };
 
         vec![
@@ -384,7 +402,10 @@ mod tests {
         let converted_amount = converter
             .convert_amount(amount, "USD", "GBP", date)
             .unwrap();
-        assert_eq!(converted_amount, Decimal::ONE_HUNDRED * Decimal::new(85, 2) * Decimal::new(90, 2));
+        assert_eq!(
+            converted_amount,
+            Decimal::ONE_HUNDRED * Decimal::new(85, 2) * Decimal::new(90, 2)
+        );
     }
 
     #[test]
@@ -438,4 +459,3 @@ mod tests {
         assert_eq!(converted_amount, Decimal::new(87, 0)); // Should use 2023-10-28
     }
 }
-

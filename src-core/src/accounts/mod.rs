@@ -12,4 +12,3 @@ pub use accounts_model::{Account, AccountDB, AccountUpdate, NewAccount};
 pub use accounts_repository::AccountRepository;
 pub use accounts_service::AccountService;
 pub use accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
-

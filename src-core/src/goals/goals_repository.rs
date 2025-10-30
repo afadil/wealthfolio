@@ -5,10 +5,10 @@ use crate::goals::goals_traits::GoalRepositoryTrait;
 use crate::schema::goals;
 use crate::schema::goals::dsl::*;
 use crate::schema::goals_allocation;
+use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
-use async_trait::async_trait;
 
 use std::sync::Arc;
 use uuid::Uuid;
@@ -19,7 +19,10 @@ pub struct GoalRepository {
 }
 
 impl GoalRepository {
-    pub fn new(pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+    pub fn new(
+        pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
+        writer: WriteHandle,
+    ) -> Self {
         GoalRepository { pool, writer }
     }
 

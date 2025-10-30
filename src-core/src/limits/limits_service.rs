@@ -98,7 +98,9 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
         &self,
         new_limit: NewContributionLimit,
     ) -> Result<ContributionLimit> {
-        self.limit_repository.create_contribution_limit(new_limit).await
+        self.limit_repository
+            .create_contribution_limit(new_limit)
+            .await
     }
 
     async fn update_contribution_limit(
@@ -145,13 +147,19 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
         } else {
             let year = limit.contribution_year;
             let start = NaiveDateTime::new(
-                chrono::NaiveDate::from_ymd_opt(year, 1, 1)
-                    .ok_or_else(|| Error::Validation(ValidationError::InvalidInput("Invalid start date".to_string())))?,
+                chrono::NaiveDate::from_ymd_opt(year, 1, 1).ok_or_else(|| {
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Invalid start date".to_string(),
+                    ))
+                })?,
                 chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
             );
             let end = NaiveDateTime::new(
-                chrono::NaiveDate::from_ymd_opt(year, 12, 31)
-                    .ok_or_else(|| Error::Validation(ValidationError::InvalidInput("Invalid start date".to_string())))?,
+                chrono::NaiveDate::from_ymd_opt(year, 12, 31).ok_or_else(|| {
+                    Error::Validation(ValidationError::InvalidInput(
+                        "Invalid start date".to_string(),
+                    ))
+                })?,
                 chrono::NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
             );
             self.calculate_deposits_by_period(&account_ids, start, end, base_currency)

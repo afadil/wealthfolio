@@ -1,8 +1,7 @@
+use crate::activities::activities_model::IncomeData;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::activities::activities_model::IncomeData;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -10,7 +9,7 @@ pub struct IncomeSummary {
     pub period: String,
     pub by_month: HashMap<String, Decimal>,
     pub by_type: HashMap<String, Decimal>,
-    pub by_symbol: HashMap<String, Decimal>,     
+    pub by_symbol: HashMap<String, Decimal>,
     pub by_currency: HashMap<String, Decimal>,
     pub total_income: Decimal,
     pub currency: String,
@@ -34,13 +33,22 @@ impl IncomeSummary {
     }
 
     pub fn add_income(&mut self, data: &IncomeData, converted_amount: Decimal) {
-        *self.by_month.entry(data.date.to_string()).or_insert_with(|| Decimal::ZERO) += &converted_amount;
-        *self.by_type.entry(data.income_type.clone()).or_insert_with(|| Decimal::ZERO) += &converted_amount;
+        *self
+            .by_month
+            .entry(data.date.to_string())
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
+        *self
+            .by_type
+            .entry(data.income_type.clone())
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_symbol
             .entry(format!("[{}]-{}", data.symbol, data.symbol_name))
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
-        *self.by_currency.entry(data.currency.clone()).or_insert_with(|| Decimal::ZERO) += &data.amount;
+        *self
+            .by_currency
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &data.amount;
         self.total_income += &converted_amount;
     }
 
@@ -51,5 +59,3 @@ impl IncomeSummary {
         }
     }
 }
-
-

@@ -3,11 +3,10 @@ use std::sync::Arc;
 
 use crate::market_data::market_data_traits::MarketDataServiceTrait;
 
-use crate::errors::{Error, Result, DatabaseError};
-use diesel::result::Error as DieselError;
 use super::assets_model::{Asset, NewAsset, UpdateAssetProfile};
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
-
+use crate::errors::{DatabaseError, Error, Result};
+use diesel::result::Error as DieselError;
 
 /// Service for managing assets
 pub struct AssetService {
@@ -42,8 +41,14 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Updates an asset profile
-    async fn update_asset_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset> {
-        self.asset_repository.update_profile(asset_id, payload).await
+    async fn update_asset_profile(
+        &self,
+        asset_id: &str,
+        payload: UpdateAssetProfile,
+    ) -> Result<Asset> {
+        self.asset_repository
+            .update_profile(asset_id, payload)
+            .await
     }
 
     /// Lists currency assets for a given base currency
@@ -58,7 +63,11 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Retrieves or creates an asset by its ID
-    async fn get_or_create_asset(&self, asset_id: &str, context_currency: Option<String>) -> Result<Asset> {
+    async fn get_or_create_asset(
+        &self,
+        asset_id: &str,
+        context_currency: Option<String>,
+    ) -> Result<Asset> {
         match self.asset_repository.get_by_id(asset_id) {
             Ok(existing_asset) => Ok(existing_asset),
             Err(Error::Database(DatabaseError::QueryFailed(DieselError::NotFound))) => {
@@ -66,10 +75,8 @@ impl AssetServiceTrait for AssetService {
                     "Asset not found locally, attempting to fetch from market data: {}",
                     asset_id
                 );
-                let asset_profile_from_provider = self
-                    .market_data_service
-                    .get_asset_profile(asset_id)
-                    .await?;
+                let asset_profile_from_provider =
+                    self.market_data_service.get_asset_profile(asset_id).await?;
 
                 let mut new_asset: NewAsset = asset_profile_from_provider.into();
 
@@ -95,10 +102,12 @@ impl AssetServiceTrait for AssetService {
 
     /// Updates the data source for an asset
     async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset> {
-        self.asset_repository.update_data_source(asset_id, data_source).await
+        self.asset_repository
+            .update_data_source(asset_id, data_source)
+            .await
     }
 
     async fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>> {
         self.asset_repository.list_by_symbols(symbols)
     }
-} 
+}

@@ -1,13 +1,13 @@
-use async_trait::async_trait;
-use reqwest::Client;
-use std::time::SystemTime;
-use crate::market_data::{MarketDataError, Quote as ModelQuote};
+use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::market_data_provider::MarketDataProvider;
-use chrono::{DateTime, Utc, TimeZone};
+use crate::market_data::{MarketDataError, Quote as ModelQuote};
+use async_trait::async_trait;
+use chrono::{DateTime, TimeZone, Utc};
+use futures;
+use reqwest::Client;
 use rust_decimal::Decimal;
 use serde_json;
-use crate::market_data::market_data_model::DataSource;
-use futures;
+use std::time::SystemTime;
 
 const BASE_URL: &str = "https://api.marketdata.app/v1";
 
@@ -23,12 +23,17 @@ impl MarketDataAppProvider {
     }
 
     async fn fetch_data(&self, url: &str) -> Result<String, MarketDataError> {
-        let response = self.client.get(url)
+        let response = self
+            .client
+            .get(url)
             .header("Authorization", format!("Bearer {}", self.token))
             .send()
             .await
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
-        let text = response.text().await.map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        let text = response
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
         Ok(text)
     }
 }
@@ -43,15 +48,29 @@ impl MarketDataProvider for MarketDataAppProvider {
         2
     }
 
-    async fn get_latest_quote(&self, symbol: &str, fallback_currency: String) -> Result<ModelQuote, MarketDataError> {
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError> {
         let url = format!("{}/stocks/prices/{}/", BASE_URL, symbol);
         let response_text = self.fetch_data(&url).await?;
-        let response_json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
 
         if response_json["s"] == "ok" {
-            let mid_price = response_json["mid"].as_array().and_then(|arr| arr.get(0)).and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let timestamp = response_json["updated"].as_array().and_then(|arr| arr.get(0)).and_then(|v| v.as_i64()).unwrap_or(0);
-            let quote_timestamp: DateTime<Utc> = Utc.timestamp_opt(timestamp, 0).single().unwrap_or_default();
+            let mid_price = response_json["mid"]
+                .as_array()
+                .and_then(|arr| arr.get(0))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let timestamp = response_json["updated"]
+                .as_array()
+                .and_then(|arr| arr.get(0))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let quote_timestamp: DateTime<Utc> =
+                Utc.timestamp_opt(timestamp, 0).single().unwrap_or_default();
 
             let model_quote = ModelQuote {
                 id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
@@ -73,7 +92,13 @@ impl MarketDataProvider for MarketDataAppProvider {
         }
     }
 
-    async fn get_historical_quotes(&self, symbol: &str, start: SystemTime, end: SystemTime, fallback_currency: String) -> Result<Vec<ModelQuote>, MarketDataError> {
+    async fn get_historical_quotes(
+        &self,
+        symbol: &str,
+        start: SystemTime,
+        end: SystemTime,
+        fallback_currency: String,
+    ) -> Result<Vec<ModelQuote>, MarketDataError> {
         let start_date = DateTime::<Utc>::from(start).format("%Y-%m-%d").to_string();
         let end_date = DateTime::<Utc>::from(end).format("%Y-%m-%d").to_string();
         let url = format!(
@@ -85,10 +110,13 @@ impl MarketDataProvider for MarketDataAppProvider {
         );
 
         let response_text = self.fetch_data(&url).await?;
-        let response_json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
+        let response_json: serde_json::Value = serde_json::from_str(&response_text)
+            .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
 
         if response_json["s"] == "ok" {
-            let quotes = response_json["c"].as_array().unwrap_or(&vec![])
+            let quotes = response_json["c"]
+                .as_array()
+                .unwrap_or(&vec![])
                 .iter()
                 .enumerate()
                 .map(|(i, close)| {
@@ -97,7 +125,8 @@ impl MarketDataProvider for MarketDataAppProvider {
                     let low = response_json["l"][i].as_f64().unwrap_or(0.0);
                     let volume = response_json["v"][i].as_f64().unwrap_or(0.0);
                     let timestamp = response_json["t"][i].as_i64().unwrap_or(0);
-                    let quote_timestamp: DateTime<Utc> = Utc.timestamp_opt(timestamp, 0).single().unwrap_or_default();
+                    let quote_timestamp: DateTime<Utc> =
+                        Utc.timestamp_opt(timestamp, 0).single().unwrap_or_default();
 
                     ModelQuote {
                         id: format!("{}_{}", quote_timestamp.format("%Y%m%d"), symbol),
@@ -109,8 +138,10 @@ impl MarketDataProvider for MarketDataAppProvider {
                         high: Decimal::from_f64_retain(high).unwrap_or_default(),
                         low: Decimal::from_f64_retain(low).unwrap_or_default(),
                         volume: Decimal::from_f64_retain(volume).unwrap_or_default(),
-                        close: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0)).unwrap_or_default(),
-                        adjclose: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0)).unwrap_or_default(),
+                        close: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0))
+                            .unwrap_or_default(),
+                        adjclose: Decimal::from_f64_retain(close.as_f64().unwrap_or(0.0))
+                            .unwrap_or_default(),
                         currency: fallback_currency.clone(),
                     }
                 })
@@ -121,23 +152,39 @@ impl MarketDataProvider for MarketDataAppProvider {
         }
     }
 
-    async fn get_historical_quotes_bulk(&self, symbols_with_currencies: &[(String, String)], start: SystemTime, end: SystemTime) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
+    async fn get_historical_quotes_bulk(
+        &self,
+        symbols_with_currencies: &[(String, String)],
+        start: SystemTime,
+        end: SystemTime,
+    ) -> Result<(Vec<ModelQuote>, Vec<(String, String)>), MarketDataError> {
         const BATCH_SIZE: usize = 10;
         let mut all_quotes = Vec::new();
         let mut failed_symbols: Vec<(String, String)> = Vec::new();
         let mut errors_for_logging: Vec<(String, String)> = Vec::new();
 
         for chunk in symbols_with_currencies.chunks(BATCH_SIZE) {
-            let futures: Vec<_> = chunk.iter().map(|(symbol, currency)| {
-                let symbol_clone = symbol.clone();
-                let currency_clone = currency.clone();
-                async move {
-                    match self.get_historical_quotes(&symbol_clone, start, end, currency_clone.clone()).await {
-                        Ok(quotes) => Ok(quotes),
-                        Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|(symbol, currency)| {
+                    let symbol_clone = symbol.clone();
+                    let currency_clone = currency.clone();
+                    async move {
+                        match self
+                            .get_historical_quotes(
+                                &symbol_clone,
+                                start,
+                                end,
+                                currency_clone.clone(),
+                            )
+                            .await
+                        {
+                            Ok(quotes) => Ok(quotes),
+                            Err(e) => Err((symbol_clone, currency_clone, e.to_string())),
+                        }
                     }
-                }
-            }).collect();
+                })
+                .collect();
 
             let results = futures::future::join_all(futures).await;
 
@@ -153,7 +200,11 @@ impl MarketDataProvider for MarketDataAppProvider {
         }
 
         if !errors_for_logging.is_empty() {
-            log::warn!("Failed to fetch history for {} symbols: {:?}", errors_for_logging.len(), errors_for_logging);
+            log::warn!(
+                "Failed to fetch history for {} symbols: {:?}",
+                errors_for_logging.len(),
+                errors_for_logging
+            );
         }
 
         Ok((all_quotes, failed_symbols))
