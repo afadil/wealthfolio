@@ -1,33 +1,27 @@
-import * as React from 'react';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarDate, CalendarDateTime, getLocalTimeZone, parseDate, parseDateTime } from "@internationalized/date";
+import { CalendarIcon } from "lucide-react";
+import * as React from "react";
 import {
   Button,
-  DatePicker as RacDatePicker,
-  DatePickerProps as RacDatePickerProps,
   DateValue,
   Dialog,
   Group,
   Popover,
-} from 'react-aria-components';
-import {
-  parseDate,
-  parseDateTime,
-  CalendarDate,
-  CalendarDateTime,
-  getLocalTimeZone,
-} from '@internationalized/date';
+  DatePicker as RacDatePicker,
+  DatePickerProps as RacDatePickerProps,
+} from "react-aria-components";
 
-import { Calendar } from '@/components/ui/calendar-rac';
-import { DateInput } from '@/components/ui/datefield-rac';
-import { cn } from '@/lib/utils';
+import { Calendar } from "@/components/ui/calendar-rac";
+import { DateInput } from "@/components/ui/datefield-rac";
+import { cn } from "@/lib/utils";
 
 function toDateValue(
   value: Date | string | undefined,
-  granularity: 'day' | 'hour' | 'minute' | 'second',
+  granularity: "day" | "hour" | "minute" | "second",
 ): DateValue | null {
   if (!value) return null;
 
-  const hasTimeGranularity = granularity !== 'day';
+  const hasTimeGranularity = granularity !== "day";
 
   if (value instanceof Date) {
     if (hasTimeGranularity) {
@@ -45,12 +39,12 @@ function toDateValue(
     }
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     try {
       if (hasTimeGranularity) {
         try {
           return parseDateTime(value);
-        } catch (e) {
+        } catch (_e) {
           const datePart = parseDate(value);
           return new CalendarDateTime(datePart.year, datePart.month, datePart.day, 0, 0, 0, 0);
         }
@@ -58,11 +52,7 @@ function toDateValue(
         return parseDate(value);
       }
     } catch (error) {
-      console.error(
-        `Invalid date string format for granularity "${granularity}":`,
-        value,
-        error,
-      );
+      console.error(`Invalid date string format for granularity "${granularity}":`, value, error);
       return null;
     }
   }
@@ -77,16 +67,13 @@ function fromDateValue(value: DateValue | null): Date | undefined {
 }
 
 interface DatePickerInputProps
-  extends Omit<
-    RacDatePickerProps<DateValue>,
-    'value' | 'onChange' | 'children' | 'className' | 'granularity'
-  > {
+  extends Omit<RacDatePickerProps<DateValue>, "value" | "onChange" | "children" | "className" | "granularity"> {
   onChange: (date: Date | undefined) => void;
   value?: string | Date;
   disabled?: boolean;
   className?: string;
   enableTime?: boolean;
-  timeGranularity?: 'hour' | 'minute' | 'second';
+  timeGranularity?: "hour" | "minute" | "second";
   onInteractionEnd?: () => void;
 }
 
@@ -102,15 +89,12 @@ export function DatePickerInput({
 }: DatePickerInputProps) {
   const actualGranularity = React.useMemo(() => {
     if (enableTime) {
-      return timeGranularity || 'minute';
+      return timeGranularity || "minute";
     }
-    return 'day';
+    return "day";
   }, [enableTime, timeGranularity]);
 
-  const racValue = React.useMemo(
-    () => toDateValue(value, actualGranularity),
-    [value, actualGranularity],
-  );
+  const racValue = React.useMemo(() => toDateValue(value, actualGranularity), [value, actualGranularity]);
 
   const handleRacChange = React.useCallback(
     (newValue: DateValue | null) => {
@@ -125,23 +109,26 @@ export function DatePickerInput({
       onChange={handleRacChange}
       isDisabled={disabled}
       granularity={actualGranularity}
-      aria-label='Date'
+      aria-label="Date"
       className={cn(`*:not-first:mt-2`, className)}
       {...props}
     >
       <Group
         className={cn(
-          "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
-          "focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+          "dark:bg-input/30 border-input ring-offset-background flex h-11 w-full items-center rounded-md border bg-transparent px-3 py-1 text-sm",
+          "focus-within:ring-ring focus-within:ring-2 focus-within:ring-offset-2 focus-within:outline-none",
           disabled && "cursor-not-allowed opacity-50",
-         )}
+        )}
       >
-        <DateInput className="flex-1 bg-transparent p-0 outline-none ring-0 placeholder:text-muted-foreground border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0" />
+        <DateInput
+          unstyled
+          className="flex-1 border-none bg-transparent ring-0 outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+        />
         <Button
           className={cn(
-            "text-muted-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "text-muted-foreground/80 hover:text-foreground focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
             "flex h-6 w-6 items-center justify-center rounded-sm transition-[color]",
-            disabled && "pointer-events-none"
+            disabled && "pointer-events-none",
           )}
           aria-label="Pick a date"
         >
@@ -149,7 +136,7 @@ export function DatePickerInput({
         </Button>
       </Group>
       <Popover
-        className="bg-background text-popover-foreground data-[entering]:animate-in data-[exiting]:animate-out data-[entering]:fade-in-0 data-[exiting]:fade-out-0 data-[entering]:zoom-in-95 data-[exiting]:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 z-50 rounded-lg border shadow-lg outline-hidden"
+        className="bg-background text-popover-foreground data-entering:animate-in data-exiting:animate-out data-entering:fade-in-0 data-exiting:fade-out-0 data-entering:zoom-in-95 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 z-50 rounded-lg border shadow-lg outline-hidden"
         offset={4}
         onOpenChange={(isOpen: boolean) => {
           if (!isOpen && onInteractionEnd) {
@@ -157,10 +144,7 @@ export function DatePickerInput({
           }
         }}
       >
-        <Dialog 
-          className="max-h-[inherit] overflow-auto p-2 outline-none" 
-          style={{ pointerEvents: 'auto' }}
-        >
+        <Dialog className="max-h-[inherit] overflow-auto p-2 outline-none" style={{ pointerEvents: "auto" }}>
           <Calendar />
         </Dialog>
       </Popover>

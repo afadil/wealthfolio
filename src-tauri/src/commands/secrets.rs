@@ -1,6 +1,6 @@
+use crate::context::ServiceContext;
 use std::sync::Arc;
 use tauri::State;
-use crate::context::ServiceContext;
 use wealthfolio_core::secrets::SecretManager;
 
 #[tauri::command]

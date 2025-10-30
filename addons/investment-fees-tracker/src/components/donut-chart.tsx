@@ -1,17 +1,17 @@
-import type React from 'react';
-import { PieChart, Pie, Cell, Sector } from 'recharts';
-import { useBalancePrivacy } from '@wealthfolio/ui';
+import type React from "react";
+import { PieChart, Pie, Cell, Sector } from "recharts";
+import { useBalancePrivacy } from "@wealthfolio/ui";
 
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-6))',
-  'hsl(var(--chart-7))',
-  'hsl(var(--chart-8))',
-  'hsl(var(--chart-9))',
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
 ];
 
 const renderActiveShape = (props: any) => {
@@ -20,11 +20,16 @@ const renderActiveShape = (props: any) => {
     props;
 
   const amountToDisplay = isBalanceHidden
-    ? '••••••'
-    : value.toLocaleString('en-US', { style: 'currency', currency: payload.currency || 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    ? "••••••"
+    : value.toLocaleString("en-US", {
+        style: "currency",
+        currency: payload.currency || "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       {/* Main sector */}
       <Sector
         cx={cx}
@@ -53,7 +58,7 @@ const renderActiveShape = (props: any) => {
       <text
         x={cx}
         y={cy - 35}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs font-medium"
@@ -65,17 +70,17 @@ const renderActiveShape = (props: any) => {
         x={cx}
         y={cy - 20}
         textAnchor="middle"
-        fill="hsl(var(--foreground))"
+        fill="var(--foreground)"
         dominantBaseline="central"
-        className="text-xs font-bold "
+        className="text-xs font-bold"
       >
-        {isBalanceHidden ? '••••••' : amountToDisplay}
+        {isBalanceHidden ? "••••••" : amountToDisplay}
       </text>
 
       <text
         x={cx}
         y={cy - 5}
-        fill="hsl(var(--muted-foreground))"
+        fill="var(--muted-foreground)"
         textAnchor="middle"
         dominantBaseline="central"
         className="text-xs"
@@ -90,7 +95,7 @@ const renderInactiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
 
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g style={{ cursor: "pointer" }}>
       <Sector
         cx={cx}
         cy={cy}

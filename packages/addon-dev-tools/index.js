@@ -1,3 +1,3 @@
 module.exports = {
-  AddonDevServer: require('./dev-server').AddonDevServer
+  AddonDevServer: require("./dev-server").AddonDevServer,
 };

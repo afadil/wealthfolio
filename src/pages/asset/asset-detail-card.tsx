@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { formatPercent } from '@wealthfolio/ui';
-import { AmountDisplay } from '@wealthfolio/ui';
-import { QuantityDisplay } from '@wealthfolio/ui';
-import { useBalancePrivacy } from '@/context/privacy-context';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { formatPercent } from "@wealthfolio/ui";
+import { AmountDisplay } from "@wealthfolio/ui";
+import { QuantityDisplay } from "@wealthfolio/ui";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 
 interface AssetDetail {
   numShares: number;
@@ -53,14 +53,14 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
 
   const holdingRows = [
     {
-      label: 'Book value',
+      label: "Book value",
       value: <AmountDisplay value={costBasis} currency={currency} isHidden={isBalanceHidden} />,
     },
     {
-      label: 'Average cost',
+      label: "Average cost",
       value: <AmountDisplay value={averagePrice} currency={currency} isHidden={isBalanceHidden} />,
     },
-    { label: '% of my portfolio', value: formatPercent(portfolioPercent) },
+    { label: "% of my portfolio", value: formatPercent(portfolioPercent) },
     ...(todaysReturn !== null && todaysReturnPercent !== null
       ? [
           {
@@ -71,27 +71,23 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   value={todaysReturn * numShares}
                   currency={currency}
                   isHidden={isBalanceHidden}
-                />{' '}
+                />{" "}
                 ({formatPercent(todaysReturnPercent)})
               </>
             ),
-            color: todaysReturn < 0 ? 'text-destructive' : 'text-success',
+            color: todaysReturn < 0 ? "text-destructive" : "text-success",
           },
         ]
       : []),
     {
-      label: 'Total return',
+      label: "Total return",
       value: (
-              <>
-                <AmountDisplay
-                  value={totalReturn}
-                  currency={currency}
-                  isHidden={isBalanceHidden}
-                />{' '}
-                ({formatPercent(totalReturnPercent)})
-              </>
-            ),
-      color: totalReturn < 0 ? 'text-destructive' : 'text-success',
+        <>
+          <AmountDisplay value={totalReturn} currency={currency} isHidden={isBalanceHidden} /> (
+          {formatPercent(totalReturnPercent)})
+        </>
+      ),
+      color: totalReturn < 0 ? "text-destructive" : "text-success",
     },
   ];
 
@@ -103,13 +99,13 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div>
               <QuantityDisplay value={numShares} isHidden={isBalanceHidden} />
             </div>
-            <div className="text-sm font-normal text-muted-foreground">shares</div>
+            <div className="text-muted-foreground text-sm font-normal">shares</div>
           </div>
           <div>
             <div className="text-xl font-extrabold">
               <AmountDisplay value={marketValue} currency={currency} isHidden={isBalanceHidden} />
             </div>
-            <div className="text-right text-sm font-normal text-muted-foreground">{currency}</div>
+            <div className="text-muted-foreground text-right text-sm font-normal">{currency}</div>
           </div>
         </CardTitle>
       </CardHeader>
@@ -120,7 +116,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
           {holdingRows.map(({ label, value, color }, idx) => (
             <div key={idx} className="flex justify-between">
               <span className="text-muted-foreground">{label}</span>
-              <span className={`font-medium ${color || ''}`}>{value}</span>
+              <span className={`font-medium ${color || ""}`}>{value}</span>
             </div>
           ))}
         </div>
@@ -131,7 +127,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">Open</span>
+                  <span className="text-muted-foreground text-xs">Open</span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.open}
@@ -141,7 +137,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-xs text-muted-foreground">Close</span>
+                  <span className="text-muted-foreground text-xs">Close</span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.close}
@@ -151,8 +147,8 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">High</span>
-                  <div className="text-sm font-medium text-success">
+                  <span className="text-muted-foreground text-xs">High</span>
+                  <div className="text-success text-sm font-medium">
                     <AmountDisplay
                       value={quote.high}
                       currency={currency}
@@ -161,8 +157,8 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-xs text-muted-foreground">Low</span>
-                  <div className="text-sm font-medium text-destructive">
+                  <span className="text-muted-foreground text-xs">Low</span>
+                  <div className="text-destructive text-sm font-medium">
                     <AmountDisplay
                       value={quote.low}
                       currency={currency}
@@ -171,7 +167,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">Adj Close</span>
+                  <span className="text-muted-foreground text-xs">Adj Close</span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.adjclose}
@@ -181,7 +177,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-xs text-muted-foreground">Volume</span>
+                  <span className="text-muted-foreground text-xs">Volume</span>
                   <span className="text-sm font-medium">
                     {new Intl.NumberFormat().format(quote.volume)}
                   </span>

@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -8,18 +8,25 @@ import {
   SelectValue,
   Badge,
   SearchableSelect,
-} from '@wealthfolio/ui';
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, ImportRequiredField, Account } from '@/lib/types';
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from '@/lib/types';
-import TickerSearchInput from '@/components/ticker-search';
-import { useState } from 'react';
-import { cn } from '@/lib/utils';
-import { IMPORT_REQUIRED_FIELDS } from '@/lib/constants';
-import { AccountSelector } from '@/components/account-selector';
+} from "@wealthfolio/ui";
+import {
+  ImportFormat,
+  ActivityType,
+  ImportMappingData,
+  CsvRowData,
+  ImportRequiredField,
+  Account,
+} from "@/lib/types";
+import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
+import TickerSearchInput from "@/components/ticker-search";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
+import { AccountSelector } from "@/components/account-selector";
 
-const SKIP_FIELD_VALUE = '__skip__';
+const SKIP_FIELD_VALUE = "__skip__";
 
-export function renderHeaderCell({
+export function MappingHeaderCell({
   field,
   mapping,
   headers,
@@ -32,45 +39,48 @@ export function renderHeaderCell({
 }) {
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
   const mappedHeader = mapping.fieldMappings[field];
-  const isMapped = typeof mappedHeader === 'string' && headers.includes(mappedHeader);
+  const isMapped = typeof mappedHeader === "string" && headers.includes(mappedHeader);
   const isEditing = editingHeader === field || !isMapped;
   const isRequired = IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField);
 
   return (
     <div>
-      <div className="flex items-center gap-2 pb-0 pt-2">
+      <div className="flex items-center gap-2 pt-2 pb-0">
         <span className="font-bold">
           {field}
-          {isRequired && !isMapped && <span className="text-amber-600 dark:text-amber-400 ml-1">*</span>}
+          {isRequired && !isMapped && (
+            <span className="ml-1 text-amber-600 dark:text-amber-400">*</span>
+          )}
         </span>
       </div>
       {isEditing ? (
         <Select
           onValueChange={(val) => {
-            handleColumnMapping(field, val === SKIP_FIELD_VALUE ? '' : val);
+            handleColumnMapping(field, val === SKIP_FIELD_VALUE ? "" : val);
             setEditingHeader(null);
           }}
           value={mappedHeader || SKIP_FIELD_VALUE}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
-          <SelectTrigger className="h-8 w-full py-2 font-normal text-muted-foreground">
-            <SelectValue placeholder={isRequired ? 'Select column' : 'Optional'} />
+          <SelectTrigger className="text-muted-foreground h-8 w-full py-2 font-normal">
+            <SelectValue placeholder={isRequired ? "Select column" : "Optional"} />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
             {!isRequired && (
               <>
                 <SelectItem value={SKIP_FIELD_VALUE}>
-                  {field === ImportFormat.CURRENCY ? 'Account Currency' : (
-                    field === ImportFormat.ACCOUNT ? 'Default Account' :'Ignore'
-                    ) 
-                    }
+                  {field === ImportFormat.CURRENCY
+                    ? "Account Currency"
+                    : field === ImportFormat.ACCOUNT
+                      ? "Default Account"
+                      : "Ignore"}
                 </SelectItem>
                 <SelectSeparator />
               </>
             )}
             {headers.map((header) => (
-              <SelectItem key={header || '-'} value={header || '-'}>
-                {header || '-'}
+              <SelectItem key={header || "-"} value={header || "-"}>
+                {header || "-"}
               </SelectItem>
             ))}
           </SelectContent>
@@ -79,10 +89,10 @@ export function renderHeaderCell({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 py-0 pl-0 font-normal text-muted-foreground"
+          className="text-muted-foreground h-8 py-0 pl-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
-          {mappedHeader || (isRequired ? 'Select column' : 'Ignore')}
+          {mappedHeader || (isRequired ? "Select column" : "Ignore")}
         </Button>
       )}
     </div>
@@ -124,20 +134,20 @@ function ActivityTypeDisplayCell({
 
   if (appType) {
     return (
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full">
-        <div title={trimmedCsvType} className="font-medium truncate max-w-[180px]">
+      <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div title={trimmedCsvType} className="max-w-[180px] truncate font-medium">
           {displayValue}
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="text-muted-foreground">→</span>
-          <Badge variant="secondary" className="transition-colors text-xs">
+          <Badge variant="secondary" className="text-xs transition-colors">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="p-0 h-auto text-xs"
+              className="h-auto p-0 text-xs"
               onClick={() => {
-                handleActivityTypeMapping(trimmedCsvType, '' as ActivityType);
+                handleActivityTypeMapping(trimmedCsvType, "" as ActivityType);
               }}
             >
               {appType}
@@ -178,7 +188,7 @@ function ActivityTypeDisplayCell({
 interface AccountIdDisplayCellProps {
   csvAccountId: string;
   mappedAccountId: string | undefined;
-  isInvalid: boolean,
+  isInvalid: boolean;
   handleAccountIdMapping: (csvAccountId: string, accountId: string) => void;
 }
 
@@ -190,22 +200,22 @@ function AccountIdDisplayCell({
 }: AccountIdDisplayCellProps) {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
-  if (!csvAccountId || csvAccountId.trim() === '') {
+  if (!csvAccountId || csvAccountId.trim() === "") {
     return null;
   }
 
   if (mappedAccountId) {
     return (
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-        <span className="text-muted-foreground truncate max-w-[120px]" title={csvAccountId}>
+      <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+        <span className="text-muted-foreground max-w-[120px] truncate" title={csvAccountId}>
           {csvAccountId}
         </span>
-        <Badge variant="secondary" className="transition-colors text-xs">
+        <Badge variant="secondary" className="text-xs transition-colors">
           <Button
             type="button"
             variant="ghost"
-            className="py-0 p-0 h-auto text-xs"
-            onClick={() => handleAccountIdMapping(csvAccountId, '')}
+            className="h-auto p-0 py-0 text-xs"
+            onClick={() => handleAccountIdMapping(csvAccountId, "")}
           >
             {mappedAccountId}
           </Button>
@@ -215,12 +225,14 @@ function AccountIdDisplayCell({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-      <span className={cn(
-            "truncate max-w-[120px]",
-            isInvalid ? "text-destructive" : "text-muted-foreground"
-          )}
-      title={csvAccountId}>
+    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+      <span
+        className={cn(
+          "max-w-[120px] truncate",
+          isInvalid ? "text-destructive" : "text-muted-foreground",
+        )}
+        title={csvAccountId}
+      >
         {csvAccountId}
       </span>
       <div className="w-full sm:w-auto sm:min-w-[180px]">
@@ -252,30 +264,34 @@ function SymbolDisplayCell({
 }: SymbolDisplayCellProps) {
   // Don't show anything if the symbol is empty/doesn't exist AND it's not invalid
   // We still want to show invalid empty symbols so they can be mapped
-  if ((!csvSymbol || csvSymbol.trim() === '') && !isInvalid) {
+  if ((!csvSymbol || csvSymbol.trim() === "") && !isInvalid) {
     return null;
   }
 
   // Show edit button if symbol is mapped or valid
   if (mappedSymbol || !isInvalid) {
     return (
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+      <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
         <span
           className={cn(
-            "truncate max-w-[120px]",
-            mappedSymbol ? "text-muted-foreground" : (isInvalid ? "text-destructive" : "text-muted-foreground")
+            "max-w-[120px] truncate",
+            mappedSymbol
+              ? "text-muted-foreground"
+              : isInvalid
+                ? "text-destructive"
+                : "text-muted-foreground",
           )}
           title={csvSymbol}
         >
           {csvSymbol || "-"}
         </span>
-        <Badge variant="secondary" className="transition-colors text-xs">
+        <Badge variant="secondary" className="text-xs transition-colors">
           <Button
             type="button"
             variant="ghost"
-            className="py-0 p-0 h-auto text-xs"
+            className="h-auto p-0 py-0 text-xs"
             onClick={() => {
-              handleSymbolMapping(csvSymbol, '');
+              handleSymbolMapping(csvSymbol, "");
             }}
           >
             {mappedSymbol || csvSymbol || "-"}
@@ -287,16 +303,13 @@ function SymbolDisplayCell({
 
   // Show search input only for invalid symbols without mapping
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-      <span
-        className="text-destructive truncate max-w-[120px]"
-        title={csvSymbol || "Empty symbol"}
-      >
+    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+      <span className="text-destructive max-w-[120px] truncate" title={csvSymbol || "Empty symbol"}>
         {csvSymbol || "-"}
       </span>
       <div className="w-full sm:w-auto sm:min-w-[180px]">
         <TickerSearchInput
-          defaultValue={mappedSymbol || ''}
+          defaultValue={mappedSymbol || ""}
           onSelectResult={(newSymbol) => handleSymbolMapping(csvSymbol, newSymbol)}
         />
       </div>
@@ -304,7 +317,7 @@ function SymbolDisplayCell({
   );
 }
 
-export function renderCell({
+export function MappingCell({
   field,
   row,
   mapping,
@@ -314,7 +327,7 @@ export function renderCell({
   handleSymbolMapping,
   handleAccountIdMapping,
   invalidSymbols,
-  invalidAccounts
+  invalidAccounts,
 }: {
   field: ImportFormat;
   row: CsvRowData;
@@ -331,10 +344,10 @@ export function renderCell({
   const value = getMappedValue(row, field);
 
   // Nothing to display if value is empty and not a special field
-  if (!value || value.trim() === '') {
+  if (!value || value.trim() === "") {
     // For symbol field, if it's invalid (e.g. empty but required), we might still want to render SymbolDisplayCell
-    if (field === ImportFormat.SYMBOL && invalidSymbols.includes(value || '')) {
-        // Fall through to SymbolDisplayCell rendering
+    if (field === ImportFormat.SYMBOL && invalidSymbols.includes(value || "")) {
+      // Fall through to SymbolDisplayCell rendering
     } else {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
@@ -353,7 +366,7 @@ export function renderCell({
   }
 
   if (field === ImportFormat.SYMBOL) {
-    const isInvalid = invalidSymbols.includes(value || ''); // handle empty string case for invalidSymbols check
+    const isInvalid = invalidSymbols.includes(value || ""); // handle empty string case for invalidSymbols check
     const mappedSymbol = mapping.symbolMappings[value];
     return (
       <SymbolDisplayCell
@@ -364,9 +377,9 @@ export function renderCell({
       />
     );
   }
-  
+
   if (field === ImportFormat.ACCOUNT) {
-    const isInvalid = invalidAccounts.includes(value || '')
+    const isInvalid = invalidAccounts.includes(value || "");
     const mappedAccountId = mapping.accountMappings?.[value];
     const account = accounts.find((acc) => acc.id === mappedAccountId);
     return (

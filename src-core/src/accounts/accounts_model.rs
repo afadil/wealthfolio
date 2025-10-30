@@ -37,7 +37,7 @@ pub struct NewAccount {
 
 impl NewAccount {
     /// Validates the new account data
-      pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.name.trim().is_empty() {
             return Err(Error::Validation(ValidationError::InvalidInput(
                 "Account name cannot be empty".to_string(),
@@ -74,7 +74,7 @@ impl AccountUpdate {
             )));
         }
         if self.name.trim().is_empty() {
-             return Err(Error::Validation(ValidationError::InvalidInput(
+            return Err(Error::Validation(ValidationError::InvalidInput(
                 "Account name cannot be empty".to_string(),
             )));
         }
@@ -164,4 +164,4 @@ impl From<AccountUpdate> for AccountDB {
             platform_id: domain.platform_id,
         }
     }
-} 
+}

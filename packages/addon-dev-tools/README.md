@@ -11,27 +11,32 @@ npm install -g @wealthfolio/addon-dev-tools
 ## CLI Commands
 
 ### Create New Addon
+
 ```bash
 wealthfolio create my-awesome-addon
 ```
 
 ### Start Development Server
+
 ```bash
 # In your addon directory
 wealthfolio dev
 ```
 
 ### Build Addon
+
 ```bash
 wealthfolio build
 ```
 
 ### Package for Distribution
+
 ```bash
 wealthfolio package
 ```
 
 ### Test Setup
+
 ```bash
 wealthfolio test
 ```
@@ -39,6 +44,7 @@ wealthfolio test
 ## Development Server
 
 The development server provides:
+
 - Hot reload functionality
 - File watching
 - Auto-building
@@ -71,8 +77,9 @@ Add to your addon's `package.json`:
 ## Architecture
 
 This package is separate from `@wealthfolio/addon-sdk` to:
+
 - Keep the SDK lightweight for production
-- Avoid unnecessary dependencies in addon bundles  
+- Avoid unnecessary dependencies in addon bundles
 - Provide optional development tooling
 
 ## License

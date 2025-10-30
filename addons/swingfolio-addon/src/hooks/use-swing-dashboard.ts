@@ -14,7 +14,7 @@ type ChartPeriodType = 'daily' | 'weekly' | 'monthly';
 
 /**
  * Custom hook for managing swing trading dashboard data
- * 
+ *
  * DESIGN PRINCIPLE:
  * - Open positions and their unrealized P/L are ALWAYS shown (current portfolio state)
  * - Period filtering only applies to:
@@ -24,10 +24,7 @@ type ChartPeriodType = 'daily' | 'weekly' | 'monthly';
  * - Total P/L combines: period-filtered realized P/L + ALL unrealized P/L
  * - Chart granularity adapts to period: 1M=daily, 3M=weekly, others=monthly
  */
-export function useSwingDashboard(
-  ctx: AddonContext,
-  period: PeriodType,
-) {
+export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
   const { data: activities } = useSwingActivities(ctx);
   const { preferences } = useSwingPreferences(ctx);
   const { exchangeRates, baseCurrency } = useCurrencyConversion({ ctx });
@@ -47,7 +44,7 @@ export function useSwingDashboard(
   // Get unique account IDs from selected activities for holdings data
   const accountIds = useMemo(() => {
     if (!activities) return [];
-    
+
     return [
       ...new Set(
         activities
@@ -93,19 +90,17 @@ export function useSwingDashboard(
         includeFees: preferences.includeFees,
         includeDividends: preferences.includeDividends,
       });
-      
+
       const { closedTrades, openPositions } = tradeMatcher.matchTrades(selectedActivities);
 
       // Set up currency conversion - use base currency instead of preference to avoid unnecessary conversion
       const reportingCurrency = baseCurrency; // Always use base currency for consistency
       const fxRateMap = createFxRateMap(exchangeRates, reportingCurrency);
-      
-
 
       // Update ALL open positions with current market prices (never filtered by period)
       const updatedOpenPositions = updateOpenPositionsWithMarketPrices(
         openPositions,
-        holdings || []
+        holdings || [],
       );
 
       // Get date range for the selected period (only for historical data)
@@ -113,8 +108,6 @@ export function useSwingDashboard(
 
       // Filter closed trades for the selected period (historical performance)
       const periodClosedTrades = filterTradesByPeriod(closedTrades, startDate, endDate);
-
-
 
       // Calculate metrics with hybrid approach:
       // - Realized P/L: only from period-filtered closed trades
@@ -126,8 +119,6 @@ export function useSwingDashboard(
         reportingCurrency,
         fxRateMap,
       );
-      
-
 
       // For charts and historical analysis, use period-filtered data
       const historicalCalculator = new PerformanceCalculator(periodClosedTrades);
@@ -143,20 +134,15 @@ export function useSwingDashboard(
       const distribution = historicalCalculator.calculateDistribution(fxRateMap);
 
       // Generate calendar data for current year (can be period-filtered)
-      const calendarCalculator = period === 'ALL' 
-        ? new PerformanceCalculator(closedTrades) // All trades for 'ALL' period
-        : historicalCalculator; // Period-filtered for specific periods
-      
-      const calendar = calendarCalculator.calculateCalendar(
-        new Date().getFullYear(), 
-        fxRateMap
-      );
+      const calendarCalculator =
+        period === 'ALL'
+          ? new PerformanceCalculator(closedTrades) // All trades for 'ALL' period
+          : historicalCalculator; // Period-filtered for specific periods
+
+      const calendar = calendarCalculator.calculateCalendar(new Date().getFullYear(), fxRateMap);
 
       // Calculate equity curve for the selected period (historical performance)
-      const equityCurve = historicalCalculator.calculateEquityCurve(
-        reportingCurrency, 
-        fxRateMap
-      );
+      const equityCurve = historicalCalculator.calculateEquityCurve(reportingCurrency, fxRateMap);
 
       return {
         metrics, // Hybrid: period realized P/L + all unrealized P/L
@@ -197,16 +183,16 @@ function filterSelectedActivities(activities: any[], preferences: any) {
  * Create FX rate map for currency conversion
  */
 function createFxRateMap(
-  exchangeRates: any[] | undefined, 
-  reportingCurrency: string
+  exchangeRates: any[] | undefined,
+  reportingCurrency: string,
 ): Record<string, number> {
   const fxRateMap: Record<string, number> = {};
-  
+
   // Set reporting currency rate to 1
   fxRateMap[reportingCurrency] = 1;
-  
+
   // Build conversion rates to reporting currency
-  (exchangeRates || []).forEach(rate => {
+  (exchangeRates || []).forEach((rate) => {
     if (rate.toCurrency === reportingCurrency) {
       // Direct rate: fromCurrency -> reportingCurrency
       fxRateMap[rate.fromCurrency] = rate.rate;
@@ -215,7 +201,7 @@ function createFxRateMap(
       fxRateMap[rate.toCurrency] = rate.rate > 0 ? 1 / rate.rate : 1;
     }
   });
-  
+
   return fxRateMap;
 }
 
@@ -224,20 +210,22 @@ function createFxRateMap(
  */
 function updateOpenPositionsWithMarketPrices(
   openPositions: OpenPosition[],
-  holdings: Holding[]
+  holdings: Holding[],
 ): OpenPosition[] {
   return openPositions.map((position) => {
     // Find matching holding by symbol
     const matchingHolding = findMatchingHolding(position.symbol, holdings);
 
-    if (matchingHolding && matchingHolding.price != null && matchingHolding.price > 0) {
+    if (matchingHolding?.price != null && matchingHolding.price > 0) {
       // Get current price and ensure it's in the same currency as the position
       let currentPrice = matchingHolding.price;
-      
+
       // If holding has different currency than position, we need to convert
-      if (matchingHolding.localCurrency && 
-          matchingHolding.localCurrency !== position.currency &&
-          matchingHolding.fxRate) {
+      if (
+        matchingHolding.localCurrency &&
+        matchingHolding.localCurrency !== position.currency &&
+        matchingHolding.fxRate
+      ) {
         // Convert holding price from local currency to position currency
         if (matchingHolding.baseCurrency === position.currency) {
           // Holding is in local currency, position is in base currency
@@ -248,7 +236,7 @@ function updateOpenPositionsWithMarketPrices(
         }
         // Note: More complex currency conversions would need additional FX rate lookups
       }
-      
+
       const marketValue = currentPrice * position.quantity;
       const costBasis = position.averageCost * position.quantity;
       // Include dividends in unrealized P/L calculation to match TradeMatcher
@@ -273,18 +261,16 @@ function updateOpenPositionsWithMarketPrices(
  */
 function findMatchingHolding(symbol: string, holdings: Holding[]): Holding | undefined {
   // Try exact symbol match first
-  let matchingHolding = holdings.find(
-    (holding) => holding.instrument?.symbol === symbol
-  );
+  let matchingHolding = holdings.find((holding) => holding.instrument?.symbol === symbol);
 
   // If no exact match, try base symbol matching (remove exchange suffixes)
   if (!matchingHolding) {
     const baseSymbol = symbol.split('.')[0];
-    
+
     matchingHolding = holdings.find((holding) => {
       const holdingSymbol = holding.instrument?.symbol;
       if (!holdingSymbol) return false;
-      
+
       const holdingBaseSymbol = holdingSymbol.split('.')[0];
       return holdingBaseSymbol === baseSymbol;
     });
@@ -330,15 +316,15 @@ function getDateRangeForPeriod(period: PeriodType): { startDate: Date; endDate: 
  * Filter closed trades by date range (for historical performance analysis)
  */
 function filterTradesByPeriod(
-  trades: ClosedTrade[], 
-  startDate: Date, 
-  endDate: Date
+  trades: ClosedTrade[],
+  startDate: Date,
+  endDate: Date,
 ): ClosedTrade[] {
   // For 'ALL' period, return all trades
   if (startDate.getFullYear() === 2000) {
     return trades;
   }
-  
+
   // Filter trades by exit date within the period
   return trades.filter((trade) => {
     const exitDate = new Date(trade.exitDate);

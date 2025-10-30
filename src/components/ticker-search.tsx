@@ -1,15 +1,15 @@
-import { useState, forwardRef, useRef, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Command as CommandPrimitive } from 'cmdk';
-import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { searchTicker } from '@/commands/market-data';
-import { cn } from '@/lib/utils';
-import { QuoteSummary } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Icons } from '@/components/ui/icons';
-import { debounce } from 'lodash';
+import { searchTicker } from "@/commands/market-data";
+import { Button } from "@/components/ui/button";
+import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Icons } from "@/components/ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QuoteSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Command as CommandPrimitive } from "cmdk";
+import { debounce } from "lodash";
+import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react";
 
 interface SearchProps {
   selectedResult?: QuoteSummary;
@@ -18,10 +18,59 @@ interface SearchProps {
   placeholder?: string;
   onSelectResult: (symbol: string, isManual?: boolean) => void;
   className?: string;
-  allowFreeText?: boolean;
 }
 
-// Removed unused SearchResults component
+interface SearchResultsProps {
+  results?: QuoteSummary[];
+  query: string;
+  isLoading: boolean;
+  isError?: boolean;
+  selectedResult: SearchProps["selectedResult"];
+  onSelect: (symbol: QuoteSummary) => void;
+}
+
+// Memoize search results component
+const SearchResults = memo(
+  ({ results, isLoading, isError, selectedResult, onSelect }: SearchResultsProps) => {
+    return (
+      <CommandList>
+        {isLoading ? (
+          <CommandPrimitive.Loading>
+            <div className="space-y-2 p-1">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </CommandPrimitive.Loading>
+        ) : null}
+        {!isError && !isLoading && selectedResult && !results?.length && (
+          <div className="p-4 text-sm">No symbols found</div>
+        )}
+        {isError && <div className="text-destructive p-4 text-sm">Something went wrong</div>}
+
+        {results?.map((ticker) => {
+          return (
+            <CommandItem
+              key={ticker.symbol}
+              onSelect={() => onSelect(ticker)}
+              value={ticker.symbol}
+            >
+              <Icons.Check
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
+                )}
+              />
+              {ticker.symbol} - {ticker.longName} ({ticker.exchange})
+            </CommandItem>
+          );
+        })}
+      </CommandList>
+    );
+  },
+);
+
+SearchResults.displayName = "SearchResults";
 
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
@@ -29,7 +78,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       selectedResult,
       defaultValue,
       value,
-      placeholder = 'Select symbol...',
+      placeholder = "Select symbol...",
       onSelectResult,
       className,
       allowFreeText = false,
@@ -37,8 +86,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     ref,
   ) => {
     const [open, setOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState(defaultValue || value || '');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(defaultValue ?? value ?? "");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
     const [selected, setSelected] = useState(() => {
       if (selectedResult) {
         return `${selectedResult.symbol} - ${selectedResult.longName}`;
@@ -49,7 +98,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       if (value) {
         return value;
       }
-      return '';
+      return "";
     });
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,8 +122,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     const handleSelectResult = useCallback(
       (ticker: QuoteSummary) => {
-        onSelectResult(ticker?.symbol, false); // false indicates it's not manual
-        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
+        onSelectResult(ticker?.symbol);
+        const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : "";
         setSearchQuery(displayText);
         setSelected(displayText);
         setOpen(false);
@@ -100,7 +149,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
-      queryKey: ['ticker-search', debouncedQuery],
+      queryKey: ["ticker-search", debouncedQuery],
       queryFn: () => searchTicker(debouncedQuery),
       enabled:
         debouncedQuery?.length > 1 &&
@@ -175,8 +224,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
             variant="outline"
             role="combobox"
             className={cn(
-              'w-full justify-between truncate rounded-md',
-              open && 'ring-2 ring-ring',
+              "w-full justify-between truncate rounded-md",
+              open && "ring-ring ring-2",
               className,
             )}
             ref={ref}
@@ -191,7 +240,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         <PopoverContent
           side="bottom"
           align="start"
-          className="h-auto w-[var(--radix-popover-trigger-width)] p-0"
+          className="h-auto w-(--radix-popover-trigger-width) p-0"
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
@@ -264,6 +313,6 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   },
 );
 
-TickerSearchInput.displayName = 'TickerSearchInput';
+TickerSearchInput.displayName = "TickerSearchInput";
 
 export default TickerSearchInput;

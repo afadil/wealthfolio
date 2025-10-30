@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,8 @@ import {
   Textarea,
   Icons,
   StarRating,
-} from '@wealthfolio/ui';
-import { useAddonRatingMutation } from '../hooks/use-addon-rating-mutation';
+} from "@wealthfolio/ui";
+import { useAddonRatingMutation } from "../hooks/use-addon-rating-mutation";
 
 interface RatingDialogProps {
   open: boolean;
@@ -29,12 +29,9 @@ export function RatingDialog({
   onRatingSubmitted,
 }: RatingDialogProps) {
   const [rating, setRating] = React.useState<number>(0);
-  const [review, setReview] = React.useState('');
-  
-  const { 
-    submitRating, 
-    isSubmittingRating
-  } = useAddonRatingMutation();
+  const [review, setReview] = React.useState("");
+
+  const { submitRatingAsync, isSubmittingRating } = useAddonRatingMutation();
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -42,27 +39,27 @@ export function RatingDialog({
     }
 
     try {
-      await submitRating({
+      await submitRatingAsync({
         addonId,
         rating,
         review: review.trim() || undefined,
       });
-      
+
       // Reset form
       setRating(0);
-      setReview('');
+      setReview("");
       onOpenChange(false);
       onRatingSubmitted?.();
     } catch (error) {
       // Error handling is done in the mutation hook
-      console.error('Failed to submit rating:', error);
+      console.error("Failed to submit rating:", error);
     }
   };
 
   const handleClose = () => {
     if (!isSubmittingRating) {
       setRating(0);
-      setReview('');
+      setReview("");
       onOpenChange(false);
     }
   };
@@ -81,16 +78,9 @@ export function RatingDialog({
           {/* Star Rating */}
           <div className="flex flex-col items-center space-y-2">
             <span className="text-sm font-medium">How would you rate this addon?</span>
-            <StarRating
-              rating={rating}
-              interactive
-              onRatingChange={setRating}
-              size="lg"
-            />
+            <StarRating rating={rating} interactive onRatingChange={setRating} size="lg" />
             {rating > 0 && (
-              <span className="text-sm text-muted-foreground">
-                {rating} out of 5 stars
-              </span>
+              <span className="text-muted-foreground text-sm">{rating} out of 5 stars</span>
             )}
           </div>
 
@@ -108,31 +98,24 @@ export function RatingDialog({
               maxLength={500}
               disabled={isSubmittingRating}
             />
-            <div className="text-xs text-muted-foreground text-right">
+            <div className="text-muted-foreground text-right text-xs">
               {review.length}/500 characters
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isSubmittingRating}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={isSubmittingRating}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={rating === 0 || isSubmittingRating}
-          >
+          <Button onClick={handleSubmit} disabled={rating === 0 || isSubmittingRating}>
             {isSubmittingRating ? (
               <>
                 <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
                 Submitting...
               </>
             ) : (
-              'Submit Rating'
+              "Submit Rating"
             )}
           </Button>
         </DialogFooter>

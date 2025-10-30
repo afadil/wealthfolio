@@ -1,0 +1,41 @@
+# Build outputs
+dist/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Generated files
+src-tauri/gen/
+**/*.d.ts
+
+# Assets and images
+public/
+
+# Rust code
+src-tauri/
+src-core/
+src-server/
+
+# Binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Binary/compiled files
+*.a
+*.so
+*.dylib
+*.dll

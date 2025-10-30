@@ -1,22 +1,22 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { logger } from "@/adapters";
+import { getAccounts } from "@/commands/account";
+import { getActivities } from "@/commands/activity";
+import { openFileSaveDialog, openFolderDialog } from "@/commands/file";
+import { getGoals } from "@/commands/goal";
+import { getHistoricalValuations } from "@/commands/portfolio";
+import { backupDatabaseToPath } from "@/commands/settings";
+import { toast } from "@/components/ui/use-toast";
+import { formatData } from "@/lib/export-utils";
+import { QueryKeys } from "@/lib/query-keys";
 import {
+  Account,
+  AccountValuation,
+  ActivityDetails,
   ExportDataType,
   ExportedFileFormat,
-  Account,
-  ActivityDetails,
   Goal,
-  AccountValuation,
-} from '@/lib/types';
-import { logger } from '@/adapters';
-import { toast } from '@/components/ui/use-toast';
-import { openFileSaveDialog, openFolderDialog } from '@/commands/file';
-import { formatData } from '@/lib/export-utils';
-import { QueryKeys } from '@/lib/query-keys';
-import { getAccounts } from '@/commands/account';
-import { getActivities } from '@/commands/activity';
-import { getGoals } from '@/commands/goal';
-import { getHistoricalValuations } from '@/commands/portfolio';
-import { backupDatabaseToPath } from '@/commands/settings';
+} from "@/lib/types";
+import { QueryObserverResult, useMutation, useQuery } from "@tanstack/react-query";
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -31,7 +31,7 @@ export function useExportData() {
   });
   const { refetch: fetchActivities } = useQuery<ActivityDetails[], Error>({
     queryKey: [QueryKeys.ACTIVITIES],
-    queryFn: getActivities,
+    queryFn: () => getActivities(),
     enabled: false,
   });
   const { refetch: fetchGoals } = useQuery<Goal[], Error>({
@@ -52,10 +52,10 @@ export function useExportData() {
   } = useMutation({
     mutationFn: async (params: ExportParams) => {
       const { format, data: desiredData } = params;
-      if (format === 'SQLite') {
+      if (format === "SQLite") {
         // Open folder dialog to let user choose backup location
         const selectedDir = await openFolderDialog();
-        
+
         if (!selectedDir) {
           // User cancelled the dialog, return null to indicate cancellation
           return null;
@@ -69,27 +69,27 @@ export function useExportData() {
         let fileName: string;
         let datasetLabel: string | null = null;
 
-        const currentDate = new Date().toISOString().split('T')[0];
+        const currentDate = new Date().toISOString().split("T")[0];
         switch (desiredData) {
-          case 'accounts':
+          case "accounts":
             exportedData = await fetchAndFormatData(fetchAccounts, format);
             fileName = `accounts_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'accounts';
+            datasetLabel = "accounts";
             break;
-          case 'activities':
+          case "activities":
             exportedData = await fetchAndFormatData(fetchActivities, format);
             fileName = `activities_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'activities';
+            datasetLabel = "activities";
             break;
-          case 'goals':
+          case "goals":
             exportedData = await fetchAndFormatData(fetchGoals, format);
             fileName = `goals_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'goals';
+            datasetLabel = "goals";
             break;
-          case 'portfolio-history':
+          case "portfolio-history":
             exportedData = await fetchAndFormatData(fetchPortfolioHistory, format);
             fileName = `portfolio-history_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = 'portfolio history records';
+            datasetLabel = "portfolio history records";
             break;
         }
 
@@ -99,7 +99,7 @@ export function useExportData() {
 
         if (datasetLabel) {
           toast({
-            title: 'Nothing to export.',
+            title: "Nothing to export.",
             description: `No ${datasetLabel} available to export right now.`,
           });
         }
@@ -113,26 +113,27 @@ export function useExportData() {
         return;
       }
 
-      if (result && typeof result === 'object' && 'path' in result) {
+      if (result && typeof result === "object" && "path" in result) {
         // SQLite backup success
         toast({
-          title: 'Database backup completed successfully.',
+          title: "Database backup completed successfully.",
           description: `Backup saved to: ${result.path}`,
-          variant: 'success',
+          variant: "success",
         });
       } else {
         // Regular export success
         toast({
-          title: 'File saved successfully.',
-          variant: 'success',
+          title: "Export completed",
+          description: "File saved successfully. Check your download location.",
+          variant: "success",
         });
       }
     },
     onError: (e) => {
-      logger.error(`Error while exporting: ${e}`);
+      logger.error(`Error while exporting: ${String(e)}`);
       toast({
-        title: 'Something went wrong.',
-        variant: 'destructive',
+        title: "Something went wrong.",
+        variant: "destructive",
       });
     },
   });
@@ -141,7 +142,7 @@ export function useExportData() {
     try {
       await exportDataMutation(params);
     } catch (error) {
-      logger.error(`Error while exporting: ${error}`);
+      logger.error(`Error while exporting: ${String(error)}`);
     }
   };
 
@@ -154,9 +155,12 @@ export function useExportData() {
 }
 
 async function fetchAndFormatData(
-  queryFn: () => Promise<any>,
+  queryFn: () => Promise<QueryObserverResult<unknown[], Error>>,
   format: ExportedFileFormat,
 ): Promise<string | undefined> {
   const response = await queryFn();
-  return formatData(response.data, format);
+
+  // Handle empty data gracefully - export empty file instead of error
+  const data = response.data ?? [];
+  return formatData(data, format);
 }

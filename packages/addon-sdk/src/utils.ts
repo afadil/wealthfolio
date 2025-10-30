@@ -60,21 +60,22 @@ export function validateManifest(manifest: AddonManifest): AddonValidationResult
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
-
-
 
 /**
  * Checks if an addon version is compatible with the current SDK
  */
-export function isCompatibleVersion(addonSdkVersion?: string, currentSdkVersion = SDK_VERSION): boolean {
+export function isCompatibleVersion(
+  addonSdkVersion?: string,
+  currentSdkVersion = SDK_VERSION,
+): boolean {
   if (!addonSdkVersion) return true; // Assume compatible if not specified
-  
+
   const [addonMajor, addonMinor] = addonSdkVersion.split('.').map(Number);
   const [currentMajor, currentMinor] = currentSdkVersion.split('.').map(Number);
-  
+
   // Same major version, and addon minor version <= current minor version
   return addonMajor === currentMajor && addonMinor <= currentMinor;
 }
@@ -85,10 +86,10 @@ export function isCompatibleVersion(addonSdkVersion?: string, currentSdkVersion 
 export function formatAddonSize(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   if (bytes === 0) return '0 B';
-  
+
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   const size = bytes / Math.pow(1024, i);
-  
+
   return `${size.toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
@@ -107,12 +108,12 @@ export function generateAddonId(name: string): string {
 /**
  * Type guard to check if an object is a valid addon manifest
  */
-export function isAddonManifest(obj: any): obj is AddonManifest {
+export function isAddonManifest(obj: unknown): obj is AddonManifest {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    typeof obj.id === 'string' &&
-    typeof obj.name === 'string' &&
-    typeof obj.version === 'string'
+    typeof (obj as Record<string, unknown>).id === 'string' &&
+    typeof (obj as Record<string, unknown>).name === 'string' &&
+    typeof (obj as Record<string, unknown>).version === 'string'
   );
 }

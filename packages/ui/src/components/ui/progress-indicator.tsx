@@ -1,15 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import {
-  Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
-import { Icons } from '@/components/ui/icons';
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { motion } from "motion/react";
+import React, { useEffect, useState } from "react";
 
 // Custom DialogContent without close button
 const DialogContentWithoutClose = React.forwardRef<
@@ -21,8 +15,8 @@ const DialogContentWithoutClose = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-        className
+        "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] fixed top-[50%] left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg",
+        className,
       )}
       {...props}
     >
@@ -69,28 +63,28 @@ export function ProgressIndicator({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   // The progress content
   const progressContent = (
     <div className="mx-auto w-full max-w-md">
-      <div className="rounded-lg border bg-card p-6 text-card-foreground shadow-md">
-        <div className="flex flex-col items-center text-center space-y-4">
-          <motion.div 
-            className="rounded-full bg-primary/10 p-4"
+      <div className="bg-card text-card-foreground rounded-lg border p-6 shadow-md">
+        <div className="flex flex-col items-center space-y-4 text-center">
+          <motion.div
+            className="bg-primary/10 rounded-full p-4"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ 
+            transition={{
               duration: 0.5,
               repeat: Number.POSITIVE_INFINITY,
               repeatType: "reverse",
-              ease: "easeInOut" 
+              ease: "easeInOut",
             }}
           >
             <Icons.Settings className="h-8 w-8 animate-spin text-orange-500" />
           </motion.div>
-          <motion.h3 
+          <motion.h3
             className="text-base font-medium"
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -103,17 +97,17 @@ export function ProgressIndicator({
         <div className="mt-6">
           <div className="relative h-2.5">
             {/* Beautiful gradient progress bar */}
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary/30">
+            <div className="bg-secondary/30 h-2.5 w-full overflow-hidden rounded-full">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500"
-                initial={{ x: '-100%' }}
-                animate={{ x: '100%' }}
+                className="h-full rounded-full bg-linear-to-r from-red-500 via-orange-500 to-yellow-500"
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
                 transition={{
                   repeat: Number.POSITIVE_INFINITY,
                   duration: 2,
-                  ease: 'easeInOut',
+                  ease: "easeInOut",
                 }}
-                style={{ width: '50%' }}
+                style={{ width: "50%" }}
               />
             </div>
           </div>
@@ -126,13 +120,9 @@ export function ProgressIndicator({
   if (open !== undefined) {
     return (
       <Dialog open={open}>
-        <DialogContentWithoutClose 
-          className="sm:max-w-md p-0 border-none bg-transparent shadow-none"
-        >
+        <DialogContentWithoutClose className="border-none bg-transparent p-0 shadow-none sm:max-w-md">
           <DialogTitle className="sr-only">{title}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {description}
-          </DialogDescription>
+          <DialogDescription className="sr-only">{description}</DialogDescription>
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

@@ -1,36 +1,57 @@
-import { useMemo } from 'react';
-import { subMonths } from 'date-fns';
-import { PerformanceChart } from '@/components/performance-chart';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
-import { DateRangeSelector } from '@wealthfolio/ui';
-import { ApplicationHeader } from '@/components/header';
-import { ApplicationShell } from '@wealthfolio/ui';
-import { EmptyPlaceholder } from '@/components/ui/empty-placeholder';
-import { useCalculatePerformanceHistory } from './hooks/use-performance-data';
-import { BenchmarkSymbolSelector } from '@/components/benchmark-symbol-selector';
-import { AlertFeedback } from '@wealthfolio/ui';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { TrackedItem, PerformanceMetrics, ReturnData, DateRange } from '@/lib/types';
-import { GainPercent } from '@wealthfolio/ui';
-import NumberFlow from '@number-flow/react';
-import { AccountSelector } from '../../components/account-selector';
-import { PORTFOLIO_ACCOUNT_ID } from '@/lib/constants';
+import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
 import {
+  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
+  MAX_DRAWDOWN_INFO as maxDrawdownInfo,
   MetricLabelWithInfo,
   TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
-  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
   VOLATILITY_INFO as volatilityInfo,
-  MAX_DRAWDOWN_INFO as maxDrawdownInfo
-} from '@/components/metric-display';
-import { usePersistentState } from '@/hooks/use-persistent-state';
+} from "@/components/metric-display";
+import { PerformanceChart } from "@/components/performance-chart";
+import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
+
+import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
+import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useIsMobileViewport } from "@/hooks/use-platform";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { DateRange, PerformanceMetrics, ReturnData, TrackedItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import NumberFlow from "@number-flow/react";
+import {
+  AlertFeedback,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  DateRangeSelector,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  GainPercent,
+  Icons,
+  Page,
+  PageContent,
+  PageHeader,
+  Separator,
+} from "@wealthfolio/ui";
+import { subMonths } from "date-fns";
+import { useMemo, useState } from "react";
+import { AccountSelector } from "../../components/account-selector";
+import { AccountSelectorMobile } from "../../components/account-selector-mobile";
+import { BenchmarkSymbolSelectorMobile } from "../../components/benchmark-symbol-selector-mobile";
+import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 
 const PORTFOLIO_TOTAL: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
-  type: 'account',
-  name: 'All Portfolio',
+  type: "account",
+  name: "All Portfolio",
 };
 
 // Define the type expected by the chart
@@ -40,10 +61,10 @@ interface ChartDataItem {
   returns: ReturnData[];
 }
 
-// Define the actual structure returned by the hook (assuming it includes name/type)
+// Define the actual structure returned by the hook
 interface PerformanceDataFromHook extends PerformanceMetrics {
   name: string;
-  type: 'account' | 'symbol';
+  type: "account" | "symbol";
 }
 
 function PerformanceContent({
@@ -51,17 +72,23 @@ function PerformanceContent({
   isLoading,
   hasErrors,
   errorMessages,
+  isMobile,
 }: {
   chartData: ChartDataItem[] | undefined;
   isLoading: boolean;
   hasErrors: boolean;
   errorMessages: string[];
+  isMobile: boolean;
 }) {
   return (
     <div className="relative flex h-full w-full flex-col">
       {chartData && chartData.length > 0 && (
         <div className="min-h-0 w-full flex-1">
-          <PerformanceChart data={chartData} />
+          {isMobile ? (
+            <PerformanceChartMobile data={chartData} />
+          ) : (
+            <PerformanceChart data={chartData} />
+          )}
         </div>
       )}
 
@@ -78,12 +105,12 @@ function PerformanceContent({
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
-            <div className="animate-progress-border absolute left-0 top-0 h-[2px] bg-primary"></div>
+            <div className="animate-progress-border bg-primary absolute top-0 left-0 h-[2px]"></div>
           </div>
-          <div className="absolute bottom-4 right-4">
-            <div className="rounded-md border bg-background/80 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-              <p className="flex items-center text-xs font-medium text-muted-foreground">
-                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-primary"></span>
+          <div className="absolute right-4 bottom-4">
+            <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
+              <p className="text-muted-foreground flex items-center text-xs font-medium">
+                <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
                 Calculating...
               </p>
             </div>
@@ -103,12 +130,7 @@ function PerformanceContent({
               ))}
             </div>
             <div className="mt-4 flex justify-end">
-              <Button
-                size="sm"
-                onClick={() => window.location.reload()}
-                variant="default"
-                className="bg-black text-white hover:bg-gray-800"
-              >
+              <Button size="sm" onClick={() => window.location.reload()} variant="default">
                 Retry
               </Button>
             </div>
@@ -119,79 +141,100 @@ function PerformanceContent({
   );
 }
 
-const SelectedItemBadge = ({ 
-  item, 
-  isSelected, 
-  onSelect, 
-  onDelete 
-}: { 
-  item: TrackedItem; 
+const SelectedItemBadge = ({
+  item,
+  isSelected,
+  onSelect,
+  onDelete,
+  color,
+}: {
+  item: TrackedItem;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (e: React.MouseEvent) => void;
+  color?: string;
 }) => {
   return (
-    <div className="my-2 flex items-center">
-      <Badge className={`rounded-md  px-3 py-1 text-gray-800 shadow-sm dark:bg-zinc-800 dark:text-zinc-300 ${
-        isSelected ? 'ring-2 ring-primary' : ''
-      }`}
-        onClick={onSelect}
-        role="button"
-        variant="secondary"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
-        aria-pressed={isSelected}
+    <Badge
+      className={cn(
+        "text-foreground group relative cursor-pointer rounded-md px-2.5 py-1.5 shadow-sm transition-all sm:px-3",
+        "hover:bg-accent/80 hover:shadow-md",
+        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+        isSelected && "bg-warning/20 hover:bg-warning/30",
+      )}
+      onClick={onSelect}
+      role="button"
+      variant="secondary"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      aria-pressed={isSelected}
+    >
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        <div
+          className={cn(
+            "h-3 w-1 rounded-full sm:h-4",
+            color
+              ? "transition-opacity group-hover:opacity-80"
+              : item.type === "account"
+                ? "bg-muted-foreground group-hover:bg-foreground transition-colors"
+                : "bg-orange-500 transition-colors group-hover:bg-orange-600 dark:bg-orange-400",
+          )}
+          style={color ? { backgroundColor: color } : undefined}
+        />
+        <span className="group-hover:text-foreground text-xs font-medium transition-colors sm:text-sm">
+          {item.name}
+        </span>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className={cn(
+          "ml-2 size-5 transition-all duration-150",
+          "hover:bg-destructive/10 hover:text-destructive hover:scale-110",
+          "focus-visible:ring-destructive/50 focus-visible:ring-2",
+        )}
+        onClick={onDelete}
+        aria-label={`Remove ${item.name}`}
       >
-        <div className="flex items-center space-x-3">
-          <div
-            className={`h-4 w-1 rounded-full ${
-              item.type === 'account'
-                ? 'bg-zinc-500 dark:bg-zinc-400'
-                : 'bg-orange-500 dark:bg-orange-400'
-            }`}
-          ></div>
-          <span className="text-sm font-medium">{item.name}</span>
-        </div>
-        <button 
-          className="ml-3 text-gray-500 dark:text-zinc-400 transition-all duration-150 hover:scale-110 hover:text-gray-800 hover:dark:text-zinc-100"
-          onClick={onDelete}
-          aria-label={`Remove ${item.name}`}
-        >
-          <Icons.Close size={18} />
-        </button>
-      </Badge>
-    </div>
+        <Icons.Close className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+      </Button>
+    </Badge>
   );
 };
 
 export default function PerformancePage() {
+  const isMobile = useIsMobileViewport();
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
-    'performance:selectedItems',
+    "performance:selectedItems",
     [PORTFOLIO_TOTAL],
   );
   const [selectedItemId, setSelectedItemId] = usePersistentState<string | null>(
-    'performance:selectedItemId',
+    "performance:selectedItemId",
     null,
   );
   const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
-    'performance:dateRange',
+    "performance:dateRange",
     {
       from: subMonths(new Date(), 12),
       to: new Date(),
     },
   );
 
+  // State for mobile dropdown menu
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+  const [benchmarkSheetOpen, setBenchmarkSheetOpen] = useState(false);
+
   // Helper function to sort comparison items (accounts first, then symbols)
   const sortComparisonItems = (items: TrackedItem[]): TrackedItem[] => {
     return [...items].sort((a, b) => {
       // Sort by type first (accounts before symbols)
       if (a.type !== b.type) {
-        return a.type === 'account' ? -1 : 1;
+        return a.type === "account" ? -1 : 1;
       }
       // If same type, maintain original order
       return 0;
@@ -204,36 +247,49 @@ export default function PerformancePage() {
     isLoading: isLoadingPerformance,
     hasErrors,
     errorMessages,
-    displayDateRange
+    displayDateRange,
   } = useCalculatePerformanceHistory({
     selectedItems,
-    dateRange
+    dateRange,
   });
 
   // Calculate derived chart data
   const chartData = useMemo(() => {
     if (!performanceData || !selectedItems) return [];
 
-    return performanceData
-      // Update type predicate to use the more accurate type
-      .filter((item): item is PerformanceDataFromHook => 
-        item !== null && typeof item.id === 'string' && Array.isArray(item.returns)
-      )
-      .map((perfItem): ChartDataItem => ({
-        id: perfItem.id,
-        name: perfItem.name, // Can now safely access name from perfItem
-        returns: perfItem.returns,
-      }));
+    return (
+      performanceData
+        // Update type predicate to use the more accurate type
+        .filter(
+          (item): item is PerformanceDataFromHook =>
+            item !== null && typeof item.id === "string" && Array.isArray(item.returns),
+        )
+        .map(
+          (perfItem): ChartDataItem => ({
+            id: perfItem.id,
+            name: perfItem.name, // Can now safely access name from perfItem
+            returns: perfItem.returns,
+          }),
+        )
+    );
   }, [performanceData, selectedItems]);
+
+  const chartColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    chartData.forEach((series, index) => {
+      map.set(series.id, PERFORMANCE_CHART_COLORS[index % PERFORMANCE_CHART_COLORS.length]);
+    });
+    return map;
+  }, [chartData]);
 
   // Calculate selected item data
   const selectedItemData = useMemo(() => {
     if (!performanceData?.length || !selectedItems) return null;
-    const targetId = selectedItemId || performanceData.find(item => item !== null)?.id; // Find first non-null item ID if none selected
+    const targetId = selectedItemId ?? performanceData.find((item) => item !== null)?.id; // Find first non-null item ID if none selected
     if (!targetId) return null;
     const found = performanceData.find((item) => item?.id === targetId);
     if (!found) return null;
-    const name = selectedItems.find(item => item.id === found.id)?.name || 'Unknown';
+    const name = selectedItems.find((item) => item.id === found.id)?.name ?? "Unknown";
     return {
       id: found.id,
       name: name,
@@ -254,7 +310,7 @@ export default function PerformancePage() {
       // Create a proper ComparisonItem
       const newItem: TrackedItem = {
         id: account.id,
-        type: 'account',
+        type: "account",
         name: account.name,
       };
 
@@ -269,7 +325,7 @@ export default function PerformancePage() {
 
       const newSymbol: TrackedItem = {
         id: symbol.id,
-        type: 'symbol',
+        type: "symbol",
         name: symbol.name,
       };
 
@@ -283,7 +339,7 @@ export default function PerformancePage() {
 
   const handleBadgeDelete = (e: React.MouseEvent, item: TrackedItem) => {
     e.stopPropagation();
-    if (item.type === 'account') {
+    if (item.type === "account") {
       handleAccountSelect({ id: item.id, name: item.name });
     } else {
       setSelectedItems((prev) => sortComparisonItems(prev.filter((i) => i.id !== item.id)));
@@ -294,125 +350,334 @@ export default function PerformancePage() {
   };
 
   return (
-    <ApplicationShell className="p-6">
-      <ApplicationHeader heading="Portfolio Performance">
-        <div className="flex items-center space-x-2">
-          <DateRangeSelector value={dateRange} onChange={setDateRange} />
+    <Page>
+      <PageHeader
+        heading="Performance"
+        actions={<DateRangeSelector value={dateRange} onChange={setDateRange} />}
+      />
+      <PageContent>
+        {/* Mobile: Carousel + Plus button in same row */}
+        <div className="flex items-center gap-2 md:hidden">
+          {/* Selected items badges carousel */}
+          {selectedItems.length > 0 && (
+            <Carousel
+              opts={{
+                align: "start",
+                loop: false,
+              }}
+              className="flex-1"
+            >
+              <CarouselContent className="-ml-2">
+                {selectedItems.map((item) => (
+                  <CarouselItem key={item.id} className="basis-auto pl-2">
+                    <SelectedItemBadge
+                      item={item}
+                      isSelected={selectedItemId === item.id}
+                      onSelect={() => handleBadgeSelect(item)}
+                      onDelete={(e) => handleBadgeDelete(e, item)}
+                      color={chartColorMap.get(item.id)}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
+          )}
+
+          {/* Mobile: Plus button with dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
+                aria-label="Add item"
+              >
+                <Icons.Plus className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
+                <Icons.Briefcase className="mr-2 h-4 w-4" />
+                Add Account
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => setBenchmarkSheetOpen(true)}
+                className="py-4 md:py-2"
+              >
+                <Icons.TrendingUp className="mr-2 h-4 w-4" />
+                Add Benchmark
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </ApplicationHeader>
 
-      <div className="flex h-[calc(100vh-12rem)] flex-col space-y-6">
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedItems.map((item) => (
-            <SelectedItemBadge
-              key={item.id}
-              item={item}
-              isSelected={selectedItemId === item.id}
-              onSelect={() => handleBadgeSelect(item)}
-              onDelete={(e) => handleBadgeDelete(e, item)}
-            />
-          ))}
-          {selectedItems.length > 0 && <Separator orientation="vertical" className="mx-2 h-6" />}
+        {/* Desktop: Full layout with separator */}
+        <div className="hidden md:flex md:flex-row md:items-center">
+          {/* Selected items badges - horizontal scroll carousel */}
+          {selectedItems.length > 0 && (
+            <div className="flex items-center gap-3">
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: false,
+                }}
+                className="w-full max-w-[calc(100vw-24rem)] md:max-w-[calc(100vw-28rem)]"
+              >
+                <CarouselContent className="-ml-2">
+                  {selectedItems.map((item) => (
+                    <CarouselItem key={item.id} className="basis-auto pl-2">
+                      <SelectedItemBadge
+                        item={item}
+                        isSelected={selectedItemId === item.id}
+                        onSelect={() => handleBadgeSelect(item)}
+                        onDelete={(e) => handleBadgeDelete(e, item)}
+                        color={chartColorMap.get(item.id)}
+                      />
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+              </Carousel>
 
-          <AccountSelector
-            setSelectedAccount={handleAccountSelect}
-            variant="button"
-            buttonText="Add account"
-            includePortfolio={true}
-          />
-          <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
-        </div>
-
-        <Card className="flex min-h-0 flex-1 flex-col">
-          <CardHeader className="pb-1">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Performance</CardTitle>
-                  <CardDescription>{displayDateRange}</CardDescription>
-                </div>
-                {performanceData && performanceData.length > 0 && (
-                  <div className="grid grid-cols-2 gap-6 rounded-lg p-2 backdrop-blur-sm md:grid-cols-4">
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
-                      <div className="flex justify-center items-baseline">
-                        <span
-                          className={`text-lg ${
-                            selectedItemData && selectedItemData.totalReturn >= 0
-                              ? 'text-success'
-                              : 'text-destructive'
-                          }`}
-                        >
-                          <GainPercent value={selectedItemData?.totalReturn || 0} animated={true} className='text-lg'/>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Annualized Return" infoText={annualizedReturnInfo} />
-                      <div className="flex justify-center items-baseline">
-                        <span
-                          className={`text-lg ${
-                            selectedItemData && selectedItemData.annualizedReturn >= 0
-                              ? 'text-success'
-                              : 'text-destructive'
-                          }`}
-                        >
-                          <GainPercent
-                            value={selectedItemData?.annualizedReturn || 0}
-                            animated={true}
-                            className='text-lg'
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
-                      <div className="flex justify-center items-baseline">
-                        <span className="text-lg text-foreground">
-                          <NumberFlow
-                            value={(selectedItemData?.volatility || 0)}
-                            animated={true}
-                            format={{
-                              style: 'percent',
-                              maximumFractionDigits: 2,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center space-y-1">
-                      <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
-                      <div className="flex justify-center items-baseline">
-                        <span className="text-lg text-destructive">
-                          <NumberFlow
-                            value={(selectedItemData?.maxDrawdown || 0) * -1}
-                            animated={true}
-                            format={{
-                              style: 'percent',
-                              maximumFractionDigits: 2,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Separator */}
+              <Separator orientation="vertical" className="h-6 flex-shrink-0" />
             </div>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 p-6">
-            <PerformanceContent
-              chartData={chartData}
-              isLoading={isLoadingPerformance}
-              hasErrors={hasErrors}
-              errorMessages={errorMessages}
+          )}
+
+          {/* Desktop: Full text buttons */}
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <AccountSelector
+              setSelectedAccount={handleAccountSelect}
+              variant="button"
+              buttonText="Add account"
+              includePortfolio={true}
             />
-          </CardContent>
-        </Card>
-      </div>
-    </ApplicationShell>
+            <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
+          </div>
+        </div>
+
+        {/* Mobile sheets controlled by dropdown - rendered but hidden by Sheet component */}
+        <AccountSelectorMobile
+          setSelectedAccount={(account) => {
+            handleAccountSelect(account);
+            setAccountSheetOpen(false);
+          }}
+          includePortfolio={true}
+          open={accountSheetOpen}
+          onOpenChange={setAccountSheetOpen}
+          className="hidden"
+        />
+        <BenchmarkSymbolSelectorMobile
+          onSelect={(symbol) => {
+            handleSymbolSelect(symbol);
+            setBenchmarkSheetOpen(false);
+          }}
+          open={benchmarkSheetOpen}
+          onOpenChange={setBenchmarkSheetOpen}
+          className="hidden"
+        />
+
+        <div className="flex h-[calc(100vh-19rem)] flex-col md:h-[calc(100vh-12rem)]">
+          <Card className="flex min-h-0 flex-1 flex-col">
+            <CardHeader className={cn("pb-2", isMobile ? "px-3 py-3" : "pb-1")}>
+              <div className={cn("space-y-3", isMobile ? "space-y-2" : "sm:space-y-4")}>
+                <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                  <div>
+                    <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
+                      Performance
+                    </CardTitle>
+                    <CardDescription
+                      className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
+                    >
+                      {displayDateRange}
+                    </CardDescription>
+                  </div>
+                  {performanceData && performanceData.length > 0 && (
+                    <>
+                      {/* Mobile compact metrics - horizontal scroll */}
+                      {isMobile ? (
+                        <Carousel
+                          opts={{
+                            align: "start",
+                            loop: false,
+                          }}
+                          className="w-full"
+                        >
+                          <CarouselContent className="-ml-2 md:-ml-4">
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Total Return
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-base font-bold",
+                                    selectedItemData && selectedItemData.totalReturn >= 0
+                                      ? "text-success"
+                                      : "text-destructive",
+                                  )}
+                                >
+                                  <GainPercent
+                                    value={selectedItemData?.totalReturn ?? 0}
+                                    animated={true}
+                                    className="text-base"
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
+
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Annualized
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-base font-bold",
+                                    selectedItemData && selectedItemData.annualizedReturn >= 0
+                                      ? "text-success"
+                                      : "text-destructive",
+                                  )}
+                                >
+                                  <GainPercent
+                                    value={selectedItemData?.annualizedReturn ?? 0}
+                                    animated={true}
+                                    className="text-base"
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
+
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Volatility
+                                </span>
+                                <span className="text-foreground text-base font-bold">
+                                  <NumberFlow
+                                    value={selectedItemData?.volatility ?? 0}
+                                    animated={true}
+                                    format={{
+                                      style: "percent",
+                                      maximumFractionDigits: 2,
+                                    }}
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
+
+                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
+                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                  Max Drawdown
+                                </span>
+                                <span className="text-destructive text-base font-bold">
+                                  <NumberFlow
+                                    value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                                    animated={true}
+                                    format={{
+                                      style: "percent",
+                                      maximumFractionDigits: 2,
+                                    }}
+                                  />
+                                </span>
+                              </div>
+                            </CarouselItem>
+                          </CarouselContent>
+                        </Carousel>
+                      ) : (
+                        /* Desktop metrics */
+                        <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                            <div className="flex items-baseline justify-center">
+                              <span
+                                className={`text-base sm:text-lg ${
+                                  selectedItemData && selectedItemData.totalReturn >= 0
+                                    ? "text-success"
+                                    : "text-destructive"
+                                }`}
+                              >
+                                <GainPercent
+                                  value={selectedItemData?.totalReturn ?? 0}
+                                  animated={true}
+                                  className="text-base sm:text-lg"
+                                />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo
+                              label="Annualized Return"
+                              infoText={annualizedReturnInfo}
+                            />
+                            <div className="flex items-baseline justify-center">
+                              <span
+                                className={`text-base sm:text-lg ${
+                                  selectedItemData && selectedItemData.annualizedReturn >= 0
+                                    ? "text-success"
+                                    : "text-destructive"
+                                }`}
+                              >
+                                <GainPercent
+                                  value={selectedItemData?.annualizedReturn ?? 0}
+                                  animated={true}
+                                  className="text-base sm:text-lg"
+                                />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                            <div className="flex items-baseline justify-center">
+                              <span className="text-foreground text-base sm:text-lg">
+                                <NumberFlow
+                                  value={selectedItemData?.volatility ?? 0}
+                                  animated={true}
+                                  format={{
+                                    style: "percent",
+                                    maximumFractionDigits: 2,
+                                  }}
+                                />
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                            <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                            <div className="flex items-baseline justify-center">
+                              <span className="text-destructive text-base sm:text-lg">
+                                <NumberFlow
+                                  value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                                  animated={true}
+                                  format={{
+                                    style: "percent",
+                                    maximumFractionDigits: 2,
+                                  }}
+                                />
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className={cn("min-h-0 flex-1", isMobile ? "p-2" : "p-3 sm:p-6")}>
+              <PerformanceContent
+                chartData={chartData}
+                isLoading={isLoadingPerformance}
+                hasErrors={hasErrors}
+                errorMessages={errorMessages}
+                isMobile={isMobile}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </PageContent>
+    </Page>
   );
 }

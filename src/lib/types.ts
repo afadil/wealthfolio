@@ -1,25 +1,20 @@
-import * as z from 'zod';
-import { importActivitySchema, importMappingSchema } from '@/lib/schemas';
-import {
-  ActivityType,
-  DataSource,
-  AccountType,
-  HoldingType,
-} from './constants';
+import { importActivitySchema, importMappingSchema } from "@/lib/schemas";
+import * as z from "zod";
+import { AccountType, ActivityType, DataSource, HoldingType } from "./constants";
 
 export {
+  AccountType,
   ActivityType,
   DataSource,
-  AccountType,
-  ImportFormat,
   ExportDataType,
   ExportedFileFormat,
   HoldingType,
-} from './constants';
+  ImportFormat,
+} from "./constants";
 
-export type { ImportRequiredField } from './constants';
+export type { ImportRequiredField } from "./constants";
 
-export type Account = {
+export interface Account {
   id: string;
   name: string;
   accountType: AccountType;
@@ -31,9 +26,9 @@ export type Account = {
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional
-};
+}
 
-export type Activity = {
+export interface Activity {
   id: string;
   type: ActivityType;
   date: Date | string;
@@ -47,7 +42,7 @@ export type Activity = {
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
-};
+}
 
 export interface ActivityDetails {
   id: string;
@@ -72,14 +67,14 @@ export interface ActivityDetails {
   subRows?: ActivityDetails[];
 }
 
-export type ActivitySearchResponse = {
+export interface ActivitySearchResponse {
   data: ActivityDetails[];
   meta: {
     totalRowCount: number;
   };
-};
+}
 
-export type ActivityCreate = {
+export interface ActivityCreate {
   accountId: string;
   activityType: string;
   activityDate: string | Date;
@@ -161,7 +156,7 @@ export interface MarketData {
   date: Date;
   id: string;
   marketPrice: number;
-  state: 'CLOSE'; // assuming state can only be 'CLOSE', expand this as needed
+  state: "CLOSE"; // assuming state can only be 'CLOSE', expand this as needed
   symbol: string;
   symbolProfileId: string;
 }
@@ -181,7 +176,7 @@ export interface ImportValidationResult {
   };
 }
 
-export type ValidationResult = { status: 'success' } | { status: 'error'; errors: string[] };
+export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };
 
 // Holding types based on Rust HoldingView model
 
@@ -326,13 +321,15 @@ export interface Settings {
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
+  isPro: boolean;
+  syncEnabled: boolean;
 }
 
 export interface SettingsContextType {
   settings: Settings | null;
   isLoading: boolean;
   isError: boolean;
-  updateBaseCurrency: (currency: Settings['baseCurrency']) => Promise<void>;
+  updateBaseCurrency: (currency: Settings["baseCurrency"]) => Promise<void>;
   accountsGrouped: boolean;
   setAccountsGrouped: (value: boolean) => void;
 }
@@ -374,13 +371,12 @@ export interface IncomeSummary {
 }
 
 // Define custom DateRange type matching react-day-picker's
-export type DateRange = {
+export interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-};
+}
 
-export type TimePeriod = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '5Y' | 'ALL';
-
+export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
 
 export interface AccountValuation {
   id: string;
@@ -455,7 +451,7 @@ export interface ContributionLimit {
   updatedAt?: string;
 }
 
-export type NewContributionLimit = Omit<ContributionLimit, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewContributionLimit = Omit<ContributionLimit, "id" | "createdAt" | "updatedAt">;
 
 export interface AccountDeposit {
   amount: number;
@@ -506,11 +502,11 @@ export interface UpdateAssetProfile {
 }
 
 // Rename ComparisonItem to TrackedItem
-export type TrackedItem = {
+export interface TrackedItem {
   id: string;
-  type: 'account' | 'symbol';
+  type: "account" | "symbol";
   name: string;
-};
+}
 
 // Addon Store Types
 export interface AddonStoreListing {
@@ -523,7 +519,7 @@ export interface AddonStoreListing {
   downloads: number;
   rating: number;
   reviewCount: number;
-  status?: 'active' | 'inactive' | 'deprecated' | 'coming-soon';
+  status?: "active" | "inactive" | "deprecated" | "coming-soon";
   lastUpdated: string;
   releaseNotes: string;
   changelogUrl: string;
@@ -531,4 +527,3 @@ export interface AddonStoreListing {
   /** Classification tags for filtering */
   tags?: string[];
 }
-

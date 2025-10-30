@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from '@/lib/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Account, ActivityType, CsvRowData, ImportFormat, ImportMappingData } from "@/lib/types";
+import { useMemo } from "react";
 
-import { MappingTable } from './mapping-table';
-import { CardContent } from '@/components/ui/card';
-import { CSVFileViewer } from './csv-file-viewer';
-import { validateTickerSymbol } from '../utils/validation-utils';
+import { CardContent } from "@/components/ui/card";
+import { validateTickerSymbol } from "../utils/validation-utils";
+import { CSVFileViewer } from "./csv-file-viewer";
+import { MappingTable } from "./mapping-table";
 
 interface CsvMappingEditorProps {
   mapping: ImportMappingData;
@@ -24,7 +24,6 @@ interface CsvMappingEditorProps {
 }
 
 export function CsvMappingEditor(props: CsvMappingEditorProps) {
-
   const distinctSymbols = useMemo(() => {
     return Array.from(
       new Set(props.data.map((row) => props.getMappedValue(row, ImportFormat.SYMBOL))),
@@ -107,9 +106,8 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
   }, [props.data, props.getMappedValue]);
 
   const invalidAccounts = useMemo(() => {
-    return distinctAccounts.filter((account) => !props.mapping.accountMappings?.[account]);    
+    return distinctAccounts.filter((account) => !props.mapping.accountMappings?.[account]);
   }, [distinctAccounts, props.mapping.accountMappings]);
-
 
   const { distinctAccountRows } = useMemo(() => {
     const accountMap = new Map<string, { row: CsvRowData; count: number }>();
@@ -131,7 +129,7 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
         });
       }
     });
-    
+
     return {
       distinctAccountRows: Array.from(accountMap.entries()).map(([account, data]) => ({
         accountId: account,
@@ -142,7 +140,6 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
       })),
     };
   }, [props.data, props.getMappedValue, invalidAccounts, props.mapping.accountMappings]);
-
 
   const dataToMap = useMemo(() => {
     // Create a Set of rows that need mapping
@@ -169,11 +166,11 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
     });
 
     distinctAccountRows.forEach(({ row, isValid, mappedAccount }) => {
-        const lineNumber = row.lineNumber;
-        processedRows.set(lineNumber, row);
-        if (!isValid && !mappedAccount) {
-          rowsNeedingMapping.add(row);
-        }
+      const lineNumber = row.lineNumber;
+      processedRows.set(lineNumber, row);
+      if (!isValid && !mappedAccount) {
+        rowsNeedingMapping.add(row);
+      }
     });
 
     // Convert to array and sort
@@ -214,13 +211,13 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
       // Add header row
       {
         id: 0,
-        content: props.headers.join(','),
+        content: props.headers.join(","),
         isValid: true,
       },
       // Add data rows
       ...props.data.map((rowData, index) => ({
         id: index + 1, // Add 1 to account for header row
-        content: props.headers.map((header) => rowData[header] || '').join(','),
+        content: props.headers.map((header) => rowData[header] || "").join(","),
         isValid: true, // Assume all lines are valid in the raw view
       })),
     ];
@@ -231,18 +228,18 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
       <Tabs defaultValue="preview" className="flex flex-1 flex-col">
         <div className="py-2">
           <div className="flex items-center justify-between">
-            <div className="px-3 text-sm text-muted-foreground">
-              <span className="font-medium">{totalRows} </span>total row{totalRows !== 1 ? 's' : ''}
+            <div className="text-muted-foreground hidden px-3 text-sm md:block">
+              <span className="font-medium">{totalRows} </span>total row{totalRows !== 1 ? "s" : ""}
             </div>
-            <TabsList className="flex space-x-1 rounded-full bg-secondary p-1">
+            <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
               <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="preview"
               >
                 Activity Preview
               </TabsTrigger>
               <TabsTrigger
-                className="h-8 rounded-full px-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:hover:bg-primary/90"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                 value="raw"
               >
                 File Preview

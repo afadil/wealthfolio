@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
-use crate::context::ServiceContext;
+use crate::{
+    context::ServiceContext,
+    events::{emit_resource_changed, ResourceEventPayload},
+};
 use log::debug;
-use tauri::State;
+use serde_json::json;
+use tauri::{AppHandle, State};
 use wealthfolio_core::goals::goals_model::{Goal, GoalsAllocation, NewGoal};
 
 #[tauri::command]
@@ -15,39 +19,64 @@ pub async fn get_goals(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Goal
 pub async fn create_goal(
     goal: NewGoal,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<Goal, String> {
     debug!("Adding new goal...");
-    state
+    let new_goal = state
         .goal_service()
         .create_goal(goal)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new("goal", "created", json!({ "goal_id": new_goal.id })),
+    );
+
+    Ok(new_goal)
 }
 
 #[tauri::command]
 pub async fn update_goal(
     goal: Goal,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<Goal, String> {
     debug!("Updating goal...");
-    state
+    let goal_id = goal.id.clone();
+    let updated_goal = state
         .goal_service()
         .update_goal(goal)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new("goal", "updated", json!({ "goal_id": goal_id })),
+    );
+
+    Ok(updated_goal)
 }
 
 #[tauri::command]
 pub async fn delete_goal(
     goal_id: String,
     state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
 ) -> Result<usize, String> {
     debug!("Deleting goal...");
-    state
+    let result = state
         .goal_service()
-        .delete_goal(goal_id)
+        .delete_goal(goal_id.clone())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new("goal", "deleted", json!({ "goal_id": goal_id })),
+    );
+
+    Ok(result)
 }
 
 #[tauri::command]

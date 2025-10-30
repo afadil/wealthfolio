@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { type AddonContext } from '@wealthfolio/addon-sdk';
+import { useQuery } from "@tanstack/react-query";
+import { type AddonContext } from "@wealthfolio/addon-sdk";
 
 interface UseHoldingsOptions {
   accountId: string;
@@ -9,12 +9,12 @@ interface UseHoldingsOptions {
 
 export function useHoldings({ accountId, ctx, enabled = true }: UseHoldingsOptions) {
   return useQuery({
-    queryKey: ['holdings', accountId],
+    queryKey: ["holdings", accountId],
     queryFn: async () => {
       if (!accountId || !ctx.api) {
-        throw new Error('Account ID and API context are required');
+        throw new Error("Account ID and API context are required");
       }
-      
+
       const data = await ctx.api.portfolio.getHoldings(accountId);
       return data || [];
     },

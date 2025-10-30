@@ -1,8 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/components/ui/use-toast';
-import { updatePortfolio, recalculatePortfolio } from '@/commands/portfolio';
-import { logger } from '@/adapters';
-
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/ui/use-toast";
+import { updatePortfolio, recalculatePortfolio } from "@/commands/portfolio";
+import { logger } from "@/adapters";
 
 export function useUpdatePortfolioMutation() {
   const queryClient = useQueryClient();
@@ -12,11 +11,11 @@ export function useUpdatePortfolioMutation() {
     onError: (error) => {
       queryClient.invalidateQueries();
       toast({
-        title: 'Failed to update portfolio data.',
-        description: 'Please try again or report an issue if the problem persists.',
-        variant: 'destructive',
+        title: "Failed to update portfolio data.",
+        description: "Please try again or report an issue if the problem persists.",
+        variant: "destructive",
       });
-      logger.error(`Error calculating historical data: ${error}`);
+      logger.error(`Error calculating historical data: ${String(error)}`);
     },
   });
 }
@@ -28,11 +27,12 @@ export function useRecalculatePortfolioMutation() {
     onError: (error) => {
       queryClient.invalidateQueries();
       toast({
-        title: 'Failed to recalculate portfolio.',
-        description: 'Please try again or report an issue if the problem persists.',
-        variant: 'destructive',
+        title: "Failed to recalculate portfolio.",
+        description: "Please try again or report an issue if the problem persists.",
+        variant: "destructive",
       });
-      logger.error(`Error recalculating portfolio: ${error}`);
+      console.warn("Error recalculating portfolio:", error);
+      logger.error(`Error recalculating portfolio: ${String(error)}`);
     },
   });
 }

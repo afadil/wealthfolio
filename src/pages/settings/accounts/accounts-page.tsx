@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { EmptyPlaceholder, Separator, Icons, Button, Skeleton } from '@wealthfolio/ui';
-import { AccountItem } from './components/account-item';
-import { AccountEditModal } from './components/account-edit-modal';
-import type { Account } from '@/lib/types';
-import { SettingsHeader } from '../header';
-import { getAccounts } from '@/commands/account';
-import { useQuery } from '@tanstack/react-query';
-import { QueryKeys } from '@/lib/query-keys';
-import { useAccountMutations } from './components/use-account-mutations';
+import { getAccounts } from "@/commands/account";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Account } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import { useState } from "react";
+import { SettingsHeader } from "../settings-header";
+import { AccountEditModal } from "./components/account-edit-modal";
+import { AccountItem } from "./components/account-item";
+import { useAccountMutations } from "./components/use-account-mutations";
 
 const SettingsAccountsPage = () => {
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
@@ -16,7 +16,7 @@ const SettingsAccountsPage = () => {
   });
 
   const [visibleModal, setVisibleModal] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   const handleAddAccount = () => {
     setSelectedAccount(null);
@@ -47,15 +47,26 @@ const SettingsAccountsPage = () => {
     <>
       <div className="space-y-6">
         <SettingsHeader heading="Accounts" text=" Manage your investment and saving accounts.">
-          <Button onClick={() => handleAddAccount()}>
-            <Icons.PlusCircle className="mr-2 h-4 w-4" />
-            Add account
-          </Button>
+          {/* Mobile: icon button; Desktop: full button */}
+          <>
+            <Button
+              size="icon"
+              className="sm:hidden"
+              onClick={() => handleAddAccount()}
+              aria-label="Add account"
+            >
+              <Icons.Plus className="h-4 w-4" />
+            </Button>
+            <Button size="sm" className="hidden sm:inline-flex" onClick={() => handleAddAccount()}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Add account
+            </Button>
+          </>
         </SettingsHeader>
         <Separator />
-        <div className="mx-auto w-full pt-8">
+        <div className="w-full pt-8">
           {accounts?.length ? (
-            <div className="divide-y divide-border rounded-md border">
+            <div className="divide-border divide-y rounded-md border">
               {accounts.map((account: Account) => (
                 <AccountItem
                   key={account.id}
@@ -81,7 +92,7 @@ const SettingsAccountsPage = () => {
         </div>
       </div>
       <AccountEditModal
-        account={selectedAccount}
+        account={selectedAccount || undefined}
         open={visibleModal}
         onClose={() => setVisibleModal(false)}
       />

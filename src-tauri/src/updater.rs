@@ -11,13 +11,12 @@ fn is_app_store_build() -> bool {
 fn open_app_store_page(_app_handle: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
-        // Replace with your actual App Store ID
         let app_store_url = "macappstore://apps.apple.com/app/6732888445";
         let _ = std::process::Command::new("open")
             .arg(app_store_url)
             .spawn();
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         // For Microsoft Store
@@ -30,7 +29,7 @@ fn open_app_store_page(_app_handle: &AppHandle) {
 
 pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all_messages: bool) {
     let is_appstore = is_app_store_build();
-    
+
     match app_handle
         .updater_builder()
         .header("X-Instance-Id", instance_id)
@@ -56,7 +55,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                             update.version,
                             update.body.clone().unwrap_or_default()
                         );
-                        
+
                         let open_store = app_handle
                             .dialog()
                             .message(&update_message)
@@ -64,7 +63,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                             .buttons(MessageDialogButtons::OkCancel)
                             .kind(MessageDialogKind::Info)
                             .blocking_show();
-                        
+
                         if open_store {
                             open_app_store_page(&app_handle);
                         }
@@ -79,7 +78,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                             update.version,
                             update.body.clone().unwrap_or_default()
                         );
-                        
+
                         let do_update = app_handle
                             .dialog()
                             .message(&update_message)
@@ -87,7 +86,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
                             .buttons(MessageDialogButtons::OkCancel)
                             .kind(MessageDialogKind::Info)
                             .blocking_show();
-                        
+
                         if do_update {
                             match update.download_and_install(|_, _| {}, || {}).await {
                                 Ok(_) => {
@@ -133,7 +132,7 @@ pub async fn check_for_update(app_handle: AppHandle, instance_id: &str, show_all
             app_handle
                 .dialog()
                 .message(format!(
-                    "We encountered an issue while checking for updates:\n\n{}\n\nPlease try again later or contact support if the problem persists.", 
+                    "We encountered an issue while checking for updates:\n\n{}\n\nPlease try again later or contact support if the problem persists.",
                     e
                 ))
                 .title("Update Check Failed")

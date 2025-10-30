@@ -1,5 +1,5 @@
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Runtime, Emitter};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
@@ -29,7 +29,7 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
         .item(
             &MenuItemBuilder::with_id("toggle_fullscreen", "Toggle Fullscreen")
                 .accelerator("F11")
-                .build(app)?
+                .build(app)?,
         )
         .build()?;
 

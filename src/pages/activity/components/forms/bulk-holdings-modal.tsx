@@ -1,24 +1,23 @@
-import { useForm, FormProvider } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, useEffect, useCallback } from 'react';
+import { toast } from "@/components/ui/use-toast";
+import { ActivityType } from "@/lib/constants";
+import { Account, ActivityImport } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Button,
   Form,
-} from '@wealthfolio/ui';
-import { toast } from '@/components/ui/use-toast';
-import { BulkHoldingsForm } from './bulk-holdings-form';
-import { bulkHoldingsFormSchema } from './schemas';
-import { useActivityImportMutations } from '../../import/hooks/use-activity-import-mutations';
-import { ActivityImport, Account } from '@/lib/types';
-import { ActivityType } from '@/lib/constants';
-import { searchTicker } from '@/commands/market-data';
-import { z } from 'zod';
+} from "@wealthfolio/ui";
+import { useCallback, useEffect, useState } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
+import { useActivityImportMutations } from "../../import/hooks/use-activity-import-mutations";
+import { BulkHoldingsForm } from "./bulk-holdings-form";
+import { bulkHoldingsFormSchema } from "./schemas";
 
 type BulkHoldingsFormValues = z.infer<typeof bulkHoldingsFormSchema>;
 
@@ -33,20 +32,20 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const [manualHoldings, setManualHoldings] = useState<Set<string>>(new Set());
 
   const form = useForm<BulkHoldingsFormValues>({
-    resolver: zodResolver(bulkHoldingsFormSchema),
-    mode: 'onSubmit',
+    resolver: zodResolver(bulkHoldingsFormSchema) as Resolver<BulkHoldingsFormValues>,
+    mode: "onSubmit",
     defaultValues: {
-      accountId: '',
+      accountId: "",
       activityDate: new Date(),
       currency: '',
       isDraft: false,
-      comment: '',
+      comment: "",
       holdings: [
         {
-          id: '1',
-          ticker: '',
-          name: '',
-          assetId: '',
+          id: "1",
+          ticker: "",
+          name: "",
+          assetId: "",
         },
       ],
     },
@@ -69,11 +68,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       // When modal opens, focus the account field with proper timing
       // Use a longer delay to ensure modal is fully rendered
       const timeoutId = setTimeout(() => {
-        form.setFocus('accountId');
+        form.setFocus("accountId");
       }, 150);
 
       return () => clearTimeout(timeoutId);
     }
+    return; // Explicit return for all code paths
   }, [open, form]);
 
   // Account change handler
@@ -97,9 +97,9 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: () => {
       toast({
-        title: 'Import successful',
-        description: 'Holdings have been imported successfully.',
-        variant: 'default',
+        title: "Import successful",
+        description: "Holdings have been imported successfully.",
+        variant: "default",
       });
       form.reset();
       setSelectedAccount(null);
@@ -179,12 +179,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const handleFormError = useCallback((errors: Record<string, any>) => {
     // Get the first error message to display
     const firstError = Object.values(errors)[0];
-    const errorMessage = firstError?.message || 'Please check the form for errors.';
+    const errorMessage = firstError?.message || "Please check the form for errors.";
 
     toast({
-      title: 'Form validation failed',
+      title: "Form validation failed",
       description: errorMessage,
-      variant: 'destructive',
+      variant: "destructive",
     });
   }, []);
 
@@ -240,7 +240,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitDisabled}>
-                  {confirmImportMutation.isPending ? 'Importing...' : 'Confirm'}
+                  {confirmImportMutation.isPending ? "Importing..." : "Confirm"}
                 </Button>
               </DialogFooter>
             </form>

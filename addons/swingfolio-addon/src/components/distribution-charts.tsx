@@ -5,14 +5,21 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  EmptyPlaceholder,
+  formatAmount,
+  Icons,
+} from '@wealthfolio/ui';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  formatAmount,
-  EmptyPlaceholder,
-  Icons,
-} from '@wealthfolio/ui';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+  XAxis,
+  YAxis,
+} from '@wealthfolio/ui/chart';
 import type { TradeDistribution } from '../types';
 
 interface DistributionChartsProps {
@@ -32,26 +39,6 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
     .sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl))
     .slice(0, 10); // Top 10
 
-  const weekdayData = Object.entries(distribution.byWeekday)
-    .map(([weekday, data]) => ({
-      name: weekday,
-      pl: data.pl,
-      count: data.count,
-      returnPercent: data.returnPercent,
-    }))
-    .sort((a, b) => {
-      const weekdayOrder = [
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-        'Sunday',
-      ];
-      return weekdayOrder.indexOf(a.name) - weekdayOrder.indexOf(b.name);
-    });
-
   const holdingPeriodData = Object.entries(distribution.byHoldingPeriod)
     .map(([period, data]) => ({
       name: period,
@@ -68,15 +55,15 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
   const chartConfig = {
     pl: {
       label: 'P/L',
-      color: 'hsl(var(--chart-1))',
+      color: 'var(--chart-1)',
     },
     count: {
       label: 'Trades',
-      color: 'hsl(var(--chart-2))',
+      color: 'var(--chart-2)',
     },
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  // const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
   // Check if there's data for charts
   const hasSymbolData = symbolData.length > 0;
@@ -107,10 +94,31 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
-                      formatter={(value, name) => [
-                        formatCurrency(Number(value)),
-                        name === 'pl' ? 'P/L' : name,
-                      ]}
+                      formatter={(value, name, entry) => {
+                        if (value === undefined || value === null) return null;
+                        const formattedValue = formatCurrency(Number(value));
+                        return (
+                          <>
+                            <div
+                              className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
+                              style={
+                                {
+                                  '--color-bg': entry.color,
+                                  '--color-border': entry.color,
+                                } as React.CSSProperties
+                              }
+                            />
+                            <div className="flex flex-1 items-center justify-between gap-2">
+                              <span className="text-muted-foreground">
+                                {name === 'pl' ? 'P/L' : name}
+                              </span>
+                              <span className="text-foreground font-mono font-medium tabular-nums">
+                                {formattedValue}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      }}
                       labelFormatter={(label) => `Symbol: ${label}`}
                     />
                   }
@@ -119,7 +127,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                   {symbolData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.pl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                      fill={entry.pl >= 0 ? 'var(--success)' : 'var(--destructive)'}
                       fillOpacity={0.6}
                     />
                   ))}
@@ -142,7 +150,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
       {/* P/L by Holding Period */}
       <Card>
         <CardHeader>
-          <CardTitle className='text-lg'>P/L by Holding Period</CardTitle>
+          <CardTitle className="text-lg">P/L by Holding Period</CardTitle>
         </CardHeader>
         <CardContent>
           {hasHoldingPeriodData ? (
@@ -165,19 +173,40 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
-                      formatter={(value, name) => [
-                        formatCurrency(Number(value)),
-                        name === 'pl' ? 'P/L' : name,
-                      ]}
+                      formatter={(value, name, entry) => {
+                        if (value === undefined || value === null) return null;
+                        const formattedValue = formatCurrency(Number(value));
+                        return (
+                          <>
+                            <div
+                              className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
+                              style={
+                                {
+                                  '--color-bg': entry.color,
+                                  '--color-border': entry.color,
+                                } as React.CSSProperties
+                              }
+                            />
+                            <div className="flex flex-1 items-center justify-between gap-2">
+                              <span className="text-muted-foreground">
+                                {name === 'pl' ? 'P/L' : name}
+                              </span>
+                              <span className="text-foreground font-mono font-medium tabular-nums">
+                                {formattedValue}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      }}
                       labelFormatter={(label) => `Period: ${label}`}
                     />
                   }
                 />
-                <Bar dataKey="pl" fill="hsl(var(--chart-3))" radius={[2, 2, 0, 0]}>
+                <Bar dataKey="pl" fill="var(--chart-3)" radius={[2, 2, 0, 0]}>
                   {holdingPeriodData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.pl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                      fill={entry.pl >= 0 ? 'var(--success)' : 'var(--destructive)'}
                       fillOpacity={0.6}
                     />
                   ))}
@@ -196,7 +225,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
           )}
         </CardContent>
       </Card>
-   
+
       {/* Trade Count Distribution */}
       {/* <Card>
         <CardHeader>
