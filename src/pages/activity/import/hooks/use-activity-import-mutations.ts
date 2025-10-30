@@ -35,9 +35,15 @@ export function useActivityImportMutations({
             : "An error occurred during import";
         onError(errMsg);
       } else {
+        const errorMessage =
+          error && typeof error === "object" && "message" in error
+            ? String((error as { message?: unknown }).message)
+            : "An error occurred during import";
+
         toast({
-          title: "Uh oh! Something went wrong.",
-          description: "Please try again or report an issue if the problem persists.",
+          title: "Import failed",
+          description:
+            errorMessage || "Please try again or report an issue if the problem persists.",
           variant: "destructive",
         });
       }

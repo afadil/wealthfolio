@@ -18,6 +18,7 @@ interface SearchProps {
   placeholder?: string;
   onSelectResult: (symbol: string, isManual?: boolean) => void;
   className?: string;
+  allowFreeText?: boolean;
 }
 
 interface SearchResultsProps {
@@ -194,7 +195,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     // Handle keyboard events for manual input detection
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && allowFreeText && searchQuery.trim()) {
+        if (e.key === "Enter" && allowFreeText && searchQuery.trim()) {
           // Check if there are no search results or user is typing without waiting for results
           const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
           if (hasNoResults || (sortedTickers && sortedTickers.length === 0)) {
@@ -286,7 +287,14 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 <div className="p-4 text-sm">No symbols found</div>
               )}
 
-              {isError && <div className="p-4 text-sm text-destructive">Something went wrong</div>}
+              {isError && (
+                <div className="text-destructive p-4 text-sm">
+                  <div>Something went wrong</div>
+                  <div className="mt-1 text-xs opacity-70">
+                    Try again or check your market data provider settings.
+                  </div>
+                </div>
+              )}
 
               {sortedTickers?.map((ticker) => {
                 return (
@@ -297,8 +305,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                   >
                     <Icons.Check
                       className={cn(
-                        'mr-2 h-4 w-4',
-                        selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
+                        "mr-2 h-4 w-4",
+                        selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
                       )}
                     />
                     {ticker.symbol} - {ticker.longName} ({ticker.exchange})

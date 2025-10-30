@@ -18,6 +18,7 @@ import { z } from "zod";
 import { useActivityImportMutations } from "../../import/hooks/use-activity-import-mutations";
 import { BulkHoldingsForm } from "./bulk-holdings-form";
 import { bulkHoldingsFormSchema } from "./schemas";
+import { searchTicker } from "@/commands/market-data";
 
 type BulkHoldingsFormValues = z.infer<typeof bulkHoldingsFormSchema>;
 
@@ -37,7 +38,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     defaultValues: {
       accountId: "",
       activityDate: new Date(),
-      currency: '',
+      currency: "",
       isDraft: false,
       comment: "",
       holdings: [
@@ -52,7 +53,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   });
 
   // Watch holdings for UI state management
-  const watchedHoldings = form.watch('holdings');
+  const watchedHoldings = form.watch("holdings");
   const hasValidHoldings =
     watchedHoldings?.some(
       (holding) =>
@@ -80,13 +81,13 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const handleAccountChange = useCallback(
     (account: Account | null) => {
       setSelectedAccount(account);
-      form.setValue('accountId', account?.id || '', {
+      form.setValue("accountId", account?.id || "", {
         shouldValidate: true,
         shouldDirty: true,
       });
 
       // Sync currency with selected account
-      form.setValue('currency', account?.currency || 'USD', {
+      form.setValue("currency", account?.currency || "USD", {
         shouldValidate: false,
         shouldDirty: true,
       });
@@ -114,6 +115,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       const results = await searchTicker(symbol);
       return results && results.length > 0;
     } catch (error) {
+      // Log error for debugging
+      console.error("Ticker search failed for symbol:", symbol, error);
       // If search fails, assume symbol doesn't exist
       return false;
     }
@@ -131,10 +134,10 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
       if (!validHoldings.length) {
         toast({
-          title: 'No valid holdings',
+          title: "No valid holdings",
           description:
-            'Please add at least one valid holding with ticker, shares, and average cost.',
-          variant: 'destructive',
+            "Please add at least one valid holding with ticker, shares, and average cost.",
+          variant: "destructive",
         });
         return;
       }
@@ -162,12 +165,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
           quantity: Number(holding.sharesOwned),
           unitPrice: Number(holding.averageCost),
           date: data.activityDate,
-          currency: data.currency || selectedAccount?.currency || 'USD',
+          currency: data.currency || selectedAccount?.currency || "USD",
           fee: 0,
           isDraft: false,
           isValid: true,
           comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
-          assetDataSource: shouldBeManual ? 'MANUAL' : undefined,
+          assetDataSource: shouldBeManual ? "MANUAL" : undefined,
         }),
       );
 
@@ -217,11 +220,11 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
               {/* Display validation errors */}
               {Object.keys(form.formState.errors).length > 0 && (
-                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                  <h4 className="mb-2 text-sm font-medium text-destructive">
+                <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
+                  <h4 className="text-destructive mb-2 text-sm font-medium">
                     Please fix the following errors:
                   </h4>
-                  <ul className="space-y-1 text-sm text-destructive/80">
+                  <ul className="text-destructive/80 space-y-1 text-sm">
                     {form.formState.errors.accountId && (
                       <li>• {form.formState.errors.accountId.message}</li>
                     )}

@@ -17,7 +17,7 @@ import {
   MoneyInput,
   QuantityInput,
 } from "@wealthfolio/ui";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 export interface BulkHoldingRow {
@@ -36,49 +36,50 @@ interface BulkHoldingsFormProps {
 }
 
 // Memoized row component to prevent unnecessary re-renders
-const HoldingRow = memo(({
-  index,
-  field,
-  onRemove,
-  onAddRow,
-  isLast,
-  isSelected,
-  onSelectRow,
-  setFocus,
-  canRemove,
-  setManualHoldings,
-}: {
-  index: number;
-  field: BulkHoldingRow;
-  onRemove: (index: number) => void;
-  onAddRow: () => void;
-  isLast: boolean;
-  isSelected: boolean;
-  onSelectRow: (id: string) => void;
-  setFocus: any;
-  canRemove: boolean;
-  setManualHoldings: React.Dispatch<React.SetStateAction<Set<string>>>;
-}) => {
-  const { control } = useFormContext();
+const HoldingRow = memo(
+  ({
+    index,
+    field,
+    onRemove,
+    onAddRow,
+    isLast,
+    isSelected,
+    onSelectRow,
+    setFocus,
+    canRemove,
+    setManualHoldings,
+  }: {
+    index: number;
+    field: BulkHoldingRow;
+    onRemove: (index: number) => void;
+    onAddRow: () => void;
+    isLast: boolean;
+    isSelected: boolean;
+    onSelectRow: (id: string) => void;
+    setFocus: any;
+    canRemove: boolean;
+    setManualHoldings: React.Dispatch<React.SetStateAction<Set<string>>>;
+  }) => {
+    const { control } = useFormContext();
 
-  // Use useWatch for specific fields instead of watch() in parent
-  const ticker = useWatch({
-    control,
-    name: `holdings.${index}.ticker`,
-    defaultValue: ''
-  });
+    // Use useWatch for specific fields instead of watch() in parent
+    const ticker = useWatch({
+      control,
+      name: `holdings.${index}.ticker`,
+      defaultValue: "",
+    });
 
-  const sharesOwned = useWatch({
-    control,
-    name: `holdings.${index}.sharesOwned`,
-    defaultValue: 0
-  });
+    const sharesOwned = useWatch({
+      control,
+      name: `holdings.${index}.sharesOwned`,
+      defaultValue: 0,
+    });
 
-  const averageCost = useWatch({
-    control,
-    name: `holdings.${index}.averageCost`,
-    defaultValue: 0
-  });
+    const averageCost = useWatch({
+      control,
+      name: `holdings.${index}.averageCost`,
+      defaultValue: 0,
+    });
 
     // Memoize total value calculation
     const totalValue = useMemo(() => {
@@ -134,8 +135,8 @@ const HoldingRow = memo(({
     return (
       <div
         className={cn(
-          'grid grid-cols-12 gap-3 rounded-lg border-b border-border/50 px-3 py-3 transition-colors last:border-b-0 hover:bg-muted/50',
-          isSelected && 'bg-muted',
+          "border-border/50 hover:bg-muted/50 grid grid-cols-12 gap-3 rounded-lg border-b px-3 py-3 transition-colors last:border-b-0",
+          isSelected && "bg-muted",
         )}
         onClick={handleRowClick}
       >
@@ -168,7 +169,7 @@ const HoldingRow = memo(({
                     }}
                     value={tickerField.value}
                     placeholder="Search ticker..."
-                    className="h-9 truncate border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                    className="focus:border-input focus:bg-background h-9 truncate border-none bg-transparent text-sm focus:border"
                     allowFreeText={true}
                   />
                 )}
@@ -282,7 +283,7 @@ export const BulkHoldingsForm = ({
   const addRow = useCallback(() => {
     const newIndex = fields.length;
     append({
-      id: `holding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
+      id: `holding-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // More unique ID
       ticker: "",
       name: "",
       assetId: "",
