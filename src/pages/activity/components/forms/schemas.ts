@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ActivityType, DataSource } from "@/lib/constants";
+import { z } from "zod";
 
 export const baseActivitySchema = z.object({
   id: z.string().uuid().optional(),
@@ -46,6 +46,7 @@ export const bulkHoldingRowSchema = z.object({
     .positive({ message: "Average cost must be greater than 0" }),
   totalValue: z.number().optional(),
   assetId: z.string().optional(),
+  isManual: z.boolean().optional().default(false),
 });
 
 export const bulkHoldingsFormSchema = baseActivitySchema.extend({
@@ -148,4 +149,6 @@ export const newActivitySchema = z
     }),
   );
 
-export type NewActivityFormValues = z.infer<typeof newActivitySchema>;
+export type NewActivityFormValues = z.infer<typeof newActivitySchema> & {
+  showCurrencySelect?: boolean;
+};

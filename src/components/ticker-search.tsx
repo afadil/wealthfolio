@@ -16,8 +16,9 @@ interface SearchProps {
   defaultValue?: string;
   value?: string;
   placeholder?: string;
-  onSelectResult: (symbol: string) => void;
+  onSelectResult: (symbol: string, isManual?: boolean) => void;
   className?: string;
+  allowFreeText?: boolean;
 }
 
 interface SearchResultsProps {
@@ -81,6 +82,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       placeholder = "Select symbol...",
       onSelectResult,
       className,
+      allowFreeText = false,
     },
     ref,
   ) => {
@@ -131,6 +133,21 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       [onSelectResult, debouncedSearch],
     );
 
+    // Handle manual input when user types a symbol that doesn't exist in search results
+    const handleManualInput = useCallback(
+      (inputValue: string) => {
+        if (allowFreeText && inputValue.trim()) {
+          const manualSymbol = inputValue.toUpperCase().trim();
+          onSelectResult(manualSymbol, true); // true indicates it's manual
+          setSelected(manualSymbol);
+          setSearchQuery(manualSymbol);
+          setOpen(false);
+          debouncedSearch.cancel();
+        }
+      },
+      [allowFreeText, onSelectResult, debouncedSearch],
+    );
+
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<QuoteSummary[], Error>({
       queryKey: ["ticker-search", debouncedQuery],
@@ -175,6 +192,32 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       e.preventDefault();
     }, []);
 
+    // Handle keyboard events for manual input detection
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && allowFreeText && searchQuery.trim()) {
+          // Check if there are no search results or user is typing without waiting for results
+          const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
+          if (hasNoResults || (sortedTickers && sortedTickers.length === 0)) {
+            e.preventDefault();
+            handleManualInput(searchQuery);
+          }
+        }
+      },
+      [allowFreeText, searchQuery, isLoading, sortedTickers, handleManualInput],
+    );
+
+    // Handle blur event to detect manual input when user clicks away
+    const handleBlur = useCallback(() => {
+      if (allowFreeText && searchQuery.trim() && !open) {
+        // If user typed something and popover is closed, treat as manual input
+        const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
+        if (hasNoResults) {
+          handleManualInput(searchQuery);
+        }
+      }
+    }, [allowFreeText, searchQuery, open, isLoading, sortedTickers, handleManualInput]);
+
     return (
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
@@ -208,16 +251,69 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               value={searchQuery}
               onValueChange={handleSearchChange}
               placeholder="Search for symbol"
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
             />
 
-            <SearchResults
-              isLoading={isLoading}
-              isError={isError}
-              query={debouncedQuery}
-              results={sortedTickers}
-              selectedResult={selectedResult}
-              onSelect={handleSelectResult}
-            />
+            <CommandList>
+              {isLoading ? (
+                <CommandPrimitive.Loading>
+                  <div className="space-y-2 p-1">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                </CommandPrimitive.Loading>
+              ) : null}
+
+              {!isError && !isLoading && sortedTickers?.length === 0 && searchQuery && (
+                <>
+                  {allowFreeText && (
+                    <CommandItem
+                      onSelect={() => {
+                        handleManualInput(searchQuery);
+                      }}
+                      value={searchQuery}
+                    >
+                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      Create manual holding: {searchQuery.toUpperCase().trim()}
+                    </CommandItem>
+                  )}
+                  {!allowFreeText && <div className="p-4 text-sm">No symbols found</div>}
+                </>
+              )}
+
+              {!isError && !isLoading && sortedTickers?.length === 0 && !searchQuery && (
+                <div className="p-4 text-sm">No symbols found</div>
+              )}
+
+              {isError && (
+                <div className="text-destructive p-4 text-sm">
+                  <div>Something went wrong</div>
+                  <div className="mt-1 text-xs opacity-70">
+                    Try again or check your market data provider settings.
+                  </div>
+                </div>
+              )}
+
+              {sortedTickers?.map((ticker) => {
+                return (
+                  <CommandItem
+                    key={ticker.symbol}
+                    onSelect={() => handleSelectResult(ticker)}
+                    value={ticker.symbol}
+                  >
+                    <Icons.Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    {ticker.symbol} - {ticker.longName} ({ticker.exchange})
+                  </CommandItem>
+                );
+              })}
+            </CommandList>
           </Command>
         </PopoverContent>
       </Popover>

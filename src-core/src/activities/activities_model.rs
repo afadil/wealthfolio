@@ -315,6 +315,7 @@ pub struct ActivityImport {
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
+    pub asset_data_source: Option<String>,
 }
 
 /// Model for sorting activities

@@ -13,11 +13,12 @@ import {
   Form,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
-import { FormProvider, useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 import { useActivityImportMutations } from "../../import/hooks/use-activity-import-mutations";
 import { BulkHoldingsForm } from "./bulk-holdings-form";
 import { bulkHoldingsFormSchema } from "./schemas";
+import { searchTicker } from "@/commands/market-data";
 
 type BulkHoldingsFormValues = z.infer<typeof bulkHoldingsFormSchema>;
 
@@ -29,6 +30,7 @@ interface BulkHoldingsModalProps {
 
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [manualHoldings, setManualHoldings] = useState<Set<string>>(new Set());
 
   const form = useForm<BulkHoldingsFormValues>({
     resolver: zodResolver(bulkHoldingsFormSchema) as Resolver<BulkHoldingsFormValues>,
@@ -36,7 +38,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     defaultValues: {
       accountId: "",
       activityDate: new Date(),
-      currency: "USD",
+      currency: "",
       isDraft: false,
       comment: "",
       holdings: [
@@ -83,6 +85,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         shouldValidate: true,
         shouldDirty: true,
       });
+
+      // Sync currency with selected account
+      form.setValue("currency", account?.currency || "USD", {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
     },
     [form],
   );
@@ -101,8 +109,21 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     },
   });
 
-  const handleSubmit: SubmitHandler<BulkHoldingsFormValues> = useCallback(
-    (data) => {
+  // Function to check if a symbol exists in market data
+  const checkSymbolExists = useCallback(async (symbol: string): Promise<boolean> => {
+    try {
+      const results = await searchTicker(symbol);
+      return results && results.length > 0;
+    } catch (error) {
+      // Log error for debugging
+      console.error("Ticker search failed for symbol:", symbol, error);
+      // If search fails, assume symbol doesn't exist
+      return false;
+    }
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (data: BulkHoldingsFormValues) => {
       // Validate holdings data
       const validHoldings = data.holdings.filter(
         (holding) =>
@@ -121,24 +142,41 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         return;
       }
 
+      // Check which symbols exist in market data
+      const symbolChecks = await Promise.all(
+        validHoldings.map(async (holding) => {
+          const symbol = holding.ticker.toUpperCase().trim();
+          const isAlreadyMarkedManual = manualHoldings.has(holding.id);
+          const symbolExists = await checkSymbolExists(symbol);
+
+          // Mark as manual if either: already marked as manual OR symbol doesn't exist in market data
+          const shouldBeManual = isAlreadyMarkedManual || !symbolExists;
+
+          return { holding, shouldBeManual };
+        }),
+      );
+
       // Transform to ActivityImport format
-      const activitiesToImport: ActivityImport[] = validHoldings.map((holding) => ({
-        accountId: data.accountId,
-        activityType: ActivityType.ADD_HOLDING,
-        symbol: holding.ticker.toUpperCase().trim(),
-        quantity: Number(holding.sharesOwned),
-        unitPrice: Number(holding.averageCost),
-        date: data.activityDate,
-        currency: data.currency || selectedAccount?.currency || "USD",
-        fee: 0,
-        isDraft: false,
-        isValid: true,
-        comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
-      }));
+      const activitiesToImport: ActivityImport[] = symbolChecks.map(
+        ({ holding, shouldBeManual }) => ({
+          accountId: data.accountId,
+          activityType: ActivityType.ADD_HOLDING,
+          symbol: holding.ticker.toUpperCase().trim(),
+          quantity: Number(holding.sharesOwned),
+          unitPrice: Number(holding.averageCost),
+          date: data.activityDate,
+          currency: data.currency || selectedAccount?.currency || "USD",
+          fee: 0,
+          isDraft: false,
+          isValid: true,
+          comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
+          assetDataSource: shouldBeManual ? "MANUAL" : undefined,
+        }),
+      );
 
       confirmImportMutation.mutate({ activities: activitiesToImport });
     },
-    [confirmImportMutation, selectedAccount],
+    [confirmImportMutation, selectedAccount, manualHoldings, checkSymbolExists],
   );
 
   const handleFormError = useCallback((errors: Record<string, any>) => {
@@ -174,7 +212,10 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit, handleFormError)} className="space-y-6">
               <div className="py-4">
-                <BulkHoldingsForm onAccountChange={handleAccountChange} />
+                <BulkHoldingsForm
+                  onAccountChange={handleAccountChange}
+                  onManualHoldingsChange={setManualHoldings}
+                />
               </div>
 
               {/* Display validation errors */}
