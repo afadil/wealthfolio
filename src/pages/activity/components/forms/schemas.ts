@@ -46,6 +46,7 @@ export const bulkHoldingRowSchema = z.object({
     .positive({ message: 'Average cost must be greater than 0' }),
   totalValue: z.number().optional(),
   assetId: z.string().optional(),
+  isManual: z.boolean().optional().default(false),
 });
 
 export const bulkHoldingsFormSchema = baseActivitySchema.extend({
@@ -121,11 +122,7 @@ export const incomeActivitySchema = baseActivitySchema.extend({
 });
 
 export const otherActivitySchema = baseActivitySchema.extend({
-  activityType: z.enum([
-    ActivityType.SPLIT,
-    ActivityType.TAX,
-    ActivityType.FEE,
-  ]),
+  activityType: z.enum([ActivityType.SPLIT, ActivityType.TAX, ActivityType.FEE]),
   assetId: z.string().min(1, { message: 'Please select a security' }).optional(),
   amount: z.coerce.number().min(0).optional(),
   quantity: z.coerce.number().nonnegative().optional(),
@@ -138,8 +135,6 @@ export const otherActivitySchema = baseActivitySchema.extend({
     .optional(),
 });
 
-
-
 export const newActivitySchema = z.discriminatedUnion('activityType', [
   tradeActivitySchema,
   cashActivitySchema,
@@ -150,5 +145,4 @@ export const newActivitySchema = z.discriminatedUnion('activityType', [
 
 export type NewActivityFormValues = z.infer<typeof newActivitySchema> & {
   showCurrencySelect?: boolean;
-}; 
-
+};

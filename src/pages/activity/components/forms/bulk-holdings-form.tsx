@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, memo, useEffect } from 'react';
 import { useFormContext, useFieldArray, useWatch } from 'react-hook-form';
 import {
   Card,
@@ -32,188 +32,221 @@ export interface BulkHoldingRow {
 
 interface BulkHoldingsFormProps {
   onAccountChange?: (account: Account | null) => void;
+  onManualHoldingsChange?: (manualHoldings: Set<string>) => void;
 }
 
 // Memoized row component to prevent unnecessary re-renders
-const HoldingRow = memo(({ 
-  index, 
-  field, 
-  onRemove, 
-  onAddRow,
-  isLast,
-  isSelected,
-  onSelectRow,
-  setFocus,
-  canRemove
-}: {
-  index: number;
-  field: any;
-  onRemove: (index: number) => void;
-  onAddRow: () => void;
-  isLast: boolean;
-  isSelected: boolean;
-  onSelectRow: (id: string) => void;
-  setFocus: any;
-  canRemove: boolean;
-}) => {
-  const { control } = useFormContext();
-  
-  // Use useWatch for specific fields instead of watch() in parent
-  const ticker = useWatch({ 
-    control, 
-    name: `holdings.${index}.ticker`,
-    defaultValue: ''
-  });
-  
-  const sharesOwned = useWatch({ 
-    control, 
-    name: `holdings.${index}.sharesOwned`,
-    defaultValue: 0
-  });
-  
-  const averageCost = useWatch({ 
-    control, 
-    name: `holdings.${index}.averageCost`,
-    defaultValue: 0
-  });
+const HoldingRow = memo(
+  ({
+    index,
+    field,
+    onRemove,
+    onAddRow,
+    isLast,
+    isSelected,
+    onSelectRow,
+    setFocus,
+    canRemove,
+    setManualHoldings,
+  }: {
+    index: number;
+    field: any;
+    onRemove: (index: number) => void;
+    onAddRow: () => void;
+    isLast: boolean;
+    isSelected: boolean;
+    onSelectRow: (id: string) => void;
+    setFocus: any;
+    canRemove: boolean;
+    setManualHoldings: React.Dispatch<React.SetStateAction<Set<string>>>;
+  }) => {
+    const { control } = useFormContext();
 
-  // Memoize total value calculation
-  const totalValue = useMemo(() => {
-    const shares = Number(sharesOwned) || 0;
-    const cost = Number(averageCost) || 0;
-    return shares * cost;
-  }, [sharesOwned, averageCost]);
+    // Use useWatch for specific fields instead of watch() in parent
+    const ticker = useWatch({
+      control,
+      name: `holdings.${index}.ticker`,
+      defaultValue: '',
+    });
 
-  // Memoize event handlers
-  const handleSharesKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      setFocus(`holdings.${index}.averageCost`);
-    }
-  }, [index, setFocus]);
+    const sharesOwned = useWatch({
+      control,
+      name: `holdings.${index}.sharesOwned`,
+      defaultValue: 0,
+    });
 
-  const handleCostKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (isLast) {
-        onAddRow();
-      } else {
-        setFocus(`holdings.${index + 1}.ticker`);
-      }
-    }
-  }, [index, isLast, onAddRow, setFocus]);
+    const averageCost = useWatch({
+      control,
+      name: `holdings.${index}.averageCost`,
+      defaultValue: 0,
+    });
 
-  const handleTickerSelect = useCallback((_symbol: string) => {
-    setFocus(`holdings.${index}.sharesOwned`);
-  }, [index, setFocus]);
+    // Memoize total value calculation
+    const totalValue = useMemo(() => {
+      const shares = Number(sharesOwned) || 0;
+      const cost = Number(averageCost) || 0;
+      return shares * cost;
+    }, [sharesOwned, averageCost]);
 
-  const handleRemoveClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onRemove(index);
-  }, [index, onRemove]);
+    // Memoize event handlers
+    const handleSharesKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          setFocus(`holdings.${index}.averageCost`);
+        }
+      },
+      [index, setFocus],
+    );
 
-  const handleRowClick = useCallback(() => {
-    onSelectRow(field.id);
-  }, [field.id, onSelectRow]);
+    const handleCostKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (isLast) {
+            onAddRow();
+          } else {
+            setFocus(`holdings.${index + 1}.ticker`);
+          }
+        }
+      },
+      [index, isLast, onAddRow, setFocus],
+    );
 
-  return (
-    <div
-      className={cn(
-        'grid grid-cols-12 gap-3 rounded-lg border-b border-border/50 px-3 py-3 transition-colors hover:bg-muted/50 last:border-b-0',
-        isSelected && 'bg-muted',
-      )}
-      onClick={handleRowClick}
-    >
-      {/* Ticker Input */}
-      <div className="col-span-6">
-        <div className="flex items-center gap-2 min-w-0">
-          <TickerAvatar symbol={ticker} className="flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <FormField
-              control={control}
-              name={`holdings.${index}.ticker`}
-              render={({ field: tickerField }) => (
-                <TickerSearchInput
-                  ref={tickerField.ref}
-                  onSelectResult={(symbol: string) => {
-                    tickerField.onChange(symbol);
-                    handleTickerSelect(symbol);
-                  }}
-                  value={tickerField.value}
-                  placeholder="Search ticker..."
-                  className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background truncate"
-                />
-              )}
-            />
+    const handleTickerSelect = useCallback(
+      (_symbol: string) => {
+        setFocus(`holdings.${index}.sharesOwned`);
+      },
+      [index, setFocus],
+    );
+
+    const handleRemoveClick = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onRemove(index);
+      },
+      [index, onRemove],
+    );
+
+    const handleRowClick = useCallback(() => {
+      onSelectRow(field.id);
+    }, [field.id, onSelectRow]);
+
+    return (
+      <div
+        className={cn(
+          'grid grid-cols-12 gap-3 rounded-lg border-b border-border/50 px-3 py-3 transition-colors last:border-b-0 hover:bg-muted/50',
+          isSelected && 'bg-muted',
+        )}
+        onClick={handleRowClick}
+      >
+        {/* Ticker Input */}
+        <div className="col-span-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <TickerAvatar symbol={ticker} className="flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <FormField
+                control={control}
+                name={`holdings.${index}.ticker`}
+                render={({ field: tickerField }) => (
+                  <TickerSearchInput
+                    ref={tickerField.ref}
+                    onSelectResult={(symbol: string, isManual?: boolean) => {
+                      tickerField.onChange(symbol);
+                      handleTickerSelect(symbol);
+
+                      // If this is a manual holding, track it
+                      if (isManual) {
+                        setManualHoldings((prev: Set<string>) => new Set(prev).add(field.id));
+                      } else {
+                        // If it's not manual, remove it from manual holdings if it was there
+                        setManualHoldings((prev: Set<string>) => {
+                          const newSet = new Set(prev);
+                          newSet.delete(field.id);
+                          return newSet;
+                        });
+                      }
+                    }}
+                    value={tickerField.value}
+                    placeholder="Search ticker..."
+                    className="h-9 truncate border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                    allowFreeText={true}
+                  />
+                )}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Shares Input */}
-      <div className="col-span-1 text-right">
-        <FormField
-          control={control}
-          name={`holdings.${index}.sharesOwned`}
-          render={({ field: sharesField }) => (
-            <QuantityInput
-              {...sharesField}
-              placeholder="Shares"
-              className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
-              onKeyDown={handleSharesKeyDown}
-            />
-          )}
-        />
-      </div>
+        {/* Shares Input */}
+        <div className="col-span-1 text-right">
+          <FormField
+            control={control}
+            name={`holdings.${index}.sharesOwned`}
+            render={({ field: sharesField }) => (
+              <QuantityInput
+                {...sharesField}
+                placeholder="Shares"
+                className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                onKeyDown={handleSharesKeyDown}
+              />
+            )}
+          />
+        </div>
 
-      {/* Average Cost Input */}
-      <div className="col-span-2 text-right">
-        <FormField
-          control={control}
-          name={`holdings.${index}.averageCost`}
-          render={({ field: priceField }) => (
-            <MoneyInput
-              {...priceField}
-              placeholder="Average cost"
-              className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
-              onKeyDown={handleCostKeyDown}
-            />
-          )}
-        />
-      </div>
+        {/* Average Cost Input */}
+        <div className="col-span-2 text-right">
+          <FormField
+            control={control}
+            name={`holdings.${index}.averageCost`}
+            render={({ field: priceField }) => (
+              <MoneyInput
+                {...priceField}
+                placeholder="Average cost"
+                className="h-9 border-none bg-transparent text-sm focus:border focus:border-input focus:bg-background"
+                onKeyDown={handleCostKeyDown}
+              />
+            )}
+          />
+        </div>
 
-      {/* Total Value */}
-      <div className="col-span-2 flex items-center justify-end">
-        <span
-          className={cn(
-            'text-sm font-medium',
-            totalValue > 0 ? 'text-foreground' : 'text-muted-foreground',
-          )}
-        >
-          ${totalValue.toFixed(2)}
-        </span>
-      </div>
-
-      {/* Delete Button */}
-      <div className="col-span-1 flex items-center justify-end">
-        {canRemove && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveClick}
-            className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
+        {/* Total Value */}
+        <div className="col-span-2 flex items-center justify-end">
+          <span
+            className={cn(
+              'text-sm font-medium',
+              totalValue > 0 ? 'text-foreground' : 'text-muted-foreground',
+            )}
           >
-            <Icons.Trash className="h-3 w-3" />
-          </Button>
-        )}
+            ${totalValue.toFixed(2)}
+          </span>
+        </div>
+
+        {/* Delete Button */}
+        <div className="col-span-1 flex items-center justify-end">
+          {canRemove && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleRemoveClick}
+              className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
+            >
+              <Icons.Trash className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+);
 
 HoldingRow.displayName = 'HoldingRow';
 
-export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => {
+export const BulkHoldingsForm = ({
+  onAccountChange,
+  onManualHoldingsChange,
+}: BulkHoldingsFormProps) => {
   const { control, setFocus } = useFormContext();
   const { fields, append, remove } = useFieldArray({
     control,
@@ -222,6 +255,14 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [manualHoldings, setManualHoldings] = useState<Set<string>>(new Set());
+
+  // Call the callback when manualHoldings changes
+  useEffect(() => {
+    if (onManualHoldingsChange) {
+      onManualHoldingsChange(manualHoldings);
+    }
+  }, [manualHoldings, onManualHoldingsChange]);
 
   // Handle account selection with improved focus management
   const handleAccountSelect = useCallback(
@@ -242,12 +283,12 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
   const addRow = useCallback(() => {
     const newIndex = fields.length;
     append({
-      id: `holding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
+      id: `holding-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // More unique ID
       ticker: '',
       name: '',
       assetId: '',
     });
-    
+
     // Use requestAnimationFrame for smoother focus transition
     requestAnimationFrame(() => {
       setFocus(`holdings.${newIndex}.ticker`);
@@ -344,6 +385,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
                 onSelectRow={handleRowSelect}
                 setFocus={setFocus}
                 canRemove={fields.length > 1}
+                setManualHoldings={setManualHoldings}
               />
             ))}
           </div>

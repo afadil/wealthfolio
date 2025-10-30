@@ -1,4 +1,4 @@
-import { useState, forwardRef, useRef, useMemo, useCallback, memo } from 'react';
+import { useState, forwardRef, useRef, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Command as CommandPrimitive } from 'cmdk';
 import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -16,61 +16,12 @@ interface SearchProps {
   defaultValue?: string;
   value?: string;
   placeholder?: string;
-  onSelectResult: (symbol: string) => void;
+  onSelectResult: (symbol: string, isManual?: boolean) => void;
   className?: string;
+  allowFreeText?: boolean;
 }
 
-interface SearchResultsProps {
-  results?: QuoteSummary[];
-  query: string;
-  isLoading: boolean;
-  isError?: boolean;
-  selectedResult: SearchProps['selectedResult'];
-  onSelect: (symbol: QuoteSummary) => void;
-}
-
-// Memoize search results component
-const SearchResults = memo(
-  ({ results, isLoading, isError, selectedResult, onSelect }: SearchResultsProps) => {
-    return (
-      <CommandList>
-        {isLoading ? (
-          <CommandPrimitive.Loading>
-            <div className="space-y-2 p-1">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          </CommandPrimitive.Loading>
-        ) : null}
-        {!isError && !isLoading && selectedResult && !results?.length && (
-          <div className="p-4 text-sm">No symbols found</div>
-        )}
-        {isError && <div className="text-destructive p-4 text-sm">Something went wrong</div>}
-
-        {results?.map((ticker) => {
-          return (
-            <CommandItem
-              key={ticker.symbol}
-              onSelect={() => onSelect(ticker)}
-              value={ticker.symbol}
-            >
-              <Icons.Check
-                className={cn(
-                  'mr-2 h-4 w-4',
-                  selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
-                )}
-              />
-              {ticker.symbol} - {ticker.longName} ({ticker.exchange})
-            </CommandItem>
-          );
-        })}
-      </CommandList>
-    );
-  },
-);
-
-SearchResults.displayName = 'SearchResults';
+// Removed unused SearchResults component
 
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
@@ -81,6 +32,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       placeholder = 'Select symbol...',
       onSelectResult,
       className,
+      allowFreeText = false,
     },
     ref,
   ) => {
@@ -121,7 +73,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
     const handleSelectResult = useCallback(
       (ticker: QuoteSummary) => {
-        onSelectResult(ticker?.symbol);
+        onSelectResult(ticker?.symbol, false); // false indicates it's not manual
         const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}` : '';
         setSearchQuery(displayText);
         setSelected(displayText);
@@ -129,6 +81,21 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         debouncedSearch.cancel(); // Cancel pending debounced calls
       },
       [onSelectResult, debouncedSearch],
+    );
+
+    // Handle manual input when user types a symbol that doesn't exist in search results
+    const handleManualInput = useCallback(
+      (inputValue: string) => {
+        if (allowFreeText && inputValue.trim()) {
+          const manualSymbol = inputValue.toUpperCase().trim();
+          onSelectResult(manualSymbol, true); // true indicates it's manual
+          setSelected(manualSymbol);
+          setSearchQuery(manualSymbol);
+          setOpen(false);
+          debouncedSearch.cancel();
+        }
+      },
+      [allowFreeText, onSelectResult, debouncedSearch],
     );
 
     // Use debounced query for API call
@@ -175,13 +142,43 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       e.preventDefault();
     }, []);
 
+    // Handle keyboard events for manual input detection
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && allowFreeText && searchQuery.trim()) {
+          // Check if there are no search results or user is typing without waiting for results
+          const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
+          if (hasNoResults || (sortedTickers && sortedTickers.length === 0)) {
+            e.preventDefault();
+            handleManualInput(searchQuery);
+          }
+        }
+      },
+      [allowFreeText, searchQuery, isLoading, sortedTickers, handleManualInput],
+    );
+
+    // Handle blur event to detect manual input when user clicks away
+    const handleBlur = useCallback(() => {
+      if (allowFreeText && searchQuery.trim() && !open) {
+        // If user typed something and popover is closed, treat as manual input
+        const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
+        if (hasNoResults) {
+          handleManualInput(searchQuery);
+        }
+      }
+    }, [allowFreeText, searchQuery, open, isLoading, sortedTickers, handleManualInput]);
+
     return (
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             role="combobox"
-            className={cn('w-full rounded-md justify-between truncate', open && 'ring-ring ring-2', className)}
+            className={cn(
+              'w-full justify-between truncate rounded-md',
+              open && 'ring-2 ring-ring',
+              className,
+            )}
             ref={ref}
             aria-expanded={open}
             aria-haspopup="listbox"
@@ -204,16 +201,62 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               value={searchQuery}
               onValueChange={handleSearchChange}
               placeholder="Search for symbol"
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
             />
 
-            <SearchResults
-              isLoading={isLoading}
-              isError={isError}
-              query={debouncedQuery}
-              results={sortedTickers}
-              selectedResult={selectedResult}
-              onSelect={handleSelectResult}
-            />
+            <CommandList>
+              {isLoading ? (
+                <CommandPrimitive.Loading>
+                  <div className="space-y-2 p-1">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                </CommandPrimitive.Loading>
+              ) : null}
+
+              {!isError && !isLoading && sortedTickers?.length === 0 && searchQuery && (
+                <>
+                  {allowFreeText && (
+                    <CommandItem
+                      onSelect={() => {
+                        handleManualInput(searchQuery);
+                      }}
+                      value={searchQuery}
+                    >
+                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      Create manual holding: {searchQuery.toUpperCase().trim()}
+                    </CommandItem>
+                  )}
+                  {!allowFreeText && <div className="p-4 text-sm">No symbols found</div>}
+                </>
+              )}
+
+              {!isError && !isLoading && sortedTickers?.length === 0 && !searchQuery && (
+                <div className="p-4 text-sm">No symbols found</div>
+              )}
+
+              {isError && <div className="p-4 text-sm text-destructive">Something went wrong</div>}
+
+              {sortedTickers?.map((ticker) => {
+                return (
+                  <CommandItem
+                    key={ticker.symbol}
+                    onSelect={() => handleSelectResult(ticker)}
+                    value={ticker.symbol}
+                  >
+                    <Icons.Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        selectedResult?.symbol === ticker.symbol ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    {ticker.symbol} - {ticker.longName} ({ticker.exchange})
+                  </CommandItem>
+                );
+              })}
+            </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
