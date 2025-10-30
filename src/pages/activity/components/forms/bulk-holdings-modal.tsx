@@ -29,14 +29,14 @@ interface BulkHoldingsModalProps {
 
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  
+
   const form = useForm<BulkHoldingsFormValues>({
     resolver: zodResolver(bulkHoldingsFormSchema),
     mode: 'onSubmit',
     defaultValues: {
       accountId: '',
       activityDate: new Date(),
-      currency: 'USD',
+      currency: '',
       isDraft: false,
       comment: '',
       holdings: [
@@ -52,11 +52,11 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
   // Watch holdings for UI state management
   const watchedHoldings = form.watch('holdings');
-  const hasValidHoldings = watchedHoldings?.some(holding => 
-    holding.ticker && 
-    Number(holding.sharesOwned) > 0 && 
-    Number(holding.averageCost) > 0
-  ) || false;
+  const hasValidHoldings =
+    watchedHoldings?.some(
+      (holding) =>
+        holding.ticker && Number(holding.sharesOwned) > 0 && Number(holding.averageCost) > 0,
+    ) || false;
 
   // Reset form when modal is closed and handle initial focus
   useEffect(() => {
@@ -75,13 +75,22 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   }, [open, form]);
 
   // Account change handler
-  const handleAccountChange = useCallback((account: Account | null) => {
-    setSelectedAccount(account);
-    form.setValue('accountId', account?.id || '', {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
-  }, [form]);
+  const handleAccountChange = useCallback(
+    (account: Account | null) => {
+      setSelectedAccount(account);
+      form.setValue('accountId', account?.id || '', {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+
+      // Sync currency with selected account
+      form.setValue('currency', account?.currency || 'USD', {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    },
+    [form],
+  );
 
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: () => {
@@ -94,49 +103,54 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       setSelectedAccount(null);
       onSuccess?.();
       onClose();
-    }
+    },
   });
 
-  const handleSubmit = useCallback((data: BulkHoldingsFormValues) => {
-    // Validate holdings data
-    const validHoldings = data.holdings.filter(holding => 
-      holding.ticker?.trim() && 
-      Number(holding.sharesOwned) > 0 && 
-      Number(holding.averageCost) > 0
-    );
-    
-    if (!validHoldings.length) {
-      toast({
-        title: 'No valid holdings',
-        description: 'Please add at least one valid holding with ticker, shares, and average cost.',
-        variant: 'destructive',
-      });
-      return;
-    }
+  const handleSubmit = useCallback(
+    (data: BulkHoldingsFormValues) => {
+      // Validate holdings data
+      const validHoldings = data.holdings.filter(
+        (holding) =>
+          holding.ticker?.trim() &&
+          Number(holding.sharesOwned) > 0 &&
+          Number(holding.averageCost) > 0,
+      );
 
-    // Transform to ActivityImport format
-    const activitiesToImport: ActivityImport[] = validHoldings.map(holding => ({
-      accountId: data.accountId,
-      activityType: ActivityType.ADD_HOLDING,
-      symbol: holding.ticker.toUpperCase().trim(),
-      quantity: Number(holding.sharesOwned),
-      unitPrice: Number(holding.averageCost),
-      date: data.activityDate,
-      currency: data.currency || selectedAccount?.currency || 'USD',
-      fee: 0,
-      isDraft: false,
-      isValid: true,
-      comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
-    }));
+      if (!validHoldings.length) {
+        toast({
+          title: 'No valid holdings',
+          description:
+            'Please add at least one valid holding with ticker, shares, and average cost.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-    confirmImportMutation.mutate({ activities: activitiesToImport });
-  }, [confirmImportMutation, selectedAccount]);
+      // Transform to ActivityImport format
+      const activitiesToImport: ActivityImport[] = validHoldings.map((holding) => ({
+        accountId: data.accountId,
+        activityType: ActivityType.ADD_HOLDING,
+        symbol: holding.ticker.toUpperCase().trim(),
+        quantity: Number(holding.sharesOwned),
+        unitPrice: Number(holding.averageCost),
+        date: data.activityDate,
+        currency: data.currency || selectedAccount?.currency || 'USD',
+        fee: 0,
+        isDraft: false,
+        isValid: true,
+        comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
+      }));
+
+      confirmImportMutation.mutate({ activities: activitiesToImport });
+    },
+    [confirmImportMutation, selectedAccount],
+  );
 
   const handleFormError = useCallback((errors: Record<string, any>) => {
     // Get the first error message to display
     const firstError = Object.values(errors)[0];
     const errorMessage = firstError?.message || 'Please check the form for errors.';
-    
+
     toast({
       title: 'Form validation failed',
       description: errorMessage,
@@ -144,18 +158,20 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     });
   }, []);
 
-  const isSubmitDisabled = confirmImportMutation.isPending || 
-                          !hasValidHoldings || 
-                          !selectedAccount ||
-                          !form.formState.isValid;
+  const isSubmitDisabled =
+    confirmImportMutation.isPending ||
+    !hasValidHoldings ||
+    !selectedAccount ||
+    !form.formState.isValid;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Portfolio</DialogTitle>
           <DialogDescription>
-            Quickly add multiple holdings to your portfolio. Enter your current positions with ticker symbols, quantities, and average costs.
+            Quickly add multiple holdings to your portfolio. Enter your current positions with
+            ticker symbols, quantities, and average costs.
           </DialogDescription>
         </DialogHeader>
 
@@ -163,16 +179,16 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit, handleFormError)} className="space-y-6">
               <div className="py-4">
-                <BulkHoldingsForm 
-                  onAccountChange={handleAccountChange}
-                />
+                <BulkHoldingsForm onAccountChange={handleAccountChange} />
               </div>
 
               {/* Display validation errors */}
               {Object.keys(form.formState.errors).length > 0 && (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                  <h4 className="text-sm font-medium text-destructive mb-2">Please fix the following errors:</h4>
-                  <ul className="text-sm text-destructive/80 space-y-1">
+                  <h4 className="mb-2 text-sm font-medium text-destructive">
+                    Please fix the following errors:
+                  </h4>
+                  <ul className="space-y-1 text-sm text-destructive/80">
                     {form.formState.errors.accountId && (
                       <li>• {form.formState.errors.accountId.message}</li>
                     )}
@@ -190,10 +206,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitDisabled}
-                >
+                <Button type="submit" disabled={isSubmitDisabled}>
                   {confirmImportMutation.isPending ? 'Importing...' : 'Confirm'}
                 </Button>
               </DialogFooter>
