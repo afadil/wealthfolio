@@ -1,11 +1,13 @@
-import { z } from 'zod';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Card,
   CardContent,
+  CurrencyInput,
+  DatePickerInput,
+  FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormControl,
   FormMessage,
   MoneyInput,
   Select,
@@ -15,6 +17,7 @@ import {
   SelectValue,
 } from '@wealthfolio/ui';
 import { useFormContext } from 'react-hook-form';
+import { z } from 'zod';
 import { AccountSelectOption } from '../activity-form';
 import {
   ActivityTypeSelector,
@@ -22,9 +25,6 @@ import {
 } from '../activity-type-selector';
 import { ConfigurationCheckbox } from './common';
 import { cashActivitySchema } from './schemas';
-import { DatePickerInput } from '@wealthfolio/ui';
-import { Textarea } from '@/components/ui/textarea';
-import { CurrencyInput } from '@wealthfolio/ui';
 
 export type CashFormValues = z.infer<typeof cashActivitySchema>;
 
@@ -217,6 +217,4 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
       </Card>
     </div>
   );
-};
-
 };
