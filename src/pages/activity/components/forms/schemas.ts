@@ -84,8 +84,10 @@ export const cashActivitySchema = baseActivitySchema.extend({
     ActivityType.WITHDRAWAL,
     ActivityType.TRANSFER_IN,
     ActivityType.TRANSFER_OUT,
+    ActivityType.TRANSFER,
   ]),
   assetId: z.string().optional(),
+  toAccountId: z.string().optional(),
   amount: z.coerce
     .number({
       required_error: "Please enter a valid amount.",
@@ -123,7 +125,7 @@ export const incomeActivitySchema = baseActivitySchema.extend({
 
 export const otherActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.SPLIT, ActivityType.TAX, ActivityType.FEE]),
-  assetId: z.string().min(1, { message: "Please select a security" }).optional(),
+  assetId: z.string().min(1, { message: 'Please select a security' }).optional(),
   amount: z.coerce.number().min(0).optional(),
   quantity: z.coerce.number().nonnegative().optional(),
   fee: z.coerce
