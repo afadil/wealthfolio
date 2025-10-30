@@ -6,10 +6,13 @@ use crate::activities::activities_errors::ActivityError;
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
+use crate::market_data::MarketDataServiceTrait;
+use crate::market_data::market_data_model::{Quote, DataSource};
 use crate::Result;
 use crate::assets::AssetServiceTrait;
 use crate::fx::FxServiceTrait;
 use uuid::Uuid;
+use chrono::DateTime;
 
 /// Service for managing activities
 pub struct ActivityService {
@@ -17,6 +20,7 @@ pub struct ActivityService {
     account_service: Arc<dyn AccountServiceTrait>,
     asset_service: Arc<dyn AssetServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
+    market_data_service: Arc<dyn MarketDataServiceTrait>,
 }
 
 impl ActivityService {
@@ -26,12 +30,14 @@ impl ActivityService {
         account_service: Arc<dyn AccountServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
+        market_data_service: Arc<dyn MarketDataServiceTrait>,
     ) -> Self {
         Self {
             activity_repository,
             account_service,
             asset_service,
             fx_service,
+            market_data_service,
         }
     }
 }
@@ -287,6 +293,37 @@ impl ActivityServiceTrait for ActivityService {
 
         let count = self.activity_repository.create_activities(new_activities).await?;
         debug!("Successfully imported {} activities", count);
+
+        // Create initial quotes for manual assets
+        for activity in &validated_activities {
+            // Check if activity is marked as manual
+            let is_manual = activity.asset_data_source.as_ref().map_or(false, |source| source == "MANUAL");
+
+            if is_manual {
+                let quote = Quote {
+                    id: Uuid::new_v4().to_string(),
+                    symbol: activity.symbol.clone(),
+                    timestamp: DateTime::parse_from_rfc3339(&activity.date)
+                        .map_err(|e| ActivityError::InvalidData(format!("Invalid date format: {}", e)))?
+                        .with_timezone(&chrono::Utc),
+                    open: activity.unit_price,
+                    high: activity.unit_price,
+                    low: activity.unit_price,
+                    close: activity.unit_price,
+                    adjclose: activity.unit_price,
+                    volume: rust_decimal::Decimal::ZERO,
+                    currency: activity.currency.clone(),
+                    data_source: DataSource::Manual,
+                    created_at: chrono::Utc::now(),
+                };
+
+                if let Err(e) = self.market_data_service.add_quote(&quote).await {
+                    debug!("Failed to create quote for manual asset {}: {}", activity.symbol, e);
+                } else {
+                    debug!("Created initial quote for manual asset {} at price {}", activity.symbol, activity.unit_price);
+                }
+            }
+        }
 
         Ok(validated_activities)
     }
