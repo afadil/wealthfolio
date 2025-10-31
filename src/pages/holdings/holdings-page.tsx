@@ -273,6 +273,7 @@ export const HoldingsPage = () => {
           setSelectedAccount={handleAccountSelect}
           variant="dropdown"
           includePortfolio={true}
+          className="h-9"
         />
         <AnimatedToggleGroup
           items={views.map((v) => ({ value: v.value, label: v.label }))}

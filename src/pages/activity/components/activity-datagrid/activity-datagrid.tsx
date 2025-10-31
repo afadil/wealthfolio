@@ -591,7 +591,7 @@ export function ActivityDatagrid({
 
   return (
     <div className="space-y-3">
-      <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 shadow-sm">
+      <div className="bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
         <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
           {selectedIds.size > 0 && (
             <span className="font-medium">
@@ -611,7 +611,7 @@ export function ActivityDatagrid({
             onClick={addNewRow}
             variant="outline"
             size="xs"
-            className="shrink-0 rounded-md text-xs"
+            className="shrink-0 rounded-md"
             title="Add transaction"
             aria-label="Add transaction"
           >
@@ -740,6 +740,7 @@ export function ActivityDatagrid({
                   currencyOptions={currencyOptions}
                   accountLookup={accountLookup}
                   isSelected={selectedIds.has(transaction.id)}
+                  isDirty={dirtyTransactionIds.has(transaction.id)}
                   focusedField={focusedCell?.rowId === transaction.id ? focusedCell.field : null}
                   onToggleSelect={toggleSelect}
                   onUpdateTransaction={updateTransaction}
@@ -765,6 +766,7 @@ interface TransactionRowProps {
   currencyOptions: { value: string; label: string; searchValue?: string }[];
   accountLookup: Map<string, Account>;
   isSelected: boolean;
+  isDirty: boolean;
   focusedField: EditableField | null;
   onToggleSelect: (id: string) => void;
   onUpdateTransaction: (id: string, field: EditableField, value: string) => void;
@@ -783,6 +785,7 @@ const TransactionRow = memo(
     currencyOptions,
     accountLookup,
     isSelected,
+    isDirty,
     focusedField,
     onToggleSelect,
     onUpdateTransaction,
@@ -840,6 +843,7 @@ const TransactionRow = memo(
           "group hover:bg-muted/40",
           isSelected && "bg-muted/60",
           transaction.isNew && "bg-primary/5",
+          isDirty && "border-l-primary border-l-2",
         )}
       >
         <TableCell className="h-9 w-12 border-r px-0 py-0 text-center">
@@ -991,6 +995,7 @@ const TransactionRow = memo(
     return (
       prev.transaction === next.transaction &&
       prev.isSelected === next.isSelected &&
+      prev.isDirty === next.isDirty &&
       prev.focusedField === next.focusedField &&
       prev.activityTypeOptions === next.activityTypeOptions &&
       prev.accountOptions === next.accountOptions &&
