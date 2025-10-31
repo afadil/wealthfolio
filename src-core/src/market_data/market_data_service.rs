@@ -31,12 +31,46 @@ pub struct MarketDataService {
 #[async_trait]
 impl MarketDataServiceTrait for MarketDataService {
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
-        self.provider_registry
+        // First, search in external providers
+        let provider_results = self.provider_registry
             .read()
             .await
             .search_ticker(query)
-            .await
-            .map_err(|e| e.into())
+            .await?;
+
+        // If provider results found, return them
+        if !provider_results.is_empty() {
+            return Ok(provider_results);
+        }
+
+        // If no results from providers, search for existing manual assets in the database
+        let all_assets = self.asset_repository.list()?;
+        let query_upper = query.to_uppercase();
+        
+        let manual_assets: Vec<QuoteSummary> = all_assets
+            .iter()
+            .filter(|asset| {
+                // Only show manual assets
+                asset.data_source == "MANUAL" &&
+                // Match by symbol (exact or starts with)
+                (asset.symbol.to_uppercase() == query_upper ||
+                 asset.symbol.to_uppercase().starts_with(&query_upper) ||
+                // Also match by name if available
+                 asset.name.as_ref().map_or(false, |n| n.to_uppercase().contains(&query_upper)))
+            })
+            .map(|asset| QuoteSummary {
+                symbol: asset.symbol.clone(),
+                short_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
+                long_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
+                quote_type: asset.asset_type.clone().unwrap_or_else(|| "EQUITY".to_string()),
+                index: "".to_string(),
+                score: 100.0, // Exact matches from DB should have high score
+                type_display: "Manual".to_string(),
+                exchange: "MANUAL".to_string(),
+            })
+            .collect();
+
+        Ok(manual_assets)
     }
 
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
