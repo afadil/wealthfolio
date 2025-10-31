@@ -1,6 +1,6 @@
 use crate::market_data::market_data_constants::{
     DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_YAHOO,
-    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API
+    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_VN_MARKET
 };
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::{
@@ -12,6 +12,7 @@ use crate::market_data::providers::marketdata_app_provider::MarketDataAppProvide
 use crate::market_data::providers::metal_price_api_provider::MetalPriceApiProvider;
 use crate::market_data::providers::alpha_vantage_provider::AlphaVantageProvider;
 use crate::market_data::providers::yahoo_provider::YahooProvider;
+use crate::market_data::providers::vn_market_provider::VnMarketProvider;
 use crate::secrets::SecretManager;
 use log::{debug, info, warn};
 use std::collections::HashMap;
@@ -120,6 +121,13 @@ impl ProviderRegistry {
                         warn!("MetalPriceApi provider '{}' (ID: {}) is enabled but requires an API key, which was not found or resolved. Skipping.", setting.name, setting.id);
                         (None, None)
                     }
+                }
+                DATA_SOURCE_VN_MARKET => {
+                    let p = Arc::new(VnMarketProvider::new());
+                    (
+                        Some(p.clone() as Arc<dyn MarketDataProvider + Send + Sync>),
+                        Some(p as Arc<dyn AssetProfiler + Send + Sync>),
+                    )
                 }
                 _ => {
                     warn!(

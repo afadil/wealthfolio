@@ -1,0 +1,2 @@
+INSERT INTO market_data_providers (id, name, description, url, priority, enabled, logo_filename, last_synced_at, last_sync_status, last_sync_error)
+VALUES ('VN_MARKET', 'Vietnam Market', 'Vietnam Stock Market Data Provider for HOSE, HNX, and UPCOM exchanges.', 'http://localhost:8765', 2, TRUE, 'vn-market.png', NULL, NULL, NULL);

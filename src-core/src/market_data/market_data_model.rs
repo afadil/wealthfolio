@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API};
+use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_VN_MARKET};
 
 #[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -132,6 +132,7 @@ pub enum DataSource {
     MarketDataApp,
     AlphaVantage,
     MetalPriceApi,
+    VnMarket,
     #[default]
     Manual,
 }
@@ -143,6 +144,7 @@ impl DataSource {
             DataSource::MarketDataApp => DATA_SOURCE_MARKET_DATA_APP,
             DataSource::AlphaVantage => DATA_SOURCE_ALPHA_VANTAGE,
             DataSource::MetalPriceApi => DATA_SOURCE_METAL_PRICE_API,
+            DataSource::VnMarket => DATA_SOURCE_VN_MARKET,
             DataSource::Manual => DATA_SOURCE_MANUAL,
         }
     }
@@ -161,6 +163,7 @@ impl From<&str> for DataSource {
             DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
             DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
             DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
+            DATA_SOURCE_VN_MARKET => DataSource::VnMarket,
             _ => DataSource::Manual,
         }
     }
