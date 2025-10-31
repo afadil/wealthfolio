@@ -16,7 +16,7 @@ export function ActivityPagination({
   totalCount,
 }: ActivityPaginationProps) {
   return (
-    <div className="mt-3 flex shrink-0 flex-col gap-3 sm:gap-4">
+    <div className="my-3 flex shrink-0 flex-col gap-3 sm:gap-4">
       <div className="relative flex flex-col items-center justify-center gap-2 sm:flex-row">
         <div className="text-muted-foreground order-2 flex items-center gap-2 text-xs sm:absolute sm:left-0 sm:order-1">
           {isFetching && !hasMore ? <Icons.Spinner className="h-4 w-4 animate-spin" /> : null}

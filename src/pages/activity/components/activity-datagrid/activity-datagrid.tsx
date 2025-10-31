@@ -12,7 +12,7 @@ import {
   ActivityDetails,
   ActivityUpdate,
 } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
 import {
   Button,
   Checkbox,
@@ -82,31 +82,6 @@ const generateTempActivityId = () => {
     return `temp-${crypto.randomUUID()}`;
   }
   return `temp-${Date.now().toString(36)}`;
-};
-
-const formatDateInputValue = (date: Date | string | undefined) => {
-  if (!date) return "";
-  const iso = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(iso.getTime())) {
-    return "";
-  }
-  return iso.toISOString().slice(0, 16);
-};
-
-const formatDateDisplayValue = (date: Date | string | undefined) => {
-  if (!date) return "";
-  const value = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(value.getTime())) {
-    return "";
-  }
-
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  const hours = String(value.getHours()).padStart(2, "0");
-  const minutes = String(value.getMinutes()).padStart(2, "0");
-
-  return `${year}/${month}/${day} ${hours}:${minutes}`;
 };
 
 const getNumericCellValue = (value: unknown): string => {
@@ -401,12 +376,13 @@ export function ActivityDatagrid({
     (id: string) => {
       const source = localTransactions.find((transaction) => transaction.id === id);
       if (!source) return;
+      const now = new Date();
       const duplicated: LocalTransaction = {
         ...source,
         id: generateTempActivityId(),
-        date: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        date: now,
+        createdAt: now,
+        updatedAt: now,
         isNew: true,
       };
       setLocalTransactions((prev) => [duplicated, ...prev]);
@@ -866,8 +842,8 @@ const TransactionRow = memo(
         </TableCell>
         <TableCell className="h-9 border-r px-0 py-0">
           <EditableCell
-            value={formatDateInputValue(transaction.date)}
-            displayValue={formatDateDisplayValue(transaction.date)}
+            value={formatDateTimeLocal(transaction.date)}
+            displayValue={formatDateTimeDisplay(transaction.date)}
             onChange={(value) => onUpdateTransaction(transaction.id, "date", value)}
             onFocus={() => handleFocus("date")}
             onNavigate={onNavigate}
