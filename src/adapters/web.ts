@@ -34,6 +34,7 @@ const COMMANDS: CommandMap = {
   search_activities: { method: "POST", path: "/activities/search" },
   create_activity: { method: "POST", path: "/activities" },
   update_activity: { method: "PUT", path: "/activities" },
+  save_activities: { method: "POST", path: "/activities/bulk" },
   delete_activity: { method: "DELETE", path: "/activities" },
   // Activity import
   check_activities_import: { method: "POST", path: "/activities/import/check" },
@@ -208,6 +209,11 @@ export const invokeWeb = async <T>(
     case "update_activity": {
       const { activity } = payload as { activity: Record<string, unknown> };
       body = JSON.stringify(activity);
+      break;
+    }
+    case "save_activities": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
       break;
     }
     case "delete_activity": {

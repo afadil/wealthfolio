@@ -1,5 +1,7 @@
 import {
   Activity,
+  ActivityBulkMutationRequest,
+  ActivityBulkMutationResult,
   ActivityCreate,
   ActivityDetails,
   ActivitySearchResponse,
@@ -105,13 +107,20 @@ export const updateActivity = async (activity: ActivityUpdate): Promise<Activity
   }
 };
 
-export const saveActivities = async (activities: ActivityUpdate[]): Promise<Activity[]> => {
+export const saveActivities = async (
+  request: ActivityBulkMutationRequest,
+): Promise<ActivityBulkMutationResult> => {
+  const payload: ActivityBulkMutationRequest = {
+    creates: request.creates ?? [],
+    updates: request.updates ?? [],
+    deleteIds: request.deleteIds ?? [],
+  };
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:
-        return invokeTauri("save_activities", { activities: activities });
+        return invokeTauri("save_activities", { request: payload });
       case RUN_ENV.WEB:
-        return invokeWeb("save_activities", { activities });
+        return invokeWeb("save_activities", { request: payload });
       default:
         throw new Error(`Unsupported`);
     }

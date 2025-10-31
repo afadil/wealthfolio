@@ -2,15 +2,16 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use log::{debug, error};
 use rust_decimal::Decimal;
-use std::collections::{HashMap, HashSet};
+use std::collections::btree_map::Entry as BTreeEntry;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 use super::market_data_constants::*;
 use super::market_data_model::{
-    LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting, Quote, QuoteRequest,
-    QuoteSummary, UpdateMarketDataProviderSetting, QuoteImport, ImportValidationStatus,
+    ImportValidationStatus, LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting,
+    Quote, QuoteImport, QuoteRequest, QuoteSummary, UpdateMarketDataProviderSetting,
 };
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
@@ -21,6 +22,13 @@ use crate::market_data::providers::ProviderRegistry;
 use crate::utils::time_utils;
 
 const QUOTE_LOOKBACK_DAYS: i64 = 7;
+
+#[derive(Debug)]
+struct SymbolSyncPlanItem {
+    symbol: String,
+    currency: String,
+    start: SystemTime,
+}
 
 pub struct MarketDataService {
     provider_registry: Arc<RwLock<ProviderRegistry>>,
@@ -245,12 +253,12 @@ impl MarketDataServiceTrait for MarketDataService {
         let latest_sync_dates_by_source = self.repository.get_latest_sync_dates_by_source()?;
 
         let mut providers_info = Vec::new();
-        let known_providers =
-            vec![(DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png")];
+        let known_providers = vec![(DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png")];
 
         for (id, name, logo_filename) in known_providers {
-            let last_synced_naive: Option<NaiveDateTime> =
-                latest_sync_dates_by_source.get(id).and_then(|opt_dt| *opt_dt);
+            let last_synced_naive: Option<NaiveDateTime> = latest_sync_dates_by_source
+                .get(id)
+                .and_then(|opt_dt| *opt_dt);
 
             let last_synced_utc: Option<DateTime<Utc>> =
                 last_synced_naive.map(|naive_dt| Utc.from_utc_datetime(&naive_dt));
@@ -286,32 +294,47 @@ impl MarketDataServiceTrait for MarketDataService {
             priority: Some(priority),
             enabled: Some(enabled),
         };
-        let updated_setting = self.repository
+        let updated_setting = self
+            .repository
             .update_provider_settings(provider_id, changes)
             .await?;
-        
+
         // Refresh the provider registry with the updated settings
         debug!("Refreshing provider registry after settings update");
         self.refresh_provider_registry().await?;
-        
+
         Ok(updated_setting)
     }
 
-    async fn import_quotes_from_csv(&self, quotes: Vec<QuoteImport>, overwrite: bool) -> Result<Vec<QuoteImport>> {
+    async fn import_quotes_from_csv(
+        &self,
+        quotes: Vec<QuoteImport>,
+        overwrite: bool,
+    ) -> Result<Vec<QuoteImport>> {
         debug!("🚀 SERVICE: import_quotes_from_csv called");
-        debug!("📊 Processing {} quotes, overwrite: {}", quotes.len(), overwrite);
-        
+        debug!(
+            "📊 Processing {} quotes, overwrite: {}",
+            quotes.len(),
+            overwrite
+        );
+
         let mut results = Vec::new();
         let mut quotes_to_import = Vec::new();
 
         debug!("🔍 Starting quote validation and duplicate checking...");
         for (index, mut quote) in quotes.into_iter().enumerate() {
-            debug!("📋 Processing quote {}/{}: symbol={}, date={}", index + 1, results.len() + quotes_to_import.len() + 1, quote.symbol, quote.date);
-            
+            debug!(
+                "📋 Processing quote {}/{}: symbol={}, date={}",
+                index + 1,
+                results.len() + quotes_to_import.len() + 1,
+                quote.symbol,
+                quote.date
+            );
+
             // Check if quote already exists
             let exists = self.repository.quote_exists(&quote.symbol, &quote.date)?;
             debug!("🔍 Quote exists check: {}", exists);
-            
+
             if exists {
                 if overwrite {
                     debug!("🔄 Quote exists but overwrite=true, will import");
@@ -319,7 +342,9 @@ impl MarketDataServiceTrait for MarketDataService {
                     quotes_to_import.push(quote.clone());
                 } else {
                     debug!("⚠️ Quote exists and overwrite=false, skipping");
-                    quote.validation_status = ImportValidationStatus::Warning("Quote already exists, skipping".to_string());
+                    quote.validation_status = ImportValidationStatus::Warning(
+                        "Quote already exists, skipping".to_string(),
+                    );
                 }
             } else {
                 debug!("✨ New quote, validating...");
@@ -332,7 +357,11 @@ impl MarketDataServiceTrait for MarketDataService {
             results.push(quote);
         }
 
-        debug!("📊 Validation complete: {} total, {} to import", results.len(), quotes_to_import.len());
+        debug!(
+            "📊 Validation complete: {} total, {} to import",
+            results.len(),
+            quotes_to_import.len()
+        );
 
         // Convert to Quote structs and import
         debug!("🔄 Converting import quotes to database quotes...");
@@ -353,16 +382,30 @@ impl MarketDataServiceTrait for MarketDataService {
             })
             .collect();
 
-        debug!("📦 Successfully converted {} quotes for database insertion", quotes_for_db.len());
+        debug!(
+            "📦 Successfully converted {} quotes for database insertion",
+            quotes_for_db.len()
+        );
 
         if !quotes_for_db.is_empty() {
-            debug!("💾 Calling repository.bulk_upsert_quotes with {} quotes", quotes_for_db.len());
-            debug!("🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}", 
-                   quotes_for_db[0].id, quotes_for_db[0].symbol, quotes_for_db[0].timestamp, quotes_for_db[0].data_source);
-            
+            debug!(
+                "💾 Calling repository.bulk_upsert_quotes with {} quotes",
+                quotes_for_db.len()
+            );
+            debug!(
+                "🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}",
+                quotes_for_db[0].id,
+                quotes_for_db[0].symbol,
+                quotes_for_db[0].timestamp,
+                quotes_for_db[0].data_source
+            );
+
             match self.repository.bulk_upsert_quotes(quotes_for_db).await {
                 Ok(count) => {
-                    debug!("✅ Successfully inserted/updated {} quotes in database", count);
+                    debug!(
+                        "✅ Successfully inserted/updated {} quotes in database",
+                        count
+                    );
                 }
                 Err(e) => {
                     error!("❌ Database insertion failed: {}", e);
@@ -415,10 +458,10 @@ impl MarketDataService {
         debug!("Refreshing provider registry with latest settings");
         let provider_settings = self.repository.get_all_providers()?;
         let new_registry = ProviderRegistry::new(provider_settings).await?;
-        
+
         // Replace the registry with the new one
         *self.provider_registry.write().await = new_registry;
-        
+
         debug!("Provider registry refreshed successfully");
         Ok(())
     }
@@ -521,29 +564,83 @@ impl MarketDataService {
             .map(|req| (req.symbol.clone(), req.currency.clone()))
             .collect();
 
-        if !symbols_with_currencies.is_empty() {
-            let start_date_time =
-                self.calculate_sync_start_time(refetch_all, &symbols_with_currencies)?;
+        let sync_plan =
+            self.calculate_sync_plan(refetch_all, &symbols_with_currencies, end_date)?;
 
-            match self
-                .provider_registry
-                .read()
-                .await
-                .historical_quotes_bulk(&symbols_with_currencies, start_date_time, end_date)
-                .await
-            {
-                Ok((quotes, provider_failures)) => {
-                    debug!("Successfully fetched {} public quotes.", quotes.len());
-                    all_quotes.extend(quotes);
-                    failed_syncs.extend(provider_failures);
+        if sync_plan.is_empty() {
+            debug!("All tracked symbols are already up to date; nothing to fetch from providers.");
+        } else {
+            let mut grouped_requests: BTreeMap<NaiveDateTime, (SystemTime, Vec<(String, String)>)> =
+                BTreeMap::new();
+
+            for plan in sync_plan {
+                let SymbolSyncPlanItem {
+                    symbol,
+                    currency,
+                    start,
+                } = plan;
+                let start_key = DateTime::<Utc>::from(start).naive_utc();
+                match grouped_requests.entry(start_key) {
+                    BTreeEntry::Occupied(mut entry) => entry.get_mut().1.push((symbol, currency)),
+                    BTreeEntry::Vacant(entry) => {
+                        entry.insert((start, vec![(symbol, currency)]));
+                    }
                 }
-                Err(e) => {
-                    error!("Failed to sync public quotes batch: {}", e);
-                    failed_syncs.extend(
-                        symbols_with_currencies
-                            .into_iter()
-                            .map(|(s, _)| (s, e.to_string())),
+            }
+
+            for (_, (start_time, group_symbols)) in grouped_requests.into_iter() {
+                if group_symbols.is_empty() {
+                    continue;
+                }
+
+                if start_time >= end_date {
+                    debug!(
+                        "Skipping sync for symbols {:?} because start time {:?} >= end time {:?}.",
+                        group_symbols
+                            .iter()
+                            .map(|(symbol, _)| symbol.clone())
+                            .collect::<Vec<_>>(),
+                        DateTime::<Utc>::from(start_time),
+                        DateTime::<Utc>::from(end_date),
                     );
+                    continue;
+                }
+
+                let symbol_names: Vec<String> = group_symbols
+                    .iter()
+                    .map(|(symbol, _)| symbol.clone())
+                    .collect();
+
+                match self
+                    .provider_registry
+                    .read()
+                    .await
+                    .historical_quotes_bulk(&group_symbols, start_time, end_date)
+                    .await
+                {
+                    Ok((quotes, provider_failures)) => {
+                        debug!(
+                            "Fetched {} quotes for symbols {:?} (start {}).",
+                            quotes.len(),
+                            symbol_names,
+                            DateTime::<Utc>::from(start_time).format("%Y-%m-%d")
+                        );
+                        all_quotes.extend(quotes);
+                        failed_syncs.extend(provider_failures);
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to sync quotes for symbols {:?} starting {}: {}",
+                            symbol_names,
+                            DateTime::<Utc>::from(start_time).format("%Y-%m-%d"),
+                            e
+                        );
+                        failed_syncs.extend(
+                            symbol_names
+                                .into_iter()
+                                .map(|symbol| (symbol, e.to_string())),
+                        );
+                    }
                 }
             }
         }
@@ -570,65 +667,93 @@ impl MarketDataService {
         Ok(((), failed_syncs))
     }
 
-    fn calculate_sync_start_time(
+    fn calculate_sync_plan(
         &self,
         refetch_all: bool,
         symbols_with_currencies: &[(String, String)],
-    ) -> Result<SystemTime> {
-        if refetch_all {
-            let default_history_days = DEFAULT_HISTORY_DAYS;
-            Ok(Utc
-                .from_utc_datetime(&(Utc::now().naive_utc() - Duration::days(default_history_days)))
-                .into())
-        } else {
-            let symbols_for_latest: Vec<String> = symbols_with_currencies
-                .iter()
-                .map(|(sym, _)| sym.clone())
-                .collect();
-
-            let default_history_days = DEFAULT_HISTORY_DAYS;
-            let default_start_date =
-                Utc::now().naive_utc().date() - Duration::days(default_history_days);
-
-            match self
-                .repository
-                .get_latest_quotes_for_symbols(&symbols_for_latest)
-            {
-                Ok(quotes_map) => {
-                    let required_start_dates: Vec<NaiveDate> = symbols_with_currencies
-                        .iter()
-                        .map(|(symbol, _currency)| {
-                            match quotes_map.get(symbol) {
-                                Some(latest_quote) => latest_quote.timestamp.date_naive(),
-                                None => {
-                                    debug!("No latest quote found for symbol {}. Using default history window.", symbol);
-                                    default_start_date
-                                }
-                            }
-                        })
-                        .collect();
-
-                    let overall_earliest_start_date =
-                        required_start_dates.into_iter().min().unwrap_or(default_start_date);
-
-                    debug!(
-                        "Determined earliest start date for sync: {}",
-                        overall_earliest_start_date
-                    );
-                    Ok(Utc
-                        .from_utc_datetime(
-                            &overall_earliest_start_date.and_hms_opt(0, 0, 0).unwrap(),
-                        )
-                        .into())
-                }
-                Err(e) => {
-                    error!("Failed to get latest quotes for symbols {:?}: {}. Falling back to default history window.", symbols_for_latest, e);
-                    Ok(Utc
-                        .from_utc_datetime(&default_start_date.and_hms_opt(0, 0, 0).unwrap())
-                        .into())
-                }
-            }
+        end_time: SystemTime,
+    ) -> Result<Vec<SymbolSyncPlanItem>> {
+        if symbols_with_currencies.is_empty() {
+            return Ok(Vec::new());
         }
+
+        let end_date = DateTime::<Utc>::from(end_time).naive_utc().date();
+        let default_history_days = DEFAULT_HISTORY_DAYS;
+        let default_start_date = end_date - Duration::days(default_history_days);
+
+        if refetch_all {
+            let default_start_time: SystemTime = Utc
+                .from_utc_datetime(&default_start_date.and_hms_opt(0, 0, 0).unwrap())
+                .into();
+
+            let plan = symbols_with_currencies
+                .iter()
+                .map(|(symbol, currency)| SymbolSyncPlanItem {
+                    symbol: symbol.clone(),
+                    currency: currency.clone(),
+                    start: default_start_time,
+                })
+                .collect();
+            return Ok(plan);
+        }
+
+        let symbols_for_latest: Vec<String> = symbols_with_currencies
+            .iter()
+            .map(|(sym, _)| sym.clone())
+            .collect();
+
+        let quotes_map = match self
+            .repository
+            .get_latest_quotes_for_symbols(&symbols_for_latest)
+        {
+            Ok(map) => map,
+            Err(e) => {
+                error!(
+                    "Failed to get latest quotes for symbols {:?}: {}. Falling back to default history window.",
+                    symbols_for_latest, e
+                );
+                HashMap::new()
+            }
+        };
+
+        let mut plan = Vec::new();
+
+        for (symbol, currency) in symbols_with_currencies {
+            let start_date = match quotes_map.get(symbol) {
+                Some(latest_quote) => {
+                    let last_date = latest_quote.timestamp.date_naive();
+                    if last_date >= end_date {
+                        debug!(
+                            "Symbol '{}' already has data through {} (end {}). Skipping fetch.",
+                            symbol, last_date, end_date
+                        );
+                        continue;
+                    }
+                    last_date.succ_opt().unwrap_or(last_date)
+                }
+                None => default_start_date,
+            };
+
+            if start_date > end_date {
+                debug!(
+                    "Symbol '{}' is already synced through {} (end {}). Skipping fetch.",
+                    symbol, start_date, end_date
+                );
+                continue;
+            }
+
+            let start_time: SystemTime = Utc
+                .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
+                .into();
+
+            plan.push(SymbolSyncPlanItem {
+                symbol: symbol.clone(),
+                currency: currency.clone(),
+                start: start_time,
+            });
+        }
+
+        Ok(plan)
     }
 
     fn validate_quote_data(&self, quote: &QuoteImport) -> ImportValidationStatus {
@@ -639,7 +764,9 @@ impl MarketDataService {
 
         // Validate date format
         if let Err(_) = chrono::NaiveDate::parse_from_str(&quote.date, "%Y-%m-%d") {
-            return ImportValidationStatus::Error("Invalid date format. Expected YYYY-MM-DD".to_string());
+            return ImportValidationStatus::Error(
+                "Invalid date format. Expected YYYY-MM-DD".to_string(),
+            );
         }
 
         // Validate close price (required)
@@ -650,13 +777,19 @@ impl MarketDataService {
         // Validate OHLC logic
         if let (Some(open), Some(high), Some(low)) = (quote.open, quote.high, quote.low) {
             if high < low {
-                return ImportValidationStatus::Error("High price cannot be less than low price".to_string());
+                return ImportValidationStatus::Error(
+                    "High price cannot be less than low price".to_string(),
+                );
             }
             if open > high || open < low {
-                return ImportValidationStatus::Warning("Open price is outside high-low range".to_string());
+                return ImportValidationStatus::Warning(
+                    "Open price is outside high-low range".to_string(),
+                );
             }
             if quote.close > high || quote.close < low {
-                return ImportValidationStatus::Warning("Close price is outside high-low range".to_string());
+                return ImportValidationStatus::Warning(
+                    "Close price is outside high-low range".to_string(),
+                );
             }
         }
 
@@ -664,7 +797,6 @@ impl MarketDataService {
     }
 
     fn convert_import_quote_to_quote(&self, import_quote: &QuoteImport) -> Result<Quote> {
-
         use super::market_data_model::DataSource;
 
         let timestamp = chrono::NaiveDate::parse_from_str(&import_quote.date, "%Y-%m-%d")?

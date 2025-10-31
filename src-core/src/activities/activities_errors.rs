@@ -37,7 +37,7 @@ impl From<ActivityError> for diesel::result::Error {
         // Using DatabaseError as it's the most appropriate for general errors
         diesel::result::Error::DatabaseError(
             diesel::result::DatabaseErrorKind::SerializationFailure,
-            Box::new(format!("{}", err))
+            Box::new(format!("{}", err)),
         )
     }
 }

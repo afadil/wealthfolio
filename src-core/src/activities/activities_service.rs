@@ -2,13 +2,13 @@ use chrono::Utc;
 use log::debug;
 use std::sync::Arc;
 
-use crate::activities::activities_errors::ActivityError;
 use crate::accounts::{Account, AccountServiceTrait};
+use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::Result;
 use crate::assets::AssetServiceTrait;
 use crate::fx::FxServiceTrait;
+use crate::Result;
 use uuid::Uuid;
 
 /// Service for managing activities
@@ -33,6 +33,65 @@ impl ActivityService {
             asset_service,
             fx_service,
         }
+    }
+}
+
+impl ActivityService {
+    async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
+        let account: Account = self.account_service.get_account(&activity.account_id)?;
+
+        let asset_context_currency = if !activity.currency.is_empty() {
+            activity.currency.clone()
+        } else {
+            account.currency.clone()
+        };
+
+        let asset = self
+            .asset_service
+            .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
+            .await?;
+
+        if activity.currency.is_empty() {
+            activity.currency = asset.currency.clone();
+        }
+
+        if activity.currency != account.currency {
+            self.fx_service
+                .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                .await?;
+        }
+
+        Ok(activity)
+    }
+
+    async fn prepare_update_activity(
+        &self,
+        mut activity: ActivityUpdate,
+    ) -> Result<ActivityUpdate> {
+        let account: Account = self.account_service.get_account(&activity.account_id)?;
+
+        let asset_context_currency = if !activity.currency.is_empty() {
+            activity.currency.clone()
+        } else {
+            account.currency.clone()
+        };
+
+        let asset = self
+            .asset_service
+            .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
+            .await?;
+
+        if activity.currency.is_empty() {
+            activity.currency = asset.currency.clone();
+        }
+
+        if activity.currency != account.currency {
+            self.fx_service
+                .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
+                .await?;
+        }
+
+        Ok(activity)
     }
 }
 
@@ -90,79 +149,85 @@ impl ActivityServiceTrait for ActivityService {
     }
 
     /// Creates a new activity
-    async fn create_activity(&self, mut activity: NewActivity) -> Result<Activity> {
-
-        let account: Account = self
-            .account_service
-            .get_account(&activity.account_id)
-            ?;
-
-        // Determine the currency to be used as context for creating the asset, if it needs to be created.
-        // Priority: 1. Activity's own currency (if specified), 2. Account's currency.
-        let asset_context_currency = if !activity.currency.is_empty() {
-            activity.currency.clone()
-        } else {
-            account.currency.clone() // Fallback to account currency for context
-        };
-
-        let asset = self
-            .asset_service
-            .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
-            .await?;
-
-        // Now, ensure the activity's currency field is set.
-        // Priority: 1. Activity's original currency (if specified), 2. Asset's currency
-        if activity.currency.is_empty() {
-            // asset.currency should now be guaranteed to be non-empty if get_or_create_asset succeeded
-            activity.currency = asset.currency.clone();
-        }
-        
-
-        if activity.currency != account.currency {
-            self.fx_service
-                .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
-                .await?;
-        }
-
-        self.activity_repository.create_activity(activity).await
+    async fn create_activity(&self, activity: NewActivity) -> Result<Activity> {
+        let prepared = self.prepare_new_activity(activity).await?;
+        self.activity_repository.create_activity(prepared).await
     }
 
     /// Updates an existing activity
-    async fn update_activity(&self, mut activity: ActivityUpdate) -> Result<Activity> {
-        let account: Account = self
-            .account_service
-            .get_account(&activity.account_id)
-            ?;
-        
-        // Determine context currency for potential asset creation
-        let asset_context_currency = if !activity.currency.is_empty() {
-            activity.currency.clone()
-        } else {
-            account.currency.clone() // Fallback
-        };
-
-        let asset = self
-            .asset_service
-            .get_or_create_asset(&activity.asset_id, Some(asset_context_currency))
-            .await?;
-
-        // Ensure activity currency is set
-        if activity.currency.is_empty() {
-            activity.currency = asset.currency.clone();
-        }
-
-        if activity.currency != account.currency {
-            self.fx_service
-                .register_currency_pair(account.currency.as_str(), activity.currency.as_str())
-                .await?;
-        }
-
-        self.activity_repository.update_activity(activity).await
+    async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity> {
+        let prepared = self.prepare_update_activity(activity).await?;
+        self.activity_repository.update_activity(prepared).await
     }
 
     /// Deletes an activity
     async fn delete_activity(&self, activity_id: String) -> Result<Activity> {
         self.activity_repository.delete_activity(activity_id).await
+    }
+
+    async fn bulk_mutate_activities(
+        &self,
+        request: ActivityBulkMutationRequest,
+    ) -> Result<ActivityBulkMutationResult> {
+        let mut errors: Vec<ActivityBulkMutationError> = Vec::new();
+        let mut prepared_creates: Vec<NewActivity> = Vec::new();
+        let mut prepared_updates: Vec<ActivityUpdate> = Vec::new();
+        let mut valid_delete_ids: Vec<String> = Vec::new();
+
+        for new_activity in request.creates {
+            let temp_id = new_activity.id.clone();
+            match self.prepare_new_activity(new_activity).await {
+                Ok(prepared) => prepared_creates.push(prepared),
+                Err(err) => {
+                    errors.push(ActivityBulkMutationError {
+                        id: temp_id,
+                        action: "create".to_string(),
+                        message: err.to_string(),
+                    });
+                }
+            }
+        }
+
+        for update_request in request.updates {
+            let target_id = update_request.id.clone();
+            match self.prepare_update_activity(update_request).await {
+                Ok(prepared) => prepared_updates.push(prepared),
+                Err(err) => {
+                    errors.push(ActivityBulkMutationError {
+                        id: Some(target_id),
+                        action: "update".to_string(),
+                        message: err.to_string(),
+                    });
+                }
+            }
+        }
+
+        for delete_id in request.delete_ids {
+            match self.activity_repository.get_activity(&delete_id) {
+                Ok(_) => valid_delete_ids.push(delete_id.clone()),
+                Err(err) => {
+                    errors.push(ActivityBulkMutationError {
+                        id: Some(delete_id),
+                        action: "delete".to_string(),
+                        message: err.to_string(),
+                    });
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            let mut outcome = ActivityBulkMutationResult::default();
+            outcome.errors = errors;
+            return Ok(outcome);
+        }
+
+        let mut persisted = self
+            .activity_repository
+            .bulk_mutate_activities(prepared_creates, prepared_updates, valid_delete_ids)
+            .await?;
+
+        persisted.errors = errors;
+        Ok(persisted)
     }
 
     /// Verifies the activities import from CSV file
@@ -171,10 +236,7 @@ impl ActivityServiceTrait for ActivityService {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>> {
-        let account: Account = self
-            .account_service
-            .get_account(&account_id)
-            ?;
+        let account: Account = self.account_service.get_account(&account_id)?;
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
 
@@ -186,13 +248,13 @@ impl ActivityServiceTrait for ActivityService {
             if activity.account_id.is_none() {
                 activity.account_id = Some(account_id.clone());
             }
-        
+
             // Determine context currency for potential asset creation during check
             let asset_context_currency = if !activity.currency.is_empty() {
                 activity.currency.clone()
             } else {
                 // Fallback to account currency for context if import data lacks currency
-                account.currency.clone() 
+                account.currency.clone()
             };
 
             let symbol_profile_result = self
@@ -203,30 +265,40 @@ impl ActivityServiceTrait for ActivityService {
             let (mut is_valid, mut error_message) = (true, None);
 
             match symbol_profile_result {
-                Ok(asset) => { // symbol_profile_result now returns Asset
+                Ok(asset) => {
+                    // symbol_profile_result now returns Asset
                     activity.symbol_name = asset.name; // Use asset name
-                    
+
                     // Check if activity currency (from import) is valid and handle FX
                     if activity.currency.is_empty() {
                         // Activity must have a currency specified in the import
                         is_valid = false;
-                        error_message = Some("Activity currency is missing in the import data.".to_string());
+                        error_message =
+                            Some("Activity currency is missing in the import data.".to_string());
                     } else if activity.currency != account.currency {
-                        match self.fx_service.register_currency_pair(
-                            account.currency.as_str(),
-                            activity.currency.as_str(), // Use currency from import data
-                        ).await {
+                        match self
+                            .fx_service
+                            .register_currency_pair(
+                                account.currency.as_str(),
+                                activity.currency.as_str(), // Use currency from import data
+                            )
+                            .await
+                        {
                             Ok(_) => { /* FX pair registered or already exists */ }
                             Err(e) => {
                                 is_valid = false;
-                                error_message = Some(format!("Failed to register currency pair for FX: {}", e));
+                                error_message =
+                                    Some(format!("Failed to register currency pair for FX: {}", e));
                             }
                         }
                     }
                 }
                 Err(e) => {
                     // Failed to get or create asset
-                    let error_msg = format!("Failed to resolve asset for symbol '{}': {}", &activity.symbol, e);
+                    let error_msg = format!(
+                        "Failed to resolve asset for symbol '{}': {}",
+                        &activity.symbol, e
+                    );
                     is_valid = false;
                     error_message = Some(error_msg);
                 }
@@ -235,7 +307,7 @@ impl ActivityServiceTrait for ActivityService {
             activity.is_valid = is_valid;
             if let Some(error_msg) = error_message {
                 let mut errors = std::collections::HashMap::new();
-                errors.insert(activity.symbol.clone(), vec![error_msg]); 
+                errors.insert(activity.symbol.clone(), vec![error_msg]);
                 activity.errors = Some(errors);
             }
 
@@ -285,7 +357,10 @@ impl ActivityServiceTrait for ActivityService {
             })
             .collect();
 
-        let count = self.activity_repository.create_activities(new_activities).await?;
+        let count = self
+            .activity_repository
+            .create_activities(new_activities)
+            .await?;
         debug!("Successfully imported {} activities", count);
 
         Ok(validated_activities)
@@ -302,14 +377,12 @@ impl ActivityServiceTrait for ActivityService {
 
     /// Gets the import mapping for a given account ID
     fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData> {
-        let mapping = self
-            .activity_repository
-            .get_import_mapping(&account_id)?;
+        let mapping = self.activity_repository.get_import_mapping(&account_id)?;
 
         let mut result = match mapping {
-            Some(m) => m
-                .to_mapping_data()
-                .map_err(|e| ActivityError::InvalidData(format!("Failed to parse mapping data: {}", e)))?,
+            Some(m) => m.to_mapping_data().map_err(|e| {
+                ActivityError::InvalidData(format!("Failed to parse mapping data: {}", e))
+            })?,
             None => ImportMappingData::default(),
         };
         result.account_id = account_id;
@@ -322,7 +395,9 @@ impl ActivityServiceTrait for ActivityService {
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData> {
         let mapping = ImportMapping::from_mapping_data(&mapping_data)?;
-        self.activity_repository.save_import_mapping(&mapping).await?;
+        self.activity_repository
+            .save_import_mapping(&mapping)
+            .await?;
         Ok(mapping_data)
     }
 }

@@ -91,6 +91,7 @@ import {
   TrendingDown,
   TrendingUp,
   Type,
+  Undo2,
   Ungroup,
   Upload,
   Users,
@@ -205,6 +206,7 @@ export const Icons = {
   Moon: Moon,
   Sun: Sun,
   ListFilter: ListFilter,
+  Undo: Undo2,
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
