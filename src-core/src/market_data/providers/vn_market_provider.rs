@@ -28,7 +28,7 @@ impl VnMarketProvider {
         }
     }
 
-    async fn search_tickers(&self, query: &str) -> Result<Vec<VnMarketSearchResult>, MarketDataError> {
+    async fn search_tickers(&self, query: &str) -> Result<Vec<VnMarketAssetProfile>, MarketDataError> {
         let url = format!("{}/search", self.base_url);
         let params = [("query", query)];
 
@@ -40,12 +40,12 @@ impl VnMarketProvider {
             )));
         }
 
-        let search_results: VnMarketSearchResponse = response.json().await?;
-        Ok(search_results.results)
+        let search_response: VnMarketSearchResponse = response.json().await?;
+        Ok(search_response.results)
     }
 
     async fn get_quote(&self, symbol: &str) -> Result<VnMarketQuote, MarketDataError> {
-        let url = format!("{}/stocks/quote/{}", self.base_url, symbol);
+        let url = format!("{}/quote/{}", self.base_url, symbol);
 
         let response = self.client.get(&url).send().await?;
         if !response.status().is_success() {
@@ -56,10 +56,8 @@ impl VnMarketProvider {
             )));
         }
 
-        let quote: VnMarketQuoteResponse = response.json().await?;
-        quote.quote().ok_or_else(|| MarketDataError::NotFound(format!(
-            "No quote data found for symbol: {}", symbol
-        )))
+        let quote: VnMarketQuote = response.json().await?;
+        Ok(quote)
     }
 
     async fn get_historical_quotes_internal(
@@ -69,17 +67,18 @@ impl VnMarketProvider {
         end: SystemTime,
         _fallback_currency: String,
     ) -> Result<Vec<Quote>, MarketDataError> {
-        let url = format!("{}/stocks/history/{}", self.base_url, symbol);
+        let url = format!("{}/history/{}", self.base_url, symbol);
 
         // Convert SystemTime to date range
         let start_date = DateTime::<Utc>::from(start).date_naive();
         let end_date = DateTime::<Utc>::from(end).date_naive();
 
-        let mut query_params = Vec::new();
-        query_params.push(("start_date", start_date.format("%Y-%m-%d").to_string()));
-        query_params.push(("end_date", end_date.format("%Y-%m-%d").to_string()));
+        let params = [
+            ("start_date", start_date.format("%Y-%m-%d").to_string()),
+            ("end_date", end_date.format("%Y-%m-%d").to_string()),
+        ];
 
-        let response = self.client.get(&url).query(&query_params).send().await?;
+        let response = self.client.get(&url).query(&params).send().await?;
         if !response.status().is_success() {
             return Err(MarketDataError::ProviderError(format!(
                 "VN_MARKET history failed for {}: {}",
@@ -88,21 +87,23 @@ impl VnMarketProvider {
             )));
         }
 
-        let history: VnMarketHistoryResponse = response.json().await?;
-        Ok(history.data.into_iter().map(|item| {
-            let date = chrono::NaiveDate::parse_from_str(&item.date, "%Y-%m-%d")
-                .unwrap_or_else(|_| chrono::NaiveDate::from_ymd_opt(2025, 1, 1).unwrap());
+        let history_response: VnMarketHistoryResponse = response.json().await?;
+
+        Ok(history_response.history.into_iter().map(|entry| {
+            let date = chrono::NaiveDate::parse_from_str(&entry.date, "%Y-%m-%d")
+                .unwrap_or_else(|_| Utc::now().date_naive());
+
             Quote {
-                id: format!("hist_{}_{}", symbol, item.date),
+                id: format!("hist_{}_{}", symbol, entry.date),
                 symbol: symbol.to_string(),
                 timestamp: date.and_time(chrono::NaiveTime::MIN).and_utc(),
-                open: Decimal::from_str(&item.open.to_string()).unwrap_or_default(),
-                high: Decimal::from_str(&item.high.to_string()).unwrap_or_default(),
-                low: Decimal::from_str(&item.low.to_string()).unwrap_or_default(),
-                close: Decimal::from_str(&item.close.to_string()).unwrap_or_default(),
-                adjclose: Decimal::from_str(&item.adjclose.to_string()).unwrap_or_default(),
-                volume: Decimal::from_str(&item.volume.to_string()).unwrap_or_default(),
-                currency: "VND".to_string(),
+                open: Decimal::from_str(&entry.open.to_string()).unwrap_or_default(),
+                high: Decimal::from_str(&entry.high.to_string()).unwrap_or_default(),
+                low: Decimal::from_str(&entry.low.to_string()).unwrap_or_default(),
+                close: Decimal::from_str(&entry.close.to_string()).unwrap_or_default(),
+                adjclose: Decimal::from_str(&entry.adjclose.to_string()).unwrap_or_default(),
+                volume: Decimal::from_str(&entry.volume.to_string()).unwrap_or_default(),
+                currency: history_response.currency.clone(),
                 data_source: DataSource::VnMarket,
                 created_at: Utc::now(),
             }
@@ -120,20 +121,20 @@ impl MarketDataProvider for VnMarketProvider {
         2 // Between Yahoo (1) and Alpha Vantage (3)
     }
 
-    async fn get_latest_quote(&self, symbol: &str, fallback_currency: String) -> Result<Quote, MarketDataError> {
+    async fn get_latest_quote(&self, symbol: &str, _fallback_currency: String) -> Result<Quote, MarketDataError> {
         let quote = self.get_quote(symbol).await?;
 
         Ok(Quote {
             id: format!("quote_{}", symbol),
             symbol: symbol.to_string(),
             timestamp: Utc::now(),
-            open: Decimal::ZERO,
-            high: Decimal::ZERO,
-            low: Decimal::ZERO,
-            close: Decimal::from_str(&quote.price.to_string()).unwrap_or_default(),
-            adjclose: Decimal::from_str(&quote.price.to_string()).unwrap_or_default(),
-            volume: Decimal::ZERO,
-            currency: fallback_currency,
+            open: Decimal::from_str(&quote.open.to_string()).unwrap_or_default(),
+            high: Decimal::from_str(&quote.high.to_string()).unwrap_or_default(),
+            low: Decimal::from_str(&quote.low.to_string()).unwrap_or_default(),
+            close: Decimal::from_str(&quote.close.to_string()).unwrap_or_default(),
+            adjclose: Decimal::from_str(&quote.adjclose.to_string()).unwrap_or_default(),
+            volume: Decimal::from_str(&quote.volume.to_string()).unwrap_or_default(),
+            currency: quote.currency,
             data_source: DataSource::VnMarket,
             created_at: Utc::now(),
         })
@@ -179,17 +180,16 @@ impl AssetProfiler for VnMarketProvider {
     async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
         let search_results = self.search_tickers(query).await?;
 
-        Ok(search_results.into_iter().map(|result| {
-            let name = result.name.clone();
+        Ok(search_results.into_iter().map(|profile| {
             QuoteSummary {
-                symbol: result.symbol,
-                short_name: name.clone(),
-                quote_type: "Stock".to_string(),
+                symbol: profile.symbol,
+                short_name: profile.name.clone(),
+                quote_type: profile.asset_type.clone(),
                 index: "".to_string(),
                 score: 100.0,
-                type_display: "Stock".to_string(),
-                long_name: name,
-                exchange: result.exchange.unwrap_or_default(),
+                type_display: profile.asset_type.clone(),
+                long_name: profile.name,
+                exchange: profile.exchange,
             }
         }).collect())
     }
@@ -198,81 +198,83 @@ impl AssetProfiler for VnMarketProvider {
         let search_results = self.search_tickers(symbol).await?;
 
         // Find exact match or first result
-        let result = search_results.iter()
-            .find(|result| result.symbol == symbol)
+        let profile = search_results.iter()
+            .find(|p| p.symbol == symbol)
             .cloned()
             .or_else(|| search_results.first().cloned())
             .ok_or_else(|| MarketDataError::NotFound(symbol.to_string()))?;
 
         Ok(AssetProfile {
-            id: None,
-            isin: None,
-            name: Some(result.name),
-            asset_type: Some(result.asset_type.unwrap_or_else(|| "Stock".to_string())),
-            symbol: result.symbol,
+            id: Some(profile.symbol.clone()),
+            isin: profile.isin,
+            name: Some(profile.name),
+            asset_type: Some(profile.asset_type.clone()),
+            symbol: profile.symbol,
             symbol_mapping: None,
-            asset_class: Some("Equity".to_string()),
-            asset_sub_class: Some("Stock".to_string()),
+            asset_class: Some(profile.asset_class),
+            asset_sub_class: Some(profile.asset_sub_class),
             notes: None,
-            countries: None,
-            categories: None,
+            countries: profile.countries.map(|c| c.join(", ")),
+            categories: profile.categories.map(|c| c.join(", ")),
             classes: None,
             attributes: None,
-            currency: "VND".to_string(),
-            data_source: "VN_MARKET".to_string(),
+            currency: profile.currency,
+            data_source: profile.data_source,
             sectors: None,
             url: None,
         })
     }
 }
 
-// VN_MARKET API Response Structures
+// VN_MARKET API Response Structures - Universal Interface
 #[derive(Debug, Deserialize)]
 struct VnMarketSearchResponse {
-    results: Vec<VnMarketSearchResult>,
+    results: Vec<VnMarketAssetProfile>,
+    total: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct VnMarketSearchResult {
+struct VnMarketAssetProfile {
     symbol: String,
     name: String,
-    exchange: Option<String>,
-    asset_type: Option<String>,
-    industry: Option<String>,
-    description: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct VnMarketQuoteResponse {
-    symbol: String,
-    close: f64,
-    date: String,
-}
-
-impl VnMarketQuoteResponse {
-    fn quote(self) -> Option<VnMarketQuote> {
-        Some(VnMarketQuote {
-            symbol: self.symbol,
-            price: self.close,
-            date: self.date,
-        })
-    }
+    asset_type: String,
+    asset_class: String,
+    asset_sub_class: String,
+    #[serde(default)]
+    isin: Option<String>,
+    #[serde(default)]
+    countries: Option<Vec<String>>,
+    #[serde(default)]
+    categories: Option<Vec<String>>,
+    currency: String,
+    exchange: String,
+    data_source: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct VnMarketQuote {
     symbol: String,
-    price: f64,
-    date: String,
+    asset_type: String,
+    open: f64,
+    high: f64,
+    low: f64,
+    close: f64,
+    adjclose: f64,
+    volume: f64,
+    currency: String,
+    data_source: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct VnMarketHistoryResponse {
-    data: Vec<VnMarketHistoryData>,
+    symbol: String,
+    history: Vec<VnMarketHistoryEntry>,
+    currency: String,
+    data_source: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct VnMarketHistoryData {
+struct VnMarketHistoryEntry {
     date: String,
     open: f64,
     high: f64,

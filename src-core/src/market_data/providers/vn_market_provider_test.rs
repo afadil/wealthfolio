@@ -1,15 +1,16 @@
-use std::collections::HashMap;
-
-use async_std::task;
+use rust_decimal::Decimal;
 
 use crate::market_data::{
-    market_data_model::{AssetProfile, HistoricalQuote, Quote},
-    market_data_provider::{AssetProfiler, MarketDataProvider},
+    market_data_model::{Quote, DataSource},
+    providers::market_data_provider::{AssetProfiler, MarketDataProvider},
     providers::vn_market_provider::VnMarketProvider,
-    market_data_service::TimeRange,
+    providers::models::AssetProfile,
+    market_data_errors::MarketDataError,
 };
+use std::time::{SystemTime, Duration};
+use chrono::Utc;
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_creation() {
     let provider = VnMarketProvider::new();
 
@@ -17,7 +18,7 @@ async fn test_vn_market_provider_creation() {
     assert_eq!(provider.priority(), 2);
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_search_ticker() {
     let provider = VnMarketProvider::new();
 
@@ -29,10 +30,10 @@ async fn test_vn_market_provider_search_ticker() {
         Ok(search_results) => {
             println!("Found {} results for 'VNM'", search_results.len());
             // Validate result structure if any results found
-            for profile in &search_results {
-                assert!(!profile.symbol.is_empty());
-                assert!(!profile.name.is_empty());
-                assert_eq!(profile.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
+            for summary in &search_results {
+                assert!(!summary.symbol.is_empty());
+                assert!(!summary.short_name.is_empty());
+                assert!(!summary.quote_type.is_empty());
             }
         }
         Err(e) => {
@@ -42,7 +43,7 @@ async fn test_vn_market_provider_search_ticker() {
     }
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_get_asset_profile() {
     let provider = VnMarketProvider::new();
 
@@ -52,10 +53,12 @@ async fn test_vn_market_provider_get_asset_profile() {
     let profile = match provider.get_asset_profile(symbol).await {
         Ok(profile) => {
             assert!(!profile.symbol.is_empty());
-            assert!(!profile.name.is_empty());
-            assert_eq!(profile.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
+            assert!(profile.name.is_some());
+            assert_eq!(profile.data_source, "VN_MARKET");
             assert_eq!(profile.currency, "VND");
-            println!("Got profile for {}: {}", profile.symbol, profile.name);
+            assert!(profile.asset_class.is_some());
+            assert!(profile.asset_sub_class.is_some());
+            println!("Got profile for {}: {:?}", profile.symbol, profile.name);
             profile
         }
         Err(e) => {
@@ -66,19 +69,20 @@ async fn test_vn_market_provider_get_asset_profile() {
     };
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_get_latest_quote() {
     let provider = VnMarketProvider::new();
 
     // Test with a Vietnamese stock symbol
     let symbol = "VNM";
 
-    let quote = match provider.get_latest_quote(symbol).await {
+    let quote = match provider.get_latest_quote(symbol, "VND".to_string()).await {
         Ok(quote) => {
             assert!(!quote.symbol.is_empty());
-            assert!(quote.price >= 0.0);
-            assert_eq!(quote.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
-            println!("Got quote for {}: ${}", quote.symbol, quote.price);
+            assert!(quote.close >= Decimal::ZERO);
+            assert_eq!(quote.data_source, DataSource::VnMarket);
+            assert_eq!(quote.currency, "VND");
+            println!("Got quote for {}: {} {}", quote.symbol, quote.close, quote.currency);
             quote
         }
         Err(e) => {
@@ -89,21 +93,22 @@ async fn test_vn_market_provider_get_latest_quote() {
     };
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_get_historical_quotes() {
     let provider = VnMarketProvider::new();
 
     // Test with a Vietnamese stock symbol for short period
     let symbol = "VNM";
-    let time_range = TimeRange::Days(30); // 30 days of historical data
+    let start = SystemTime::now() - Duration::from_secs(30 * 24 * 60 * 60); // 30 days ago
+    let end = SystemTime::now();
 
-    let quotes = match provider.get_historical_quotes(symbol, time_range).await {
+    let quotes = match provider.get_historical_quotes(symbol, start, end, "VND".to_string()).await {
         Ok(quotes) => {
             assert!(!quotes.is_empty());
             for quote in &quotes {
                 assert!(!quote.symbol.is_empty());
-                assert!(quote.close >= 0.0);
-                assert_eq!(quote.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
+                assert!(quote.close >= Decimal::ZERO);
+                assert_eq!(quote.data_source, DataSource::VnMarket);
             }
             println!("Got {} historical quotes for {}", quotes.len(), symbol);
             quotes
@@ -116,32 +121,30 @@ async fn test_vn_market_provider_get_historical_quotes() {
     };
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_historical_quotes_bulk() {
     let provider = VnMarketProvider::new();
 
     // Test bulk fetching with multiple Vietnamese symbols
-    let symbols = vec
-!["VNM".to_string(), "HPG".to_string(), "FPT".to_string()];
-    let time_range = TimeRange::Days(7); // 7 days of historical data
+    let symbols_with_currencies = vec![
+        ("VNM".to_string(), "VND".to_string()),
+        ("HPG".to_string(), "VND".to_string()),
+        ("FPT".to_string(), "VND".to_string())
+    ];
+    let start = SystemTime::now() - Duration::from_secs(7 * 24 * 60 * 60);
+    let end = SystemTime::now(); // 7 days of historical data
 
-    let results = match provider.get_historical_quotes_bulk(&symbols, time_range).await {
-        Ok(results) => {
-            assert!(!results.is_empty());
-
-            for (symbol, historical_quotes) in &results {
-                assert!(!symbol.is_empty());
-                if !historical_quotes.is_empty() {
-                    for quote in historical_quotes {
-                        assert_eq!(quote.symbol, *symbol);
-                        assert!(quote.close >= 0.0);
-                        assert_eq!(quote.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
-                    }
-                }
+    let results = match provider.get_historical_quotes_bulk(&symbols_with_currencies, start, end).await {
+        Ok((quotes, failed)) => {
+            println!("Got {} quotes, {} failed symbols", quotes.len(), failed.len());
+            
+            for quote in &quotes {
+                assert!(!quote.symbol.is_empty());
+                assert!(quote.close >= Decimal::ZERO);
+                assert_eq!(quote.data_source, DataSource::VnMarket);
             }
 
-            println!("Got bulk historical quotes for {} symbols", results.len());
-            results
+            (quotes, failed)
         }
         Err(e) => {
             // Expected if API is not available
@@ -152,7 +155,7 @@ async fn test_vn_market_provider_historical_quotes_bulk() {
 }
 
 // Integration test to verify the provider can be created and basic methods work
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_integration() {
     let provider = VnMarketProvider::new();
 
@@ -173,60 +176,74 @@ async fn test_vn_market_provider_integration() {
     let _ = provider.get_asset_profile("VNM").await.unwrap_or_else(|e| {
         println!("Get asset profile failed (expected if API unavailable): {}", e);
         AssetProfile {
+            id: Some("VNM".to_string()),
             symbol: "VNM".to_string(),
-            name: "Test Asset".to_string(),
-            exchange: "HOSE".to_string(),
-            asset_type: "Stock".to_string(),
-            industry: "Test Industry".to_string(),
-            description: "Test description".to_string(),
+            name: Some("Test Asset".to_string()),
+            asset_type: Some("STOCK".to_string()),
+            asset_class: Some("Equity".to_string()),
+            asset_sub_class: Some("Stock".to_string()),
             currency: "VND".to_string(),
-            data_source: crate::market_data::market_data_model::DataSource::VnMarket,
+            data_source: "VN_MARKET".to_string(),
+            isin: None,
+            symbol_mapping: None,
+            notes: None,
+            countries: None,
+            categories: None,
+            classes: None,
+            attributes: None,
+            sectors: None,
+            url: None,
         }
     });
 
     println!("Testing get_latest_quote...");
-    let _ = provider.get_latest_quote("VNM").await.unwrap_or_else(|e| {
+    let _ = provider.get_latest_quote("VNM", "VND".to_string()).await.unwrap_or_else(|e| {
         println!("Get latest quote failed (expected if API unavailable): {}", e);
         Quote {
+            id: "quote_VNM".to_string(),
             symbol: "VNM".to_string(),
-            price: 0.0,
-            change: 0.0,
-            change_percent: 0.0,
-            volume: 0,
-            market_cap: 0.0,
-            data_source: crate::market_data::market_data_model::DataSource::VnMarket,
-            last_updated: std::time::SystemTime::now().into(),
+            timestamp: Utc::now(),
+            open: Decimal::ZERO,
+            high: Decimal::ZERO,
+            low: Decimal::ZERO,
+            close: Decimal::ZERO,
+            adjclose: Decimal::ZERO,
+            volume: Decimal::ZERO,
+            currency: "VND".to_string(),
+            data_source: DataSource::VnMarket,
+            created_at: Utc::now(),
         }
     });
 
     println!("VN_MARKET provider integration test completed");
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn test_vn_market_provider_data_source_consistency() {
     let provider = VnMarketProvider::new();
 
     // Test that all returned data objects have consistent data source
-    let test_symbols = vec
-!["VNM", "HPG", "FPT"];
+    let test_symbols = vec!["VNM", "HPG", "FPT"];
 
     for symbol in test_symbols {
         println!("Testing data source consistency for symbol: {}", symbol);
 
         // Test profile
         if let Ok(profile) = provider.get_asset_profile(symbol).await {
-            assert_eq!(profile.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
+            assert_eq!(profile.data_source, "VN_MARKET");
         }
 
         // Test quote
-        if let Ok(quote) = provider.get_latest_quote(symbol).await {
-            assert_eq!(quote.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
+        if let Ok(quote) = provider.get_latest_quote(symbol, "VND".to_string()).await {
+            assert_eq!(quote.data_source, DataSource::VnMarket);
         }
 
         // Test historical quotes
-        if let Ok(quotes) = provider.get_historical_quotes(symbol, TimeRange::Days(7)).await {
+        let start = SystemTime::now() - Duration::from_secs(7 * 24 * 60 * 60);
+        let end = SystemTime::now();
+        if let Ok(quotes) = provider.get_historical_quotes(symbol, start, end, "VND".to_string()).await {
             for quote in quotes {
-                assert_eq!(quote.data_source, crate::market_data::market_data_model::DataSource::VnMarket);
+                assert_eq!(quote.data_source, DataSource::VnMarket);
             }
         }
     }

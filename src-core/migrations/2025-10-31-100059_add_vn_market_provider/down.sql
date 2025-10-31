@@ -1,1 +1,0 @@
-DELETE FROM market_data_providers WHERE id = 'VN_MARKET';

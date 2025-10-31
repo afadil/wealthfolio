@@ -243,22 +243,21 @@ impl MarketDataServiceTrait for MarketDataService {
     async fn get_market_data_providers_info(&self) -> Result<Vec<MarketDataProviderInfo>> {
         debug!("Fetching market data providers info");
         let latest_sync_dates_by_source = self.repository.get_latest_sync_dates_by_source()?;
+        let provider_settings = self.repository.get_all_providers()?;
 
         let mut providers_info = Vec::new();
-        let known_providers =
-            vec![(DATA_SOURCE_YAHOO, "Yahoo Finance", "yahoo-finance.png")];
 
-        for (id, name, logo_filename) in known_providers {
+        for setting in provider_settings {
             let last_synced_naive: Option<NaiveDateTime> =
-                latest_sync_dates_by_source.get(id).and_then(|opt_dt| *opt_dt);
+                latest_sync_dates_by_source.get(&setting.id).and_then(|opt_dt| *opt_dt);
 
             let last_synced_utc: Option<DateTime<Utc>> =
                 last_synced_naive.map(|naive_dt| Utc.from_utc_datetime(&naive_dt));
 
             providers_info.push(MarketDataProviderInfo {
-                id: id.to_string(),
-                name: name.to_string(),
-                logo_filename: logo_filename.to_string(),
+                id: setting.id.clone(),
+                name: setting.name.clone(),
+                logo_filename: setting.logo_filename.clone().unwrap_or_default(),
                 last_synced_date: last_synced_utc,
             });
         }
