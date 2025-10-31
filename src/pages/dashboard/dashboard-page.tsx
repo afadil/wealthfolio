@@ -93,8 +93,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <Page className="flex h-screen flex-col">
-      <div data-ptr-content className="flex h-full flex-col">
+    <Page className="flex flex-col">
+      <div data-ptr-content className="flex min-h-screen flex-col">
         <div className="px-4 pt-22 pb-6 md:px-6 md:pt-10 md:pb-8 lg:px-8 lg:pt-12">
           <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
             <div className="flex items-start gap-2">
