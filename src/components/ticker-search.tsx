@@ -268,23 +268,43 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
 
               {!isError && !isLoading && sortedTickers?.length === 0 && searchQuery && (
                 <>
-                  {allowFreeText && (
-                    <CommandItem
-                      onSelect={() => {
-                        handleManualInput(searchQuery);
-                      }}
-                      value={searchQuery}
-                    >
-                      <Icons.Plus className="mr-2 h-4 w-4" />
-                      Create manual holding: {searchQuery.toUpperCase().trim()}
-                    </CommandItem>
-                  )}
+                  <div className="border-border border-b p-2">
+                    <div className="text-muted-foreground mb-2 px-2 text-xs">No results found</div>
+                    {allowFreeText && (
+                      <CommandItem
+                        onSelect={() => {
+                          handleManualInput(searchQuery);
+                        }}
+                        value={searchQuery}
+                        className="bg-accent/50 aria-selected:bg-accent"
+                      >
+                        <Icons.Plus className="mr-2 h-4 w-4" />
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Add new manual asset</span>
+                          <span className="text-muted-foreground text-xs">
+                            Create "{searchQuery.toUpperCase().trim()}" as manual holding
+                          </span>
+                        </div>
+                      </CommandItem>
+                    )}
+                  </div>
                   {!allowFreeText && <div className="p-4 text-sm">No symbols found</div>}
                 </>
               )}
 
               {!isError && !isLoading && sortedTickers?.length === 0 && !searchQuery && (
-                <div className="p-4 text-sm">No symbols found</div>
+                <>
+                  {allowFreeText ? (
+                    <div className="p-4 text-center text-sm">
+                      <div className="text-muted-foreground">Start typing to search for symbols</div>
+                      <div className="text-muted-foreground mt-1 text-xs">
+                        Or type a symbol name to create a manual asset
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 text-sm">No symbols found</div>
+                  )}
+                </>
               )}
 
               {isError && (
@@ -313,6 +333,33 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                   </CommandItem>
                 );
               })}
+
+              {/* Add manual asset option when there are results but user might want something else */}
+              {allowFreeText &&
+                searchQuery &&
+                sortedTickers &&
+                sortedTickers.length > 0 &&
+                !sortedTickers.some(
+                  (t) => t.symbol.toLowerCase() === searchQuery.toLowerCase().trim(),
+                ) && (
+                  <div className="border-border border-t">
+                    <CommandItem
+                      onSelect={() => {
+                        handleManualInput(searchQuery);
+                      }}
+                      value={`manual-${searchQuery}`}
+                      className="bg-accent/30"
+                    >
+                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm font-medium">Add "{searchQuery.toUpperCase().trim()}" as manual asset</span>
+                        <span className="text-muted-foreground text-xs">
+                          If the symbol you want isn't listed above
+                        </span>
+                      </div>
+                    </CommandItem>
+                  </div>
+                )}
             </CommandList>
           </Command>
         </PopoverContent>

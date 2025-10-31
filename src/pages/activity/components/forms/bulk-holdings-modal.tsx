@@ -174,6 +174,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         }),
       );
 
+      console.log("Importing activities:", activitiesToImport);
       confirmImportMutation.mutate({ activities: activitiesToImport });
     },
     [confirmImportMutation, selectedAccount, manualHoldings, checkSymbolExists],

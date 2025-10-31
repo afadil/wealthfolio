@@ -13,6 +13,7 @@ export function useActivityImportMutations({
   const confirmImportMutation = useMutation({
     mutationFn: importActivities,
     onSuccess: async (result: unknown) => {
+      console.log("Import result:", result);
       // Call the provided onSuccess callback if it exists
       if (onSuccess) {
         // Ensure we pass an array of activities to the callback

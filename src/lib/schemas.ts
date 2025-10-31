@@ -104,6 +104,7 @@ export const importActivitySchema = z
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),
     comment: z.string().optional(),
+    assetDataSource: z.string().optional(),
   })
   .refine(
     (data) => {
