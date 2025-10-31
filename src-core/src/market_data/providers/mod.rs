@@ -5,9 +5,13 @@ pub mod marketdata_app_provider;
 pub mod metal_price_api_provider;
 pub mod models;
 pub mod provider_registry;
+pub mod vn_market_provider;
 pub mod yahoo_provider;
 
 #[cfg(test)]
 pub mod metal_price_api_provider_test;
+
+#[cfg(test)]
+pub mod vn_market_provider_test;
 
 pub use provider_registry::ProviderRegistry;

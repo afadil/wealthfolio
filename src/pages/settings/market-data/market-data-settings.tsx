@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import {
   useRecalculatePortfolioMutation,
@@ -30,14 +29,14 @@ import {
   useUpdateMarketDataProviderSettings,
 } from "./use-market-data-settings";
 
-const useApiKeyStatus = (providerId: string) => {
+const useApiKeyStatus = (providerId: string, isOpen: boolean) => {
   const queryClient = useQueryClient();
   const needsApiKey = providerId !== "YAHOO" && providerId !== "MANUAL";
 
   const { data: apiKey, isLoading } = useQuery({
     queryKey: QueryKeys.secrets.apiKey(providerId),
     queryFn: () => getSecret(providerId),
-    enabled: needsApiKey,
+    enabled: needsApiKey && isOpen, // Only fetch when collapsible is open
     staleTime: Infinity,
   });
 
@@ -67,7 +66,7 @@ function ProviderSettings({
 }: ProviderSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus } = useApiKeyStatus(provider.id);
+  const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus } = useApiKeyStatus(provider.id, isOpen);
   const { mutate: setApiKey } = useSetApiKey();
   const { mutate: deleteApiKey } = useDeleteApiKey();
 
@@ -96,8 +95,6 @@ function ProviderSettings({
       );
     }
   };
-
-  const isConfigured = !needsApiKey || isSecretSet;
 
   return (
     <Card
@@ -141,32 +138,13 @@ function ProviderSettings({
                   Disabled
                 </Badge>
               )}
-              {!isConfigured && provider.enabled && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 rounded-full text-amber-500 hover:bg-amber-50 hover:text-amber-600"
-                    >
-                      <Icons.AlertTriangle className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80">
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <h4 className="flex items-center gap-2 font-medium">
-                          <Icons.AlertTriangle className="h-4 w-4 text-amber-500" />
-                          Configuration Required
-                        </h4>
-                        <p className="text-muted-foreground text-sm">
-                          This provider requires an API key to function properly. Configure the API
-                          key in the settings below to start fetching market data.
-                        </p>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+              {needsApiKey && provider.enabled && (
+                <Badge
+                  variant="outline"
+                  className="shrink-0 text-xs"
+                >
+                  API Key Required
+                </Badge>
               )}
             </div>
 
@@ -231,9 +209,9 @@ function ProviderSettings({
         <CollapsibleContent>
           <CardContent className="bg-muted/20 space-y-6 pt-6 pb-6">
             {needsApiKey && (
-              <div className="space-y-2">
-                <Label htmlFor={`apikey-${provider.id}`}>API Key</Label>
-                <div className="flex items-center space-x-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`apikey-${provider.id}`}>API Key</Label>
+                  <div className="flex items-center space-x-2">
                   <Input
                     id={`apikey-${provider.id}`}
                     type={showApiKey ? "text" : "password"}
@@ -269,7 +247,7 @@ function ProviderSettings({
                     No API key set. Enter a key and save.
                   </p>
                 )}
-              </div>
+                </div>
             )}
 
             <div className="space-y-2">
