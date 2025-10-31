@@ -201,10 +201,18 @@ impl ActivityServiceTrait for ActivityService {
                 account.currency.clone() 
             };
 
-            let symbol_profile_result = self
-                .asset_service
-                .get_or_create_asset(&activity.symbol, Some(asset_context_currency))
-                .await;
+            // Check if this should be created as a manual asset
+            let is_manual_asset = activity.asset_data_source.as_ref().map_or(false, |source| source == "MANUAL");
+
+            let symbol_profile_result = if is_manual_asset {
+                // Create manual asset directly without searching providers
+                self.asset_service.create_manual_asset(&activity.symbol, asset_context_currency).await
+            } else {
+                // Try to find/create asset from market data providers
+                self.asset_service
+                    .get_or_create_asset(&activity.symbol, Some(asset_context_currency))
+                    .await
+            };
 
             let (mut is_valid, mut error_message) = (true, None);
 

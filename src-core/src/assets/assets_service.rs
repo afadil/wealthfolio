@@ -57,6 +57,42 @@ impl AssetServiceTrait for AssetService {
         self.asset_repository.create(new_asset).await
     }
 
+    /// Creates a manual asset without searching providers
+    async fn create_manual_asset(&self, symbol: &str, currency: String) -> Result<Asset> {
+        // Check if asset already exists
+        match self.asset_repository.get_by_id(symbol) {
+            Ok(existing_asset) => Ok(existing_asset),
+            Err(Error::Database(DatabaseError::QueryFailed(DieselError::NotFound))) => {
+                debug!("Creating manual asset: {}", symbol);
+                // Create a simple manual asset profile
+                let new_asset = NewAsset {
+                    id: Some(symbol.to_string()),
+                    isin: None,
+                    name: Some(symbol.to_string()),
+                    asset_type: Some("EQUITY".to_string()),
+                    symbol: symbol.to_string(),
+                    symbol_mapping: None,
+                    asset_class: Some("Equity".to_string()),
+                    asset_sub_class: Some("Stock".to_string()),
+                    notes: None,
+                    countries: None,
+                    categories: None,
+                    classes: None,
+                    attributes: None,
+                    currency,
+                    data_source: "MANUAL".to_string(),
+                    sectors: None,
+                    url: None,
+                };
+                self.asset_repository.create(new_asset).await
+            }
+            Err(e) => {
+                error!("Error checking for existing manual asset '{}': {}", symbol, e);
+                Err(e)
+            }
+        }
+    }
+
     /// Retrieves or creates an asset by its ID
     async fn get_or_create_asset(&self, asset_id: &str, context_currency: Option<String>) -> Result<Asset> {
         match self.asset_repository.get_by_id(asset_id) {

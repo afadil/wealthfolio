@@ -337,8 +337,8 @@ impl ProviderRegistry {
             }
         }
 
-        Err(MarketDataError::ProviderError(
-            "Search ticker is not supported by any active provider".to_string(),
-        ))
+        // Return empty array instead of error to allow frontend to show "Add manual asset" option
+        info!("No results found for query '{}' from any provider. Returning empty results.", query);
+        Ok(vec![])
     }
 }
