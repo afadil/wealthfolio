@@ -128,13 +128,20 @@ fn calculate_investment_market_value_acct(
             let market_value = position.quantity * quote.close * quote_fx_rate;
             total_position_market_value += market_value;
         } else {
-            debug!(
-                "Missing quote for asset {} on date {}. Excluding from market value calculation.",
-                asset_id, target_date
-            );
-            // Exclude position from market value calculation when no quote is available
-            // This prevents artificial performance distortion when quotes become available
-            // Cost basis should not be used as market value fallback
+            // Use cost basis as fallback when quote is unavailable (pre-IPO/non-tradable assets)
+            let cost_basis_value = position.total_cost_basis;
+            if !cost_basis_value.is_zero() {
+                total_position_market_value += cost_basis_value;
+                debug!(
+                    "No quote available for asset {} on date {}. Using cost basis ({} {}) as valuation fallback.",
+                    asset_id, target_date, cost_basis_value, position.currency
+                );
+            } else {
+                debug!(
+                    "No quote available for asset {} on date {} and cost basis is zero. Excluding from market value.",
+                    asset_id, target_date
+                );
+            }
         }
     }
     Ok(total_position_market_value)
