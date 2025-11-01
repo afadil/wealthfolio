@@ -31,19 +31,7 @@ pub struct MarketDataService {
 #[async_trait]
 impl MarketDataServiceTrait for MarketDataService {
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>> {
-        // First, search in external providers
-        let provider_results = self.provider_registry
-            .read()
-            .await
-            .search_ticker(query)
-            .await?;
-
-        // If provider results found, return them
-        if !provider_results.is_empty() {
-            return Ok(provider_results);
-        }
-
-        // If no results from providers, search for existing manual assets in the database
+        // 1. Search for existing manual assets in the database
         let all_assets = self.asset_repository.list()?;
         let query_upper = query.to_uppercase();
         
@@ -64,13 +52,56 @@ impl MarketDataServiceTrait for MarketDataService {
                 long_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
                 quote_type: asset.asset_type.clone().unwrap_or_else(|| "EQUITY".to_string()),
                 index: "".to_string(),
-                score: 100.0, // Exact matches from DB should have high score
+                score: 100.0, // Manual assets get highest priority
                 type_display: "Manual".to_string(),
                 exchange: "MANUAL".to_string(),
             })
             .collect();
 
-        Ok(manual_assets)
+        // 2. Search all external providers in parallel
+        let provider_results_with_ids = self.provider_registry
+            .read()
+            .await
+            .search_ticker_parallel(query)
+            .await?;
+        
+        // 3. Sort provider results by priority
+        let registry = self.provider_registry.read().await;
+        let provider_priority_map: HashMap<String, usize> = registry
+            .get_ordered_profiler_ids()
+            .iter()
+            .enumerate()
+            .map(|(idx, id)| (id.clone(), idx))
+            .collect();
+        drop(registry); // Release lock
+        
+        let mut sorted_provider_results: Vec<(usize, i32, QuoteSummary)> = provider_results_with_ids
+            .into_iter()
+            .map(|(provider_id, summary)| {
+                let priority = provider_priority_map.get(&provider_id).copied().unwrap_or(999);
+                let score = -(summary.score as i32); // Negative for descending order
+                (priority, score, summary)
+            })
+            .collect();
+        
+        // Sort by: 1) provider priority (ascending), 2) score (descending via negative)
+        sorted_provider_results.sort_by_key(|(priority, score, _)| (*priority, *score));
+        
+        let provider_results: Vec<QuoteSummary> = sorted_provider_results
+            .into_iter()
+            .map(|(_, _, summary)| summary)
+            .collect();
+        
+        // 4. Combine: manual assets first, then provider results
+        let mut all_results = manual_assets;
+        all_results.extend(provider_results);
+        
+        // 5. Deduplicate by symbol (keep first occurrence = highest priority)
+        let mut seen_symbols = HashSet::new();
+        all_results.retain(|item| seen_symbols.insert(item.symbol.clone()));
+        
+        debug!("Search completed: {} unique results for query '{}'", all_results.len(), query);
+        Ok(all_results)
     }
 
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote> {
