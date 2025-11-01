@@ -257,18 +257,19 @@ impl ValuationServiceTrait for ValuationService {
 
                 if !missing_quotes.is_empty() {
                     debug!(
-                        "Missing quotes {:?} on {} (account '{}'). Skipping day.",
+                        "Missing quotes {:?} on {} (account '{}'). These positions will be excluded from market value calculation.",
                         missing_quotes, current_date, account_id_clone
                     );
-                    return None;
+                    // Continue with calculation - missing quotes will be excluded from valuation
+                    // This prevents artificial performance distortion
                 }
 
                 if quotes_for_current_date.is_empty() && !holdings_snapshot.positions.is_empty() {
                     debug!(
-                        "No quotes for date {} (account '{}'). Skipping day.",
+                        "No quotes for date {} (account '{}'). All positions will be excluded from market value calculation.",
                         current_date, account_id_clone
                     );
-                    return None;
+                    // Continue with calculation - all positions will be excluded from market value
                 }
                 let account_curr = &holdings_snapshot.currency;
                 if account_curr != &base_curr_clone

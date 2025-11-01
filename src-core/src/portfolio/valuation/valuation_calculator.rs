@@ -129,9 +129,12 @@ fn calculate_investment_market_value_acct(
             total_position_market_value += market_value;
         } else {
             debug!(
-                "Missing quote for asset {} on date {}. Position market value treated as ZERO.",
+                "Missing quote for asset {} on date {}. Excluding from market value calculation.",
                 asset_id, target_date
             );
+            // Exclude position from market value calculation when no quote is available
+            // This prevents artificial performance distortion when quotes become available
+            // Cost basis should not be used as market value fallback
         }
     }
     Ok(total_position_market_value)
