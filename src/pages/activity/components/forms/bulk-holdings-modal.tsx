@@ -31,6 +31,7 @@ interface BulkHoldingsModalProps {
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [manualHoldings, setManualHoldings] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<BulkHoldingsFormValues>({
     resolver: zodResolver(bulkHoldingsFormSchema) as Resolver<BulkHoldingsFormValues>,
@@ -104,8 +105,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       });
       form.reset();
       setSelectedAccount(null);
+      setIsSubmitting(false);
       onSuccess?.();
       onClose();
+    },
+    onError: () => {
+      setIsSubmitting(false);
     },
   });
 
@@ -124,58 +129,67 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
   const handleSubmit = useCallback(
     async (data: BulkHoldingsFormValues) => {
-      // Validate holdings data
-      const validHoldings = data.holdings.filter(
-        (holding) =>
-          holding.ticker?.trim() &&
-          Number(holding.sharesOwned) > 0 &&
-          Number(holding.averageCost) > 0,
-      );
+      // Set immediate loading state
+      setIsSubmitting(true);
 
-      if (!validHoldings.length) {
-        toast({
-          title: "No valid holdings",
-          description:
-            "Please add at least one valid holding with ticker, shares, and average cost.",
-          variant: "destructive",
-        });
-        return;
+      try {
+        // Validate holdings data
+        const validHoldings = data.holdings.filter(
+          (holding) =>
+            holding.ticker?.trim() &&
+            Number(holding.sharesOwned) > 0 &&
+            Number(holding.averageCost) > 0,
+        );
+
+        if (!validHoldings.length) {
+          toast({
+            title: "No valid holdings",
+            description:
+              "Please add at least one valid holding with ticker, shares, and average cost.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Check which symbols exist in market data
+        const symbolChecks = await Promise.all(
+          validHoldings.map(async (holding) => {
+            const symbol = holding.ticker.toUpperCase().trim();
+            const isAlreadyMarkedManual = manualHoldings.has(holding.id);
+            const symbolExists = await checkSymbolExists(symbol);
+
+            // Mark as manual if either: already marked as manual OR symbol doesn't exist in market data
+            const shouldBeManual = isAlreadyMarkedManual || !symbolExists;
+
+            return { holding, shouldBeManual };
+          }),
+        );
+
+        // Transform to ActivityImport format
+        const activitiesToImport: ActivityImport[] = symbolChecks.map(
+          ({ holding, shouldBeManual }) => ({
+            accountId: data.accountId,
+            activityType: ActivityType.ADD_HOLDING,
+            symbol: holding.ticker.toUpperCase().trim(),
+            quantity: Number(holding.sharesOwned),
+            unitPrice: Number(holding.averageCost),
+            date: data.activityDate,
+            currency: data.currency || selectedAccount?.currency || "USD",
+            fee: 0,
+            isDraft: false,
+            isValid: true,
+            comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
+            assetDataSource: shouldBeManual ? "MANUAL" : undefined,
+          }),
+        );
+
+        console.log("Importing activities:", activitiesToImport);
+        confirmImportMutation.mutate({ activities: activitiesToImport });
+      } catch (error) {
+        setIsSubmitting(false);
+        throw error;
       }
-
-      // Check which symbols exist in market data
-      const symbolChecks = await Promise.all(
-        validHoldings.map(async (holding) => {
-          const symbol = holding.ticker.toUpperCase().trim();
-          const isAlreadyMarkedManual = manualHoldings.has(holding.id);
-          const symbolExists = await checkSymbolExists(symbol);
-
-          // Mark as manual if either: already marked as manual OR symbol doesn't exist in market data
-          const shouldBeManual = isAlreadyMarkedManual || !symbolExists;
-
-          return { holding, shouldBeManual };
-        }),
-      );
-
-      // Transform to ActivityImport format
-      const activitiesToImport: ActivityImport[] = symbolChecks.map(
-        ({ holding, shouldBeManual }) => ({
-          accountId: data.accountId,
-          activityType: ActivityType.ADD_HOLDING,
-          symbol: holding.ticker.toUpperCase().trim(),
-          quantity: Number(holding.sharesOwned),
-          unitPrice: Number(holding.averageCost),
-          date: data.activityDate,
-          currency: data.currency || selectedAccount?.currency || "USD",
-          fee: 0,
-          isDraft: false,
-          isValid: true,
-          comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
-          assetDataSource: shouldBeManual ? "MANUAL" : undefined,
-        }),
-      );
-
-      console.log("Importing activities:", activitiesToImport);
-      confirmImportMutation.mutate({ activities: activitiesToImport });
     },
     [confirmImportMutation, selectedAccount, manualHoldings, checkSymbolExists],
   );
@@ -193,6 +207,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   }, []);
 
   const isSubmitDisabled =
+    isSubmitting ||
     confirmImportMutation.isPending ||
     !hasValidHoldings ||
     !selectedAccount ||
@@ -244,7 +259,11 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitDisabled}>
-                  {confirmImportMutation.isPending ? "Importing..." : "Confirm"}
+                  {confirmImportMutation.isPending
+                    ? "Importing..."
+                    : isSubmitting
+                      ? "Validating..."
+                      : "Confirm"}
                 </Button>
               </DialogFooter>
             </form>
