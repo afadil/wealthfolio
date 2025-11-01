@@ -160,10 +160,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
     });
 
-    // Memoize sorted results
-    const sortedTickers = useMemo(() => {
-      return data?.sort((a, b) => b.score - a.score);
-    }, [data]);
+    // Backend already returns results sorted by provider priority and score
+    // No need for frontend sorting - use data directly
 
     // Calculate display name for the button
     const displayName = selected || placeholder;
@@ -197,26 +195,26 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter" && allowFreeText && searchQuery.trim()) {
           // Check if there are no search results or user is typing without waiting for results
-          const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
-          if (hasNoResults || (sortedTickers && sortedTickers.length === 0)) {
+          const hasNoResults = !isLoading && (!data || data.length === 0);
+          if (hasNoResults || (data && data.length === 0)) {
             e.preventDefault();
             handleManualInput(searchQuery);
           }
         }
       },
-      [allowFreeText, searchQuery, isLoading, sortedTickers, handleManualInput],
+      [allowFreeText, searchQuery, isLoading, data, handleManualInput],
     );
 
     // Handle blur event to detect manual input when user clicks away
     const handleBlur = useCallback(() => {
       if (allowFreeText && searchQuery.trim() && !open) {
         // If user typed something and popover is closed, treat as manual input
-        const hasNoResults = !isLoading && (!sortedTickers || sortedTickers.length === 0);
+        const hasNoResults = !isLoading && (!data || data.length === 0);
         if (hasNoResults) {
           handleManualInput(searchQuery);
         }
       }
-    }, [allowFreeText, searchQuery, open, isLoading, sortedTickers, handleManualInput]);
+    }, [allowFreeText, searchQuery, open, isLoading, data, handleManualInput]);
 
     return (
       <Popover open={open} onOpenChange={handleOpenChange}>
@@ -245,7 +243,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
-          <Command shouldFilter={false} className="border-none">
+          <Command shouldFilter={false} className="!h-auto border-none">
             <CommandInput
               ref={inputRef}
               value={searchQuery}
@@ -255,7 +253,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               onBlur={handleBlur}
             />
 
-            <CommandList>
+            <CommandList className="!max-h-[400px] overflow-y-auto">
               {isLoading ? (
                 <CommandPrimitive.Loading>
                   <div className="space-y-2 p-1">
@@ -266,7 +264,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 </CommandPrimitive.Loading>
               ) : null}
 
-              {!isError && !isLoading && sortedTickers?.length === 0 && searchQuery && (
+              {!isError && !isLoading && data?.length === 0 && searchQuery && (
                 <>
                   <div className="border-border border-b p-2">
                     <div className="text-muted-foreground mb-2 px-2 text-xs">No results found</div>
@@ -292,11 +290,13 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 </>
               )}
 
-              {!isError && !isLoading && sortedTickers?.length === 0 && !searchQuery && (
+              {!isError && !isLoading && data?.length === 0 && !searchQuery && (
                 <>
                   {allowFreeText ? (
                     <div className="p-4 text-center text-sm">
-                      <div className="text-muted-foreground">Start typing to search for symbols</div>
+                      <div className="text-muted-foreground">
+                        Start typing to search for symbols
+                      </div>
                       <div className="text-muted-foreground mt-1 text-xs">
                         Or type a symbol name to create a manual asset
                       </div>
@@ -316,20 +316,32 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 </div>
               )}
 
-              {sortedTickers?.map((ticker) => {
+              {data?.map((ticker) => {
                 return (
                   <CommandItem
-                    key={ticker.symbol}
+                    key={`${ticker.symbol}-${ticker.exchange}`}
                     onSelect={() => handleSelectResult(ticker)}
                     value={ticker.symbol}
                   >
                     <Icons.Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "mr-2 h-4 w-4 flex-shrink-0",
                         selectedResult?.symbol === ticker.symbol ? "opacity-100" : "opacity-0",
                       )}
                     />
-                    {ticker.symbol} - {ticker.longName} ({ticker.exchange})
+                    <div className="flex flex-1 items-center justify-between gap-2 overflow-hidden">
+                      <span className="truncate">
+                        {ticker.symbol} - {ticker.longName}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-muted-foreground flex-shrink-0 rounded px-1.5 py-0.5 text-xs",
+                          ticker.exchange === "MANUAL" && "bg-accent text-accent-foreground",
+                        )}
+                      >
+                        {ticker.exchange}
+                      </span>
+                    </div>
                   </CommandItem>
                 );
               })}
@@ -337,11 +349,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               {/* Add manual asset option when there are results but user might want something else */}
               {allowFreeText &&
                 searchQuery &&
-                sortedTickers &&
-                sortedTickers.length > 0 &&
-                !sortedTickers.some(
-                  (t) => t.symbol.toLowerCase() === searchQuery.toLowerCase().trim(),
-                ) && (
+                data &&
+                data.length > 0 &&
+                !data.some((t) => t.symbol.toLowerCase() === searchQuery.toLowerCase().trim()) && (
                   <div className="border-border border-t">
                     <CommandItem
                       onSelect={() => {
@@ -352,7 +362,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                     >
                       <Icons.Plus className="mr-2 h-4 w-4" />
                       <div className="flex flex-col items-start">
-                        <span className="text-sm font-medium">Add "{searchQuery.toUpperCase().trim()}" as manual asset</span>
+                        <span className="text-sm font-medium">
+                          Add "{searchQuery.toUpperCase().trim()}" as manual asset
+                        </span>
                         <span className="text-muted-foreground text-xs">
                           If the symbol you want isn't listed above
                         </span>
