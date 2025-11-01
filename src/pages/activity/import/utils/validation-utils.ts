@@ -106,14 +106,27 @@ export function calculateCashActivityAmount(
   // Fallback to quantity
   return safeQuantity;
 }
+// Define a type for partially populated activity during transformation
+type PartialActivity = {
+  accountId?: string;
+  activityType?: ActivityType;
+  symbol?: string;
+  currency?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  fee?: number;
+  date?: string;
+  lineNumber?: number;
+};
 
 // Define types for the calculation functions
 type SymbolCalculator = (
-  activity: Partial<ActivityImport>,
+  activity: PartialActivity,
   accountCurrency: string,
 ) => string | undefined;
-type AmountCalculator = (activity: Partial<ActivityImport>) => number | undefined;
-type FeeCalculator = (activity: Partial<ActivityImport>) => number | undefined;
+type AmountCalculator = (activity: PartialActivity) => number | undefined;
+type FeeCalculator = (activity: PartialActivity) => number | undefined;
 
 // Define the configuration structure
 interface ActivityLogicConfig {
@@ -280,8 +293,8 @@ function transformRowToActivity(
   mapping: ImportMappingData,
   accountId: string,
   accountCurrency: string,
-): Partial<ActivityImport> {
-  const activity: Partial<ActivityImport> = { accountId, isDraft: true, isValid: false };
+): PartialActivity & { accountId: string; isDraft: boolean; isValid: boolean } {
+  const activity: PartialActivity & { accountId: string; isDraft: boolean; isValid: boolean } = { accountId, isDraft: true, isValid: false };
 
   // Helper to get mapped value
   const getMappedValue = (field: ImportFormat): string | undefined => {
