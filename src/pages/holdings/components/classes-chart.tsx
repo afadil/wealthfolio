@@ -1,14 +1,14 @@
 import { Holding, HoldingType } from "@/lib/types";
-import { useMemo, useState } from "react";
 import {
-  DonutChart,
-  EmptyPlaceholder,
-  Skeleton,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DonutChart,
+  EmptyPlaceholder,
+  Skeleton,
 } from "@wealthfolio/ui";
+import { useMemo, useState } from "react";
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
@@ -77,10 +77,6 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
     );
   }
 
-  const onPieEnter = (_: React.MouseEvent, index: number) => {
-    setActiveIndex(index);
-  };
-
   return (
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
@@ -95,7 +91,6 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
           <DonutChart
             data={data}
             activeIndex={activeIndex}
-            onPieEnter={onPieEnter}
             onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}

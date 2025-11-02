@@ -1,18 +1,18 @@
+import { getAccounts } from "@/commands/account";
+import { useAccountsSimplePerformance } from "@/hooks/use-accounts-simple-performance";
+import { QueryKeys } from "@/lib/query-keys";
 import { Account } from "@/lib/types";
-import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  DonutChart,
-  EmptyPlaceholder,
-  Skeleton,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DonutChart,
+  EmptyPlaceholder,
+  Skeleton,
 } from "@wealthfolio/ui";
-import { useQuery } from "@tanstack/react-query";
-import { getAccounts } from "@/commands/account";
-import { useAccountsSimplePerformance } from "@/hooks/use-accounts-simple-performance";
-import { QueryKeys } from "@/lib/query-keys";
+import { useMemo, useState } from "react";
 
 interface AccountAllocationChartProps {
   isLoading?: boolean;
@@ -82,10 +82,6 @@ export function AccountAllocationChart({
     );
   }
 
-  const onPieEnter = (_: React.MouseEvent, index: number) => {
-    setActiveIndex(index);
-  };
-
   const handleInternalSectionClick = (sectionData: {
     name: string;
     value: number;
@@ -121,7 +117,6 @@ export function AccountAllocationChart({
           <DonutChart
             data={data}
             activeIndex={activeIndex}
-            onPieEnter={onPieEnter}
             onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}
