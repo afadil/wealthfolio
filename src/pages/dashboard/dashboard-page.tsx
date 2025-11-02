@@ -2,6 +2,7 @@ import { HistoryChart } from "@/components/history-chart";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHoldings } from "@/hooks/use-holdings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -39,9 +40,16 @@ const getInitialDateRange = (): DateRange => ({
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 export default function DashboardPage() {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
+  const [intervalCode, setIntervalCode] = usePersistentState<TimePeriod>(
+    "dashboard:intervalCode",
+    INITIAL_INTERVAL_CODE,
+  );
+  const [dateRange, setDateRange] = usePersistentState<DateRange | undefined>(
+    "dashboard:dateRange",
+    getInitialDateRange(),
+  );
   const [selectedIntervalDescription, setSelectedIntervalDescription] =
-    useState<string>("Last 3 months");
+    usePersistentState<string>("dashboard:selectedIntervalDescription", "Last 3 months");
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
@@ -87,6 +95,7 @@ export default function DashboardPage() {
     description: string,
     range: DateRange | undefined,
   ) => {
+    setIntervalCode(code);
     setSelectedIntervalDescription(description);
     setDateRange(range);
     setIsAllTime(code === "ALL");
@@ -141,7 +150,7 @@ export default function DashboardPage() {
                   className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
                   onIntervalSelect={handleIntervalSelect}
                   isLoading={isValuationHistoryLoading}
-                  initialSelection={INITIAL_INTERVAL_CODE}
+                  initialSelection={intervalCode}
                 />
               </div>
             </>
