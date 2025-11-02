@@ -10,11 +10,10 @@ use tokio::sync::RwLock;
 use super::market_data_constants::*;
 use super::market_data_model::{
     LatestQuotePair, MarketDataProviderInfo, MarketDataProviderSetting, Quote, QuoteRequest,
-    QuoteSummary, UpdateMarketDataProviderSetting, QuoteImport, ImportValidationStatus,
+    QuoteSummary, UpdateMarketDataProviderSetting, QuoteImport, ImportValidationStatus, DataSource,
 };
 use super::market_data_traits::{MarketDataRepositoryTrait, MarketDataServiceTrait};
 use super::providers::models::AssetProfile;
-use crate::assets::assets_constants::CASH_ASSET_TYPE;
 use crate::assets::assets_traits::AssetRepositoryTrait;
 use crate::errors::Result;
 use crate::market_data::providers::ProviderRegistry;
@@ -34,7 +33,7 @@ impl MarketDataServiceTrait for MarketDataService {
         // 1. Search for existing manual assets in the database
         let all_assets = self.asset_repository.list()?;
         let query_upper = query.to_uppercase();
-        
+
         let manual_assets: Vec<QuoteSummary> = all_assets
             .iter()
             .filter(|asset| {
@@ -192,17 +191,18 @@ impl MarketDataServiceTrait for MarketDataService {
 
     async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)> {
         debug!("Syncing market data.");
+
         let assets = self.asset_repository.list()?;
-        let quote_requests: Vec<_> = assets
-            .iter()
+        let quote_requests: Vec<QuoteRequest> = assets
+            .into_iter()
             .filter(|asset| {
-                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
-                    && asset.data_source != DATA_SOURCE_MANUAL
+                asset.asset_type.as_deref() != Some("CASH")
+                    && asset.data_source != "MANUAL"
             })
             .map(|asset| QuoteRequest {
-                symbol: asset.symbol.clone(),
-                data_source: asset.data_source.as_str().into(),
-                currency: asset.currency.clone(),
+                symbol: asset.symbol,
+                data_source: DataSource::from(asset.data_source.as_str()),
+                currency: asset.currency,
             })
             .collect();
 
@@ -214,24 +214,19 @@ impl MarketDataServiceTrait for MarketDataService {
         symbols: Option<Vec<String>>,
     ) -> Result<((), Vec<(String, String)>)> {
         debug!("Resyncing market data. Symbols: {:?}", symbols);
-        let assets = match symbols {
-            Some(syms) if !syms.is_empty() => self.asset_repository.list_by_symbols(&syms)?,
-            _ => {
-                debug!("No symbols provided or empty list. Fetching all assets.");
-                self.asset_repository.list()?
-            }
+
+        let assets = if let Some(syms) = symbols {
+            self.asset_repository.list_by_symbols(&syms)?
+        } else {
+            self.asset_repository.list()?
         };
 
-        let quote_requests: Vec<_> = assets
-            .iter()
-            .filter(|asset| {
-                asset.asset_type.as_deref() != Some(CASH_ASSET_TYPE)
-                    && asset.data_source != DATA_SOURCE_MANUAL
-            })
+        let quote_requests: Vec<QuoteRequest> = assets
+            .into_iter()
             .map(|asset| QuoteRequest {
-                symbol: asset.symbol.clone(),
-                data_source: asset.data_source.as_str().into(),
-                currency: asset.currency.clone(),
+                symbol: asset.symbol,
+                data_source: DataSource::from(asset.data_source.as_str()),
+                currency: asset.currency,
             })
             .collect();
 
@@ -353,29 +348,29 @@ impl MarketDataServiceTrait for MarketDataService {
         let updated_setting = self.repository
             .update_provider_settings(provider_id, changes)
             .await?;
-        
+
         // Refresh the provider registry with the updated settings
         debug!("Refreshing provider registry after settings update");
         self.refresh_provider_registry().await?;
-        
+
         Ok(updated_setting)
     }
 
     async fn import_quotes_from_csv(&self, quotes: Vec<QuoteImport>, overwrite: bool) -> Result<Vec<QuoteImport>> {
         debug!("🚀 SERVICE: import_quotes_from_csv called");
         debug!("📊 Processing {} quotes, overwrite: {}", quotes.len(), overwrite);
-        
+
         let mut results = Vec::new();
         let mut quotes_to_import = Vec::new();
 
         debug!("🔍 Starting quote validation and duplicate checking...");
         for (index, mut quote) in quotes.into_iter().enumerate() {
             debug!("📋 Processing quote {}/{}: symbol={}, date={}", index + 1, results.len() + quotes_to_import.len() + 1, quote.symbol, quote.date);
-            
+
             // Check if quote already exists
             let exists = self.repository.quote_exists(&quote.symbol, &quote.date)?;
             debug!("🔍 Quote exists check: {}", exists);
-            
+
             if exists {
                 if overwrite {
                     debug!("🔄 Quote exists but overwrite=true, will import");
@@ -421,9 +416,9 @@ impl MarketDataServiceTrait for MarketDataService {
 
         if !quotes_for_db.is_empty() {
             debug!("💾 Calling repository.bulk_upsert_quotes with {} quotes", quotes_for_db.len());
-            debug!("🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}", 
+            debug!("🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}",
                    quotes_for_db[0].id, quotes_for_db[0].symbol, quotes_for_db[0].timestamp, quotes_for_db[0].data_source);
-            
+
             match self.repository.bulk_upsert_quotes(quotes_for_db).await {
                 Ok(count) => {
                     debug!("✅ Successfully inserted/updated {} quotes in database", count);
@@ -444,6 +439,8 @@ impl MarketDataServiceTrait for MarketDataService {
     async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize> {
         self.repository.bulk_upsert_quotes(quotes).await
     }
+
+
 }
 
 impl MarketDataService {
@@ -474,15 +471,19 @@ impl MarketDataService {
         })
     }
 
+
+
+
+
     /// Refreshes the provider registry with the latest settings from the database
     async fn refresh_provider_registry(&self) -> Result<()> {
         debug!("Refreshing provider registry with latest settings");
         let provider_settings = self.repository.get_all_providers()?;
         let new_registry = ProviderRegistry::new(provider_settings).await?;
-        
+
         // Replace the registry with the new one
         *self.provider_registry.write().await = new_registry;
-        
+
         debug!("Provider registry refreshed successfully");
         Ok(())
     }
@@ -580,12 +581,13 @@ impl MarketDataService {
         let public_requests = quote_requests;
         let mut all_quotes = Vec::new();
         let mut failed_syncs = Vec::new();
-        let symbols_with_currencies: Vec<(String, String)> = public_requests
-            .iter()
-            .map(|req| (req.symbol.clone(), req.currency.clone()))
-            .collect();
 
-        if !symbols_with_currencies.is_empty() {
+        if !public_requests.is_empty() {
+            let symbols_with_currencies: Vec<(String, String)> = public_requests
+                .iter()
+                .map(|req| (req.symbol.clone(), req.currency.clone()))
+                .collect();
+
             let start_date_time =
                 self.calculate_sync_start_time(refetch_all, &symbols_with_currencies)?;
 
@@ -593,7 +595,7 @@ impl MarketDataService {
                 .provider_registry
                 .read()
                 .await
-                .historical_quotes_bulk(&symbols_with_currencies, start_date_time, end_date)
+                .historical_quotes_bulk(&public_requests, start_date_time, end_date)
                 .await
             {
                 Ok((quotes, provider_failures)) => {
@@ -604,9 +606,10 @@ impl MarketDataService {
                 Err(e) => {
                     error!("Failed to sync public quotes batch: {}", e);
                     failed_syncs.extend(
-                        symbols_with_currencies
-                            .into_iter()
-                            .map(|(s, _)| (s, e.to_string())),
+                        public_requests
+                            .iter()
+                            .map(|req| (req.symbol.clone(), format!("Provider error: {}", e)))
+                            .collect::<Vec<_>>()
                     );
                 }
             }

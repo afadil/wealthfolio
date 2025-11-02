@@ -151,6 +151,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         account_service.clone(),
         asset_service.clone(),
         fx_service.clone(),
+        market_data_service.clone(),
     ));
 
     // Determine data root directory (parent of DB path)

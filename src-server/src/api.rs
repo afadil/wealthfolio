@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::{Path, State, Query, RawQuery}, routing::{get, post, put, delete}, Json, Router};
 use tower_http::{cors::{Any, CorsLayer}, trace::TraceLayer, timeout::TimeoutLayer, request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer}};
 use utoipa::OpenApi;
-use crate::{error::ApiResult, models::{Account, NewAccount, AccountUpdate}, config::Config, main_lib::AppState};
+use crate::{error::{ApiResult, ApiError}, models::{Account, NewAccount, AccountUpdate}, config::Config, main_lib::AppState};
 use crate::addons::{self, *};
 use axum::http::StatusCode;
 use wealthfolio_core::{
@@ -30,7 +30,7 @@ pub async fn readyz() -> &'static str { "ok" }
 async fn list_accounts(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<Account>>> {
     let accounts = state.account_service.get_all_accounts()?;
     Ok(Json(accounts.into_iter().map(Account::from).collect()))
-} 
+}
 
 #[utoipa::path(post, path="/api/v1/accounts", request_body = NewAccount, responses((status=200, body = Account)))]
 async fn create_account(
@@ -115,7 +115,7 @@ async fn get_latest_valuations(State(state): State<Arc<AppState>>, raw: RawQuery
     if ids.is_empty() {
         ids = state
             .account_service
-            .get_active_accounts()? 
+            .get_active_accounts()?
             .into_iter()
             .map(|a| a.id)
             .collect();
