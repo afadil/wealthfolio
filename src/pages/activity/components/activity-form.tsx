@@ -49,6 +49,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
   SPLIT: "other",
   TRANSFER_IN: "cash",
   TRANSFER_OUT: "cash",
+  TRANSFER: "cash",
   FEE: "other",
   TAX: "other",
   ADD_HOLDING: "holdings",

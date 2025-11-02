@@ -84,6 +84,7 @@ export const cashActivitySchema = baseActivitySchema.extend({
     ActivityType.WITHDRAWAL,
     ActivityType.TRANSFER_IN,
     ActivityType.TRANSFER_OUT,
+    ActivityType.TRANSFER,
   ]),
   assetId: z.string().optional(),
   toAccountId: z.string().optional(),
