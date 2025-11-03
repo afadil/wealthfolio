@@ -3,7 +3,7 @@ import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { MobileNavigationContainer } from "@/pages/layouts/mobile-navigation-container";
-import { ApplicationShell, ErrorBoundary, PageScrollContainer } from "@wealthfolio/ui";
+import { ApplicationShell, ErrorBoundary, PageScrollContainer, Toaster } from "@wealthfolio/ui";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useNavigation } from "./navigation/app-navigation";
 import { AppSidebar } from "./navigation/app-sidebar";
@@ -56,7 +56,7 @@ const AppLayout = () => {
 
       {shouldUseMobileNavigation && <MobileNavBar navigation={navigation} />}
 
-      {/* <Toaster /> */}
+      <Toaster />
     </ApplicationShell>
   );
 };

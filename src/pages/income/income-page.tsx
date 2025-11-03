@@ -28,17 +28,36 @@ const periods = [
   { value: "YTD" as const, label: "Year to Date" },
 ];
 
+const mobilePeriods = [
+  { value: "TOTAL" as const, label: "All" },
+  { value: "LAST_YEAR" as const, label: "Last Yr" },
+  { value: "YTD" as const, label: "YTD" },
+];
+
 const IncomePeriodSelector: React.FC<{
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   onPeriodSelect: (period: "TOTAL" | "YTD" | "LAST_YEAR") => void;
 }> = ({ selectedPeriod, onPeriodSelect }) => (
-  <AnimatedToggleGroup
-    variant="secondary"
-    size="sm"
-    items={periods}
-    value={selectedPeriod}
-    onValueChange={onPeriodSelect}
-  />
+  <>
+    <div className="hidden sm:block">
+      <AnimatedToggleGroup
+        variant="secondary"
+        size="sm"
+        items={periods}
+        value={selectedPeriod}
+        onValueChange={onPeriodSelect}
+      />
+    </div>
+    <div className="block sm:hidden">
+      <AnimatedToggleGroup
+        variant="secondary"
+        size="xs"
+        items={mobilePeriods}
+        value={selectedPeriod}
+        onValueChange={onPeriodSelect}
+      />
+    </div>
+  </>
 );
 
 export default function IncomePage() {

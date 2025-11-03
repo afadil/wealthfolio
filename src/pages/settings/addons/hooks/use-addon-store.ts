@@ -1,17 +1,18 @@
-import { useState, useCallback, useEffect } from "react";
+import { logger } from "@/adapters";
+import type { ExtractedAddon } from "@/adapters/tauri";
+import {
+  clearAddonStaging,
+  downloadAddonForReview,
+  fetchAddonStoreListings,
+  getAddonRatings,
+  installFromStaging,
+  submitAddonRating,
+} from "@/commands/addon";
+import { QueryKeys } from "@/lib/query-keys";
+import type { AddonStoreListing } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@wealthfolio/ui";
-import {
-  downloadAddonForReview,
-  installFromStaging,
-  clearAddonStaging,
-  submitAddonRating,
-  getAddonRatings,
-  fetchAddonStoreListings,
-} from "@/commands/addon";
-import type { AddonStoreListing } from "@/lib/types";
-import type { ExtractedAddon } from "@/adapters/tauri";
-import { QueryKeys } from "@/lib/query-keys";
+import { useCallback, useEffect, useState } from "react";
 
 export function useAddonStore() {
   const [isInstalling, setIsInstalling] = useState<string | null>(null);
@@ -35,7 +36,7 @@ export function useAddonStore() {
   // Handle errors separately
   useEffect(() => {
     if (storeError) {
-      console.error("Failed to fetch store listings:", storeError);
+      logger.error(`Failed to fetch store listings: ${String(storeError)}`);
       toast({
         title: "Failed to load addon store",
         description: storeError instanceof Error ? storeError.message : "Unknown error occurred",
@@ -75,16 +76,17 @@ export function useAddonStore() {
           queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
         });
       } catch (error) {
-        console.error("Failed to prepare addon from store:", error);
+        logger.error(`Failed to prepare addon from store: ${String(error)}`);
+
         // Clean up staging on error
         try {
           await clearAddonStaging(listing.id);
         } catch (cleanupError) {
-          console.error("Failed to clean up staging after error:", cleanupError);
+          logger.error(`Failed to clean up staging after error: ${String(cleanupError)}`);
         }
         toast({
           title: "Installation failed",
-          description: error instanceof Error ? error.message : "Failed to prepare addon",
+          description: error instanceof Error ? error.message : "Failed to download the addon",
           variant: "destructive",
         });
         throw error;
@@ -106,7 +108,7 @@ export function useAddonStore() {
     try {
       await clearAddonStaging();
     } catch (error) {
-      console.error("Failed to clear staging directory:", error);
+      logger.error(`Failed to clear staging directory: ${String(error)}`);
       toast({
         title: "Failed to clear staging",
         description: error instanceof Error ? error.message : "Failed to clear staging directory",
@@ -129,7 +131,7 @@ export function useAddonStore() {
         // Invalidate store listings to refresh ratings data
         queryClient.invalidateQueries({ queryKey: [QueryKeys.ADDON_STORE_LISTINGS] });
       } catch (error) {
-        console.error("Failed to submit rating:", error);
+        logger.error(`Failed to submit rating: ${String(error)}`);
         toast({
           title: "Rating submission failed",
           description: error instanceof Error ? error.message : "Failed to submit rating",
@@ -148,7 +150,7 @@ export function useAddonStore() {
       try {
         return await getAddonRatings(addonId);
       } catch (error) {
-        console.error("Failed to fetch ratings:", error);
+        logger.error(`Failed to fetch ratings: ${String(error)}`);
         toast({
           title: "Failed to load ratings",
           description: error instanceof Error ? error.message : "Failed to fetch addon ratings",

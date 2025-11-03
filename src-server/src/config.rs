@@ -6,6 +6,7 @@ pub struct Config {
     pub cors_allow: Vec<String>,
     pub request_timeout: Duration,
     pub static_dir: String,
+    pub addons_root: String,
 }
 
 impl Config {
@@ -27,12 +28,20 @@ impl Config {
             .parse()
             .unwrap_or(30000);
         let static_dir = std::env::var("WF_STATIC_DIR").unwrap_or_else(|_| "dist".into());
+        let addons_root = std::env::var("WF_ADDONS_DIR").unwrap_or_else(|_| {
+            std::path::Path::new(&db_path)
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .to_string_lossy()
+                .into_owned()
+        });
         Self {
             listen_addr,
             db_path,
             cors_allow,
             request_timeout: Duration::from_millis(timeout_ms),
             static_dir,
+            addons_root,
         }
     }
 }

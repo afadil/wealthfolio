@@ -139,27 +139,27 @@ export default function AddonSettingsPage() {
         onValueChange={(value: string) => setActiveTab(value as "installed" | "store")}
       >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="installed" className="flex items-center gap-2">
-            <Icons.Package className="h-4 w-4" />
-            Installed Add-ons
+          <TabsTrigger value="installed" className="flex items-center justify-center gap-1.5 sm:gap-2">
+            <Icons.Package className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Installed</span>
             {installedAddons.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="secondary" className="ml-0.5 flex-shrink-0 sm:ml-1">
                 {installedAddons.length}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="store" className="flex items-center gap-2">
-            <Icons.Store className="h-4 w-4" />
-            Available Add-ons
+          <TabsTrigger value="store" className="flex items-center justify-center gap-1.5 sm:gap-2">
+            <Icons.Store className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Available</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="installed" className="space-y-4">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium">Installed Add-ons</h3>
-                <div className="text-muted-foreground flex items-center gap-4 text-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <h3 className="text-base font-medium sm:text-lg">Installed Add-ons</h3>
+                <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm">
                   <span>
                     {installedAddons.length} add-on{installedAddons.length !== 1 ? "s" : ""}{" "}
                     installed
@@ -177,7 +177,7 @@ export default function AddonSettingsPage() {
               </div>
 
               {/* Tab Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Check Updates */}
                 <Popover>
                   <PopoverTrigger asChild>
@@ -262,10 +262,11 @@ export default function AddonSettingsPage() {
                 <Button
                   variant="outline"
                   onClick={() => setActiveTab("store")}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1.5"
                 >
-                  <Icons.Store className="h-4 w-4" />
-                  Browse Add-ons
+                  <Icons.Store className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">Browse Add-ons</span>
+                  <span className="sm:hidden">Browse</span>
                 </Button>
               </div>
             </div>
@@ -273,21 +274,21 @@ export default function AddonSettingsPage() {
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
                 <Icons.Loader className="text-muted-foreground h-8 w-8 animate-spin" />
-                <span className="text-muted-foreground ml-2">Loading add-ons...</span>
+                <span className="text-muted-foreground ml-2 text-sm sm:text-base">Loading add-ons...</span>
               </div>
             ) : installedAddons.length === 0 ? (
               <EmptyPlaceholder>
                 <EmptyPlaceholder.Icon name="Package" />
                 <EmptyPlaceholder.Title>No add-ons installed</EmptyPlaceholder.Title>
                 <EmptyPlaceholder.Description>
-                  Get started by installing your first add-on to extend Wealthfolio's functionality.
+                  Get started by installing your first add-on to extend Wealthfolio&apos;s functionality.
                 </EmptyPlaceholder.Description>
-                <div className="flex items-center gap-3">
-                  <Button onClick={() => setActiveTab("store")}>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
+                  <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
                     <Icons.Store className="mr-2 h-4 w-4" />
                     Browse Add-ons
                   </Button>
-                  <Button variant="outline" onClick={handleLoadAddon} disabled={isLoading}>
+                  <Button variant="outline" onClick={handleLoadAddon} disabled={isLoading} className="w-full sm:w-auto">
                     <Icons.Plus className="mr-2 h-4 w-4" />
                     Install from File
                   </Button>
@@ -298,22 +299,22 @@ export default function AddonSettingsPage() {
                 {installedAddons.map((addon) => (
                   <div
                     key={addon.metadata.id}
-                    className={`group rounded-lg border p-6 transition-all duration-200 ${
+                    className={`group rounded-lg border p-4 transition-all duration-200 sm:p-6 ${
                       addon.metadata.enabled
                         ? "bg-card hover:bg-accent/30 hover:shadow-md"
                         : "bg-muted/30 border-dashed opacity-75 hover:opacity-90"
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1 space-y-2 sm:space-y-3">
                         {/* Header section with name and version */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
                           <div className="flex items-center gap-2">
                             {!addon.metadata.enabled && (
-                              <Icons.PauseCircle className="text-muted-foreground/60 h-5 w-5" />
+                              <Icons.PauseCircle className="text-muted-foreground/60 h-5 w-5 flex-shrink-0" />
                             )}
                             <h4
-                              className={`truncate text-lg font-semibold ${
+                              className={`truncate text-sm font-semibold md:text-lg ${
                                 addon.metadata.enabled ? "" : "text-muted-foreground"
                               }`}
                             >
@@ -340,7 +341,7 @@ export default function AddonSettingsPage() {
                         {/* Description */}
                         {addon.metadata.description && (
                           <p
-                            className={`text-sm leading-relaxed ${
+                            className={`text-xs leading-relaxed sm:text-sm ${
                               addon.metadata.enabled
                                 ? "text-muted-foreground"
                                 : "text-muted-foreground/70"
@@ -353,73 +354,73 @@ export default function AddonSettingsPage() {
                         {/* Author info */}
                         {addon.metadata.author && (
                           <div
-                            className={`flex items-center gap-2 text-sm ${
+                            className={`flex items-center gap-2 text-xs sm:text-sm ${
                               addon.metadata.enabled
                                 ? "text-muted-foreground"
                                 : "text-muted-foreground/70"
                             }`}
                           >
-                            <Icons.Users className="h-4 w-4" />
-                            <span>By {addon.metadata.author}</span>
+                            <Icons.Users className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">By {addon.metadata.author}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Controls section */}
-                      <div className="ml-6 flex items-center gap-2">
-                        {/* Permissions button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewPermissions(addon)}
-                          className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <Icons.Eye className="h-4 w-4" />
-                          <span className="sr-only">View permissions</span>
-                        </Button>
+                      <div className="flex items-center justify-between gap-2 sm:ml-6 sm:justify-normal">
+                        <div className="flex items-center gap-2">
+                          {/* Permissions button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewPermissions(addon)}
+                            className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+                          >
+                            <Icons.Eye className="h-4 w-4" />
+                            <span className="sr-only">View permissions</span>
+                          </Button>
 
-                        {/* Rating button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRateAddon(addon.metadata.id, addon.metadata.name)}
-                          className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <Icons.Star className="h-4 w-4" />
-                          <span className="sr-only">Rate addon</span>
-                        </Button>
+                          {/* Rating button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRateAddon(addon.metadata.id, addon.metadata.name)}
+                            className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+                          >
+                            <Icons.Star className="h-4 w-4" />
+                            <span className="sr-only">Rate addon</span>
+                          </Button>
 
-                        {/* Delete button with confirmation */}
-                        <DeleteConfirm
-                          deleteConfirmTitle="Remove Addon"
-                          deleteConfirmMessage={
-                            <div className="space-y-2">
-                              <p>
-                                Are you sure you want to remove{" "}
-                                <strong>{addon.metadata.name}</strong>?
-                              </p>
-                              <p className="text-muted-foreground text-sm">
-                                This action cannot be undone. The addon will be completely removed
-                                from your system.
-                              </p>
-                            </div>
-                          }
-                          handleDeleteConfirm={() => handleUninstallAddon(addon.metadata.id)}
-                          isPending={false}
-                          button={
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-9 w-9 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                            >
-                              <Icons.Trash className="h-4 w-4" />
-                              <span className="sr-only">Remove addon</span>
-                            </Button>
-                          }
-                        />
+                          {/* Delete button with confirmation */}
+                          <DeleteConfirm
+                            deleteConfirmTitle="Remove Addon"
+                            deleteConfirmMessage={
+                              <div className="space-y-2">
+                                <p>
+                                  Are you sure you want to remove{" "}
+                                  <strong>{addon.metadata.name}</strong>?
+                                </p>
+                                <p className="text-muted-foreground text-sm">
+                                  This action cannot be undone. The addon will be completely removed
+                                  from your system.
+                                </p>
+                              </div>
+                            }
+                            handleDeleteConfirm={() => handleUninstallAddon(addon.metadata.id)}
+                            isPending={false}
+                            button={
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+                              >
+                                <Icons.Trash className="h-4 w-4" />
+                                <span className="sr-only">Remove addon</span>
+                              </Button>
+                            }
+                          />
 
-                        {/* Enable/Disable Switch */}
-                        <div className="mr-2 flex items-center gap-3">
+                          {/* Enable/Disable Switch */}
                           <Switch
                             id={`addon-${addon.metadata.id}`}
                             checked={addon.metadata.enabled}

@@ -1,8 +1,7 @@
 pub mod api;
 pub mod config;
 pub mod error;
-pub mod models;
-pub mod addons;
 mod main_lib;
+pub mod models;
 
-pub use main_lib::{AppState, build_state, init_tracing};
+pub use main_lib::{build_state, init_tracing, AppState};

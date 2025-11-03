@@ -6474,7 +6474,6 @@ dependencies = [
  "tokio",
  "uuid",
  "wealthfolio_core",
- "zip 2.4.2",
 ]
 
 [[package]]
@@ -6507,6 +6506,7 @@ dependencies = [
  "urlencoding",
  "uuid",
  "yahoo_finance_api",
+ "zip 2.4.2",
 ]
 
 [[package]]
