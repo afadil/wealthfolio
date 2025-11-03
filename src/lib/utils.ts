@@ -1,7 +1,7 @@
-import { format, isValid, parseISO, parse } from "date-fns";
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { logger } from "@/adapters";
+import { type ClassValue, clsx } from "clsx";
+import { format, isValid, parse, parseISO } from "date-fns";
+import { twMerge } from "tailwind-merge";
 import { AccountValuation } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -191,6 +191,34 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
     time: timeFormatter.format(dateObj),
   };
 };
+
+/**
+ * Formats a date for use with HTML datetime-local input elements.
+ * Returns format: "YYYY-MM-DDTHH:mm" in local timezone.
+ * @param date Date string, Date object, or undefined
+ * @returns Formatted string suitable for datetime-local input, or empty string if invalid
+ */
+export function formatDateTimeLocal(date: Date | string | undefined): string {
+  if (!date) return "";
+  const value = typeof date === "string" ? new Date(date) : date;
+  if (!isValid(value)) return "";
+  // Format in local timezone for datetime-local input
+  return format(value, "yyyy-MM-dd'T'HH:mm");
+}
+
+/**
+ * Formats a date for display in the UI.
+ * Returns format: "YYYY/MM/DD HH:mm" in local timezone.
+ * @param date Date string, Date object, or undefined
+ * @returns Formatted string for display, or empty string if invalid
+ */
+export function formatDateTimeDisplay(date: Date | string | undefined): string {
+  if (!date) return "";
+  const value = typeof date === "string" ? new Date(date) : date;
+  if (!isValid(value)) return "";
+  // Display format: YYYY/MM/DD HH:mm
+  return format(value, "yyyy/MM/dd HH:mm");
+}
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
   // Handle pence (GBp) specially
   if (currency === "GBp" || currency === "GBX") {

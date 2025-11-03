@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { InputTags } from "@/components/ui/tag-input";
-import { usePlatform } from "@/hooks/use-platform";
+import { useHapticFeedback } from "@/hooks";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
@@ -57,15 +57,6 @@ interface AssetDetailData {
 
 type AssetTab = "overview" | "lots" | "history";
 
-type HapticsModule = typeof import("@tauri-apps/plugin-haptics");
-
-let hapticsModulePromise: Promise<HapticsModule> | null = null;
-
-async function loadHapticsModule(): Promise<HapticsModule> {
-  hapticsModulePromise ??= import("@tauri-apps/plugin-haptics");
-  return hapticsModulePromise;
-}
-
 export const AssetProfilePage = () => {
   const { symbol: encodedSymbol = "" } = useParams<{ symbol: string }>();
   const symbol = decodeURIComponent(encodedSymbol);
@@ -77,7 +68,7 @@ export const AssetProfilePage = () => {
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const { isMobile: isMobilePlatform, isTauri } = usePlatform();
+  const triggerHaptic = useHapticFeedback();
   const [formData, setFormData] = useState<AssetProfileFormData>({
     name: "",
     sectors: [],
@@ -123,30 +114,6 @@ export const AssetProfilePage = () => {
 
   const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
-
-  const triggerHaptic = useCallback(() => {
-    if (!isMobilePlatform || !isTauri) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const haptics = await loadHapticsModule();
-        if (typeof haptics.selectionFeedback === "function") {
-          await haptics.selectionFeedback();
-          return;
-        }
-
-        if (typeof haptics.impactFeedback === "function") {
-          await haptics.impactFeedback("medium");
-        }
-      } catch (unknownError) {
-        if (import.meta.env.DEV) {
-          console.warn("Haptic feedback unavailable:", unknownError);
-        }
-      }
-    })();
-  }, [isMobilePlatform, isTauri]);
 
   useEffect(() => {
     setFormData({
@@ -546,11 +513,7 @@ export const AssetProfilePage = () => {
   if (assetProfile?.assetType === "FOREX") {
     return (
       <Page>
-        <PageHeader
-          heading="Quote History"
-          text={symbol}
-          onBack={() => navigate(backTarget)}
-        />
+        <PageHeader heading="Quote History" text={symbol} onBack={() => navigate(backTarget)} />
         <PageContent>
           <QuoteHistoryTable
             data={quoteHistory ?? []}

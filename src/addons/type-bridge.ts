@@ -9,6 +9,8 @@ import type {
   Holding,
   Activity,
   Account,
+  ActivityBulkMutationRequest,
+  ActivityBulkMutationResult,
   ActivityDetails,
   ActivityCreate,
   ActivityUpdate,
@@ -119,7 +121,7 @@ export interface InternalHostAPI {
   ): Promise<ActivitySearchResponse>;
   createActivity(activity: ActivityCreate): Promise<Activity>;
   updateActivity(activity: ActivityUpdate): Promise<Activity>;
-  saveActivities(activities: ActivityUpdate[]): Promise<Activity[]>;
+  saveActivities(request: ActivityBulkMutationRequest): Promise<ActivityBulkMutationResult>;
 
   // File operations
   openCsvFileDialog(): Promise<null | string | string[]>;
@@ -196,7 +198,10 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       search: internalAPI.searchActivities,
       create: internalAPI.createActivity,
       update: internalAPI.updateActivity,
-      saveMany: internalAPI.saveActivities,
+      saveMany: (input: ActivityUpdate[] | ActivityBulkMutationRequest) =>
+        Array.isArray(input)
+          ? internalAPI.saveActivities({ updates: input })
+          : internalAPI.saveActivities(input),
       import: (activities: ActivityImport[]) => internalAPI.importActivities({ activities }),
       checkImport: (accountId: string, activities: ActivityImport[]) =>
         internalAPI.checkActivitiesImport({ account_id: accountId, activities }),

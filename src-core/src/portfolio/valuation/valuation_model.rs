@@ -22,7 +22,9 @@ pub struct DailyAccountValuation {
     pub calculated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Queryable, QueryableByName, Insertable)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Queryable, QueryableByName, Insertable,
+)]
 #[serde(rename_all = "camelCase")]
 #[diesel(table_name = crate::schema::daily_account_valuation)]
 pub struct DailyAccountValuationDb {

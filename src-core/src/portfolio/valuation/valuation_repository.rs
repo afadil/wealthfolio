@@ -1,20 +1,21 @@
+use async_trait::async_trait;
+use chrono::NaiveDate;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::sqlite::SqliteConnection;
-use std::sync::Arc;
-use chrono::NaiveDate;
-use std::collections::HashMap;
 use diesel::sql_query;
 use diesel::sql_types::Text;
 use diesel::sqlite::Sqlite;
-use async_trait::async_trait;
+use diesel::sqlite::SqliteConnection;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::Result;
-use crate::portfolio::valuation::valuation_model::{DailyAccountValuation, DailyAccountValuationDb};
-use crate::schema::daily_account_valuation::dsl::*;
+use crate::portfolio::valuation::valuation_model::{
+    DailyAccountValuation, DailyAccountValuationDb,
+};
 use crate::schema::daily_account_valuation;
-
+use crate::schema::daily_account_valuation::dsl::*;
 
 #[async_trait]
 pub trait ValuationRepositoryTrait: Send + Sync {
@@ -37,7 +38,6 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         date: NaiveDate,
     ) -> Result<Vec<DailyAccountValuation>>;
 }
-
 
 pub struct ValuationRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -64,14 +64,16 @@ impl ValuationRepositoryTrait for ValuationRepository {
             .map(DailyAccountValuationDb::from)
             .collect();
 
-        self.writer.exec(move |conn| {
-            for chunk in records_to_save.chunks(1000) {
-                diesel::replace_into(daily_account_valuation::table)
-                    .values(chunk) // Pass the chunk directly
-                    .execute(conn)?;
-            }
-            Ok(())
-        }).await
+        self.writer
+            .exec(move |conn| {
+                for chunk in records_to_save.chunks(1000) {
+                    diesel::replace_into(daily_account_valuation::table)
+                        .values(chunk) // Pass the chunk directly
+                        .execute(conn)?;
+                }
+                Ok(())
+            })
+            .await
     }
 
     fn get_historical_valuations(
@@ -95,8 +97,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query = query.filter(valuation_date.le(end_date_val));
         }
 
-        let history_dbs = query
-            .load::<DailyAccountValuationDb>(&mut conn)?;
+        let history_dbs = query.load::<DailyAccountValuationDb>(&mut conn)?;
 
         // Convert Vec<DailyAccountValuationDb> to Vec<DailyAccountValuation>
         // Handle potential conversion errors if necessary (using From implicitly handles unwrap_or_default)
@@ -130,11 +131,15 @@ impl ValuationRepositoryTrait for ValuationRepository {
 
     async fn delete_valuations_for_account(&self, input_account_id: &str) -> Result<()> {
         let account_id_owned = input_account_id.to_string();
-        self.writer.exec(move |conn| {
-            diesel::delete(daily_account_valuation::table.filter(account_id.eq(account_id_owned)))
+        self.writer
+            .exec(move |conn| {
+                diesel::delete(
+                    daily_account_valuation::table.filter(account_id.eq(account_id_owned)),
+                )
                 .execute(conn)?;
-            Ok(())
-        }).await
+                Ok(())
+            })
+            .await
     }
 
     fn get_latest_valuations(
@@ -180,19 +185,25 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query_builder = query_builder.bind::<Text, _>(acc_id_str);
         }
 
-        let latest_valuations_db: Vec<DailyAccountValuationDb> = query_builder
-            .load::<DailyAccountValuationDb>(&mut conn)?;
+        let latest_valuations_db: Vec<DailyAccountValuationDb> =
+            query_builder.load::<DailyAccountValuationDb>(&mut conn)?;
 
         // To maintain input order, we first put results into a map
         let mut results_map: HashMap<String, DailyAccountValuation> = latest_valuations_db
             .into_iter()
-            .map(|db_item| (db_item.account_id.clone(), DailyAccountValuation::from(db_item)))
+            .map(|db_item| {
+                (
+                    db_item.account_id.clone(),
+                    DailyAccountValuation::from(db_item),
+                )
+            })
             .collect();
 
         // Then build the ordered Vec
         let mut ordered_results = Vec::new();
         for acc_id_str in input_account_ids {
-            if let Some(valuation) = results_map.remove(acc_id_str) { // Use remove to avoid cloning if DailyAccountValuation is large
+            if let Some(valuation) = results_map.remove(acc_id_str) {
+                // Use remove to avoid cloning if DailyAccountValuation is large
                 ordered_results.push(valuation);
             }
         }
@@ -207,9 +218,9 @@ impl ValuationRepositoryTrait for ValuationRepository {
         if input_account_ids.is_empty() {
             return Ok(Vec::new()); // No need to query if the list is empty
         }
-        
+
         let mut conn = get_connection(&self.pool)?;
-        
+
         let history_dbs = daily_account_valuation::table
             .filter(account_id.eq_any(input_account_ids)) // Use eq_any for multiple IDs
             .filter(valuation_date.eq(input_date)) // Filter by the specific date
@@ -223,4 +234,4 @@ impl ValuationRepositoryTrait for ValuationRepository {
 
         Ok(history_records)
     }
-} 
+}

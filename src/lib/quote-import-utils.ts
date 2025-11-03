@@ -10,8 +10,7 @@ const CSV_PARSE_BASE_CONFIG = {
   header: true,
   skipEmptyLines: true,
   transformHeader: (header: string) => header.trim().toLowerCase(),
-  transform: (value: string | undefined) =>
-    typeof value === "string" ? value.trim() : value,
+  transform: (value: string | undefined) => (typeof value === "string" ? value.trim() : value),
 } satisfies ParseConfig<QuoteCsvRow>;
 
 function parseCsv(
@@ -34,10 +33,7 @@ function parseOptionalNumber(value?: string): number | undefined {
 }
 
 function buildParseErrorMessage(error: ParseError): string {
-  const row =
-    typeof error.row === "number" && error.row >= 0
-      ? ` (row ${error.row + 1})`
-      : "";
+  const row = typeof error.row === "number" && error.row >= 0 ? ` (row ${error.row + 1})` : "";
   return `CSV parse error${row}: ${error.message}`;
 }
 
@@ -84,9 +80,7 @@ export async function validateCsvFile(file: File): Promise<{
       };
     }
 
-    const missingHeaders = REQUIRED_HEADERS.filter(
-      (header) => !headers.includes(header),
-    );
+    const missingHeaders = REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 
     if (missingHeaders.length > 0) {
       return {
@@ -211,9 +205,10 @@ MSFT,2023-01-02,252.00,258.00,250.00,255.50,900000,USD`;
  * @param quote The quote to validate
  * @returns Validation status and error message
  */
-export function validateQuoteImport(
-  quote: QuoteImport,
-): { status: ImportValidationStatus; errorMessage?: string } {
+export function validateQuoteImport(quote: QuoteImport): {
+  status: ImportValidationStatus;
+  errorMessage?: string;
+} {
   if (!quote.symbol.trim()) {
     return { status: "error", errorMessage: "Symbol is required" };
   }
@@ -242,11 +237,7 @@ export function validateQuoteImport(
     return { status: "error", errorMessage: "Close price must be greater than 0" };
   }
 
-  if (
-    quote.high !== undefined &&
-    quote.low !== undefined &&
-    quote.high < quote.low
-  ) {
+  if (quote.high !== undefined && quote.low !== undefined && quote.high < quote.low) {
     return {
       status: "error",
       errorMessage: "High price cannot be less than low price",

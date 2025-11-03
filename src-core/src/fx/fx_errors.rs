@@ -1,6 +1,6 @@
+use crate::errors::DatabaseError;
 use std::error::Error;
 use std::fmt;
-use crate::errors::DatabaseError;
 
 #[derive(Debug)]
 pub enum FxError {
@@ -43,28 +43,92 @@ impl From<DatabaseError> for FxError {
     }
 }
 
-impl From<std::sync::PoisonError<std::sync::RwLockReadGuard<'_, std::collections::HashMap<String, f64>>>> for FxError {
-    fn from(err: std::sync::PoisonError<std::sync::RwLockReadGuard<'_, std::collections::HashMap<String, f64>>>) -> Self {
+impl
+    From<
+        std::sync::PoisonError<
+            std::sync::RwLockReadGuard<'_, std::collections::HashMap<String, f64>>,
+        >,
+    > for FxError
+{
+    fn from(
+        err: std::sync::PoisonError<
+            std::sync::RwLockReadGuard<'_, std::collections::HashMap<String, f64>>,
+        >,
+    ) -> Self {
         FxError::CacheError(err.to_string())
     }
 }
 
-impl From<std::sync::PoisonError<std::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, f64>>>> for FxError {
-    fn from(err: std::sync::PoisonError<std::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, f64>>>) -> Self {
+impl
+    From<
+        std::sync::PoisonError<
+            std::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, f64>>,
+        >,
+    > for FxError
+{
+    fn from(
+        err: std::sync::PoisonError<
+            std::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, f64>>,
+        >,
+    ) -> Self {
         FxError::CacheError(err.to_string())
     }
 }
 
-impl From<std::sync::PoisonError<std::sync::RwLockReadGuard<'_, std::collections::HashMap<String, Vec<crate::market_data::market_data_model::Quote>>>>> for FxError {
-    fn from(err: std::sync::PoisonError<std::sync::RwLockReadGuard<'_, std::collections::HashMap<String, Vec<crate::market_data::market_data_model::Quote>>>>) -> Self {
+impl
+    From<
+        std::sync::PoisonError<
+            std::sync::RwLockReadGuard<
+                '_,
+                std::collections::HashMap<
+                    String,
+                    Vec<crate::market_data::market_data_model::Quote>,
+                >,
+            >,
+        >,
+    > for FxError
+{
+    fn from(
+        err: std::sync::PoisonError<
+            std::sync::RwLockReadGuard<
+                '_,
+                std::collections::HashMap<
+                    String,
+                    Vec<crate::market_data::market_data_model::Quote>,
+                >,
+            >,
+        >,
+    ) -> Self {
         FxError::CacheError(err.to_string())
     }
 }
 
-impl From<std::sync::PoisonError<std::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, Vec<crate::market_data::market_data_model::Quote>>>>> for FxError {
-    fn from(err: std::sync::PoisonError<std::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, Vec<crate::market_data::market_data_model::Quote>>>>) -> Self {
+impl
+    From<
+        std::sync::PoisonError<
+            std::sync::RwLockWriteGuard<
+                '_,
+                std::collections::HashMap<
+                    String,
+                    Vec<crate::market_data::market_data_model::Quote>,
+                >,
+            >,
+        >,
+    > for FxError
+{
+    fn from(
+        err: std::sync::PoisonError<
+            std::sync::RwLockWriteGuard<
+                '_,
+                std::collections::HashMap<
+                    String,
+                    Vec<crate::market_data::market_data_model::Quote>,
+                >,
+            >,
+        >,
+    ) -> Self {
         FxError::CacheError(err.to_string())
     }
 }
 
-use diesel; 
+use diesel;

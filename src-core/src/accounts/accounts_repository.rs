@@ -1,8 +1,8 @@
+use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::Result;
@@ -56,7 +56,7 @@ impl AccountRepositoryTrait for AccountRepository {
             .exec(move |conn| {
                 let mut account_db: AccountDB = account_update.into();
 
-                let existing = accounts 
+                let existing = accounts
                     .select(AccountDB::as_select())
                     .find(&account_db.id)
                     .first::<AccountDB>(conn)?;
@@ -78,7 +78,10 @@ impl AccountRepositoryTrait for AccountRepository {
     fn get_by_id(&self, account_id: &str) -> Result<Account> {
         let mut conn = get_connection(&self.pool)?;
 
-        let account = accounts.select(AccountDB::as_select()).find(account_id).first::<AccountDB>(&mut conn)?;
+        let account = accounts
+            .select(AccountDB::as_select())
+            .find(account_id)
+            .first::<AccountDB>(&mut conn)?;
 
         Ok(account.into())
     }

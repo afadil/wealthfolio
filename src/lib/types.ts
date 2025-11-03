@@ -75,6 +75,7 @@ export interface ActivitySearchResponse {
 }
 
 export interface ActivityCreate {
+  id?: string;
   accountId: string;
   activityType: string;
   activityDate: string | Date;
@@ -89,6 +90,27 @@ export interface ActivityCreate {
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };
+export interface ActivityBulkMutationRequest {
+  creates?: ActivityCreate[];
+  updates?: ActivityUpdate[];
+  deleteIds?: string[];
+}
+export interface ActivityBulkMutationError {
+  id?: string;
+  action: string;
+  message: string;
+}
+export interface ActivityBulkIdentifierMapping {
+  tempId?: string | null;
+  activityId: string;
+}
+export interface ActivityBulkMutationResult {
+  created: Activity[];
+  updated: Activity[];
+  deleted: Activity[];
+  createdMappings: ActivityBulkIdentifierMapping[];
+  errors: ActivityBulkMutationError[];
+}
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
 

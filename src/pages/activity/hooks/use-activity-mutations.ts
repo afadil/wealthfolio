@@ -1,9 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/use-toast";
-import { createActivity, updateActivity, deleteActivity } from "@/commands/activity";
+import { createActivity, updateActivity, deleteActivity, saveActivities } from "@/commands/activity";
 import { logger } from "@/adapters";
 import { NewActivityFormValues } from "../components/forms/schemas";
-import { ActivityDetails, Quote, ActivityCreate, ActivityUpdate } from "@/lib/types";
+import {
+  ActivityDetails,
+  Quote,
+  ActivityBulkMutationRequest,
+  ActivityBulkMutationResult,
+  ActivityCreate,
+  ActivityUpdate,
+} from "@/lib/types";
 import { DataSource } from "@/lib/constants";
 import { updateQuote } from "@/commands/market-data";
 import { QueryKeys } from "@/lib/query-keys";
@@ -126,10 +133,38 @@ export function useActivityMutations(
     ...createMutationOptions("duplicating"),
   });
 
+  const saveActivitiesMutation = useMutation({
+    mutationFn: async (request: ActivityBulkMutationRequest) => {
+      const result = await saveActivities(request);
+      const quoteCandidates: (ActivityCreate | ActivityUpdate)[] = [
+        ...(request.creates ?? []),
+        ...(request.updates ?? []),
+      ];
+      for (const candidate of quoteCandidates) {
+        await createQuoteFromActivity(candidate);
+      }
+      return result;
+    },
+    onSuccess: (_result: ActivityBulkMutationResult) => {
+      queryClient.invalidateQueries();
+    },
+    onError: (error: string) => {
+      logger.error(`Error saving activities: ${String(error)}`);
+      toast({
+        title: "Uh oh! Something went wrong saving activities.",
+        description: `Please try again or report an issue if the problem persists. Error: ${String(
+          error,
+        )}`,
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     addActivityMutation,
     updateActivityMutation,
     deleteActivityMutation,
     duplicateActivityMutation,
+    saveActivitiesMutation,
   };
 }

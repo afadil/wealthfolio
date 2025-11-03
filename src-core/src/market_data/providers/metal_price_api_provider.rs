@@ -1,11 +1,14 @@
-use std::time::SystemTime;
+use crate::market_data::market_data_errors::MarketDataError;
+use crate::market_data::providers::models::AssetProfile;
+use crate::market_data::{
+    market_data_model::DataSource, AssetProfiler, MarketDataProvider, Quote as ModelQuote,
+    QuoteSummary,
+};
 use chrono::{DateTime, Utc};
+use num_traits::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use num_traits::FromPrimitive;
-use crate::market_data::market_data_errors::MarketDataError;
-use crate::market_data::{AssetProfiler, MarketDataProvider, Quote as ModelQuote, QuoteSummary, market_data_model::DataSource};
-use crate::market_data::providers::models::{AssetProfile};
+use std::time::SystemTime;
 
 #[derive(Deserialize, Debug)]
 struct MetalPriceApiResponse {
@@ -107,7 +110,10 @@ impl AssetProfiler for MetalPriceApiProvider {
             currency: "USD".to_string(),
             data_source: "METAL_PRICE_API".to_string(),
             sectors: Some("Materials,Commodities".to_string()),
-            url: Some(format!("https://api.metalpriceapi.com/metals/{}", symbol.to_lowercase())),
+            url: Some(format!(
+                "https://api.metalpriceapi.com/metals/{}",
+                symbol.to_lowercase()
+            )),
         })
     }
 
@@ -119,13 +125,25 @@ impl AssetProfiler for MetalPriceApiProvider {
         let calculate_score = |name: &str, symbol: &str, query: &str| -> f64 {
             let name_lower = name.to_lowercase();
             let symbol_lower = symbol.to_lowercase();
-            
-            if query == symbol_lower { return 1.0; } // Exact symbol match
-            if query == name_lower { return 0.9; }   // Exact name match
-            if symbol_lower.starts_with(query) { return 0.8; } // Symbol starts with query
-            if name_lower.starts_with(query) { return 0.7; }   // Name starts with query
-            if symbol_lower.contains(query) { return 0.6; }    // Symbol contains query
-            if name_lower.contains(query) { return 0.5; }      // Name contains query
+
+            if query == symbol_lower {
+                return 1.0;
+            } // Exact symbol match
+            if query == name_lower {
+                return 0.9;
+            } // Exact name match
+            if symbol_lower.starts_with(query) {
+                return 0.8;
+            } // Symbol starts with query
+            if name_lower.starts_with(query) {
+                return 0.7;
+            } // Name starts with query
+            if symbol_lower.contains(query) {
+                return 0.6;
+            } // Symbol contains query
+            if name_lower.contains(query) {
+                return 0.5;
+            } // Name contains query
             0.0 // No match
         };
 
@@ -200,7 +218,11 @@ impl AssetProfiler for MetalPriceApiProvider {
         }
 
         // Sort results by score (highest first)
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(results)
     }
@@ -223,14 +245,13 @@ impl MarketDataProvider for MetalPriceApiProvider {
     ) -> Result<ModelQuote, MarketDataError> {
         // Validate that this provider supports the requested symbol
         match symbol {
-            "XAU" | "XAG" | "XPT" | "XPD" | "XRH" | "XRU" | "XIR" | "XOS" => {},
+            "XAU" | "XAG" | "XPT" | "XPD" | "XRH" | "XRU" | "XIR" | "XOS" => {}
             _ => return Err(MarketDataError::NotFound(symbol.to_string())),
         }
 
         let url = format!(
             "https://api.metalpriceapi.com/v1/latest?api_key={}&base=USD&currencies={}",
-            self.api_key,
-            symbol
+            self.api_key, symbol
         );
 
         let response = reqwest::get(&url)
@@ -241,19 +262,31 @@ impl MarketDataProvider for MetalPriceApiProvider {
             .map_err(|e| MarketDataError::ProviderError(e.to_string()))?;
 
         if !response.success {
-            return Err(MarketDataError::ProviderError("API request failed".to_string()));
+            return Err(MarketDataError::ProviderError(
+                "API request failed".to_string(),
+            ));
         }
 
-        let rate = response.rates.get(symbol).ok_or_else(|| MarketDataError::NotFound(symbol.to_string()))?;
-        
+        let rate = response
+            .rates
+            .get(symbol)
+            .ok_or_else(|| MarketDataError::NotFound(symbol.to_string()))?;
+
         // API returns the rate as: 1 USD = rate troy ounces of metal
         // So to get price per troy ounce in USD: price = 1 / rate
         if *rate == 0.0 {
-            return Err(MarketDataError::ProviderError(format!("Invalid rate (zero) for symbol: {}", symbol)));
+            return Err(MarketDataError::ProviderError(format!(
+                "Invalid rate (zero) for symbol: {}",
+                symbol
+            )));
         }
-        
-        let price = Decimal::from_f64(1.0 / *rate)
-            .ok_or_else(|| MarketDataError::ProviderError(format!("Failed to convert rate to decimal for symbol: {}", symbol)))?;
+
+        let price = Decimal::from_f64(1.0 / *rate).ok_or_else(|| {
+            MarketDataError::ProviderError(format!(
+                "Failed to convert rate to decimal for symbol: {}",
+                symbol
+            ))
+        })?;
 
         let now_utc: DateTime<Utc> = Utc::now();
 

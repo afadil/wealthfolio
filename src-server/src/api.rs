@@ -11,8 +11,15 @@ use wealthfolio_core::{
     settings::{Settings, SettingsUpdate, SettingsServiceTrait},
     portfolio::{holdings::holdings_model::Holding, valuation::valuation_model::DailyAccountValuation, performance::PerformanceMetrics, income::IncomeSummary},
     goals::goals_model::{Goal, NewGoal, GoalsAllocation},
-    activities::{NewActivity, ActivityUpdate, ActivitySearchResponse},
-    activities::{ActivityImport, ImportMappingData},
+    activities::{
+        ActivityBulkMutationRequest,
+        ActivityBulkMutationResult,
+        ActivityImport,
+        ActivitySearchResponse,
+        ActivityUpdate,
+        ImportMappingData,
+        NewActivity,
+    },
     fx::fx_model::{ExchangeRate, NewExchangeRate},
     limits::{ContributionLimit, NewContributionLimit, DepositsCalculation},
     market_data::{MarketDataProviderSetting, MarketDataProviderInfo, Quote},
@@ -311,6 +318,17 @@ async fn update_activity(State(state): State<Arc<AppState>>, Json(activity): Jso
     Ok(Json(updated))
 }
 
+async fn save_activities(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<ActivityBulkMutationRequest>,
+) -> ApiResult<Json<ActivityBulkMutationResult>> {
+    let result = state
+        .activity_service
+        .bulk_mutate_activities(request)
+        .await?;
+    Ok(Json(result))
+}
+
 async fn delete_activity(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
     let deleted = state.activity_service.delete_activity(id).await?;
     Ok(Json(deleted))
@@ -524,6 +542,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/exchange-rates/:id", delete(delete_exchange_rate))
         .route("/activities/search", post(search_activities))
         .route("/activities", post(create_activity).put(update_activity))
+        .route("/activities/bulk", post(save_activities))
         .route("/activities/:id", delete(delete_activity))
         .route("/activities/import/check", post(check_activities_import))
         .route("/activities/import", post(import_activities))

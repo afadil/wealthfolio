@@ -4,14 +4,18 @@ use std::time::SystemTime;
 
 use super::models::AssetProfile;
 
-
-
 #[async_trait]
 pub trait MarketDataProvider: Send + Sync {
     fn name(&self) -> &'static str;
-    fn priority(&self) -> u8 { 10 } 
+    fn priority(&self) -> u8 {
+        10
+    }
 
-    async fn get_latest_quote(&self, symbol: &str, fallback_currency: String) -> Result<ModelQuote, MarketDataError>;
+    async fn get_latest_quote(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, MarketDataError>;
     async fn get_historical_quotes(
         &self,
         symbol: &str,
@@ -19,7 +23,7 @@ pub trait MarketDataProvider: Send + Sync {
         end: SystemTime,
         fallback_currency: String,
     ) -> Result<Vec<ModelQuote>, MarketDataError>;
-    
+
     /// Fetch historical quotes for multiple symbols in parallel
     async fn get_historical_quotes_bulk(
         &self,

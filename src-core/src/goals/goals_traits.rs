@@ -1,5 +1,5 @@
-use crate::goals::goals_model::{Goal, GoalsAllocation, NewGoal};
 use crate::errors::Result;
+use crate::goals::goals_model::{Goal, GoalsAllocation, NewGoal};
 use async_trait::async_trait;
 
 /// Trait for goal repository operations
@@ -22,4 +22,4 @@ pub trait GoalServiceTrait: Send + Sync {
     async fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize>;
     async fn upsert_goal_allocations(&self, allocations: Vec<GoalsAllocation>) -> Result<usize>;
     fn load_goals_allocations(&self) -> Result<Vec<GoalsAllocation>>;
-} 
+}

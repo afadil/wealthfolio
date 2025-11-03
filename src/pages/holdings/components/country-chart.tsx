@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import { Holding, Country } from "@/lib/types";
-import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Country, Holding } from "@/lib/types";
+import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
+import { useMemo, useState } from "react";
 
 interface CountryChartProps {
   holdings?: Holding[];
@@ -56,10 +56,6 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
     );
   }
 
-  const onPieEnter = (_: React.MouseEvent, index: number) => {
-    setActiveIndex(index);
-  };
-
   const handleInternalSectionClick = (sectionData: {
     name: string;
     value: number;
@@ -88,7 +84,6 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
           <DonutChart
             data={data}
             activeIndex={activeIndex}
-            onPieEnter={onPieEnter}
             onSectionClick={handleInternalSectionClick}
             startAngle={180}
             endAngle={0}

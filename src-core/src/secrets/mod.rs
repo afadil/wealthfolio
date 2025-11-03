@@ -1,5 +1,5 @@
-use keyring::Entry;
 use crate::errors::{Error, Result};
+use keyring::Entry;
 
 const USERNAME: &str = "default";
 const SERVICE_PREFIX: &str = "wealthfolio_";

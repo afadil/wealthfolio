@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -5,7 +6,6 @@ use diesel::sqlite::SqliteConnection;
 use log::{debug, error};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use async_trait::async_trait;
 
 use super::market_data_errors::MarketDataError;
 use super::market_data_model::{
@@ -66,7 +66,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         if input_quotes.is_empty() {
             return Ok(());
         }
-        let quotes_owned: Vec<Quote> = input_quotes.to_vec(); 
+        let quotes_owned: Vec<Quote> = input_quotes.to_vec();
         let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
 
         self.writer
@@ -394,8 +394,7 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
             .exec(
                 move |conn: &mut SqliteConnection| -> Result<MarketDataProviderSetting> {
                     diesel::update(
-                        market_data_providers_dsl::market_data_providers
-                            .find(&provider_id_input),
+                        market_data_providers_dsl::market_data_providers.find(&provider_id_input),
                     )
                     .set(&changes)
                     .get_result(conn)
@@ -448,53 +447,88 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
     }
 
     async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize> {
-        debug!("🚀 REPOSITORY: bulk_upsert_quotes called with {} quotes", quote_records.len());
-        
+        debug!(
+            "🚀 REPOSITORY: bulk_upsert_quotes called with {} quotes",
+            quote_records.len()
+        );
+
         if quote_records.is_empty() {
             debug!("⚠️ No quotes to insert, returning 0");
             return Ok(0);
         }
 
-        debug!("🔄 Converting {} Quote structs to QuoteDb structs", quote_records.len());
+        debug!(
+            "🔄 Converting {} Quote structs to QuoteDb structs",
+            quote_records.len()
+        );
         let quotes_owned = quote_records.clone();
         let db_rows: Vec<QuoteDb> = quotes_owned.iter().map(QuoteDb::from).collect();
         debug!("✅ Converted to {} QuoteDb records", db_rows.len());
-        debug!("🎯 Sample QuoteDb: id={}, symbol={}, timestamp={}, data_source={}", 
-               db_rows[0].id, db_rows[0].symbol, db_rows[0].timestamp, db_rows[0].data_source);
+        debug!(
+            "🎯 Sample QuoteDb: id={}, symbol={}, timestamp={}, data_source={}",
+            db_rows[0].id, db_rows[0].symbol, db_rows[0].timestamp, db_rows[0].data_source
+        );
 
         debug!("💾 Executing database transaction...");
-        let result = self.writer
+        let result = self
+            .writer
             .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
                 debug!("🔄 Inside database transaction");
                 let mut total_upserted = 0;
                 let chunk_size = 1000;
                 let total_chunks = (db_rows.len() + chunk_size - 1) / chunk_size;
-                
-                debug!("📦 Processing {} quotes in {} chunks of {}", db_rows.len(), total_chunks, chunk_size);
-                
+
+                debug!(
+                    "📦 Processing {} quotes in {} chunks of {}",
+                    db_rows.len(),
+                    total_chunks,
+                    chunk_size
+                );
+
                 for (chunk_index, chunk) in db_rows.chunks(chunk_size).enumerate() {
-                    debug!("💾 Processing chunk {}/{} with {} quotes", chunk_index + 1, total_chunks, chunk.len());
-                    
+                    debug!(
+                        "💾 Processing chunk {}/{} with {} quotes",
+                        chunk_index + 1,
+                        total_chunks,
+                        chunk.len()
+                    );
+
                     let count = diesel::replace_into(quotes)
                         .values(chunk)
                         .execute(conn)
                         .map_err(|e| {
-                            error!("❌ Database error in chunk {}/{}: {}", chunk_index + 1, total_chunks, e);
+                            error!(
+                                "❌ Database error in chunk {}/{}: {}",
+                                chunk_index + 1,
+                                total_chunks,
+                                e
+                            );
                             MarketDataError::DatabaseError(e)
                         })?;
-                        
-                    debug!("✅ Chunk {}/{} inserted {} records", chunk_index + 1, total_chunks, count);
+
+                    debug!(
+                        "✅ Chunk {}/{} inserted {} records",
+                        chunk_index + 1,
+                        total_chunks,
+                        count
+                    );
                     total_upserted += count;
                 }
-                
-                debug!("✅ Transaction completed successfully, total upserted: {}", total_upserted);
+
+                debug!(
+                    "✅ Transaction completed successfully, total upserted: {}",
+                    total_upserted
+                );
                 Ok(total_upserted)
             })
             .await;
 
         match result {
             Ok(count) => {
-                debug!("✅ REPOSITORY: bulk_upsert_quotes completed successfully, upserted {} quotes", count);
+                debug!(
+                    "✅ REPOSITORY: bulk_upsert_quotes completed successfully, upserted {} quotes",
+                    count
+                );
                 Ok(count)
             }
             Err(e) => {
@@ -517,7 +551,12 @@ impl MarketDataRepositoryTrait for MarketDataRepository {
         Ok(count > 0)
     }
 
-    fn get_existing_quotes_for_period(&self, symbol_param: &str, start_date: &str, end_date: &str) -> Result<Vec<Quote>> {
+    fn get_existing_quotes_for_period(
+        &self,
+        symbol_param: &str,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
 
         Ok(quotes

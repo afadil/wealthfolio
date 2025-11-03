@@ -2,7 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::str::FromStr; 
+use std::str::FromStr;
 
 use diesel::prelude::*;
 use diesel::sql_types::Text;
@@ -88,8 +88,6 @@ pub struct AccountStateSnapshotDB {
     pub calculated_at: String,
     #[diesel(sql_type = Text)]
     pub net_contribution_base: String,
-
-
 }
 
 // --- Conversions ---

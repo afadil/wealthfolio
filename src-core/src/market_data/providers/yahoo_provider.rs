@@ -4,16 +4,16 @@ use super::models::{AssetClass, AssetProfile, AssetSubClass, PriceDetail, YahooR
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::{AssetProfiler, MarketDataProvider, Quote as ModelQuote, QuoteSummary};
-use rust_decimal::Decimal;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use num_traits::FromPrimitive;
 use reqwest::{header, Client};
+use rust_decimal::Decimal;
 use serde_json::json;
+use urlencoding::encode;
 use yahoo::{YQuoteItem, YahooError};
 use yahoo_finance_api as yahoo;
-use urlencoding::encode;
 
 #[derive(Debug, Clone)]
 pub struct CrumbData {
@@ -114,7 +114,8 @@ impl YahooProvider {
             }
             Err(_) => {
                 // If the primary method fails, try the backup method
-                self.get_latest_quote_backup(symbol, fallback_currency).await
+                self.get_latest_quote_backup(symbol, fallback_currency)
+                    .await
             }
         }
     }
@@ -144,7 +145,11 @@ impl YahooProvider {
                 let quotes = yahoo_api_quotes
                     .into_iter()
                     .map(|q| {
-                        self.yahoo_quote_to_model_quote(symbol.to_string(), q, fallback_currency.clone())
+                        self.yahoo_quote_to_model_quote(
+                            symbol.to_string(),
+                            q,
+                            fallback_currency.clone(),
+                        )
                     })
                     .collect();
                 Ok(quotes)
@@ -152,19 +157,24 @@ impl YahooProvider {
             Err(yahoo::YahooError::NoQuotes) => {
                 warn!(
                     "No historical quotes returned by Yahoo API for symbol '{}' between {} and {}.",
-                    symbol, 
-                    DateTime::<Utc>::from(start).format("%Y-%m-%d"), 
+                    symbol,
+                    DateTime::<Utc>::from(start).format("%Y-%m-%d"),
                     DateTime::<Utc>::from(end).format("%Y-%m-%d")
                 );
                 Err(MarketDataError::NoData)
             }
-            Err(e) => { // e is any other yahoo::YahooError
+            Err(e) => {
+                // e is any other yahoo::YahooError
                 Err(MarketDataError::from(e))
             }
         }
     }
 
-    async fn get_latest_quote_backup(&self, symbol: &str, fallback_currency: String) -> Result<ModelQuote, yahoo::YahooError> {
+    async fn get_latest_quote_backup(
+        &self,
+        symbol: &str,
+        fallback_currency: String,
+    ) -> Result<ModelQuote, yahoo::YahooError> {
         let asset_profile = self.fetch_asset_profile(symbol).await?;
 
         let price = asset_profile
@@ -218,18 +228,10 @@ impl YahooProvider {
                     .unwrap_or(0.0),
             )
             .unwrap_or_default(),
-            close: Decimal::from_f64_retain(
-                regular_market_price
-                    .raw
-                    .unwrap_or(0.0),
-            )
-            .unwrap_or_default(),
-            adjclose: Decimal::from_f64_retain(
-                regular_market_price
-                    .raw
-                    .unwrap_or(0.0),
-            )
-            .unwrap_or_default(),
+            close: Decimal::from_f64_retain(regular_market_price.raw.unwrap_or(0.0))
+                .unwrap_or_default(),
+            adjclose: Decimal::from_f64_retain(regular_market_price.raw.unwrap_or(0.0))
+                .unwrap_or_default(),
             currency: price.currency.clone().unwrap_or(fallback_currency),
         })
     }
@@ -240,7 +242,10 @@ impl YahooProvider {
         yahoo_quote: yahoo::Quote,
         fallback_currency: String,
     ) -> ModelQuote {
-        let quote_timestamp: DateTime<Utc> = Utc.timestamp_opt(yahoo_quote.timestamp as i64, 0).single().unwrap_or_default();
+        let quote_timestamp: DateTime<Utc> = Utc
+            .timestamp_opt(yahoo_quote.timestamp as i64, 0)
+            .single()
+            .unwrap_or_default();
         let now_utc: DateTime<Utc> = Utc::now();
 
         ModelQuote {

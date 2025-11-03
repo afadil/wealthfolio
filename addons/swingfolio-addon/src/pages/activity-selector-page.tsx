@@ -151,10 +151,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
 
   const headerActions = (
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-      <Button
-        variant="outline"
-        onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
-      >
+      <Button variant="outline" onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
         <Icons.ArrowLeft className="mr-2 h-4 w-4" />
         Back to Dashboard
       </Button>

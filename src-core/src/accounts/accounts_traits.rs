@@ -1,5 +1,5 @@
-use diesel::sqlite::SqliteConnection;
 use async_trait::async_trait;
+use diesel::sqlite::SqliteConnection;
 
 use super::accounts_model::{Account, AccountUpdate, NewAccount};
 use crate::errors::Result;
@@ -8,9 +8,9 @@ use crate::errors::Result;
 #[async_trait]
 pub trait AccountRepositoryTrait: Send + Sync {
     fn create_in_transaction(
-        &self, 
-        new_account: NewAccount, 
-        conn: &mut SqliteConnection
+        &self,
+        new_account: NewAccount,
+        conn: &mut SqliteConnection,
     ) -> Result<Account>;
     async fn update(&self, account_update: AccountUpdate) -> Result<Account>;
     async fn delete(&self, account_id: &str) -> Result<usize>;
@@ -37,4 +37,4 @@ pub trait AccountServiceTrait: Send + Sync {
     fn get_all_accounts(&self) -> Result<Vec<Account>>;
     fn get_active_accounts(&self) -> Result<Vec<Account>>;
     fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>>;
-} 
+}

@@ -61,11 +61,7 @@ pub async fn update_contribution_limit(
 
     emit_resource_changed(
         &handle,
-        ResourceEventPayload::new(
-            "contribution_limit",
-            "updated",
-            json!({ "limit_id": id }),
-        ),
+        ResourceEventPayload::new("contribution_limit", "updated", json!({ "limit_id": id })),
     );
 
     Ok(updated_limit)

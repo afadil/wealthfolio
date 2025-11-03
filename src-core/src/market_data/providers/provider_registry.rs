@@ -1,16 +1,16 @@
 use crate::market_data::market_data_constants::{
-    DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_YAHOO,
-    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API
+    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP,
+    DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_YAHOO,
 };
 use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::{
     MarketDataProviderSetting, Quote as ModelQuote, QuoteSummary,
 };
+use crate::market_data::providers::alpha_vantage_provider::AlphaVantageProvider;
 use crate::market_data::providers::manual_provider::ManualProvider;
 use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketDataProvider};
 use crate::market_data::providers::marketdata_app_provider::MarketDataAppProvider;
 use crate::market_data::providers::metal_price_api_provider::MetalPriceApiProvider;
-use crate::market_data::providers::alpha_vantage_provider::AlphaVantageProvider;
 use crate::market_data::providers::yahoo_provider::YahooProvider;
 use crate::secrets::SecretManager;
 use log::{debug, info, warn};
@@ -122,10 +122,7 @@ impl ProviderRegistry {
                     }
                 }
                 _ => {
-                    warn!(
-                        "Unknown market data provider ID: {}. Skipping.",
-                        setting.id
-                    );
+                    warn!("Unknown market data provider ID: {}. Skipping.", setting.id);
                     (None, None)
                 }
             };
@@ -183,16 +180,14 @@ impl ProviderRegistry {
         })
     }
 
-
-
-    pub fn get_enabled_providers(&self) -> Vec<(&String, &Arc<dyn MarketDataProvider + Send + Sync>)> {
+    pub fn get_enabled_providers(
+        &self,
+    ) -> Vec<(&String, &Arc<dyn MarketDataProvider + Send + Sync>)> {
         self.ordered_data_provider_ids
             .iter()
             .filter_map(|id| self.data_providers.get(id).map(|p| (id, p)))
             .collect()
     }
-
-  
 
     pub fn get_enabled_profilers(&self) -> Vec<(&String, &Arc<dyn AssetProfiler + Send + Sync>)> {
         self.ordered_profiler_ids
@@ -313,10 +308,7 @@ impl ProviderRegistry {
         Err(MarketDataError::NotFound(symbol.to_string()))
     }
 
-    pub async fn search_ticker(
-        &self,
-        query: &str,
-    ) -> Result<Vec<QuoteSummary>, MarketDataError> {
+    pub async fn search_ticker(&self, query: &str) -> Result<Vec<QuoteSummary>, MarketDataError> {
         for (profiler_id, profiler) in self.get_enabled_profilers() {
             match profiler.search_ticker(query).await {
                 Ok(results) if !results.is_empty() => {

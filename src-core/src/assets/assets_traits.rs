@@ -6,10 +6,18 @@ use crate::errors::Result;
 pub trait AssetServiceTrait: Send + Sync {
     fn get_assets(&self) -> Result<Vec<Asset>>;
     fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset>;
-    async fn update_asset_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset>;
+    async fn update_asset_profile(
+        &self,
+        asset_id: &str,
+        payload: UpdateAssetProfile,
+    ) -> Result<Asset>;
     fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     async fn create_cash_asset(&self, currency: &str) -> Result<Asset>;
-    async fn get_or_create_asset(&self, asset_id: &str, context_currency: Option<String>) -> Result<Asset>;
+    async fn get_or_create_asset(
+        &self,
+        asset_id: &str,
+        context_currency: Option<String>,
+    ) -> Result<Asset>;
     async fn update_asset_data_source(&self, asset_id: &str, data_source: String) -> Result<Asset>;
     async fn get_assets_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
 }
@@ -24,4 +32,4 @@ pub trait AssetRepositoryTrait: Send + Sync {
     fn list(&self) -> Result<Vec<Asset>>;
     fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     fn list_by_symbols(&self, symbols: &Vec<String>) -> Result<Vec<Asset>>;
-} 
+}

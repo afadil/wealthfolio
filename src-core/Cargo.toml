@@ -11,6 +11,10 @@ edition = "2021"
 
 
 
+[features]
+default = []
+wealthfolio-pro = []
+
 [dependencies]
 anyhow = "1"
 log = "0.4"
@@ -42,23 +46,6 @@ r2d2 = "0.8"
 
 # Runtime
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
-
-# Optional: crypto identity (public-key IDs)
-ed25519-dalek = { version = "2.2", features = ["serde", "rand_core"], optional = true }
-rand_core = { version = "0.6", features = ["getrandom"], optional = true }
-
-# Optional: pro-only sync engine
-wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
-
-
-[features]
-default = ["p2p", "tls"]          # For Tauri app builds
-p2p = []
-tls = []
-crypto-id = ["ed25519-dalek", "rand_core"]
-wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
-wealthfolio-pro = ["wealthfolio-pro-sync"]
-pro = ["wealthfolio-pro"]
 
 
 [dev-dependencies]

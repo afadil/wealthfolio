@@ -1,5 +1,5 @@
-use super::limits_model::{ ContributionLimit, DepositsCalculation, NewContributionLimit};
-use crate::errors::Result; 
+use super::limits_model::{ContributionLimit, DepositsCalculation, NewContributionLimit};
+use crate::errors::Result;
 use async_trait::async_trait;
 
 /// Trait defining the contract for Contribution Limit repository operations.
@@ -7,7 +7,10 @@ use async_trait::async_trait;
 pub trait ContributionLimitRepositoryTrait: Send + Sync {
     fn get_contribution_limit(&self, id: &str) -> Result<ContributionLimit>;
     fn get_contribution_limits(&self) -> Result<Vec<ContributionLimit>>;
-    async fn create_contribution_limit(&self, new_limit: NewContributionLimit) -> Result<ContributionLimit>;
+    async fn create_contribution_limit(
+        &self,
+        new_limit: NewContributionLimit,
+    ) -> Result<ContributionLimit>;
     async fn update_contribution_limit(
         &self,
         id: &str,
@@ -20,7 +23,10 @@ pub trait ContributionLimitRepositoryTrait: Send + Sync {
 #[async_trait]
 pub trait ContributionLimitServiceTrait: Send + Sync {
     fn get_contribution_limits(&self) -> Result<Vec<ContributionLimit>>;
-    async fn create_contribution_limit(&self, new_limit: NewContributionLimit) -> Result<ContributionLimit>;
+    async fn create_contribution_limit(
+        &self,
+        new_limit: NewContributionLimit,
+    ) -> Result<ContributionLimit>;
     async fn update_contribution_limit(
         &self,
         id: &str,
@@ -33,4 +39,4 @@ pub trait ContributionLimitServiceTrait: Send + Sync {
         base_currency: &str,
     ) -> Result<DepositsCalculation>;
     // Note: calculate_deposits_by_period might be better as a private helper or part of the trait if needed elsewhere
-} 
+}

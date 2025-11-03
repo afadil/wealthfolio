@@ -2,19 +2,20 @@ use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use std::collections::{HashMap, HashSet};
 
-use crate::errors::Result;
-use crate::market_data::market_data_model::{MarketDataProviderSetting, UpdateMarketDataProviderSetting};
-use super::market_data_model::{Quote, QuoteSummary, LatestQuotePair, MarketDataProviderInfo, QuoteDb, QuoteImport};
+use super::market_data_model::{
+    LatestQuotePair, MarketDataProviderInfo, Quote, QuoteDb, QuoteImport, QuoteSummary,
+};
 use super::providers::models::AssetProfile;
+use crate::errors::Result;
+use crate::market_data::market_data_model::{
+    MarketDataProviderSetting, UpdateMarketDataProviderSetting,
+};
 
 #[async_trait]
 pub trait MarketDataServiceTrait: Send + Sync {
     async fn search_symbol(&self, query: &str) -> Result<Vec<QuoteSummary>>;
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
-    fn get_latest_quotes_for_symbols(
-        &self,
-        symbols: &[String],
-    ) -> Result<HashMap<String, Quote>>;
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
     fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>>;
     async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile>;
     fn get_historical_quotes_for_symbol(&self, symbol: &str) -> Result<Vec<Quote>>;
@@ -28,7 +29,10 @@ pub trait MarketDataServiceTrait: Send + Sync {
         end_date: NaiveDate,
     ) -> Result<Vec<Quote>>;
     async fn sync_market_data(&self) -> Result<((), Vec<(String, String)>)>;
-    async fn resync_market_data(&self, symbols: Option<Vec<String>>) -> Result<((), Vec<(String, String)>)>;
+    async fn resync_market_data(
+        &self,
+        symbols: Option<Vec<String>>,
+    ) -> Result<((), Vec<(String, String)>)>;
     fn get_latest_quotes_pair_for_symbols(
         &self,
         symbols: &[String],
@@ -56,7 +60,11 @@ pub trait MarketDataServiceTrait: Send + Sync {
     ) -> Result<MarketDataProviderSetting>;
 
     // --- Quote Import Methods ---
-    async fn import_quotes_from_csv(&self, quotes: Vec<QuoteImport>, overwrite: bool) -> Result<Vec<QuoteImport>>;
+    async fn import_quotes_from_csv(
+        &self,
+        quotes: Vec<QuoteImport>,
+        overwrite: bool,
+    ) -> Result<Vec<QuoteImport>>;
     async fn bulk_upsert_quotes(&self, quotes: Vec<Quote>) -> Result<usize>;
 }
 
@@ -70,10 +78,7 @@ pub trait MarketDataRepositoryTrait {
     async fn delete_quotes_for_symbols(&self, symbols: &[String]) -> Result<()>;
     fn get_quotes_by_source(&self, symbol: &str, source: &str) -> Result<Vec<Quote>>;
     fn get_latest_quote_for_symbol(&self, symbol: &str) -> Result<Quote>;
-    fn get_latest_quotes_for_symbols(
-        &self,
-        symbols: &[String],
-    ) -> Result<HashMap<String, Quote>>;
+    fn get_latest_quotes_for_symbols(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
     fn get_latest_quotes_pair_for_symbols(
         &self,
         symbols: &[String],
@@ -107,5 +112,10 @@ pub trait MarketDataRepositoryTrait {
     async fn bulk_update_quotes(&self, quote_records: Vec<QuoteDb>) -> Result<usize>;
     async fn bulk_upsert_quotes(&self, quote_records: Vec<Quote>) -> Result<usize>;
     fn quote_exists(&self, symbol_param: &str, date: &str) -> Result<bool>;
-    fn get_existing_quotes_for_period(&self, symbol_param: &str, start_date: &str, end_date: &str) -> Result<Vec<Quote>>;
+    fn get_existing_quotes_for_period(
+        &self,
+        symbol_param: &str,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<Quote>>;
 }

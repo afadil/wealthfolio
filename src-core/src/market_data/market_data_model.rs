@@ -1,16 +1,18 @@
-use crate::schema::quotes;
-use diesel::prelude::*;
-use diesel::{
-    sql_types::Text,
-    expression::AsExpression,
+use crate::market_data::market_data_constants::{
+    DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP,
+    DATA_SOURCE_METAL_PRICE_API, DATA_SOURCE_YAHOO,
 };
-use rust_decimal::Decimal;
+use crate::schema::quotes;
 use chrono::{DateTime, Utc};
+use diesel::prelude::*;
+use diesel::{expression::AsExpression, sql_types::Text};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::market_data::market_data_constants::{DATA_SOURCE_YAHOO, DATA_SOURCE_MANUAL, DATA_SOURCE_MARKET_DATA_APP, DATA_SOURCE_ALPHA_VANTAGE, DATA_SOURCE_METAL_PRICE_API};
 
-#[derive(Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(
+    Queryable, Identifiable, Selectable, Debug, Clone, Serialize, Deserialize, PartialEq, Default,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
     pub id: String,
@@ -27,7 +29,19 @@ pub struct Quote {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Queryable, Identifiable, Selectable, Insertable, AsChangeset, Debug, Clone, Serialize, Deserialize, PartialEq, QueryableByName)]
+#[derive(
+    Queryable,
+    Identifiable,
+    Selectable,
+    Insertable,
+    AsChangeset,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    QueryableByName,
+)]
 #[diesel(table_name = quotes)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
@@ -183,7 +197,17 @@ pub struct MarketDataProviderInfo {
 
 // --- Added for MarketDataProviderSetting ---
 
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, Selectable, Insertable, AsChangeset)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Queryable,
+    Identifiable,
+    Selectable,
+    Insertable,
+    AsChangeset,
+)]
 #[diesel(table_name = crate::schema::market_data_providers)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]

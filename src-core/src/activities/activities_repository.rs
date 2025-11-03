@@ -15,9 +15,9 @@ use crate::activities::activities_model::*;
 use crate::db::{get_connection, WriteHandle};
 use crate::schema::{accounts, activities, activity_import_profiles, assets};
 use crate::{Error, Result};
+use async_trait::async_trait;
 use diesel::dsl::min;
 use num_traits::Zero;
-use async_trait::async_trait;
 
 /// Repository for managing activity data in the database
 pub struct ActivityRepository {
@@ -123,9 +123,15 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 match sort.id.as_str() {
                     "date" => {
                         if sort.desc {
-                            query = query.order((activities::activity_date.desc(), activities::created_at.asc()));
+                            query = query.order((
+                                activities::activity_date.desc(),
+                                activities::created_at.asc(),
+                            ));
                         } else {
-                            query = query.order((activities::activity_date.asc(), activities::created_at.asc()));
+                            query = query.order((
+                                activities::activity_date.asc(),
+                                activities::created_at.asc(),
+                            ));
                         }
                     }
                     "activityType" => {
@@ -149,10 +155,18 @@ impl ActivityRepositoryTrait for ActivityRepository {
                             query = query.order(accounts::name.asc());
                         }
                     }
-                    _ => query = query.order((activities::activity_date.desc(), activities::created_at.asc())), // Default order
+                    _ => {
+                        query = query.order((
+                            activities::activity_date.desc(),
+                            activities::created_at.asc(),
+                        ))
+                    } // Default order
                 }
             } else {
-                query = query.order((activities::activity_date.desc(), activities::created_at.asc())); // Default order
+                query = query.order((
+                    activities::activity_date.desc(),
+                    activities::created_at.asc(),
+                )); // Default order
             }
 
             query
@@ -199,7 +213,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
         new_activity.validate()?;
         let activity_db_owned: ActivityDB = new_activity.into();
-        
+
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Activity> {
                 let mut activity_to_insert = activity_db_owned;
@@ -228,9 +242,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activity_to_update.created_at = existing.created_at;
                 activity_to_update.updated_at = chrono::Utc::now().to_rfc3339();
 
-                let updated_activity = diesel::update(activities::table.find(&activity_to_update.id))
-                    .set(&activity_to_update)
-                    .get_result::<ActivityDB>(conn)?;
+                let updated_activity =
+                    diesel::update(activities::table.find(&activity_to_update.id))
+                        .set(&activity_to_update)
+                        .get_result::<ActivityDB>(conn)?;
                 Ok(Activity::from(updated_activity))
             })
             .await
@@ -247,6 +262,75 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .execute(conn)?;
                 Ok(activity.into())
             })
+            .await
+    }
+
+    async fn bulk_mutate_activities(
+        &self,
+        creates: Vec<NewActivity>,
+        updates: Vec<ActivityUpdate>,
+        delete_ids: Vec<String>,
+    ) -> Result<ActivityBulkMutationResult> {
+        self.writer
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<ActivityBulkMutationResult> {
+                    let mut outcome = ActivityBulkMutationResult::default();
+
+                    for delete_id in delete_ids {
+                        let activity_db = activities::table
+                            .select(ActivityDB::as_select())
+                            .find(&delete_id)
+                            .first::<ActivityDB>(conn)?;
+                        diesel::delete(activities::table.filter(activities::id.eq(&delete_id)))
+                            .execute(conn)?;
+                        outcome.deleted.push(Activity::from(activity_db));
+                    }
+
+                    for update in updates {
+                        update.validate()?;
+                        let mut activity_db: ActivityDB = update.clone().into();
+                        let existing = activities::table
+                            .select(ActivityDB::as_select())
+                            .find(&activity_db.id)
+                            .first::<ActivityDB>(conn)?;
+
+                        activity_db.created_at = existing.created_at;
+                        activity_db.updated_at = chrono::Utc::now().to_rfc3339();
+
+                        let updated_activity =
+                            diesel::update(activities::table.find(&activity_db.id))
+                                .set(&activity_db)
+                                .get_result::<ActivityDB>(conn)?;
+                        outcome.updated.push(Activity::from(updated_activity));
+                    }
+
+                    for new_activity in creates {
+                        new_activity.validate()?;
+                        let temp_id = new_activity.id.clone();
+                        let mut activity_db: ActivityDB = new_activity.into();
+                        let generated_id = if activity_db.id.is_empty() {
+                            Uuid::new_v4().to_string()
+                        } else {
+                            activity_db.id.clone()
+                        };
+                        activity_db.id = generated_id.clone();
+                        let inserted_activity = diesel::insert_into(activities::table)
+                            .values(&activity_db)
+                            .get_result::<ActivityDB>(conn)?;
+                        outcome
+                            .created
+                            .push(Activity::from(inserted_activity.clone()));
+                        outcome
+                            .created_mappings
+                            .push(ActivityBulkIdentifierMapping {
+                                temp_id: temp_id.filter(|id| !id.is_empty()),
+                                activity_id: generated_id,
+                            });
+                    }
+
+                    Ok(outcome)
+                },
+            )
             .await
     }
 
@@ -519,7 +603,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
         match min_date_str_opt {
             Some(date_str) => DateTime::parse_from_rfc3339(&date_str)
                 .map(|dt| Some(dt.with_timezone(&Utc)))
-                .map_err(|e| ActivityError::InvalidData(format!("Failed to parse date: {}", e)).into()),
+                .map_err(|e| {
+                    ActivityError::InvalidData(format!("Failed to parse date: {}", e)).into()
+                }),
             None => Ok(None), // If no activity found, return None
         }
     }

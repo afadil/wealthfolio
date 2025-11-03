@@ -1,11 +1,13 @@
 use crate::assets::AssetServiceTrait;
 use crate::assets_model::{Asset, Country as AssetCountry, Sector as AssetSector};
-use crate::portfolio::holdings::holdings_model::{Holding, Instrument, HoldingType, MonetaryValue, Country, Sector};
-use crate::portfolio::snapshot::{self, SnapshotServiceTrait, Position};
-use crate::errors::{Error as CoreError, Result, CalculatorError};
+use crate::errors::{CalculatorError, Error as CoreError, Result};
+use crate::portfolio::holdings::holdings_model::{
+    Country, Holding, HoldingType, Instrument, MonetaryValue, Sector,
+};
+use crate::portfolio::snapshot::{self, Position, SnapshotServiceTrait};
 use async_trait::async_trait;
 use chrono::Utc;
-use log::{error, debug, warn};
+use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json;
@@ -96,7 +98,11 @@ impl HoldingsServiceTrait for HoldingsService {
             .collect();
 
         let instruments_map: HashMap<String, Instrument> = if !security_symbols.is_empty() {
-            match self.asset_service.get_assets_by_symbols(&security_symbols).await {
+            match self
+                .asset_service
+                .get_assets_by_symbols(&security_symbols)
+                .await
+            {
                 Ok(assets) => assets
                     .into_iter()
                     .filter_map(|asset: Asset| {
@@ -301,7 +307,10 @@ impl HoldingsServiceTrait for HoldingsService {
         );
         let today = Utc::now().date_naive();
 
-        let latest_snapshot = match self.snapshot_service.get_latest_holdings_snapshot(account_id) {
+        let latest_snapshot = match self
+            .snapshot_service
+            .get_latest_holdings_snapshot(account_id)
+        {
             Ok(snap) => snap,
             Err(CoreError::Repository(ref msg)) if msg.contains("No snapshot found") => {
                 warn!(
@@ -324,7 +333,8 @@ impl HoldingsServiceTrait for HoldingsService {
         if maybe_position.is_none() {
             log::debug!(
                 "Asset {} not found in holdings snapshot for account {}.",
-                asset_id, account_id
+                asset_id,
+                account_id
             );
             return Ok(None);
         }
@@ -333,9 +343,10 @@ impl HoldingsServiceTrait for HoldingsService {
         if position.quantity == Decimal::ZERO {
             log::debug!(
                 "Asset {} found but quantity is zero in snapshot for account {}.",
-                asset_id, account_id
+                asset_id,
+                account_id
             );
-             return Ok(None);
+            return Ok(None);
         }
 
         let asset_details = self.asset_service.get_asset_by_id(asset_id).map_err(|e| {
@@ -351,13 +362,23 @@ impl HoldingsServiceTrait for HoldingsService {
 
         let countries_vec = asset_details.countries.as_ref().and_then(|c| {
             serde_json::from_str::<Option<Vec<AssetCountry>>>(c)
-                .map_err(|e| warn!("Failed to parse countries for {}: {}", asset_details.symbol, e))
+                .map_err(|e| {
+                    warn!(
+                        "Failed to parse countries for {}: {}",
+                        asset_details.symbol, e
+                    )
+                })
                 .ok()
                 .flatten()
         });
         let sectors_vec = asset_details.sectors.as_ref().and_then(|s| {
             serde_json::from_str::<Option<Vec<AssetSector>>>(s)
-                .map_err(|e| warn!("Failed to parse sectors for {}: {}", asset_details.symbol, e))
+                .map_err(|e| {
+                    warn!(
+                        "Failed to parse sectors for {}: {}",
+                        asset_details.symbol, e
+                    )
+                })
                 .ok()
                 .flatten()
         });
@@ -427,20 +448,20 @@ impl HoldingsServiceTrait for HoldingsService {
         {
             Ok(_) => {
                 if let Some(valued_holding) = single_holding_vec.into_iter().next() {
-                     Ok(Some(valued_holding))
-                 } else {
-                     error!("Valuation service returned Ok but the holding vector was empty for asset {} in account {}.", asset_id, account_id);
-                     Err(CoreError::Calculation(CalculatorError::Calculation(
-                         "Valuation failed unexpectedly".to_string()
-                     )))
-                 }
+                    Ok(Some(valued_holding))
+                } else {
+                    error!("Valuation service returned Ok but the holding vector was empty for asset {} in account {}.", asset_id, account_id);
+                    Err(CoreError::Calculation(CalculatorError::Calculation(
+                        "Valuation failed unexpectedly".to_string(),
+                    )))
+                }
             }
             Err(e) => {
                 error!(
                     "Live valuation failed for single holding {} in account {}: {}. Returning holding without valuation.",
                     asset_id, account_id, e
                 );
-                 Err(e)
+                Err(e)
             }
         }
     }

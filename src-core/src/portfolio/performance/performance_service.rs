@@ -53,7 +53,6 @@ const TRADING_DAYS_PER_YEAR: u32 = 252;
 const DAYS_PER_YEAR_DECIMAL: Decimal = dec!(365.25);
 const SQRT_TRADING_DAYS_APPROX: Decimal = dec!(15.874507866); // sqrt(252)
 
-
 impl PerformanceService {
     pub fn new(
         valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
@@ -221,7 +220,7 @@ impl PerformanceService {
         let net_cash_flow = end_net_contribution - start_net_contribution;
 
         let start_value_for_gain_calc = start_point.total_value;
-    
+
         let gain_loss_amount = end_point.total_value - start_value_for_gain_calc - net_cash_flow;
 
         let simple_total_return = if start_value_for_gain_calc.is_zero() {
@@ -235,7 +234,7 @@ impl PerformanceService {
                 // This case implies infinite return or an anomaly. For now, returning zero to avoid division by zero error.
                 // A more robust solution might be None or an error.
                 warn!("Simple total return calculation: start_value_for_gain_calc is zero but gain_loss_amount is non-zero for account_id: {}. Returning 0.", account_id);
-                Decimal::ZERO 
+                Decimal::ZERO
             }
         } else {
             gain_loss_amount / start_value_for_gain_calc
@@ -370,7 +369,12 @@ impl PerformanceService {
 
         let quote_map: HashMap<NaiveDate, Decimal> = quote_history
             .into_iter()
-            .map(|quote| (quote.timestamp.date_naive(), quote.close.round_dp(DECIMAL_PRECISION)))
+            .map(|quote| {
+                (
+                    quote.timestamp.date_naive(),
+                    quote.close.round_dp(DECIMAL_PRECISION),
+                )
+            })
             .collect();
 
         let mut current_loop_date = actual_start_date;
@@ -652,7 +656,6 @@ impl PerformanceService {
             portfolio_weight,
         }
     }
-
 }
 
 #[async_trait::async_trait]

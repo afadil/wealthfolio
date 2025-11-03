@@ -1,4 +1,3 @@
-
 /// Total account ID
 pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
 

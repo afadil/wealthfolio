@@ -1,6 +1,6 @@
+use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::market_data_model::DataSource;
 use crate::market_data::providers::market_data_provider::AssetProfiler;
-use crate::market_data::market_data_errors::MarketDataError;
 use crate::market_data::QuoteSummary;
 
 use super::models::AssetProfile;

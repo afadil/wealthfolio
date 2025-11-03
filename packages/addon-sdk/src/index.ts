@@ -13,12 +13,12 @@
 export type {
   AddonContext,
   AddonEnableFunction,
-  SidebarItemHandle,
-  SidebarItemConfig,
-  RouteConfig,
-  SidebarManager,
-  RouterManager,
   EventCallback,
+  RouteConfig,
+  RouterManager,
+  SidebarItemConfig,
+  SidebarItemHandle,
+  SidebarManager,
   UnlistenFn,
 } from './types';
 
@@ -34,44 +34,44 @@ export type * from './data-types';
 
 // Manifest and metadata types
 export type {
-  AddonManifest,
-  DevelopmentManifest,
-  InstalledManifest,
   AddonFile,
+  AddonInstallResult,
+  AddonManifest,
+  AddonStoreListing,
+  AddonUpdateCheckResult,
+  AddonUpdateInfo,
+  AddonValidationResult,
+  DevelopmentManifest,
   ExtractedAddon,
   InstalledAddon,
-  AddonInstallResult,
-  AddonValidationResult,
-  AddonStoreListing,
-  AddonUpdateInfo,
-  AddonUpdateCheckResult,
+  InstalledManifest,
 } from './manifest';
 
 export { isInstalledManifest } from './manifest';
 
 // Permission system
 export type {
-  RiskLevel,
+  FunctionPermission,
   Permission,
   PermissionCategory,
-  FunctionPermission,
+  RiskLevel,
 } from './permissions';
 
 export {
-  PERMISSION_CATEGORIES,
-  getPermissionCategory,
-  getPermissionCategoriesByRisk,
   getFunctionRiskLevel,
+  getPermissionCategoriesByRisk,
+  getPermissionCategory,
   isPermissionRequired,
+  PERMISSION_CATEGORIES,
 } from './permissions';
 
 // Utilities
 export {
-  validateManifest,
-  isCompatibleVersion,
   formatAddonSize,
   generateAddonId,
   isAddonManifest,
+  isCompatibleVersion,
+  validateManifest,
 } from './utils';
 
 // -----------------------------------------------------------------------------
@@ -82,7 +82,7 @@ export {
  * React version guaranteed by the host application. Addons may assert against
  * this at runtime if they rely on a particular React feature set.
  */
-export const ReactVersion = '18.3.1';
+export const ReactVersion = '19.1.1';
 
 /**
  * Addons receive their context as a parameter to the enable() function.
