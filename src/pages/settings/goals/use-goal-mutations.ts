@@ -1,25 +1,20 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteGoal, updateGoalsAllocations, createGoal, updateGoal } from "@/commands/goal";
-import { QueryKeys } from "@/lib/query-keys";
-import { toast } from "@/components/ui/use-toast";
 import { logger } from "@/adapters";
+import { createGoal, deleteGoal, updateGoal, updateGoalsAllocations } from "@/commands/goal";
+import { QueryKeys } from "@/lib/query-keys";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export const useGoalMutations = () => {
   const queryClient = useQueryClient();
 
   const handleSuccess = (message: string, invalidateKeys: string[]) => {
     invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
-    toast({
-      title: message,
-      variant: "success",
-    });
+    toast.success(message);
   };
 
   const handleError = (action: string) => {
-    toast({
-      title: "Uh oh! Something went wrong.",
+    toast.error("Uh oh! Something went wrong.", {
       description: `There was a problem ${action}.`,
-      variant: "destructive",
     });
   };
 

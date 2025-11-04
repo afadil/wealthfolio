@@ -24,9 +24,9 @@ import {
   TableHeader,
   TableRow,
   formatAmount,
-  toast,
   worldCurrencies,
 } from "@wealthfolio/ui";
+import { toast } from "@/components/ui/use-toast";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";

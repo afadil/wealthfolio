@@ -23,15 +23,15 @@ import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
 
 const periods = [
-  { value: "TOTAL" as const, label: "All Time" },
-  { value: "LAST_YEAR" as const, label: "Last Year" },
   { value: "YTD" as const, label: "Year to Date" },
+  { value: "LAST_YEAR" as const, label: "Last Year" },
+  { value: "TOTAL" as const, label: "All Time" },
 ];
 
 const mobilePeriods = [
-  { value: "TOTAL" as const, label: "All" },
-  { value: "LAST_YEAR" as const, label: "Last Yr" },
   { value: "YTD" as const, label: "YTD" },
+  { value: "LAST_YEAR" as const, label: "Last Yr" },
+  { value: "TOTAL" as const, label: "All" },
 ];
 
 const IncomePeriodSelector: React.FC<{
