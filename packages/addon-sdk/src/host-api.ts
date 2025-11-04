@@ -8,6 +8,8 @@ import type {
   Holding,
   Activity,
   Account,
+  ActivityBulkMutationRequest,
+  ActivityBulkMutationResult,
   ActivityDetails,
   ActivityCreate,
   ActivityUpdate,
@@ -151,11 +153,11 @@ export interface ActivitiesAPI {
   update(activity: ActivityUpdate): Promise<Activity>;
 
   /**
-   * Save multiple activities
-   * @param activities Array of activities to save
-   * @returns Promise resolving to array of saved activities
+   * Save multiple activities (create/update/delete) in a single request.
+   * @param request Bulk mutation payload
+   * @returns Promise resolving to detailed mutation result
    */
-  saveMany(activities: ActivityUpdate[]): Promise<Activity[]>;
+  saveMany(request: ActivityBulkMutationRequest): Promise<ActivityBulkMutationResult>;
 
   /**
    * Import activities from parsed data

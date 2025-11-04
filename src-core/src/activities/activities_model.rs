@@ -199,6 +199,48 @@ impl ActivityUpdate {
     }
 }
 
+/// Request payload grouping multiple activity mutations.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityBulkMutationRequest {
+    #[serde(default)]
+    pub creates: Vec<NewActivity>,
+    #[serde(default)]
+    pub updates: Vec<ActivityUpdate>,
+    #[serde(default)]
+    pub delete_ids: Vec<String>,
+}
+
+/// Summary of the results for a bulk mutation request.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityBulkMutationResult {
+    pub created: Vec<Activity>,
+    pub updated: Vec<Activity>,
+    pub deleted: Vec<Activity>,
+    #[serde(default)]
+    pub created_mappings: Vec<ActivityBulkIdentifierMapping>,
+    #[serde(default)]
+    pub errors: Vec<ActivityBulkMutationError>,
+}
+
+/// Structured error reported for a single bulk mutation entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityBulkMutationError {
+    pub id: Option<String>,
+    pub action: String,
+    pub message: String,
+}
+
+/// Maps a temporary client identifier to the persisted activity identifier.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityBulkIdentifierMapping {
+    pub temp_id: Option<String>,
+    pub activity_id: String,
+}
+
 /// Model for activity details including related data
 #[derive(Queryable, QueryableByName, Serialize, Deserialize, Clone, Debug)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]

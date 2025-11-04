@@ -1,6 +1,7 @@
 import type React from "react";
 import type { ComponentProps } from "react";
-import { Cell, Pie, PieChart, Sector } from "recharts";
+import { useMemo, useState } from "react";
+import { Cell, Pie, PieChart } from "recharts";
 import type { NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
 import { formatPercent } from "../../lib/utils";
@@ -19,131 +20,33 @@ const COLORS = [
   "var(--chart-9)",
 ];
 
-interface ActiveShapeProps {
-  cx: number;
-  cy: number;
-  innerRadius: number;
-  outerRadius: number;
-  startAngle: number;
-  endAngle: number;
-  fill: string;
-  payload: { name: string; currency?: string };
-  value: number;
-  percent: number;
+interface ChartCenterLabelProps {
+  activeData: { name: string; value: number; currency: string } | undefined;
+  totalValue: number;
+  isBalanceHidden: boolean;
 }
 
-type InactiveShapeProps = {
-  cx: number;
-  cy: number;
-  innerRadius: number;
-  outerRadius: number;
-  startAngle: number;
-  endAngle: number;
-  fill: string;
-};
+const ChartCenterLabel: React.FC<ChartCenterLabelProps> = ({ activeData, totalValue, isBalanceHidden }) => {
+  if (!activeData) {
+    return null;
+  }
 
-const renderActiveShape = (props: unknown): React.JSX.Element => {
-  const typedProps = props as ActiveShapeProps;
-  const { isBalanceHidden } = useBalancePrivacy();
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value, percent } = typedProps;
-
-  const amountToDisplay = isBalanceHidden
-    ? "••••••"
-    : value.toLocaleString("en-US", {
-        style: "currency",
-        currency: payload.currency || "USD",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      });
+  const percent = totalValue > 0 ? activeData.value / totalValue : 0;
 
   return (
-    <g style={{ cursor: "pointer" }}>
-      {/* Main sector */}
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        cornerRadius={6}
-      />
-
-      {/* Subtle highlight ring */}
-      <Sector
-        cx={cx}
-        cy={cy}
-        startAngle={startAngle - 1}
-        endAngle={endAngle + 1}
-        innerRadius={outerRadius + 2}
-        outerRadius={outerRadius + 4}
-        cornerRadius={6}
-        fill={fill}
-        opacity={0.7}
-      />
-
-      <text
-        x={cx}
-        y={cy - 35}
-        fill="var(--muted-foreground)"
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="text-xs font-medium"
-      >
-        {payload.name}
-      </text>
-
-      <text
-        x={cx}
-        y={cy - 20}
-        textAnchor="middle"
-        fill="var(--foreground)"
-        dominantBaseline="central"
-        className="text-xs font-bold"
-      >
-        {isBalanceHidden ? "••••••" : amountToDisplay}
-      </text>
-
-      <text
-        x={cx}
-        y={cy - 5}
-        fill="var(--muted-foreground)"
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="text-xs"
-      >
-        ({formatPercent(percent)})
-      </text>
-    </g>
-  );
-};
-
-const renderInactiveShape = (props: unknown): React.JSX.Element => {
-  const typedProps = props as InactiveShapeProps;
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = typedProps;
-
-  return (
-    <g style={{ cursor: "pointer" }}>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        cornerRadius={6}
-      />
-    </g>
+    <div className="pointer-events-none absolute top-[108px] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+      <p className="text-muted-foreground text-xs font-medium">{activeData.name}</p>
+      <p className="text-foreground text-xs font-bold">
+        <AmountDisplay value={activeData.value} currency={activeData.currency} isHidden={isBalanceHidden} />
+      </p>
+      <p className="text-muted-foreground text-xs">({formatPercent(percent)})</p>
+    </div>
   );
 };
 
 interface DonutChartProps {
   data: { name: string; value: number; currency: string }[];
   activeIndex: number;
-  onPieEnter: (event: React.MouseEvent, index: number) => void;
-  onPieLeave?: (event: React.MouseEvent, index: number) => void;
   onSectionClick?: (data: { name: string; value: number; currency: string }, index: number) => void;
   startAngle?: number;
   endAngle?: number;
@@ -153,14 +56,26 @@ interface DonutChartProps {
 export const DonutChart: React.FC<DonutChartProps> = ({
   data,
   activeIndex,
-  onPieEnter,
-  onPieLeave,
   onSectionClick,
   startAngle = 180,
   endAngle = 0,
   displayTooltip = false,
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  const handlePieEnter = (_: React.MouseEvent, index: number) => {
+    setHoverIndex(index);
+  };
+
+  const handleMouseLeave = () => {
+    setHoverIndex(null);
+  };
+
+  const totalValue = useMemo(() => data.reduce((acc, item) => acc + item.value, 0), [data]);
+  const displayIndex = hoverIndex ?? activeIndex;
+  const activeData = data[displayIndex];
+  const activeColor = COLORS[displayIndex % COLORS.length];
 
   const tooltipFormatter = (value: ValueType, name: NameType, entry: Payload<ValueType, NameType>) => {
     const payload = entry.payload as { currency: string };
@@ -183,14 +98,9 @@ export const DonutChart: React.FC<DonutChartProps> = ({
     outerRadius: "140%",
     paddingAngle: 4,
     cornerRadius: 6,
-    animationDuration: 100,
     dataKey: "value",
     nameKey: "name",
-    activeIndex: activeIndex !== -1 ? activeIndex : undefined,
-    activeShape: renderActiveShape,
-    inactiveShape: renderInactiveShape,
-    onMouseEnter: onPieEnter,
-    onMouseLeave: onPieLeave,
+    onMouseEnter: handlePieEnter,
     onClick: (_event, index) => {
       if (onSectionClick && data[index]) {
         onSectionClick(data[index], index);
@@ -198,24 +108,46 @@ export const DonutChart: React.FC<DonutChartProps> = ({
     },
     startAngle,
     endAngle,
+    isAnimationActive: false,
   } as PieComponentProps;
 
   return (
-    <ChartContainer config={{}} className="h-[160px] w-full p-0">
-      <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-        {displayTooltip && (
-          <ChartTooltip
-            cursor={{ fill: "var(--muted)", opacity: 0.3 }}
-            content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
-            position={{ y: 0 }}
-          />
-        )}
-        <Pie {...pieProps}>
-          {data.map((_, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-      </PieChart>
-    </ChartContainer>
+    <div className="relative h-[160px] w-full p-0">
+      <ChartContainer config={{}} className="h-full w-full">
+        <PieChart onMouseLeave={handleMouseLeave} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          {displayTooltip && (
+            <ChartTooltip
+              cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+              content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
+              position={{ y: 0 }}
+            />
+          )}
+          <Pie {...pieProps}>
+            {data.map((_, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          {activeData && (
+            <Pie
+              data={data}
+              dataKey="value"
+              cy="80%"
+              innerRadius="143%"
+              outerRadius="145%"
+              paddingAngle={6}
+              cornerRadius={6}
+              startAngle={startAngle}
+              endAngle={endAngle}
+              isAnimationActive={false}
+            >
+              {data.map((_, index) => (
+                <Cell key={`active-ring-${index}`} fill={index === displayIndex ? activeColor : "transparent"} />
+              ))}
+            </Pie>
+          )}
+        </PieChart>
+      </ChartContainer>
+      <ChartCenterLabel activeData={activeData} totalValue={totalValue} isBalanceHidden={isBalanceHidden} />
+    </div>
   );
 };

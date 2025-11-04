@@ -9,8 +9,6 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
-
 [dependencies]
 anyhow = "1"
 log = "0.4"
@@ -48,7 +46,7 @@ ed25519-dalek = { version = "2.2", features = ["serde", "rand_core"], optional =
 rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
 # Optional: pro-only sync engine
-# wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
+wealthfolio_sync = { path = "../../wealthfolio-pro/wealthfolio-sync", package = "wealthfolio-sync", optional = true, default-features = false }
 
 
 [features]
@@ -56,9 +54,9 @@ default = ["p2p", "tls"]          # For Tauri app builds
 p2p = []
 tls = []
 crypto-id = ["ed25519-dalek", "rand_core"]
-# wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
-# wealthfolio-pro = ["wealthfolio-pro-sync"]
-# pro = ["wealthfolio-pro"]
+wealthfolio-pro-sync = ["wealthfolio_sync/sync"]
+wealthfolio-pro = ["wealthfolio-pro-sync"]
+pro = ["wealthfolio-pro"]
 
 
 [dev-dependencies]

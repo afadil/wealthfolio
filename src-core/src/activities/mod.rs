@@ -7,7 +7,12 @@ pub(crate) mod activities_traits;
 
 pub use activities_constants::*;
 pub use activities_errors::ActivityError;
-pub use activities_model::{Activity, ActivityType, ActivityDB, ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate, ImportMapping, ImportMappingData, NewActivity, Sort};
+pub use activities_model::{
+    Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationError,
+    ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDB, ActivityDetails,
+    ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityType,
+    ActivityUpdate, ImportMapping, ImportMappingData, NewActivity, Sort,
+};
 pub use activities_repository::ActivityRepository;
 pub use activities_service::ActivityService;
-pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait}; 
+pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

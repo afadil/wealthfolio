@@ -1,10 +1,10 @@
 use super::activities_model::*;
 use crate::Result;
-use chrono::NaiveDateTime;
+use async_trait::async_trait;
 use chrono::DateTime;
+use chrono::NaiveDateTime;
 use chrono::Utc;
 use rust_decimal::Decimal; // Assuming Result is defined in activities_model or activities_errors
-use async_trait::async_trait;
 
 /// Trait defining the contract for Activity repository operations.
 #[async_trait]
@@ -33,8 +33,17 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
+    async fn bulk_mutate_activities(
+        &self,
+        creates: Vec<NewActivity>,
+        updates: Vec<ActivityUpdate>,
+        delete_ids: Vec<String>,
+    ) -> Result<ActivityBulkMutationResult>;
     async fn create_activities(&self, activities: Vec<NewActivity>) -> Result<usize>;
-    fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<DateTime<Utc>>>;
+    fn get_first_activity_date(
+        &self,
+        account_ids: Option<&[String]>,
+    ) -> Result<Option<DateTime<Utc>>>;
     fn get_import_mapping(&self, account_id: &str) -> Result<Option<ImportMapping>>;
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
     // Add other repository methods if necessary, e.g., calculate_average_cost, get_deposit_activities
@@ -61,11 +70,18 @@ pub trait ActivityServiceTrait: Send + Sync {
         asset_id_keyword: Option<String>,
         sort: Option<Sort>,
     ) -> Result<ActivitySearchResponse>;
-    fn get_first_activity_date(&self, account_ids: Option<&[String]>) -> Result<Option<DateTime<Utc>>>;
+    fn get_first_activity_date(
+        &self,
+        account_ids: Option<&[String]>,
+    ) -> Result<Option<DateTime<Utc>>>;
     fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData>;
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
+    async fn bulk_mutate_activities(
+        &self,
+        request: ActivityBulkMutationRequest,
+    ) -> Result<ActivityBulkMutationResult>;
     async fn check_activities_import(
         &self,
         account_id: String,
@@ -76,7 +92,8 @@ pub trait ActivityServiceTrait: Send + Sync {
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>>;
-    async fn save_import_mapping(&self, mapping_data: ImportMappingData) -> Result<ImportMappingData>;
-  
-
+    async fn save_import_mapping(
+        &self,
+        mapping_data: ImportMappingData,
+    ) -> Result<ImportMappingData>;
 }

@@ -32,15 +32,13 @@ const IncomePeriodSelector: React.FC<{
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   onPeriodSelect: (period: "TOTAL" | "YTD" | "LAST_YEAR") => void;
 }> = ({ selectedPeriod, onPeriodSelect }) => (
-  <div className="flex justify-end">
-    <AnimatedToggleGroup
-      variant="secondary"
-      size="sm"
-      items={periods}
-      value={selectedPeriod}
-      onValueChange={onPeriodSelect}
-    />
-  </div>
+  <AnimatedToggleGroup
+    variant="secondary"
+    size="sm"
+    items={periods}
+    value={selectedPeriod}
+    onValueChange={onPeriodSelect}
+  />
 );
 
 export default function IncomePage() {
@@ -70,14 +68,15 @@ export default function IncomePage() {
   if (!periodSummary || !totalSummary) {
     return (
       <Page>
-        <PageHeader heading="Investment Income">
-          <div className="flex items-center space-x-2">
+        <PageHeader
+          heading="Investment Income"
+          actions={
             <IncomePeriodSelector
               selectedPeriod={selectedPeriod}
               onPeriodSelect={setSelectedPeriod}
             />
-          </div>
-        </PageHeader>
+          }
+        />
         <PageContent>
           <EmptyPlaceholder
             className="mx-auto flex max-w-[420px] items-center justify-center"
@@ -153,14 +152,15 @@ export default function IncomePage() {
 
   return (
     <Page>
-      <PageHeader heading="Investment Income">
-        <div className="flex items-center space-x-2">
+      <PageHeader
+        heading="Investment Income"
+        actions={
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
           />
-        </div>
-      </PageHeader>
+        }
+      />
       <PageContent>
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">

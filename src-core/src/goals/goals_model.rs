@@ -1,8 +1,8 @@
+use crate::accounts::Account;
 use diesel::prelude::*;
 use diesel::Queryable;
 use diesel::Selectable;
 use serde::{Deserialize, Serialize};
-use crate::accounts::Account;
 
 #[derive(
     Queryable,

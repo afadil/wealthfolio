@@ -104,8 +104,8 @@ impl Position {
             quantity: Decimal::ZERO,
             average_cost: Decimal::ZERO,
             total_cost_basis: Decimal::ZERO,
-            currency: asset_currency, 
-            inception_date: date,    
+            currency: asset_currency,
+            inception_date: date,
             lots: VecDeque::new(),
             created_at: date,
             last_updated: date,
@@ -155,10 +155,7 @@ impl Position {
     /// Costs are stored in the Position's currency (which must match activity currency).
     /// activity_id is used for the Lot ID.
     /// Returns the cost basis of the added lot in the position's currency.
-    pub fn add_lot(
-        &mut self,
-        activity: &Activity,
-    ) -> Result<Decimal> {
+    pub fn add_lot(&mut self, activity: &Activity) -> Result<Decimal> {
         if !activity.quantity.is_sign_positive() {
             warn!(
                 "Skipping add_lot for activity {} with non-positive quantity: {}",

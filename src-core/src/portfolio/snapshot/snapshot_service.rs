@@ -93,8 +93,11 @@ impl SnapshotService {
         asset_repository: Arc<dyn AssetRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
-        let holdings_calculator =
-            HoldingsCalculator::new(fx_service.clone(), base_currency.clone(), asset_repository.clone());
+        let holdings_calculator = HoldingsCalculator::new(
+            fx_service.clone(),
+            base_currency.clone(),
+            asset_repository.clone(),
+        );
         Self {
             base_currency: base_currency.clone(),
             account_repository,

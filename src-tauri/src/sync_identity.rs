@@ -21,8 +21,7 @@ struct StoredSyncIdentity {
 }
 
 pub fn get_or_create_sync_identity() -> Result<(Uuid, Arc<transport::Identity>)> {
-    if let Some(raw) = SecretManager::get_secret(SYNC_IDENTITY_SECRET_KEY)?
-    {
+    if let Some(raw) = SecretManager::get_secret(SYNC_IDENTITY_SECRET_KEY)? {
         if let Some(restored) = restore_identity_from_secret(&raw) {
             return Ok(restored);
         }
@@ -43,9 +42,7 @@ pub fn get_or_create_sync_identity() -> Result<(Uuid, Arc<transport::Identity>)>
     Ok((device_id, Arc::new(identity)))
 }
 
-fn restore_identity_from_secret(
-    raw: &str,
-) -> Option<(Uuid, Arc<transport::Identity>)> {
+fn restore_identity_from_secret(raw: &str) -> Option<(Uuid, Arc<transport::Identity>)> {
     let stored: StoredSyncIdentity = serde_json::from_str(raw).ok()?;
     let device_id = Uuid::parse_str(&stored.device_id).ok()?;
     let certificate = BASE64.decode(stored.certificate.as_bytes()).ok()?;

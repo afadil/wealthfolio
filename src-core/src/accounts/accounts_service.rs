@@ -3,8 +3,8 @@ use std::sync::{Arc, RwLock};
 
 use super::accounts_model::{Account, AccountUpdate, NewAccount};
 use super::accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
-use crate::errors::Result;
 use crate::db::DbTransactionExecutor;
+use crate::errors::Result;
 use crate::fx::fx_traits::FxServiceTrait;
 
 /// Service for managing accounts (Generic over Executor)
@@ -44,10 +44,12 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountServiceTrait for Acc
 
         // Perform async currency pair registration if needed
         if new_account.currency != base_currency {
-            self.fx_service.register_currency_pair(
-                new_account.currency.as_str(),
-                base_currency.as_str(), // base_currency is String, .as_str() is correct
-            ).await?;
+            self.fx_service
+                .register_currency_pair(
+                    new_account.currency.as_str(),
+                    base_currency.as_str(), // base_currency is String, .as_str() is correct
+                )
+                .await?;
         }
 
         // Clones for the transaction closure

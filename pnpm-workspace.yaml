@@ -3,6 +3,6 @@ packages:
   - addons/*
 
 ignoredBuiltDependencies:
-  - '@tailwindcss/oxide'
+  - "@tailwindcss/oxide"
   - esbuild
   - msw

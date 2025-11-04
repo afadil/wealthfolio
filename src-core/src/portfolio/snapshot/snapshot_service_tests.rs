@@ -149,51 +149,57 @@ mod tests {
     impl MockAssetRepository {
         fn new() -> Self {
             let mut assets = HashMap::new();
-            
-            // Add predefined test assets with their listing currencies
-            assets.insert("AAPL".to_string(), Asset {
-                id: "AAPL".to_string(),
-                isin: Some("US0378331005".to_string()),
-                name: Some("Apple Inc.".to_string()),
-                asset_type: Some("STOCK".to_string()),
-                symbol: "AAPL".to_string(),
-                symbol_mapping: Some("AAPL".to_string()),
-                asset_class: Some("EQUITY".to_string()),
-                asset_sub_class: Some("LARGE_CAP".to_string()),
-                notes: None,
-                countries: Some("US".to_string()),
-                categories: Some("Technology".to_string()),
-                classes: Some("Equity".to_string()),
-                attributes: None,
-                currency: "USD".to_string(), // USD listing
-                data_source: "MANUAL".to_string(),
-                sectors: Some("Technology".to_string()),
-                url: None,
-                created_at: chrono::Utc::now().naive_utc(),
-                updated_at: chrono::Utc::now().naive_utc(),
-            });
 
-            assets.insert("SHOP".to_string(), Asset {
-                id: "SHOP".to_string(),
-                isin: Some("CA82509L1076".to_string()),
-                name: Some("Shopify Inc.".to_string()),
-                asset_type: Some("STOCK".to_string()),
-                symbol: "SHOP".to_string(),
-                symbol_mapping: Some("SHOP".to_string()),
-                asset_class: Some("EQUITY".to_string()),
-                asset_sub_class: Some("LARGE_CAP".to_string()),
-                notes: None,
-                countries: Some("CA".to_string()),
-                categories: Some("Technology".to_string()),
-                classes: Some("Equity".to_string()),
-                attributes: None,
-                currency: "CAD".to_string(), // CAD listing
-                data_source: "MANUAL".to_string(),
-                sectors: Some("Technology".to_string()),
-                url: None,
-                created_at: chrono::Utc::now().naive_utc(),
-                updated_at: chrono::Utc::now().naive_utc(),
-            });
+            // Add predefined test assets with their listing currencies
+            assets.insert(
+                "AAPL".to_string(),
+                Asset {
+                    id: "AAPL".to_string(),
+                    isin: Some("US0378331005".to_string()),
+                    name: Some("Apple Inc.".to_string()),
+                    asset_type: Some("STOCK".to_string()),
+                    symbol: "AAPL".to_string(),
+                    symbol_mapping: Some("AAPL".to_string()),
+                    asset_class: Some("EQUITY".to_string()),
+                    asset_sub_class: Some("LARGE_CAP".to_string()),
+                    notes: None,
+                    countries: Some("US".to_string()),
+                    categories: Some("Technology".to_string()),
+                    classes: Some("Equity".to_string()),
+                    attributes: None,
+                    currency: "USD".to_string(), // USD listing
+                    data_source: "MANUAL".to_string(),
+                    sectors: Some("Technology".to_string()),
+                    url: None,
+                    created_at: chrono::Utc::now().naive_utc(),
+                    updated_at: chrono::Utc::now().naive_utc(),
+                },
+            );
+
+            assets.insert(
+                "SHOP".to_string(),
+                Asset {
+                    id: "SHOP".to_string(),
+                    isin: Some("CA82509L1076".to_string()),
+                    name: Some("Shopify Inc.".to_string()),
+                    asset_type: Some("STOCK".to_string()),
+                    symbol: "SHOP".to_string(),
+                    symbol_mapping: Some("SHOP".to_string()),
+                    asset_class: Some("EQUITY".to_string()),
+                    asset_sub_class: Some("LARGE_CAP".to_string()),
+                    notes: None,
+                    countries: Some("CA".to_string()),
+                    categories: Some("Technology".to_string()),
+                    classes: Some("Equity".to_string()),
+                    attributes: None,
+                    currency: "CAD".to_string(), // CAD listing
+                    data_source: "MANUAL".to_string(),
+                    sectors: Some("Technology".to_string()),
+                    url: None,
+                    created_at: chrono::Utc::now().naive_utc(),
+                    updated_at: chrono::Utc::now().naive_utc(),
+                },
+            );
 
             Self { assets }
         }
@@ -205,11 +211,19 @@ mod tests {
             unimplemented!("create not implemented for MockAssetRepository")
         }
 
-        async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> AppResult<Asset> {
+        async fn update_profile(
+            &self,
+            _asset_id: &str,
+            _payload: UpdateAssetProfile,
+        ) -> AppResult<Asset> {
             unimplemented!("update_profile not implemented for MockAssetRepository")
         }
 
-        async fn update_data_source(&self, _asset_id: &str, _data_source: String) -> AppResult<Asset> {
+        async fn update_data_source(
+            &self,
+            _asset_id: &str,
+            _data_source: String,
+        ) -> AppResult<Asset> {
             unimplemented!("update_data_source not implemented for MockAssetRepository")
         }
 
@@ -229,7 +243,8 @@ mod tests {
         }
 
         fn list_by_symbols(&self, symbols: &Vec<String>) -> AppResult<Vec<Asset>> {
-            Ok(self.assets
+            Ok(self
+                .assets
                 .values()
                 .filter(|asset| symbols.contains(&asset.symbol))
                 .cloned()
@@ -1063,11 +1078,19 @@ mod tests {
         let mut frames_sorted = frames.clone();
         frames_sorted.sort_by_key(|s| s.snapshot_date);
 
-        assert_eq!(frames_sorted.len(), 2, "Expected exactly two keyframes for the two activity dates.");
+        assert_eq!(
+            frames_sorted.len(),
+            2,
+            "Expected exactly two keyframes for the two activity dates."
+        );
 
         // First keyframe from the first deposit
         let first_frame = &frames_sorted[0];
-        assert_eq!(first_frame.net_contribution, dec!(5000), "First keyframe should only reflect the first deposit.");
+        assert_eq!(
+            first_frame.net_contribution,
+            dec!(5000),
+            "First keyframe should only reflect the first deposit."
+        );
         assert_eq!(first_frame.snapshot_date, d1);
 
         // Second keyframe should include the second deposit, but the dividend should have no impact on net contribution.

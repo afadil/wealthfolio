@@ -8,13 +8,16 @@ pub(crate) mod providers;
 
 // Re-export the public interface
 pub use market_data_constants::*;
-pub use market_data_model::{Quote, QuoteSummary, QuoteRequest, DataSource, MarketDataProviderInfo, MarketDataProviderSetting, QuoteImport, ImportValidationStatus};
+pub use market_data_model::{
+    DataSource, ImportValidationStatus, MarketDataProviderInfo, MarketDataProviderSetting, Quote,
+    QuoteImport, QuoteRequest, QuoteSummary,
+};
 pub use market_data_repository::MarketDataRepository;
 pub use market_data_service::MarketDataService;
 pub use market_data_traits::MarketDataServiceTrait;
 
 // Re-export provider types
-pub use providers::market_data_provider::{MarketDataProvider, AssetProfiler};
+pub use providers::market_data_provider::{AssetProfiler, MarketDataProvider};
 
 // Re-export error types for convenience
 pub use market_data_errors::MarketDataError;

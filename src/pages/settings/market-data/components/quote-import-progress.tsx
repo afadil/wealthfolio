@@ -4,11 +4,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@wealthfolio/ui/components/ui/card';
-import { Progress } from '@wealthfolio/ui/components/ui/progress';
-import { Badge } from '@wealthfolio/ui/components/ui/badge';
-import { Icons } from '@wealthfolio/ui/components/ui/icons';
-import { Button } from '@wealthfolio/ui/components/ui/button';
+} from "@wealthfolio/ui/components/ui/card";
+import { Progress } from "@wealthfolio/ui/components/ui/progress";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 
 interface QuoteImportProgressProps {
   isImporting: boolean;
@@ -33,11 +33,11 @@ export function QuoteImportProgress({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Icons.Spinner className={`h-5 w-5 ${isImporting ? 'animate-spin' : ''}`} />
+          <Icons.Spinner className={`h-5 w-5 ${isImporting ? "animate-spin" : ""}`} />
           Import Progress
         </CardTitle>
         <CardDescription>
-          {isImporting ? 'Importing quotes...' : 'Import completed'}
+          {isImporting ? "Importing quotes..." : "Import completed"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -52,15 +52,15 @@ export function QuoteImportProgress({
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{totalRows}</div>
-            <div className="text-sm text-muted-foreground">Total</div>
+            <div className="text-muted-foreground text-sm">Total</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{successfulRows}</div>
-            <div className="text-sm text-muted-foreground">Successful</div>
+            <div className="text-muted-foreground text-sm">Successful</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">{failedRows}</div>
-            <div className="text-sm text-muted-foreground">Failed</div>
+            <div className="text-muted-foreground text-sm">Failed</div>
           </div>
         </div>
 

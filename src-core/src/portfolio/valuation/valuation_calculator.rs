@@ -32,7 +32,6 @@ pub fn calculate_valuation(
     target_date: NaiveDate,
     base_currency: &str, // Pass base currency directly
 ) -> Result<DailyAccountValuation> {
-
     let account_currency = &holdings_snapshot.currency;
 
     // --- 1. Calculate Market Values (Account Currency) ---

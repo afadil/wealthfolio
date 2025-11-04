@@ -149,10 +149,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
         });
       }, 200);
 
-      const result = await importManualQuotes(
-        prepareQuotesForImport(allQuotes),
-        overwriteExisting,
-      );
+      const result = await importManualQuotes(prepareQuotesForImport(allQuotes), overwriteExisting);
       const normalizedResult = result.map(normalizeQuoteImport);
 
       clearInterval(progressInterval);

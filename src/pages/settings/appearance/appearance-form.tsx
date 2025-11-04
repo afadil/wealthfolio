@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
+import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
 
 const appearanceFormSchema = z.object({
@@ -31,6 +32,7 @@ type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
 
 export function AppearanceForm() {
   const { settings, updateSettings } = useSettingsContext();
+  const { isMobile } = usePlatform();
   const defaultValues: Partial<AppearanceFormValues> = {
     theme: settings?.theme as AppearanceFormValues["theme"],
     font: settings?.font as AppearanceFormValues["font"],
@@ -100,27 +102,29 @@ export function AppearanceForm() {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="menuBarVisible"
-          render={({ field }) => (
-            <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-              <div className="space-y-0.5">
-                <FormLabel>Show menu bar</FormLabel>
-                <FormDescription>Toggle to display the application menu bar.</FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={(value) => {
-                    field.onChange(value);
-                    handlePartialUpdate({ menuBarVisible: value });
-                  }}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
+        {!isMobile && (
+          <FormField
+            control={form.control}
+            name="menuBarVisible"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <FormLabel>Show menu bar</FormLabel>
+                  <FormDescription>Toggle to display the application menu bar.</FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={(value) => {
+                      field.onChange(value);
+                      handlePartialUpdate({ menuBarVisible: value });
+                    }}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        )}
       </div>
     </Form>
   );

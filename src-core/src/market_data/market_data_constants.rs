@@ -17,4 +17,4 @@ pub const RECENT_SYNC_PERIOD_DAYS: i64 = 30; // For smart sync when no data exis
 pub const MAX_GAP_DAYS_TO_FILL: i64 = 90; // Don't fill gaps larger than this automatically
 
 /// Time constants
-pub const MARKET_DATA_QUOTE_TIME: (u32, u32, u32) = (16, 0, 0); // 4:00 PM 
+pub const MARKET_DATA_QUOTE_TIME: (u32, u32, u32) = (16, 0, 0); // 4:00 PM

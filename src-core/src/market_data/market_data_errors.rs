@@ -31,8 +31,8 @@ pub enum MarketDataError {
 
     #[error("Invalid data: {0}")]
     InvalidData(String),
-    
-     #[error("Provider exhausted: {0}")]
+
+    #[error("Provider exhausted: {0}")]
     ProviderExhausted(String),
 
     #[error("No data found")]

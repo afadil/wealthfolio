@@ -5,8 +5,8 @@ use crate::events::{emit_resource_changed, ResourceEventPayload};
 use log::debug;
 use tauri::{AppHandle, State};
 use wealthfolio_core::activities::{
-    Activity, ActivityImport, ActivitySearchResponse, ActivityUpdate, ImportMappingData,
-    NewActivity, Sort,
+    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
+    ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity, Sort,
 };
 
 use serde_json::json;
@@ -126,6 +126,44 @@ pub async fn delete_activity(
                 "asset_id": result.asset_id,
             }),
         ),
+    );
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn save_activities(
+    request: ActivityBulkMutationRequest,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<ActivityBulkMutationResult, String> {
+    let create_count = request.creates.len();
+    let update_count = request.updates.len();
+    let delete_count = request.delete_ids.len();
+    debug!(
+        "Bulk activity mutation request: {} creates, {} updates, {} deletes",
+        create_count, update_count, delete_count
+    );
+
+    let result = state
+        .activity_service()
+        .bulk_mutate_activities(request)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let result_value = serde_json::to_value(&result).unwrap_or_else(|_| json!({}));
+    let event_payload = json!({
+        "request": {
+            "createCount": create_count,
+            "updateCount": update_count,
+            "deleteCount": delete_count,
+        },
+        "result": result_value,
+    });
+
+    emit_resource_changed(
+        &handle,
+        ResourceEventPayload::new("activity", "bulk-mutated", event_payload),
     );
 
     Ok(result)

@@ -10,7 +10,7 @@ pub use assets_constants::*;
 pub use assets_model::{Asset, NewAsset, UpdateAssetProfile};
 pub use assets_repository::AssetRepository;
 pub use assets_service::AssetService;
-pub use assets_traits::{AssetServiceTrait, AssetRepositoryTrait};
+pub use assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 
 // Re-export error types for convenience
 // pub use assets_errors::{AssetError, Result};

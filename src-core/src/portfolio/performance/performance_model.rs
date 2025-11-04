@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
-use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CumulativeReturn {
@@ -55,7 +55,6 @@ pub struct PerformanceMetrics {
     pub volatility: Decimal,
     pub max_drawdown: Decimal,
 }
-
 
 // This struct now only holds the calculated performance metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

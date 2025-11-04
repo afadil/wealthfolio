@@ -1,8 +1,8 @@
-pub mod db;
-pub mod constants;
 pub mod accounts;
 pub mod activities;
 pub mod assets;
+pub mod constants;
+pub mod db;
 #[cfg(feature = "wealthfolio-pro")]
 pub use wealthfolio_sync as sync;
 
@@ -13,12 +13,11 @@ pub mod limits;
 pub mod market_data;
 pub mod portfolio;
 pub mod schema;
-pub mod settings;
 pub mod secrets;
+pub mod settings;
 pub mod utils;
-pub use portfolio::*;
 pub use assets::*;
+pub use portfolio::*;
 
 pub use errors::Error;
 pub use errors::Result;
-

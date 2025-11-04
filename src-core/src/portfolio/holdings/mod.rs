@@ -8,4 +8,3 @@ pub use holdings_valuation_service::*;
 
 #[cfg(test)]
 mod holdings_valuation_service_tests;
-

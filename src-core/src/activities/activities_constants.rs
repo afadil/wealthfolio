@@ -54,7 +54,4 @@ pub const TRADING_ACTIVITY_TYPES: [&str; 5] = [
 ];
 
 /// Income activity types
-pub const INCOME_ACTIVITY_TYPES: [&str; 2] = [
-    ACTIVITY_TYPE_DIVIDEND,
-    ACTIVITY_TYPE_INTEREST,
-];
+pub const INCOME_ACTIVITY_TYPES: [&str; 2] = [ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_INTEREST];

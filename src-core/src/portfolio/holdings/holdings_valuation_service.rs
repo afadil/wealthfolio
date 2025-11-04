@@ -13,10 +13,7 @@ use std::sync::Arc;
 
 #[async_trait]
 pub trait HoldingsValuationServiceTrait: Send + Sync {
-    async fn calculate_holdings_live_valuation(
-        &self,
-        holdings: &mut [Holding],
-    ) -> Result<()>;
+    async fn calculate_holdings_live_valuation(&self, holdings: &mut [Holding]) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -87,10 +84,7 @@ impl HoldingsValuationService {
 
 #[async_trait]
 impl HoldingsValuationServiceTrait for HoldingsValuationService {
-    async fn calculate_holdings_live_valuation(
-        &self,
-        holdings: &mut [Holding],
-    ) -> Result<()> {
+    async fn calculate_holdings_live_valuation(&self, holdings: &mut [Holding]) -> Result<()> {
         if holdings.is_empty() {
             return Ok(());
         }
@@ -117,7 +111,8 @@ impl HoldingsValuationServiceTrait for HoldingsValuationService {
                         holding.as_of_date = today;
                     }
                     let base_currency = holding.base_currency.clone();
-                    self.calculate_security_valuation(holding, &base_currency, &latest_quote_pairs).await?;
+                    self.calculate_security_valuation(holding, &base_currency, &latest_quote_pairs)
+                        .await?;
                 }
                 HoldingType::Cash => {
                     holding.as_of_date = today;
@@ -328,11 +323,7 @@ impl HoldingsValuationService {
         Ok(())
     }
 
-    fn calculate_cash_valuation(
-        &self,
-        holding: &mut Holding,
-        base_currency: &str,
-    ) -> Result<()> {
+    fn calculate_cash_valuation(&self, holding: &mut Holding, base_currency: &str) -> Result<()> {
         let cash_currency = &holding.local_currency;
         let cash_amount = holding.quantity;
         let context_msg = format!("HoldingValuation [CASH {}]", cash_currency);

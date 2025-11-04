@@ -159,7 +159,7 @@ pub fn backup_database(app_data_dir: &str) -> Result<String> {
 
 pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()> {
     let db_path = get_db_path(app_data_dir);
-    
+
     info!(
         "Restoring database from {} to {}",
         backup_file_path, db_path
@@ -173,11 +173,12 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
     }
 
     // Create backup of current database before restore
-    let restore_backup_path = format!("{}.pre-restore-{}", 
-        db_path, 
+    let restore_backup_path = format!(
+        "{}.pre-restore-{}",
+        db_path,
         Local::now().format("%Y%m%d_%H%M%S")
     );
-    
+
     if Path::new(&db_path).exists() {
         // Copy main database file
         fs::copy(&db_path, &restore_backup_path).map_err(|e| {
@@ -205,7 +206,10 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
             })?;
         }
 
-        info!("Created pre-restore backup at: {} (including WAL/SHM files if present)", restore_backup_path);
+        info!(
+            "Created pre-restore backup at: {} (including WAL/SHM files if present)",
+            restore_backup_path
+        );
     }
 
     // Remove existing WAL and SHM files to ensure clean state.
@@ -226,12 +230,22 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
     }
 
     // Copy the main backup file
-    copy_with_retries(backup_file_path, &db_path, 5, std::time::Duration::from_millis(200))?;
+    copy_with_retries(
+        backup_file_path,
+        &db_path,
+        5,
+        std::time::Duration::from_millis(200),
+    )?;
 
     // Copy WAL file if it exists in backup
     let backup_wal_path = format!("{}-wal", backup_file_path);
     if Path::new(&backup_wal_path).exists() {
-        if let Err(e) = copy_with_retries(&backup_wal_path, &wal_path, 3, std::time::Duration::from_millis(200)) {
+        if let Err(e) = copy_with_retries(
+            &backup_wal_path,
+            &wal_path,
+            3,
+            std::time::Duration::from_millis(200),
+        ) {
             // WAL copy failure is non-fatal; DB will recreate WAL on next write.
             warn!("Failed to restore WAL file (non-fatal): {}", e);
         }
@@ -240,7 +254,12 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
     // Copy SHM file if it exists in backup
     let backup_shm_path = format!("{}-shm", backup_file_path);
     if Path::new(&backup_shm_path).exists() {
-        if let Err(e) = copy_with_retries(&backup_shm_path, &shm_path, 3, std::time::Duration::from_millis(200)) {
+        if let Err(e) = copy_with_retries(
+            &backup_shm_path,
+            &shm_path,
+            3,
+            std::time::Duration::from_millis(200),
+        ) {
             // SHM copy failure is non-fatal; it'll be recreated as needed.
             warn!("Failed to restore SHM file (non-fatal): {}", e);
         }
@@ -261,7 +280,7 @@ pub fn restore_database_safe(app_data_dir: &str, backup_file_path: &str) -> Resu
     // First, execute a checkpoint to force WAL content to be written to the main database file
     // This helps reduce the chance of WAL files being locked on Windows
     let db_path = get_db_path(app_data_dir);
-    
+
     // Try to checkpoint the database before restore
     if let Ok(mut conn) = SqliteConnection::establish(&db_path) {
         use diesel::RunQueryDsl;
@@ -270,10 +289,10 @@ pub fn restore_database_safe(app_data_dir: &str, backup_file_path: &str) -> Resu
         let _ = diesel::sql_query("PRAGMA journal_mode = DELETE").execute(&mut conn);
         info!("Executed WAL checkpoint before restore");
     }
-    
+
     // Small delay to allow any pending operations to complete
     std::thread::sleep(std::time::Duration::from_millis(150));
-    
+
     // Now perform the actual restore
     restore_database(app_data_dir, backup_file_path)
 }
@@ -341,7 +360,12 @@ fn try_remove_file_best_effort(path: &str, label: &str) -> std::result::Result<(
 }
 
 /// Copy a file with retry/backoff; maps errors into existing Result type on failure.
-fn copy_with_retries(src: &str, dst: &str, attempts: usize, backoff: std::time::Duration) -> Result<()> {
+fn copy_with_retries(
+    src: &str,
+    dst: &str,
+    attempts: usize,
+    backoff: std::time::Duration,
+) -> Result<()> {
     let mut last_err: Option<io::Error> = None;
     for i in 0..attempts {
         match fs::copy(src, dst) {

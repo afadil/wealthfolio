@@ -16,4 +16,4 @@ pub fn get_days_between(start: NaiveDate, end: NaiveDate) -> Vec<NaiveDate> {
         }
     }
     days
-} 
+}
