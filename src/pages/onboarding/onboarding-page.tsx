@@ -65,7 +65,7 @@ const OnboardingPage = () => {
       <div className="flex min-h-screen flex-col lg:min-h-0">
         {/* Mobile: Sticky header | Desktop: Normal header */}
         <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 pt-[env(safe-area-inset-top)] backdrop-blur lg:relative lg:backdrop-blur-none">
-          <div className="flex flex-col items-center py-4 lg:py-6">
+          <div className="flex flex-col items-center">
             <img
               alt="Wealthfolio Illustration"
               className="h-20 w-20 sm:h-24 sm:w-24"
@@ -76,7 +76,7 @@ const OnboardingPage = () => {
               }}
             />
             {/* Progress indicators */}
-            <div className="flex justify-center gap-2 pt-4">
+            <div className="flex justify-center gap-2">
               {Array.from({ length: MAX_STEPS }).map((_, index) => (
                 <div
                   key={index}
