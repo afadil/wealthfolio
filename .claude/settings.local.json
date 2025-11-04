@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm tauri dev)",
+      "Bash(tee /tmp/tauri_error.log)",
+      "Bash(lsof -ti:1420)",
+      "Bash(xargs kill -9)",
+      "Bash(pkill -f \"tauri\\|vite\\|cargo\")",
+      "Bash(cargo clean -p wealthfolio_core)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
