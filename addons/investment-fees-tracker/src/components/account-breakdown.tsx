@@ -49,11 +49,11 @@ export function AccountBreakdown({
 
   if (topAccounts.length === 0) {
     return (
-      <Card>
+      <Card className="flex h-full flex-col">
         <CardHeader>
           <CardTitle className="text-xl">Account Breakdown</CardTitle>
         </CardHeader>
-        <CardContent className="h-full">
+        <CardContent className="flex flex-1 items-center justify-center">
           <EmptyPlaceholder
             className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
             icon={<Icons.CreditCard className="h-10 w-10" />}
@@ -68,11 +68,11 @@ export function AccountBreakdown({
   // total fees for percentage are calculated per-section where needed
 
   return (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardHeader>
         <CardTitle className="text-xl">Account Breakdown</CardTitle>
       </CardHeader>
-      <CardContent className="h-full">
+      <CardContent className="flex flex-1 flex-col">
         <div className="space-y-6">
           {/* Horizontal Bar Chart */}
           <div className="flex w-full space-x-0.5">

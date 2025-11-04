@@ -160,8 +160,8 @@ export function PageHeader({
 
       <div className="p-4">
         <div className="mx-auto">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+            <div className="flex min-w-[200px] items-center gap-2 sm:min-w-0 sm:flex-1">
               {onBack && (
                 <Button variant="secondary" size="icon" onClick={onBack}>
                   <Icons.ArrowLeft className="size-6" />

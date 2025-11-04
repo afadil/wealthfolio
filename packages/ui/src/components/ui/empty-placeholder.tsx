@@ -1,7 +1,7 @@
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
 import { Icons } from "@/components/ui/icons";
+import { cn } from "@/lib/utils";
 
 interface EmptyPlaceholderProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
@@ -19,7 +19,7 @@ export function EmptyPlaceholder({ className, children, icon, title, description
       {...props}
     >
       <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-        {icon && <div className="bg-muted flex h-20 w-20 items-center justify-center rounded-full">{icon}</div>}
+        {icon && <div className="bg-muted flex size-20 items-center justify-center rounded-full">{icon}</div>}
         {title && <EmptyPlaceholder.Title>{title}</EmptyPlaceholder.Title>}
         {description && <EmptyPlaceholder.Description>{description}</EmptyPlaceholder.Description>}
         {children}
