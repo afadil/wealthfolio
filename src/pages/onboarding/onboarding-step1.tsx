@@ -4,8 +4,8 @@ import React from "react";
 
 export const OnboardingStep1: React.FC = () => {
   return (
-    <div className="flex min-h-full items-center justify-center px-4 py-8 md:px-6 lg:px-8">
-      <div className="w-full max-w-5xl space-y-6 md:space-y-8">
+    <div className="flex min-h-full items-center justify-center px-4 md:px-6 lg:px-8">
+      <div className="w-full max-w-5xl space-y-4 md:space-y-8">
         <div className="text-center">
           <p className="text-muted-foreground text-sm md:text-base">
             Two ways to track your portfolio.

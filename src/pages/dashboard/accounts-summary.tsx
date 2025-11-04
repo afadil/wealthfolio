@@ -43,17 +43,17 @@ interface AccountSummaryDisplayData {
 
 // Skeleton component for loading state within AccountSummaryComponent
 const AccountSummarySkeleton = () => (
-  <div className="flex w-full items-center justify-between py-1">
+  <div className="flex w-full items-center justify-between">
     <div className="flex flex-col space-y-1">
-      <Skeleton className="h-5 w-32 rounded" />
-      <Skeleton className="h-4 w-24 rounded" />
+      <Skeleton className="h-4 w-32 rounded md:h-5" />
+      <Skeleton className="h-3 w-24 rounded md:h-4" />
     </div>
     <div className="flex items-center">
       <div className="flex flex-col items-end space-y-1">
-        <Skeleton className="h-5 w-20 rounded" />
-        <Skeleton className="h-4 w-28 rounded" />
+        <Skeleton className="h-4 w-20 rounded md:h-5" />
+        <Skeleton className="h-3 w-28 rounded md:h-4" />
       </div>
-      <Skeleton className="ml-2 h-6 w-6 rounded-full md:h-5 md:w-5" />
+      <Skeleton className="ml-2 h-5 w-5 rounded-full" />
     </div>
   </div>
 );
@@ -80,17 +80,22 @@ const AccountSummaryComponent = React.memo(
     if (!isGroup && isLoadingValuation) {
       // Show basic info but skeleton for values
       return (
-        <div key={item.accountId} className="flex w-full items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-base leading-tight font-medium">{item.accountName}</span>
-            <span className="text-muted-foreground truncate text-sm">
+        <div
+          key={item.accountId}
+          className="flex w-full items-center justify-between gap-2 md:gap-3"
+        >
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:gap-1">
+            <span className="truncate text-sm leading-tight font-medium md:text-base">
+              {item.accountName}
+            </span>
+            <span className="text-muted-foreground truncate text-xs md:text-sm">
               {`${item.accountGroup ? `${item.accountGroup} | ` : ""}${item.accountCurrency}`}
             </span>
           </div>
           <div className="flex items-center">
             <div className="flex flex-col items-end space-y-1">
-              <Skeleton className="h-5 w-20 rounded" />
-              <Skeleton className="h-4 w-28 rounded" />
+              <Skeleton className="h-4 w-20 rounded md:h-5" />
+              <Skeleton className="h-3 w-28 rounded md:h-4" />
             </div>
           </div>
         </div>
@@ -123,21 +128,21 @@ const AccountSummaryComponent = React.memo(
 
     const content = (
       <>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="truncate text-base leading-tight font-medium">{name}</span>
-          <span className="text-muted-foreground truncate text-sm">{subText}</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:gap-1">
+          <span className="truncate text-sm leading-tight font-medium md:text-base">{name}</span>
+          <span className="text-muted-foreground truncate text-xs md:text-sm">{subText}</span>
         </div>
-        <div className="flex shrink-0 items-center gap-2 md:gap-3">
-          <div className="flex flex-col items-end gap-1">
-            <p className="text-base leading-tight font-medium">
+        <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
+          <div className="flex flex-col items-end gap-0.5 md:gap-1">
+            <p className="text-sm leading-tight font-medium md:text-base">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
             {(gainAmountToDisplay !== null || gainPercentToDisplay !== null) &&
               !(gainAmountToDisplay === 0 && gainPercentToDisplay === 0) && (
-                <div className="flex items-center space-x-1.5 md:space-x-2">
+                <div className="flex items-center space-x-1 md:space-x-2">
                   {gainAmountToDisplay !== null && (
                     <GainAmount
-                      className="text-sm font-light"
+                      className="text-xs font-light md:text-sm"
                       value={gainAmountToDisplay ?? 0}
                       currency={gainDisplayCurrency}
                       displayCurrency={false}
@@ -145,25 +150,26 @@ const AccountSummaryComponent = React.memo(
                     />
                   )}
                   {gainAmountToDisplay !== null && gainPercentToDisplay !== null && (
-                    <Separator orientation="vertical" className="h-3" />
+                    <Separator orientation="vertical" className="h-2.5 md:h-3" />
                   )}
                   {gainPercentToDisplay !== null && (
-                    <GainPercent className="text-sm font-light" value={gainPercentToDisplay} />
+                    <GainPercent
+                      className="text-xs font-light md:text-sm"
+                      value={gainPercentToDisplay}
+                    />
                   )}
                 </div>
               )}
           </div>
           {isGroup ? (
             <Icons.ChevronDown
-              className={`text-muted-foreground h-6 w-6 shrink-0 transition-transform md:h-5 md:w-5 ${
+              className={`text-muted-foreground h-5 w-5 shrink-0 transition-transform ${
                 isExpanded ? "rotate-180 transform" : ""
               }`}
             />
           ) : (
             !isLoadingValuation &&
-            accountId && (
-              <Icons.ChevronRight className="text-muted-foreground h-6 w-6 shrink-0 md:h-5 md:w-5" />
-            )
+            accountId && <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
           )}
         </div>
       </>
@@ -173,7 +179,7 @@ const AccountSummaryComponent = React.memo(
       return (
         <div
           key={name}
-          className="flex w-full cursor-pointer items-center justify-between gap-3"
+          className="flex w-full cursor-pointer items-center justify-between gap-2 md:gap-3"
           onClick={onToggle}
         >
           {content}
@@ -186,7 +192,7 @@ const AccountSummaryComponent = React.memo(
         <Link
           key={accountId}
           to={`/accounts/${accountId}`}
-          className="flex w-full cursor-pointer items-center justify-between gap-3"
+          className="flex w-full cursor-pointer items-center justify-between gap-2 md:gap-3"
         >
           {content}
         </Link>
@@ -194,7 +200,7 @@ const AccountSummaryComponent = React.memo(
     }
 
     return (
-      <div key={accountId} className="flex w-full items-center justify-between gap-3">
+      <div key={accountId} className="flex w-full items-center justify-between gap-2 md:gap-3">
         {content}
       </div>
     );
@@ -280,8 +286,8 @@ export const AccountsSummary = React.memo(() => {
   const renderedContent = useMemo(() => {
     if (isLoadingAccounts) {
       return Array.from({ length: 4 }).map((_, index) => (
-        <Card key={`skeleton-${index}`} className="border-none shadow-sm">
-          <CardHeader className="py-3 md:py-6">
+        <Card key={`skeleton-${index}`} className="shadow-sm">
+          <CardHeader className="py-2.5 md:py-6">
             <AccountSummarySkeleton />
           </CardHeader>
         </Card>
@@ -375,7 +381,7 @@ export const AccountsSummary = React.memo(() => {
 
             return (
               <Card key={group.accountName} className="shadow-none">
-                <CardHeader className="py-3 md:py-6">
+                <CardHeader className="py-2.5 md:py-6">
                   <AccountSummaryComponent
                     item={group}
                     isExpanded={isExpanded}
@@ -383,9 +389,9 @@ export const AccountsSummary = React.memo(() => {
                   />
                 </CardHeader>
                 {isExpanded && (
-                  <CardContent className="border-t px-4 pt-3 md:px-6 md:pt-4">
+                  <CardContent className="border-t px-4 pt-2.5 md:px-6 md:pt-4">
                     {sortedAccounts.map((account) => (
-                      <div key={account.accountId} className="py-3 md:py-4">
+                      <div key={account.accountId} className="py-2.5 md:py-4">
                         <AccountSummaryComponent
                           item={account}
                           isLoadingValuation={isLoadingPerformance}
@@ -400,7 +406,7 @@ export const AccountsSummary = React.memo(() => {
           })}
           {standaloneAccounts.map((account) => (
             <Card key={account.accountId} className="shadow-none">
-              <CardHeader className="py-3 md:py-6">
+              <CardHeader className="py-2.5 md:py-6">
                 <AccountSummaryComponent
                   item={account}
                   isLoadingValuation={isLoadingPerformance}
@@ -417,8 +423,8 @@ export const AccountsSummary = React.memo(() => {
       );
 
       return sortedAccounts.map((account) => (
-        <Card key={account.accountId} className="border-none shadow-sm">
-          <CardHeader className="py-3 md:py-6">
+        <Card key={account.accountId} className="shadow-sm">
+          <CardHeader className="py-2.5 md:py-6">
             <AccountSummaryComponent
               item={account}
               isLoadingValuation={isLoadingPerformance}
@@ -461,7 +467,7 @@ export const AccountsSummary = React.memo(() => {
         </Button>
       </CardHeader>
       <CardContent className="px-0">
-        <div className="space-y-2 md:space-y-4">{renderedContent}</div>
+        <div className="space-y-1.5 md:space-y-4">{renderedContent}</div>
       </CardContent>
     </Card>
   );

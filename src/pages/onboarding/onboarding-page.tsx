@@ -60,85 +60,88 @@ const OnboardingPage = () => {
   };
 
   return (
-    <section className="scan-hide-target bg-background relative flex min-h-screen flex-col">
-      {/* Sticky header with logo */}
-      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 pt-[env(safe-area-inset-top)] backdrop-blur">
-        <div className="flex flex-col items-center">
-          <img
-            alt="Wealthfolio Illustration"
-            className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28"
-            src="/illustration2.png"
-            style={{
-              aspectRatio: "1 / 1",
-              objectFit: "cover",
-            }}
-          />
-          {/* Progress indicators */}
-          <div className="flex justify-center gap-2 pt-4">
-            {Array.from({ length: MAX_STEPS }).map((_, index) => (
-              <div
-                key={index}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  index === currentStep - 1
-                    ? "bg-primary w-12"
-                    : index < currentStep - 1
-                      ? "bg-primary/60 w-2"
-                      : "bg-muted w-2"
-                }`}
-              />
-            ))}
+    <section className="scan-hide-target bg-background relative flex min-h-screen flex-col lg:items-center lg:justify-center">
+      {/* Desktop: All content in centered wrapper | Mobile: Stacked layout */}
+      <div className="flex min-h-screen flex-col lg:min-h-0">
+        {/* Mobile: Sticky header | Desktop: Normal header */}
+        <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 pt-[env(safe-area-inset-top)] backdrop-blur lg:relative lg:backdrop-blur-none">
+          <div className="flex flex-col items-center py-4 lg:py-6">
+            <img
+              alt="Wealthfolio Illustration"
+              className="h-20 w-20 sm:h-24 sm:w-24"
+              src="/illustration2.png"
+              style={{
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
+              }}
+            />
+            {/* Progress indicators */}
+            <div className="flex justify-center gap-2 pt-4">
+              {Array.from({ length: MAX_STEPS }).map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === currentStep - 1
+                      ? "bg-primary w-12"
+                      : index < currentStep - 1
+                        ? "bg-primary/60 w-2"
+                        : "bg-muted w-2"
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Main content with smooth transitions - scrollable area */}
-      <div className="flex-1 overflow-y-auto pb-20 sm:pb-24">
-        <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{
-                duration: 0.3,
-                ease: "easeInOut",
-              }}
-            >
-              {renderCurrentStep()}
-            </motion.div>
-          </AnimatePresence>
+        {/* Main content */}
+        <div className="flex-1 overflow-y-auto pb-20 sm:pb-24 lg:flex-none lg:overflow-visible lg:pb-0">
+          <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{
+                  duration: 0.3,
+                  ease: "easeInOut",
+                }}
+              >
+                {renderCurrentStep()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
 
-      {/* Sticky bottom navigation */}
-      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed right-0 bottom-0 left-0 z-20 border-none backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left side - Back button */}
-            <div className="flex items-center gap-3">
-              {currentStep > 1 && (
-                <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
-                  <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-              )}
+        {/* Mobile: Fixed bottom navigation | Desktop: Normal bottom navigation */}
+        <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed right-0 bottom-0 left-0 z-20 border-none backdrop-blur lg:relative lg:backdrop-blur-none">
+          <div className="mx-auto max-w-4xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-6">
+            <div className="flex items-center justify-between gap-4">
+              {/* Left side - Back button */}
+              <div className="flex items-center gap-3">
+                {currentStep > 1 && (
+                  <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
+                    <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                )}
+              </div>
+
+              {/* Right side - Continue/Get Started button */}
+              <Button
+                onClick={handleContinue}
+                disabled={!isStepValid}
+                type="button"
+                className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
+              >
+                {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
+                {currentStep === MAX_STEPS ? (
+                  <Icons.Check className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
+                ) : (
+                  <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                )}
+              </Button>
             </div>
-
-            {/* Right side - Continue/Get Started button */}
-            <Button
-              onClick={handleContinue}
-              disabled={!isStepValid}
-              type="button"
-              className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
-            >
-              {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
-              {currentStep === MAX_STEPS ? (
-                <Icons.Check className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-              ) : (
-                <Icons.ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              )}
-            </Button>
           </div>
         </div>
       </div>
