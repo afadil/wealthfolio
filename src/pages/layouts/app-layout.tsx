@@ -57,7 +57,7 @@ const AppLayout = () => {
 
       {shouldUseMobileNavigation && <MobileNavBar navigation={navigation} />}
 
-      <Toaster />
+      <Toaster mobileOffset={{ top: "68px" }} />
     </ApplicationShell>
   );
 };

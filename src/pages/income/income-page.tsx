@@ -88,7 +88,7 @@ export default function IncomePage() {
     return (
       <Page>
         <PageHeader
-          heading="Investment Income"
+          heading="Income"
           actions={
             <IncomePeriodSelector
               selectedPeriod={selectedPeriod}
@@ -172,7 +172,7 @@ export default function IncomePage() {
   return (
     <Page>
       <PageHeader
-        heading="Investment Income"
+        heading="Income"
         actions={
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}

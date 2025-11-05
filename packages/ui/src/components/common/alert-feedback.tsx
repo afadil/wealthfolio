@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Icons } from "../ui/icons";
 
@@ -6,30 +7,34 @@ interface AlertFeedbackProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "success" | "error" | "warning";
 }
 
-export function AlertFeedback({ title, children, variant, className, ...props }: AlertFeedbackProps) {
-  let alertIcon;
-  let alertVariant: "default" | "destructive" = "default";
-
-  switch (variant) {
-    case "success":
-      alertIcon = <Icons.CheckCircle className="h-4 w-4" />;
-      alertVariant = "default";
-      break;
-    case "warning":
-      alertIcon = <Icons.AlertTriangle className="h-4 w-4" />;
-      alertVariant = "default";
-      break;
-    case "error":
-    default:
-      alertIcon = <Icons.AlertCircle className="h-4 w-4" />;
-      alertVariant = "destructive";
-  }
+export function AlertFeedback({ title, children, variant = "error", className, ...props }: AlertFeedbackProps) {
+  const getIcon = () => {
+    switch (variant) {
+      case "success":
+        return <Icons.CheckCircle className="size-4" />;
+      case "warning":
+        return <Icons.AlertTriangle className="size-4" />;
+      case "error":
+        return <Icons.AlertCircle className="size-4" />;
+      default:
+        return <Icons.AlertCircle className="size-4" />;
+    }
+  };
 
   return (
-    <Alert variant={alertVariant} className={className} {...props}>
-      {alertIcon}
-      {title && <AlertTitle>{title}</AlertTitle>}
-      <AlertDescription>{children}</AlertDescription>
+    <Alert
+      variant={variant}
+      className={cn(
+        "flex items-start gap-3 [&>div]:flex [&>div]:items-start [&>div]:gap-3 [&>svg]:static [&>svg]:shrink-0 [&>svg~*]:pl-0",
+        className,
+      )}
+      {...props}
+    >
+      {getIcon()}
+      <div className="flex-1 pt-[1px]">
+        {title && <AlertTitle>{title}</AlertTitle>}
+        <AlertDescription>{children}</AlertDescription>
+      </div>
     </Alert>
   );
 }

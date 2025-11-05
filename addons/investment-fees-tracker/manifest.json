@@ -19,7 +19,7 @@
       "purpose": "Access transaction activities to track fee data"
     },
     {
-      "category": "currency",
+      "category": "exchangeRates",
       "functions": ["getAll"],
       "purpose": "Access to exchange rates and currency data"
     },
