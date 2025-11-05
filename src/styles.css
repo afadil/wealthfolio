@@ -417,6 +417,23 @@
 
   --mobile-nav-ui-height: 64px; /* nav bar height */
   --mobile-nav-gap: 12px; /* space between nav and bottom */
+
+  /* Sonner toast overrides - matching Alert component style */
+  --toast-bg: hsl(var(--flexoki-bg-2));
+  --toast-fg: hsl(var(--flexoki-tx));
+  --toast-border: hsl(var(--flexoki-ui));
+  --toast-success-bg: color-mix(in srgb, var(--color-green-100) 30%, transparent);
+  --toast-success-fg: var(--color-green-500);
+  --toast-success-border: color-mix(in srgb, var(--color-green-100) 40%, transparent);
+  --toast-error-bg: color-mix(in srgb, var(--color-red-100) 30%, transparent);
+  --toast-error-fg: var(--color-red-500);
+  --toast-error-border: color-mix(in srgb, var(--color-red-100) 40%, transparent);
+  --toast-warning-bg: color-mix(in srgb, var(--color-orange-100) 30%, transparent);
+  --toast-warning-fg: var(--color-orange-500);
+  --toast-warning-border: color-mix(in srgb, var(--color-orange-100) 40%, transparent);
+  --toast-info-bg: color-mix(in srgb, var(--color-blue-100) 30%, transparent);
+  --toast-info-fg: var(--color-blue-500);
+  --toast-info-border: color-mix(in srgb, var(--color-blue-100) 40%, transparent);
 }
 
 .dark {
@@ -443,6 +460,23 @@
   --chart-7: hsl(22 79% 25%);
   --chart-8: hsl(22 75% 20%);
   --chart-9: hsl(22 70% 15%);
+
+  /* Sonner toast overrides for dark mode - matching Alert component style */
+  --toast-bg: hsl(var(--flexoki-bg-2));
+  --toast-fg: hsl(var(--flexoki-tx));
+  --toast-border: hsl(var(--flexoki-ui));
+  --toast-success-bg: color-mix(in srgb, var(--color-green-100) 20%, transparent);
+  --toast-success-fg: var(--color-green-200);
+  --toast-success-border: color-mix(in srgb, var(--color-green-100) 20%, transparent);
+  --toast-error-bg: color-mix(in srgb, var(--color-red-100) 20%, transparent);
+  --toast-error-fg: var(--color-red-300);
+  --toast-error-border: color-mix(in srgb, var(--color-red-100) 20%, transparent);
+  --toast-warning-bg: color-mix(in srgb, var(--color-orange-100) 20%, transparent);
+  --toast-warning-fg: var(--color-orange-200);
+  --toast-warning-border: color-mix(in srgb, var(--color-orange-100) 20%, transparent);
+  --toast-info-bg: color-mix(in srgb, var(--color-blue-100) 20%, transparent);
+  --toast-info-fg: var(--color-blue-200);
+  --toast-info-border: color-mix(in srgb, var(--color-blue-100) 20%, transparent);
 }
 
 @layer base {

@@ -47,15 +47,13 @@ const PeriodSelector: React.FC<{
   selectedPeriod: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
   onPeriodSelect: (period: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL') => void;
 }> = ({ selectedPeriod, onPeriodSelect }) => (
-  <div className="flex justify-center sm:justify-end">
-    <AnimatedToggleGroup
-      items={periods}
-      value={selectedPeriod}
-      onValueChange={onPeriodSelect}
-      variant="secondary"
-      className="w-full sm:w-auto"
-    />
-  </div>
+  <AnimatedToggleGroup
+    items={periods}
+    value={selectedPeriod}
+    onValueChange={onPeriodSelect}
+    variant="secondary"
+    size="sm"
+  />
 );
 
 interface DashboardPageProps {
@@ -83,12 +81,10 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
     return <DashboardSkeleton />;
   }
 
-  const pageDescription = 'Track your trading performance and analytics';
-
   if (error || !dashboardData) {
     return (
       <Page>
-        <PageHeader heading="Trading Dashboard" text={pageDescription} />
+        <PageHeader heading="Trading Dashboard" />
         <PageContent>
           <div className="flex h-[calc(100vh-200px)] items-center justify-center">
             <div className="px-4 text-center">
@@ -112,7 +108,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   if (!hasSelectedActivities) {
     return (
       <Page>
-        <PageHeader heading="Trading Dashboard" text={pageDescription} />
+        <PageHeader heading="Trading Dashboard" />
         <PageContent>
           <div className="flex h-[calc(100vh-200px)] items-center justify-center">
             <div className="px-4 text-center">
@@ -150,33 +146,40 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   });
 
   const headerActions = (
-    <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:gap-2 sm:space-y-0">
+    <>
       <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={handleNavigateToActivities}
-          className="flex-1 rounded-full sm:flex-none"
-        >
-          <Icons.ListChecks className="mr-1 h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Select Activities</span>
-          <span className="sm:hidden">Activities</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleNavigateToSettings}
-          className="rounded-full"
-        >
-          <Icons.Settings className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+      <Button
+        variant="outline"
+        className="hidden rounded-full sm:inline-flex"
+        onClick={handleNavigateToActivities}
+      >
+        <Icons.ListChecks className="mr-2 h-4 w-4" />
+        <span>Select Activities</span>
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleNavigateToActivities}
+        className="sm:hidden"
+        aria-label="Select activities"
+      >
+        <Icons.ListChecks className="h-4 w-4" />
+      </Button>
+
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleNavigateToSettings}
+        className="rounded-full"
+      >
+        <Icons.Settings className="size-4" />
+      </Button>
+    </>
   );
 
   return (
     <Page>
-      <PageHeader heading="Trading Dashboard" text={pageDescription} actions={headerActions} />
+      <PageHeader heading="Trading Dashboard" actions={headerActions} />
 
       <PageContent>
         <div className="space-y-4 sm:space-y-6">
@@ -377,21 +380,16 @@ function DashboardSkeleton() {
   return (
     <Page>
       <PageHeader
+        heading="Trading Dashboard"
+        text="Track your trading performance and analytics"
         actions={
-          <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:gap-2 sm:space-y-0">
-            <Skeleton className="h-8 w-full sm:h-10 sm:w-[200px]" />
-            <div className="flex gap-2">
-              <Skeleton className="h-8 w-[100px] sm:h-10 sm:w-[140px]" />
-              <Skeleton className="h-8 w-8 sm:h-10 sm:w-10" />
-            </div>
-          </div>
+          <>
+            <Skeleton className="h-9 w-[280px]" />
+            <Skeleton className="h-9 w-[100px] sm:w-[140px]" />
+            <Skeleton className="h-9 w-9" />
+          </>
         }
-      >
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-[250px] sm:h-8 sm:w-[300px]" />
-          <Skeleton className="h-4 w-[300px] sm:h-5 sm:w-[400px]" />
-        </div>
-      </PageHeader>
+      />
 
       <PageContent>
         <div className="space-y-4 sm:space-y-6">

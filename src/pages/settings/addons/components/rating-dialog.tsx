@@ -1,16 +1,16 @@
-import React from "react";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Button,
-  Textarea,
   Icons,
   StarRating,
+  Textarea,
 } from "@wealthfolio/ui";
+import React from "react";
 import { useAddonRatingMutation } from "../hooks/use-addon-rating-mutation";
 
 interface RatingDialogProps {
@@ -67,17 +67,17 @@ export function RatingDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Rate {addonName}</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="space-y-4 pt-4">
+          <DialogTitle className="text-lg sm:text-xl">Rate {addonName}</DialogTitle>
+          <DialogDescription className="text-sm">
             Share your experience with this addon to help other users.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 py-8">
           {/* Star Rating */}
-          <div className="flex flex-col items-center space-y-2">
-            <span className="text-sm font-medium">How would you rate this addon?</span>
+          <div className="flex flex-col items-center space-y-6">
+            <span className="text-center text-sm font-medium">How would you rate this addon?</span>
             <StarRating rating={rating} interactive onRatingChange={setRating} size="lg" />
             {rating > 0 && (
               <span className="text-muted-foreground text-sm">{rating} out of 5 stars</span>
@@ -86,9 +86,6 @@ export function RatingDialog({
 
           {/* Review Text */}
           <div className="space-y-2">
-            <label htmlFor="review" className="text-sm font-medium">
-              Write a review (optional)
-            </label>
             <Textarea
               id="review"
               placeholder="Share your thoughts about this addon..."
@@ -97,6 +94,7 @@ export function RatingDialog({
               rows={4}
               maxLength={500}
               disabled={isSubmittingRating}
+              className="resize-none"
             />
             <div className="text-muted-foreground text-right text-xs">
               {review.length}/500 characters
@@ -104,11 +102,20 @@ export function RatingDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isSubmittingRating}>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={isSubmittingRating}
+            className="w-full sm:w-auto"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={rating === 0 || isSubmittingRating}>
+          <Button
+            onClick={handleSubmit}
+            disabled={rating === 0 || isSubmittingRating}
+            className="w-full sm:w-auto"
+          >
             {isSubmittingRating ? (
               <>
                 <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />

@@ -1,64 +1,51 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { AccountValuation } from "@/lib/types";
+import type { AccountValuation } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-// Define a unified type for displaying both individual accounts and groups
 interface AccountSummaryDisplayData {
-  // Common fields
-  accountName: string; // Account name or Group name
-  baseCurrency: string; // Mandatory
-
-  // Base Currency Values (for sorting, grouping, and default display)
+  accountName: string;
+  baseCurrency: string;
   totalValueBaseCurrency: number;
   totalGainLossAmountBaseCurrency: number | null;
-
-  // Account Currency Values (for expanded view)
   totalValueAccountCurrency?: number;
   totalGainLossAmountAccountCurrency?: number | null;
   accountCurrency?: string;
-
-  // Common Performance
   totalGainLossPercent: number | null;
-
-  // Individual Account specific fields
   accountId?: string;
   accountType?: string;
   accountGroup?: string | null;
-
-  // Group specific fields
   isGroup?: boolean;
   accountCount?: number;
   accounts?: AccountSummaryDisplayData[];
 }
 
-// Skeleton component for loading state within AccountSummaryComponent
 const AccountSummarySkeleton = () => (
-  <div className="flex w-full items-center justify-between py-1">
-    <div className="flex flex-col space-y-1">
-      <Skeleton className="h-5 w-32 rounded" />
-      <Skeleton className="h-4 w-24 rounded" />
+  <div className="flex w-full items-center justify-between gap-3">
+    <div className="flex flex-1 flex-col gap-2">
+      <Skeleton className="h-5 w-40 rounded md:h-6" />
+      <Skeleton className="h-4 w-32 rounded md:h-4" />
     </div>
-    <div className="flex items-center">
-      <div className="flex flex-col items-end space-y-1">
-        <Skeleton className="h-5 w-20 rounded" />
-        <Skeleton className="h-4 w-28 rounded" />
+    <div className="flex items-center gap-2">
+      <div className="flex flex-col items-end gap-2">
+        <Skeleton className="h-5 w-24 rounded md:h-6" />
+        <Skeleton className="h-4 w-32 rounded md:h-4" />
       </div>
-      <Skeleton className="ml-2 h-6 w-6 rounded-full md:h-5 md:w-5" />
+      <Skeleton className="h-6 w-6 rounded-full" />
     </div>
   </div>
 );
 
-// Reusable component for displaying either a single account summary or a group summary
 const AccountSummaryComponent = React.memo(
   ({
     item,
@@ -66,46 +53,43 @@ const AccountSummaryComponent = React.memo(
     onToggle,
     isLoadingValuation = false,
     displayInAccountCurrency = false,
+    isNested = false,
   }: {
     item: AccountSummaryDisplayData;
     isExpanded?: boolean;
     onToggle?: () => void;
     isLoadingValuation?: boolean;
     displayInAccountCurrency?: boolean;
+    isNested?: boolean;
   }) => {
     const isGroup = item.isGroup ?? false;
     const useAccountCurrency = !isGroup && displayInAccountCurrency;
 
-    // If loading valuation for a single account, show skeleton for values
     if (!isGroup && isLoadingValuation) {
-      // Show basic info but skeleton for values
       return (
-        <div key={item.accountId} className="flex w-full items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-base leading-tight font-medium">{item.accountName}</span>
-            <span className="text-muted-foreground truncate text-sm">
-              {`${item.accountGroup ? `${item.accountGroup} | ` : ""}${item.accountCurrency}`}
-            </span>
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-2 md:gap-2">
+            <Skeleton className="h-5 w-32 rounded md:h-6" />
+            <Skeleton className="h-4 w-40 rounded md:h-4" />
           </div>
-          <div className="flex items-center">
-            <div className="flex flex-col items-end space-y-1">
-              <Skeleton className="h-5 w-20 rounded" />
-              <Skeleton className="h-4 w-28 rounded" />
+          <div className="flex items-center gap-2">
+            <div className="flex flex-col items-end gap-2">
+              <Skeleton className="h-5 w-24 rounded md:h-6" />
+              <Skeleton className="h-4 w-32 rounded md:h-4" />
             </div>
           </div>
         </div>
       );
     }
 
-    // --- Derive display values based on item type (account or group) ---
     const name = item.accountName;
     const accountId = item.accountId;
 
     const subText = useAccountCurrency
-      ? `${item.accountGroup ? `${item.accountGroup} | ` : ""}${item.accountCurrency}`
+      ? item.accountCurrency
       : isGroup
-        ? `${item.accountCount} accounts`
-        : `${item.accountGroup ? `${item.accountGroup} | ` : ""}${item.baseCurrency}`;
+        ? `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+        : item.baseCurrency;
 
     const totalValue = useAccountCurrency
       ? (item.totalValueAccountCurrency ?? 0)
@@ -114,7 +98,6 @@ const AccountSummaryComponent = React.memo(
       ? (item.accountCurrency ?? item.baseCurrency)
       : item.baseCurrency;
 
-    // Performance is always in base currency for groups, but can be account currency for individuals
     const gainAmountToDisplay = useAccountCurrency
       ? item.totalGainLossAmountAccountCurrency
       : item.totalGainLossAmountBaseCurrency;
@@ -123,21 +106,23 @@ const AccountSummaryComponent = React.memo(
 
     const content = (
       <>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="truncate text-base leading-tight font-medium">{name}</span>
-          <span className="text-muted-foreground truncate text-sm">{subText}</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1 md:gap-1.5">
+          <h3 className="truncate text-sm leading-tight font-semibold md:text-base md:font-semibold">
+            {name}
+          </h3>
+          <p className="text-muted-foreground truncate text-xs md:text-sm">{subText}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
-          <div className="flex flex-col items-end gap-1">
-            <p className="text-base leading-tight font-medium">
+          <div className="flex flex-col items-end gap-1 md:gap-1.5">
+            <p className="text-sm leading-tight font-semibold md:text-base md:font-semibold">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
             {(gainAmountToDisplay !== null || gainPercentToDisplay !== null) &&
               !(gainAmountToDisplay === 0 && gainPercentToDisplay === 0) && (
-                <div className="flex items-center space-x-1.5 md:space-x-2">
+                <div className="flex items-center gap-1.5 md:gap-2">
                   {gainAmountToDisplay !== null && (
                     <GainAmount
-                      className="text-sm font-light"
+                      className="text-xs font-medium md:text-sm md:font-medium"
                       value={gainAmountToDisplay ?? 0}
                       currency={gainDisplayCurrency}
                       displayCurrency={false}
@@ -145,24 +130,31 @@ const AccountSummaryComponent = React.memo(
                     />
                   )}
                   {gainAmountToDisplay !== null && gainPercentToDisplay !== null && (
-                    <Separator orientation="vertical" className="h-3" />
+                    <Separator orientation="vertical" className="h-3 md:h-4" />
                   )}
                   {gainPercentToDisplay !== null && (
-                    <GainPercent className="text-sm font-light" value={gainPercentToDisplay} />
+                    <GainPercent
+                      className="text-xs font-medium md:text-sm md:font-medium"
+                      value={gainPercentToDisplay}
+                    />
                   )}
                 </div>
               )}
           </div>
           {isGroup ? (
-            <Icons.ChevronDown
-              className={`text-muted-foreground h-6 w-6 shrink-0 transition-transform md:h-5 md:w-5 ${
-                isExpanded ? "rotate-180 transform" : ""
-              }`}
-            />
+            <div className="flex items-center justify-center">
+              <Icons.ChevronDown
+                className={`text-muted-foreground h-5 w-5 shrink-0 transition-transform duration-200 ${
+                  isExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </div>
           ) : (
             !isLoadingValuation &&
             accountId && (
-              <Icons.ChevronRight className="text-muted-foreground h-6 w-6 shrink-0 md:h-5 md:w-5" />
+              <div className="flex items-center justify-center">
+                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
+              </div>
             )
           )}
         </div>
@@ -172,9 +164,8 @@ const AccountSummaryComponent = React.memo(
     if (isGroup) {
       return (
         <div
-          key={name}
-          className="flex w-full cursor-pointer items-center justify-between gap-3"
           onClick={onToggle}
+          className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg p-3 transition-colors duration-150 md:p-4"
         >
           {content}
         </div>
@@ -182,11 +173,20 @@ const AccountSummaryComponent = React.memo(
     }
 
     if (!isLoadingValuation && accountId) {
+      if (isNested) {
+        return (
+          <Link
+            to={`/accounts/${accountId}`}
+            className="flex w-full cursor-pointer items-center justify-between gap-3"
+          >
+            {content}
+          </Link>
+        );
+      }
       return (
         <Link
-          key={accountId}
           to={`/accounts/${accountId}`}
-          className="flex w-full cursor-pointer items-center justify-between gap-3"
+          className="border-border bg-card flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border px-4 py-3 shadow-xs transition-all duration-150 hover:shadow-md md:px-5 md:py-4"
         >
           {content}
         </Link>
@@ -194,7 +194,7 @@ const AccountSummaryComponent = React.memo(
     }
 
     return (
-      <div key={accountId} className="flex w-full items-center justify-between gap-3">
+      <div className="border-border bg-card flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 shadow-xs md:px-5 md:py-4">
         {content}
       </div>
     );
@@ -206,7 +206,6 @@ export const AccountsSummary = React.memo(() => {
   const { accountsGrouped, setAccountsGrouped, settings } = useSettingsContext();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  // --- Data Fetching ---
   const {
     accounts,
     isLoading: isLoadingAccounts,
@@ -218,7 +217,6 @@ export const AccountsSummary = React.memo(() => {
 
   const { latestValuations, isLoading: isLoadingValuations } = useLatestValuations(accountIds);
 
-  // --- Data Processing ---
   const combinedAccountViews = useMemo((): AccountSummaryDisplayData[] => {
     if (!accounts) return [];
     const valuationMap = new Map<string, AccountValuation>();
@@ -276,24 +274,34 @@ export const AccountsSummary = React.memo(() => {
     }));
   }, []);
 
-  // --- Rendering Logic ---
   const renderedContent = useMemo(() => {
     if (isLoadingAccounts) {
       return Array.from({ length: 4 }).map((_, index) => (
-        <Card key={`skeleton-${index}`} className="border-none shadow-sm">
-          <CardHeader className="py-3 md:py-6">
-            <AccountSummarySkeleton />
-          </CardHeader>
-        </Card>
+        <div
+          key={`skeleton-${index}`}
+          className="border-border bg-card rounded-lg border px-4 py-3 shadow-xs md:px-5 md:py-4"
+        >
+          <AccountSummarySkeleton />
+        </div>
       ));
     }
 
     if (isErrorAccounts) {
-      return <p className="text-destructive">Error loading accounts: {errorAccounts?.message}</p>;
+      return (
+        <div className="border-destructive/30 bg-destructive/5 rounded-lg border p-4 md:p-5">
+          <p className="text-destructive text-sm font-medium">
+            Error loading accounts: {errorAccounts?.message}
+          </p>
+        </div>
+      );
     }
 
     if (!combinedAccountViews || combinedAccountViews.length === 0) {
-      return <p className="text-muted-foreground">No accounts found.</p>;
+      return (
+        <div className="border-border/50 bg-secondary/30 rounded-lg border p-6 text-center md:p-8">
+          <p className="text-muted-foreground text-sm">No accounts found.</p>
+        </div>
+      );
     }
 
     const isLoadingPerformance = isLoadingValuations;
@@ -314,11 +322,9 @@ export const AccountsSummary = React.memo(() => {
         }
       });
 
-      // Separate single-account groups from multi-account groups
       const actualGroups: AccountSummaryDisplayData[] = [];
 
       Object.entries(groups).forEach(([groupName, groupAccounts]) => {
-        // If group has only one account, treat it as standalone
         if (groupAccounts.length === 1) {
           standaloneAccounts.push(groupAccounts[0]);
         } else {
@@ -374,40 +380,43 @@ export const AccountsSummary = React.memo(() => {
             );
 
             return (
-              <Card key={group.accountName} className="shadow-none">
-                <CardHeader className="py-3 md:py-6">
+              <div
+                key={group.accountName}
+                className="border-border bg-card overflow-hidden rounded-lg border shadow-xs transition-shadow duration-150 hover:shadow-md"
+              >
+                <div className="cursor-pointer">
                   <AccountSummaryComponent
                     item={group}
                     isExpanded={isExpanded}
                     onToggle={() => toggleGroup(group.accountName)}
                   />
-                </CardHeader>
+                </div>
                 {isExpanded && (
-                  <CardContent className="border-t px-4 pt-3 md:px-6 md:pt-4">
-                    {sortedAccounts.map((account) => (
-                      <div key={account.accountId} className="py-3 md:py-4">
-                        <AccountSummaryComponent
-                          item={account}
-                          isLoadingValuation={isLoadingPerformance}
-                          displayInAccountCurrency
-                        />
-                      </div>
-                    ))}
-                  </CardContent>
+                  <div className="border-border/50 border-t">
+                    <div className="divide-border/50 divide-y">
+                      {sortedAccounts.map((account) => (
+                        <div key={account.accountId} className="px-4 py-3 md:px-5 md:py-4">
+                          <AccountSummaryComponent
+                            item={account}
+                            isLoadingValuation={isLoadingPerformance}
+                            displayInAccountCurrency
+                            isNested
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </Card>
+              </div>
             );
           })}
           {standaloneAccounts.map((account) => (
-            <Card key={account.accountId} className="shadow-none">
-              <CardHeader className="py-3 md:py-6">
-                <AccountSummaryComponent
-                  item={account}
-                  isLoadingValuation={isLoadingPerformance}
-                  displayInAccountCurrency={false}
-                />
-              </CardHeader>
-            </Card>
+            <AccountSummaryComponent
+              key={account.accountId}
+              item={account}
+              isLoadingValuation={isLoadingPerformance}
+              displayInAccountCurrency={false}
+            />
           ))}
         </>
       );
@@ -417,15 +426,12 @@ export const AccountsSummary = React.memo(() => {
       );
 
       return sortedAccounts.map((account) => (
-        <Card key={account.accountId} className="border-none shadow-sm">
-          <CardHeader className="py-3 md:py-6">
-            <AccountSummaryComponent
-              item={account}
-              isLoadingValuation={isLoadingPerformance}
-              displayInAccountCurrency={false}
-            />
-          </CardHeader>
-        </Card>
+        <AccountSummaryComponent
+          key={account.accountId}
+          item={account}
+          isLoadingValuation={isLoadingPerformance}
+          displayInAccountCurrency={false}
+        />
       ));
     }
   }, [
@@ -441,29 +447,27 @@ export const AccountsSummary = React.memo(() => {
   ]);
 
   return (
-    <Card className="border-none bg-transparent shadow-none">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-2 py-1">
-        <CardTitle className="text-md"></CardTitle>
+    <div className="mb-4 w-full space-y-0">
+      <div className="flex flex-row items-center justify-between gap-2 pb-2">
+        <h2 className="text-md font-semibold tracking-tight">Accounts</h2>
         <Button
-          variant="ghost"
-          className="rounded-full"
+          variant="outline"
+          className="rounded-lg bg-transparent transition-colors duration-150"
           size="sm"
           onClick={() => setAccountsGrouped(!accountsGrouped)}
           aria-label={accountsGrouped ? "List view" : "Group view"}
-          title={accountsGrouped ? "List view" : "Group view"}
+          title={accountsGrouped ? "Switch to list view" : "Switch to group view"}
           disabled={isLoadingAccounts || combinedAccountViews.length === 0}
         >
           {accountsGrouped ? (
-            <Icons.ListCollapse className="text-muted-foreground h-4 w-4" />
+            <Icons.ListCollapse className="h-4 w-4" />
           ) : (
-            <Icons.Group className="text-muted-foreground h-4 w-4" />
+            <Icons.Group className="h-4 w-4" />
           )}
         </Button>
-      </CardHeader>
-      <CardContent className="px-0">
-        <div className="space-y-2 md:space-y-4">{renderedContent}</div>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="space-y-2 md:space-y-3">{renderedContent}</div>
+    </div>
   );
 });
 AccountsSummary.displayName = "AccountsSummary";

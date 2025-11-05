@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { reloadAllAddons } from "@/addons/addons-core";
+import { updateAddon } from "@/commands/addon";
 import { Badge } from "@/components/ui/badge";
-import { Icons } from "@/components/ui/icons";
-import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,11 +10,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Icons } from "@/components/ui/icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { updateAddon } from "@/commands/addon";
-import { reloadAllAddons } from "@/addons/addons-core";
+import { useToast } from "@/components/ui/use-toast";
 import type { AddonUpdateInfo } from "@wealthfolio/addon-sdk";
+import { useState } from "react";
 
 interface AddonUpdateCardProps {
   addonId: string;

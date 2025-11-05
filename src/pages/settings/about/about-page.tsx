@@ -77,6 +77,10 @@ export default function AboutSettingsPage() {
     }
   };
 
+  const handleOpenLink = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="space-y-6">
       <SettingsHeader heading="About" text="Application information" />
@@ -98,38 +102,29 @@ export default function AboutSettingsPage() {
             </p>
             <div className="flex flex-wrap items-center gap-3">
               {!isMobile && <Button onClick={handleCheckForUpdates}>Check for Update</Button>}
-              <Button variant="outline" asChild>
-                <a
-                  href="https://wealthfolio.app"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-2"
-                >
-                  <Icons.Globe className="h-4 w-4" />
-                  Visit Website
-                </a>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenLink("https://wealthfolio.app")}
+                className="inline-flex items-center gap-2"
+              >
+                <Icons.Globe className="h-4 w-4" />
+                Website
               </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href="https://wealthfolio.app/docs/introduction/"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-2"
-                >
-                  <Icons.FileText className="h-4 w-4" />
-                  Documentation
-                </a>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenLink("https://wealthfolio.app/docs/introduction/")}
+                className="inline-flex items-center gap-2"
+              >
+                <Icons.FileText className="h-4 w-4" />
+                Docs
               </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href="https://github.com/afadil/wealthfolio"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-2"
-                >
-                  <Icons.ExternalLink className="h-4 w-4" />
-                  GitHub
-                </a>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenLink("https://github.com/afadil/wealthfolio")}
+                className="inline-flex items-center gap-2"
+              >
+                <Icons.ExternalLink className="h-4 w-4" />
+                GitHub
               </Button>
             </div>
           </div>
@@ -192,22 +187,23 @@ export default function AboutSettingsPage() {
               <span className="font-mono font-semibold select-all">wealthfolio@teymz.com</span>
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <a href="mailto:wealthfolio@teymz.com" className="inline-flex items-center gap-2">
-                  <Icons.ExternalLink className="h-4 w-4" />
-                  Email Us
-                </a>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenLink("mailto:wealthfolio@teymz.com")}
+                className="inline-flex items-center gap-2"
+              >
+                <Icons.ExternalLink className="h-4 w-4" />
+                Email Us
               </Button>
-              <Button variant="outline" size="sm" asChild>
-                <a
-                  href="https://github.com/afadil/wealthfolio/issues"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-2"
-                >
-                  <Icons.AlertCircle className="h-4 w-4" />
-                  Report Issue
-                </a>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenLink("https://github.com/afadil/wealthfolio/issues")}
+                className="inline-flex items-center gap-2"
+              >
+                <Icons.AlertCircle className="h-4 w-4" />
+                Report Issue
               </Button>
             </div>
 

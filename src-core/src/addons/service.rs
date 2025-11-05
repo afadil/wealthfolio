@@ -14,9 +14,21 @@ fn create_request_with_headers(
     url: &str,
     instance_id: Option<&str>,
 ) -> reqwest::RequestBuilder {
-    let mut request = client
-        .request(method, url)
-        .header("User-Agent", "Wealthfolio/1.0");
+    let mut request = client.request(method, url);
+
+    // Always add User-Agent, with version if available
+    let app_version = option_env!("CARGO_PKG_VERSION");
+    let user_agent = if let Some(version) = app_version {
+        format!("Wealthfolio/{}", version)
+    } else {
+        "Wealthfolio".to_string()
+    };
+    request = request.header("User-Agent", user_agent);
+
+    // Add X-App-Version header only if version is available
+    if let Some(version) = app_version {
+        request = request.header("X-App-Version", version);
+    }
 
     // Add instance ID header if provided
     if let Some(instance_id) = instance_id {
@@ -59,9 +71,9 @@ where
     })
 }
 
-/// Initialize the addons directory in app_data
-pub fn ensure_addons_directory(app_data_dir: &str) -> Result<PathBuf, String> {
-    let addons_dir = Path::new(app_data_dir).join("addons");
+/// Initialize the addons directory in the provided data root
+pub fn ensure_addons_directory(base_dir: impl AsRef<Path>) -> Result<PathBuf, String> {
+    let addons_dir = base_dir.as_ref().join("addons");
     if !addons_dir.exists() {
         fs::create_dir_all(&addons_dir)
             .map_err(|e| format!("Failed to create addons directory: {}", e))?;
@@ -70,8 +82,8 @@ pub fn ensure_addons_directory(app_data_dir: &str) -> Result<PathBuf, String> {
 }
 
 /// Get addon directory path for a specific addon
-pub fn get_addon_path(app_data_dir: &str, addon_id: &str) -> Result<PathBuf, String> {
-    let addons_dir = ensure_addons_directory(app_data_dir)?;
+pub fn get_addon_path(base_dir: impl AsRef<Path>, addon_id: &str) -> Result<PathBuf, String> {
+    let addons_dir = ensure_addons_directory(base_dir)?;
     Ok(addons_dir.join(addon_id))
 }
 
@@ -794,19 +806,30 @@ pub async fn download_addon_package(download_url: &str) -> Result<Vec<u8>, Strin
     log::info!("Downloading addon package from URL: {}", download_url);
 
     let client = reqwest::Client::new();
-    let response = client
-        .get(download_url)
-        .header("User-Agent", "Wealthfolio/1.0")
-        .send()
-        .await
-        .map_err(|e| {
-            log::error!(
-                "Failed to download addon package from '{}': {}",
-                download_url,
-                e
-            );
-            format!("Failed to download addon package: {}", e)
-        })?;
+    let mut request = client.get(download_url);
+
+    // Always add User-Agent, with version if available
+    let app_version = option_env!("CARGO_PKG_VERSION");
+    let user_agent = if let Some(version) = app_version {
+        format!("Wealthfolio/{}", version)
+    } else {
+        "Wealthfolio".to_string()
+    };
+    request = request.header("User-Agent", user_agent);
+
+    // Add X-App-Version header only if version is available
+    if let Some(version) = app_version {
+        request = request.header("X-App-Version", version);
+    }
+
+    let response = request.send().await.map_err(|e| {
+        log::error!(
+            "Failed to download addon package from '{}': {}",
+            download_url,
+            e
+        );
+        format!("Failed to download addon package: {}", e)
+    })?;
 
     let status = response.status();
     log::debug!(
@@ -847,8 +870,8 @@ pub async fn download_addon_package(download_url: &str) -> Result<Vec<u8>, Strin
 }
 
 /// Get staging directory for downloads
-pub fn get_staging_directory(app_data_dir: &str) -> Result<PathBuf, String> {
-    let staging_dir = Path::new(app_data_dir).join("addons").join("staging");
+pub fn get_staging_directory(base_dir: impl AsRef<Path>) -> Result<PathBuf, String> {
+    let staging_dir = base_dir.as_ref().join("addons").join("staging");
 
     if !staging_dir.exists() {
         fs::create_dir_all(&staging_dir)
@@ -859,8 +882,8 @@ pub fn get_staging_directory(app_data_dir: &str) -> Result<PathBuf, String> {
 }
 
 /// Clear staging directory
-pub fn clear_staging_directory(app_data_dir: &str) -> Result<(), String> {
-    let staging_dir = get_staging_directory(app_data_dir)?;
+pub fn clear_staging_directory(base_dir: impl AsRef<Path>) -> Result<(), String> {
+    let staging_dir = get_staging_directory(base_dir)?;
 
     if staging_dir.exists() {
         fs::remove_dir_all(&staging_dir)
@@ -1012,10 +1035,10 @@ pub async fn download_addon_from_store(
 /// Save addon data to staging directory
 pub fn save_addon_to_staging(
     addon_id: &str,
-    app_data_dir: &str,
+    base_dir: impl AsRef<Path>,
     zip_data: &[u8],
 ) -> Result<PathBuf, String> {
-    let staging_dir = get_staging_directory(app_data_dir)?;
+    let staging_dir = get_staging_directory(base_dir)?;
     let staged_file_path = staging_dir.join(format!("{}.zip", addon_id));
 
     // Validate zip data before saving
@@ -1105,8 +1128,11 @@ pub fn save_addon_to_staging(
 }
 
 /// Load addon from staging directory
-pub fn load_addon_from_staging(addon_id: &str, app_data_dir: &str) -> Result<Vec<u8>, String> {
-    let staging_dir = get_staging_directory(app_data_dir)?;
+pub fn load_addon_from_staging(
+    addon_id: &str,
+    base_dir: impl AsRef<Path>,
+) -> Result<Vec<u8>, String> {
+    let staging_dir = get_staging_directory(base_dir)?;
     let staged_file_path = staging_dir.join(format!("{}.zip", addon_id));
 
     if !staged_file_path.exists() {
@@ -1129,8 +1155,8 @@ pub fn load_addon_from_staging(addon_id: &str, app_data_dir: &str) -> Result<Vec
 }
 
 /// Remove specific addon from staging
-pub fn remove_addon_from_staging(addon_id: &str, app_data_dir: &str) -> Result<(), String> {
-    let staging_dir = get_staging_directory(app_data_dir)?;
+pub fn remove_addon_from_staging(addon_id: &str, base_dir: impl AsRef<Path>) -> Result<(), String> {
+    let staging_dir = get_staging_directory(base_dir)?;
     let staged_file_path = staging_dir.join(format!("{}.zip", addon_id));
 
     if staged_file_path.exists() {
@@ -1142,7 +1168,7 @@ pub fn remove_addon_from_staging(addon_id: &str, app_data_dir: &str) -> Result<(
     Ok(())
 }
 
-/// Fetch available addons from the store API  
+/// Fetch available addons from the store API
 pub async fn fetch_addon_store_listings(
     instance_id: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, String> {

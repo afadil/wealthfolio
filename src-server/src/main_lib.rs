@@ -1,23 +1,30 @@
 use std::sync::{Arc, RwLock};
 
-use tracing_subscriber::{fmt, EnvFilter};
-use tracing_subscriber::prelude::*;
 use crate::config::Config;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_core::{
     accounts::{AccountRepository, AccountService},
-    activities::{ActivityRepository, ActivityService as CoreActivityService, ActivityServiceTrait},
+    activities::{
+        ActivityRepository, ActivityService as CoreActivityService, ActivityServiceTrait,
+    },
     assets::{AssetRepository, AssetService, AssetServiceTrait},
     db::{self, write_actor},
     fx::{FxRepository, FxService, FxServiceTrait},
+    goals::{GoalRepository, GoalService, GoalServiceTrait},
+    limits::{
+        ContributionLimitRepository, ContributionLimitService, ContributionLimitServiceTrait,
+    },
     market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait},
+    portfolio::income::{IncomeService, IncomeServiceTrait},
     portfolio::{
-        holdings::{holdings_valuation_service::HoldingsValuationService, HoldingsService, HoldingsServiceTrait},
+        holdings::{
+            holdings_valuation_service::HoldingsValuationService, HoldingsService,
+            HoldingsServiceTrait,
+        },
         snapshot::{SnapshotRepository, SnapshotService, SnapshotServiceTrait},
         valuation::{ValuationRepository, ValuationService, ValuationServiceTrait},
     },
-    portfolio::income::{IncomeService, IncomeServiceTrait},
-    goals::{GoalRepository, GoalService, GoalServiceTrait},
-    limits::{ContributionLimitRepository, ContributionLimitService, ContributionLimitServiceTrait},
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
 };
 
@@ -32,13 +39,15 @@ pub struct AppState {
     pub market_data_service: Arc<dyn MarketDataServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
-    pub performance_service: Arc<dyn wealthfolio_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
+    pub performance_service:
+        Arc<dyn wealthfolio_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
     pub income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
     pub goal_service: Arc<dyn GoalServiceTrait + Send + Sync>,
     pub limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync>,
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
+    pub addons_root: String,
     pub data_root: String,
     pub instance_id: String,
 }
@@ -46,7 +55,10 @@ pub struct AppState {
 pub fn init_tracing() {
     let fmt_layer = fmt::layer().json().with_current_span(false);
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::registry().with(filter).with(fmt_layer).init();
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
+        .init();
 }
 
 pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
@@ -87,12 +99,14 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     // Additional repositories/services for web API
     let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
     let market_data_repository = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
-    let market_data_service = Arc::new(MarketDataService::new(
-        market_data_repository.clone(),
-        asset_repository.clone(),
-    ).await?);
+    let market_data_service = Arc::new(
+        MarketDataService::new(market_data_repository.clone(), asset_repository.clone()).await?,
+    );
 
-    let asset_service = Arc::new(AssetService::new(asset_repository.clone(), market_data_service.clone())?);
+    let asset_service = Arc::new(AssetService::new(
+        asset_repository.clone(),
+        market_data_service.clone(),
+    )?);
     let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let snapshot_service = Arc::new(SnapshotService::new(
@@ -123,10 +137,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         holdings_valuation_service.clone(),
     ));
 
-    let performance_service = Arc::new(wealthfolio_core::portfolio::performance::PerformanceService::new(
-        valuation_service.clone(),
-        market_data_service.clone(),
-    ));
+    let performance_service = Arc::new(
+        wealthfolio_core::portfolio::performance::PerformanceService::new(
+            valuation_service.clone(),
+            market_data_service.clone(),
+        ),
+    );
 
     let income_service = Arc::new(IncomeService::new(
         fx_service.clone(),
@@ -137,21 +153,24 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let goal_repository = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
     let goal_service = Arc::new(GoalService::new(goal_repository));
 
-    let limits_repository = Arc::new(ContributionLimitRepository::new(pool.clone(), writer.clone()));
-    let limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync> = Arc::new(
-        ContributionLimitService::new(
+    let limits_repository = Arc::new(ContributionLimitRepository::new(
+        pool.clone(),
+        writer.clone(),
+    ));
+    let limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync> =
+        Arc::new(ContributionLimitService::new(
             fx_service.clone(),
             limits_repository.clone(),
             activity_repository.clone(),
-        ),
-    );
+        ));
 
-    let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> = Arc::new(CoreActivityService::new(
-        activity_repository.clone(),
-        account_service.clone(),
-        asset_service.clone(),
-        fx_service.clone(),
-    ));
+    let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> =
+        Arc::new(CoreActivityService::new(
+            activity_repository.clone(),
+            account_service.clone(),
+            asset_service.clone(),
+            fx_service.clone(),
+        ));
 
     // Determine data root directory (parent of DB path)
     let data_root = std::path::Path::new(&db_path)
@@ -175,6 +194,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service: fx_service.clone(),
         activity_service,
         asset_service,
+        addons_root: config.addons_root.clone(),
         data_root,
         instance_id: settings.instance_id,
     }))

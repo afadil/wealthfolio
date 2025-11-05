@@ -11,6 +11,7 @@ export interface NavLink {
 export interface NavigationProps {
   primary: NavLink[];
   secondary?: NavLink[];
+  addons?: NavLink[];
 }
 
 const staticNavigation: NavigationProps = {
@@ -71,10 +72,11 @@ export function useNavigation() {
     };
   }, []);
 
-  // Combine static and dynamic navigation items
+  // Combine static navigation items with addons grouped separately
   const navigation: NavigationProps = {
-    primary: [...staticNavigation.primary, ...dynamicItems],
+    primary: staticNavigation.primary,
     secondary: staticNavigation.secondary,
+    addons: dynamicItems,
   };
 
   return navigation;

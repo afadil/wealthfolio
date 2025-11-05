@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use log::{debug, error};
 use rust_decimal::Decimal;
 use std::collections::btree_map::Entry as BTreeEntry;
@@ -545,16 +545,11 @@ impl MarketDataService {
             return Ok(((), Vec::new()));
         }
 
-        let current_local_naive_date = Local::now().date_naive();
-        let end_date_naive_local = current_local_naive_date.and_hms_opt(23, 59, 59).unwrap();
-        let end_date: SystemTime = Utc
-            .from_utc_datetime(
-                &end_date_naive_local
-                    .and_local_timezone(Local)
-                    .unwrap()
-                    .naive_utc(),
-            )
-            .into();
+        let current_utc_naive_date = Utc::now().date_naive();
+        let end_date_naive_utc = current_utc_naive_date
+            .and_hms_opt(23, 59, 59)
+            .expect("valid end-of-day time");
+        let end_date: SystemTime = Utc.from_utc_datetime(&end_date_naive_utc).into();
 
         let public_requests = quote_requests;
         let mut all_quotes = Vec::new();
@@ -722,14 +717,13 @@ impl MarketDataService {
             let start_date = match quotes_map.get(symbol) {
                 Some(latest_quote) => {
                     let last_date = latest_quote.timestamp.date_naive();
+
                     if last_date >= end_date {
-                        debug!(
-                            "Symbol '{}' already has data through {} (end {}). Skipping fetch.",
-                            symbol, last_date, end_date
-                        );
-                        continue;
+                        // Re-fetch the latest day to pick up intraday adjustments Yahoo publishes.
+                        end_date
+                    } else {
+                        last_date.succ_opt().unwrap_or(last_date)
                     }
-                    last_date.succ_opt().unwrap_or(last_date)
                 }
                 None => default_start_date,
             };

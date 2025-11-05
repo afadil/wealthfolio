@@ -47,6 +47,7 @@ function CalendarDot({
       style={{
         background: `conic-gradient(var(--primary) ${partialPercent * 3.6}deg, var(--muted) 0deg)`,
       }}
+      onMouseEnter={(event) => onHover(event, dotData)}
       onMouseLeave={onLeave}
       onClick={(e) => onClick(e, dotData)}
     />
@@ -57,6 +58,7 @@ function CalendarDot({
           ? "border-primary bg-primary scale-105"
           : "border-muted-foreground/30 bg-muted hover:bg-muted-foreground/10"
       }`}
+      onMouseEnter={(event) => onHover(event, dotData)}
       onMouseLeave={onLeave}
       onClick={(e) => onClick(e, dotData)}
     />
@@ -179,7 +181,7 @@ function InvestmentCalendar({
   };
 
   const dotsPerRow = getDotsPerRow();
-  const totalRows = Math.ceil(totalSteps / dotsPerRow);
+  const gridColumns = Math.min(dotsPerRow, Math.max(totalSteps, 1));
 
   // Tooltip handlers
   const handleDotHover = (event: React.MouseEvent, data: DotData) => {
@@ -205,42 +207,26 @@ function InvestmentCalendar({
     }
   };
 
-  const rows = [];
-  for (let row = 0; row < totalRows; row++) {
-    const rowDots = [];
-    for (let col = 0; col < dotsPerRow; col++) {
-      const dotIndex = row * dotsPerRow + col;
-      if (dotIndex >= totalSteps) break;
+  const dots = Array.from({ length: totalSteps }, (_, dotIndex) => {
+    const isFilled = dotIndex < completedSteps;
+    const isPartial = dotIndex === completedSteps && partialPercent > 0;
+    const stepAmount = (dotIndex + 1) * stepSize;
 
-      const isFilled = dotIndex < completedSteps;
-      const isPartial = dotIndex === completedSteps && partialPercent > 0;
-      const stepAmount = (dotIndex + 1) * stepSize;
-
-      rowDots.push(
-        <CalendarDot
-          key={dotIndex}
-          filled={isFilled}
-          isPartial={isPartial}
-          partialPercent={partialPercent}
-          stepIndex={dotIndex}
-          stepAmount={stepAmount}
-          stepSize={stepSize}
-          onHover={handleDotHover}
-          onLeave={handleDotLeave}
-          onClick={handleDotClick}
-        />,
-      );
-    }
-
-    rows.push(
-      <div
-        key={row}
-        className="mb-3 flex w-full flex-wrap items-center justify-start gap-4 sm:mb-5 sm:gap-6"
-      >
-        {rowDots}
-      </div>,
+    return (
+      <CalendarDot
+        key={dotIndex}
+        filled={isFilled}
+        isPartial={isPartial}
+        partialPercent={partialPercent}
+        stepIndex={dotIndex}
+        stepAmount={stepAmount}
+        stepSize={stepSize}
+        onHover={handleDotHover}
+        onLeave={handleDotLeave}
+        onClick={handleDotClick}
+      />
     );
-  }
+  });
 
   return (
     <>
@@ -248,7 +234,14 @@ function InvestmentCalendar({
         <CardContent className="p-4 pt-12 sm:p-8">
           <div className="w-full">
             <div className="mb-4 flex flex-col items-center justify-center sm:mb-6">
-              <div className="inline-block">{rows}</div>
+              <div
+                className="grid w-full justify-items-center gap-2 sm:gap-3 md:gap-4"
+                style={{
+                  gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                }}
+              >
+                {dots}
+              </div>
             </div>
             {/* Unified Footer */}
             <div className="border-border space-y-3 border-t pt-3 sm:pt-4">

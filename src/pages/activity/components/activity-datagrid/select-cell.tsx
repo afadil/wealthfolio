@@ -33,6 +33,7 @@ interface SelectCellProps {
   isFocused?: boolean;
   renderValue?: (value: string) => React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SelectCell({
@@ -44,16 +45,18 @@ export function SelectCell({
   isFocused = false,
   renderValue,
   className,
+  disabled = false,
 }: SelectCellProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const cellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (disabled) return;
     if (isFocused && !open && cellRef.current) {
       cellRef.current.focus();
     }
-  }, [isFocused, open]);
+  }, [disabled, isFocused, open]);
 
   const handleSelect = (selectedOption: SelectOption) => {
     onChange(selectedOption.value);
@@ -111,6 +114,22 @@ export function SelectCell({
   const handleCellFocus = () => {
     onFocus?.();
   };
+
+  if (disabled) {
+    const selectedOption = options.find((option) => option.value === value);
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full cursor-not-allowed items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground",
+          className,
+        )}
+      >
+        <span className="flex-1">
+          {renderValue ? renderValue(value) : selectedOption?.label ?? value}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

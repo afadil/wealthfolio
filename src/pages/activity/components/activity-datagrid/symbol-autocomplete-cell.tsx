@@ -26,6 +26,7 @@ interface SymbolAutocompleteCellProps {
   onNavigate?: (direction: "up" | "down" | "left" | "right") => void;
   isFocused?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SymbolAutocompleteCell({
@@ -35,6 +36,7 @@ export function SymbolAutocompleteCell({
   onNavigate,
   isFocused = false,
   className,
+  disabled = false,
 }: SymbolAutocompleteCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,18 +58,20 @@ export function SymbolAutocompleteCell({
   }, [data]);
 
   useEffect(() => {
+    if (disabled) return;
     if (isFocused && !isEditing && cellRef.current) {
       cellRef.current.focus();
     }
-  }, [isFocused, isEditing]);
+  }, [disabled, isFocused, isEditing]);
 
   useEffect(() => {
+    if (disabled) return;
     if (isEditing) {
       requestAnimationFrame(() => {
         inputRef.current?.focus();
       });
     }
-  }, [isEditing]);
+  }, [disabled, isEditing]);
 
   const handleSelect = (symbol: string) => {
     onChange(symbol);
@@ -123,6 +127,19 @@ export function SymbolAutocompleteCell({
   const displayName = (option: QuoteSummary) => {
     return option.longName || option.shortName || option.symbol;
   };
+
+  if (disabled) {
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full cursor-not-allowed items-center px-2 py-1.5 text-xs text-muted-foreground",
+          className,
+        )}
+      >
+        {value || "TICKER"}
+      </div>
+    );
+  }
 
   return (
     <Popover open={isEditing} onOpenChange={handleOpenChange}>

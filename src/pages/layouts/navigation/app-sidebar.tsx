@@ -2,6 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@wealthfolio/ui";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { type NavLink, type NavigationProps, isPathActive } from "./app-navigation";
@@ -61,6 +67,10 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                 {navigation?.primary?.map((item) => (
                   <NavItem key={item.title} item={item} collapsed={collapsed} />
                 ))}
+
+                {navigation?.addons && navigation.addons.length > 0 && (
+                  <AddonsMenu addons={navigation.addons} collapsed={collapsed} />
+                )}
               </nav>
             </div>
 
@@ -134,5 +144,66 @@ function NavItem({ item, collapsed, className, ...props }: NavItemProps) {
         </span>
       </Link>
     </Button>
+  );
+}
+
+interface AddonsMenuProps {
+  addons: NavLink[];
+  collapsed: boolean;
+}
+
+function AddonsMenu({ addons, collapsed }: AddonsMenuProps) {
+  const location = useLocation();
+  const hasActiveAddon = addons.some((addon) => isPathActive(location.pathname, addon.href));
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant={hasActiveAddon ? "secondary" : "ghost"}
+          className={cn(
+            "text-foreground mb-1 h-12 rounded-md transition-all duration-300 [&_svg]:size-5!",
+            collapsed ? "justify-center" : "justify-start",
+          )}
+        >
+          <span aria-hidden="true">
+            <Icons.Addons className="h-5 w-5" />
+          </span>
+          <span
+            className={cn({
+              "ml-2 transition-opacity delay-100 duration-300 ease-in-out": true,
+              "sr-only opacity-0": collapsed,
+              "block opacity-100": !collapsed,
+            })}
+          >
+            Add-ons
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side={collapsed ? "right" : "bottom"} align="start" className="w-56">
+        {addons.map((addon) => {
+          const isActive = isPathActive(location.pathname, addon.href);
+          return (
+            <DropdownMenuItem key={addon.href} asChild>
+              <Link
+                to={addon.href}
+                className={cn(
+                  "flex h-12 w-full cursor-pointer items-center gap-3 px-3 py-3",
+                  isActive && "bg-secondary",
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-5 shrink-0 items-center justify-center"
+                >
+                  {addon.icon ?? <Icons.ArrowRight className="h-5 w-5" />}
+                </span>
+                <span className="text-sm font-medium">{addon.title}</span>
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -23,22 +23,41 @@ import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
 
 const periods = [
-  { value: "TOTAL" as const, label: "All Time" },
-  { value: "LAST_YEAR" as const, label: "Last Year" },
   { value: "YTD" as const, label: "Year to Date" },
+  { value: "LAST_YEAR" as const, label: "Last Year" },
+  { value: "TOTAL" as const, label: "All Time" },
+];
+
+const mobilePeriods = [
+  { value: "YTD" as const, label: "YTD" },
+  { value: "LAST_YEAR" as const, label: "Last Yr" },
+  { value: "TOTAL" as const, label: "All" },
 ];
 
 const IncomePeriodSelector: React.FC<{
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   onPeriodSelect: (period: "TOTAL" | "YTD" | "LAST_YEAR") => void;
 }> = ({ selectedPeriod, onPeriodSelect }) => (
-  <AnimatedToggleGroup
-    variant="secondary"
-    size="sm"
-    items={periods}
-    value={selectedPeriod}
-    onValueChange={onPeriodSelect}
-  />
+  <>
+    <div className="hidden sm:block">
+      <AnimatedToggleGroup
+        variant="secondary"
+        size="sm"
+        items={periods}
+        value={selectedPeriod}
+        onValueChange={onPeriodSelect}
+      />
+    </div>
+    <div className="block sm:hidden">
+      <AnimatedToggleGroup
+        variant="secondary"
+        size="xs"
+        items={mobilePeriods}
+        value={selectedPeriod}
+        onValueChange={onPeriodSelect}
+      />
+    </div>
+  </>
 );
 
 export default function IncomePage() {
@@ -69,7 +88,7 @@ export default function IncomePage() {
     return (
       <Page>
         <PageHeader
-          heading="Investment Income"
+          heading="Income"
           actions={
             <IncomePeriodSelector
               selectedPeriod={selectedPeriod}
@@ -153,7 +172,7 @@ export default function IncomePage() {
   return (
     <Page>
       <PageHeader
-        heading="Investment Income"
+        heading="Income"
         actions={
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}

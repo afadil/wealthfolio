@@ -1,3 +1,5 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,16 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/ui/icons";
-import { AlertFeedback } from "@wealthfolio/ui";
 import type {
   AddonManifest,
-  PermissionCategory,
   Permission,
+  PermissionCategory,
   RiskLevel,
 } from "@wealthfolio/addon-sdk";
+import { AlertFeedback } from "@wealthfolio/ui";
 import { PermissionCategoriesDisplay } from "./permission-categories-display";
 
 interface PermissionDialogProps {
@@ -74,17 +74,19 @@ export function PermissionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <Icons.Settings className="h-5 w-5" />
-            <div className="flex items-center gap-3">
-              <span>{manifest.name}</span>
-              <Badge variant="outline">v{manifest.version}</Badge>
-              {manifest.author && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <Icons.Users className="h-3 w-3" />
-                  <span>By {manifest.author}</span>
-                </Badge>
-              )}
+          <DialogTitle className="flex flex-col gap-3 md:flex-row md:items-center">
+            <Icons.Settings className="hidden h-5 w-5 md:block" />
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+              <span className="text-base md:text-lg">{manifest.name}</span>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">v{manifest.version}</Badge>
+                {manifest.author && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Icons.Users className="h-3 w-3" />
+                    <span>By {manifest.author}</span>
+                  </Badge>
+                )}
+              </div>
             </div>
           </DialogTitle>
           <DialogDescription className="space-y-2">
@@ -93,17 +95,12 @@ export function PermissionDialog({
                 <p className="text-muted-foreground text-sm">{manifest.description}</p>
               )}
             </div>
-            <div className="font-light">
-              {isViewOnly
-                ? "View the permissions and data access for this installed addon."
-                : "Review the permissions requested by this addon before installation."}
-            </div>
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 space-y-6 overflow-hidden">
           {/* Function Count Warning */}
-          <div className="space-y-3">
+          <div className="pt-8">
             <AlertFeedback variant={getWarningVariantByFunctionCount(totalFunctionCount)}>
               {totalFunctionCount <= 3 && "This addon has minimal access to your data."}
               {totalFunctionCount > 3 &&
@@ -116,10 +113,7 @@ export function PermissionDialog({
 
           {/* Data Access Permissions using shared component - Make scrollable */}
           <div className="flex-1 overflow-auto">
-            <PermissionCategoriesDisplay
-              permissions={permissionsToDisplay}
-              variant="no-risk-badges"
-            />
+            <PermissionCategoriesDisplay permissions={permissionsToDisplay} />
           </div>
         </div>
 

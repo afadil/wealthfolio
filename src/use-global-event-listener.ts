@@ -1,8 +1,8 @@
 // useGlobalEventListener.ts
 import { listenMarketSyncComplete } from "@/commands/portfolio-listener";
-import { toast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
+import { toast } from "sonner";
 
 import {
   listenMarketSyncStart,
@@ -12,42 +12,52 @@ import {
 } from "@/commands/portfolio-listener";
 import { logger } from "./adapters";
 
+const TOAST_IDS = {
+  marketSyncStart: "market-sync-start",
+  portfolioUpdateStart: "portfolio-update-start",
+  portfolioUpdateError: "portfolio-update-error",
+} as const;
+
 function handleMarketSyncStart() {
-  toast({
-    description: "Syncing market data...",
-    duration: 3000,
-    variant: "subtle",
-  });
+  // toast.loading("Syncing market data...", {
+  //   id: TOAST_IDS.marketSyncStart,
+  //   duration: 3000,
+  // });
 }
 
 function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, string][] } }) {
   const { failed_syncs } = event.payload || { failed_syncs: [] };
   if (failed_syncs && failed_syncs.length > 0) {
     const failedSymbols = failed_syncs.map(([symbol]) => symbol).join(", ");
-    toast({
-      title: "🔴 Market Data Update Incomplete",
+    toast.dismiss(TOAST_IDS.marketSyncStart);
+    toast.error("Market Data Update Incomplete", {
+      id: `market-sync-error-${failedSymbols || "unknown"}`,
       description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
       duration: 15000,
-      variant: "destructive",
+      cancel: {
+        label: "Dismiss",
+        onClick: () => {},
+      },
     });
+  } else {
+    toast.dismiss(TOAST_IDS.marketSyncStart);
   }
 }
 
 const handlePortfolioUpdateStart = () => {
-  toast({
-    description: "Calculating portfolio performance...",
+  toast.loading("Calculating portfolio performance...", {
+    id: TOAST_IDS.portfolioUpdateStart,
     duration: 2000,
-    variant: "subtle",
   });
 };
 
 const handlePortfolioUpdateError = (error: string) => {
-  toast({
-    title: "Portfolio Update Failed",
+  toast.dismiss(TOAST_IDS.portfolioUpdateStart);
+  toast.error("Portfolio Update Failed", {
+    id: TOAST_IDS.portfolioUpdateError,
     description:
-      "🔴 There was an error updating your portfolio. Please try again or contact support if the issue persists.",
+      "There was an error updating your portfolio. Please try again or contact support if the issue persists.",
     duration: 5000,
-    variant: "destructive",
   });
   logger.error("Portfolio Update Error: " + error);
 };
@@ -56,6 +66,7 @@ const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
 
   const handlePortfolioUpdateComplete = useCallback(() => {
+    toast.dismiss(TOAST_IDS.portfolioUpdateStart);
     queryClient.invalidateQueries();
   }, [queryClient]);
 
