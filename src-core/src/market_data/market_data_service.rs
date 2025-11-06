@@ -318,7 +318,7 @@ impl MarketDataServiceTrait for MarketDataService {
 
         for setting in provider_settings {
             let last_synced_naive: Option<NaiveDateTime> =
-                latest_sync_dates_by_source.get(&setting.id).and_then(|opt_dt| *opt_dt);
+            latest_sync_dates_by_source.get(&setting.id).and_then(|opt_dt| *opt_dt);
 
             let last_synced_utc: Option<DateTime<Utc>> =
                 last_synced_naive.map(|naive_dt| Utc.from_utc_datetime(&naive_dt));
@@ -370,16 +370,26 @@ impl MarketDataServiceTrait for MarketDataService {
         &self,
         quotes: Vec<QuoteImport>,
         overwrite: bool,
-    ) -> Result<Vec<QuoteImport>> {
+        ) -> Result<Vec<QuoteImport>> {
         debug!("🚀 SERVICE: import_quotes_from_csv called");
-        debug!("📊 Processing {} quotes, overwrite: {}", quotes.len(), overwrite);
+        debug!(
+            "📊 Processing {} quotes, overwrite: {}",
+            quotes.len(),
+            overwrite
+        );
 
         let mut results = Vec::new();
         let mut quotes_to_import = Vec::new();
 
         debug!("🔍 Starting quote validation and duplicate checking...");
         for (index, mut quote) in quotes.into_iter().enumerate() {
-            debug!("📋 Processing quote {}/{}: symbol={}, date={}", index + 1, results.len() + quotes_to_import.len() + 1, quote.symbol, quote.date);
+            debug!(
+            "📋 Processing quote {}/{}: symbol={}, date={}",
+                index + 1,
+            results.len() + quotes_to_import.len() + 1,
+        quote.symbol,
+        quote.date
+        );
 
             // Check if quote already exists
             let exists = self.repository.quote_exists(&quote.symbol, &quote.date)?;
@@ -438,9 +448,17 @@ impl MarketDataServiceTrait for MarketDataService {
         );
 
         if !quotes_for_db.is_empty() {
-            debug!("💾 Calling repository.bulk_upsert_quotes with {} quotes", quotes_for_db.len());
-            debug!("🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}",
-                   quotes_for_db[0].id, quotes_for_db[0].symbol, quotes_for_db[0].timestamp, quotes_for_db[0].data_source);
+            debug!(
+            "💾 Calling repository.bulk_upsert_quotes with {} quotes",
+            quotes_for_db.len()
+        );
+            debug!(
+            "🎯 Sample quote for DB: id={}, symbol={}, timestamp={}, data_source={:?}",
+        quotes_for_db[0].id,
+        quotes_for_db[0].symbol,
+            quotes_for_db[0].timestamp,
+            quotes_for_db[0].data_source
+        );
 
             match self.repository.bulk_upsert_quotes(quotes_for_db).await {
                 Ok(count) => {
@@ -616,7 +634,6 @@ impl MarketDataService {
 
             let sync_plan =
                 self.calculate_sync_plan(refetch_all, &symbols_with_currencies, end_date)?;
-
         if sync_plan.is_empty() {
             debug!("All tracked symbols are already up to date; nothing to fetch from providers.");
         } else {
@@ -670,7 +687,7 @@ impl MarketDataService {
                             .find(|req| req.symbol == symbol)
                             .map(|req| req.data_source.clone())
                             .unwrap_or(DataSource::Yahoo); // Fallback to Yahoo if not found
-                        
+
                         QuoteRequest {
                             symbol,
                             currency,

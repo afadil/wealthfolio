@@ -41,8 +41,9 @@ describe("convertToCSV", () => {
     const rows = csvOutput.split("\n");
 
     expect(rows[0]).toBe('"id","description","notes"');
-    // Values with quotes, commas, or newlines should be properly stringified
-    expect(rows[1]).toBe('1,"Item with \\"quotes\\"","Comma, and new\\nline"');
+    // Values with quotes, commas, or newlines should be properly escaped
+    expect(rows[1]).toBe('1,"Item with ""quotes""","Comma, and new');
+    expect(rows[2]).toBe('line"');
   });
 
   it('should use "symbol" as header when assetId is present along with other columns', () => {

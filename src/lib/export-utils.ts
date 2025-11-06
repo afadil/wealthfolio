@@ -19,14 +19,18 @@ export function convertToCSV<T extends Record<string, unknown>>(data: T[]): stri
     headers[assetIDIndex] = "symbol";
   }
   const dataRows = data.map((row) => Object.values(row).map(String));
-  const array = [headers].concat(dataRows);
-  return array
-    .map((row) => {
-      return row
-        .map((value) => {
-          return typeof value === "string" ? JSON.stringify(value) : value;
-        })
-        .toString();
-    })
-    .join("\n");
+  // Quote all headers for consistency
+  const headerRow = headers.map(header => `"${header}"`).join(",");
+  const dataRowsCsv = dataRows.map((row) => {
+    return row
+      .map((value) => {
+        // Quote strings with spaces or special characters, but not plain numbers
+        if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes(" ")) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      })
+      .join(",");
+  });
+  return [headerRow, ...dataRowsCsv].join("\n");
 }

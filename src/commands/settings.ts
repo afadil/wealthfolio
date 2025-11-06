@@ -11,9 +11,19 @@ export const getSettings = async (): Promise<Settings> => {
       default:
         throw new Error(`Unsupported`);
     }
-  } catch (_error) {
-    logger.error("Error fetching settings.");
-    return {} as Settings;
+  } catch (error) {
+    logger.error(`Error fetching settings: ${error instanceof Error ? error.message : String(error)}`);
+    // Return default settings instead of empty object
+    return {
+      theme: "dark",
+      font: "font-mono",
+      baseCurrency: "",
+      onboardingCompleted: false,
+      autoUpdateCheckEnabled: true,
+      menuBarVisible: true,
+      isPro: false,
+      syncEnabled: true,
+    };
   }
 };
 

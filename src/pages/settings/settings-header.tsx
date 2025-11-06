@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
 interface SettingsHeaderProps {
@@ -49,7 +49,7 @@ export function SettingsHeader({
             onClick={handleBack}
             className="ml-1 lg:hidden"
           >
-            <Icons.ArrowLeft className="h-4 w-4" />
+            <Icons.ArrowLeft className="size-6" />
           </Button>
         )}
         <div className="grid min-w-0 gap-1">

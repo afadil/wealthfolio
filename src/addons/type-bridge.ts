@@ -256,7 +256,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
 
-    logger: createAddonLogger(addonId ?? "unknown-addon"),
+    logger: createAddonLogger(addonId || "unknown-addon"),
 
     events: {
       import: {

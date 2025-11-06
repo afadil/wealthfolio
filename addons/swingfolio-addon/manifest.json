@@ -19,7 +19,7 @@
       "purpose": "Access portfolio holdings to calculate unrealized P/L for open positions"
     },
     {
-      "category": "currency",
+      "category": "exchangeRates",
       "functions": ["getAll"],
       "purpose": "Access to exchange rates and currency data"
     },

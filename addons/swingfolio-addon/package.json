@@ -43,6 +43,7 @@
     "@types/react": "^19.1.1",
     "@types/react-dom": "^19.1.1",
     "@vitejs/plugin-react": "^5.0.2",
+    "@wealthfolio/addon-dev-tools": "workspace:*",
     "rollup-plugin-external-globals": "^0.13.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",

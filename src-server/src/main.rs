@@ -1,13 +1,12 @@
 mod api;
 mod config;
 mod error;
-mod models;
 mod main_lib;
-mod addons;
+mod models;
 
 use api::app_router;
 use config::Config;
-use main_lib::{init_tracing, build_state};
+use main_lib::{build_state, init_tracing};
 use tower_http::services::ServeDir;
 
 #[tokio::main]

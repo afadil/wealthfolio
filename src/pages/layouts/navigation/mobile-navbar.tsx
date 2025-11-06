@@ -1,4 +1,4 @@
-import { LiquidGlass } from "@/components/navigation/liquid-glass";
+import { LiquidGlass } from "@/components/liquid-glass";
 import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, Icons } from "@wealthfolio/ui";

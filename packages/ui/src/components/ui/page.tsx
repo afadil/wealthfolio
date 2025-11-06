@@ -128,7 +128,7 @@ export function PageHeader({
     <div data-tauri-drag-region={dragRegion ? "true" : undefined} className="flex items-center gap-3">
       {headingPrefix && (
         <>
-          <h1 className="text-muted-foreground text-lg font-semibold md:text-xl lg:text-2xl">{headingPrefix}</h1>
+          <h1 className="text-muted-foreground text-lg font-semibold md:text-xl">{headingPrefix}</h1>
           <div className="bg-border h-5 w-px md:h-6" />
         </>
       )}
@@ -158,13 +158,13 @@ export function PageHeader({
         <div data-tauri-drag-region="true" className="pointer-events-auto absolute inset-x-0 top-0 h-6 opacity-0" />
       )}
 
-      <div className="px-4 py-3 md:px-6 md:py-4 lg:px-8">
+      <div className="p-4">
         <div className="mx-auto">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+            <div className="flex min-w-[200px] items-center gap-2 sm:min-w-0 sm:flex-1">
               {onBack && (
-                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 md:h-10 md:w-10" onClick={onBack}>
-                  <Icons.ArrowLeft className="h-6 w-6 md:h-7 md:w-7" />
+                <Button variant="secondary" size="icon" onClick={onBack}>
+                  <Icons.ArrowLeft className="size-6" />
                 </Button>
               )}
               {titleContent ?? children}
@@ -194,7 +194,7 @@ export function PageContent({
     <div
       data-ptr-content
       className={cn(
-        withPadding && "p-2 md:p-6 lg:p-8",
+        withPadding && "px-2 py-2 md:px-4 md:py-2",
         // In containerMode, the scroll container handles bottom padding for mobile nav
         // In standalone mode, add extra bottom padding on desktop
         !containerMode && "pb-safe md:pb-6 lg:pb-8",

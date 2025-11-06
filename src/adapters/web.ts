@@ -9,12 +9,18 @@ const COMMANDS: CommandMap = {
   delete_account: { method: "DELETE", path: "/accounts" },
   get_settings: { method: "GET", path: "/settings" },
   update_settings: { method: "PUT", path: "/settings" },
+  is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },
+  backup_database: { method: "POST", path: "/utilities/database/backup" },
+  backup_database_to_path: { method: "POST", path: "/utilities/database/backup-to-path" },
+  restore_database: { method: "POST", path: "/utilities/database/restore" },
   get_holdings: { method: "GET", path: "/holdings" },
+  get_holding: { method: "GET", path: "/holdings/item" },
   get_historical_valuations: { method: "GET", path: "/valuations/history" },
   get_latest_valuations: { method: "GET", path: "/valuations/latest" },
   update_portfolio: { method: "POST", path: "/portfolio/update" },
   recalculate_portfolio: { method: "POST", path: "/portfolio/recalculate" },
   // Performance
+  calculate_accounts_simple_performance: { method: "POST", path: "/performance/accounts/simple" },
   calculate_performance_history: { method: "POST", path: "/performance/history" },
   calculate_performance_summary: { method: "POST", path: "/performance/summary" },
   get_income_summary: { method: "GET", path: "/income/summary" },
@@ -60,6 +66,7 @@ const COMMANDS: CommandMap = {
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
   update_quote: { method: "PUT", path: "/market-data/quotes" },
   delete_quote: { method: "DELETE", path: "/market-data/quotes/id" },
+  synch_quotes: { method: "POST", path: "/market-data/sync/history" },
   sync_market_data: { method: "POST", path: "/market-data/sync" },
   // Secrets
   set_secret: { method: "POST", path: "/secrets" },
@@ -77,9 +84,20 @@ const COMMANDS: CommandMap = {
   fetch_addon_store_listings: { method: "GET", path: "/addons/store/listings" },
   submit_addon_rating: { method: "POST", path: "/addons/store/ratings" },
   get_addon_ratings: { method: "GET", path: "/addons/store/ratings" },
+  check_addon_update: { method: "POST", path: "/addons/store/check-update" },
+  check_all_addon_updates: { method: "POST", path: "/addons/store/check-all" },
+  update_addon_from_store_by_id: { method: "POST", path: "/addons/store/update" },
   download_addon_to_staging: { method: "POST", path: "/addons/store/staging/download" },
   install_addon_from_staging: { method: "POST", path: "/addons/store/install-from-staging" },
   clear_addon_staging: { method: "DELETE", path: "/addons/store/staging" },
+  // Sync (web mode returns not implemented stub)
+  get_sync_status: { method: "GET", path: "/sync/status" },
+  generate_pairing_payload: { method: "POST", path: "/sync/generate-pairing-payload" },
+  pair_and_sync: { method: "POST", path: "/sync/pair-and-sync" },
+  force_full_sync_with_peer: { method: "POST", path: "/sync/force-full" },
+  sync_now: { method: "POST", path: "/sync/sync-now" },
+  initialize_sync_for_existing_data: { method: "POST", path: "/sync/initialize-existing" },
+  probe_local_network_access: { method: "POST", path: "/sync/probe" },
 };
 
 export const invokeWeb = async <T>(
@@ -108,6 +126,16 @@ export const invokeWeb = async <T>(
       body = JSON.stringify(data.account);
       break;
     }
+    case "backup_database_to_path": {
+      const { backupDir } = payload as { backupDir: string };
+      body = JSON.stringify({ backupDir });
+      break;
+    }
+    case "restore_database": {
+      const { backupFilePath } = payload as { backupFilePath: string };
+      body = JSON.stringify({ backupFilePath });
+      break;
+    }
     case "update_settings": {
       const data = payload as { settingsUpdate: Record<string, unknown> };
       body = JSON.stringify(data.settingsUpdate);
@@ -116,6 +144,14 @@ export const invokeWeb = async <T>(
     case "get_holdings": {
       const p = payload as { accountId: string };
       url += `?accountId=${encodeURIComponent(p.accountId)}`;
+      break;
+    }
+    case "get_holding": {
+      const { accountId, assetId } = payload as { accountId: string; assetId: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      params.set("assetId", assetId);
+      url += `?${params.toString()}`;
       break;
     }
     case "get_historical_valuations": {
@@ -136,6 +172,11 @@ export const invokeWeb = async <T>(
       }
       const qs = params.toString();
       if (qs) url += `?${qs}`;
+      break;
+    }
+    case "calculate_accounts_simple_performance": {
+      const { accountIds } = (payload ?? {}) as { accountIds?: string[] };
+      body = JSON.stringify({ accountIds });
       break;
     }
     case "get_accounts":
@@ -197,6 +238,8 @@ export const invokeWeb = async <T>(
       url += `/${encodeURIComponent(rateId)}`;
       break;
     }
+    case "synch_quotes":
+      break;
     case "search_activities": {
       body = JSON.stringify(payload);
       break;
@@ -365,6 +408,14 @@ export const invokeWeb = async <T>(
       body = JSON.stringify({ zipDataB64 });
       break;
     }
+    case "check_addon_update":
+    case "update_addon_from_store_by_id": {
+      const { addonId } = payload as { addonId: string };
+      body = JSON.stringify({ addonId });
+      break;
+    }
+    case "check_all_addon_updates":
+      break;
     case "download_addon_to_staging": {
       const { addonId } = payload as { addonId: string };
       body = JSON.stringify({ addonId });
@@ -403,6 +454,26 @@ export const invokeWeb = async <T>(
       url += `?${params.toString()}`;
       break;
     }
+    case "pair_and_sync":
+    case "force_full_sync_with_peer": {
+      const { payload: syncPayload } = payload as { payload: string };
+      body = JSON.stringify({ payload: syncPayload });
+      break;
+    }
+    case "sync_now": {
+      const { payload: syncPayload } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify({ payload: syncPayload });
+      break;
+    }
+    case "probe_local_network_access": {
+      const { host, port } = payload as { host: string; port: number };
+      body = JSON.stringify({ host, port });
+      break;
+    }
+    case "generate_pairing_payload":
+    case "get_sync_status":
+    case "initialize_sync_for_existing_data":
+      break;
   }
 
   const res = await fetch(url, {
@@ -420,6 +491,17 @@ export const invokeWeb = async <T>(
       void 0;
     }
     throw new Error(msg);
+  }
+  if (command === "backup_database") {
+    const parsed = (await res.json()) as { filename: string; dataB64: string };
+    return {
+      filename: parsed.filename,
+      data: fromBase64(parsed.dataB64),
+    } as T;
+  }
+  if (command === "backup_database_to_path") {
+    const parsed = (await res.json()) as { path: string };
+    return parsed.path as T;
   }
   if (res.status === 204) {
     return undefined as T;
@@ -446,4 +528,13 @@ function toBase64(data: Uint8Array | number[]): string {
   }
   // btoa expects binary string
   return btoa(binary);
+}
+
+function fromBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }

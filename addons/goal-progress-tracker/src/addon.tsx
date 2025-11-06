@@ -1,5 +1,5 @@
 import { type AddonContext, type Goal } from "@wealthfolio/addon-sdk";
-import { Icons, EmptyPlaceholder, Button } from "@wealthfolio/ui";
+import { Icons, EmptyPlaceholder, Button, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import React, { useState, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { InvestmentCalendar, GoalSelector, HelpPopover } from "./components";
@@ -44,98 +44,96 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
     }
   }, [goals, selectedGoal]);
 
+  const headerDescription =
+    goals && goals.length > 0
+      ? selectedGoal
+        ? `Tracking progress for: ${selectedGoal.title}`
+        : "Select a goal to track your investment progress"
+      : "Track your investment progress towards your financial goals";
+
+  const headerActions =
+    !isLoading && goals && goals.length > 0 ? (
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <GoalSelector goals={goals} selectedGoal={selectedGoal} onGoalSelect={setSelectedGoal} />
+      </div>
+    ) : undefined;
+
+  const header = (
+    <PageHeader actions={headerActions}>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold sm:text-xl">Goal Progress Tracker</h1>
+          <HelpPopover />
+        </div>
+        <p className="text-muted-foreground text-sm sm:text-base">{headerDescription}</p>
+      </div>
+    </PageHeader>
+  );
+
   if (isLoading) {
     return (
-      <div className="bg-background flex h-full items-center justify-center p-6">
-        <div className="text-center">
-          <Icons.Loader className="text-primary mx-auto h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground mt-4 text-sm">Loading data...</p>
-        </div>
-      </div>
+      <Page>
+        {header}
+        <PageContent>
+          <div className="flex min-h-[40vh] items-center justify-center">
+            <div className="text-center">
+              <Icons.Loader className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
+              <p className="text-muted-foreground text-sm">Loading data...</p>
+            </div>
+          </div>
+        </PageContent>
+      </Page>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-background flex h-full items-center justify-center p-6">
-        <div className="text-destructive max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950">
-          <h3 className="mb-2 text-base font-semibold">Error Loading Data</h3>
-          <p className="text-sm">{error?.message}</p>
-        </div>
-      </div>
+      <Page>
+        {header}
+        <PageContent>
+          <div className="flex min-h-[40vh] items-center justify-center px-4">
+            <div className="text-destructive max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950">
+              <h3 className="mb-2 text-base font-semibold">Error Loading Data</h3>
+              <p className="text-sm">{error?.message}</p>
+            </div>
+          </div>
+        </PageContent>
+      </Page>
     );
   }
 
   // Show empty placeholder if no goals exist
   if (!goals || goals.length === 0) {
     return (
-      <div className="bg-background h-full">
-        {/* Header */}
-        <header className="border-border mb-4 w-full border-b p-3 pb-3 sm:mb-6 sm:p-6 sm:pb-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-foreground text-xl font-semibold sm:text-2xl">
-              Goal Progress Tracker
-            </h1>
-            <HelpPopover />
+      <Page>
+        {header}
+        <PageContent>
+          <div className="flex justify-center">
+            <div className="w-full max-w-lg">
+              <EmptyPlaceholder className="mt-16">
+                <EmptyPlaceholder.Icon name="Goals" />
+                <EmptyPlaceholder.Title>No Goals Found</EmptyPlaceholder.Title>
+                <EmptyPlaceholder.Description>
+                  You haven&apos;t created any investment goals yet. Create your first goal to start
+                  tracking your progress.
+                </EmptyPlaceholder.Description>
+                <Button onClick={() => ctx.api.navigation.navigate("/settings/goals")}>
+                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  Create Your First Goal
+                </Button>
+              </EmptyPlaceholder>
+            </div>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Track your investment progress towards your financial goals
-          </p>
-        </header>
-
-        {/* Empty State */}
-        <div className="flex justify-center px-3 sm:px-6">
-          <div className="w-full max-w-lg">
-            <EmptyPlaceholder className="mt-16">
-              <EmptyPlaceholder.Icon name="Goals" />
-              <EmptyPlaceholder.Title>No Goals Found</EmptyPlaceholder.Title>
-              <EmptyPlaceholder.Description>
-                You haven't created any investment goals yet. Create your first goal to start
-                tracking your progress.
-              </EmptyPlaceholder.Description>
-              <Button onClick={() => ctx.api.navigation.navigate("/settings/goals")}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                Create Your First Goal
-              </Button>
-            </EmptyPlaceholder>
-          </div>
-        </div>
-      </div>
+        </PageContent>
+      </Page>
     );
   }
 
   return (
-    <div className="bg-background flex h-full flex-col">
-      {/* Header - Full Width */}
-      <header className="border-border mb-4 w-full border-b p-3 pb-3 sm:mb-6 sm:p-6 sm:pb-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex-1">
-            <div className="mb-1 flex items-center gap-2">
-              <h1 className="text-foreground text-xl font-semibold sm:text-2xl">
-                Goal Progress Tracker
-              </h1>
-              <HelpPopover />
-            </div>
-            <p className="text-muted-foreground text-sm">
-              {selectedGoal
-                ? `Tracking progress for: ${selectedGoal.title}`
-                : "Select a goal to track your investment progress"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <GoalSelector
-              goals={goals}
-              selectedGoal={selectedGoal}
-              onGoalSelect={setSelectedGoal}
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* Calendar Content - Centered */}
-      <div className="flex justify-center px-3 sm:px-6">
-        <div className="w-full max-w-4xl">
+    <Page>
+      {header}
+      <PageContent>
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 sm:gap-6">
           <InvestmentCalendar
             currentAmount={currentAmount}
             targetAmount={targetAmount}
@@ -151,8 +149,8 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
             isBalanceHidden={isBalanceHidden}
           />
         </div>
-      </div>
-    </div>
+      </PageContent>
+    </Page>
   );
 }
 

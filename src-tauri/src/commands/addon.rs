@@ -4,8 +4,15 @@ use tauri::Manager;
 use tauri::{AppHandle, State};
 
 // Import addon modules
-use crate::addons::*;
 use crate::context::ServiceContext;
+use wealthfolio_core::addons::{
+    self,
+    AddonManifest,
+    AddonUpdateCheckResult,
+    AddonUpdateInfo,
+    ExtractedAddon,
+    InstalledAddon,
+};
 
 #[tauri::command]
 pub async fn install_addon_zip(
@@ -21,11 +28,11 @@ pub async fn install_addon_zip(
         .ok_or("Failed to convert app data dir path to string")?
         .to_string();
 
-    let extracted = extract_addon_zip_internal(zip_data)?;
+    let extracted = addons::extract_addon_zip_internal(zip_data)?;
     let addon_id = extracted.metadata.id.clone();
 
     // Create addon directory
-    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
+    let addon_dir = addons::get_addon_path(&app_data_dir, &addon_id)?;
     if addon_dir.exists() {
         fs::remove_dir_all(&addon_dir)
             .map_err(|e| format!("Failed to remove existing addon directory: {}", e))?;
@@ -68,7 +75,7 @@ pub async fn list_installed_addons(app_handle: AppHandle) -> Result<Vec<Installe
         .ok_or("Failed to convert app data dir path to string")?
         .to_string();
 
-    let addons_dir = ensure_addons_directory(&app_data_dir)?;
+    let addons_dir = addons::ensure_addons_directory(&app_data_dir)?;
     let mut installed_addons = Vec::new();
 
     if !addons_dir.exists() {
@@ -140,7 +147,7 @@ pub async fn toggle_addon(
         .ok_or("Failed to convert app data dir path to string")?
         .to_string();
 
-    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
+    let addon_dir = addons::get_addon_path(&app_data_dir, &addon_id)?;
     let manifest_path = addon_dir.join("manifest.json");
 
     if !manifest_path.exists() {
@@ -175,7 +182,7 @@ pub async fn uninstall_addon(app_handle: AppHandle, addon_id: String) -> Result<
         .ok_or("Failed to convert app data dir path to string")?
         .to_string();
 
-    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
+    let addon_dir = addons::get_addon_path(&app_data_dir, &addon_id)?;
 
     if !addon_dir.exists() {
         return Err("Addon not found".to_string());
@@ -200,7 +207,7 @@ pub async fn load_addon_for_runtime(
         .ok_or("Failed to convert app data dir path to string")?
         .to_string();
 
-    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
+    let addon_dir = addons::get_addon_path(&app_data_dir, &addon_id)?;
     let manifest_path = addon_dir.join("manifest.json");
 
     if !manifest_path.exists() {
@@ -219,7 +226,7 @@ pub async fn load_addon_for_runtime(
 
     // Read addon files recursively
     let mut files = Vec::new();
-    read_addon_files_recursive(&addon_dir, &addon_dir, &mut files)?;
+    addons::read_addon_files_recursive(&addon_dir, &addon_dir, &mut files)?;
 
     // Set the is_main flag based on metadata.main
     let main_file = metadata.get_main()?;
@@ -278,7 +285,7 @@ pub async fn extract_addon_zip(
     _app_handle: AppHandle,
     zip_data: Vec<u8>,
 ) -> Result<ExtractedAddon, String> {
-    extract_addon_zip_internal(zip_data)
+    addons::extract_addon_zip_internal(zip_data)
 }
 
 /// Check for updates for a specific addon from the addon store
@@ -290,7 +297,7 @@ pub async fn check_addon_update(
 ) -> Result<AddonUpdateCheckResult, String> {
     let instance_id = state.instance_id.as_str();
     // Check for updates from addon store
-    match check_addon_update_from_api(&addon_id, &current_version, Some(instance_id)).await {
+    match addons::check_addon_update_from_api(&addon_id, &current_version, Some(instance_id)).await {
         Ok(update_check_result) => {
             // The API already provides the complete result, just return it
             Ok(update_check_result)
@@ -332,7 +339,7 @@ pub async fn check_all_addon_updates(
     let instance_id = state.instance_id.as_str();
 
     for addon in installed_addons {
-        match check_addon_update_from_api(
+        match addons::check_addon_update_from_api(
             &addon.metadata.id,
             &addon.metadata.version,
             Some(instance_id),
@@ -380,7 +387,7 @@ pub async fn update_addon_from_store_by_id(
     let instance_id = state.instance_id.as_str();
 
     // Download the addon package using the new download API
-    let zip_data = download_addon_from_store(&addon_id, instance_id)
+    let zip_data = addons::download_addon_from_store(&addon_id, instance_id)
         .await
         .map_err(|e| format!("Failed to download addon: {}", e))?;
 
@@ -393,7 +400,7 @@ pub async fn update_addon_from_store_by_id(
         .ok_or("Failed to convert app data dir path to string")?
         .to_string();
 
-    let addon_dir = get_addon_path(&app_data_dir, &addon_id)?;
+    let addon_dir = addons::get_addon_path(&app_data_dir, &addon_id)?;
     let was_enabled =
         if let Ok(manifest_content) = fs::read_to_string(addon_dir.join("manifest.json")) {
             if let Ok(metadata) = serde_json::from_str::<AddonManifest>(&manifest_content) {
@@ -420,7 +427,7 @@ pub async fn fetch_addon_store_listings(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let instance_id = state.instance_id.as_str();
-    crate::addons::service::fetch_addon_store_listings(Some(instance_id)).await
+    addons::fetch_addon_store_listings(Some(instance_id)).await
 }
 
 /// Download addon to staging directory for permission review
@@ -441,20 +448,20 @@ pub async fn download_addon_to_staging(
     let instance_id = state.instance_id.as_str();
 
     // Download addon data
-    let zip_data = download_addon_from_store(&addon_id, instance_id)
+    let zip_data = addons::download_addon_from_store(&addon_id, instance_id)
         .await
         .map_err(|e| {
             // Clean up any partial staging on download failure
-            let _ = remove_addon_from_staging(&addon_id, &app_data_dir);
+            let _ = addons::remove_addon_from_staging(&addon_id, &app_data_dir);
             format!("Failed to download addon: {}", e)
         })?;
 
     // Save to staging directory with validation
-    let _staged_path = save_addon_to_staging(&addon_id, &app_data_dir, &zip_data)
+    let _staged_path = addons::save_addon_to_staging(&addon_id, &app_data_dir, &zip_data)
         .map_err(|e| format!("Failed to stage addon: {}", e))?;
 
     // Extract and analyze permissions
-    extract_addon_zip_internal(zip_data)
+    addons::extract_addon_zip_internal(zip_data)
 }
 
 /// Install addon from staging directory after permission approval
@@ -473,13 +480,13 @@ pub async fn install_addon_from_staging(
         .to_string();
 
     // Load addon from staging
-    let zip_data = load_addon_from_staging(&addon_id, &app_data_dir)?;
+    let zip_data = addons::load_addon_from_staging(&addon_id, &app_data_dir)?;
 
     // Install the addon
     let result = install_addon_zip(app_handle, zip_data, enable_after_install).await;
 
     // Clean up staging regardless of install success/failure
-    let _ = remove_addon_from_staging(&addon_id, &app_data_dir);
+    let _ = addons::remove_addon_from_staging(&addon_id, &app_data_dir);
 
     result
 }
@@ -499,8 +506,8 @@ pub async fn clear_addon_staging(
         .to_string();
 
     match addon_id {
-        Some(id) => remove_addon_from_staging(&id, &app_data_dir),
-        None => clear_staging_directory(&app_data_dir),
+        Some(id) => addons::remove_addon_from_staging(&id, &app_data_dir),
+        None => addons::clear_staging_directory(&app_data_dir),
     }
 }
 
@@ -513,5 +520,5 @@ pub async fn submit_addon_rating(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<serde_json::Value, String> {
     let instance_id = state.instance_id.as_str();
-    crate::addons::service::submit_addon_rating(&addon_id, rating, review, instance_id).await
+    addons::submit_addon_rating(&addon_id, rating, review, instance_id).await
 }

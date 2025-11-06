@@ -1,23 +1,23 @@
+import type { AddonStoreListing } from "@/lib/types";
 import {
-  Button,
   Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Icons,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  Icons,
   StarRatingDisplay,
 } from "@wealthfolio/ui";
-import { RatingDialog } from "./rating-dialog";
-import type { AddonStoreListing } from "@/lib/types";
 import React from "react";
+import { RatingDialog } from "./rating-dialog";
 
 interface AddonStoreCardProps {
   listing: AddonStoreListing;
@@ -51,9 +51,9 @@ export function AddonStoreCard({
 
   return (
     <Card className="group hover:shadow-primary/10 relative h-full overflow-hidden transition-all duration-200 hover:shadow-lg">
-      <CardHeader className="pb-2">
-        <CardTitle className="line-clamp-1 text-base">{listing.name}</CardTitle>
-        <CardDescription className="line-clamp-2 text-sm">{listing.description}</CardDescription>
+      <CardHeader className="pt-8 pb-2">
+        <CardTitle className="line-clamp-1 text-sm">{listing.name}</CardTitle>
+        <CardDescription className="line-clamp-2 text-xs">{listing.description}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-3">
@@ -81,10 +81,202 @@ export function AddonStoreCard({
             className="mt-1"
           />
         )}
+
+        {/* Mobile Action Buttons - Always visible on mobile, hidden on desktop */}
+        <div className="flex gap-2 pt-2 sm:hidden">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="flex-1">
+                <Icons.Eye className="mr-2 h-4 w-4" />
+                Details
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {listing.name}
+                  <Badge variant="outline">v{listing.version}</Badge>
+                </DialogTitle>
+                <DialogDescription className="text-base">{listing.description}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                {/* Screenshots */}
+                {listing.images && listing.images.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Screenshots</h4>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {listing.images.map((image, index) => (
+                        <div key={index} className="overflow-hidden rounded-lg border">
+                          <img
+                            src={image}
+                            alt={`${listing.name} screenshot ${index + 1}`}
+                            className="h-48 w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Release Notes */}
+                <div className="space-y-3">
+                  <h4 className="font-medium">Latest Release Notes</h4>
+                  <p className="text-muted-foreground text-sm">{listing.releaseNotes}</p>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Downloads</p>
+                    <p className="text-primary text-2xl font-bold">
+                      {formatDownloads(listing.downloads)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Rating</p>
+                    <div className="flex flex-col gap-1">
+                      <StarRatingDisplay
+                        rating={listing.rating || 0}
+                        reviewCount={listing.reviewCount || 0}
+                        size="sm"
+                        showText={true}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Author</p>
+                    <p className="text-muted-foreground text-sm">{listing.author}</p>
+                  </div>
+                </div>
+
+                {/* Rate this addon section */}
+                {isInstalled && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Rate this Add-on</h4>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRatingDialogOpen(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <Icons.Star className="h-4 w-4" />
+                        Write a Review
+                      </Button>
+                      <p className="text-muted-foreground text-sm">
+                        Share your experience with other users
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tags */}
+                {listing.tags && listing.tags.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Categories</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {listing.tags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className={`capitalize ${onTagClick ? "hover:bg-primary hover:text-primary-foreground cursor-pointer" : ""}`}
+                          onClick={() => onTagClick?.(tag)}
+                        >
+                          <Icons.Tag className="mr-1 h-3 w-3" />
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => onInstall?.(listing)}
+                    disabled={isInstalled || isInstalling}
+                    className="flex-1"
+                  >
+                    {isInstalling ? (
+                      <>
+                        <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                        Installing...
+                      </>
+                    ) : isInstalled ? (
+                      <>
+                        <Icons.Check className="mr-2 h-4 w-4" />
+                        Installed
+                      </>
+                    ) : (
+                      <>
+                        <Icons.Download className="mr-2 h-4 w-4" />
+                        Install
+                      </>
+                    )}
+                  </Button>
+
+                  {listing.changelogUrl && (
+                    <Button variant="outline" asChild>
+                      <a href={listing.changelogUrl} target="_blank" rel="noopener noreferrer">
+                        <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                        Changelog
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {!isInstalled ? (
+            <Button
+              onClick={() => onInstall?.(listing)}
+              disabled={isInstalling || listing.status !== "active"}
+              size="sm"
+              className="flex-1"
+            >
+              {isInstalling ? (
+                <>
+                  <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Installing...
+                </>
+              ) : listing.status !== "active" ? (
+                listing.status === "coming-soon" ? (
+                  <>
+                    <Icons.Clock className="mr-2 h-4 w-4" />
+                    Coming Soon
+                  </>
+                ) : (
+                  <>
+                    <Icons.Close className="mr-2 h-4 w-4" />
+                    {listing.status === "deprecated" ? "Deprecated" : "Unavailable"}
+                  </>
+                )
+              ) : (
+                <>
+                  <Icons.Download className="mr-2 h-4 w-4" />
+                  Install
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => setRatingDialogOpen(true)}
+            >
+              <Icons.Star className="mr-2 h-4 w-4" />
+              Rate
+            </Button>
+          )}
+        </div>
       </CardContent>
 
-      {/* Overlay Actions - Show on Hover */}
-      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+      {/* Desktop Overlay Actions - Show on Hover (hidden on mobile) */}
+      <div className="absolute inset-0 hidden items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:flex">
         {/* View Details Button */}
         <Dialog>
           <DialogTrigger asChild>

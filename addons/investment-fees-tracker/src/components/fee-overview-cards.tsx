@@ -1,5 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
-import { AmountDisplay, GainPercent, Icons } from "@wealthfolio/ui";
+import {
+  AmountDisplay,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  GainPercent,
+  Icons,
+} from "@wealthfolio/ui";
 import type { FeeAnalytics, FeeSummary } from "../lib/fee-calculation.service";
 import { FeeCategoriesWidget } from "./fee-categories-widget";
 
@@ -18,7 +25,7 @@ export function FeeOverviewCards({
   const { averageFeePerTransaction, feeAsPercentageOfPortfolio, feeImpactAnalysis } = feeAnalytics;
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
+    <>
       {/* Fee Analytics Card 1 - Total Fees & Efficiency */}
       <Card className="border-destructive/10 bg-destructive/10">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -132,6 +139,6 @@ export function FeeOverviewCards({
         currency={currency}
         isBalanceHidden={isBalanceHidden}
       />
-    </div>
+    </>
   );
 }

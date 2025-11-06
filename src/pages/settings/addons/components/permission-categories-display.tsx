@@ -1,7 +1,7 @@
+import type { FunctionPermission, Permission } from "@/adapters/tauri";
 import { Badge } from "@/components/ui/badge";
-import type { Permission, FunctionPermission } from "@/adapters/tauri";
-import { getPermissionCategory } from "@wealthfolio/addon-sdk";
 import { getFunctionDisplayName } from "@/pages/settings/addons/components/addon-function-names";
+import { getPermissionCategory } from "@wealthfolio/addon-sdk";
 
 interface PermissionForDisplay {
   category: string;
@@ -14,7 +14,6 @@ interface PermissionForDisplay {
 
 interface PermissionCategoriesDisplayProps {
   permissions: Permission[];
-  variant?: "default" | "compact" | "no-risk-badges";
 }
 
 // Helper to convert SDK Permission to display format
@@ -23,25 +22,12 @@ const convertToDisplayPermission = (permission: Permission): PermissionForDispla
   return {
     category: permission.category,
     name:
-      category?.name || permission.category.charAt(0).toUpperCase() + permission.category.slice(1),
-    description: category?.description || permission.purpose,
-    riskLevel: category?.riskLevel || "medium",
+      category?.name ?? permission.category.charAt(0).toUpperCase() + permission.category.slice(1),
+    description: category?.description ?? permission.purpose,
+    riskLevel: category?.riskLevel ?? "medium",
     functions: permission.functions,
     purpose: permission.purpose,
   };
-};
-
-const getRiskBadgeColor = (riskLevel: string) => {
-  switch (riskLevel) {
-    case "low":
-      return "border-success/20 text-success bg-success/10";
-    case "medium":
-      return "border-warning/20 text-warning bg-warning/10";
-    case "high":
-      return "border-destructive/20 text-destructive bg-destructive/10";
-    default:
-      return "border-gray-200 text-gray-600";
-  }
 };
 
 const getFunctionBadgeVariant = (func: FunctionPermission) => {
@@ -53,20 +39,10 @@ const getFunctionBadgeVariant = (func: FunctionPermission) => {
   return "outline"; // Fallback (declared but not detected)
 };
 
-export function PermissionCategoriesDisplay({
-  permissions,
-  variant = "default",
-}: PermissionCategoriesDisplayProps) {
-  const isCompact = variant === "compact";
-  const showRiskBadges = variant !== "no-risk-badges";
-
+export function PermissionCategoriesDisplay({ permissions }: PermissionCategoriesDisplayProps) {
   if (permissions.length === 0) {
     return (
-      <div
-        className={`text-muted-foreground bg-muted/30 rounded-lg p-3 ${
-          isCompact ? "p-2 text-sm" : "text-sm"
-        }`}
-      >
+      <div className="text-muted-foreground bg-muted/30 rounded-lg p-3 text-sm">
         No data access permissions detected. This addon appears to have minimal system access.
       </div>
     );
@@ -78,41 +54,29 @@ export function PermissionCategoriesDisplay({
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        <h4 className={`font-medium ${isCompact ? "text-sm" : ""}`}>Permissions</h4>
+        <h4 className="font-medium">Permissions</h4>
         <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
           {displayPermissions.map((permission) => (
             <div
               key={permission.category}
-              className={`bg-muted/30 flex items-start gap-3 rounded-lg p-3 ${
-                isCompact ? "p-2" : ""
-              }`}
+              className="bg-muted/30 flex items-start gap-3 rounded-lg p-3"
             >
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className={`font-medium ${isCompact ? "text-sm" : "text-sm"}`}>
-                    {permission.name}
-                  </span>
-                  {showRiskBadges && (
-                    <Badge variant="outline" className={getRiskBadgeColor(permission.riskLevel)}>
-                      {permission.riskLevel}
-                    </Badge>
-                  )}
+                  <span className="text-sm font-medium">{permission.name}</span>
                 </div>
-                <p className={`text-muted-foreground ${isCompact ? "text-xs" : "text-xs"}`}>
-                  {permission.description}
-                </p>
+                <p className="text-muted-foreground text-xs">{permission.description}</p>
                 {permission.functions.length > 0 && (
                   <div className="mt-2 space-y-2">
-                    <p className="text-muted-foreground text-xs font-medium">Functions:</p>
                     <div className="flex flex-wrap gap-1">
                       {permission.functions.map((func: FunctionPermission) => (
                         <Badge
                           key={func.name}
                           variant={getFunctionBadgeVariant(func)}
-                          className={isCompact ? "text-xs" : "text-xs"}
+                          className="text-xs font-light"
                           title={func.name} // Show technical name on hover
                         >
-                          {getFunctionDisplayName(permission.category, func.name)}
+                          {getFunctionDisplayName(permission.category, func.name)} ?? func.name
                         </Badge>
                       ))}
                     </div>

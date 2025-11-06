@@ -1,7 +1,7 @@
-use wealthfolio_server::{config::Config, api::app_router, build_state};
 use axum::{body::Body, http::Request};
-use tower::ServiceExt;
 use tempfile::tempdir;
+use tower::ServiceExt;
+use wealthfolio_server::{api::app_router, build_state, config::Config};
 
 #[tokio::test]
 async fn healthz_works() {
@@ -12,7 +12,12 @@ async fn healthz_works() {
     let app = app_router(state, &config);
 
     let response = app
-        .oneshot(Request::builder().uri("/api/v1/healthz").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/healthz")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), 200);

@@ -1,9 +1,15 @@
-import { Button } from "@wealthfolio/ui";
+import { AnimatedToggleGroup } from "@wealthfolio/ui";
 
-const periods: { code: "TOTAL" | "YTD" | "LAST_YEAR"; label: string }[] = [
-  { code: "TOTAL", label: "All Time" },
-  { code: "LAST_YEAR", label: "Last Year" },
-  { code: "YTD", label: "Year to Date" },
+const periods = [
+  { value: "YTD" as const, label: "Year to Date" },
+  { value: "LAST_YEAR" as const, label: "Last Year" },
+  { value: "TOTAL" as const, label: "All Time" },
+];
+
+const mobilePeriods = [
+  { value: "YTD" as const, label: "YTD" },
+  { value: "LAST_YEAR" as const, label: "Last Yr" },
+  { value: "TOTAL" as const, label: "All" },
 ];
 
 interface FeePeriodSelectorProps {
@@ -13,20 +19,27 @@ interface FeePeriodSelectorProps {
 
 export function FeePeriodSelector({ selectedPeriod, onPeriodSelect }: FeePeriodSelectorProps) {
   return (
-    <div className="flex justify-end">
-      <div className="bg-secondary flex space-x-1 rounded-full p-1">
-        {periods.map(({ code, label }) => (
-          <Button
-            key={code}
-            size="sm"
-            className="h-8 rounded-full px-2 text-xs"
-            variant={selectedPeriod === code ? "default" : "ghost"}
-            onClick={() => onPeriodSelect(code)}
-          >
-            {label}
-          </Button>
-        ))}
+    <>
+      <div className="hidden sm:block">
+        <AnimatedToggleGroup
+          items={periods}
+          value={selectedPeriod}
+          onValueChange={onPeriodSelect}
+          variant="secondary"
+          size="sm"
+          rounded="full"
+        />
       </div>
-    </div>
+      <div className="block sm:hidden">
+        <AnimatedToggleGroup
+          items={mobilePeriods}
+          value={selectedPeriod}
+          onValueChange={onPeriodSelect}
+          variant="secondary"
+          size="xs"
+          rounded="full"
+        />
+      </div>
+    </>
   );
 }

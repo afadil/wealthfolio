@@ -372,6 +372,14 @@ mod tests {
         async fn delete_activity(&self, _activity_id: String) -> AppResult<Activity> {
             unimplemented!()
         }
+        async fn bulk_mutate_activities(
+            &self,
+            _creates: Vec<NewActivity>,
+            _updates: Vec<ActivityUpdate>,
+            _delete_ids: Vec<String>,
+        ) -> AppResult<crate::activities::ActivityBulkMutationResult> {
+            unimplemented!()
+        }
         async fn create_activities(&self, _activities: Vec<NewActivity>) -> AppResult<usize> {
             unimplemented!()
         }
@@ -473,6 +481,14 @@ mod tests {
             unimplemented!()
         }
         async fn delete_activity(&self, _id: String) -> AppResult<Activity> {
+            unimplemented!()
+        }
+        async fn bulk_mutate_activities(
+            &self,
+            _creates: Vec<NewActivity>,
+            _updates: Vec<ActivityUpdate>,
+            _delete_ids: Vec<String>,
+        ) -> AppResult<crate::activities::ActivityBulkMutationResult> {
             unimplemented!()
         }
         async fn create_activities(&self, _a: Vec<NewActivity>) -> AppResult<usize> {

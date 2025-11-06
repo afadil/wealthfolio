@@ -1,4 +1,5 @@
 import type { ActivityDetails } from "@wealthfolio/addon-sdk";
+import { differenceInMonths } from "date-fns";
 
 export interface FeeSummary {
   period: "TOTAL" | "YTD" | "LAST_YEAR";
@@ -431,9 +432,28 @@ export function calculateFeeAnalytics({
     estimatedAnnualFees = periodFees; // Last year is a full year
   } else {
     // For TOTAL, estimate based on average annual fees
-    const firstActivity = activities.length > 0 ? new Date(activities[0].date) : now;
-    const yearsElapsed = (now.getTime() - firstActivity.getTime()) / (1000 * 60 * 60 * 24 * 365);
-    estimatedAnnualFees = yearsElapsed > 0 ? periodFees / yearsElapsed : 0;
+    const relevantActivities = feeActivities.length > 0 ? feeActivities : filteredActivities;
+
+    if (relevantActivities.length > 0) {
+      const { earliest, latest } = relevantActivities.reduce(
+        (acc, activity) => {
+          const activityDate = new Date(activity.date);
+          if (activityDate < acc.earliest) {
+            acc.earliest = activityDate;
+          }
+          if (activityDate > acc.latest) {
+            acc.latest = activityDate;
+          }
+          return acc;
+        },
+        { earliest: new Date(relevantActivities[0].date), latest: new Date(relevantActivities[0].date) },
+      );
+
+      const monthsElapsed = Math.max(1, differenceInMonths(latest, earliest) + 1);
+      estimatedAnnualFees = (periodFees / monthsElapsed) * 12;
+    } else {
+      estimatedAnnualFees = 0;
+    }
   }
 
   // Assume 7% average market return for potential return loss calculation
