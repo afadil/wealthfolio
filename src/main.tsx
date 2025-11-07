@@ -6,6 +6,8 @@ import "./addons/addons-runtime-context";
 import App from "./App";
 import { installLockdown } from "./lockdown";
 import "./styles.css";
+import "./lib/i18n";
+import "./lib/i18n-types";
 
 // Initialize development mode only in development
 if (import.meta.env.DEV) {

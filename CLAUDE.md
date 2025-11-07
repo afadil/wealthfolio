@@ -196,6 +196,42 @@ Wealthfolio features a comprehensive addon system allowing developers to extend 
 
 All trading activities (buy, sell, dividend, etc.) are documented in `docs/activities/activity-types.md` with required fields.
 
+### Internationalization (i18n)
+
+The application uses react-i18next for multilanguage support:
+
+**Setup**:
+- Configuration: `src/lib/i18n.ts`
+- Type definitions: `src/lib/i18n-types.ts` (for TypeScript autocomplete)
+- Translations: `src/locales/{lang}/*.json` (organized by namespace)
+- Supported languages: English (en), French (fr)
+
+**Usage in Components**:
+```typescript
+import { useTranslation } from "react-i18next";
+
+function MyComponent() {
+  const { t } = useTranslation("namespace"); // e.g., "common", "settings", "dashboard"
+  return <div>{t("translation_key")}</div>;
+}
+```
+
+**Translation Namespaces**:
+- `common` - Common UI elements (buttons, labels, etc.)
+- `settings` - Settings page translations
+- `dashboard` - Dashboard-specific translations
+
+**Adding New Translations**:
+1. Add keys to English JSON files in `src/locales/en/`
+2. Add corresponding translations to other languages
+3. Import new namespace in `src/lib/i18n.ts` if creating new file
+4. Use `useTranslation("namespace")` hook in components
+
+**Language Switching**:
+- User can change language in Settings > General > Language
+- Selection persisted in localStorage
+- Entire app updates immediately on language change
+
 ## Common Development Patterns
 
 ### Adding a New Feature
