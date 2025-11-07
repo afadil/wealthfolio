@@ -49,6 +49,9 @@ easy-to-use tool to track their investments and goals.
       your own API keys (OpenAI, Anthropic, etc)
 - [ ] Let you track liabilities and debts
 - [ ] Let you track more assets like houses, gold, and cars
+- [ ] LANG-001: Multilanguage support infrastructure (i18n functions and
+      directory structure)
+- [ ] LANG-002: French translation
 
 ### Step 3: Smart Tools (6-12 months)
 
