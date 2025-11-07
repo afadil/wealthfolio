@@ -76,7 +76,7 @@ export function PermissionCategoriesDisplay({ permissions }: PermissionCategorie
                           className="text-xs font-light"
                           title={func.name} // Show technical name on hover
                         >
-                          {getFunctionDisplayName(permission.category, func.name)} ?? func.name
+                          {getFunctionDisplayName(permission.category, func.name)}
                         </Badge>
                       ))}
                     </div>
