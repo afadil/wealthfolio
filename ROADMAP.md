@@ -47,8 +47,9 @@ easy-to-use tool to track their investments and goals.
 - [ ] Add Addons system to extend the app with custom features
 - [ ] Add AI Chat addon with local first LLM(Ollama, LmStudio, etc) or Bring
       your own API keys (OpenAI, Anthropic, etc)
-- [ ] Let you track liabilities and debts
-- [ ] Let you track more assets like houses, gold, and cars
+- [ ] Real estate tracking (properties, mortgages, valuations, rental income)
+- [ ] Loan and liability tracking (mortgages, personal loans, credit cards, debts)
+- [ ] Alternative assets tracking (gold, collectibles, cryptocurrencies, vehicles)
 - [x] LANG-001: Multilanguage support infrastructure (i18n functions and
       directory structure)
 - [x] LANG-002: French translation
