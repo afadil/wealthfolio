@@ -227,10 +227,13 @@ function MyComponent() {
 3. Import new namespace in `src/lib/i18n.ts` if creating new file
 4. Use `useTranslation("namespace")` hook in components
 
-**Language Switching**:
-- User can change language in Settings > General > Language
-- Selection persisted in localStorage
+**Language Detection & Switching**:
+- **First-time users**: Automatically detects OS/browser language (e.g., `fr-FR` → `fr`)
+- **Returning users**: Uses previously selected language from localStorage
+- **Manual switching**: User can change language in Settings > General > Language
+- Selection persisted in localStorage (`i18nextLng` key)
 - Entire app updates immediately on language change
+- Falls back to English if OS language not supported
 
 ## Common Development Patterns
 

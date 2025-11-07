@@ -35,6 +35,9 @@ i18n
     resources,
     defaultNS,
     fallbackLng: "en",
+    supportedLngs: ["en", "fr"],
+    // Enable language detection that works with regional codes (e.g., en-US -> en)
+    load: "languageOnly",
     debug: import.meta.env.DEV,
 
     interpolation: {
@@ -42,6 +45,7 @@ i18n
     },
 
     detection: {
+      // Order: user preference (localStorage), then OS/browser language (navigator)
       order: ["localStorage", "navigator"],
       caches: ["localStorage"],
       lookupLocalStorage: "i18nextLng",
