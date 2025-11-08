@@ -1,0 +1,64 @@
+{
+  "goals": "Objectifs",
+  "add_goal": "Ajouter un objectif",
+  "edit_goal": "Modifier l'objectif",
+  "delete_goal": "Supprimer l'objectif",
+  "goal_details": "Détails de l'objectif",
+
+  "goal_name": "Nom de l'objectif",
+  "goal_name_placeholder": "Entrez le nom de l'objectif",
+  "target_amount": "Montant cible",
+  "current_amount": "Montant actuel",
+  "target_date": "Date cible",
+  "start_date": "Date de début",
+
+  "goal_type": "Type d'objectif",
+  "type_retirement": "Retraite",
+  "type_house": "Achat de maison",
+  "type_education": "Éducation",
+  "type_emergency": "Fonds d'urgence",
+  "type_vacation": "Vacances",
+  "type_custom": "Personnalisé",
+
+  "allocation_accounts": "Allocation par comptes",
+  "select_accounts": "Sélectionner les comptes",
+  "account_allocation": "Allocation des comptes",
+  "allocate_percentage": "Allouer {percent}%",
+
+  "progress": "Progression",
+  "progress_percent": "{percent}% complété",
+  "amount_to_go": "Montant restant",
+  "time_remaining": "Temps restant",
+  "on_track": "Sur la bonne voie",
+  "behind": "En retard",
+  "ahead": "En avance",
+
+  "monthly_contribution": "Contribution mensuelle",
+  "required_monthly": "Contribution mensuelle requise",
+  "projected_completion": "Achèvement projeté",
+
+  "save_goal": "Enregistrer l'objectif",
+  "cancel": "Annuler",
+
+  "delete_confirm_title": "Supprimer l'objectif",
+  "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer cet objectif ?",
+
+  "goal_saved": "Objectif enregistré avec succès",
+  "goal_deleted": "Objectif supprimé avec succès",
+  "goal_error": "Erreur lors de l'enregistrement de l'objectif",
+
+  "no_goals": "Aucun objectif trouvé",
+  "no_goals_desc": "Créez un objectif pour commencer à suivre vos objectifs financiers.",
+
+  "goal_required": "Le nom de l'objectif est obligatoire",
+  "target_amount_required": "Le montant cible est obligatoire",
+  "target_date_required": "La date cible est obligatoire",
+
+  "contribution_limits": "Limites de contribution",
+  "limit_type": "Type de limite",
+  "limit_amount": "Montant limite",
+  "year": "Année",
+  "add_limit": "Ajouter une limite",
+  "edit_limit": "Modifier la limite",
+  "delete_limit": "Supprimer la limite"
+}

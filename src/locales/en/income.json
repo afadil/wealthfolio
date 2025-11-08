@@ -1,0 +1,40 @@
+{
+  "income": "Income",
+  "income_summary": "Income Summary",
+  "income_details": "Income Details",
+
+  "dividends": "Dividends",
+  "interest": "Interest",
+  "total_income": "Total Income",
+  "income_ytd": "Income YTD",
+  "income_month": "Income This Month",
+  "income_year": "Income This Year",
+
+  "dividend_yield": "Dividend Yield",
+  "average_yield": "Average Yield",
+
+  "income_by_symbol": "Income by Symbol",
+  "income_by_account": "Income by Account",
+  "income_by_month": "Income by Month",
+  "income_by_type": "Income by Type",
+
+  "filter_by_year": "Filter by Year",
+  "filter_by_account": "Filter by Account",
+  "all_years": "All Years",
+
+  "payment_date": "Payment Date",
+  "ex_dividend_date": "Ex-Dividend Date",
+  "amount": "Amount",
+
+  "projected_annual": "Projected Annual Income",
+  "based_on_current": "Based on current holdings",
+
+  "no_income": "No income data available",
+  "no_income_desc": "Dividend and interest income from your activities will appear here.",
+
+  "export_income": "Export Income Data",
+
+  "chart_monthly": "Monthly Income",
+  "chart_yearly": "Yearly Income",
+  "chart_cumulative": "Cumulative Income"
+}

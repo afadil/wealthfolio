@@ -1,0 +1,64 @@
+{
+  "goals": "Goals",
+  "add_goal": "Add Goal",
+  "edit_goal": "Edit Goal",
+  "delete_goal": "Delete Goal",
+  "goal_details": "Goal Details",
+
+  "goal_name": "Goal Name",
+  "goal_name_placeholder": "Enter goal name",
+  "target_amount": "Target Amount",
+  "current_amount": "Current Amount",
+  "target_date": "Target Date",
+  "start_date": "Start Date",
+
+  "goal_type": "Goal Type",
+  "type_retirement": "Retirement",
+  "type_house": "House Purchase",
+  "type_education": "Education",
+  "type_emergency": "Emergency Fund",
+  "type_vacation": "Vacation",
+  "type_custom": "Custom",
+
+  "allocation_accounts": "Allocation by Accounts",
+  "select_accounts": "Select Accounts",
+  "account_allocation": "Account Allocation",
+  "allocate_percentage": "Allocate {percent}%",
+
+  "progress": "Progress",
+  "progress_percent": "{percent}% Complete",
+  "amount_to_go": "Amount to Go",
+  "time_remaining": "Time Remaining",
+  "on_track": "On Track",
+  "behind": "Behind",
+  "ahead": "Ahead",
+
+  "monthly_contribution": "Monthly Contribution",
+  "required_monthly": "Required Monthly",
+  "projected_completion": "Projected Completion",
+
+  "save_goal": "Save Goal",
+  "cancel": "Cancel",
+
+  "delete_confirm_title": "Delete Goal",
+  "delete_confirm_message": "Are you sure you want to delete this goal?",
+
+  "goal_saved": "Goal saved successfully",
+  "goal_deleted": "Goal deleted successfully",
+  "goal_error": "Error saving goal",
+
+  "no_goals": "No goals found",
+  "no_goals_desc": "Create a goal to start tracking your financial objectives.",
+
+  "goal_required": "Goal name is required",
+  "target_amount_required": "Target amount is required",
+  "target_date_required": "Target date is required",
+
+  "contribution_limits": "Contribution Limits",
+  "limit_type": "Limit Type",
+  "limit_amount": "Limit Amount",
+  "year": "Year",
+  "add_limit": "Add Limit",
+  "edit_limit": "Edit Limit",
+  "delete_limit": "Delete Limit"
+}

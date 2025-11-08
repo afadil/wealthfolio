@@ -1,0 +1,40 @@
+{
+  "income": "Revenus",
+  "income_summary": "Résumé des revenus",
+  "income_details": "Détails des revenus",
+
+  "dividends": "Dividendes",
+  "interest": "Intérêts",
+  "total_income": "Revenu total",
+  "income_ytd": "Revenus de l'année",
+  "income_month": "Revenus ce mois",
+  "income_year": "Revenus cette année",
+
+  "dividend_yield": "Rendement du dividende",
+  "average_yield": "Rendement moyen",
+
+  "income_by_symbol": "Revenus par symbole",
+  "income_by_account": "Revenus par compte",
+  "income_by_month": "Revenus par mois",
+  "income_by_type": "Revenus par type",
+
+  "filter_by_year": "Filtrer par année",
+  "filter_by_account": "Filtrer par compte",
+  "all_years": "Toutes les années",
+
+  "payment_date": "Date de paiement",
+  "ex_dividend_date": "Date ex-dividende",
+  "amount": "Montant",
+
+  "projected_annual": "Revenu annuel projeté",
+  "based_on_current": "Basé sur les positions actuelles",
+
+  "no_income": "Aucune donnée de revenu disponible",
+  "no_income_desc": "Les revenus de dividendes et d'intérêts de vos activités apparaîtront ici.",
+
+  "export_income": "Exporter les données de revenus",
+
+  "chart_monthly": "Revenus mensuels",
+  "chart_yearly": "Revenus annuels",
+  "chart_cumulative": "Revenus cumulés"
+}

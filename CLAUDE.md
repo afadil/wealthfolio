@@ -217,9 +217,15 @@ function MyComponent() {
 ```
 
 **Translation Namespaces**:
-- `common` - Common UI elements (buttons, labels, etc.)
+- `common` - Common UI elements (buttons, labels, navigation)
 - `settings` - Settings page translations
 - `dashboard` - Dashboard-specific translations
+- `activity` - Activity page and import workflow
+- `holdings` - Holdings and insights page
+- `performance` - Performance analysis page
+- `account` - Account management
+- `goals` - Goals and contribution limits
+- `income` - Income tracking (dividends, interest)
 
 **Adding New Translations**:
 1. Add keys to English JSON files in `src/locales/en/`

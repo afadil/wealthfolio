@@ -1,0 +1,61 @@
+{
+  "holdings": "Holdings",
+  "insights": "Insights",
+  "my_holdings": "My Holdings",
+  "holding_details": "Holding Details",
+
+  "symbol": "Symbol",
+  "shares": "Shares",
+  "avg_cost": "Avg Cost",
+  "market_price": "Market Price",
+  "market_value": "Market Value",
+  "book_value": "Book Value",
+  "gain_loss": "Gain/Loss",
+  "gain_loss_percent": "Gain/Loss %",
+  "today_gain": "Today's Gain",
+  "weight": "Weight",
+  "sector": "Sector",
+  "asset_class": "Asset Class",
+
+  "sort_by": "Sort by",
+  "sort_symbol": "Symbol",
+  "sort_value": "Value",
+  "sort_gain": "Gain",
+  "sort_weight": "Weight",
+
+  "filter_by_account": "Filter by Account",
+  "filter_by_sector": "Filter by Sector",
+  "filter_by_asset_class": "Filter by Asset Class",
+  "all_accounts": "All Accounts",
+  "all_sectors": "All Sectors",
+  "all_asset_classes": "All Asset Classes",
+
+  "total_market_value": "Total Market Value",
+  "total_book_value": "Total Book Value",
+  "total_gain_loss": "Total Gain/Loss",
+  "total_gain_loss_percent": "Total Gain/Loss %",
+
+  "no_holdings": "No holdings found",
+  "no_holdings_desc": "You don't have any holdings yet. Add activities to see your holdings here.",
+
+  "view_details": "View Details",
+  "add_activity": "Add Activity",
+
+  "performance_1d": "1D",
+  "performance_1w": "1W",
+  "performance_1m": "1M",
+  "performance_3m": "3M",
+  "performance_6m": "6M",
+  "performance_1y": "1Y",
+  "performance_ytd": "YTD",
+  "performance_all": "All",
+
+  "chart_market_value": "Market Value Over Time",
+  "chart_allocation": "Portfolio Allocation",
+  "chart_sector": "Sector Allocation",
+  "chart_asset_class": "Asset Class Allocation",
+
+  "top_gainers": "Top Gainers",
+  "top_losers": "Top Losers",
+  "top_holdings": "Top Holdings"
+}
