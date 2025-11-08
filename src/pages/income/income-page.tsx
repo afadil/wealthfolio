@@ -114,7 +114,7 @@ export default function IncomePage() {
             className="mx-auto flex max-w-[420px] items-center justify-center"
             icon={<Icons.DollarSign className="h-10 w-10" />}
             title={t("no_income_data")}
-            description="There is no income data for the selected period. Try selecting a different time range or check back later."
+            description={t("no_income_data_desc")}
           />
         </PageContent>
       </Page>

@@ -15,6 +15,7 @@ import { QuoteSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const BENCHMARKS = [
   {
@@ -81,6 +82,7 @@ export function BenchmarkSymbolSelector({
   className,
   iconOnly = false,
 }: BenchmarkSymbolSelectorProps) {
+  const { t } = useTranslation("performance");
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,7 +128,7 @@ export function BenchmarkSymbolSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label={iconOnly ? "Add benchmark" : undefined}
+          aria-label={iconOnly ? t("add_benchmark") : undefined}
           className={cn(
             "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
             iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -135,19 +137,19 @@ export function BenchmarkSymbolSelector({
           size={iconOnly ? "icon" : "sm"}
         >
           <Icons.TrendingUp className="h-4 w-4" />
-          {!iconOnly && "Add Benchmark"}
+          {!iconOnly && t("add_benchmark")}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[350px] p-0">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search benchmarks or any symbol..."
+            placeholder={t("search_benchmarks", { ns: "common" })}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
           <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>
-              {isLoading ? "Searching..." : "No benchmarks or symbols found."}
+              {isLoading ? t("searching", { ns: "common" }) : t("no_benchmarks_found", { ns: "common" })}
             </CommandEmpty>
 
             {/* Predefined benchmark groups */}
@@ -214,7 +216,7 @@ export function BenchmarkSymbolSelector({
                 className="[&_[cmdk-group-heading]]:bg-popover [&_[cmdk-group-heading]]:border-border/10 [&_[cmdk-group-heading]]:sticky [&_[cmdk-group-heading]]:top-0 [&_[cmdk-group-heading]]:z-10 [&_[cmdk-group-heading]]:border-b"
               >
                 <div className="text-muted-foreground p-4 text-sm">
-                  Error searching for symbols. Please try again.
+                  {t("error_searching", { ns: "common" })}
                 </div>
               </CommandGroup>
             )}

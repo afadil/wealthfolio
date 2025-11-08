@@ -15,6 +15,7 @@ import { QuoteSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { forwardRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SymbolSelectorMobileProps {
   onSelect: (symbol: string) => void;
@@ -30,13 +31,14 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     {
       onSelect,
       value,
-      placeholder = "Select symbol...",
+      placeholder,
       className,
       open: controlledOpen,
       onOpenChange,
     },
     ref,
   ) => {
+    const { t } = useTranslation("common");
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
@@ -68,7 +70,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
 
     const displayText = selectedSymbol
       ? `${selectedSymbol.symbol} - ${selectedSymbol.longName}`
-      : value || placeholder;
+      : value || placeholder || t("search_symbol");
 
     return (
       <Sheet open={open} onOpenChange={setOpen}>
@@ -101,7 +103,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                 <Icons.Search className="text-muted-foreground absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search symbols..."
+                  placeholder={t("search_symbols")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"

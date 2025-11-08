@@ -18,6 +18,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useSettings } from "@/hooks/use-settings";
 import { AccountType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { AnimatePresence, motion } from "motion/react";
+import { useTranslation } from "react-i18next";
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -115,6 +116,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
     },
     ref,
   ) => {
+    const { t } = useTranslation("common");
     const [open, setOpen] = useState(false);
     const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
     const { data: settings, isLoading: isLoadingSettings } = useSettings();
@@ -376,7 +378,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
           }}
         >
           <Command className="w-full">
-            <CommandInput placeholder="Search accounts..." />
+            <CommandInput placeholder={t("search_accounts")} />
             <CommandList>
               {isLoading ? (
                 <div className="px-2 py-6 text-center">

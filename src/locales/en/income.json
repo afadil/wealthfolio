@@ -64,5 +64,6 @@
   "no_dividend_income_recorded": "No dividend income recorded",
   "no_dividend_sources_desc": "There are no dividend sources for the selected period. Try selecting a different time range or check back later.",
   "year_over_year": "Year-over-year growth",
-  "cumulative_income": "Cumulative income since inception"
+  "cumulative_income": "Cumulative income since inception",
+  "no_income_data_desc": "There is no income data for the selected period. Try selecting a different time range or check back later."
 }
