@@ -66,6 +66,8 @@ i18n
 
     interpolation: {
       escapeValue: false, // React already escapes values
+      prefix: "{",
+      suffix: "}",
     },
 
     detection: {
