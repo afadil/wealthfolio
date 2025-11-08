@@ -89,12 +89,12 @@
   "import_failed": "Échec de l'importation",
 
   "delete_activity": "Supprimer l'activité",
-  "delete_activity_confirm": "Êtes-vous sûr de vouloir supprimer cette activité ?",
+  "delete_activity_confirm": "Êtes-vous sûr de vouloir supprimer cette activité ?",
   "delete_activity_description": "Cette action ne peut pas être annulée.",
   "delete_button": "Supprimer",
   "cancel": "Annuler",
   "delete_selected": "Supprimer la sélection",
-  "delete_selected_confirm": "Êtes-vous sûr de vouloir supprimer {count} activités sélectionnées ?",
+  "delete_selected_confirm": "Êtes-vous sûr de vouloir supprimer {count} activités sélectionnées ?",
 
   "cash_balance_checking": "Vérification du solde du compte...",
   "cash_balance_insufficient": "Fonds insuffisants :",
@@ -299,6 +299,6 @@
   "import_help_example_with_symbols": "# Avec symboles monétaires (analysés automatiquement) :",
   "import_help_docs_link": "Pour plus de détails, consultez la",
   "import_help_docs_activity_ref": "documentation de référence des activités",
-  "import_help_how_to_title": "Comment importer un CSV ?",
+  "import_help_how_to_title": "Comment importer un CSV ?",
   "import_help_how_to_mobile": "Comment importer un CSV"
 }

@@ -32,7 +32,7 @@
   "cancel": "Annuler",
 
   "delete_confirm_title": "Supprimer le compte",
-  "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer ce compte ? Cette action est irréversible.",
+  "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer ce compte ? Cette action est irréversible.",
   "delete_with_activities": "Ce compte contient {count} activités. Toutes les activités seront supprimées.",
 
   "account_saved": "Compte enregistré avec succès",

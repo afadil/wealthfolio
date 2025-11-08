@@ -41,7 +41,7 @@
   "cancel": "Annuler",
 
   "delete_confirm_title": "Supprimer l'objectif",
-  "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer cet objectif ?",
+  "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer cet objectif ?",
 
   "goal_saved": "Objectif enregistré avec succès",
   "goal_deleted": "Objectif supprimé avec succès",
