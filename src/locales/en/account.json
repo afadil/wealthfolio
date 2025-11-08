@@ -52,5 +52,33 @@
 
   "account_settings": "Account Settings",
   "account_info": "Account Information",
-  "danger_zone": "Danger Zone"
+  "danger_zone": "Danger Zone",
+
+  "switch_account": "Switch account",
+  "choose_account_to_view": "Choose an account to view",
+  "search_accounts": "Search accounts...",
+  "no_accounts_found": "No accounts found.",
+  "holdings": "Holdings",
+
+  "click_to_update_cash_balance": "Click to update the cash balance",
+  "investments": "Investments",
+  "net_contribution": "Net Contribution",
+  "cost_basis": "Cost Basis",
+  "from": "from",
+  "to": "to",
+
+  "contributed_amount": "You've contributed",
+  "so_far_in": "so far in",
+  "no_limit_set": "There's no contribution limit set for this account.",
+  "total_contribution": "Your total contribution towards the",
+  "limit_is": "limit is",
+  "over_limit": "which is over the",
+  "limit": "limit",
+  "to_this_account_in": "to this account in",
+  "your_total_is": "Your total is",
+
+  "time_weighted_return": "Time Weighted Return",
+  "money_weighted_return": "Money Weighted Return",
+  "volatility": "Volatility",
+  "max_drawdown": "Max Drawdown"
 }

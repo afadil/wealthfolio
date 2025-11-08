@@ -1,5 +1,6 @@
 import { debounce } from "lodash";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import { Account } from "@/lib/types";
@@ -38,6 +39,7 @@ export function ActivityViewControls({
   totalRowCount,
   isFetching,
 }: ActivityViewControlsProps) {
+  const { t } = useTranslation("activity");
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   // Create a stable debounced search function
@@ -92,7 +94,7 @@ export function ActivityViewControls({
               setLocalSearch(value);
               debouncedSearch(value);
             }}
-            placeholder="Search..."
+            placeholder={t("search_placeholder")}
             className="h-8 w-[160px] pr-8 lg:w-[240px]"
           />
           {localSearch && (
@@ -107,20 +109,20 @@ export function ActivityViewControls({
               }}
             >
               <Icons.Close className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
+              <span className="sr-only">{t("clear_search")}</span>
             </Button>
           )}
         </div>
 
         <DataTableFacetedFilter
-          title="Account"
+          title={t("filter_account")}
           options={accountOptions}
           selectedValues={new Set(selectedAccountIds)}
           onFilterChange={(values: Set<string>) => onAccountIdsChange(Array.from(values))}
         />
 
         <DataTableFacetedFilter
-          title="Type"
+          title={t("filter_type")}
           options={activityOptions}
           selectedValues={new Set(selectedActivityTypes)}
           onFilterChange={(values: Set<string>) =>
@@ -140,7 +142,7 @@ export function ActivityViewControls({
               onActivityTypesChange([]);
             }}
           >
-            Reset
+            {t("reset_filters")}
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         ) : null}
@@ -151,10 +153,10 @@ export function ActivityViewControls({
           {isFetching ? (
             <span className="inline-flex items-center gap-1">
               <Icons.Spinner className="h-4 w-4 animate-spin" />
-              Loading…
+              {t("loading")}
             </span>
           ) : (
-            `${totalFetched} / ${totalRowCount} activities`
+            `${totalFetched} / ${totalRowCount} ${t("activities")}`
           )}
         </span>
         <AnimatedToggleGroup
@@ -173,20 +175,20 @@ export function ActivityViewControls({
               label: (
                 <>
                   <Icons.Rows3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">View mode</span>
+                  <span className="sr-only">{t("view_mode")}</span>
                 </>
               ),
-              title: "View mode",
+              title: t("view_mode"),
             },
             {
               value: "datagrid",
               label: (
                 <>
                   <Icons.Grid3x3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Edit mode</span>
+                  <span className="sr-only">{t("edit_mode")}</span>
                 </>
               ),
-              title: "Edit mode",
+              title: t("edit_mode"),
             },
           ]}
         />

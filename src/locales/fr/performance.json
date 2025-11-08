@@ -2,6 +2,12 @@
   "performance": "Performance",
   "portfolio_performance": "Performance du portefeuille",
   "performance_summary": "Résumé de performance",
+  "all_portfolio": "Tous les portefeuilles",
+  "add_account": "Ajouter un compte",
+  "add_benchmark": "Ajouter un indice de référence",
+  "calculating": "Calcul en cours...",
+  "retry": "Réessayer",
+  "error_calculating": "Erreur lors du calcul des données de performance",
 
   "time_period": "Période",
   "custom_period": "Période personnalisée",

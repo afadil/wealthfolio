@@ -9,13 +9,15 @@ import { CurrencyInput } from "@wealthfolio/ui";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+type TranslateFn = ReturnType<typeof useTranslation<"settings">>["t"];
+
 const baseCurrencyFormSchema = z.object({
   baseCurrency: z.string(),
 });
 
 type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
 
-const createBaseCurrencyFormSchema = (t: (key: string) => string) =>
+const createBaseCurrencyFormSchema = (t: TranslateFn) =>
   z.object({
     baseCurrency: z.string({ required_error: t("currency_select_error") }),
   });

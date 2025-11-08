@@ -1,4 +1,5 @@
 import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -19,23 +20,22 @@ import {
 import { CashBalanceWarning } from "../cash-balance-warning";
 
 export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+  const { t } = useTranslation("activity");
   const { control, watch } = useFormContext();
   const isManualAsset = watch("assetDataSource") === "MANUAL";
 
   const tradeTypes: ActivityTypeUI[] = [
     {
       value: "BUY",
-      label: "Buy",
+      label: t("type_buy"),
       icon: "ArrowDown",
-      description:
-        "Purchase an asset. This increases your holding quantity and decreases your cash balance.",
+      description: t("type_buy_desc"),
     },
     {
       value: "SELL",
-      label: "Sell",
+      label: t("type_sell"),
       icon: "ArrowUp",
-      description:
-        "Sell an asset. This decreases your holding quantity and increases your cash balance.",
+      description: t("type_sell_desc"),
     },
   ];
 
@@ -61,7 +61,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Shares</FormLabel>
+                  <FormLabel>{t("field_shares")}</FormLabel>
                   <FormControl>
                     <QuantityInput {...field} />
                   </FormControl>
@@ -74,7 +74,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
               name="unitPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price</FormLabel>
+                  <FormLabel>{t("field_price")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>
@@ -87,7 +87,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
               name="fee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fee</FormLabel>
+                  <FormLabel>{t("field_fee")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>

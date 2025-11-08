@@ -36,7 +36,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { MoneyInput } from "@wealthfolio/ui";
 
-const exchangeRateSchema = (t: (key: string) => string) => z.object({
+type TranslateFn = ReturnType<typeof useTranslation<"settings">>["t"];
+
+const exchangeRateSchema = (t: TranslateFn) => z.object({
   fromCurrency: z.string().min(1, t("exchange_rates_from_required")),
   toCurrency: z.string().min(1, t("exchange_rates_to_required")),
   rate: z.coerce

@@ -5,11 +5,13 @@ import {
   type ActivityType as ActivityTypeUI,
 } from "../activity-type-selector";
 import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { MoneyInput, QuantityInput } from "@wealthfolio/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
 
 export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+  const { t } = useTranslation("activity");
   const { control, watch } = useFormContext();
   const activityType = watch("activityType");
   const isManualAsset = watch("assetDataSource") === "MANUAL";
@@ -17,24 +19,21 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
   const otherTypes: ActivityTypeUI[] = [
     {
       value: "SPLIT",
-      label: "Split",
+      label: t("type_split"),
       icon: "Split",
-      description:
-        "Record a stock split. This changes the number of shares you own but typically not the total value of your holding (e.g., a 2-for-1 split doubles your shares).",
+      description: t("type_split_desc"),
     },
     {
       value: "FEE",
-      label: "Fee",
+      label: t("type_fee"),
       icon: "Receipt",
-      description:
-        "Record a standalone fee or charge not directly tied to a specific trade, such as an account maintenance fee. This will decrease your cash balance.",
+      description: t("type_fee_desc"),
     },
     {
       value: "TAX",
-      label: "Tax",
+      label: t("type_tax"),
       icon: "ReceiptText",
-      description:
-        "Record tax payments related to your investments, such as capital gains tax or withholding tax. This will decrease your cash balance.",
+      description: t("type_tax_desc"),
     },
   ];
 
@@ -60,7 +59,7 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
               name="fee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fee Amount</FormLabel>
+                  <FormLabel>{t("field_fee_amount")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>
@@ -74,7 +73,7 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tax Amount</FormLabel>
+                  <FormLabel>{t("field_tax_amount")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>
@@ -97,10 +96,10 @@ export const OtherForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Split Ratio</FormLabel>
+                      <FormLabel>{t("field_split_ratio")}</FormLabel>
                       <FormControl>
                         <QuantityInput
-                          placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split"
+                          placeholder={t("split_ratio_placeholder")}
                           {...field}
                         />
                       </FormControl>

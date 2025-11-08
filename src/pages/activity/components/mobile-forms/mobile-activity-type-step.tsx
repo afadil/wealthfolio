@@ -4,120 +4,122 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useFormContext } from "react-hook-form";
-
-const activityTypes = [
-  {
-    category: "Trade",
-    types: [
-      {
-        value: "BUY",
-        label: "Buy",
-        icon: "ArrowDown" as const,
-        description: "Purchase an asset",
-      },
-      {
-        value: "SELL",
-        label: "Sell",
-        icon: "ArrowUp" as const,
-        description: "Sell an asset",
-      },
-    ],
-  },
-  {
-    category: "Holdings",
-    types: [
-      {
-        value: "ADD_HOLDING",
-        label: "Add Holding",
-        icon: "PlusCircle" as const,
-        description: "Record existing holdings",
-      },
-      {
-        value: "REMOVE_HOLDING",
-        label: "Remove Holding",
-        icon: "MinusCircle" as const,
-        description: "Remove holdings from account",
-      },
-    ],
-  },
-  {
-    category: "Cash",
-    types: [
-      {
-        value: "DEPOSIT",
-        label: "Deposit",
-        icon: "ArrowDown" as const,
-        description: "Add funds to account",
-      },
-      {
-        value: "WITHDRAWAL",
-        label: "Withdrawal",
-        icon: "ArrowUp" as const,
-        description: "Remove funds from account",
-      },
-      {
-        value: "TRANSFER_IN",
-        label: "Transfer In",
-        icon: "ArrowLeftRight" as const,
-        description: "Transfer from another account",
-      },
-      {
-        value: "TRANSFER_OUT",
-        label: "Transfer Out",
-        icon: "ArrowRightLeft" as const,
-        description: "Transfer to another account",
-      },
-    ],
-  },
-  {
-    category: "Income",
-    types: [
-      {
-        value: "DIVIDEND",
-        label: "Dividend",
-        icon: "Income" as const,
-        description: "Dividend payment received",
-      },
-      {
-        value: "INTEREST",
-        label: "Interest",
-        icon: "Percent" as const,
-        description: "Interest earned",
-      },
-    ],
-  },
-  {
-    category: "Other",
-    types: [
-      {
-        value: "FEE",
-        label: "Fee",
-        icon: "DollarSign" as const,
-        description: "Account or transaction fee",
-      },
-      {
-        value: "TAX",
-        label: "Tax",
-        icon: "Receipt" as const,
-        description: "Tax payment",
-      },
-      {
-        value: "SPLIT",
-        label: "Stock Split",
-        icon: "Split" as const,
-        description: "Stock split adjustment",
-      },
-    ],
-  },
-];
+import { useTranslation } from "react-i18next";
 
 export function MobileActivityTypeStep() {
   const { control } = useFormContext();
+  const { t } = useTranslation("activity");
+
+  const activityTypes = [
+    {
+      category: t("tab_trade"),
+      types: [
+        {
+          value: "BUY",
+          label: t("type_buy"),
+          icon: "ArrowDown" as const,
+          description: t("mobile_type_buy_desc"),
+        },
+        {
+          value: "SELL",
+          label: t("type_sell"),
+          icon: "ArrowUp" as const,
+          description: t("mobile_type_sell_desc"),
+        },
+      ],
+    },
+    {
+      category: t("tab_holdings"),
+      types: [
+        {
+          value: "ADD_HOLDING",
+          label: t("type_add_holding"),
+          icon: "PlusCircle" as const,
+          description: t("mobile_type_add_holding_desc"),
+        },
+        {
+          value: "REMOVE_HOLDING",
+          label: t("type_remove_holding"),
+          icon: "MinusCircle" as const,
+          description: t("mobile_type_remove_holding_desc"),
+        },
+      ],
+    },
+    {
+      category: t("tab_cash"),
+      types: [
+        {
+          value: "DEPOSIT",
+          label: t("type_deposit"),
+          icon: "ArrowDown" as const,
+          description: t("mobile_type_deposit_desc"),
+        },
+        {
+          value: "WITHDRAWAL",
+          label: t("type_withdrawal"),
+          icon: "ArrowUp" as const,
+          description: t("mobile_type_withdrawal_desc"),
+        },
+        {
+          value: "TRANSFER_IN",
+          label: t("type_transfer_in"),
+          icon: "ArrowLeftRight" as const,
+          description: t("mobile_type_transfer_in_desc"),
+        },
+        {
+          value: "TRANSFER_OUT",
+          label: t("type_transfer_out"),
+          icon: "ArrowRightLeft" as const,
+          description: t("mobile_type_transfer_out_desc"),
+        },
+      ],
+    },
+    {
+      category: t("tab_income"),
+      types: [
+        {
+          value: "DIVIDEND",
+          label: t("type_dividend"),
+          icon: "Income" as const,
+          description: t("mobile_type_dividend_desc"),
+        },
+        {
+          value: "INTEREST",
+          label: t("type_interest"),
+          icon: "Percent" as const,
+          description: t("mobile_type_interest_desc"),
+        },
+      ],
+    },
+    {
+      category: t("tab_other"),
+      types: [
+        {
+          value: "FEE",
+          label: t("type_fee"),
+          icon: "DollarSign" as const,
+          description: t("mobile_type_fee_desc"),
+        },
+        {
+          value: "TAX",
+          label: t("type_tax"),
+          icon: "Receipt" as const,
+          description: t("mobile_type_tax_desc"),
+        },
+        {
+          value: "SPLIT",
+          label: t("type_split"),
+          icon: "Split" as const,
+          description: t("mobile_type_split_desc"),
+        },
+      ],
+    },
+  ];
 
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold">Select Transaction Type</h3>
+        <h3 className="text-lg font-semibold">{t("mobile_select_transaction_type")}</h3>
       </div>
 
       <ScrollArea>

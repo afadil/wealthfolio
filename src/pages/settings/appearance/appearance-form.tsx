@@ -18,7 +18,9 @@ import { Switch } from "@/components/ui/switch";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
 
-const createAppearanceFormSchema = (t: (key: string) => string) =>
+type TranslateFn = ReturnType<typeof useTranslation<"settings">>["t"];
+
+const createAppearanceFormSchema = (t: TranslateFn) =>
   z.object({
     theme: z.enum(["light", "dark", "system"], {
       required_error: t("appearance_theme_required"),

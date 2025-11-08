@@ -52,5 +52,33 @@
 
   "account_settings": "Paramètres du compte",
   "account_info": "Informations du compte",
-  "danger_zone": "Zone dangereuse"
+  "danger_zone": "Zone dangereuse",
+
+  "switch_account": "Changer de compte",
+  "choose_account_to_view": "Choisissez un compte à afficher",
+  "search_accounts": "Rechercher des comptes...",
+  "no_accounts_found": "Aucun compte trouvé.",
+  "holdings": "Positions",
+
+  "click_to_update_cash_balance": "Cliquez pour mettre à jour le solde de trésorerie",
+  "investments": "Investissements",
+  "net_contribution": "Contribution nette",
+  "cost_basis": "Coût de base",
+  "from": "du",
+  "to": "au",
+
+  "contributed_amount": "Vous avez contribué",
+  "so_far_in": "jusqu'à présent en",
+  "no_limit_set": "Aucune limite de contribution n'est définie pour ce compte.",
+  "total_contribution": "Votre contribution totale envers la limite de",
+  "limit_is": "est",
+  "over_limit": "ce qui dépasse la limite de",
+  "limit": "limite",
+  "to_this_account_in": "à ce compte en",
+  "your_total_is": "Votre total est",
+
+  "time_weighted_return": "Rendement pondéré dans le temps",
+  "money_weighted_return": "Rendement pondéré en argent",
+  "volatility": "Volatilité",
+  "max_drawdown": "Perte maximale"
 }

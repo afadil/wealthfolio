@@ -2,6 +2,12 @@
   "performance": "Performance",
   "portfolio_performance": "Portfolio Performance",
   "performance_summary": "Performance Summary",
+  "all_portfolio": "All Portfolio",
+  "add_account": "Add Account",
+  "add_benchmark": "Add Benchmark",
+  "calculating": "Calculating...",
+  "retry": "Retry",
+  "error_calculating": "Error calculating performance data",
 
   "time_period": "Time Period",
   "custom_period": "Custom Period",
