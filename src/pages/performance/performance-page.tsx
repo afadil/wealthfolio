@@ -49,10 +49,11 @@ import { AccountSelectorMobile } from "../../components/account-selector-mobile"
 import { BenchmarkSymbolSelectorMobile } from "../../components/benchmark-symbol-selector-mobile";
 import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 
-const PORTFOLIO_TOTAL: TrackedItem = {
+// Note: This constant will be translated in the component using useTranslation
+const PORTFOLIO_TOTAL_ID: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
   type: "account",
-  name: "All Portfolio",
+  name: "All Portfolio", // This will be replaced with translation in component
 };
 
 // Define the type expected by the chart
@@ -213,6 +214,14 @@ const SelectedItemBadge = ({
 export default function PerformancePage() {
   const { t } = useTranslation("performance");
   const isMobile = useIsMobileViewport();
+
+  // Create the portfolio total item with translation
+  const PORTFOLIO_TOTAL: TrackedItem = {
+    id: PORTFOLIO_TOTAL_ID.id,
+    type: PORTFOLIO_TOTAL_ID.type,
+    name: t("all_portfolio"),
+  };
+
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
     "performance:selectedItems",
     [PORTFOLIO_TOTAL],
@@ -592,7 +601,7 @@ export default function PerformancePage() {
                         /* Desktop metrics */
                         <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                            <MetricLabelWithInfo label={t("total_return")} infoText={totalReturnInfo} />
                             <div className="flex items-baseline justify-center">
                               <span
                                 className={`text-base sm:text-lg ${
@@ -612,7 +621,7 @@ export default function PerformancePage() {
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
-                              label="Annualized Return"
+                              label={t("annualized_return")}
                               infoText={annualizedReturnInfo}
                             />
                             <div className="flex items-baseline justify-center">
@@ -633,7 +642,7 @@ export default function PerformancePage() {
                           </div>
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                            <MetricLabelWithInfo label={t("volatility")} infoText={volatilityInfo} />
                             <div className="flex items-baseline justify-center">
                               <span className="text-foreground text-base sm:text-lg">
                                 <NumberFlow
@@ -649,7 +658,7 @@ export default function PerformancePage() {
                           </div>
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                            <MetricLabelWithInfo label={t("max_drawdown")} infoText={maxDrawdownInfo} />
                             <div className="flex items-baseline justify-center">
                               <span className="text-destructive text-base sm:text-lg">
                                 <NumberFlow

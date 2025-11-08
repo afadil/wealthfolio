@@ -118,7 +118,7 @@ export function ContributionLimitItem({
                     ? t("limits_completed")
                     : isOverLimit
                       ? t("limits_over_limit", { amount: formatAmount(overLimitAmount, baseCurrency) })
-                      : `${limit.contributionYear}`}
+                      : t("limits_remaining", { amount: formatAmount(remainingAmount, baseCurrency) })}
                 </span>
               </div>
             )}

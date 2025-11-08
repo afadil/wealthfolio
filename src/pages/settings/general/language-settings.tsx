@@ -33,31 +33,44 @@ const languageFormSchema = z.object({
 
 type LanguageFormValues = z.infer<typeof languageFormSchema>;
 
-const languages = [
-  { value: "en", label: "English" },
-  { value: "fr", label: "Français (French)" },
-];
-
 export function LanguageForm() {
   const { i18n, t } = useTranslation("settings");
 
+  // Get current language or "auto" if using browser detection
+  const currentLanguage = localStorage.getItem("i18nextLng") || "auto";
+
+  const languages = [
+    { value: "auto", label: t("language_auto") },
+    { value: "en", label: "English" },
+    { value: "fr", label: "Français (French)" },
+  ];
+
   const defaultValues: Partial<LanguageFormValues> = {
-    language: i18n.language || "en",
+    language: currentLanguage,
   };
 
   const form = useForm<LanguageFormValues>({
     resolver: zodResolver(languageFormSchema),
     defaultValues,
-    values: { language: i18n.language || "en" },
+    values: { language: currentLanguage },
   });
 
   async function onSubmit(data: LanguageFormValues) {
     try {
-      await i18n.changeLanguage(data.language);
-      toast.success("Language updated successfully");
+      if (data.language === "auto") {
+        // Remove the stored language to allow browser detection
+        localStorage.removeItem("i18nextLng");
+        // Detect from navigator
+        const browserLang = navigator.language.split("-")[0];
+        const detectedLang = ["en", "fr"].includes(browserLang) ? browserLang : "en";
+        await i18n.changeLanguage(detectedLang);
+      } else {
+        await i18n.changeLanguage(data.language);
+      }
+      toast.success(t("language_updated"));
     } catch (error) {
       console.error("Failed to update language:", error);
-      toast.error("Failed to update language");
+      toast.error(t("language_update_failed"));
     }
   }
 

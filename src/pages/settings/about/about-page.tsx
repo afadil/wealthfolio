@@ -2,6 +2,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir, appLogDir } from "@tauri-apps/api/path";
 import { check } from "@tauri-apps/plugin-updater";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { usePlatform } from "@/hooks/use-platform";
 import { SettingsHeader } from "../settings-header";
 
 export default function AboutSettingsPage() {
+  const { t } = useTranslation("settings");
   const [version, setVersion] = useState<string>("");
   const [dbDir, setDbDir] = useState<string>("");
   const [logsDir, setLogsDir] = useState<string>("");
@@ -47,16 +49,16 @@ export default function AboutSettingsPage() {
       const update = await check();
       if (update) {
         toast({
-          title: "Update available",
-          description: `Version ${update.version} is available.`,
+          title: t("about_update_available"),
+          description: t("about_update_available_description", { version: update.version }),
         });
       } else {
-        toast({ title: "Up to date", description: "You have the latest version." });
+        toast({ title: t("about_up_to_date"), description: t("about_up_to_date_description") });
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to check for updates.",
+        title: t("about_update_error"),
+        description: t("about_update_error_description"),
         variant: "destructive",
       });
       console.error("Failed to check for updates:", error);
@@ -66,11 +68,11 @@ export default function AboutSettingsPage() {
   const handleCopy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      toast({ title: "Copied", description: `${label} copied to clipboard.` });
+      toast({ title: t("about_copied"), description: t("about_copied_description", { label }) });
     } catch (error) {
       toast({
-        title: "Copy failed",
-        description: `Could not copy ${label.toLowerCase()}.`,
+        title: t("about_copy_failed"),
+        description: t("about_copy_failed_description", { label: label.toLowerCase() }),
         variant: "destructive",
       });
       console.error("Failed to copy to clipboard:", error);
@@ -83,32 +85,31 @@ export default function AboutSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <SettingsHeader heading="About" text="Application information" />
+      <SettingsHeader heading={t("about_title")} text={t("about_description")} />
       <Separator />
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
           <img src="/logo.svg" alt="Wealthfolio logo" className="h-12 w-12 rounded-md shadow" />
           <div className="flex flex-col">
-            <CardTitle className="text-xl">Wealthfolio</CardTitle>
-            <CardDescription>Version {version || "N/A"}</CardDescription>
+            <CardTitle className="text-xl">{t("about_app_name")}</CardTitle>
+            <CardDescription>{t("about_version", { version: version || "N/A" })}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              A beautiful, simple, and secure personal finance and investment tracker that helps you
-              take control of your wealth.
+              {t("about_tagline")}
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              {!isMobile && <Button onClick={handleCheckForUpdates}>Check for Update</Button>}
+              {!isMobile && <Button onClick={handleCheckForUpdates}>{t("about_check_update_button")}</Button>}
               <Button
                 variant="outline"
                 onClick={() => handleOpenLink("https://wealthfolio.app")}
                 className="inline-flex items-center gap-2"
               >
                 <Icons.Globe className="h-4 w-4" />
-                Website
+                {t("about_website_button")}
               </Button>
               <Button
                 variant="outline"
@@ -116,7 +117,7 @@ export default function AboutSettingsPage() {
                 className="inline-flex items-center gap-2"
               >
                 <Icons.FileText className="h-4 w-4" />
-                Docs
+                {t("about_docs_button")}
               </Button>
               <Button
                 variant="outline"
@@ -124,7 +125,7 @@ export default function AboutSettingsPage() {
                 className="inline-flex items-center gap-2"
               >
                 <Icons.ExternalLink className="h-4 w-4" />
-                GitHub
+                {t("about_github_button")}
               </Button>
             </div>
           </div>
@@ -136,42 +137,40 @@ export default function AboutSettingsPage() {
               <div className="grid gap-4">
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    Database directory
+                    {t("about_database_directory")}
                   </p>
                   <div className="flex items-center gap-2">
                     <p className="bg-muted text-muted-foreground flex-1 truncate rounded-md px-3 py-2 font-mono text-xs">
-                      {dbDir || "Unavailable"}
+                      {dbDir || t("about_unavailable")}
                     </p>
                     <Button
                       variant="ghost"
                       size="icon"
                       disabled={!dbDir}
-                      onClick={() => dbDir && handleCopy(dbDir, "Database directory")}
+                      onClick={() => dbDir && handleCopy(dbDir, t("about_database_directory"))}
                     >
                       <Icons.Copy className="h-4 w-4" />
-                      <span className="sr-only">Copy database directory</span>
+                      <span className="sr-only">{t("about_copy_aria", { label: t("about_database_directory") })}</span>
                     </Button>
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    Database file: <span className="font-mono">app.db</span>
-                  </p>
+                  <p className="text-muted-foreground text-xs" dangerouslySetInnerHTML={{ __html: t("about_database_file") }} />
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    Logs directory
+                    {t("about_logs_directory")}
                   </p>
                   <div className="flex items-center gap-2">
                     <p className="bg-muted text-muted-foreground flex-1 truncate rounded-md px-3 py-2 font-mono text-xs">
-                      {logsDir || "Unavailable"}
+                      {logsDir || t("about_unavailable")}
                     </p>
                     <Button
                       variant="ghost"
                       size="icon"
                       disabled={!logsDir}
-                      onClick={() => logsDir && handleCopy(logsDir, "Logs directory")}
+                      onClick={() => logsDir && handleCopy(logsDir, t("about_logs_directory"))}
                     >
                       <Icons.Copy className="h-4 w-4" />
-                      <span className="sr-only">Copy logs directory</span>
+                      <span className="sr-only">{t("about_copy_aria", { label: t("about_logs_directory") })}</span>
                     </Button>
                   </div>
                 </div>
@@ -183,7 +182,7 @@ export default function AboutSettingsPage() {
 
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
-              Have questions or found a bug? Please email us at{" "}
+              {t("about_support_message")}{" "}
               <span className="font-mono font-semibold select-all">wealthfolio@teymz.com</span>
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -194,7 +193,7 @@ export default function AboutSettingsPage() {
                 className="inline-flex items-center gap-2"
               >
                 <Icons.ExternalLink className="h-4 w-4" />
-                Email Us
+                {t("about_email_button")}
               </Button>
               <Button
                 variant="outline"
@@ -203,7 +202,7 @@ export default function AboutSettingsPage() {
                 className="inline-flex items-center gap-2"
               >
                 <Icons.AlertCircle className="h-4 w-4" />
-                Report Issue
+                {t("about_report_issue_button")}
               </Button>
             </div>
 
@@ -216,7 +215,7 @@ export default function AboutSettingsPage() {
                 rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
-                Privacy Policy
+                {t("about_privacy_policy")}
               </a>
               <span className="mx-2">•</span>
               <a
@@ -225,7 +224,7 @@ export default function AboutSettingsPage() {
                 rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
-                Terms of Use
+                {t("about_terms_of_use")}
               </a>
               <span className="mx-2">•</span>
               <a
@@ -234,7 +233,7 @@ export default function AboutSettingsPage() {
                 rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
-                Website
+                {t("about_website_link")}
               </a>
             </p>
           </div>
