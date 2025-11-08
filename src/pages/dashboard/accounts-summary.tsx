@@ -11,6 +11,7 @@ import type { AccountValuation } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 interface AccountSummaryDisplayData {
@@ -62,6 +63,7 @@ const AccountSummaryComponent = React.memo(
     displayInAccountCurrency?: boolean;
     isNested?: boolean;
   }) => {
+    const { t } = useTranslation("dashboard");
     const isGroup = item.isGroup ?? false;
     const useAccountCurrency = !isGroup && displayInAccountCurrency;
 
@@ -88,7 +90,7 @@ const AccountSummaryComponent = React.memo(
     const subText = useAccountCurrency
       ? item.accountCurrency
       : isGroup
-        ? `${item.accountCount} ${item.accountCount === 1 ? "account" : "accounts"}`
+        ? `${item.accountCount} ${item.accountCount === 1 ? t("account") : t("accounts_plural")}`
         : item.baseCurrency;
 
     const totalValue = useAccountCurrency
@@ -203,6 +205,7 @@ const AccountSummaryComponent = React.memo(
 AccountSummaryComponent.displayName = "AccountSummaryComponent";
 
 export const AccountsSummary = React.memo(() => {
+  const { t } = useTranslation("dashboard");
   const { accountsGrouped, setAccountsGrouped, settings } = useSettingsContext();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -290,7 +293,7 @@ export const AccountsSummary = React.memo(() => {
       return (
         <div className="border-destructive/30 bg-destructive/5 rounded-lg border p-4 md:p-5">
           <p className="text-destructive text-sm font-medium">
-            Error loading accounts: {errorAccounts?.message}
+            {t("error_loading_accounts")}: {errorAccounts?.message}
           </p>
         </div>
       );
@@ -299,7 +302,7 @@ export const AccountsSummary = React.memo(() => {
     if (!combinedAccountViews || combinedAccountViews.length === 0) {
       return (
         <div className="border-border/50 bg-secondary/30 rounded-lg border p-6 text-center md:p-8">
-          <p className="text-muted-foreground text-sm">No accounts found.</p>
+          <p className="text-muted-foreground text-sm">{t("no_accounts_found")}</p>
         </div>
       );
     }
@@ -311,8 +314,8 @@ export const AccountsSummary = React.memo(() => {
       const standaloneAccounts: AccountSummaryDisplayData[] = [];
 
       combinedAccountViews.forEach((account) => {
-        const groupName = account.accountGroup ?? "Uncategorized";
-        if (groupName === "Uncategorized") {
+        const groupName = account.accountGroup ?? t("uncategorized");
+        if (groupName === t("uncategorized")) {
           standaloneAccounts.push(account);
         } else {
           if (!groups[groupName]) {
@@ -449,14 +452,14 @@ export const AccountsSummary = React.memo(() => {
   return (
     <div className="mb-4 w-full space-y-0">
       <div className="flex flex-row items-center justify-between gap-2 pb-2">
-        <h2 className="text-md font-semibold tracking-tight">Accounts</h2>
+        <h2 className="text-md font-semibold tracking-tight">{t("accounts")}</h2>
         <Button
           variant="outline"
           className="rounded-lg bg-transparent transition-colors duration-150"
           size="sm"
           onClick={() => setAccountsGrouped(!accountsGrouped)}
-          aria-label={accountsGrouped ? "List view" : "Group view"}
-          title={accountsGrouped ? "Switch to list view" : "Switch to group view"}
+          aria-label={accountsGrouped ? t("list_view") : t("group_view")}
+          title={accountsGrouped ? t("switch_to_list_view") : t("switch_to_group_view")}
           disabled={isLoadingAccounts || combinedAccountViews.length === 0}
         >
           {accountsGrouped ? (
