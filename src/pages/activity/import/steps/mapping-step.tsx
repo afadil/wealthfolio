@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { CsvMappingEditor } from "../components/mapping-editor";
 import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from "@/lib/types";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { validateTickerSymbol } from "../utils/validation-utils";
 import { useImportMapping } from "../hooks/use-import-mapping";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
@@ -25,6 +26,7 @@ export const MappingStep = ({
   onNext,
   onBack,
 }: MappingStepProps) => {
+  const { t } = useTranslation("activity");
   const {
     mapping,
     handleColumnMapping,
@@ -52,8 +54,8 @@ export const MappingStep = ({
     return (
       <ImportAlert
         variant="destructive"
-        title="No CSV data available"
-        description="Please go back and upload a valid file."
+        title={t("no_data")}
+        description={t("import_invalid_csv")}
         icon={Icons.AlertCircle}
       />
     );
@@ -265,14 +267,14 @@ export const MappingStep = ({
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          {t("mobile_back")}
         </Button>
         <Button
           onClick={handleNextClick}
           disabled={!allMappingsComplete || saveMappingMutation.isPending}
           className="min-w-[120px]"
         >
-          {saveMappingMutation.isPending ? "Saving..." : "Next"}
+          {saveMappingMutation.isPending ? t("importing") : t("mobile_next")}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

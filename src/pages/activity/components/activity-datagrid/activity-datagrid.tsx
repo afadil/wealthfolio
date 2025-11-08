@@ -29,6 +29,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -181,6 +182,7 @@ export function ActivityDatagrid({
   onRefetch,
   onEditActivity,
 }: ActivityDatagridProps) {
+  const { t } = useTranslation("activity");
   const [localTransactions, setLocalTransactions] = useState<LocalTransaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
@@ -610,8 +612,8 @@ export function ActivityDatagrid({
       setSelectedIds(new Set());
 
       toast({
-        title: "Activities saved",
-        description: "Your pending changes are now synced.",
+        title: t("datagrid_activities_saved"),
+        description: t("datagrid_changes_synced"),
         variant: "success",
       });
 
@@ -636,11 +638,11 @@ export function ActivityDatagrid({
     setLocalTransactions((prev) => prev.filter((transaction) => !transaction.isNew));
     onRefetch();
     toast({
-      title: "Changes discarded",
-      description: "Unsaved edits and drafts have been cleared.",
+      title: t("datagrid_changes_discarded"),
+      description: t("datagrid_unsaved_cleared"),
       variant: "default",
     });
-  }, [onRefetch]);
+  }, [onRefetch, t]);
 
   return (
     <div className="space-y-3">
@@ -648,13 +650,16 @@ export function ActivityDatagrid({
         <div className="text-muted-foreground flex items-center gap-2.5 text-xs">
           {selectedIds.size > 0 && (
             <span className="font-medium">
-              {selectedIds.size} row{selectedIds.size === 1 ? "" : "s"} selected
+              {selectedIds.size === 1
+                ? t("datagrid_row_selected", { count: selectedIds.size })
+                : t("datagrid_rows_selected", { count: selectedIds.size })}
             </span>
           )}
           {hasUnsavedChanges && (
             <span className="text-primary font-medium">
-              {dirtyTransactionIds.size + pendingDeleteIds.size} pending change
-              {dirtyTransactionIds.size + pendingDeleteIds.size === 1 ? "" : "s"}
+              {dirtyTransactionIds.size + pendingDeleteIds.size === 1
+                ? t("datagrid_pending_change", { count: dirtyTransactionIds.size + pendingDeleteIds.size })
+                : t("datagrid_pending_changes", { count: dirtyTransactionIds.size + pendingDeleteIds.size })}
             </span>
           )}
         </div>
@@ -665,11 +670,11 @@ export function ActivityDatagrid({
             variant="outline"
             size="xs"
             className="shrink-0 rounded-md"
-            title="Add transaction"
-            aria-label="Add transaction"
+            title={t("datagrid_add_transaction")}
+            aria-label={t("datagrid_add_transaction")}
           >
             <Icons.Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
+            <span>{t("datagrid_add")}</span>
           </Button>
 
           {selectedIds.size > 0 && (
@@ -680,12 +685,12 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="destructive"
                 className="shrink-0 rounded-md text-xs"
-                title="Delete selected"
-                aria-label="Delete selected"
+                title={t("datagrid_delete_selected")}
+                aria-label={t("datagrid_delete_selected")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Trash className="h-3.5 w-3.5" />
-                <span>Delete</span>
+                <span>{t("datagrid_delete")}</span>
               </Button>
             </>
           )}
@@ -697,8 +702,8 @@ export function ActivityDatagrid({
                 onClick={handleSaveChanges}
                 size="xs"
                 className="shrink-0 rounded-md text-xs"
-                title="Save changes"
-                aria-label="Save changes"
+                title={t("datagrid_save_changes")}
+                aria-label={t("datagrid_save_changes")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 {saveActivitiesMutation.isPending ? (
@@ -706,7 +711,7 @@ export function ActivityDatagrid({
                 ) : (
                   <Icons.Save className="h-3.5 w-3.5" />
                 )}
-                <span>Save</span>
+                <span>{t("datagrid_save")}</span>
               </Button>
 
               <Button
@@ -714,12 +719,12 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="outline"
                 className="shrink-0 rounded-md text-xs"
-                title="Discard changes"
-                aria-label="Discard changes"
+                title={t("datagrid_discard_changes")}
+                aria-label={t("datagrid_discard_changes")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Undo className="h-3.5 w-3.5" />
-                <span>Cancel</span>
+                <span>{t("datagrid_cancel")}</span>
               </Button>
             </>
           )}
@@ -741,37 +746,37 @@ export function ActivityDatagrid({
                 </div>
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Type
+                {t("table_type")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Date & Time
+                {t("mobile_date_time")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Symbol
+                {t("table_symbol")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Quantity
+                {t("table_quantity")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Unit Price
+                {t("field_price")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 w-24 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Amount
+                {t("field_amount")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Fee
+                {t("table_fee")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-right text-xs font-semibold">
-                Total
+                {t("table_total")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Account
+                {t("table_account")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Currency
+                {t("table_currency")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 border-r px-2 py-1.5 text-xs font-semibold">
-                Comment
+                {t("table_comment")}
               </TableHead>
               <TableHead className="bg-muted/30 h-9 px-2 py-1.5" />
             </TableRow>
@@ -780,7 +785,7 @@ export function ActivityDatagrid({
             {localTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={12} className="text-muted-foreground h-32 text-center">
-                  No transactions yet. Click &quot;Add Transaction&quot; to get started.
+                  {t("datagrid_no_transactions")}
                 </TableCell>
               </TableRow>
             ) : (

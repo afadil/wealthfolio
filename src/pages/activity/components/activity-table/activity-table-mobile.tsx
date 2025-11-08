@@ -12,6 +12,7 @@ import { ActivityTypeNames } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { formatAmount, Separator } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
 
@@ -30,12 +31,14 @@ export const ActivityTableMobile = ({
   handleDelete,
   onDuplicate,
 }: ActivityTableMobileProps) => {
+  const { t } = useTranslation("activity");
+
   if (activities.length === 0) {
     return (
       <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-        <h3 className="text-lg font-medium">No activities found</h3>
+        <h3 className="text-lg font-medium">{t("table_no_activity")}</h3>
         <p className="text-muted-foreground text-sm">
-          Try adjusting your search or filter criteria.
+          {t("search_activities")}
         </p>
       </div>
     );
@@ -122,7 +125,7 @@ export const ActivityTableMobile = ({
               <div className="space-y-1.5 text-sm">
                 {/* Date and Type */}
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Date</span>
+                  <span className="text-muted-foreground">{t("table_date")}</span>
                   <div className="text-right">
                     <p>{formattedDate.date}</p>
                     <p className="text-muted-foreground text-xs">{formattedDate.time}</p>
@@ -130,7 +133,7 @@ export const ActivityTableMobile = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Type</span>
+                  <span className="text-muted-foreground">{t("table_type")}</span>
                   <ActivityTypeBadge type={activity.activityType} className="text-xs font-normal" />
                 </div>
 
@@ -140,7 +143,7 @@ export const ActivityTableMobile = ({
                   !isSplitActivity(activity.activityType) &&
                   !isFeeActivity(activity.activityType) && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Shares</span>
+                      <span className="text-muted-foreground">{t("table_quantity")}</span>
                       <span className="font-medium">{activity.quantity}</span>
                     </div>
                   )}
@@ -149,12 +152,12 @@ export const ActivityTableMobile = ({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">
                     {activity.activityType === "SPLIT"
-                      ? "Ratio"
+                      ? t("field_split_ratio")
                       : isCashActivity(activity.activityType) ||
                           isCashTransfer(activity.activityType, symbol) ||
                           isIncomeActivity(activity.activityType)
-                        ? "Amount"
-                        : "Price"}
+                        ? t("field_amount")
+                        : t("field_price")}
                   </span>
                   <span className="font-medium">
                     {activity.activityType === "FEE"
@@ -172,7 +175,7 @@ export const ActivityTableMobile = ({
                 {/* Fee (if applicable) */}
                 {activity.fee > 0 && activity.activityType !== "SPLIT" && (
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Fee</span>
+                    <span className="text-muted-foreground">{t("table_fee")}</span>
                     <span className="font-medium">
                       {formatAmount(activity.fee, activity.currency)}
                     </span>
@@ -182,7 +185,7 @@ export const ActivityTableMobile = ({
                 {/* Total Value */}
                 {activity.activityType !== "SPLIT" && (
                   <div className="flex items-center justify-between border-t pt-1.5">
-                    <span className="text-muted-foreground font-medium">Total Value</span>
+                    <span className="text-muted-foreground font-medium">{t("table_total")}</span>
                     <span className="font-semibold">
                       {formatAmount(displayValue, activity.currency)}
                     </span>
@@ -191,7 +194,7 @@ export const ActivityTableMobile = ({
 
                 {/* Account */}
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Account</span>
+                  <span className="text-muted-foreground">{t("table_account")}</span>
                   <div className="text-right">
                     <p>{activity.accountName}</p>
                     <p className="text-muted-foreground text-xs">{activity.accountCurrency}</p>

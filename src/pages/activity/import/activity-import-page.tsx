@@ -215,7 +215,10 @@ const ActivityImportPage = () => {
   );
 };
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
   override state = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error) {

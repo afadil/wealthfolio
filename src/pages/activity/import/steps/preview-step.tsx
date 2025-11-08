@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Account, ActivityImport, CsvRowData } from "@/lib/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CSVFileViewer } from "../components/csv-file-viewer";
 import { ImportAlert } from "../components/import-alert";
 import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
@@ -30,6 +31,7 @@ export const DataPreviewStep = ({
   onBack,
   onError,
 }: DataPreviewStepProps) => {
+  const { t } = useTranslation("activity");
   const [importError, setImportError] = useState<string | null>(null);
   const [confirmationState, setConfirmationState] = useState<"initial" | "confirm" | "processing">(
     "initial",
@@ -79,10 +81,10 @@ export const DataPreviewStep = ({
 
   if (importError) {
     return (
-      <ImportAlert variant="destructive" title="Import Error" description={importError}>
+      <ImportAlert variant="destructive" title={t("import_error")} description={importError}>
         <div className="mt-4">
           <Button variant="destructive" onClick={() => setImportError(null)} size="sm">
-            Try Again
+            {t("mobile_back")}
           </Button>
         </div>
       </ImportAlert>
@@ -93,12 +95,12 @@ export const DataPreviewStep = ({
     return (
       <ImportAlert
         variant="destructive"
-        title="No Data Available"
-        description="No CSV data available. Please go back and upload a valid file."
+        title={t("no_data")}
+        description={t("import_invalid_csv")}
       >
         <div className="mt-4">
           <Button variant="destructive" onClick={onBack} size="sm">
-            Go Back
+            {t("mobile_back")}
           </Button>
         </div>
       </ImportAlert>
@@ -195,14 +197,14 @@ export const DataPreviewStep = ({
           {hasErrors ? (
             <ImportAlert
               variant="warning"
-              title={`There are issues with ${activities.length - validActivitiesCount} of ${activities.length} activities`}
-              description="Please review the errors below. You can either go back to fix the issues or proceed with only the valid entries."
+              title={t("import_partial_success")}
+              description={t("import_some_failed")}
             />
           ) : (
             <ImportAlert
               variant="success"
-              title={`All ${activities.length} activities are valid`}
-              description="Your data is ready to be imported."
+              title={t("validation_passed")}
+              description={t("import_preview")}
             />
           )}
         </div>
@@ -215,13 +217,13 @@ export const DataPreviewStep = ({
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="preview"
                 >
-                  Activity Preview
+                  {t("import_preview")}
                 </TabsTrigger>
                 <TabsTrigger
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="raw"
                 >
-                  File Preview
+                  {t("preview_data")}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -240,9 +242,9 @@ export const DataPreviewStep = ({
 
         {/* Dialog for import progress */}
         <ProgressIndicator
-          title="Import Progress"
-          description="Please wait while the application processes your data."
-          message="Processing Import..."
+          title={t("import_importing_activities")}
+          description={t("import_processing")}
+          message={t("import_importing_activities")}
           isLoading={isProcessing}
           open={isProcessing}
         />
@@ -264,12 +266,12 @@ export const DataPreviewStep = ({
             {confirmationState === "confirm" ? (
               <>
                 <Icons.XCircle className="mr-2 h-4 w-4" />
-                Cancel
+                {t("cancel")}
               </>
             ) : (
               <>
                 <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+                {t("mobile_back")}
               </>
             )}
           </Button>
@@ -295,8 +297,8 @@ export const DataPreviewStep = ({
               >
                 <div className="relative flex items-center">
                   {validActivitiesCount === activities.length
-                    ? "Import Activities"
-                    : `Import ${validActivitiesCount} Valid Activities`}
+                    ? t("import_preview_import")
+                    : t("import_successfully_imported", { count: validActivitiesCount })}
                   <Icons.ArrowRight className="ml-2 h-4 w-4" />
                 </div>
               </Button>
@@ -320,7 +322,7 @@ export const DataPreviewStep = ({
                   className="w-full bg-yellow-600 font-bold text-white shadow-md hover:bg-yellow-700"
                 >
                   <Icons.AlertTriangle className="mr-2 h-4 w-4" />
-                  Confirm importing {validActivitiesCount} activities
+                  {t("confirm")} {t("importing")} {validActivitiesCount} {t("activities")}
                 </Button>
               </motion.div>
             </motion.div>
@@ -334,7 +336,7 @@ export const DataPreviewStep = ({
             >
               <Button disabled className="bg-primary w-full font-medium shadow-md md:w-auto">
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Importing Activities...
+                {t("import_importing_activities")}
               </Button>
             </motion.div>
           )}

@@ -40,6 +40,7 @@ import {
 } from "@tanstack/react-table";
 import { Button, formatAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -61,6 +62,7 @@ export const ActivityTable = ({
   handleEdit,
   handleDelete,
 }: ActivityTableProps) => {
+  const { t } = useTranslation("activity");
   const { duplicateActivityMutation } = useActivityMutations();
 
   const handleDuplicate = React.useCallback(
@@ -81,7 +83,7 @@ export const ActivityTable = ({
         id: "activityType",
         accessorKey: "activityType",
         enableHiding: false,
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("table_type")} />,
         cell: ({ row }) => {
           const activityType = row.getValue("activityType");
           return (
@@ -106,7 +108,7 @@ export const ActivityTable = ({
         id: "date",
         accessorKey: "date",
         enableHiding: false,
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("table_date")} />,
         cell: ({ row }) => {
           const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const dateVal = row.getValue("date");
@@ -125,7 +127,7 @@ export const ActivityTable = ({
       {
         id: "assetSymbol",
         accessorKey: "assetSymbol",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("table_symbol")} />,
         cell: ({ row }) => {
           const symbol = String(row.getValue("assetSymbol"));
           const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
@@ -165,13 +167,13 @@ export const ActivityTable = ({
         enableHiding: true,
         enableSorting: false,
         meta: {
-          label: "Quantity",
+          label: t("table_quantity"),
         },
         header: ({ column }) => (
           <DataTableColumnHeader
             className="justify-end text-right"
             column={column}
-            title="Quantity"
+            title={t("table_quantity")}
           />
         ),
         cell: ({ row }) => {
@@ -196,13 +198,13 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Price / Amount",
+          label: t("table_price_amount"),
         },
         header: ({ column }) => (
           <DataTableColumnHeader
             className="justify-end text-right"
             column={column}
-            title="Price/Amount"
+            title={t("table_price_amount")}
           />
         ),
         cell: ({ row }) => {
@@ -236,10 +238,10 @@ export const ActivityTable = ({
         enableHiding: true,
         enableSorting: false,
         meta: {
-          label: "Fee",
+          label: t("table_fee"),
         },
         header: ({ column }) => (
-          <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
+          <DataTableColumnHeader className="justify-end text-right" column={column} title={t("table_fee")} />
         ),
         cell: ({ row }) => {
           const activityType = String(row.getValue("activityType"));
@@ -260,10 +262,10 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Total",
+          label: t("table_total"),
         },
         header: ({ column }) => (
-          <DataTableColumnHeader className="justify-end text-right" column={column} title="Total" />
+          <DataTableColumnHeader className="justify-end text-right" column={column} title={t("table_total")} />
         ),
         cell: ({ row }) => {
           const activity = row.original;
@@ -284,9 +286,9 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Account",
+          label: t("table_account"),
         },
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("table_account")} />,
         cell: ({ row }) => {
           const accountName = row.getValue("account");
           const accountCurrency = row.getValue("accountCurrency");
@@ -306,9 +308,9 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Currency",
+          label: t("table_currency"),
         },
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("table_currency")} />,
         cell: ({ row }) => <div>{row.getValue("currency")}</div>,
       },
       {
@@ -346,7 +348,7 @@ export const ActivityTable = ({
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 rounded-lg"
-                    title="Toggle columns"
+                    title={t("table_toggle_columns")}
                   >
                     <Icons.ChevronDown className="h-4 w-4" />
                   </Button>
@@ -413,7 +415,7 @@ export const ActivityTable = ({
   if (isLoading) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        Loading...
+        {t("loading")}
       </div>
     );
   }
@@ -454,7 +456,7 @@ export const ActivityTable = ({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No activity found.
+                  {t("table_no_activity")}
                 </TableCell>
               </TableRow>
             )}
