@@ -27,6 +27,9 @@ import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import AboutSettingsPage from "./pages/settings/about/about-page";
+import SwingfolioDashboardPage from "./pages/swingfolio/dashboard-page";
+import SwingfolioActivitySelectorPage from "./pages/swingfolio/activity-selector-page";
+import SwingfolioSettingsPage from "./pages/swingfolio/settings-page";
 
 export function AppRoutes() {
   useGlobalEventListener();
@@ -73,6 +76,9 @@ export function AppRoutes() {
           <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
+          <Route path="trading" element={<SwingfolioDashboardPage />} />
+          <Route path="trading/activities" element={<SwingfolioActivitySelectorPage />} />
+          <Route path="trading/settings" element={<SwingfolioSettingsPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route

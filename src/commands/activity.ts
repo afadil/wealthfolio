@@ -10,8 +10,8 @@ import {
 import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
 
 interface Filters {
-  accountId?: string;
-  activityType?: string;
+  accountId?: string | string[];
+  activityType?: string | string[];
   symbol?: string;
 }
 

@@ -38,6 +38,7 @@ import {
   FileText,
   FileUp,
   FileX,
+  Files,
   GaugeCircle,
   Globe2,
   Goal,
@@ -142,6 +143,7 @@ export const Icons = {
   PanelLeftOpen: PanelLeftOpen,
   Download: Download,
   Activity2: Activity,
+  Activity: Activity,
   DollarSign: DollarSign,
   Users: Users,
   ChevronUp: ChevronUp,
@@ -192,6 +194,8 @@ export const Icons = {
   Percent: Percent,
   Split: Split,
   FileUp: FileUp,
+  Files: Files,
+  Holdings: Briefcase,
   Store: Store,
   Package: Package,
   Star: Star,
@@ -310,51 +314,6 @@ export const Icons = {
     </svg>
   ),
 
-  Files: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      {...props}
-    >
-      <path d="M208,72V184a8,8,0,0,1-8,8H176V104L136,64H80V40a8,8,0,0,1,8-8h80Z" opacity="0.2"></path>
-      <path d="M213.66,66.34l-40-40A8,8,0,0,0,168,24H88A16,16,0,0,0,72,40V56H56A16,16,0,0,0,40,72V216a16,16,0,0,0,16,16H168a16,16,0,0,0,16-16V200h16a16,16,0,0,0,16-16V72A8,8,0,0,0,213.66,66.34ZM168,216H56V72h76.69L168,107.31v84.53c0,.06,0,.11,0,.16s0,.1,0,.16V216Zm32-32H184V104a8,8,0,0,0-2.34-5.66l-40-40A8,8,0,0,0,136,56H88V40h76.69L200,75.31Zm-56-32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,152Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h48A8,8,0,0,1,144,184Z"></path>
-    </svg>
-  ),
-
-  Holdings: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      {...props}
-    >
-      <path
-        d="M224,88V200a8,8,0,0,1-8,8H56a16,16,0,0,1-16-16V64A16,16,0,0,0,56,80H216A8,8,0,0,1,224,88Z"
-        opacity="0.2"
-      ></path>
-      <path d="M216,72H56a8,8,0,0,1,0-16H192a8,8,0,0,0,0-16H56A24,24,0,0,0,32,64V192a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V88A16,16,0,0,0,216,72Zm0,128H56a8,8,0,0,1-8-8V86.63A23.84,23.84,0,0,0,56,88H216Zm-48-60a12,12,0,1,1,12,12A12,12,0,0,1,168,140Z"></path>
-    </svg>
-  ),
-
-  Activity: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      {...props}
-    >
-      <path d="M216,128a88,88,0,1,1-88-88A88,88,0,0,1,216,128Z" opacity="0.2"></path>
-      <path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"></path>
-    </svg>
-  ),
-
   Settings: ({ size, ...props }: LucideProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -383,6 +342,23 @@ export const Icons = {
     >
       <path d="M224,104v88a8,8,0,0,1-8,8H168V104Z" opacity="0.2"></path>
       <path d="M28,128a8,8,0,0,1,0-16H56a8,8,0,0,0,0-16H40a24,24,0,0,1,0-48,8,8,0,0,1,16,0h8a8,8,0,0,1,0,16H40a8,8,0,0,0,0,16H56a24,24,0,0,1,0,48,8,8,0,0,1-16,0ZM232,56V192a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v40H160V160H80a8,8,0,0,1,0-16h80V112H104a8,8,0,0,1,0-16H216V64H96a8,8,0,0,1,0-16H224A8,8,0,0,1,232,56Zm-56,88h40V112H176Zm40,48V160H176v32Z"></path>
+    </svg>
+  ),
+
+  Swingfolio: ({ size, ...props }: LucideProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size ?? 32}
+      height={size ?? 32}
+      fill="currentColor"
+      viewBox="0 0 256 256"
+      {...props}
+    >
+      <path
+        d="M216,88V200a8,8,0,0,1-8,8H56a16,16,0,0,1-16-16V64A16,16,0,0,0,56,80H216A8,8,0,0,1,224,88Z"
+        opacity="0.2"
+      ></path>
+      <path d="M216,72H56a8,8,0,0,1,0-16H192a8,8,0,0,0,0-16H56A24,24,0,0,0,32,64V192a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V88A16,16,0,0,0,216,72Zm0,128H56a8,8,0,0,1-8-8V86.63A23.84,23.84,0,0,0,56,88H216Zm-48-60a12,12,0,1,1,12,12A12,12,0,0,1,168,140Z"></path>
     </svg>
   ),
 
