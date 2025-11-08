@@ -160,14 +160,14 @@ export default function AddonSettingsPage() {
                 <h3 className="text-base font-medium sm:text-lg">{t("addons_installed_title")}</h3>
                 <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm">
                   <span>
-                    {t("addons_installed_count", { count: installedAddons.length, plural: installedAddons.length !== 1 ? "s" : "" })}
+                    {t("addons_installed_count", { count: installedAddons.length })}
                   </span>
                   {hasUpdates() && (
                     <Badge
                       variant={getCriticalUpdateCount() > 0 ? "destructive" : "default"}
                       className="text-xs"
                     >
-                      {t("addons_updates_available", { count: getUpdateCount(), plural: getUpdateCount() !== 1 ? "s" : "" })}
+                      {t("addons_updates_available", { count: getUpdateCount() })}
                       {getCriticalUpdateCount() > 0 && ` ${t("addons_updates_critical", { count: getCriticalUpdateCount() })}`}
                     </Badge>
                   )}
