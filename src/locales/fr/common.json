@@ -60,5 +60,7 @@
   "help": "Aide",
   "about": "À propos",
   "logout": "Déconnexion",
-  "login": "Connexion"
+  "login": "Connexion",
+  "income": "Revenus",
+  "dashboard": "Tableau de bord"
 }

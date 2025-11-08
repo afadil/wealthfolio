@@ -60,5 +60,7 @@
   "help": "Help",
   "about": "About",
   "logout": "Logout",
-  "login": "Login"
+  "login": "Login",
+  "income": "Income",
+  "dashboard": "Dashboard"
 }
