@@ -17,6 +17,7 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAddonActions } from "../hooks/use-addon-actions";
 import { useAddonStore } from "../hooks/use-addon-store";
 import { PermissionDialog } from "./addon-permission-dialog";
@@ -34,6 +35,7 @@ const isAddonDisplayable = (listing: AddonStoreListing) => {
 };
 
 export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: AddonStoreBrowserProps) {
+  const { t } = useTranslation("settings");
   const {
     storeListings,
     isLoadingStore,

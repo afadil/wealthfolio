@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
+import { useTranslation } from "react-i18next";
 
 interface QuotePreviewTableProps {
   quotes: QuoteImport[];
@@ -24,6 +25,7 @@ interface QuotePreviewTableProps {
 }
 
 export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTableProps) {
+  const { t } = useTranslation("settings");
   const displayQuotes = quotes.slice(0, maxRows);
 
   return (
@@ -31,24 +33,24 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Icons.FileText className="h-5 w-5" />
-          Preview Data ({quotes.length} rows)
+          {t("quote_preview_title", { count: quotes.length })}
         </CardTitle>
-        <CardDescription>Review the first {maxRows} rows of your CSV data</CardDescription>
+        <CardDescription>{t("quote_preview_description", { count: maxRows })}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Open</TableHead>
-                <TableHead>High</TableHead>
-                <TableHead>Low</TableHead>
-                <TableHead>Close</TableHead>
-                <TableHead>Volume</TableHead>
-                <TableHead>Currency</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("quote_preview_symbol")}</TableHead>
+                <TableHead>{t("quote_preview_date")}</TableHead>
+                <TableHead>{t("quote_preview_open")}</TableHead>
+                <TableHead>{t("quote_preview_high")}</TableHead>
+                <TableHead>{t("quote_preview_low")}</TableHead>
+                <TableHead>{t("quote_preview_close")}</TableHead>
+                <TableHead>{t("quote_preview_volume")}</TableHead>
+                <TableHead>{t("quote_preview_currency")}</TableHead>
+                <TableHead>{t("quote_preview_status")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -77,7 +79,7 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
         </div>
         {quotes.length > maxRows && (
           <p className="text-muted-foreground mt-2 text-sm">
-            Showing first {maxRows} of {quotes.length} rows
+            {t("quote_preview_showing", { max: maxRows, total: quotes.length })}
           </p>
         )}
       </CardContent>

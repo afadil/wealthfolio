@@ -6,8 +6,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Holding, Sector } from "@/lib/types";
 import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
-function getSectorsData(holdings: Holding[]) {
+type TranslateFn = ReturnType<typeof useTranslation<"holdings">>["t"];
+
+function getSectorsData(holdings: Holding[], t: TranslateFn) {
   if (!holdings) return [];
   const sectors = holdings?.reduce(
     (acc, holding) => {
@@ -15,7 +18,7 @@ function getSectorsData(holdings: Holding[]) {
       const marketValue = Number(holding.marketValue?.base) || 0;
 
       const sectorsToProcess =
-        assetSectors && assetSectors.length > 0 ? assetSectors : [{ name: "Others", weight: 1 }];
+        assetSectors && assetSectors.length > 0 ? assetSectors : [{ name: t("others"), weight: 1 }];
 
       if (isNaN(marketValue)) return acc;
 
@@ -43,7 +46,8 @@ interface SectorsChartProps {
 }
 
 export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: SectorsChartProps) {
-  const sectors = useMemo(() => getSectorsData(holdings), [holdings]);
+  const { t } = useTranslation("holdings");
+  const sectors = useMemo(() => getSectorsData(holdings, t), [holdings, t]);
   const total = sectors.reduce((sum, s) => sum + s.value, 0);
 
   return (
@@ -51,7 +55,7 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Sector Allocation
+            {t("sector_allocation")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -70,8 +74,8 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
             <div className="flex h-[330px] items-center justify-center">
               <EmptyPlaceholder
                 icon={<Icons.BarChart className="h-10 w-10" />}
-                title="No sectors data"
-                description="There is no sector data available for your holdings."
+                title={t("no_sectors_data")}
+                description={t("no_sectors_data_desc")}
               />
             </div>
           ) : (

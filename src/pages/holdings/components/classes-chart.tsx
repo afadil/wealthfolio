@@ -9,8 +9,11 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-function getClassData(holdings: Holding[]) {
+type TranslateFn = ReturnType<typeof useTranslation<"holdings">>["t"];
+
+function getClassData(holdings: Holding[], t: TranslateFn) {
   if (!holdings?.length) return [];
 
   const currency = holdings[0]?.baseCurrency || "USD";
@@ -18,7 +21,7 @@ function getClassData(holdings: Holding[]) {
   const classes = holdings.reduce(
     (acc, holding) => {
       const isCash = holding.holdingType === HoldingType.CASH;
-      const assetSubClass = isCash ? "Cash" : holding.instrument?.assetSubclass || "Other";
+      const assetSubClass = isCash ? t("cash") : holding.instrument?.assetSubclass || t("other");
 
       const current = acc[assetSubClass] || 0;
       const value = Number(holding.marketValue?.base) || 0;
@@ -41,9 +44,10 @@ interface ClassesChartProps {
 }
 
 export function ClassesChart({ holdings, isLoading, onClassSectionClick }: ClassesChartProps) {
+  const { t } = useTranslation("holdings");
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
+  const data = useMemo(() => getClassData(holdings ?? [], t), [holdings, t]);
 
   const handleInternalSectionClick = (sectionData: {
     name: string;
@@ -82,7 +86,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Asset Allocation
+            {t("asset_allocation")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -96,7 +100,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description="There is no class data available for your holdings." />
+          <EmptyPlaceholder description={t("no_class_data")} />
         )}
       </CardContent>
     </Card>

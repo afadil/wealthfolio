@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountOperations } from "./account-operations";
 import type { Account } from "@/lib/types";
@@ -11,6 +12,7 @@ export interface AccountItemProps {
 }
 
 export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
+  const { t } = useTranslation("settings");
   return (
     <div className="flex items-center justify-between p-4">
       <div className="grid gap-1">
@@ -30,7 +32,7 @@ export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        {!account.isActive && <Badge variant="secondary">Disabled</Badge>}
+        {!account.isActive && <Badge variant="secondary">{t("accounts_disabled_badge")}</Badge>}
         <AccountOperations account={account} onEdit={onEdit} onDelete={onDelete} />
       </div>
     </div>

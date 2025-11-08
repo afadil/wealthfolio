@@ -15,7 +15,7 @@ export default function GeneralSettingsPage() {
     <div className="space-y-6">
       <SettingsHeader
         heading={t("general")}
-        text="Manage the general application settings and preferences."
+        text={t("general_page_description")}
       />
       <Separator />
       <LanguageSettings />

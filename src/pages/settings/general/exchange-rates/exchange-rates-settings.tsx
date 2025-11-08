@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useExchangeRates } from "./use-exchange-rate";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -15,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { formatDate } from "@/lib/utils";
 
 export function ExchangeRatesSettings() {
+  const { t } = useTranslation("settings");
   const { exchangeRates, isLoadingRates, updateExchangeRate, addExchangeRate, deleteExchangeRate } =
     useExchangeRates();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -22,7 +24,7 @@ export function ExchangeRatesSettings() {
   const columns: ColumnDef<ExchangeRate>[] = [
     {
       accessorKey: "fromCurrency",
-      header: "From",
+      header: t("exchange_rates_from"),
       enableHiding: false,
       cell: ({ row }) => (
         <div>
@@ -33,7 +35,7 @@ export function ExchangeRatesSettings() {
     },
     {
       accessorKey: "toCurrency",
-      header: "To",
+      header: t("exchange_rates_to"),
       enableHiding: false,
       cell: ({ row }) => (
         <div>
@@ -44,19 +46,19 @@ export function ExchangeRatesSettings() {
     },
     {
       accessorKey: "source",
-      header: "Source",
+      header: t("exchange_rates_source"),
       enableHiding: false,
     },
     {
       accessorKey: "rate",
-      header: "Rate",
+      header: t("exchange_rates_rate"),
       enableHiding: false,
       cell: ({ row }) => <RateCell rate={row.original} onUpdate={updateExchangeRate} />,
       size: 180,
     },
     {
       accessorKey: "updatedAt",
-      header: "Last Updated",
+      header: t("exchange_rates_last_updated"),
       enableHiding: false,
       cell: ({ row }) => (
         <div className="text-muted-foreground text-sm">{formatDate(row.original.timestamp)}</div>
@@ -72,7 +74,7 @@ export function ExchangeRatesSettings() {
         >
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Icons.Clock className="h-4 w-4" />
-            <span className="sr-only">View history</span>
+            <span className="sr-only">{t("exchange_rates_view_history")}</span>
           </Button>
         </Link>
       ),
@@ -96,9 +98,9 @@ export function ExchangeRatesSettings() {
             <PopoverContent className="w-80" align="end">
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <h4 className="leading-none font-medium">Delete Exchange Rate</h4>
+                  <h4 className="leading-none font-medium">{t("exchange_rates_delete_title")}</h4>
                   <p className="text-muted-foreground text-sm">
-                    Are you sure you want to delete this exchange rate?
+                    {t("exchange_rates_delete_message")}
                   </p>
                 </div>
                 <div className="flex justify-end space-x-2">
@@ -107,7 +109,7 @@ export function ExchangeRatesSettings() {
                     size="sm"
                     onClick={() => deleteExchangeRate(row.original.id)}
                   >
-                    Delete
+                    {t("exchange_rates_delete_button")}
                   </Button>
                 </div>
               </div>
@@ -123,16 +125,16 @@ export function ExchangeRatesSettings() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Exchange Rates</CardTitle>
+            <CardTitle className="text-lg">{t("exchange_rates_title")}</CardTitle>
             <CardDescription>
-              Manage exchange rates for currencies in your portfolio.
+              {t("exchange_rates_description")}
             </CardDescription>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Icons.PlusCircle className="mr-2 h-4 w-4" />
-                Add rate
+                {t("exchange_rates_add_button")}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -159,11 +161,11 @@ export function ExchangeRatesSettings() {
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <Icons.DollarSign className="text-muted-foreground h-12 w-12" />
-            <h3 className="mt-4 text-lg font-semibold">No exchange rates defined yet</h3>
+            <h3 className="mt-4 text-lg font-semibold">{t("exchange_rates_empty_title")}</h3>
 
             <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>
               <Icons.PlusCircle className="mr-2 h-4 w-4" />
-              Add rate
+              {t("exchange_rates_add_button")}
             </Button>
           </div>
         )}
