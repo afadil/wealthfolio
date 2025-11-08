@@ -25,7 +25,7 @@ const createBaseCurrencyFormSchema = (t: TranslateFn) =>
 // Extracted form component
 export function BaseCurrencyForm() {
   const { settings, updateBaseCurrency } = useSettingsContext();
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || "USD",
   };
@@ -53,7 +53,7 @@ export function BaseCurrencyForm() {
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormControl className="w-[300px]">
-                <CurrencyInput value={field.value} onChange={field.onChange} />
+                <CurrencyInput value={field.value} onChange={field.onChange} language={i18n.language} />
               </FormControl>
               <FormMessage />
             </FormItem>

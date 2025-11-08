@@ -36,7 +36,7 @@ interface AccountFormlProps {
 }
 
 export function AccountForm({ defaultValues, onSuccess = () => undefined }: AccountFormlProps) {
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
   const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
   const accountTypes: ResponsiveSelectOption[] = [
@@ -130,6 +130,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     <CurrencyInput
                       value={field.value}
                       onChange={(value: string) => field.onChange(value)}
+                      language={i18n.language}
                     />
                   </FormControl>
                   <FormMessage />

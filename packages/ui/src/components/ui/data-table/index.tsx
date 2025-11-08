@@ -30,6 +30,12 @@ interface DataTableProps<TData, TValue> {
   manualPagination?: boolean;
   scrollable?: boolean;
   showColumnToggle?: boolean;
+  translations?: {
+    searchPlaceholder?: string;
+    reset?: string;
+    columns?: string;
+    noResultsFound?: string;
+  };
 }
 
 export function DataTable<TData, TValue>({
@@ -42,11 +48,14 @@ export function DataTable<TData, TValue>({
   defaultSorting,
   scrollable = false,
   showColumnToggle = false,
+  translations = {},
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(defaultColumnVisibility || {});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
+
+  const { noResultsFound = "No results found." } = translations;
 
   const table = useReactTable({
     data,
@@ -81,7 +90,7 @@ export function DataTable<TData, TValue>({
   return (
     <div className="flex h-full flex-col">
       <div className="mb-2 shrink-0">
-        <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} />
+        <DataTableToolbar table={table} searchBy={searchBy} filters={filters} showColumnToggle={showColumnToggle} translations={translations} />
       </div>
       <div className={`min-h-0 flex-1 rounded-md border ${scrollable ? "overflow-auto" : ""}`}>
         <Table>
@@ -112,7 +121,7 @@ export function DataTable<TData, TValue>({
                 <TableCell colSpan={columns.length} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <Icons.FileText className="text-muted-foreground mb-2 h-10 w-10" />
-                    <p className="text-muted-foreground text-sm">No results found.</p>
+                    <p className="text-muted-foreground text-sm">{noResultsFound}</p>
                   </div>
                 </TableCell>
               </TableRow>

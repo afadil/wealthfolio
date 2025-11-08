@@ -22,6 +22,11 @@ interface DataTableToolbarProps<TData> {
   searchBy?: string;
   filters?: DataTableFacetedFilterProps<TData, unknown>[];
   showColumnToggle?: boolean;
+  translations?: {
+    searchPlaceholder?: string;
+    reset?: string;
+    columns?: string;
+  };
 }
 
 export function DataTableToolbar<TData>({
@@ -29,16 +34,23 @@ export function DataTableToolbar<TData>({
   searchBy,
   filters,
   showColumnToggle = false,
+  translations = {},
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0 || table.getState().globalFilter;
   const hideableColumns = table.getAllColumns().filter((column) => column.getCanHide());
+
+  const {
+    searchPlaceholder = "Search ...",
+    reset = "Reset",
+    columns = "Columns",
+  } = translations;
 
   return (
     <div className="flex items-center justify-between">
       <div className="flex flex-1 items-center space-x-2">
         {searchBy && (
           <SearchInput
-            placeholder="Search ..."
+            placeholder={searchPlaceholder}
             value={table.getState().globalFilter ?? ""}
             onChange={(value) => table.setGlobalFilter(value)}
             className="bg-muted/40 border-border/50 h-8 w-[150px] shadow-[inset_0_0.5px_0.5px_rgba(0,0,0,0.06)] lg:w-[250px]"
@@ -62,7 +74,7 @@ export function DataTableToolbar<TData>({
             }}
             className="h-8 px-2 lg:px-3"
           >
-            Reset
+            {reset}
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         )}
@@ -75,7 +87,7 @@ export function DataTableToolbar<TData>({
               size="sm"
               className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
             >
-              Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
+              {columns} <Icons.ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

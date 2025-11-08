@@ -51,6 +51,7 @@ export const HoldingsTable = ({
   isLoading: boolean;
 }) => {
   const { t } = useTranslation("holdings");
+  const { t: tCommon } = useTranslation("common");
   const { isBalanceHidden } = useBalancePrivacy();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
 
@@ -102,6 +103,12 @@ export const HoldingsTable = ({
         }}
         defaultSorting={[{ id: "symbol", desc: false }]}
         scrollable={true}
+        translations={{
+          searchPlaceholder: tCommon("search_placeholder"),
+          reset: tCommon("reset"),
+          columns: tCommon("columns"),
+          noResultsFound: tCommon("no_results_found"),
+        }}
       />
     </div>
   );

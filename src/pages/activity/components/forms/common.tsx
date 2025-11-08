@@ -93,7 +93,7 @@ export const ConfigurationCheckbox = ({
 };
 
 export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) => {
-  const { t } = useTranslation("activity");
+  const { t, i18n } = useTranslation("activity");
   const { control, watch } = useFormContext();
   const showCurrency = watch("showCurrencySelect");
 
@@ -149,7 +149,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
             <FormItem>
               <FormLabel>{t("field_currency")}</FormLabel>
               <FormControl>
-                <CurrencyInput {...field} />
+                <CurrencyInput {...field} language={i18n.language} />
               </FormControl>
               <FormMessage />
             </FormItem>

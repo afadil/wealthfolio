@@ -86,5 +86,7 @@
   "validation_errors": "Erreurs de validation",
   "invalid_activity": "Activité invalide",
   "no_activities_found": "Aucune activité trouvée",
-  "csv_content": "Contenu CSV"
+  "csv_content": "Contenu CSV",
+  "reset": "Réinitialiser",
+  "columns": "Colonnes"
 }

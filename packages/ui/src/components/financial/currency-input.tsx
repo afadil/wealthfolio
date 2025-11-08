@@ -1,7 +1,7 @@
 import { Check, ChevronsUpDown } from "lucide-react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useMemo, useRef, useState } from "react";
 import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
-import { worldCurrencies } from "../../lib/currencies";
+import { getWorldCurrencies } from "../../lib/currencies";
 import { cn } from "../../lib/utils";
 import type { ButtonProps } from "../ui/button";
 import { Button } from "../ui/button";
@@ -18,6 +18,7 @@ interface CurrencyInputCustomProps {
   placeholder?: string;
   displayMode?: "auto" | "desktop" | "mobile";
   useIsMobile?: () => boolean;
+  language?: string;
 }
 
 type CurrencyInputProps = CurrencyInputCustomProps & Omit<ButtonProps, "onChange" | "value">;
@@ -33,6 +34,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
       placeholder = "Select account currency",
       displayMode = "auto",
       useIsMobile,
+      language = 'en',
       ...props
     },
     ref,
@@ -44,6 +46,9 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
     const useIsMobileHook = useIsMobile ?? defaultUseIsMobile;
     const isMobileFromHook = useIsMobileHook();
     const isMobile = displayMode === "mobile" || (displayMode === "auto" && isMobileFromHook);
+
+    // Generate translated currency list based on language
+    const worldCurrencies = useMemo(() => getWorldCurrencies(language), [language]);
 
     const selectedCurrency = worldCurrencies.find((currency) => currency.value === value);
     const buttonLabel = selectedCurrency ? selectedCurrency.label : placeholder;
