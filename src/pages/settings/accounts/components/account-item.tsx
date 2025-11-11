@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AccountOperations } from "./account-operations";
 import type { Account } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
 
 export interface AccountItemProps {
   account: Account;
@@ -11,6 +12,8 @@ export interface AccountItemProps {
 }
 
 export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
+  const { t } = useTranslation("settings");
+
   return (
     <div className="flex items-center justify-between p-4">
       <div className="grid gap-1">
@@ -30,7 +33,7 @@ export function AccountItem({ account, onEdit, onDelete }: AccountItemProps) {
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        {!account.isActive && <Badge variant="secondary">Disabled</Badge>}
+        {!account.isActive && <Badge variant="secondary">{t("accounts.item.disabled")}</Badge>}
         <AccountOperations account={account} onEdit={onEdit} onDelete={onDelete} />
       </div>
     </div>

@@ -171,6 +171,14 @@ export const activityTypeSchema = z.enum([
   ActivityType.SPLIT,
 ]);
 
+// Helper function to get activity type display name with i18n support
+// Pass the translation function from useTranslation("activity")
+export function getActivityTypeName(type: ActivityType, t: any): string {
+  return t(`types.${type}`);
+}
+
+// Legacy constant for backwards compatibility (deprecated - use getActivityTypeName instead)
+// This will be removed in a future version
 export const ActivityTypeNames: Record<ActivityType, string> = {
   [ActivityType.BUY]: "Buy",
   [ActivityType.SELL]: "Sell",

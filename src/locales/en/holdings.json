@@ -1,0 +1,78 @@
+{
+  "title": "Holdings",
+  "page": {
+    "title": "Holdings",
+    "allPortfolio": "All Portfolio",
+    "viewHoldings": "Holdings",
+    "viewInsights": "Insights",
+    "detailsFor": "Details for {{name}}",
+    "noHoldings": "No holdings found for this selection.",
+    "close": "Close",
+    "cash": "Cash"
+  },
+  "table": {
+    "position": "Position",
+    "symbolName": "Symbol Name",
+    "shares": "Shares",
+    "todayPrice": "Today's Price",
+    "bookCost": "Book Cost",
+    "totalValue": "Total Value",
+    "totalGainLoss": "Total Gain/Loss",
+    "assetType": "Asset Type",
+    "currency": "Currency",
+    "type": "Type",
+    "showInBaseCurrency": "Show values in Base Currency",
+    "showInAssetCurrency": "Show values in Asset Currency"
+  },
+  "filters": {
+    "title": "Filter Holdings",
+    "account": "Account",
+    "assetType": "Asset Type",
+    "allTypes": "All Types",
+    "done": "Done"
+  },
+  "search": {
+    "placeholder": "Search..."
+  },
+  "noPositions": {
+    "title": "No positions found",
+    "noHoldings": "Add activities to see your positions here.",
+    "noMatch": "Try adjusting your search or filter criteria."
+  },
+  "widget": {
+    "cashBalance": "Cash Balance"
+  },
+  "charts": {
+    "assetClasses": "Asset Classes",
+    "currency": "Currency",
+    "countries": "Countries",
+    "sectors": "Sectors",
+    "composition": "Portfolio Composition",
+    "accountAllocation": "Account Allocation",
+    "assetAllocation": "Asset Allocation",
+    "sectorAllocation": "Sector Allocation",
+    "currencyAllocation": "Currency Allocation",
+    "countryAllocation": "Country Allocation",
+    "noDataAvailable": "There is no class data available for your holdings.",
+    "noAccountData": "No account valuation data available.",
+    "noSectorsData": "No sectors data",
+    "noSectorDataAvailable": "There is no sector data available for your holdings.",
+    "noCountryData": "There is no country data available for your holdings.",
+    "noCurrencyData": "No currency data available",
+    "noHoldingsData": "No holdings data",
+    "noHoldingsDataAvailable": "There is no holdings data available for your portfolio.",
+    "showFullNames": "Show full names",
+    "showSymbols": "Show symbols",
+    "marketValue": "Market Value",
+    "return": "Return",
+    "daily": "Daily",
+    "total": "Total",
+    "holdingsIn": "Holdings in {{name}}",
+    "assetClass": "Asset Class: {{name}}",
+    "sector": "Holdings in Sector: {{name}}"
+  },
+  "empty": {
+    "title": "No holdings yet",
+    "description": "Start adding activities to see your holdings"
+  }
+}

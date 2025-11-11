@@ -7,6 +7,7 @@ import { useImportMapping } from "../hooks/use-import-mapping";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import { ImportAlert } from "../components/import-alert";
 import { Icons, Icon } from "@/components/ui/icons";
+import { useTranslation } from "react-i18next";
 
 interface MappingStepProps {
   headers: string[];
@@ -25,6 +26,7 @@ export const MappingStep = ({
   onNext,
   onBack,
 }: MappingStepProps) => {
+  const { t } = useTranslation("activity");
   const {
     mapping,
     handleColumnMapping,
@@ -52,8 +54,8 @@ export const MappingStep = ({
     return (
       <ImportAlert
         variant="destructive"
-        title="No CSV data available"
-        description="Please go back and upload a valid file."
+        title={t("import.mapping.noDataAvailable")}
+        description={t("import.mapping.pleaseGoBack")}
         icon={Icons.AlertCircle}
       />
     );
@@ -199,8 +201,11 @@ export const MappingStep = ({
         <ImportAlert
           variant={requiredFieldsMapped ? "success" : "destructive"}
           size="sm"
-          title="Fields"
-          description={`${mappedFieldsCount} of ${totalFields} mapped`}
+          title={t("import.mapping.fields")}
+          description={t("import.mapping.fieldsMapped", {
+            count: mappedFieldsCount,
+            total: totalFields,
+          })}
           icon={Icons.ListChecks}
           className="mb-0"
           rightIcon={requiredFieldsMapped ? Icons.CheckCircle : Icons.AlertCircle}
@@ -210,8 +215,11 @@ export const MappingStep = ({
         <ImportAlert
           variant={activitiesToMapCount === 0 ? "success" : "destructive"}
           size="sm"
-          title="Activities"
-          description={`${distinctActivityTypes.length - activitiesToMapCount} of ${distinctActivityTypes.length} mapped`}
+          title={t("import.mapping.activities")}
+          description={t("import.mapping.activitiesMapped", {
+            count: distinctActivityTypes.length - activitiesToMapCount,
+            total: distinctActivityTypes.length,
+          })}
           icon={Icons.Activity as Icon}
           className="mb-0"
           rightIcon={activitiesToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
@@ -221,8 +229,11 @@ export const MappingStep = ({
         <ImportAlert
           variant={symbolsToMapCount === 0 ? "success" : "destructive"}
           size="sm"
-          title="Symbols"
-          description={`${distinctSymbols.length - symbolsToMapCount} of ${distinctSymbols.length} mapped`}
+          title={t("import.mapping.symbols")}
+          description={t("import.mapping.symbolsMapped", {
+            count: distinctSymbols.length - symbolsToMapCount,
+            total: distinctSymbols.length,
+          })}
           icon={Icons.Tag as Icon}
           className="mb-0"
           rightIcon={symbolsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
@@ -233,11 +244,14 @@ export const MappingStep = ({
           <ImportAlert
             variant={accountsToMapCount === 0 ? "success" : "destructive"}
             size="sm"
-            title="Accounts"
+            title={t("import.mapping.accounts")}
             description={
               distinctAccountIds.length > 0
-                ? `${distinctAccountIds.length - accountsToMapCount} of ${distinctAccountIds.length} mapped`
-                : "No unmapped account IDs found"
+                ? t("import.mapping.accountsMapped", {
+                    count: distinctAccountIds.length - accountsToMapCount,
+                    total: distinctAccountIds.length,
+                  })
+                : t("import.mapping.noUnmappedAccountIds")
             }
             icon={Icons.Wallet as Icon}
             className="mb-0"
@@ -265,14 +279,14 @@ export const MappingStep = ({
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          {t("import.mapping.back")}
         </Button>
         <Button
           onClick={handleNextClick}
           disabled={!allMappingsComplete || saveMappingMutation.isPending}
           className="min-w-[120px]"
         >
-          {saveMappingMutation.isPending ? "Saving..." : "Next"}
+          {saveMappingMutation.isPending ? t("import.mapping.saving") : t("import.mapping.next")}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import AssetDetailCard from "./asset-detail-card";
 import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
@@ -58,6 +59,7 @@ interface AssetDetailData {
 type AssetTab = "overview" | "lots" | "history";
 
 export const AssetProfilePage = () => {
+  const { t } = useTranslation(["assets"]);
   const { symbol: encodedSymbol = "" } = useParams<{ symbol: string }>();
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
@@ -243,17 +245,17 @@ export const AssetProfilePage = () => {
     const items: { value: AssetTab; label: string }[] = [];
 
     if (profile) {
-      items.push({ value: "overview", label: "Overview" });
+      items.push({ value: "overview", label: t("assets:profile.tabs.overview") });
     }
 
     if (holding?.lots && holding.lots.length > 0) {
-      items.push({ value: "lots", label: "Lots" });
+      items.push({ value: "lots", label: t("assets:profile.tabs.lots") });
     }
 
-    items.push({ value: "history", label: "Quotes" });
+    items.push({ value: "history", label: t("assets:profile.tabs.quotes") });
 
     return items;
-  }, [profile, holding]);
+  }, [profile, holding, t]);
 
   // Build swipable tabs for mobile
   const swipableTabs = useMemo(() => {
@@ -261,7 +263,7 @@ export const AssetProfilePage = () => {
 
     if (profile) {
       tabs.push({
-        name: "Overview",
+        name: t("assets:profile.tabs.overview"),
         content: (
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
@@ -281,7 +283,7 @@ export const AssetProfilePage = () => {
 
             <div className="group relative">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold">About</h3>
+                <h3 className="text-lg font-bold">{t("assets:profile.about")}</h3>
                 {!isEditing && (
                   <Button
                     variant="ghost"
@@ -300,7 +302,7 @@ export const AssetProfilePage = () => {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
                     }
-                    placeholder="Enter asset class"
+                    placeholder={t("assets:profile.placeholders.assetClass")}
                     className="w-[180px]"
                   />
                 ) : (
@@ -316,7 +318,7 @@ export const AssetProfilePage = () => {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
                     }
-                    placeholder="Enter sub-class"
+                    placeholder={t("assets:profile.placeholders.subClass")}
                     className="w-[180px]"
                   />
                 ) : (
@@ -334,7 +336,7 @@ export const AssetProfilePage = () => {
                     value={formData.sectors.map(
                       (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
                     )}
-                    placeholder="sector:weight"
+                    placeholder={t("assets:profile.placeholders.sector")}
                     onChange={(values) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -364,7 +366,7 @@ export const AssetProfilePage = () => {
                 )}
                 {isEditing ? (
                   <InputTags
-                    placeholder="country:weight"
+                    placeholder={t("assets:profile.placeholders.country")}
                     value={formData.countries.map(
                       (c) => `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
                     )}
@@ -416,13 +418,13 @@ export const AssetProfilePage = () => {
                   <textarea
                     className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
                     value={formData.notes}
-                    placeholder="Symbol/Company description"
+                    placeholder={t("assets:profile.placeholders.description")}
                     rows={6}
                     onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm font-light">
-                    {formData.notes || "No description available."}
+                    {formData.notes || t("assets:profile.noDescription")}
                   </p>
                 )}
               </div>
@@ -434,7 +436,7 @@ export const AssetProfilePage = () => {
 
     if (holding?.lots && holding.lots.length > 0 && profile) {
       tabs.push({
-        name: "Lots",
+        name: t("assets:profile.tabs.lots"),
         content: (
           <AssetLotsTable
             lots={holding.lots}
@@ -446,7 +448,7 @@ export const AssetProfilePage = () => {
     }
 
     tabs.push({
-      name: "Quotes",
+      name: t("assets:profile.tabs.quotes"),
       content: (
         <QuoteHistoryTable
           data={quoteHistory ?? []}
@@ -496,6 +498,7 @@ export const AssetProfilePage = () => {
     symbol,
     handleCancel,
     handleSave,
+    t,
   ]);
 
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
@@ -513,7 +516,11 @@ export const AssetProfilePage = () => {
   if (assetProfile?.assetType === "FOREX") {
     return (
       <Page>
-        <PageHeader heading="Quote History" text={symbol} onBack={() => navigate(backTarget)} />
+        <PageHeader
+          heading={t("assets:profile.quoteHistory")}
+          text={symbol}
+          onBack={() => navigate(backTarget)}
+        />
         <PageContent>
           <QuoteHistoryTable
             data={quoteHistory ?? []}
@@ -558,18 +565,19 @@ export const AssetProfilePage = () => {
       <Page>
         <PageHeader
           heading={symbol}
-          text={`Error loading data for ${symbol}`}
+          text={`${t("assets:profile.errorLoading")} ${symbol}`}
           onBack={() => navigate(backTarget)}
         />
         <PageContent>
-          <p>
-            Could not load necessary information for this symbol. Please check the symbol or try
-            again later.
-          </p>
-          {isHoldingError && <p className="text-sm text-red-500">Holding fetch error.</p>}
-          {isQuotesError && <p className="text-sm text-red-500">Quote fetch error.</p>}
+          <p>{t("assets:profile.errorMessage")}</p>
+          {isHoldingError && (
+            <p className="text-sm text-red-500">{t("assets:profile.errors.holding")}</p>
+          )}
+          {isQuotesError && (
+            <p className="text-sm text-red-500">{t("assets:profile.errors.quote")}</p>
+          )}
           {isAssetProfileError && (
-            <p className="text-sm text-red-500">Asset profile fetch error.</p>
+            <p className="text-sm text-red-500">{t("assets:profile.errors.profile")}</p>
           )}
         </PageContent>
       </Page>
@@ -596,7 +604,7 @@ export const AssetProfilePage = () => {
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter asset name"
+                placeholder={t("assets:profile.placeholders.assetName")}
                 className="font-heading text-xl font-bold tracking-tight"
                 onBlur={() => {
                   setIsEditingTitle(false);
@@ -705,7 +713,7 @@ export const AssetProfilePage = () => {
 
               <div className="group relative">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold">About</h3>
+                  <h3 className="text-lg font-bold">{t("assets:profile.about")}</h3>
                   {!isEditing && (
                     <Button
                       variant="ghost"
@@ -724,7 +732,7 @@ export const AssetProfilePage = () => {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
                       }
-                      placeholder="Enter asset class"
+                      placeholder={t("assets:profile.placeholders.assetClass")}
                       className="w-[180px]"
                     />
                   ) : (
@@ -740,7 +748,7 @@ export const AssetProfilePage = () => {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
                       }
-                      placeholder="Enter sub-class"
+                      placeholder={t("assets:profile.placeholders.subClass")}
                       className="w-[180px]"
                     />
                   ) : (
@@ -758,7 +766,7 @@ export const AssetProfilePage = () => {
                         (s) =>
                           `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
                       )}
-                      placeholder="sector:weight"
+                      placeholder={t("assets:profile.placeholders.sector")}
                       onChange={(values) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -789,7 +797,7 @@ export const AssetProfilePage = () => {
                   )}
                   {isEditing ? (
                     <InputTags
-                      placeholder="country:weight"
+                      placeholder={t("assets:profile.placeholders.country")}
                       value={formData.countries.map(
                         (c) =>
                           `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
@@ -848,13 +856,13 @@ export const AssetProfilePage = () => {
                     <textarea
                       className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
                       value={formData.notes}
-                      placeholder="Symbol/Company description"
+                      placeholder={t("assets:profile.placeholders.description")}
                       rows={6}
                       onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                     />
                   ) : (
                     <p className="text-muted-foreground text-sm font-light">
-                      {formData.notes || "No description available."}
+                      {formData.notes || t("assets:profile.noDescription")}
                     </p>
                   )}
                 </div>

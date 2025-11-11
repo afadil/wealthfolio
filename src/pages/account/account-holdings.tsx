@@ -7,8 +7,10 @@ import { HoldingsTable } from "@/pages/holdings/components/holdings-table";
 import { HoldingsTableMobile } from "@/pages/holdings/components/holdings-table-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const AccountHoldings = ({ accountId }: { accountId: string }) => {
+  const { t } = useTranslation(["accounts"]);
   const isMobile = useIsMobileViewport();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
 
@@ -43,7 +45,7 @@ const AccountHoldings = ({ accountId }: { accountId: string }) => {
 
   return (
     <div>
-      <h3 className="py-4 text-lg font-bold">Holdings</h3>
+      <h3 className="py-4 text-lg font-bold">{t("holdings.title")}</h3>
       {isMobile ? (
         <HoldingsTableMobile
           holdings={filteredHoldings ?? []}

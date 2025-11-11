@@ -15,6 +15,7 @@ import { QuoteSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const BENCHMARKS = [
   {
@@ -85,6 +86,7 @@ export function BenchmarkSymbolSelectorMobile({
   open: controlledOpen,
   onOpenChange,
 }: BenchmarkSymbolSelectorMobileProps) {
+  const { t } = useTranslation("performance");
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
@@ -128,7 +130,7 @@ export function BenchmarkSymbolSelectorMobile({
       <SheetTrigger asChild>
         <Button
           variant="outline"
-          aria-label={iconOnly ? "Add benchmark" : undefined}
+          aria-label={iconOnly ? t("benchmarkSelector.title") : undefined}
           className={cn(
             "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-[1.5px] border-none text-sm font-medium",
             iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -137,13 +139,13 @@ export function BenchmarkSymbolSelectorMobile({
           size={iconOnly ? "icon" : "sm"}
         >
           <Icons.TrendingUp className="h-4 w-4" />
-          {!iconOnly && "Add Benchmark"}
+          {!iconOnly && t("benchmarkSelector.title")}
         </Button>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[85vh] p-0">
         <SheetHeader className="border-border border-b px-6 py-4">
-          <SheetTitle>Select Benchmark</SheetTitle>
-          <SheetDescription>Choose a benchmark or search for any symbol</SheetDescription>
+          <SheetTitle>{t("benchmarkSelector.selectTitle")}</SheetTitle>
+          <SheetDescription>{t("benchmarkSelector.description")}</SheetDescription>
         </SheetHeader>
 
         <div className="flex h-[calc(85vh-5rem)] flex-col">
@@ -153,7 +155,7 @@ export function BenchmarkSymbolSelectorMobile({
               <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search benchmarks or any symbol..."
+                placeholder={t("benchmarkSelector.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-full rounded-md border px-3 py-2 pl-9 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -166,7 +168,9 @@ export function BenchmarkSymbolSelectorMobile({
             {/* Loading state for search results */}
             {isLoading && searchQuery.length > 2 && (
               <div className="space-y-2">
-                <div className="text-muted-foreground mb-3 text-sm font-medium">Searching...</div>
+                <div className="text-muted-foreground mb-3 text-sm font-medium">
+                  {t("benchmarkSelector.searching")}
+                </div>
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
@@ -176,7 +180,7 @@ export function BenchmarkSymbolSelectorMobile({
             {/* Error state for search results */}
             {isError && searchQuery.length > 2 && (
               <div className="text-muted-foreground py-8 text-center text-sm">
-                Error searching for symbols. Please try again.
+                {t("benchmarkSelector.errorSearching")}
               </div>
             )}
 
@@ -186,7 +190,9 @@ export function BenchmarkSymbolSelectorMobile({
               filteredSearchResults.length > 0 &&
               searchQuery.length > 2 && (
                 <div className="mb-6">
-                  <h3 className="text-muted-foreground mb-3 text-sm font-medium">Search Results</h3>
+                  <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+                    {t("benchmarkSelector.groups.searchResults")}
+                  </h3>
                   <div className="space-y-2">
                     {filteredSearchResults.slice(0, 8).map((ticker) => (
                       <button
@@ -281,7 +287,7 @@ export function BenchmarkSymbolSelectorMobile({
                   ).length === 0,
               ) && (
                 <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                  No benchmarks or symbols found.
+                  {t("benchmarkSelector.noResults")}
                 </div>
               )}
           </ScrollArea>

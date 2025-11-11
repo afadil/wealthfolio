@@ -13,6 +13,7 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface AccountAllocationChartProps {
   isLoading?: boolean;
@@ -23,6 +24,7 @@ export function AccountAllocationChart({
   isLoading: isLoadingProp,
   onAccountSectionClick,
 }: AccountAllocationChartProps) {
+  const { t } = useTranslation("holdings");
   const [activeIndex, setActiveIndex] = useState(0);
 
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[], Error>({
@@ -108,7 +110,7 @@ export function AccountAllocationChart({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Account Allocation
+            {t("charts.accountAllocation")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -122,7 +124,7 @@ export function AccountAllocationChart({
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description="No account valuation data available." />
+          <EmptyPlaceholder description={t("charts.noAccountData")} />
         )}
       </CardContent>
     </Card>

@@ -1,0 +1,38 @@
+{
+  "title": "Performance",
+  "allPortfolio": "All Portfolio",
+  "actions": {
+    "addAccount": "Add account",
+    "addBenchmark": "Add Benchmark",
+    "addItem": "Add item",
+    "retry": "Retry",
+    "remove": "Remove {{name}}"
+  },
+  "metrics": {
+    "totalReturn": "Total Return",
+    "annualizedReturn": "Annualized Return",
+    "annualized": "Annualized",
+    "volatility": "Volatility",
+    "maxDrawdown": "Max Drawdown"
+  },
+  "empty": {
+    "title": "No performance data",
+    "description": "Select accounts to compare their performance over time."
+  },
+  "error": {
+    "title": "Error calculating performance data"
+  },
+  "calculating": "Calculating...",
+  "benchmarkSelector": {
+    "title": "Add Benchmark",
+    "selectTitle": "Select Benchmark",
+    "description": "Choose a benchmark or search for any symbol",
+    "searchPlaceholder": "Search benchmarks or any symbol...",
+    "searching": "Searching...",
+    "noResults": "No benchmarks or symbols found.",
+    "errorSearching": "Error searching for symbols. Please try again.",
+    "groups": {
+      "searchResults": "Search Results"
+    }
+  }
+}

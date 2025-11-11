@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 // Status Card Component
 interface MappingStatusCardProps {
@@ -20,6 +21,8 @@ export function MappingStatusCard({
   isComplete,
   additionalText,
 }: MappingStatusCardProps) {
+  const { t } = useTranslation("activity");
+
   return (
     <div
       className={cn(
@@ -49,7 +52,7 @@ export function MappingStatusCard({
           {title}
         </p>
         <p className="text-muted-foreground text-xs">
-          {mappedCount} of {totalCount} mapped
+          {mappedCount} {t("import.mapping.ofMapped", { total: totalCount })}
           {additionalText && ` ${additionalText}`}
         </p>
       </div>

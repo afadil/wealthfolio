@@ -1,0 +1,78 @@
+{
+  "title": "Danh mục",
+  "page": {
+    "title": "Danh mục",
+    "allPortfolio": "Toàn bộ danh mục",
+    "viewHoldings": "Danh mục",
+    "viewInsights": "Phân tích",
+    "detailsFor": "Chi tiết cho {{name}}",
+    "noHoldings": "Không tìm thấy tài sản nào cho lựa chọn này.",
+    "close": "Đóng",
+    "cash": "Tiền mặt"
+  },
+  "table": {
+    "position": "Vị thế",
+    "symbolName": "Tên mã",
+    "shares": "Số cổ phần",
+    "todayPrice": "Giá hôm nay",
+    "bookCost": "Giá vốn",
+    "totalValue": "Tổng giá trị",
+    "totalGainLoss": "Tổng lãi/lỗ",
+    "assetType": "Loại tài sản",
+    "currency": "Tiền tệ",
+    "type": "Loại",
+    "showInBaseCurrency": "Hiển thị giá trị theo tiền tệ cơ sở",
+    "showInAssetCurrency": "Hiển thị giá trị theo tiền tệ tài sản"
+  },
+  "filters": {
+    "title": "Lọc danh mục",
+    "account": "Tài khoản",
+    "assetType": "Loại tài sản",
+    "allTypes": "Tất cả loại",
+    "done": "Xong"
+  },
+  "search": {
+    "placeholder": "Tìm kiếm..."
+  },
+  "noPositions": {
+    "title": "Không tìm thấy vị thế nào",
+    "noHoldings": "Thêm hoạt động để xem vị thế của bạn tại đây.",
+    "noMatch": "Thử điều chỉnh tiêu chí tìm kiếm hoặc bộ lọc của bạn."
+  },
+  "widget": {
+    "cashBalance": "Số dư tiền mặt"
+  },
+  "charts": {
+    "assetClasses": "Loại tài sản",
+    "currency": "Tiền tệ",
+    "countries": "Quốc gia",
+    "sectors": "Ngành",
+    "composition": "Thành phần danh mục",
+    "accountAllocation": "Phân bổ tài khoản",
+    "assetAllocation": "Phân bổ tài sản",
+    "sectorAllocation": "Phân bổ ngành",
+    "currencyAllocation": "Phân bổ tiền tệ",
+    "countryAllocation": "Phân bổ quốc gia",
+    "noDataAvailable": "Không có dữ liệu loại tài sản cho danh mục của bạn.",
+    "noAccountData": "Không có dữ liệu định giá tài khoản.",
+    "noSectorsData": "Không có dữ liệu ngành",
+    "noSectorDataAvailable": "Không có dữ liệu ngành cho danh mục của bạn.",
+    "noCountryData": "Không có dữ liệu quốc gia cho danh mục của bạn.",
+    "noCurrencyData": "Không có dữ liệu tiền tệ",
+    "noHoldingsData": "Không có dữ liệu danh mục",
+    "noHoldingsDataAvailable": "Không có dữ liệu danh mục cho danh mục của bạn.",
+    "showFullNames": "Hiển thị tên đầy đủ",
+    "showSymbols": "Hiển thị mã",
+    "marketValue": "Giá trị thị trường",
+    "return": "Lợi nhuận",
+    "daily": "Hằng ngày",
+    "total": "Tổng cộng",
+    "holdingsIn": "Danh mục tại {{name}}",
+    "assetClass": "Loại tài sản: {{name}}",
+    "sector": "Danh mục trong ngành: {{name}}"
+  },
+  "empty": {
+    "title": "Chưa có tài sản nào",
+    "description": "Bắt đầu thêm hoạt động để xem danh mục của bạn"
+  }
+}

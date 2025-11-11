@@ -1,9 +1,11 @@
 import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { Alert, AlertDescription, Icons } from "@wealthfolio/ui";
 import { useCashBalanceValidation } from "../hooks/use-cash-balance-validation";
 import { NewActivityFormValues } from "./forms/schemas";
 
 export function CashBalanceWarning() {
+  const { t } = useTranslation("activity");
   const { watch } = useFormContext<NewActivityFormValues>();
   const activityType = watch("activityType");
   const {
@@ -26,7 +28,7 @@ export function CashBalanceWarning() {
     return (
       <Alert variant="default">
         <Icons.Spinner className="h-4 w-4 animate-spin" />
-        <AlertDescription className="text-sm">Checking account balance...</AlertDescription>
+        <AlertDescription className="text-sm">{t("cashBalance.checking")}</AlertDescription>
       </Alert>
     );
   }
@@ -36,11 +38,8 @@ export function CashBalanceWarning() {
       <Alert variant="warning">
         <Icons.AlertTriangle className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          <strong>Insufficient Funds:</strong> {warning}
-          <p>
-            Record cash deposits to cover the shortfall, or use &quot;Add Holding&quot; (bypasses
-            cash tracking).
-          </p>
+          <strong>{t("cashBalance.insufficientFunds")}</strong> {warning}
+          <p>{t("cashBalance.insufficientFundsHelp")}</p>
         </AlertDescription>
       </Alert>
     );
@@ -59,7 +58,7 @@ export function CashBalanceWarning() {
       <Alert variant="success">
         <Icons.CheckCircle className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          Transaction cost: {formatter.format(requiredAmount)} - Sufficient funds available
+          {t("cashBalance.sufficientFunds", { amount: formatter.format(requiredAmount) })}
         </AlertDescription>
       </Alert>
     );

@@ -1,15 +1,16 @@
 import { Card } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export const OnboardingStep1: React.FC = () => {
+  const { t } = useTranslation("onboarding");
+
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-8 md:px-6 lg:px-8">
       <div className="w-full max-w-5xl space-y-6 md:space-y-8">
         <div className="text-center">
-          <p className="text-muted-foreground text-sm md:text-base">
-            Two ways to track your portfolio.
-          </p>
+          <p className="text-muted-foreground text-sm md:text-base">{t("step1.subtitle")}</p>
         </div>
 
         <div className="mx-auto grid gap-5 md:grid-cols-2 md:gap-6 lg:gap-8">
@@ -20,9 +21,9 @@ export const OnboardingStep1: React.FC = () => {
                 <Icons.Holdings className="h-5 w-5 text-green-600 md:h-6 md:w-6 dark:text-green-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold md:text-xl">Simple Tracking</h3>
+                <h3 className="text-lg font-bold md:text-xl">{t("step1.simpleTracking.title")}</h3>
                 <p className="text-muted-foreground text-xs md:text-sm">
-                  No transaction history needed
+                  {t("step1.simpleTracking.subtitle")}
                 </p>
               </div>
             </div>
@@ -30,21 +31,21 @@ export const OnboardingStep1: React.FC = () => {
             <div className="relative mb-4 flex-1 space-y-2.5 md:mb-8 md:space-y-4">
               <div className="flex items-center gap-2.5">
                 <Icons.Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <p className="text-sm">Add/remove holdings instantly</p>
+                <p className="text-sm">{t("step1.simpleTracking.feature1")}</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Icons.Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <p className="text-sm">Simple cash deposits/withdrawals</p>
+                <p className="text-sm">{t("step1.simpleTracking.feature2")}</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Icons.Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <p className="text-sm">Perfect for portfolio snapshots</p>
+                <p className="text-sm">{t("step1.simpleTracking.feature3")}</p>
               </div>
             </div>
 
             <div className="relative mt-auto rounded-md border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
               <p className="text-xs text-green-800 md:text-sm dark:text-green-200">
-                Holdings don&apos;t affect cash balance
+                {t("step1.simpleTracking.note")}
               </p>
             </div>
           </Card>
@@ -56,29 +57,33 @@ export const OnboardingStep1: React.FC = () => {
                 <Icons.Activity className="h-5 w-5 text-blue-600 md:h-6 md:w-6 dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold md:text-xl">Complete Tracking</h3>
-                <p className="text-muted-foreground text-xs md:text-sm">Full transaction history</p>
+                <h3 className="text-lg font-bold md:text-xl">
+                  {t("step1.completeTracking.title")}
+                </h3>
+                <p className="text-muted-foreground text-xs md:text-sm">
+                  {t("step1.completeTracking.subtitle")}
+                </p>
               </div>
             </div>
 
             <div className="relative mb-4 flex-1 space-y-2.5 md:mb-8 md:space-y-4">
               <div className="flex items-center gap-2.5">
                 <Icons.Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <p className="text-sm">Track every buy and sell</p>
+                <p className="text-sm">{t("step1.completeTracking.feature1")}</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Icons.Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <p className="text-sm">Deposits, withdrawals, transfers</p>
+                <p className="text-sm">{t("step1.completeTracking.feature2")}</p>
               </div>
               <div className="flex items-center gap-2.5">
                 <Icons.Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <p className="text-sm">Precise performance analytics</p>
+                <p className="text-sm">{t("step1.completeTracking.feature3")}</p>
               </div>
             </div>
 
             <div className="relative mt-auto rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
               <p className="text-xs text-blue-800 md:text-sm dark:text-blue-200">
-                Trades update cash balance automatically
+                {t("step1.completeTracking.note")}
               </p>
             </div>
           </Card>
@@ -86,14 +91,14 @@ export const OnboardingStep1: React.FC = () => {
 
         <div className="text-center">
           <p className="text-muted-foreground text-xs md:text-sm">
-            Mix both types as needed.{" "}
+            {t("step1.footer")}{" "}
             <a
               href="https://wealthfolio.app/docs/concepts/activity-types"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground underline transition-colors"
             >
-              Learn more
+              {t("step1.learnMore")}
             </a>
           </p>
         </div>

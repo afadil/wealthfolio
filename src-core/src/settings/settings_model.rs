@@ -14,6 +14,7 @@ pub struct Settings {
     pub menu_bar_visible: bool,
     pub is_pro: bool,
     pub sync_enabled: bool,
+    pub language: String,
 }
 
 impl Default for Settings {
@@ -28,6 +29,7 @@ impl Default for Settings {
             menu_bar_visible: true,
             is_pro: false,
             sync_enabled: true,
+            language: "en".to_string(),
         }
     }
 }
@@ -43,6 +45,7 @@ pub struct SettingsUpdate {
     pub menu_bar_visible: Option<bool>,
     pub is_pro: Option<bool>,
     pub sync_enabled: Option<bool>,
+    pub language: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

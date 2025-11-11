@@ -8,9 +8,11 @@ import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { MoneyInput } from "@wealthfolio/ui";
 import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
+import { useTranslation } from "react-i18next";
 
 export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
+  const { t } = useTranslation(["activity"]);
   const activityType = watch("activityType");
   const isManualAsset = watch("assetDataSource") === "MANUAL";
   const shouldShowSymbolLookup = activityType === "DIVIDEND";
@@ -18,17 +20,15 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
   const incomeTypes: ActivityTypeUI[] = [
     {
       value: "DIVIDEND",
-      label: "Dividend",
+      label: t("activity:form.dividend"),
       icon: "Income",
-      description:
-        "Income received from owning shares in a company or units in a fund. This typically represents a distribution of profits.",
+      description: t("activity:form.dividendDescription"),
     },
     {
       value: "INTEREST",
-      label: "Interest",
+      label: t("activity:form.interest"),
       icon: "Percent",
-      description:
-        "Income earned from cash deposits, bonds, or lending money. This is a payment for the use of your money.",
+      description: t("activity:form.interestDescription"),
     },
   ];
 
@@ -62,14 +62,16 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      {activityType === "DIVIDEND" ? "Dividend Amount" : "Interest Amount"}
+                      {activityType === "DIVIDEND"
+                        ? t("activity:form.dividendAmount")
+                        : t("activity:form.interestAmount")}
                     </FormLabel>
                     <FormControl>
                       <MoneyInput
                         placeholder={
                           activityType === "DIVIDEND"
-                            ? "Enter dividend amount"
-                            : "Enter interest amount"
+                            ? t("activity:form.enterDividendAmount")
+                            : t("activity:form.enterInterestAmount")
                         }
                         {...field}
                       />
@@ -84,7 +86,7 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                   name="fee"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fee</FormLabel>
+                      <FormLabel>{t("activity:form.fee")}</FormLabel>
                       <FormControl>
                         <MoneyInput {...field} />
                       </FormControl>

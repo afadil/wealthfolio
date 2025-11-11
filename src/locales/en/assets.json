@@ -1,0 +1,105 @@
+{
+  "title": "Assets",
+  "search": "Search assets...",
+  "profile": {
+    "tabs": {
+      "overview": "Overview",
+      "lots": "Lots",
+      "quotes": "Quotes"
+    },
+    "about": "About",
+    "placeholders": {
+      "assetClass": "Enter asset class",
+      "subClass": "Enter sub-class",
+      "sector": "sector:weight",
+      "country": "country:weight",
+      "description": "Symbol/Company description",
+      "assetName": "Enter asset name"
+    },
+    "noDescription": "No description available.",
+    "quoteHistory": "Quote History",
+    "errorLoading": "Error loading data for",
+    "errorMessage": "Could not load necessary information for this symbol. Please check the symbol or try again later.",
+    "errors": {
+      "holding": "Holding fetch error.",
+      "quote": "Quote fetch error.",
+      "profile": "Asset profile fetch error."
+    }
+  },
+  "detailCard": {
+    "shares": "shares",
+    "bookValue": "Book value",
+    "averageCost": "Average cost",
+    "portfolioPercent": "% of my portfolio",
+    "todaysReturn": "Today's return",
+    "totalReturn": "Total return",
+    "adjClose": "Adj Close"
+  },
+  "historyCard": {
+    "asOf": "As of:",
+    "refreshing": "Refreshing quotes...",
+    "refresh": "Refresh Quotes"
+  },
+  "lotsTable": {
+    "acquiredDate": "Acquired Date",
+    "quantity": "Quantity",
+    "acquisitionPrice": "Acquisition Price",
+    "fees": "Fees",
+    "costBasis": "Cost Basis",
+    "marketValue": "Market Value",
+    "gainLoss": "Gain/Loss"
+  },
+  "quotesTable": {
+    "date": "Date",
+    "open": "Open",
+    "high": "High",
+    "low": "Low",
+    "close": "Close",
+    "volume": "Volume",
+    "actions": "Actions",
+    "manualTracking": "Manual tracking",
+    "addQuote": "Add Quote",
+    "deleteQuote": "Delete Quote",
+    "deleteConfirmation": "Are you sure you want to delete this historical quote? This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page",
+    "of": "of",
+    "changeMode": {
+      "title": "Change Tracking Mode",
+      "toAutomatic": "Switching to automatic tracking will enable data fetching from Market Data Provider. Please note that this will override any manually entered quotes on the next sync.",
+      "toManual": "Switching to manual tracking will stop automatic data fetching from Market Data Provider. You'll need to enter and maintain price data manually.",
+      "warningAutomatic": "⚠️ Your manually entered historical data may be lost.",
+      "warningManual": "⚠️ Automatic price updates will be disabled.",
+      "confirm": "Confirm Change"
+    }
+  },
+  "details": {
+    "overview": "Overview",
+    "price": "Price",
+    "change": "Change",
+    "volume": "Volume",
+    "marketCap": "Market Cap",
+    "high": "High",
+    "low": "Low",
+    "open": "Open",
+    "close": "Close"
+  },
+  "chart": {
+    "title": "Price Chart",
+    "period": {
+      "1D": "1 Day",
+      "1W": "1 Week",
+      "1M": "1 Month",
+      "3M": "3 Months",
+      "1Y": "1 Year",
+      "ALL": "All Time"
+    }
+  },
+  "empty": {
+    "title": "Asset not found",
+    "description": "The requested asset could not be found"
+  }
+}

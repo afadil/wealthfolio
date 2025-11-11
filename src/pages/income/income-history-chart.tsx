@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 interface IncomeHistoryChartProps {
@@ -29,6 +30,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   currency,
   isBalanceHidden,
 }) => {
+  const { t } = useTranslation(["income"]);
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -58,15 +60,15 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
 
   const periodDescription =
     selectedPeriod === "TOTAL"
-      ? "All Time"
+      ? t("income:periods.allTime")
       : selectedPeriod === "YTD"
-        ? "Year to Date"
-        : "Last Year";
+        ? t("income:periods.ytd")
+        : t("income:periods.lastYear");
 
   return (
     <Card className="md:col-span-2">
       <CardHeader className="pb-4 md:pb-6">
-        <CardTitle className="text-sm font-medium">Income History</CardTitle>
+        <CardTitle className="text-sm font-medium">{t("income:chart.incomeHistory")}</CardTitle>
         <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
       </CardHeader>
       <CardContent className="px-4 pt-0 md:px-6">
@@ -74,22 +76,22 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
           <EmptyPlaceholder
             className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
             icon={<Icons.Activity className="h-8 w-8 md:h-10 md:w-10" />}
-            title="No income history available"
-            description="There is no income history for the selected period. Try selecting a different time range or check back later."
+            title={t("income:empty.noHistory")}
+            description={t("income:empty.description")}
           />
         ) : (
           <ChartContainer
             config={{
               income: {
-                label: "Monthly Income",
+                label: t("income:chart.monthlyIncome"),
                 color: "var(--chart-1)",
               },
               cumulative: {
-                label: "Cumulative Income",
+                label: t("income:chart.cumulativeIncome"),
                 color: "var(--chart-5)",
               },
               previousIncome: {
-                label: "Previous Period Income",
+                label: t("income:chart.previousPeriod"),
                 color: "var(--chart-5)",
               },
             }}
@@ -155,12 +157,12 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                             <span className="text-muted-foreground text-xs md:text-sm">
                               {name === "income"
                                 ? isMobile
-                                  ? "Monthly"
-                                  : "Monthly Income"
+                                  ? t("income:chart.monthly")
+                                  : t("income:chart.monthlyIncome")
                                 : name === "previousIncome"
-                                  ? "Previous"
+                                  ? t("income:chart.previous")
                                   : name === "cumulative"
-                                    ? "Cumulative"
+                                    ? t("income:chart.cumulative")
                                     : name}
                             </span>
                             <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">

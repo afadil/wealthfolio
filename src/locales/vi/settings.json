@@ -1,0 +1,521 @@
+{
+  "title": "Cài đặt",
+  "navigation": {
+    "general": {
+      "title": "Chung",
+      "subtitle": "Đơn vị tiền tệ và tùy chọn chung"
+    },
+    "appearance": {
+      "title": "Giao diện",
+      "subtitle": "Chủ đề, kiểu chữ và mật độ"
+    },
+    "accounts": {
+      "title": "Tài khoản",
+      "subtitle": "Tài khoản đầu tư và tiết kiệm"
+    },
+    "limits": {
+      "title": "Giới hạn",
+      "subtitle": "Giới hạn đóng góp và quy tắc"
+    },
+    "goals": {
+      "title": "Mục tiêu",
+      "subtitle": "Lập kế hoạch và theo dõi mục tiêu"
+    },
+    "marketData": {
+      "title": "Dữ liệu thị trường",
+      "subtitle": "Nhà cung cấp và cập nhật dữ liệu"
+    },
+    "addons": {
+      "title": "Tiện ích",
+      "subtitle": "Mở rộng Wealthfolio với các tính năng"
+    },
+    "exports": {
+      "title": "Xuất dữ liệu",
+      "subtitle": "Sao lưu và xuất dữ liệu của bạn"
+    },
+    "about": {
+      "title": "Về ứng dụng",
+      "subtitle": "Về Wealthfolio"
+    }
+  },
+  "appearance": {
+    "title": "Giao diện",
+    "description": "Tùy chỉnh giao diện ứng dụng",
+    "theme": {
+      "label": "Chủ đề",
+      "description": "Chọn chủ đề ưa thích cho ứng dụng",
+      "light": "Sáng",
+      "dark": "Tối",
+      "system": "Hệ thống"
+    },
+    "font": {
+      "label": "Phông chữ",
+      "description": "Chọn phông chữ sử dụng trong giao diện",
+      "mono": "Monospace",
+      "sans": "Sans Serif"
+    },
+    "language": {
+      "label": "Ngôn ngữ",
+      "description": "Chọn ngôn ngữ ưa thích cho giao diện ứng dụng"
+    },
+    "menuBar": {
+      "label": "Hiển thị thanh menu",
+      "description": "Bật/tắt hiển thị thanh menu ứng dụng."
+    }
+  },
+  "accounts": {
+    "title": "Tài khoản",
+    "description": " Quản lý tài khoản đầu tư và tiết kiệm của bạn.",
+    "addButton": "Thêm tài khoản",
+    "addAccountButton": "Thêm một tài khoản",
+    "empty": {
+      "title": "Chưa có tài khoản nào!",
+      "description": "Bạn chưa có tài khoản nào. Bắt đầu thêm tài khoản đầu tư của bạn."
+    },
+    "item": {
+      "disabled": "Đã vô hiệu hóa"
+    },
+    "form": {
+      "addTitle": "Thêm tài khoản",
+      "updateTitle": "Cập nhật tài khoản",
+      "addDescription": " Thêm tài khoản đầu tư để theo dõi.",
+      "updateDescription": "Cập nhật thông tin tài khoản",
+      "fields": {
+        "name": {
+          "label": "Tên tài khoản",
+          "placeholder": "Tên hiển thị tài khoản"
+        },
+        "group": {
+          "label": "Nhóm tài khoản",
+          "placeholder": "Hưu trí, 401K, RRSP, TFSA,..."
+        },
+        "accountType": {
+          "label": "Loại tài khoản",
+          "placeholder": "Chọn loại tài khoản",
+          "sheetTitle": "Chọn loại tài khoản",
+          "sheetDescription": "Chọn loại tài khoản phù hợp nhất.",
+          "options": {
+            "securities": "Chứng khoán",
+            "cash": "Tiền mặt",
+            "crypto": "Tiền điện tử"
+          }
+        },
+        "currency": {
+          "label": "Đơn vị tiền tệ"
+        },
+        "isDefault": {
+          "label": " Tài khoản mặc định"
+        },
+        "isActive": {
+          "label": " Đang hoạt động"
+        }
+      },
+      "buttons": {
+        "cancel": "Hủy",
+        "add": "Thêm tài khoản",
+        "update": "Cập nhật tài khoản"
+      }
+    }
+  },
+  "general": {
+    "title": "Chung",
+    "description": "Quản lý các cài đặt và tùy chọn ứng dụng chung.",
+    "baseCurrency": {
+      "title": "Đơn vị tiền tệ",
+      "description": "Chọn đơn vị tiền tệ cơ sở cho danh mục đầu tư của bạn.",
+      "selectPlaceholder": "Vui lòng chọn đơn vị tiền tệ cơ sở.",
+      "saveButton": "Lưu đơn vị tiền tệ"
+    },
+    "exchangeRates": {
+      "title": "Tỷ giá hối đoái",
+      "description": "Quản lý tỷ giá hối đoái cho các loại tiền tệ trong danh mục của bạn.",
+      "addButton": "Thêm tỷ giá",
+      "columns": {
+        "from": "Từ",
+        "to": "Đến",
+        "source": "Nguồn",
+        "rate": "Tỷ giá",
+        "lastUpdated": "Cập nhật lần cuối"
+      },
+      "empty": {
+        "title": "Chưa có tỷ giá nào được định nghĩa",
+        "button": "Thêm tỷ giá"
+      },
+      "delete": {
+        "title": "Xóa tỷ giá hối đoái",
+        "description": "Bạn có chắc chắn muốn xóa tỷ giá này không?",
+        "button": "Xóa"
+      },
+      "viewHistory": "Xem lịch sử"
+    },
+    "autoUpdate": {
+      "title": "Cập nhật tự động",
+      "enableLabel": "Bật kiểm tra cập nhật tự động",
+      "enableDescription": "Khi được bật, Wealthfolio sẽ tự động kiểm tra cập nhật khi ứng dụng khởi động. Bạn vẫn có thể kiểm tra cập nhật thủ công từ menu Trợ giúp.",
+      "toast": {
+        "successTitle": "Đã cập nhật cài đặt",
+        "successDescription": "Cài đặt cập nhật tự động đã được lưu thành công.",
+        "errorTitle": "Lỗi",
+        "errorDescription": "Không thể cập nhật cài đặt tự động. Vui lòng thử lại."
+      }
+    }
+  },
+  "goals": {
+    "title": "Mục tiêu",
+    "description": " Quản lý các mục tiêu đầu tư và tiết kiệm của bạn.",
+    "addButton": "Thêm mục tiêu",
+    "addGoalButton": "Thêm một mục tiêu",
+    "goalsHeading": "Mục tiêu",
+    "allocationsHeading": "Phân bổ",
+    "allocationsDescription": "Nhấp vào ô để chỉ định phần trăm phân bổ của từng tài khoản cho mục tiêu của bạn.",
+    "empty": {
+      "title": "Chưa có mục tiêu nào!",
+      "description": "Bạn chưa có mục tiêu nào. Bắt đầu thêm mục tiêu đầu tư của bạn."
+    },
+    "form": {
+      "addTitle": "Thêm mục tiêu",
+      "updateTitle": "Cập nhật mục tiêu",
+      "addDescription": " Thêm mục tiêu đầu tư để theo dõi.",
+      "updateDescription": "Cập nhật thông tin mục tiêu",
+      "fields": {
+        "title": {
+          "label": "Tên mục tiêu",
+          "placeholder": "Tiêu đề hiển thị mục tiêu"
+        },
+        "description": {
+          "label": "Mô tả mục tiêu",
+          "placeholder": "Mô tả ngắn gọn mục tiêu"
+        },
+        "targetAmount": {
+          "label": "Số tiền mục tiêu",
+          "placeholder": "Số tiền mục tiêu"
+        },
+        "isAchieved": {
+          "label": " Đã đạt mục tiêu"
+        }
+      },
+      "buttons": {
+        "cancel": "Hủy",
+        "add": "Thêm mục tiêu",
+        "update": "Cập nhật mục tiêu"
+      }
+    },
+    "operations": {
+      "edit": "Chỉnh sửa",
+      "delete": "Xóa",
+      "openMenu": "Mở"
+    },
+    "delete": {
+      "title": "Bạn có chắc chắn muốn xóa mục tiêu này và các hoạt động liên quan?",
+      "description": "Hành động này không thể hoàn tác.",
+      "button": "Xóa"
+    },
+    "allocations": {
+      "tableHeader": "Mục tiêu \\ Tài khoản",
+      "totalRow": "Tổng cộng",
+      "saveButton": "Lưu phân bổ",
+      "toast": {
+        "errorTitle": "Tổng phân bổ cho một tài khoản không được vượt quá 100%."
+      }
+    }
+  },
+  "contributionLimits": {
+    "title": "Giới hạn đóng góp",
+    "description": "Quản lý giới hạn đóng góp của bạn.",
+    "addButton": "Thêm giới hạn",
+    "addLimitButton": "Thêm một giới hạn đóng góp",
+    "currentYear": "Năm hiện tại",
+    "previousYears": "Các năm trước",
+    "showPreviousYears": "Hiển thị các năm trước",
+    "hidePreviousYears": "Ẩn các năm trước",
+    "daysLeft": "ngày còn lại",
+    "completed": "đã hoàn thành",
+    "overLimit": "vượt giới hạn",
+    "contributed": "Đã đóng góp",
+    "loading": "Đang tải...",
+    "empty": {
+      "title": "Không có giới hạn đóng góp cho {{year}}!",
+      "description": "Bạn không có giới hạn đóng góp nào cho năm hiện tại. Bắt đầu thêm giới hạn đóng góp của bạn."
+    },
+    "form": {
+      "addTitle": "Thêm giới hạn đóng góp",
+      "updateTitle": "Cập nhật giới hạn đóng góp",
+      "addDescription": "Thêm một giới hạn đóng góp mới.",
+      "updateDescription": "Cập nhật thông tin giới hạn đóng góp",
+      "fields": {
+        "groupName": {
+          "label": "Tên nhóm",
+          "placeholder": "ví dụ: TFSA, 401(k), RRSP",
+          "description": "Tên của nhóm giới hạn đóng góp"
+        },
+        "limitAmount": {
+          "label": "Số tiền giới hạn",
+          "placeholder": "ví dụ: 6,000.00",
+          "description": "Số tiền đóng góp tối đa được phép"
+        },
+        "contributionYear": {
+          "label": "Năm",
+          "placeholder": "ví dụ: 2024"
+        },
+        "startDate": {
+          "label": "Ngày bắt đầu"
+        },
+        "endDate": {
+          "label": "Ngày kết thúc"
+        },
+        "dateNote": "Ngày mặc định từ ngày 1 tháng 1 đến ngày 31 tháng 12 của năm đã chọn"
+      },
+      "buttons": {
+        "cancel": "Hủy",
+        "save": "Lưu",
+        "update": "Cập nhật",
+        "saving": "Đang lưu...",
+        "updating": "Đang cập nhật..."
+      }
+    },
+    "operations": {
+      "edit": "Chỉnh sửa",
+      "delete": "Xóa",
+      "openMenu": "Mở"
+    },
+    "delete": {
+      "title": "Bạn có chắc chắn muốn xóa giới hạn đóng góp này?",
+      "description": "Hành động này không thể hoàn tác.",
+      "button": "Xóa"
+    },
+    "accountSelection": {
+      "title": "Chọn tài khoản",
+      "saveButton": "Lưu tài khoản đã chọn",
+      "saving": "Đang lưu..."
+    }
+  },
+  "about": {
+    "title": "Về ứng dụng",
+    "description": "Về Wealthfolio"
+  },
+  "marketData": {
+    "title": "Dữ Liệu Thị Trường",
+    "description": "Quản lý cài đặt cho các nhà cung cấp dữ liệu thị trường.",
+    "buttons": {
+      "import": "Nhập dữ liệu",
+      "refetchAll": "Tải lại tất cả",
+      "update": "Cập nhật",
+      "refetching": "Đang tải lại...",
+      "saveKey": "Lưu khóa"
+    },
+    "loading": "Đang tải cài đặt nhà cung cấp...",
+    "error": "Lỗi tải cài đặt",
+    "noProviders": "Chưa cấu hình nhà cung cấp dữ liệu thị trường. Có thể là lỗi khởi tạo.",
+    "providers": {
+      "disabled": "Đã tắt",
+      "apiKeyRequired": "Cần API Key",
+      "configure": "Cấu hình",
+      "enableToConfigure": "Bật nhà cung cấp để cấu hình",
+      "apiKey": {
+        "label": "API Key",
+        "placeholder": "Nhập API Key",
+        "placeholderSet": "API Key đã được thiết lập",
+        "showKey": "Hiện API key",
+        "hideKey": "Ẩn API key",
+        "hintSet": "API key đã được thiết lập. Nhập key mới để cập nhật, hoặc để trống và lưu để xóa key.",
+        "hintNotSet": "Chưa thiết lập API key. Nhập key và lưu."
+      },
+      "priority": {
+        "label": "Độ ưu tiên",
+        "placeholder": "ví dụ: 1 hoặc 2",
+        "hint": "Số thấp hơn có độ ưu tiên cao hơn (ví dụ: 1 cao hơn 10)."
+      }
+    },
+    "confirm": {
+      "title": "Bạn có chắc chắn?",
+      "message": "Thao tác này sẽ tải lại toàn bộ lịch sử dữ liệu thị trường và tính toán lại danh mục đầu tư.",
+      "refetch": "Tải lại",
+      "cancel": "Hủy"
+    },
+    "import": {
+      "title": "Nhập Giá Lịch Sử",
+      "description": "Tải lên tệp CSV để bổ sung dữ liệu thị trường cho danh mục đầu tư của bạn.",
+      "backToProviders": "Quay lại nhà cung cấp",
+      "section": {
+        "title": "Nhập Giá Lịch Sử",
+        "description": "Nhập dữ liệu thị trường lịch sử từ tệp CSV để lấp đầy khoảng trống trong dữ liệu danh mục đầu tư của bạn",
+        "startOver": "Bắt đầu lại"
+      },
+      "steps": {
+        "uploadValidate": "Tải lên & Xác thực",
+        "preview": "Xem trước dữ liệu",
+        "results": "Kết quả nhập"
+      },
+      "form": {
+        "title": "Chọn tệp CSV",
+        "description": "Chọn tệp CSV chứa dữ liệu giá lịch sử để nhập",
+        "clickToUpload": "Nhấp để tải lên",
+        "orDrop": "hoặc kéo thả",
+        "csvOnly": "Chỉ CSV",
+        "processingFile": "Đang xử lý tệp...",
+        "removeFile": "Xóa tệp",
+        "overwriteExisting": "Ghi đè giá hiện tại có cùng mã và ngày",
+        "validateButton": "Xác thực tệp",
+        "validating": "Đang xác thực...",
+        "fileSize": "KB"
+      },
+      "summary": {
+        "title": "Tóm tắt nhập dữ liệu",
+        "description": "Xem lại kết quả xác thực trước khi tiếp tục nhập",
+        "totalRows": "Tổng số dòng",
+        "valid": "Hợp lệ",
+        "invalid": "Không hợp lệ",
+        "duplicates": "Trùng lặp",
+        "importButton": "Nhập {{count}} giá hợp lệ"
+      },
+      "progress": {
+        "title": "Tiến trình nhập",
+        "importing": "Đang nhập giá...",
+        "completed": "Nhập hoàn tất",
+        "progressLabel": "Tiến trình",
+        "total": "Tổng",
+        "successful": "Thành công",
+        "failed": "Thất bại",
+        "imported": "Đã nhập {{count}}",
+        "failedCount": "Thất bại {{count}}",
+        "cancelButton": "Hủy nhập"
+      },
+      "preview": {
+        "title": "Xem trước dữ liệu ({{count}} dòng)",
+        "description": "Xem lại {{maxRows}} dòng đầu tiên của dữ liệu CSV",
+        "showing": "Hiển thị {{shown}} dòng đầu tiên trong tổng số {{total}} dòng",
+        "columns": {
+          "symbol": "Mã",
+          "date": "Ngày",
+          "open": "Mở cửa",
+          "high": "Cao nhất",
+          "low": "Thấp nhất",
+          "close": "Đóng cửa",
+          "volume": "Khối lượng",
+          "currency": "Tiền tệ",
+          "status": "Trạng thái"
+        }
+      },
+      "help": {
+        "buttonText": "Cách nhập giá?",
+        "title": "Nhập giá lịch sử",
+        "description": "Nhập dữ liệu thị trường lịch sử từ tệp CSV để lấp đầy khoảng trống trong dữ liệu danh mục đầu tư cho các tài sản mà nguồn dữ liệu bên ngoài chỉ cung cấp giá gần đây.",
+        "steps": {
+          "step1": "Chuẩn bị tệp CSV với định dạng dữ liệu OHLCV",
+          "step2": "Tải lên và xác thực tệp CSV của bạn",
+          "step3": "Xem lại kết quả xác thực và dữ liệu mẫu",
+          "step4": "Nhập giá với tùy chọn xử lý trùng lặp"
+        },
+        "tips": {
+          "usage": {
+            "title": "💡 Mẹo:",
+            "text": "Sử dụng tính năng này khi nhà cung cấp dữ liệu bên ngoài chỉ có giá từ những năm gần đây, nhưng bạn có lịch sử giao dịch từ các giai đoạn trước đó."
+          },
+          "requiredFields": {
+            "title": "📊 Trường bắt buộc:",
+            "text": "Chỉ có mã và giá đóng cửa là bắt buộc. Giá mở cửa, cao nhất, thấp nhất, khối lượng và tiền tệ là tùy chọn nhưng được khuyến nghị để có dữ liệu đầy đủ."
+          },
+          "autoFormatting": {
+            "title": "⚡ Định dạng tự động:",
+            "text": "Nhiều định dạng ngày được hỗ trợ (YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY). Ký hiệu tiền tệ được xử lý tự động."
+          },
+          "important": {
+            "title": "⚠️ Quan trọng:",
+            "text": "Nhập dữ liệu lớn có thể mất thời gian. Hệ thống sẽ hiển thị tiến trình và xử lý lỗi một cách ổn định."
+          }
+        },
+        "csvFormat": {
+          "title": "Định dạng CSV yêu cầu:",
+          "comment1": "# Cột bắt buộc: symbol, date, close",
+          "comment2": "# Tùy chọn: open, high, low, volume, currency",
+          "comment3": "# Các định dạng ngày thay thế được hỗ trợ:"
+        },
+        "validation": {
+          "title": "Xác thực dữ liệu:",
+          "symbol": "Mã: Phải là mã ticker hợp lệ",
+          "date": "Ngày: Phải là ngày hợp lệ (hỗ trợ nhiều định dạng)",
+          "prices": "Giá: Phải là số thập phân hợp lệ",
+          "currency": "Tiền tệ: Mã tiền tệ 3 chữ cái (mặc định là USD)",
+          "duplicates": "Trùng lặp: Giá hiện tại có thể được ghi đè hoặc bỏ qua"
+        }
+      }
+    }
+  },
+  "exports": {
+    "page": {
+      "title": "Xuất dữ liệu & Sao lưu",
+      "description": "Xuất dữ liệu tài chính và quản lý sao lưu cơ sở dữ liệu với các tùy chọn nâng cao.",
+      "tabs": {
+        "backup": "Sao lưu & Khôi phục",
+        "export": "Xuất dữ liệu"
+      },
+      "dataExportTitle": "Xuất dữ liệu",
+      "dataExportDescription": "Xuất các loại dữ liệu cụ thể ở nhiều định dạng khác nhau để phân tích hoặc sử dụng bên ngoài."
+    },
+    "backup": {
+      "title": "Sao lưu & Khôi phục Cơ sở dữ liệu",
+      "description": "Tạo bản sao lưu hoàn chỉnh cơ sở dữ liệu và khôi phục từ các bản sao lưu trước đó.",
+      "create": {
+        "title": "Tạo bản sao lưu",
+        "description": "Tạo bản sao lưu hoàn chỉnh cơ sở dữ liệu bao gồm các tệp WAL và SHM. Chọn vị trí sao lưu của bạn.",
+        "button": "Sao lưu cơ sở dữ liệu",
+        "buttonLoading": "Đang tạo bản sao lưu..."
+      },
+      "restore": {
+        "title": "Khôi phục bản sao lưu",
+        "description": "Khôi phục cơ sở dữ liệu từ tệp sao lưu trước đó. Điều này sẽ thay thế tất cả dữ liệu hiện tại. Sau đó khởi động lại ứng dụng để áp dụng các thay đổi.",
+        "button": "Khôi phục cơ sở dữ liệu",
+        "buttonLoading": "Đang khôi phục..."
+      },
+      "importantNotes": {
+        "title": "Lưu ý quan trọng:",
+        "note1": "Bản sao lưu bao gồm các tệp WAL và SHM để đảm bảo toàn vẹn dữ liệu",
+        "note2": "Khôi phục sẽ thay thế TẤT CẢ dữ liệu hiện tại bằng dữ liệu sao lưu",
+        "note3": "Một bản sao lưu trước khôi phục được tạo tự động trước khi khôi phục",
+        "note4": "Bạn sẽ được nhắc khởi động lại ứng dụng sau khi khôi phục"
+      }
+    },
+    "dataExport": {
+      "formatTitle": "Chọn định dạng ưa thích",
+      "customizeTitle": "Tùy chỉnh xuất dữ liệu",
+      "formats": {
+        "csv": {
+          "name": "CSV",
+          "description": "Định dạng bảng tính đơn giản, tương thích rộng rãi"
+        },
+        "json": {
+          "name": "JSON",
+          "description": "Dữ liệu có cấu trúc để truy cập lập trình dễ dàng"
+        },
+        "sqlite": {
+          "name": "SQLite",
+          "description": "Tệp cơ sở dữ liệu nhỏ gọn, độc lập"
+        }
+      },
+      "dataTypes": {
+        "accounts": {
+          "name": "Tài khoản",
+          "description": "Các tài khoản tài chính của bạn"
+        },
+        "activities": {
+          "name": "Hoạt động",
+          "description": "Lịch sử giao dịch và nhật ký chi tiết"
+        },
+        "goals": {
+          "name": "Mục tiêu",
+          "description": "Mục tiêu tài chính và theo dõi tiến trình"
+        },
+        "portfolioHistory": {
+          "name": "Lịch sử danh mục đầu tư",
+          "description": "Hiệu suất danh mục đầu tư của bạn theo thời gian, bao gồm định giá, lợi nhuận và hoạt động dòng tiền."
+        },
+        "full": {
+          "name": "Xuất toàn bộ cơ sở dữ liệu SQLite",
+          "description": "Sao lưu cơ sở dữ liệu hoàn chỉnh với các tệp WAL/SHM - chọn vị trí sao lưu của bạn"
+        }
+      },
+      "exportButton": "Xuất {{name}}",
+      "exportingButton": "Đang xuất {{name}}..."
+    }
+  }
+}

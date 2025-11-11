@@ -1,0 +1,60 @@
+{
+  "title": "Accounts",
+  "addAccount": "Add Account",
+  "types": {
+    "SECURITIES": "Securities",
+    "BANK": "Bank",
+    "CRYPTO": "Cryptocurrency"
+  },
+  "form": {
+    "name": "Account Name",
+    "type": "Account Type",
+    "currency": "Currency",
+    "balance": "Balance",
+    "group": "Group",
+    "isDefault": "Set as default"
+  },
+  "table": {
+    "name": "Name",
+    "type": "Type",
+    "balance": "Balance",
+    "currency": "Currency",
+    "performance": "Performance"
+  },
+  "empty": {
+    "title": "No accounts yet",
+    "description": "Create an account to start tracking your investments"
+  },
+  "page": {
+    "accountFallback": "Account",
+    "switchAccount": "Switch account",
+    "searchPlaceholder": "Search accounts...",
+    "noAccountsFound": "No accounts found.",
+    "switchAccountTitle": "Switch Account",
+    "chooseAccountDescription": "Choose an account to view"
+  },
+  "metrics": {
+    "clickToUpdate": "Click to update the cash balance",
+    "cashBalance": "Cash Balance",
+    "investments": "Investments",
+    "netContribution": "Net Contribution",
+    "costBasis": "Cost Basis",
+    "dateRange": "from {{startDate}} to {{endDate}}"
+  },
+  "holdings": {
+    "title": "Holdings"
+  },
+  "contributionLimit": {
+    "contributedSoFar": "You've contributed",
+    "soFarIn": "so far in",
+    "noLimitSet": "There's no contribution limit set for this account.",
+    "youHaveContributed": "You've contributed",
+    "toThisAccountIn": "to this account in",
+    "yourTotalIs": "Your total is",
+    "whichIsOverThe": "which is over the",
+    "limit": "limit.",
+    "yourTotalContribution": "Your total contribution towards the",
+    "limitIs": "limit is",
+    "youHaveExceeded": "You have exceeded your limit by"
+  }
+}

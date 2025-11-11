@@ -1,4 +1,5 @@
 import { Icons } from "@/components/ui/icons";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,85 +15,85 @@ import {
 
 export function ImportHelpPopover() {
   const { isMobile } = usePlatform();
+  const { t } = useTranslation("activity");
 
   const helpContent = (
     <div className="space-y-4">
       <div>
-        <h4 className="text-lg font-semibold">Importing Account Activities</h4>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Import your account activities from CSV files with automatic data normalization and
-          flexible column mapping.
-        </p>
+        <h4 className="text-lg font-semibold">{t("import.help.heading")}</h4>
+        <p className="text-muted-foreground mt-2 text-sm">{t("import.help.description")}</p>
       </div>
 
       <div>
-        <p className="font-semibold">Steps:</p>
+        <p className="font-semibold">{t("import.help.stepsTitle")}</p>
         <ol className="mt-2 list-inside list-decimal space-y-1 text-sm">
-          <li>Ensure your CSV has headers with the required fields</li>
-          <li>Select account and upload your CSV file</li>
+          <li>{t("import.help.step1")}</li>
+          <li>{t("import.help.step2")}</li>
           <li>
-            Map CSV columns to required fields:
+            {t("import.help.step3")}
             <span className="text-muted-foreground ml-2 text-xs">
-              date, symbol, quantity, activityType, unitPrice, currency, fee, amount
+              {t("import.help.step3Fields")}
             </span>
           </li>
-          <li>Map activity types and symbols if needed</li>
-          <li>Preview, verify, and import your activities</li>
+          <li>{t("import.help.step4")}</li>
+          <li>{t("import.help.step5")}</li>
         </ol>
       </div>
 
       <div className="space-y-3">
         <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
           <p className="text-sm">
-            <strong className="text-blue-700 dark:text-blue-300">💡 Tip:</strong> Column names and
-            activity types don&apos;t need to match exactly - you can map them during import.
-            Mappings are saved for future imports.
+            <strong className="text-blue-700 dark:text-blue-300">
+              {t("import.help.tipTitle")}
+            </strong>{" "}
+            {t("import.help.tipText")}
           </p>
         </div>
 
         <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
           <p className="text-sm">
-            <strong className="text-green-700 dark:text-green-300">💰 Amount field:</strong> For
-            cash activities (DIVIDEND, DEPOSIT, WITHDRAWAL, TAX, FEE, INTEREST, TRANSFER_IN,
-            TRANSFER_OUT), amount is preferred when provided, otherwise calculated from quantity ×
-            unitPrice.
+            <strong className="text-green-700 dark:text-green-300">
+              {t("import.help.amountFieldTitle")}
+            </strong>{" "}
+            {t("import.help.amountFieldText")}
           </p>
         </div>
 
         <div className="border-purple-500 bg-purple-50 p-3 dark:bg-purple-900/50">
           <p className="text-sm">
-            <strong className="text-purple-700 dark:text-purple-300">⚡ Auto-formatting:</strong>{" "}
-            Negative values, currency symbols ($, £, €), commas, and parentheses are automatically
-            handled. No manual data cleanup needed.
+            <strong className="text-purple-700 dark:text-purple-300">
+              {t("import.help.autoFormattingTitle")}
+            </strong>{" "}
+            {t("import.help.autoFormattingText")}
           </p>
         </div>
       </div>
 
       <div>
-        <p className="font-semibold">Supported Activity Types:</p>
+        <p className="font-semibold">{t("import.help.supportedTypesTitle")}</p>
         <pre className="bg-muted mt-2 overflow-x-auto p-4 text-xs">
           <ul className="list-inside list-disc space-y-1">
-            <li>BUY</li>
-            <li>SELL</li>
-            <li>DIVIDEND</li>
-            <li>INTEREST</li>
-            <li>DEPOSIT</li>
-            <li>WITHDRAWAL</li>
-            <li>ADD_HOLDING (Increases quantity, cash not impacted)</li>
-            <li>REMOVE_HOLDING (Decreases quantity, cash not impacted)</li>
-            <li>TRANSFER_IN (Increases cash)</li>
-            <li>TRANSFER_OUT (Decreases cash)</li>
-            <li>FEE</li>
-            <li>TAX</li>
-            <li>SPLIT (Adjusts quantity & unit cost, no cash impact)</li>
+            <li>{t("import.help.typeBuy")}</li>
+            <li>{t("import.help.typeSell")}</li>
+            <li>{t("import.help.typeDividend")}</li>
+            <li>{t("import.help.typeInterest")}</li>
+            <li>{t("import.help.typeDeposit")}</li>
+            <li>{t("import.help.typeWithdrawal")}</li>
+            <li>{t("import.help.typeAddHolding")}</li>
+            <li>{t("import.help.typeRemoveHolding")}</li>
+            <li>{t("import.help.typeTransferIn")}</li>
+            <li>{t("import.help.typeTransferOut")}</li>
+            <li>{t("import.help.typeFee")}</li>
+            <li>{t("import.help.typeTax")}</li>
+            <li>{t("import.help.typeSplit")}</li>
           </ul>
         </pre>
       </div>
 
       <div>
-        <p className="font-semibold">Example CSV format:</p>
+        <p className="font-semibold">{t("import.help.exampleTitle")}</p>
         <pre className="bg-muted mt-2 overflow-x-auto p-3 text-xs leading-relaxed select-all">
-          <span className="text-muted-foreground"># Standard format:</span>
+          <span className="text-muted-foreground">{t("import.help.exampleStandard")}</span>
           <br />
           date,symbol,quantity,activityType,unitPrice,currency,fee,amount
           <br />
@@ -103,7 +104,7 @@ export function ImportHelpPopover() {
           2023-08-11,$CASH-USD,1,DEPOSIT,1,USD,0,600.03
           <br />
           <br />
-          <span className="text-muted-foreground"># With currency symbols (auto-parsed):</span>
+          <span className="text-muted-foreground">{t("import.help.exampleWithSymbols")}</span>
           <br />
           06/27/2025,AAPL,25,SELL,$48.95,USD,,$1223.63
           <br />
@@ -112,14 +113,14 @@ export function ImportHelpPopover() {
       </div>
 
       <p className="text-xs">
-        For more details, see the{" "}
+        {t("import.help.documentationText")}{" "}
         <a
           href="https://wealthfolio.app/docs/concepts/activity-types"
           target="_blank"
           rel="noopener noreferrer"
           className="underline"
         >
-          Activity Reference documentation
+          {t("import.help.documentationLink")}
         </a>
         .
       </p>
@@ -136,7 +137,7 @@ export function ImportHelpPopover() {
         </SheetTrigger>
         <SheetContent side="bottom" className="h-[85vh]">
           <SheetHeader>
-            <SheetTitle>How to Import CSV</SheetTitle>
+            <SheetTitle>{t("import.help.sheetTitle")}</SheetTitle>
           </SheetHeader>
           <ScrollArea className="h-[calc(85vh-4rem)] pr-4">{helpContent}</ScrollArea>
         </SheetContent>
@@ -149,7 +150,7 @@ export function ImportHelpPopover() {
       <PopoverTrigger asChild>
         <Button type="button" variant="link" className="flex items-center">
           <Icons.HelpCircle className="mr-1 h-5 w-5" />
-          How to Import CSV?
+          {t("import.help.title")}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="m-4 w-[900px] max-w-[calc(100vw-2rem)] p-6 text-sm">

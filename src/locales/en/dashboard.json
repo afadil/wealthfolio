@@ -1,0 +1,60 @@
+{
+  "title": "Dashboard",
+  "overview": "Overview",
+  "portfolio": {
+    "title": "Portfolio",
+    "totalValue": "Total Value",
+    "totalGain": "Total Gain",
+    "totalGainPercent": "Total Gain %",
+    "dayGain": "Day Gain",
+    "dayGainPercent": "Day Gain %"
+  },
+  "performance": {
+    "title": "Performance",
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month",
+    "year": "This Year",
+    "all": "All Time"
+  },
+  "allocation": {
+    "title": "Allocation",
+    "byAsset": "By Asset",
+    "bySector": "By Sector",
+    "byAccount": "By Account"
+  },
+  "intervalDescriptions": {
+    "last3Months": "Last 3 months"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "account": "account",
+    "accounts": "accounts",
+    "groupView": "Switch to group view",
+    "listView": "Switch to list view",
+    "groupViewAria": "Group view",
+    "listViewAria": "List view",
+    "uncategorized": "Uncategorized",
+    "noAccountsFound": "No accounts found.",
+    "errorLoading": "Error loading accounts: {{error}}"
+  },
+  "goals": {
+    "title": "Saving Goals",
+    "noGoalsSet": "No saving goals set",
+    "createGoalPrompt": "Create a goal to start tracking your progress",
+    "progress": "Progress",
+    "currentValue": "Current Value",
+    "targetValue": "Target Value",
+    "progressPending": "Progress calculation pending or not applicable.",
+    "goalDataNotAvailable": "Goal data not yet available.",
+    "errorLoading": "Could not load saving goals data.",
+    "tryAgain": "Please try again later."
+  },
+  "portfolioUpdate": {
+    "asOf": "As of:",
+    "updateButton": "Update Portfolio",
+    "updating": "Updating portfolio...",
+    "recalculateButton": "Recalculate",
+    "recalculating": "Recalculating..."
+  }
+}

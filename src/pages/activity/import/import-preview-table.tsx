@@ -14,6 +14,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
@@ -71,6 +72,7 @@ export const ImportPreviewTable = ({
   activities: ActivityImport[];
   accounts: Account[];
 }) => {
+  const { t } = useTranslation("activity");
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: "lineNumber",
@@ -115,22 +117,24 @@ export const ImportPreviewTable = ({
   const filters = [
     {
       id: "isValid",
-      title: "Status",
+      title: t("import.previewTable.filterStatus"),
       options: [
-        { label: "Error", value: "false" },
-        { label: "Valid", value: "true" },
+        { label: t("import.previewTable.filterError"), value: "false" },
+        { label: t("import.previewTable.filterValid"), value: "true" },
       ],
     },
     {
       id: "activityType",
-      title: "Type",
+      title: t("import.previewTable.filterType"),
       options: activitiesType,
     },
   ] satisfies DataTableFacetedFilterProps<ActivityImport, string>[];
 
+  const columns = useMemo(() => getColumns(accounts, t), [accounts, t]);
+
   const table = useReactTable({
     data: activities,
-    columns: getColumns(accounts),
+    columns,
     state: {
       sorting,
       columnFilters,
@@ -205,7 +209,9 @@ export const ImportPreviewTable = ({
                   <TableCell colSpan={table.getAllColumns().length} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center space-y-2 py-8">
                       <Icons.FileText className="text-muted-foreground h-10 w-10 opacity-40" />
-                      <p className="text-muted-foreground text-sm">No activities found</p>
+                      <p className="text-muted-foreground text-sm">
+                        {t("import.previewTable.noActivitiesFound")}
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -257,7 +263,11 @@ const ErrorCell = ({
   );
 };
 
-function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
+function getColumns(
+  accounts: Account[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any,
+): ColumnDef<ActivityImport>[] {
   return [
     {
       id: "lineNumber",
@@ -266,7 +276,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     {
       id: "isValid",
       accessorKey: "isValid",
-      header: () => <span className="sr-only">Status</span>,
+      header: () => <span className="sr-only">{t("import.previewTable.filterStatus")}</span>,
       cell: ({ row }) => {
         const isValid = row.getValue("isValid");
         const errors = row.original.errors || {};
@@ -304,12 +314,12 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
                 sideOffset={10}
                 className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
               >
-                <h4 className="mb-2 font-medium">Validation Errors</h4>
+                <h4 className="mb-2 font-medium">{t("import.previewTable.validationErrors")}</h4>
                 <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
                   {allErrors.length > 0 ? (
                     allErrors.map((error, index) => <li key={index}>{error}</li>)
                   ) : (
-                    <li>Invalid activity</li>
+                    <li>{t("import.previewTable.invalidActivity")}</li>
                   )}
                 </ul>
               </TooltipContent>
@@ -331,7 +341,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     {
       id: "account",
       accessorKey: "account",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("import.previewTable.columnAccount")} />
+      ),
       cell: ({ row }) => {
         const accountId = row.original.accountId;
         const hasError = hasFieldError(row.original, "accountId");
@@ -350,7 +362,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     {
       id: "date",
       accessorKey: "date",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("import.previewTable.columnDate")} />
+      ),
       cell: ({ row }) => {
         const formattedDate = formatDateTime(row.getValue("date"));
         const hasError = hasFieldError(row.original, "date");
@@ -369,7 +383,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     {
       id: "activityType",
       accessorKey: "activityType",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("import.previewTable.columnType")} />
+      ),
       cell: ({ row }) => {
         const type = row.getValue("activityType");
         const hasError = hasFieldError(row.original, "activityType");
@@ -387,7 +403,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     {
       id: "symbol",
       accessorKey: "symbol",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("import.previewTable.columnSymbol")} />
+      ),
       cell: ({ row }) => {
         const hasError = hasFieldError(row.original, "symbol");
         const errorMessages = getFieldErrorMessage(row.original, "symbol");
@@ -417,7 +435,11 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       accessorKey: "quantity",
       enableHiding: false,
       header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
+        <DataTableColumnHeader
+          className="justify-end text-right"
+          column={column}
+          title={t("import.previewTable.columnShares")}
+        />
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
@@ -440,7 +462,11 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       enableHiding: false,
       enableSorting: false,
       header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Price" />
+        <DataTableColumnHeader
+          className="justify-end text-right"
+          column={column}
+          title={t("import.previewTable.columnPrice")}
+        />
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
@@ -467,7 +493,11 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       id: "amount",
       accessorKey: "amount",
       header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Amount" />
+        <DataTableColumnHeader
+          className="justify-end text-right"
+          column={column}
+          title={t("import.previewTable.columnAmount")}
+        />
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
@@ -495,7 +525,11 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       enableHiding: false,
       enableSorting: false,
       header: ({ column }) => (
-        <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
+        <DataTableColumnHeader
+          className="justify-end text-right"
+          column={column}
+          title={t("import.previewTable.columnFee")}
+        />
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
@@ -519,7 +553,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
     {
       id: "currency",
       accessorKey: "currency",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("import.previewTable.columnCurrency")} />
+      ),
       cell: ({ row }) => {
         const hasError = hasFieldError(row.original, "currency");
         const errorMessages = getFieldErrorMessage(row.original, "currency");

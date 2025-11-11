@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -29,6 +30,7 @@ interface EditableBalanceProps {
 }
 
 const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalance, currency }) => {
+  const { t } = useTranslation("accounts");
   const [isEditing, setIsEditing] = useState(false);
   const [balance, setBalance] = useState(initialBalance);
   const { updateBalance, isPending } = useBalanceUpdate(account);
@@ -77,7 +79,7 @@ const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalan
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Click to update the cash balance</p>
+          <p>{t("metrics.clickToUpdate")}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -97,6 +99,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   className,
   isLoading,
 }) => {
+  const { t } = useTranslation("accounts");
   if (isLoading || !performance || !valuation)
     return (
       <Card className={className}>
@@ -133,17 +136,17 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
 
   const rows = [
     {
-      label: "Investments",
+      label: t("metrics.investments"),
       value: (
         <PrivacyAmount value={valuation?.investmentMarketValue || 0} currency={displayCurrency} />
       ),
     },
     {
-      label: "Net Contribution",
+      label: t("metrics.netContribution"),
       value: <PrivacyAmount value={valuation?.netContribution || 0} currency={displayCurrency} />,
     },
     {
-      label: "Cost Basis",
+      label: t("metrics.costBasis"),
       value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
     },
   ];
@@ -154,7 +157,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-bold">Cash Balance</CardTitle>
+        <CardTitle className="text-lg font-bold">{t("metrics.cashBalance")}</CardTitle>
         {valuation && (
           <EditableBalance
             account={valuation}
@@ -178,7 +181,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
       </CardContent>
       <CardFooter className="flex justify-end pb-0">
         <p className="text-muted-foreground m-0 p-0 text-xs">
-          from {formattedStartDate} to {formattedEndDate}
+          {t("metrics.dateRange", { startDate: formattedStartDate, endDate: formattedEndDate })}
         </p>
       </CardFooter>
     </Card>

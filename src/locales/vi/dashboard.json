@@ -1,0 +1,60 @@
+{
+  "title": "Bảng tổng quan",
+  "overview": "Tổng quan",
+  "portfolio": {
+    "title": "Danh mục đầu tư",
+    "totalValue": "Tổng giá trị",
+    "totalGain": "Tổng lãi/lỗ",
+    "totalGainPercent": "% Lãi/lỗ",
+    "dayGain": "Lãi/lỗ trong ngày",
+    "dayGainPercent": "% Lãi/lỗ trong ngày"
+  },
+  "performance": {
+    "title": "Hiệu suất",
+    "today": "Hôm nay",
+    "week": "Tuần này",
+    "month": "Tháng này",
+    "year": "Năm nay",
+    "all": "Tất cả"
+  },
+  "allocation": {
+    "title": "Phân bổ",
+    "byAsset": "Theo tài sản",
+    "bySector": "Theo ngành",
+    "byAccount": "Theo tài khoản"
+  },
+  "intervalDescriptions": {
+    "last3Months": "3 tháng gần đây"
+  },
+  "accounts": {
+    "title": "Tài khoản",
+    "account": "tài khoản",
+    "accounts": "tài khoản",
+    "groupView": "Chuyển sang chế độ nhóm",
+    "listView": "Chuyển sang chế độ danh sách",
+    "groupViewAria": "Chế độ nhóm",
+    "listViewAria": "Chế độ danh sách",
+    "uncategorized": "Chưa phân loại",
+    "noAccountsFound": "Không tìm thấy tài khoản.",
+    "errorLoading": "Lỗi khi tải tài khoản: {{error}}"
+  },
+  "goals": {
+    "title": "Mục tiêu tiết kiệm",
+    "noGoalsSet": "Chưa có mục tiêu tiết kiệm",
+    "createGoalPrompt": "Tạo mục tiêu để bắt đầu theo dõi tiến trình của bạn",
+    "progress": "Tiến trình",
+    "currentValue": "Giá trị hiện tại",
+    "targetValue": "Giá trị mục tiêu",
+    "progressPending": "Tính toán tiến trình đang chờ xử lý hoặc không áp dụng.",
+    "goalDataNotAvailable": "Dữ liệu mục tiêu chưa có sẵn.",
+    "errorLoading": "Không thể tải dữ liệu mục tiêu tiết kiệm.",
+    "tryAgain": "Vui lòng thử lại sau."
+  },
+  "portfolioUpdate": {
+    "asOf": "Tính đến:",
+    "updateButton": "Cập nhật danh mục",
+    "updating": "Đang cập nhật danh mục...",
+    "recalculateButton": "Tính toán lại",
+    "recalculating": "Đang tính toán lại..."
+  }
+}

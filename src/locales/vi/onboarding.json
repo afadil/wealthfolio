@@ -1,0 +1,58 @@
+{
+  "step1": {
+    "subtitle": "Hai cách để theo dõi danh mục đầu tư của bạn.",
+    "simpleTracking": {
+      "title": "Theo Dõi Đơn Giản",
+      "subtitle": "Không cần lịch sử giao dịch",
+      "feature1": "Thêm/xóa tài sản ngay lập tức",
+      "feature2": "Nạp/rút tiền mặt đơn giản",
+      "feature3": "Hoàn hảo cho ảnh chụp danh mục",
+      "note": "Tài sản không ảnh hưởng đến số dư tiền mặt"
+    },
+    "completeTracking": {
+      "title": "Theo Dõi Hoàn Chỉnh",
+      "subtitle": "Lịch sử giao dịch đầy đủ",
+      "feature1": "Theo dõi mọi giao dịch mua và bán",
+      "feature2": "Nạp tiền, rút tiền, chuyển khoản",
+      "feature3": "Phân tích hiệu suất chính xác",
+      "note": "Giao dịch tự động cập nhật số dư tiền mặt"
+    },
+    "footer": "Kết hợp cả hai loại theo nhu cầu.",
+    "learnMore": "Tìm hiểu thêm"
+  },
+  "step2": {
+    "subtitle": "Chỉ cần một vài tùy chọn để bắt đầu",
+    "currency": {
+      "label": "Tiền tệ",
+      "other": "Khác",
+      "selectTitle": "Chọn Tiền Tệ",
+      "searchPlaceholder": "Tìm kiếm tiền tệ...",
+      "noResults": "Không tìm thấy tiền tệ",
+      "validation": "Vui lòng chọn tiền tệ cơ bản."
+    },
+    "theme": {
+      "label": "Giao diện",
+      "dark": "Tối",
+      "light": "Sáng",
+      "system": "Hệ thống",
+      "validation": "Vui lòng chọn giao diện."
+    }
+  },
+  "step3": {
+    "subtitle": "Dưới đây là một số điều bạn có thể làm để tận dụng tối đa Wealthfolio",
+    "checklist": {
+      "createAccount": "Tạo tài khoản đầu tiên của bạn",
+      "importActivities": "Thêm hoặc nhập các giao dịch",
+      "exploreDashboard": "Khám phá bảng điều khiển ứng dụng",
+      "createGoals": "Tạo mục tiêu tiết kiệm",
+      "setLimits": "Đặt giới hạn đóng góp",
+      "installAddons": "Khám phá và cài đặt tiện ích"
+    },
+    "tip": "💡 Mẹo: Bạn có thể hoàn thành các bước này theo tốc độ của riêng mình sau khi thiết lập"
+  },
+  "navigation": {
+    "back": "Quay lại",
+    "continue": "Tiếp tục",
+    "getStarted": "Bắt đầu"
+  }
+}

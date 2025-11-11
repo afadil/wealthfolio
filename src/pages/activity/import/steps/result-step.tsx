@@ -4,6 +4,7 @@ import { Icons } from "@/components/ui/icons";
 import { Account, ActivityImport } from "@/lib/types";
 import { motion } from "motion/react";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ImportAlert } from "../components/import-alert";
 import { ImportPreviewTable } from "../import-preview-table";
@@ -16,6 +17,7 @@ interface ResultStepProps {
 }
 
 export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStepProps) => {
+  const { t } = useTranslation("activity");
   // Use navigate directly in the component
   const navigate = useNavigate();
 
@@ -50,7 +52,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Icons.Spinner className="text-primary h-8 w-8 animate-spin" />
-        <p className="text-muted-foreground mt-4">Validating imported data...</p>
+        <p className="text-muted-foreground mt-4">{t("import.result.validatingData")}</p>
       </div>
     );
   }
@@ -139,8 +141,8 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
         <div className="space-y-4">
           <ImportAlert
             variant="destructive"
-            title="Import Failed"
-            description="Due to validation errors, none of the activities were imported. Please review the errors below, fix the issues in your file, and try again."
+            title={t("import.result.importFailed")}
+            description={t("import.result.importFailedDesc")}
           />
 
           <Card>
@@ -163,12 +165,21 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
               </motion.div>
 
               <motion.div className="space-y-2" variants={textVariants}>
-                <h2 className="text-success/90 text-xl font-semibold">Import Successful!</h2>
-                <p className="text-muted-foreground text-sm">
-                  All <strong className="text-success font-medium">{totalRows}</strong>{" "}
-                  {totalRows === 1 ? "activity" : "activities"} have been successfully added to your
-                  account.
-                </p>
+                <h2 className="text-success/90 text-xl font-semibold">
+                  {t("import.result.importSuccessful")}
+                </h2>
+                <p
+                  className="text-muted-foreground text-sm"
+                  dangerouslySetInnerHTML={{
+                    __html: t("import.result.importSuccessfulDesc", {
+                      count: totalRows,
+                      activityText:
+                        totalRows === 1
+                          ? t("import.result.activity")
+                          : t("import.result.activities"),
+                    }),
+                  }}
+                />
               </motion.div>
             </CardContent>
           </Card>
@@ -179,19 +190,19 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
         {hasImportErrors && (
           <Button variant="outline" onClick={onBack} className="order-1">
             <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            {t("import.result.back")}
           </Button>
         )}
 
         <div className={`flex gap-3 ${hasImportErrors ? "order-3 ml-auto" : "order-2"}`}>
           <Button variant="outline" onClick={startNewImport}>
             <Icons.Import className="mr-2 h-4 w-4" />
-            Import Another File
+            {t("import.result.importAnotherFile")}
           </Button>
 
           <Button onClick={goToActivities}>
             <Icons.Activity className="mr-2 h-4 w-4" />
-            View All Activities
+            {t("import.result.viewAllActivities")}
           </Button>
         </div>
       </motion.div>

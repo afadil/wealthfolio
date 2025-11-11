@@ -4,6 +4,8 @@ import { TooltipProvider } from "@wealthfolio/ui";
 import { useState } from "react";
 import { PrivacyProvider } from "./context/privacy-context";
 import { AppRoutes } from "./routes";
+// Import i18n to ensure it's initialized
+import "@/locales";
 
 function App() {
   const [queryClient] = useState(

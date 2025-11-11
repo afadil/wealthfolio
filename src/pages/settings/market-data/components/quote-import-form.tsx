@@ -13,6 +13,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface QuoteImportFormProps {
   file: File | null;
@@ -33,6 +34,7 @@ export function QuoteImportForm({
   onValidate,
   onOverwriteChange,
 }: QuoteImportFormProps) {
+  const { t } = useTranslation("settings");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -140,10 +142,10 @@ export function QuoteImportForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">Select CSV File</CardTitle>
-        <CardDescription>
-          Choose a CSV file containing historical quote data to import
-        </CardDescription>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {t("marketData.import.form.title")}
+        </CardTitle>
+        <CardDescription>{t("marketData.import.form.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* File Drop Zone */}
@@ -166,7 +168,7 @@ export function QuoteImportForm({
                   className="flex items-center gap-1.5 px-3"
                 >
                   <Icons.Trash className="h-4 w-4" />
-                  <span>Remove File</span>
+                  <span>{t("marketData.import.form.removeFile")}</span>
                 </Button>
               </div>
             </div>
@@ -240,7 +242,7 @@ export function QuoteImportForm({
                     transition={{ duration: 0.2 }}
                     className="text-xs font-medium"
                   >
-                    Processing file...
+                    {t("marketData.import.form.processingFile")}
                   </motion.p>
                 ) : file && error ? (
                   <motion.div
@@ -279,9 +281,14 @@ export function QuoteImportForm({
                     transition={{ duration: 0.2 }}
                   >
                     <p className="text-xs font-medium">
-                      <span className="text-primary">Click to upload</span> or drop
+                      <span className="text-primary">
+                        {t("marketData.import.form.clickToUpload")}
+                      </span>{" "}
+                      {t("marketData.import.form.orDrop")}
                     </p>
-                    <p className="text-muted-foreground text-xs">CSV only</p>
+                    <p className="text-muted-foreground text-xs">
+                      {t("marketData.import.form.csvOnly")}
+                    </p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -316,14 +323,16 @@ export function QuoteImportForm({
               className="h-6 w-6"
             />
             <Label htmlFor="overwrite" className="text-sm">
-              Overwrite existing quotes with the same symbol and date
+              {t("marketData.import.form.overwriteExisting")}
             </Label>
           </div>
         </div>
 
         {/* Validate Button */}
         <Button onClick={onValidate} disabled={!file || isValidating} className="w-full">
-          {isValidating ? "Validating..." : "Validate File"}
+          {isValidating
+            ? t("marketData.import.form.validating")
+            : t("marketData.import.form.validateButton")}
         </Button>
       </CardContent>
     </Card>

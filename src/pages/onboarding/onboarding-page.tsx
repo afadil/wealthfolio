@@ -3,16 +3,31 @@ import { Icons } from "@/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { LanguageSelector } from "@/components/language-selector";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
 import { OnboardingStep3 } from "./onboarding-step3";
 
 const OnboardingPage = () => {
+  const { t, i18n } = useTranslation("onboarding");
   const navigate = useNavigate();
+  const { settings } = useSettingsContext();
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(settings?.language ?? "en");
   const step2Ref = useRef<OnboardingStep2Handle>(null);
   const MAX_STEPS = 3;
+
+  const handleLanguageChange = (language: string) => {
+    // Store language temporarily in local state (don't save to DB yet)
+    setSelectedLanguage(language);
+    // Update i18n immediately for UI preview
+    i18n.changeLanguage(language).catch((error) => {
+      console.error("Failed to change language:", error);
+    });
+  };
 
   const handleNext = () => {
     setCurrentStep((prevStep) => Math.min(prevStep + 1, MAX_STEPS));
@@ -50,7 +65,12 @@ const OnboardingPage = () => {
         return <OnboardingStep1 />;
       case 2:
         return (
-          <OnboardingStep2 ref={step2Ref} onNext={handleNext} onValidityChange={setIsStepValid} />
+          <OnboardingStep2
+            ref={step2Ref}
+            onNext={handleNext}
+            onValidityChange={setIsStepValid}
+            selectedLanguage={selectedLanguage}
+          />
         );
       case 3:
         return <OnboardingStep3 />;
@@ -65,7 +85,18 @@ const OnboardingPage = () => {
       <div className="flex min-h-screen flex-col lg:min-h-0">
         {/* Mobile: Sticky header | Desktop: Normal header */}
         <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 pt-[env(safe-area-inset-top)] backdrop-blur lg:relative lg:backdrop-blur-none">
-          <div className="flex flex-col items-center">
+          <div className="relative flex flex-col items-center">
+            {/* Language selector - positioned absolutely in top right */}
+            <div className="absolute top-2 right-4 z-10 sm:right-6 lg:right-8">
+              <div className="w-24 sm:w-28">
+                <LanguageSelector
+                  value={selectedLanguage}
+                  onChange={handleLanguageChange}
+                  compact
+                />
+              </div>
+            </div>
+
             <img
               alt="Wealthfolio Illustration"
               className="h-20 w-20 sm:h-24 sm:w-24"
@@ -122,7 +153,7 @@ const OnboardingPage = () => {
                 {currentStep > 1 && (
                   <Button variant="outline" onClick={handleBack} type="button" className="shrink-0">
                     <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
+                    {t("navigation.back")}
                   </Button>
                 )}
               </div>
@@ -134,7 +165,7 @@ const OnboardingPage = () => {
                 type="button"
                 className="group from-primary to-primary/90 bg-linear-to-r shadow-lg transition-all duration-300 hover:shadow-xl"
               >
-                {currentStep === MAX_STEPS ? "Get Started" : "Continue"}
+                {currentStep === MAX_STEPS ? t("navigation.getStarted") : t("navigation.continue")}
                 {currentStep === MAX_STEPS ? (
                   <Icons.Check className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                 ) : (

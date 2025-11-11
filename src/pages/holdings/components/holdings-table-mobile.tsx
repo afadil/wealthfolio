@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { AmountDisplay, GainPercent, Separator } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { HoldingsMobileFilterSheet } from "./holdings-mobile-filter-sheet";
 
 interface HoldingsTableMobileProps {
@@ -38,6 +39,7 @@ export const HoldingsTableMobile = ({
   showSearch = true,
   showFilterButton = true,
 }: HoldingsTableMobileProps) => {
+  const { t } = useTranslation("holdings");
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,7 +99,7 @@ export const HoldingsTableMobile = ({
         <div className="flex items-center gap-2">
           {showSearch && (
             <Input
-              placeholder="Search..."
+              placeholder={t("search.placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-secondary/30 flex-1 rounded-full border-none"
@@ -171,11 +173,9 @@ export const HoldingsTableMobile = ({
           })
         ) : (
           <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-            <h3 className="text-lg font-medium">No positions found</h3>
+            <h3 className="text-lg font-medium">{t("noPositions.title")}</h3>
             <p className="text-muted-foreground text-sm">
-              {holdings.length === 0
-                ? "Add activities to see your positions here."
-                : "Try adjusting your search or filter criteria."}
+              {holdings.length === 0 ? t("noPositions.noHoldings") : t("noPositions.noMatch")}
             </p>
           </div>
         )}

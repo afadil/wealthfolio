@@ -1,0 +1,30 @@
+{
+  "general": {
+    "title": "Lỗi",
+    "unknown": "Đã xảy ra lỗi không xác định",
+    "network": "Lỗi mạng. Vui lòng kiểm tra kết nối của bạn",
+    "server": "Lỗi máy chủ. Vui lòng thử lại sau",
+    "notFound": "Không tìm thấy tài nguyên"
+  },
+  "validation": {
+    "required": "Trường này là bắt buộc",
+    "invalid": "Giá trị không hợp lệ",
+    "min": "Giá trị phải ít nhất là {{min}}",
+    "max": "Giá trị phải nhiều nhất là {{max}}",
+    "email": "Địa chỉ email không hợp lệ",
+    "date": "Ngày không hợp lệ",
+    "number": "Phải là một số",
+    "positive": "Phải là số dương"
+  },
+  "auth": {
+    "unauthorized": "Truy cập không được phép",
+    "forbidden": "Truy cập bị cấm",
+    "sessionExpired": "Phiên của bạn đã hết hạn. Vui lòng đăng nhập lại"
+  },
+  "data": {
+    "loadFailed": "Không thể tải dữ liệu",
+    "saveFailed": "Không thể lưu dữ liệu",
+    "deleteFailed": "Không thể xóa dữ liệu",
+    "updateFailed": "Không thể cập nhật dữ liệu"
+  }
+}

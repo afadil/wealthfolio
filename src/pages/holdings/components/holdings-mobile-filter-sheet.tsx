@@ -12,6 +12,7 @@ import { ASSET_SUBCLASS_TYPES, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 
 interface HoldingsMobileFilterSheetProps {
   open: boolean;
@@ -34,18 +35,20 @@ export const HoldingsMobileFilterSheet = ({
   setSelectedTypes,
   showAccountFilter = true,
 }: HoldingsMobileFilterSheetProps) => {
+  const { t } = useTranslation("holdings");
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="flex h-[80vh] flex-col rounded-t-xl">
         <SheetHeader className="text-left">
-          <SheetTitle>Filter Holdings</SheetTitle>
+          <SheetTitle>{t("filters.title")}</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 py-4">
           <div className="space-y-6 pr-4">
             {/* Account Filter Section */}
             {showAccountFilter && (
               <div>
-                <h4 className="mb-3 font-medium">Account</h4>
+                <h4 className="mb-3 font-medium">{t("filters.account")}</h4>
                 <ul className="space-y-1">
                   <li
                     className={cn(
@@ -57,7 +60,7 @@ export const HoldingsMobileFilterSheet = ({
                     onClick={() => {
                       onAccountChange({
                         id: PORTFOLIO_ACCOUNT_ID,
-                        name: "All Portfolio",
+                        name: t("page.allPortfolio"),
                         accountType: "PORTFOLIO" as unknown as Account["accountType"],
                         balance: 0,
                         currency: "USD",
@@ -69,7 +72,7 @@ export const HoldingsMobileFilterSheet = ({
                       onOpenChange(false);
                     }}
                   >
-                    <span>All Portfolio</span>
+                    <span>{t("page.allPortfolio")}</span>
                     {selectedAccount?.id === PORTFOLIO_ACCOUNT_ID && (
                       <Icons.Check className="h-4 w-4" />
                     )}
@@ -96,7 +99,7 @@ export const HoldingsMobileFilterSheet = ({
 
             {/* Asset Type Filter Section */}
             <div>
-              <h4 className="mb-3 font-medium">Asset Type</h4>
+              <h4 className="mb-3 font-medium">{t("filters.assetType")}</h4>
               <ul className="space-y-1">
                 <li
                   className={cn(
@@ -108,7 +111,7 @@ export const HoldingsMobileFilterSheet = ({
                     onOpenChange(false);
                   }}
                 >
-                  <span>All Types</span>
+                  <span>{t("filters.allTypes")}</span>
                   {selectedTypes.length === 0 && <Icons.Check className="h-4 w-4" />}
                 </li>
                 {ASSET_SUBCLASS_TYPES.map((type) => (
@@ -135,7 +138,7 @@ export const HoldingsMobileFilterSheet = ({
         </ScrollArea>
         <SheetFooter className="mt-auto">
           <SheetClose asChild>
-            <Button className="w-full">Done</Button>
+            <Button className="w-full">{t("filters.done")}</Button>
           </SheetClose>
         </SheetFooter>
       </SheetContent>

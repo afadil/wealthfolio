@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { GainAmount } from "@wealthfolio/ui";
 import { GainPercent } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 
 interface AssetLotsTableProps {
   lots: Lot[];
@@ -20,6 +21,8 @@ interface AssetLotsTableProps {
 }
 
 export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTableProps) => {
+  const { t } = useTranslation(["assets"]);
+
   if (!lots || lots.length === 0) {
     return null;
   }
@@ -35,13 +38,15 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
           <Table>
             <TableHeader className="bg-muted">
               <TableRow>
-                <TableHead className="w-[160px]">Acquired Date</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">Acquisition Price</TableHead>
-                <TableHead className="text-right">Fees</TableHead>
-                <TableHead className="text-right">Cost Basis</TableHead>
-                <TableHead className="text-right">Market Value</TableHead>
-                <TableHead className="text-right">Gain/Loss</TableHead>
+                <TableHead className="w-[160px]">{t("assets:lotsTable.acquiredDate")}</TableHead>
+                <TableHead className="text-right">{t("assets:lotsTable.quantity")}</TableHead>
+                <TableHead className="text-right">
+                  {t("assets:lotsTable.acquisitionPrice")}
+                </TableHead>
+                <TableHead className="text-right">{t("assets:lotsTable.fees")}</TableHead>
+                <TableHead className="text-right">{t("assets:lotsTable.costBasis")}</TableHead>
+                <TableHead className="text-right">{t("assets:lotsTable.marketValue")}</TableHead>
+                <TableHead className="text-right">{t("assets:lotsTable.gainLoss")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

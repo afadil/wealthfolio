@@ -12,6 +12,7 @@ import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigg
 import { GainAmount, GainPercent, IntervalSelector, Page } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
@@ -40,6 +41,7 @@ const getInitialDateRange = (): DateRange => ({
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 export default function DashboardPage() {
+  const { t } = useTranslation("dashboard");
   const [intervalCode, setIntervalCode] = usePersistentState<TimePeriod>(
     "dashboard:intervalCode",
     INITIAL_INTERVAL_CODE,
@@ -48,8 +50,10 @@ export default function DashboardPage() {
     "dashboard:dateRange",
     getInitialDateRange(),
   );
-  const [selectedIntervalDescription, setSelectedIntervalDescription] =
-    usePersistentState<string>("dashboard:selectedIntervalDescription", "Last 3 months");
+  const [selectedIntervalDescription, setSelectedIntervalDescription] = usePersistentState<string>(
+    "dashboard:selectedIntervalDescription",
+    t("intervalDescriptions.last3Months"),
+  );
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);

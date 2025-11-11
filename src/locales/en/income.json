@@ -1,0 +1,62 @@
+{
+  "title": "Investment Income",
+  "addIncome": "Add Income",
+  "types": {
+    "dividend": "Dividends",
+    "interest": "Interest",
+    "other": "Other"
+  },
+  "form": {
+    "source": "Source",
+    "amount": "Amount",
+    "date": "Date",
+    "type": "Type",
+    "recurring": "Recurring"
+  },
+  "table": {
+    "date": "Date",
+    "source": "Source",
+    "type": "Type",
+    "amount": "Amount"
+  },
+  "summary": {
+    "total": "Total Income",
+    "thisMonth": "This Month",
+    "thisYear": "This Year",
+    "allTime": "All Time Income",
+    "lastYear": "Last Year Income",
+    "thisYearIncome": "This Year Income",
+    "monthlyAverage": "Monthly Average",
+    "incomeSources": "Income Sources",
+    "yoyGrowth": "Year-over-year growth",
+    "cumulativeIncome": "Cumulative income since inception",
+    "sinceLastPeriod": "Since last period",
+    "topDividendSources": "Top 10 Dividend Sources",
+    "ofTotal": "of total"
+  },
+  "periods": {
+    "allTime": "All Time",
+    "lastYear": "Last Year",
+    "ytd": "Year to Date"
+  },
+  "chart": {
+    "incomeHistory": "Income History",
+    "monthlyIncome": "Monthly Income",
+    "cumulativeIncome": "Cumulative Income",
+    "previousPeriod": "Previous Period Income",
+    "previous": "Previous",
+    "cumulative": "Cumulative",
+    "monthly": "Monthly"
+  },
+  "empty": {
+    "title": "No income data available",
+    "description": "There is no income data for the selected period. Try selecting a different time range or check back later.",
+    "noHistory": "No income history available",
+    "noDividends": "No dividend income recorded",
+    "noDividendsDesc": "There are no dividend sources for the selected period. Try selecting a different time range or check back later."
+  },
+  "error": {
+    "failedToLoad": "Failed to load income summary"
+  },
+  "otherSources": "other sources"
+}

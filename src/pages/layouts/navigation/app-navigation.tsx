@@ -1,6 +1,7 @@
 import { getDynamicNavItems, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import { Icons } from "@/components/ui/icons";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface NavLink {
   title: string;
@@ -14,49 +15,8 @@ export interface NavigationProps {
   addons?: NavLink[];
 }
 
-const staticNavigation: NavigationProps = {
-  primary: [
-    {
-      icon: <Icons.Dashboard className="size-6" />,
-      title: "Dashboard",
-      href: "/dashboard",
-    },
-    {
-      icon: <Icons.Holdings className="size-6" />,
-      title: "Holdings",
-      href: "/holdings",
-    },
-    {
-      icon: <Icons.Performance className="size-6" />,
-      title: "Performance",
-      href: "/performance",
-    },
-    {
-      icon: <Icons.Income className="size-6" />,
-      title: "Income",
-      href: "/income",
-    },
-    {
-      icon: <Icons.Activity className="size-6" />,
-      title: "Activities",
-      href: "/activities",
-    },
-    {
-      icon: <Icons.Swingfolio className="size-6" />,
-      title: "Trading",
-      href: "/trading",
-    },
-  ],
-  secondary: [
-    {
-      icon: <Icons.Settings className="size-6" />,
-      title: "Settings",
-      href: "/settings",
-    },
-  ],
-};
-
 export function useNavigation() {
+  const { t } = useTranslation("common");
   const [dynamicItems, setDynamicItems] = useState<NavigationProps["primary"]>([]);
 
   // Subscribe to navigation updates from addons
@@ -76,6 +36,49 @@ export function useNavigation() {
       unsubscribe();
     };
   }, []);
+
+  // Build static navigation with translations
+  const staticNavigation: NavigationProps = {
+    primary: [
+      {
+        icon: <Icons.Dashboard className="size-6" />,
+        title: t("navigation.dashboard"),
+        href: "/dashboard",
+      },
+      {
+        icon: <Icons.Holdings className="size-6" />,
+        title: t("navigation.holdings"),
+        href: "/holdings",
+      },
+      {
+        icon: <Icons.Performance className="size-6" />,
+        title: t("navigation.performance"),
+        href: "/performance",
+      },
+      {
+        icon: <Icons.Income className="size-6" />,
+        title: t("navigation.income"),
+        href: "/income",
+      },
+      {
+        icon: <Icons.Trading className="size-6" />,
+        title: t("navigation.trading"),
+        href: "/trading",
+      },
+      {
+        icon: <Icons.Activity className="size-6" />,
+        title: t("navigation.activities"),
+        href: "/activities",
+      },
+    ],
+    secondary: [
+      {
+        icon: <Icons.Settings className="size-6" />,
+        title: t("navigation.settings"),
+        href: "/settings",
+      },
+    ],
+  };
 
   // Combine static navigation items with addons grouped separately
   const navigation: NavigationProps = {

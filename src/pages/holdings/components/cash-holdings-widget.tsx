@@ -6,6 +6,7 @@ import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 interface CashHoldingsWidgetProps {
   cashHoldings: Holding[];
@@ -18,6 +19,7 @@ export const CashHoldingsWidget = ({
   isLoading,
   className,
 }: CashHoldingsWidgetProps) => {
+  const { t } = useTranslation("holdings");
   const { isBalanceHidden } = useBalancePrivacy();
   const { settings } = useSettingsContext();
 
@@ -34,7 +36,7 @@ export const CashHoldingsWidget = ({
           <div className="flex items-center gap-2.5">
             <div>
               <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase sm:text-xs">
-                Cash Balance
+                {t("widget.cashBalance")}
               </p>
               <Skeleton className="mt-0.5 h-5 w-24 sm:h-5 sm:w-24" />
             </div>
@@ -60,7 +62,7 @@ export const CashHoldingsWidget = ({
         <div className="flex items-center gap-2.5">
           <div className="min-w-0">
             <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase sm:text-xs">
-              Cash Balance
+              {t("widget.cashBalance")}
             </p>
             <p className="text-foreground mt-0.5 text-base font-semibold tracking-tight sm:text-base">
               <AmountDisplay

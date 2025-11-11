@@ -1,0 +1,62 @@
+{
+  "title": "Thu nhập đầu tư",
+  "addIncome": "Thêm thu nhập",
+  "types": {
+    "dividend": "Cổ tức",
+    "interest": "Lãi",
+    "other": "Khác"
+  },
+  "form": {
+    "source": "Nguồn",
+    "amount": "Số tiền",
+    "date": "Ngày",
+    "type": "Loại",
+    "recurring": "Định kỳ"
+  },
+  "table": {
+    "date": "Ngày",
+    "source": "Nguồn",
+    "type": "Loại",
+    "amount": "Số tiền"
+  },
+  "summary": {
+    "total": "Tổng thu nhập",
+    "thisMonth": "Tháng này",
+    "thisYear": "Năm nay",
+    "allTime": "Thu nhập mọi thời điểm",
+    "lastYear": "Thu nhập năm ngoái",
+    "thisYearIncome": "Thu nhập năm nay",
+    "monthlyAverage": "Trung bình hàng tháng",
+    "incomeSources": "Nguồn thu nhập",
+    "yoyGrowth": "Tăng trưởng so với năm trước",
+    "cumulativeIncome": "Thu nhập tích lũy từ khi bắt đầu",
+    "sinceLastPeriod": "Kể từ kỳ trước",
+    "topDividendSources": "Top 10 nguồn cổ tức",
+    "ofTotal": "của tổng"
+  },
+  "periods": {
+    "allTime": "Mọi thời điểm",
+    "lastYear": "Năm ngoái",
+    "ytd": "Từ đầu năm"
+  },
+  "chart": {
+    "incomeHistory": "Lịch sử thu nhập",
+    "monthlyIncome": "Thu nhập hàng tháng",
+    "cumulativeIncome": "Thu nhập tích lũy",
+    "previousPeriod": "Thu nhập kỳ trước",
+    "previous": "Trước",
+    "cumulative": "Tích lũy",
+    "monthly": "Hàng tháng"
+  },
+  "empty": {
+    "title": "Không có dữ liệu thu nhập",
+    "description": "Không có dữ liệu thu nhập cho khoảng thời gian đã chọn. Hãy thử chọn khoảng thời gian khác hoặc quay lại sau.",
+    "noHistory": "Không có lịch sử thu nhập",
+    "noDividends": "Chưa ghi nhận thu nhập cổ tức",
+    "noDividendsDesc": "Không có nguồn cổ tức nào cho khoảng thời gian đã chọn. Hãy thử chọn khoảng thời gian khác hoặc quay lại sau."
+  },
+  "error": {
+    "failedToLoad": "Không thể tải tóm tắt thu nhập"
+  },
+  "otherSources": "nguồn khác"
+}

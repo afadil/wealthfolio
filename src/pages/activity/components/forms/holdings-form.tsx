@@ -1,4 +1,5 @@
 import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -18,23 +19,22 @@ import {
 } from "../activity-type-selector";
 
 export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+  const { t } = useTranslation(["activity"]);
   const { control, watch } = useFormContext();
   const isManualAsset = watch("assetDataSource") === "MANUAL";
 
   const holdingTypes: ActivityTypeUI[] = [
     {
       value: "ADD_HOLDING",
-      label: "Add Holding",
+      label: t("activity:form.addHolding"),
       icon: "PlusCircle",
-      description:
-        'Record a new asset holding. This is similar to a "Buy" but does not impact your cash balance. Use this for initial holdings, assets transferred from another brokerage, holdings received (e.g., gifts, inheritance), or to quickly record a purchase without a separate deposit entry.',
+      description: t("activity:form.addHoldingDescription"),
     },
     {
       value: "REMOVE_HOLDING",
-      label: "Remove Holding",
+      label: t("activity:form.removeHolding"),
       icon: "MinusCircle",
-      description:
-        'Record the removal of an asset holding. This is similar to a "Sell" but does not impact your cash balance. Also use to record assets transferred out to another brokerage or holdings removed for reasons other than a sale (e.g., gifts, donations).',
+      description: t("activity:form.removeHoldingDescription"),
     },
   ];
 
@@ -59,7 +59,7 @@ export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) 
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Shares</FormLabel>
+                  <FormLabel>{t("activity:form.shares")}</FormLabel>
                   <FormControl>
                     <QuantityInput {...field} />
                   </FormControl>
@@ -72,7 +72,7 @@ export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) 
               name="unitPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Average Cost</FormLabel>
+                  <FormLabel>{t("activity:form.averageCost")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>

@@ -5,6 +5,7 @@ import type { Goal, GoalAllocation } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import GoalsAllocations from "./components/goal-allocations";
 import { GoalEditModal } from "./components/goal-edit-modal";
@@ -12,6 +13,7 @@ import { GoalItem } from "./components/goal-item";
 import { useGoalMutations } from "./use-goal-mutations";
 
 const SettingsGoalsPage = () => {
+  const { t } = useTranslation("settings");
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
     queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
@@ -59,19 +61,19 @@ const SettingsGoalsPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <SettingsHeader heading="Goals" text=" Manage your investment and saving goals.">
+        <SettingsHeader heading={t("goals.title")} text={t("goals.description")}>
           <>
             <Button
               size="icon"
               className="sm:hidden"
               onClick={() => handleAddGoal()}
-              aria-label="Add goal"
+              aria-label={t("goals.addButton")}
             >
               <Icons.Plus className="h-4 w-4" />
             </Button>
             <Button className="hidden sm:inline-flex" onClick={() => handleAddGoal()}>
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add goal
+              {t("goals.addButton")}
             </Button>
           </>
         </SettingsHeader>
@@ -79,7 +81,7 @@ const SettingsGoalsPage = () => {
         <div className="w-full pt-8">
           {goals?.length ? (
             <>
-              <h3 className="p-2 text-xl font-bold">Goals</h3>
+              <h3 className="p-2 text-xl font-bold">{t("goals.goalsHeading")}</h3>
 
               <div className="divide-border divide-y rounded-md border">
                 {goals.map((goal: Goal) => (
@@ -91,10 +93,9 @@ const SettingsGoalsPage = () => {
                   />
                 ))}
               </div>
-              <h3 className="p-2 pt-12 text-xl font-bold">Allocations</h3>
+              <h3 className="p-2 pt-12 text-xl font-bold">{t("goals.allocationsHeading")}</h3>
               <h5 className="text-muted-foreground p-2 pt-0 pb-4 text-sm font-light">
-                Click on a cell to specify the percentage of each account's allocation to your
-                goals.
+                {t("goals.allocationsDescription")}
               </h5>
               <GoalsAllocations
                 goals={goals}
@@ -106,13 +107,13 @@ const SettingsGoalsPage = () => {
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="Goal" />
-              <EmptyPlaceholder.Title>No goals added!</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Title>{t("goals.empty.title")}</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any goals yet. Start adding your investment goals.
+                {t("goals.empty.description")}
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddGoal()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
-                Add a goal
+                {t("goals.addGoalButton")}
               </Button>
             </EmptyPlaceholder>
           )}

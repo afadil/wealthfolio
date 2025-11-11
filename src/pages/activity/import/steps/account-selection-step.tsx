@@ -3,6 +3,7 @@ import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import { usePlatform } from "@/hooks/use-platform";
 import { Account, CsvRowError } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 import { AccountSelector } from "../../../../components/account-selector";
 import { AccountSelectorMobile } from "../../../../components/account-selector-mobile";
 import { CSVFileViewer } from "../components/csv-file-viewer";
@@ -34,6 +35,7 @@ export const AccountSelectionStep = ({
   onBack,
 }: AccountSelectionStepProps) => {
   const { isMobile } = usePlatform();
+  const { t } = useTranslation("activity");
 
   // Check if there are any errors
   const hasErrors =
@@ -122,8 +124,8 @@ export const AccountSelectionStep = ({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <div className="mb-1 flex items-center">
-            <h2 className="font-semibold">Select Account</h2>
-            <HelpTooltip content="Make sure to select the account you want to import activities for" />
+            <h2 className="font-semibold">{t("import.accountSelection.selectAccount")}</h2>
+            <HelpTooltip content={t("import.accountSelection.selectAccountHelp")} />
           </div>
           <div className="h-[120px]">
             {isMobile ? (
@@ -146,7 +148,9 @@ export const AccountSelectionStep = ({
                 ) : (
                   <>
                     <Icons.Briefcase className="text-muted-foreground h-8 w-8" />
-                    <p className="text-muted-foreground text-center text-sm">No account selected</p>
+                    <p className="text-muted-foreground text-center text-sm">
+                      {t("import.accountSelection.noAccountSelected")}
+                    </p>
                     <AccountSelectorMobile
                       setSelectedAccount={setSelectedAccount}
                       includePortfolio={false}
@@ -166,8 +170,8 @@ export const AccountSelectionStep = ({
 
         <div>
           <div className="mb-1 flex items-center">
-            <h2 className="font-semibold">Upload CSV File</h2>
-            <HelpTooltip content="Upload a CSV file containing your investment activities. The file should include headers in the first row." />
+            <h2 className="font-semibold">{t("import.accountSelection.uploadCsvFile")}</h2>
+            <HelpTooltip content={t("import.accountSelection.uploadCsvFileHelp")} />
           </div>
           <div className="h-[120px]">
             <FileDropzone
@@ -176,7 +180,7 @@ export const AccountSelectionStep = ({
               isLoading={isParsing}
               accept=".csv"
               isValid={fileValidationStatus === "valid"}
-              error={hasErrors ? "File contains errors" : null}
+              error={hasErrors ? t("import.accountSelection.fileContainsErrors") : null}
             />
           </div>
         </div>
@@ -193,8 +197,8 @@ export const AccountSelectionStep = ({
         {fileValidationStatus === "invalid" && formattedData.length === 0 && (
           <ImportAlert
             variant="destructive"
-            title="Invalid CSV Format"
-            description={displayError ?? "Unknown error"}
+            title={t("import.accountSelection.invalidCsvFormat")}
+            description={displayError ?? t("import.accountSelection.unknownError")}
             icon={Icons.FileX}
           />
         )}
@@ -203,18 +207,18 @@ export const AccountSelectionStep = ({
       {/* Row 3: Action buttons */}
       <div className="flex justify-between pt-2">
         <Button variant="outline" onClick={onBack} disabled={isParsing}>
-          Cancel
+          {t("import.accountSelection.cancel")}
         </Button>
         <Button onClick={onNext} disabled={!canProceed}>
-          {isParsing ? "Validating..." : "Next"}
+          {isParsing ? t("import.accountSelection.validating") : t("import.accountSelection.next")}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
       {/* Loading indicator */}
       <ProgressIndicator
-        title="Reading the file"
-        description="Please wait while the application processes your data."
-        message="Reading the file..."
+        title={t("import.accountSelection.readingFile")}
+        description={t("import.accountSelection.readingFileDesc")}
+        message={t("import.accountSelection.readingFileMessage")}
         isLoading={isParsing}
         open={isParsing}
       />

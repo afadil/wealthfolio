@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -8,15 +9,17 @@ import { CurrencyInput } from "@wealthfolio/ui";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const baseCurrencyFormSchema = z.object({
-  baseCurrency: z.string({ required_error: "Please select a base currency." }),
-});
-
-type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
-
 // Extracted form component
 export function BaseCurrencyForm() {
   const { settings, updateBaseCurrency } = useSettingsContext();
+  const { t } = useTranslation("settings");
+
+  const baseCurrencyFormSchema = z.object({
+    baseCurrency: z.string({ required_error: t("general.baseCurrency.selectPlaceholder") }),
+  });
+
+  type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
+
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || "USD",
   };
@@ -50,7 +53,7 @@ export function BaseCurrencyForm() {
             </FormItem>
           )}
         />
-        <Button type="submit">Save Currency</Button> {/* Changed button text slightly */}
+        <Button type="submit">{t("general.baseCurrency.saveButton")}</Button>
       </form>
     </Form>
   );
@@ -58,12 +61,14 @@ export function BaseCurrencyForm() {
 
 // Original component now uses the extracted form inside a Card
 export function BaseCurrencySettings() {
+  const { t } = useTranslation("settings");
+
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="text-lg">Base Currency</CardTitle>
-          <CardDescription>Select your portfolio base currency.</CardDescription>
+          <CardTitle className="text-lg">{t("general.baseCurrency.title")}</CardTitle>
+          <CardDescription>{t("general.baseCurrency.description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>

@@ -23,6 +23,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import { AccountSelector } from "@/components/account-selector";
+import { useTranslation } from "react-i18next";
 
 const SKIP_FIELD_VALUE = "__skip__";
 
@@ -37,6 +38,7 @@ export function MappingHeaderCell({
   headers: string[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
 }) {
+  const { t } = useTranslation("activity");
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
   const mappedHeader = mapping.fieldMappings[field];
   const isMapped = typeof mappedHeader === "string" && headers.includes(mappedHeader);
@@ -63,17 +65,23 @@ export function MappingHeaderCell({
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
           <SelectTrigger className="text-muted-foreground h-8 w-full py-2 font-normal">
-            <SelectValue placeholder={isRequired ? "Select column" : "Optional"} />
+            <SelectValue
+              placeholder={
+                isRequired
+                  ? t("import.mappingTable.selectColumn")
+                  : t("import.mappingTable.optional")
+              }
+            />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
             {!isRequired && (
               <>
                 <SelectItem value={SKIP_FIELD_VALUE}>
                   {field === ImportFormat.CURRENCY
-                    ? "Account Currency"
+                    ? t("import.mappingTable.accountCurrency")
                     : field === ImportFormat.ACCOUNT
-                      ? "Default Account"
-                      : "Ignore"}
+                      ? t("import.mappingTable.defaultAccount")
+                      : t("import.mappingTable.ignore")}
                 </SelectItem>
                 <SelectSeparator />
               </>
@@ -92,7 +100,8 @@ export function MappingHeaderCell({
           className="text-muted-foreground h-8 py-0 pl-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
-          {mappedHeader || (isRequired ? "Select column" : "Ignore")}
+          {mappedHeader ||
+            (isRequired ? t("import.mappingTable.selectColumn") : t("import.mappingTable.ignore"))}
         </Button>
       )}
     </div>
@@ -128,6 +137,7 @@ function ActivityTypeDisplayCell({
   appType,
   handleActivityTypeMapping,
 }: ActivityTypeDisplayCellProps) {
+  const { t } = useTranslation("activity");
   const trimmedCsvType = csvType.trim().toUpperCase();
   const displayValue =
     trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
@@ -179,7 +189,7 @@ function ActivityTypeDisplayCell({
         onValueChange={(newType) =>
           handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
         }
-        placeholder="Map to..."
+        placeholder={t("import.mappingTable.mapTo")}
         value=""
       />
     </div>
@@ -198,6 +208,7 @@ function AccountIdDisplayCell({
   isInvalid,
   handleAccountIdMapping,
 }: AccountIdDisplayCellProps) {
+  const { t } = useTranslation("activity");
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   if (!csvAccountId || csvAccountId.trim() === "") {
@@ -243,7 +254,7 @@ function AccountIdDisplayCell({
             handleAccountIdMapping(csvAccountId, account.id);
           }}
           variant="dropdown"
-          buttonText="Select Account"
+          buttonText={t("import.mappingTable.selectAccount")}
         />
       </div>
     </div>

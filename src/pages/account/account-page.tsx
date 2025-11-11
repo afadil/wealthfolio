@@ -13,6 +13,7 @@ import {
   PrivacyAmount,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,7 @@ const getInitialDateRange = (): DateRange => ({
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 const AccountPage = () => {
+  const { t } = useTranslation("accounts");
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
@@ -166,7 +168,7 @@ const AccountPage = () => {
   return (
     <Page>
       <PageHeader
-        heading={account?.name ?? "Account"}
+        heading={account?.name ?? t("page.accountFallback")}
         text={account?.group ?? account?.currency}
         onBack={() => navigate(-1)}
         actions={
@@ -179,16 +181,16 @@ const AccountPage = () => {
                     variant="outline"
                     size="icon"
                     className="h-9 w-9"
-                    aria-label="Switch account"
+                    aria-label={t("page.switchAccount")}
                   >
                     <Icons.ChevronDown className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[240px] p-0" align="end">
                   <Command>
-                    <CommandInput placeholder="Search accounts..." />
+                    <CommandInput placeholder={t("page.searchPlaceholder")} />
                     <CommandList>
-                      <CommandEmpty>No accounts found.</CommandEmpty>
+                      <CommandEmpty>{t("page.noAccountsFound")}</CommandEmpty>
                       {accountsByType.map(([type, typeAccounts]) => (
                         <CommandGroup key={type} heading={type}>
                           {typeAccounts.map((acc) => {
@@ -230,15 +232,15 @@ const AccountPage = () => {
                     variant="outline"
                     size="icon"
                     className="h-9 w-9"
-                    aria-label="Switch account"
+                    aria-label={t("page.switchAccount")}
                   >
                     <Icons.ChevronDown className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="bottom" className="h-[80vh] p-0">
                   <SheetHeader className="border-border border-b px-6 py-4">
-                    <SheetTitle>Switch Account</SheetTitle>
-                    <SheetDescription>Choose an account to view</SheetDescription>
+                    <SheetTitle>{t("page.switchAccountTitle")}</SheetTitle>
+                    <SheetDescription>{t("page.chooseAccountDescription")}</SheetDescription>
                   </SheetHeader>
                   <ScrollArea className="h-[calc(80vh-5rem)] px-6 py-4">
                     <div className="space-y-6">

@@ -1,0 +1,30 @@
+{
+  "general": {
+    "title": "Error",
+    "unknown": "An unknown error occurred",
+    "network": "Network error. Please check your connection",
+    "server": "Server error. Please try again later",
+    "notFound": "Resource not found"
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalid": "Invalid value",
+    "min": "Value must be at least {{min}}",
+    "max": "Value must be at most {{max}}",
+    "email": "Invalid email address",
+    "date": "Invalid date",
+    "number": "Must be a number",
+    "positive": "Must be a positive number"
+  },
+  "auth": {
+    "unauthorized": "Unauthorized access",
+    "forbidden": "Access forbidden",
+    "sessionExpired": "Your session has expired. Please log in again"
+  },
+  "data": {
+    "loadFailed": "Failed to load data",
+    "saveFailed": "Failed to save data",
+    "deleteFailed": "Failed to delete data",
+    "updateFailed": "Failed to update data"
+  }
+}

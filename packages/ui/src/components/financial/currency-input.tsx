@@ -22,7 +22,7 @@ interface CurrencyInputCustomProps {
 
 type CurrencyInputProps = CurrencyInputCustomProps & Omit<ButtonProps, "onChange" | "value">;
 
-const popularCurrencies = ["USD", "CAD", "EUR", "GBP", "CHF"];
+const popularCurrencies = ["VND", "USD", "CAD", "EUR", "GBP", "CHF"];
 
 export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
   (

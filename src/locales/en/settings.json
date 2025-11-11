@@ -1,0 +1,521 @@
+{
+  "title": "Settings",
+  "navigation": {
+    "general": {
+      "title": "General",
+      "subtitle": "Currency and general preferences"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "Theme, typography, and density"
+    },
+    "accounts": {
+      "title": "Accounts",
+      "subtitle": "Investment and savings accounts"
+    },
+    "limits": {
+      "title": "Limits",
+      "subtitle": "Contribution limits and rules"
+    },
+    "goals": {
+      "title": "Goals",
+      "subtitle": "Plan and track objectives"
+    },
+    "marketData": {
+      "title": "Market Data",
+      "subtitle": "Providers and data update"
+    },
+    "addons": {
+      "title": "Add-ons",
+      "subtitle": "Extend Wealthfolio with features"
+    },
+    "exports": {
+      "title": "Data Export",
+      "subtitle": "Backup and export your data"
+    },
+    "about": {
+      "title": "About",
+      "subtitle": "About Wealthfolio"
+    }
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Customize the look and feel of the application",
+    "theme": {
+      "label": "Theme",
+      "description": "Select your preferred theme for the application",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "font": {
+      "label": "Font Family",
+      "description": "Choose the font family used throughout the interface",
+      "mono": "Monospace",
+      "sans": "Sans Serif"
+    },
+    "language": {
+      "label": "Language",
+      "description": "Select your preferred language for the application interface"
+    },
+    "menuBar": {
+      "label": "Show menu bar",
+      "description": "Toggle to display the application menu bar."
+    }
+  },
+  "accounts": {
+    "title": "Accounts",
+    "description": " Manage your investment and saving accounts.",
+    "addButton": "Add account",
+    "addAccountButton": "Add an account",
+    "empty": {
+      "title": "No account added!",
+      "description": "You don't have any account yet. Start adding your investment accounts."
+    },
+    "item": {
+      "disabled": "Disabled"
+    },
+    "form": {
+      "addTitle": "Add Account",
+      "updateTitle": "Update Account",
+      "addDescription": " Add an investment account to track.",
+      "updateDescription": "Update account information",
+      "fields": {
+        "name": {
+          "label": "Account Name",
+          "placeholder": "Account display name"
+        },
+        "group": {
+          "label": "Account Group",
+          "placeholder": "Retirement, 401K, RRSP, TFSA,..."
+        },
+        "accountType": {
+          "label": "Account Type",
+          "placeholder": "Select an account type",
+          "sheetTitle": "Select Account Type",
+          "sheetDescription": "Choose the account type that best matches.",
+          "options": {
+            "securities": "Securities",
+            "cash": "Cash",
+            "crypto": "Crypto"
+          }
+        },
+        "currency": {
+          "label": "Currency"
+        },
+        "isDefault": {
+          "label": " Default Account"
+        },
+        "isActive": {
+          "label": " Is Active"
+        }
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "add": "Add Account",
+        "update": "Update Account"
+      }
+    }
+  },
+  "general": {
+    "title": "General",
+    "description": "Manage the general application settings and preferences.",
+    "baseCurrency": {
+      "title": "Base Currency",
+      "description": "Select your portfolio base currency.",
+      "selectPlaceholder": "Please select a base currency.",
+      "saveButton": "Save Currency"
+    },
+    "exchangeRates": {
+      "title": "Exchange Rates",
+      "description": "Manage exchange rates for currencies in your portfolio.",
+      "addButton": "Add rate",
+      "columns": {
+        "from": "From",
+        "to": "To",
+        "source": "Source",
+        "rate": "Rate",
+        "lastUpdated": "Last Updated"
+      },
+      "empty": {
+        "title": "No exchange rates defined yet",
+        "button": "Add rate"
+      },
+      "delete": {
+        "title": "Delete Exchange Rate",
+        "description": "Are you sure you want to delete this exchange rate?",
+        "button": "Delete"
+      },
+      "viewHistory": "View history"
+    },
+    "autoUpdate": {
+      "title": "Automatic Updates",
+      "enableLabel": "Enable automatic update checks",
+      "enableDescription": "When enabled, Wealthfolio will automatically check for updates when the application starts. You can still manually check for updates from the Help menu.",
+      "toast": {
+        "successTitle": "Settings updated",
+        "successDescription": "Auto-update settings have been saved successfully.",
+        "errorTitle": "Error",
+        "errorDescription": "Failed to update auto-update settings. Please try again."
+      }
+    }
+  },
+  "goals": {
+    "title": "Goals",
+    "description": " Manage your investment and saving goals.",
+    "addButton": "Add goal",
+    "addGoalButton": "Add a goal",
+    "goalsHeading": "Goals",
+    "allocationsHeading": "Allocations",
+    "allocationsDescription": "Click on a cell to specify the percentage of each account's allocation to your goals.",
+    "empty": {
+      "title": "No goals added!",
+      "description": "You don't have any goals yet. Start adding your investment goals."
+    },
+    "form": {
+      "addTitle": "Add Goal",
+      "updateTitle": "Update Goal",
+      "addDescription": " Add an investment goal to track.",
+      "updateDescription": "Update goal information",
+      "fields": {
+        "title": {
+          "label": "Goal Name",
+          "placeholder": "Goal display title"
+        },
+        "description": {
+          "label": "Goal description",
+          "placeholder": "Goal short description"
+        },
+        "targetAmount": {
+          "label": "Target amount",
+          "placeholder": "Target amount"
+        },
+        "isAchieved": {
+          "label": " Goal Achieved"
+        }
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "add": "Add Goal",
+        "update": "Update Goal"
+      }
+    },
+    "operations": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "openMenu": "Open"
+    },
+    "delete": {
+      "title": "Are you sure you want to delete this goal and related activities?",
+      "description": "This action cannot be undone.",
+      "button": "Delete"
+    },
+    "allocations": {
+      "tableHeader": "Goals \\ Accounts",
+      "totalRow": "Total",
+      "saveButton": "Save Allocations",
+      "toast": {
+        "errorTitle": "Total allocation for an account can't exceed 100%."
+      }
+    }
+  },
+  "contributionLimits": {
+    "title": "Contribution Limits",
+    "description": "Manage your contribution limits.",
+    "addButton": "Add limit",
+    "addLimitButton": "Add a contribution limit",
+    "currentYear": "Current Year",
+    "previousYears": "Previous Years",
+    "showPreviousYears": "Show Previous Years",
+    "hidePreviousYears": "Hide Previous Years",
+    "daysLeft": "days left",
+    "completed": "completed",
+    "overLimit": "over limit",
+    "contributed": "Contributed",
+    "loading": "Loading...",
+    "empty": {
+      "title": "No contribution limits for {{year}}!",
+      "description": "You don't have any contribution limits for the current year. Start adding your contribution limits."
+    },
+    "form": {
+      "addTitle": "Add Contribution Limit",
+      "updateTitle": "Update Contribution Limit",
+      "addDescription": "Add a new contribution limit.",
+      "updateDescription": "Update contribution limit information",
+      "fields": {
+        "groupName": {
+          "label": "Group Name",
+          "placeholder": "e.g., TFSA, 401(k), RRSP",
+          "description": "Name of the contribution limit group"
+        },
+        "limitAmount": {
+          "label": "Limit Amount",
+          "placeholder": "e.g., 6,000.00",
+          "description": "Maximum contribution amount allowed"
+        },
+        "contributionYear": {
+          "label": "Year",
+          "placeholder": "e.g., 2024"
+        },
+        "startDate": {
+          "label": "Start Date"
+        },
+        "endDate": {
+          "label": "End Date"
+        },
+        "dateNote": "Dates default to January 1st through December 31st of the selected year"
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "save": "Save",
+        "update": "Update",
+        "saving": "Saving...",
+        "updating": "Updating..."
+      }
+    },
+    "operations": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "openMenu": "Open"
+    },
+    "delete": {
+      "title": "Are you sure you want to delete this contribution limit?",
+      "description": "This action cannot be undone.",
+      "button": "Delete"
+    },
+    "accountSelection": {
+      "title": "Select Accounts",
+      "saveButton": "Save Selected Accounts",
+      "saving": "Saving..."
+    }
+  },
+  "about": {
+    "title": "About",
+    "description": "About Wealthfolio"
+  },
+  "marketData": {
+    "title": "Market Data",
+    "description": "Manage settings for your market data providers.",
+    "buttons": {
+      "import": "Import",
+      "refetchAll": "Refetch all",
+      "update": "Update",
+      "refetching": "Refetching...",
+      "saveKey": "Save Key"
+    },
+    "loading": "Loading provider settings...",
+    "error": "Error loading settings",
+    "noProviders": "No market data providers configured. This might be an initialization issue.",
+    "providers": {
+      "disabled": "Disabled",
+      "apiKeyRequired": "API Key Required",
+      "configure": "Configure Settings",
+      "enableToConfigure": "Enable provider to configure",
+      "apiKey": {
+        "label": "API Key",
+        "placeholder": "Enter API Key",
+        "placeholderSet": "API Key is Set",
+        "showKey": "Show API key",
+        "hideKey": "Hide API key",
+        "hintSet": "An API key is set. Enter a new key to update, or leave blank and save to clear the key.",
+        "hintNotSet": "No API key set. Enter a key and save."
+      },
+      "priority": {
+        "label": "Priority",
+        "placeholder": "e.g., 1 or 2",
+        "hint": "Lower number means higher priority (e.g., 1 is higher than 10)."
+      }
+    },
+    "confirm": {
+      "title": "Are you sure?",
+      "message": "This will refetch all market data history and recalculate the portfolio.",
+      "refetch": "Refetch",
+      "cancel": "Cancel"
+    },
+    "import": {
+      "title": "Import Historical Quotes",
+      "description": "Upload CSV files to backfill market data for your portfolio.",
+      "backToProviders": "Back to providers",
+      "section": {
+        "title": "Import Historical Quotes",
+        "description": "Import historical market data from CSV files to fill gaps in your portfolio data",
+        "startOver": "Start Over"
+      },
+      "steps": {
+        "uploadValidate": "Upload & Validate",
+        "preview": "Preview Data",
+        "results": "Import Results"
+      },
+      "form": {
+        "title": "Select CSV File",
+        "description": "Choose a CSV file containing historical quote data to import",
+        "clickToUpload": "Click to upload",
+        "orDrop": "or drop",
+        "csvOnly": "CSV only",
+        "processingFile": "Processing file...",
+        "removeFile": "Remove File",
+        "overwriteExisting": "Overwrite existing quotes with the same symbol and date",
+        "validateButton": "Validate File",
+        "validating": "Validating...",
+        "fileSize": "KB"
+      },
+      "summary": {
+        "title": "Import Summary",
+        "description": "Review the validation results before proceeding with the import",
+        "totalRows": "Total Rows",
+        "valid": "Valid",
+        "invalid": "Invalid",
+        "duplicates": "Duplicates",
+        "importButton": "Import {{count}} Valid Quotes"
+      },
+      "progress": {
+        "title": "Import Progress",
+        "importing": "Importing quotes...",
+        "completed": "Import completed",
+        "progressLabel": "Progress",
+        "total": "Total",
+        "successful": "Successful",
+        "failed": "Failed",
+        "imported": "{{count}} imported",
+        "failedCount": "{{count}} failed",
+        "cancelButton": "Cancel Import"
+      },
+      "preview": {
+        "title": "Preview Data ({{count}} rows)",
+        "description": "Review the first {{maxRows}} rows of your CSV data",
+        "showing": "Showing first {{shown}} of {{total}} rows",
+        "columns": {
+          "symbol": "Symbol",
+          "date": "Date",
+          "open": "Open",
+          "high": "High",
+          "low": "Low",
+          "close": "Close",
+          "volume": "Volume",
+          "currency": "Currency",
+          "status": "Status"
+        }
+      },
+      "help": {
+        "buttonText": "How to Import Quotes?",
+        "title": "Importing Historical Quotes",
+        "description": "Import historical market data from CSV files to fill gaps in your portfolio data for assets where external data sources only provide recent quotes.",
+        "steps": {
+          "step1": "Prepare your CSV file with OHLCV data format",
+          "step2": "Upload and validate your CSV file",
+          "step3": "Review validation results and sample data",
+          "step4": "Import quotes with optional duplicate handling"
+        },
+        "tips": {
+          "usage": {
+            "title": "💡 Tip:",
+            "text": "Use this feature when external data providers only have quotes from recent years, but you have transaction history from earlier periods."
+          },
+          "requiredFields": {
+            "title": "📊 Required fields:",
+            "text": "Only symbol and close price are required. Open, high, low, volume, and currency are optional but recommended for complete data."
+          },
+          "autoFormatting": {
+            "title": "⚡ Auto-formatting:",
+            "text": "Multiple date formats are supported (YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY). Currency symbols are automatically handled."
+          },
+          "important": {
+            "title": "⚠️ Important:",
+            "text": "Large imports may take time. The system will show progress and handle errors gracefully."
+          }
+        },
+        "csvFormat": {
+          "title": "Required CSV Format:",
+          "comment1": "# Required columns: symbol, date, close",
+          "comment2": "# Optional: open, high, low, volume, currency",
+          "comment3": "# Alternative date formats supported:"
+        },
+        "validation": {
+          "title": "Data Validation:",
+          "symbol": "Symbol: Must be a valid ticker symbol",
+          "date": "Date: Must be a valid date (multiple formats supported)",
+          "prices": "Prices: Must be valid decimal numbers",
+          "currency": "Currency: 3-letter currency code (defaults to USD)",
+          "duplicates": "Duplicates: Existing quotes can be overwritten or skipped"
+        }
+      }
+    }
+  },
+  "exports": {
+    "page": {
+      "title": "Data Export & Backup",
+      "description": "Export your financial data and manage database backups with advanced options.",
+      "tabs": {
+        "backup": "Backup & Restore",
+        "export": "Data Export"
+      },
+      "dataExportTitle": "Data Export",
+      "dataExportDescription": "Export specific data types in various formats for analysis or external use."
+    },
+    "backup": {
+      "title": "Database Backup & Restore",
+      "description": "Create complete database backups and restore from previous backups.",
+      "create": {
+        "title": "Create Backup",
+        "description": "Create a complete backup of your database including WAL and SHM files. Choose your backup location.",
+        "button": "Backup Database",
+        "buttonLoading": "Creating Backup..."
+      },
+      "restore": {
+        "title": "Restore Backup",
+        "description": "Restore your database from a previous backup file. This will replace all current data. Then restart the application to apply changes.",
+        "button": "Restore Database",
+        "buttonLoading": "Restoring..."
+      },
+      "importantNotes": {
+        "title": "Important Notes:",
+        "note1": "Backup includes WAL and SHM files for complete data integrity",
+        "note2": "Restore will replace ALL current data with backup data",
+        "note3": "A pre-restore backup is automatically created before restoration",
+        "note4": "You will be prompted to restart the application after restoration"
+      }
+    },
+    "dataExport": {
+      "formatTitle": "Choose Your Preferred Format",
+      "customizeTitle": "Customize Your Export",
+      "formats": {
+        "csv": {
+          "name": "CSV",
+          "description": "Simple, widely compatible spreadsheet format"
+        },
+        "json": {
+          "name": "JSON",
+          "description": "Structured data for easy programmatic access"
+        },
+        "sqlite": {
+          "name": "SQLite",
+          "description": "Compact, self-contained database file"
+        }
+      },
+      "dataTypes": {
+        "accounts": {
+          "name": "Accounts",
+          "description": "Your financial accounts"
+        },
+        "activities": {
+          "name": "Activities",
+          "description": "Detailed transaction history and logs"
+        },
+        "goals": {
+          "name": "Goals",
+          "description": "Financial objectives and progress tracking"
+        },
+        "portfolioHistory": {
+          "name": "Portfolio History",
+          "description": "Your portfolio's performance over time, including valuations, gains, and cash flow activities."
+        },
+        "full": {
+          "name": "Export the full SQLite Database",
+          "description": "Complete database backup with WAL/SHM files - choose your backup location"
+        }
+      },
+      "exportButton": "Export {{name}}",
+      "exportingButton": "Exporting {{name}}..."
+    }
+  }
+}

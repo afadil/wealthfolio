@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
@@ -43,6 +44,7 @@ export function ContributionLimitForm({
   defaultValues,
   onSuccess = () => {},
 }: ContributionLimitFormProps) {
+  const { t } = useTranslation("settings");
   const { addContributionLimitMutation, updateContributionLimitMutation } =
     useContributionLimitMutations();
 
@@ -104,12 +106,14 @@ export function ContributionLimitForm({
       <form onSubmit={form.handleSubmit(onSubmit)} className="mx-auto w-full max-w-4xl space-y-8">
         <DialogHeader className="px-1">
           <DialogTitle className="text-2xl font-semibold">
-            {defaultValues?.id ? "Update Contribution Limit" : "Add Contribution Limit"}
+            {defaultValues?.id
+              ? t("contributionLimits.form.updateTitle")
+              : t("contributionLimits.form.addTitle")}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground mt-1 text-base">
             {defaultValues?.id
-              ? "Update contribution limit information"
-              : "Add a new contribution limit."}
+              ? t("contributionLimits.form.updateDescription")
+              : t("contributionLimits.form.addDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -126,16 +130,18 @@ export function ContributionLimitForm({
                   name="groupName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">Group Name</FormLabel>
+                      <FormLabel className="text-base font-medium">
+                        {t("contributionLimits.form.fields.groupName.label")}
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="e.g., TFSA, 401(k), RRSP"
+                          placeholder={t("contributionLimits.form.fields.groupName.placeholder")}
                           {...field}
                           className="h-11 text-base"
                         />
                       </FormControl>
                       <FormDescription className="text-muted-foreground mt-1 text-sm">
-                        Name of the contribution limit group
+                        {t("contributionLimits.form.fields.groupName.description")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -147,12 +153,17 @@ export function ContributionLimitForm({
                   name="limitAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">Limit Amount</FormLabel>
+                      <FormLabel className="text-base font-medium">
+                        {t("contributionLimits.form.fields.limitAmount.label")}
+                      </FormLabel>
                       <FormControl>
-                        <MoneyInput placeholder="e.g., 6,000.00" {...field} />
+                        <MoneyInput
+                          placeholder={t("contributionLimits.form.fields.limitAmount.placeholder")}
+                          {...field}
+                        />
                       </FormControl>
                       <FormDescription className="text-muted-foreground mt-1 text-sm">
-                        Maximum contribution amount allowed
+                        {t("contributionLimits.form.fields.limitAmount.description")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -166,11 +177,15 @@ export function ContributionLimitForm({
                       name="contributionYear"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">Year</FormLabel>
+                          <FormLabel className="text-base font-medium">
+                            {t("contributionLimits.form.fields.contributionYear.label")}
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
-                              placeholder="e.g., 2024"
+                              placeholder={t(
+                                "contributionLimits.form.fields.contributionYear.placeholder",
+                              )}
                               value={field.value || ""}
                               onChange={(e) => {
                                 const numValue =
@@ -190,7 +205,9 @@ export function ContributionLimitForm({
                       name="startDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">Start Date</FormLabel>
+                          <FormLabel className="text-base font-medium">
+                            {t("contributionLimits.form.fields.startDate.label")}
+                          </FormLabel>
                           <div className="h-11">
                             <FormControl>
                               <DatePickerInput
@@ -210,7 +227,9 @@ export function ContributionLimitForm({
                       name="endDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">End Date</FormLabel>
+                          <FormLabel className="text-base font-medium">
+                            {t("contributionLimits.form.fields.endDate.label")}
+                          </FormLabel>
                           <div className="h-11">
                             <FormControl>
                               <DatePickerInput
@@ -227,7 +246,7 @@ export function ContributionLimitForm({
                   </div>
 
                   <p className="text-muted-foreground mt-2 text-sm italic">
-                    Dates default to January 1st through December 31st of the selected year
+                    {t("contributionLimits.form.fields.dateNote")}
                   </p>
                 </div>
               </div>
@@ -239,7 +258,7 @@ export function ContributionLimitForm({
           <div className="flex w-full justify-end gap-3">
             <DialogTrigger asChild>
               <Button variant="outline" type="button" className="h-11 min-w-24 text-base">
-                Cancel
+                {t("contributionLimits.form.buttons.cancel")}
               </Button>
             </DialogTrigger>
             <Button
@@ -253,12 +272,16 @@ export function ContributionLimitForm({
               updateContributionLimitMutation.isPending ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  {defaultValues?.id ? "Updating..." : "Saving..."}
+                  {defaultValues?.id
+                    ? t("contributionLimits.form.buttons.updating")
+                    : t("contributionLimits.form.buttons.saving")}
                 </>
               ) : (
                 <>
                   <Icons.Check className="mr-2 h-4 w-4" />
-                  {defaultValues?.id ? "Update" : "Save"}
+                  {defaultValues?.id
+                    ? t("contributionLimits.form.buttons.update")
+                    : t("contributionLimits.form.buttons.save")}
                 </>
               )}
             </Button>

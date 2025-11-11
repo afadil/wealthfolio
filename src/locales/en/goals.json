@@ -1,0 +1,21 @@
+{
+  "title": "Goals",
+  "addGoal": "Add Goal",
+  "form": {
+    "title": "Goal Title",
+    "description": "Description",
+    "targetAmount": "Target Amount",
+    "currentAmount": "Current Amount",
+    "targetDate": "Target Date"
+  },
+  "progress": {
+    "title": "Progress",
+    "achieved": "Achieved",
+    "remaining": "Remaining",
+    "percentComplete": "% Complete"
+  },
+  "empty": {
+    "title": "No goals yet",
+    "description": "Set financial goals to track your progress"
+  }
+}

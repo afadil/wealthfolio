@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { ActivityType, getActivityTypeName } from "@/lib/constants";
+import { useTranslation } from "react-i18next";
 
 interface ActivityTypeBadgeProps {
   type: ActivityType;
@@ -31,11 +32,12 @@ function getActivityBadgeVariant(type: ActivityType) {
 }
 
 export function ActivityTypeBadge({ type, className }: ActivityTypeBadgeProps) {
+  const { t } = useTranslation("activity");
   const variant = getActivityBadgeVariant(type);
 
   return (
     <Badge variant={variant} className={className}>
-      {ActivityTypeNames[type]}
+      {getActivityTypeName(type, t)}
     </Badge>
   );
 }

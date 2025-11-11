@@ -27,9 +27,9 @@ import useGlobalEventListener from "./use-global-event-listener";
 // import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
 import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import AboutSettingsPage from "./pages/settings/about/about-page";
-import SwingfolioDashboardPage from "./pages/swingfolio/dashboard-page";
-import SwingfolioActivitySelectorPage from "./pages/swingfolio/activity-selector-page";
-import SwingfolioSettingsPage from "./pages/swingfolio/settings-page";
+import SwingfolioActivitySelectorPage from "./pages/trading/activities/activity-selector-page";
+import SwingfolioDashboardPage from "./pages/trading/dashboard/dashboard-page";
+import SwingfolioSettingsPage from "./pages/trading/settings/settings-page";
 
 export function AppRoutes() {
   useGlobalEventListener();

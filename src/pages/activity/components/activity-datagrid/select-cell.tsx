@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Check, ChevronDown } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SelectOption {
   value: string;
@@ -45,6 +46,7 @@ export function SelectCell({
   renderValue,
   className,
 }: SelectCellProps) {
+  const { t } = useTranslation(["activity"]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const cellRef = useRef<HTMLDivElement>(null);
@@ -129,7 +131,7 @@ export function SelectCell({
           )}
         >
           <span className="flex-1">
-            {renderValue ? renderValue(value) : selectedOption?.label ?? value}
+            {renderValue ? renderValue(value) : (selectedOption?.label ?? value)}
           </span>
           <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </div>
@@ -141,13 +143,13 @@ export function SelectCell({
       >
         <Command>
           <CommandInput
-            placeholder="Search..."
+            placeholder={t("activity:datagrid.searchPlaceholder")}
             value={search}
             onValueChange={setSearch}
             autoFocus
           />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>{t("activity:datagrid.noResultsFound")}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem

@@ -1,0 +1,21 @@
+{
+  "title": "Mục tiêu",
+  "addGoal": "Thêm mục tiêu",
+  "form": {
+    "title": "Tiêu đề mục tiêu",
+    "description": "Mô tả",
+    "targetAmount": "Số tiền mục tiêu",
+    "currentAmount": "Số tiền hiện tại",
+    "targetDate": "Ngày mục tiêu"
+  },
+  "progress": {
+    "title": "Tiến độ",
+    "achieved": "Đã đạt",
+    "remaining": "Còn lại",
+    "percentComplete": "% Hoàn thành"
+  },
+  "empty": {
+    "title": "Chưa có mục tiêu nào",
+    "description": "Đặt mục tiêu tài chính để theo dõi tiến độ của bạn"
+  }
+}

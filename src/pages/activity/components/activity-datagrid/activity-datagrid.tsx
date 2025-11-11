@@ -4,7 +4,7 @@ import {
   isCashTransfer,
   isIncomeActivity,
 } from "@/lib/activity-utils";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { ActivityType, getActivityTypeName } from "@/lib/constants";
 import {
   Account,
   ActivityBulkMutationRequest,
@@ -29,6 +29,7 @@ import {
 } from "@wealthfolio/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -158,6 +159,7 @@ export function ActivityDatagrid({
   onRefetch,
   onEditActivity,
 }: ActivityDatagridProps) {
+  const { t } = useTranslation(["activity"]);
   const [localTransactions, setLocalTransactions] = useState<LocalTransaction[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedCell, setFocusedCell] = useState<CellCoordinate | null>(null);
@@ -167,12 +169,15 @@ export function ActivityDatagrid({
 
   const activityTypeOptions = useMemo(
     () =>
-      (Object.values(ActivityType) as ActivityType[]).map((type) => ({
-        value: type,
-        label: ActivityTypeNames[type],
-        searchValue: `${ActivityTypeNames[type]} ${type}`,
-      })),
-    [],
+      (Object.values(ActivityType) as ActivityType[]).map((type) => {
+        const label = getActivityTypeName(type, t);
+        return {
+          value: type,
+          label,
+          searchValue: `${label} ${type}`,
+        };
+      }),
+    [t],
   );
 
   const accountOptions = useMemo(
@@ -534,8 +539,8 @@ export function ActivityDatagrid({
       setSelectedIds(new Set());
 
       toast({
-        title: "Activities saved",
-        description: "Your pending changes are now synced.",
+        title: t("activity:datagrid.saveSuccess.title"),
+        description: t("activity:datagrid.saveSuccess.description"),
         variant: "success",
       });
 
@@ -550,6 +555,7 @@ export function ActivityDatagrid({
     pendingDeleteIds,
     onRefetch,
     saveActivitiesMutation,
+    t,
   ]);
 
   const handleCancelChanges = useCallback(() => {
@@ -559,11 +565,11 @@ export function ActivityDatagrid({
     setLocalTransactions((prev) => prev.filter((transaction) => !transaction.isNew));
     onRefetch();
     toast({
-      title: "Changes discarded",
-      description: "Unsaved edits and drafts have been cleared.",
+      title: t("activity:datagrid.discardSuccess.title"),
+      description: t("activity:datagrid.discardSuccess.description"),
       variant: "default",
     });
-  }, [onRefetch]);
+  }, [onRefetch, t]);
 
   return (
     <div className="space-y-3">
@@ -588,8 +594,8 @@ export function ActivityDatagrid({
             variant="outline"
             size="xs"
             className="shrink-0 rounded-md"
-            title="Add transaction"
-            aria-label="Add transaction"
+            title={t("activity:datagrid.addTransaction")}
+            aria-label={t("activity:datagrid.addTransaction")}
           >
             <Icons.Plus className="h-3.5 w-3.5" />
             <span>Add</span>
@@ -603,8 +609,8 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="destructive"
                 className="shrink-0 rounded-md text-xs"
-                title="Delete selected"
-                aria-label="Delete selected"
+                title={t("activity:datagrid.deleteSelected")}
+                aria-label={t("activity:datagrid.deleteSelected")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Trash className="h-3.5 w-3.5" />
@@ -620,8 +626,8 @@ export function ActivityDatagrid({
                 onClick={handleSaveChanges}
                 size="xs"
                 className="shrink-0 rounded-md text-xs"
-                title="Save changes"
-                aria-label="Save changes"
+                title={t("activity:datagrid.saveChanges")}
+                aria-label={t("activity:datagrid.saveChanges")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 {saveActivitiesMutation.isPending ? (
@@ -637,8 +643,8 @@ export function ActivityDatagrid({
                 size="xs"
                 variant="outline"
                 className="shrink-0 rounded-md text-xs"
-                title="Discard changes"
-                aria-label="Discard changes"
+                title={t("activity:datagrid.discardChanges")}
+                aria-label={t("activity:datagrid.discardChanges")}
                 disabled={saveActivitiesMutation.isPending}
               >
                 <Icons.Undo className="h-3.5 w-3.5" />

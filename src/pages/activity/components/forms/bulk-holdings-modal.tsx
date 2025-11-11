@@ -14,6 +14,7 @@ import {
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { useActivityImportMutations } from "../../import/hooks/use-activity-import-mutations";
 import { BulkHoldingsForm } from "./bulk-holdings-form";
@@ -29,6 +30,7 @@ interface BulkHoldingsModalProps {
 }
 
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
+  const { t } = useTranslation(["activity", "common"]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [manualHoldings, setManualHoldings] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,8 +101,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: () => {
       toast({
-        title: "Import successful",
-        description: "Holdings have been imported successfully.",
+        title: t("activity:form.importSuccessTitle"),
+        description: t("activity:form.importSuccessDescription"),
         variant: "default",
       });
       form.reset();
@@ -143,9 +145,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
         if (!validHoldings.length) {
           toast({
-            title: "No valid holdings",
-            description:
-              "Please add at least one valid holding with ticker, shares, and average cost.",
+            title: t("activity:form.noValidHoldings"),
+            description: t("activity:form.noValidHoldingsDescription"),
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -179,7 +180,9 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
             fee: 0,
             isDraft: false,
             isValid: true,
-            comment: data.comment || `Bulk import - ${validHoldings.length} holdings`,
+            comment:
+              data.comment ||
+              `${t("activity:form.bulkImportComment", { count: validHoldings.length })}`,
             assetDataSource: shouldBeManual ? "MANUAL" : undefined,
           }),
         );
@@ -194,17 +197,20 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     [confirmImportMutation, selectedAccount, manualHoldings, checkSymbolExists],
   );
 
-  const handleFormError = useCallback((errors: Record<string, any>) => {
-    // Get the first error message to display
-    const firstError = Object.values(errors)[0];
-    const errorMessage = firstError?.message || "Please check the form for errors.";
+  const handleFormError = useCallback(
+    (errors: Record<string, any>) => {
+      // Get the first error message to display
+      const firstError = Object.values(errors)[0];
+      const errorMessage = firstError?.message || t("activity:form.checkFormErrors");
 
-    toast({
-      title: "Form validation failed",
-      description: errorMessage,
-      variant: "destructive",
-    });
-  }, []);
+      toast({
+        title: t("activity:form.formValidationFailed"),
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+    [t],
+  );
 
   const isSubmitDisabled =
     isSubmitting ||
@@ -217,11 +223,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Portfolio</DialogTitle>
-          <DialogDescription>
-            Quickly add multiple holdings to your portfolio. Enter your current positions with
-            ticker symbols, quantities, and average costs.
-          </DialogDescription>
+          <DialogTitle>{t("activity:form.bulkHoldingsTitle")}</DialogTitle>
+          <DialogDescription>{t("activity:form.bulkHoldingsDescription")}</DialogDescription>
         </DialogHeader>
 
         <FormProvider {...form}>
@@ -238,7 +241,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
               {Object.keys(form.formState.errors).length > 0 && (
                 <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
                   <h4 className="text-destructive mb-2 text-sm font-medium">
-                    Please fix the following errors:
+                    {t("activity:form.pleaseFixErrors")}
                   </h4>
                   <ul className="text-destructive/80 space-y-1 text-sm">
                     {form.formState.errors.accountId && (
@@ -256,14 +259,14 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>
-                  Cancel
+                  {t("common:actions.cancel")}
                 </Button>
                 <Button type="submit" disabled={isSubmitDisabled}>
                   {confirmImportMutation.isPending
-                    ? "Importing..."
+                    ? t("activity:form.importing")
                     : isSubmitting
-                      ? "Validating..."
-                      : "Confirm"}
+                      ? t("activity:form.validating")
+                      : t("activity:form.confirm")}
                 </Button>
               </DialogFooter>
             </form>

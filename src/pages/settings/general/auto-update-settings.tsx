@@ -6,24 +6,26 @@ import { updateSettings } from "@/commands/settings";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@/components/ui/use-toast";
+import { useTranslation } from "react-i18next";
 
 export function AutoUpdateSettings() {
   const { settings } = useSettingsContext();
   const queryClient = useQueryClient();
+  const { t } = useTranslation("settings");
 
   const updateSettingsMutation = useMutation({
     mutationFn: updateSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
       toast({
-        title: "Settings updated",
-        description: "Auto-update settings have been saved successfully.",
+        title: t("general.autoUpdate.toast.successTitle"),
+        description: t("general.autoUpdate.toast.successDescription"),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: "Failed to update auto-update settings. Please try again.",
+        title: t("general.autoUpdate.toast.errorTitle"),
+        description: t("general.autoUpdate.toast.errorDescription"),
         variant: "destructive",
       });
       console.error("Failed to update settings:", error);
@@ -46,17 +48,16 @@ export function AutoUpdateSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Automatic Updates</CardTitle>
+        <CardTitle className="text-lg">{t("general.autoUpdate.title")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="auto-update-check" className="text-base">
-              Enable automatic update checks
+              {t("general.autoUpdate.enableLabel")}
             </Label>
             <p className="text-muted-foreground text-xs">
-              When enabled, Wealthfolio will automatically check for updates when the application
-              starts. You can still manually check for updates from the Help menu.
+              {t("general.autoUpdate.enableDescription")}
             </p>
           </div>
           <Switch

@@ -1,0 +1,246 @@
+{
+  "activitySelector": {
+    "heading": "Select Activities",
+    "description": "Choose which trading activities to include in your trading portfolio analysis",
+    "backToDashboard": "Back to Tradings",
+    "saveSelection": "Save Selection",
+    "savingSettings": "Saving settings...",
+    "manualSelection": {
+      "title": "Manual Selection",
+      "selectedCount": "{{filtered}} of {{total}} selected",
+      "totalSelected": "{{count}} total selected",
+      "searchPlaceholder": "Search by symbol or name...",
+      "allAccounts": "All Accounts",
+      "allTypes": "All Types",
+      "selectAllFiltered": "Select All Filtered",
+      "deselectAllFiltered": "Deselect All Filtered"
+    },
+    "table": {
+      "date": "Date",
+      "type": "Type",
+      "symbol": "Symbol",
+      "quantity": "Quantity",
+      "price": "Price",
+      "account": "Account",
+      "tags": "Tags",
+      "tagSwing": "Swing",
+      "tagSelected": "Selected"
+    },
+    "types": {
+      "buy": "Buy",
+      "sell": "Sell"
+    },
+    "emptyState": "No activities match your current filters",
+    "error": {
+      "heading": "Failed to load activities",
+      "message": "Unable to load trading activities",
+      "backButton": "Back to Dashboard"
+    }
+  },
+  "dashboard": {
+    "heading": "Trading Dashboard",
+    "description": "Track your trading performance and analytics",
+    "selectActivities": "Select Activities",
+    "settings": "Settings",
+    "tryAgain": "Try Again",
+    "periods": {
+      "1M": "1M",
+      "3M": "3M",
+      "6M": "6M",
+      "YTD": "YTD",
+      "1Y": "1Y",
+      "ALL": "ALL"
+    },
+    "chartPeriod": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "dailyDescription": "Daily P/L and cumulative equity performance",
+      "weeklyDescription": "Weekly P/L and cumulative equity performance",
+      "monthlyDescription": "Monthly P/L and cumulative equity performance"
+    },
+    "kpi": {
+      "pl": {
+        "title": "P/L",
+        "realized": "Realized ({{count}} trades)",
+        "unrealized": "Unrealized ({{count}} open)"
+      },
+      "corePerformance": {
+        "title": "Core Performance",
+        "winRate": "Win Rate",
+        "avgWin": "Avg Win",
+        "avgLoss": "Avg Loss",
+        "totalTrades": "Total Trades"
+      },
+      "analytics": {
+        "title": "Analytics & Ratios",
+        "expectancy": "Expectancy",
+        "profitFactor": "Profit Factor",
+        "avgHoldTime": "Avg Hold Time",
+        "daysUnit": "days"
+      }
+    },
+    "charts": {
+      "equityCurve": {
+        "title": "{{period}} Equity Curve",
+        "periodDisplay": "{{selectedPeriod}} → {{periodType}}"
+      }
+    },
+    "openPositions": {
+      "title": "Open Positions",
+      "position": "position",
+      "positions": "positions"
+    },
+    "emptyState": {
+      "heading": "No Trading Activities Selected",
+      "message": "Select BUY and SELL activities to start tracking your trading performance",
+      "button": "Select Activities"
+    },
+    "error": {
+      "heading": "Failed to load dashboard",
+      "message": "Unable to load trading data"
+    }
+  },
+  "settings": {
+    "heading": "Trading Settings",
+    "description": "Configure your trading analysis preferences",
+    "backToDashboard": "Back to Dashboard",
+    "savingSettings": "Saving settings...",
+    "close": "Close",
+    "autoSelection": {
+      "title": "Auto-Selection Options",
+      "includeSwingTag": "Automatically include activities tagged with \"swing\"",
+      "tagDescription": "Activities with \"swing\" in their comment will be automatically included"
+    },
+    "tradeMatching": {
+      "title": "Trade Matching",
+      "lotMethod": "Lot Matching Method",
+      "fifo": "FIFO (First In, First Out)",
+      "lifo": "LIFO (Last In, First Out)",
+      "average": "Average Cost",
+      "description": "Method used to match buy and sell orders for P/L calculation:",
+      "fifoDesc": "• FIFO: Matches oldest purchases first",
+      "lifoDesc": "• LIFO: Matches newest purchases first",
+      "averageDesc": "• Average Cost: Uses weighted average price of all purchases"
+    },
+    "displaySettings": {
+      "title": "Display Settings",
+      "defaultRange": "Default Date Range",
+      "1M": "1 Month",
+      "3M": "3 Months",
+      "6M": "6 Months",
+      "YTD": "Year to Date",
+      "1Y": "1 Year",
+      "ALL": "All Time",
+      "description": "Default time period when opening dashboard"
+    },
+    "calculationSettings": {
+      "title": "Calculation Settings",
+      "includeFees": "Include fees in P/L calculations",
+      "feesDescription": "When enabled, trading fees will be subtracted from realized P/L",
+      "includeDividends": "Include dividends in performance",
+      "dividendsDescription": "When enabled, dividend payments will be included in total returns"
+    }
+  },
+  "components": {
+    "calendar": {
+      "daily": {
+        "title": "Daily Trading Calendar",
+        "monthlyPL": "Monthly P/L:",
+        "trades": "trades",
+        "days": {
+          "sun": "Sun",
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat"
+        }
+      },
+      "yearly": {
+        "title": "Yearly Trading Calendar",
+        "yearlyPL": "Yearly P/L:",
+        "noTrades": "No trades",
+        "trade": "trade",
+        "trades": "trades",
+        "months": {
+          "jan": "Jan",
+          "feb": "Feb",
+          "mar": "Mar",
+          "apr": "Apr",
+          "may": "May",
+          "jun": "Jun",
+          "jul": "Jul",
+          "aug": "Aug",
+          "sep": "Sep",
+          "oct": "Oct",
+          "nov": "Nov",
+          "dec": "Dec"
+        }
+      }
+    },
+    "distribution": {
+      "plBySymbol": {
+        "title": "P/L by Symbol",
+        "emptyTitle": "No Symbol Data",
+        "emptyDescription": "No completed trades in this period to analyze P/L by symbol. Complete some trades to see distribution."
+      },
+      "plByPeriod": {
+        "title": "P/L by Holding Period",
+        "emptyTitle": "No Holding Period Data",
+        "emptyDescription": "No completed trades in this period to analyze P/L by holding period. Complete some trades to see distribution."
+      },
+      "labels": {
+        "pl": "P/L",
+        "symbol": "Symbol",
+        "period": "Period"
+      }
+    },
+    "equityCurve": {
+      "labels": {
+        "dailyPL": "Daily P/L",
+        "monthlyPL": "Monthly P/L",
+        "cumulativeEquity": "Cumulative Equity",
+        "daily": "Daily",
+        "monthly": "Monthly"
+      },
+      "emptyState": {
+        "title": "No data available",
+        "description": "There is no equity curve data for selected period. Complete some trades to see your performance."
+      }
+    },
+    "openTrades": {
+      "table": {
+        "symbol": "Symbol",
+        "account": "Account",
+        "quantity": "Quantity",
+        "avgCost": "Avg Cost",
+        "current": "Current",
+        "pl": "P/L",
+        "returnPercent": "Return %",
+        "days": "Days"
+      },
+      "search": {
+        "placeholder": "Search symbol or name...",
+        "clear": "Clear search"
+      },
+      "filter": {
+        "account": "Account",
+        "reset": "Reset"
+      },
+      "showing": "Showing {{count}} of {{total}}",
+      "noResults": "No results found.",
+      "pagination": {
+        "info": "{{from}}-{{to}} of {{total}}",
+        "previous": "Previous",
+        "page": "Page {{current}} of {{total}}",
+        "next": "Next"
+      },
+      "emptyState": {
+        "title": "No Open Positions",
+        "description": "You don't have any open swing trading positions. Buy some securities to start tracking."
+      }
+    }
+  }
+}

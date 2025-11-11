@@ -1,4 +1,4 @@
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -15,47 +15,48 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@wealthfolio/ui';
-import { useFormContext } from 'react-hook-form';
-import { z } from 'zod';
-import { AccountSelectOption } from '../activity-form';
+} from "@wealthfolio/ui";
+import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { z } from "zod";
+import { AccountSelectOption } from "../activity-form";
 import {
   ActivityTypeSelector,
   type ActivityType as ActivityTypeUI,
-} from '../activity-type-selector';
-import { ConfigurationCheckbox } from './common';
-import { cashActivitySchema } from './schemas';
+} from "../activity-type-selector";
+import { ConfigurationCheckbox } from "./common";
+import { cashActivitySchema } from "./schemas";
 
 export type CashFormValues = z.infer<typeof cashActivitySchema>;
 
 export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+  const { t } = useTranslation(["activity"]);
   const { control, watch } = useFormContext();
-  const activityType = watch('activityType');
-  const showCurrency = watch('showCurrencySelect');
+  const activityType = watch("activityType");
+  const showCurrency = watch("showCurrencySelect");
 
   const cashTypes: ActivityTypeUI[] = [
     {
-      value: 'DEPOSIT',
-      label: 'Deposit',
-      icon: 'ArrowDown',
-      description: 'Increase your account balance by adding funds.',
+      value: "DEPOSIT",
+      label: t("activity:form.deposit"),
+      icon: "ArrowDown",
+      description: t("activity:form.depositDescription"),
     },
     {
-      value: 'WITHDRAWAL',
-      label: 'Withdrawal',
-      icon: 'ArrowUp',
-      description: 'Decrease your account balance by taking out funds.',
+      value: "WITHDRAWAL",
+      label: t("activity:form.withdrawal"),
+      icon: "ArrowUp",
+      description: t("activity:form.withdrawalDescription"),
     },
     {
-      value: 'TRANSFER',
-      label: 'Transfer',
-      icon: 'ArrowRightLeft',
-      description:
-        "Move funds between your accounts. Note: This type of transfer typically doesn't count towards contribution limits.",
+      value: "TRANSFER",
+      label: t("activity:form.transfer"),
+      icon: "ArrowRightLeft",
+      description: t("activity:form.transferDescription"),
     },
   ];
 
-  const isTransfer = activityType === 'TRANSFER';
+  const isTransfer = activityType === "TRANSFER";
 
   return (
     <div className="space-y-4">
@@ -74,7 +75,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount</FormLabel>
+                  <FormLabel>{t("activity:form.amount")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>
@@ -87,7 +88,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
               name="fee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fee</FormLabel>
+                  <FormLabel>{t("activity:form.fee")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>
@@ -103,17 +104,19 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
             name="accountId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{isTransfer ? 'From Account' : 'Account'}</FormLabel>
+                <FormLabel>
+                  {isTransfer ? t("activity:form.fromAccount") : t("activity:form.account")}
+                </FormLabel>
                 <FormControl>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select an account" />
+                      <SelectValue placeholder={t("activity:form.selectAccount")} />
                     </SelectTrigger>
                     <SelectContent className="max-h-[500px] overflow-y-auto">
                       {accounts.map((account) => (
                         <SelectItem value={account.value} key={account.value}>
                           {account.label}
-                          <span className="font-light text-muted-foreground">
+                          <span className="text-muted-foreground font-light">
                             ({account.currency})
                           </span>
                         </SelectItem>
@@ -133,17 +136,17 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
               name="toAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>To Account</FormLabel>
+                  <FormLabel>{t("activity:form.toAccount")}</FormLabel>
                   <FormControl>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select destination account" />
+                        <SelectValue placeholder={t("activity:form.selectDestinationAccount")} />
                       </SelectTrigger>
                       <SelectContent className="max-h-[500px] overflow-y-auto">
                         {accounts.map((account) => (
                           <SelectItem value={account.value} key={account.value}>
                             {account.label}
-                            <span className="font-light text-muted-foreground">
+                            <span className="text-muted-foreground font-light">
                               ({account.currency})
                             </span>
                           </SelectItem>
@@ -163,7 +166,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
             name="activityDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Date</FormLabel>
+                <FormLabel>{t("activity:form.date")}</FormLabel>
                 <DatePickerInput
                   onChange={(date: Date | undefined) => field.onChange(date)}
                   value={field.value}
@@ -183,7 +186,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
               name="currency"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Activity Currency</FormLabel>
+                  <FormLabel>{t("activity:form.activityCurrency")}</FormLabel>
                   <FormControl>
                     <CurrencyInput {...field} />
                   </FormControl>
@@ -199,14 +202,14 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
             name="comment"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Description</FormLabel>
+                <FormLabel>{t("activity:form.description")}</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Add an optional description or comment for this transaction..."
+                    placeholder={t("activity:form.descriptionPlaceholder")}
                     className="resize-none"
                     rows={3}
                     {...field}
-                    value={field.value || ''}
+                    value={field.value || ""}
                   />
                 </FormControl>
                 <FormMessage />

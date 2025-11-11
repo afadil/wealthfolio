@@ -15,6 +15,7 @@ import { QuoteSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { forwardRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SymbolSelectorMobileProps {
   onSelect: (symbol: string) => void;
@@ -26,17 +27,8 @@ interface SymbolSelectorMobileProps {
 }
 
 export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelectorMobileProps>(
-  (
-    {
-      onSelect,
-      value,
-      placeholder = "Select symbol...",
-      className,
-      open: controlledOpen,
-      onOpenChange,
-    },
-    ref,
-  ) => {
+  ({ onSelect, value, placeholder, className, open: controlledOpen, onOpenChange }, ref) => {
+    const { t } = useTranslation("activity");
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
@@ -68,7 +60,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
 
     const displayText = selectedSymbol
       ? `${selectedSymbol.symbol} - ${selectedSymbol.longName}`
-      : value || placeholder;
+      : value || placeholder || t("symbolSelector.selectSymbol");
 
     return (
       <Sheet open={open} onOpenChange={setOpen}>

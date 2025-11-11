@@ -5,95 +5,95 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ExportDataType, ExportedFileFormat } from "@/lib/types";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useExportData } from "./use-export-data";
 
-const dataFormats = [
-  {
-    name: "CSV",
-    icon: Icons.FileCsv,
-    description: "Simple, widely compatible spreadsheet format",
-  },
-  {
-    name: "JSON",
-    icon: Icons.FileJson,
-    description: "Structured data for easy programmatic access",
-  },
-  {
-    name: "SQLite",
-    icon: Icons.Database,
-    description: "Compact, self-contained database file",
-  },
-];
-
-const dataTypes = {
-  CSV: [
-    {
-      key: "accounts",
-      name: "Accounts",
-      icon: Icons.Holdings,
-      description: "Your financial accounts",
-    },
-    {
-      key: "activities",
-      name: "Activities",
-      icon: Icons.Activity,
-      description: "Detailed transaction history and logs",
-    },
-    {
-      key: "goals",
-      name: "Goals",
-      icon: Icons.Goals,
-      description: "Financial objectives and progress tracking",
-    },
-    {
-      key: "portfolio-history",
-      name: "Portfolio History",
-      icon: Icons.Files,
-      description:
-        "Your portfolio's performance over time, including valuations, gains, and cash flow activities.",
-    },
-  ],
-  JSON: [
-    {
-      key: "accounts",
-      name: "Accounts",
-      icon: Icons.Holdings,
-      description: "Your financial accounts",
-    },
-    {
-      key: "activities",
-      name: "Activities",
-      icon: Icons.Activity,
-      description: "Detailed transaction history and logs",
-    },
-    {
-      key: "goals",
-      name: "Goals",
-      icon: Icons.Goals,
-      description: "Financial objectives and progress tracking",
-    },
-    {
-      key: "portfolio-history",
-      name: "Portfolio History",
-      icon: Icons.Files,
-      description:
-        "Your portfolio's performance over time, including valuations, gains, and cash flow activities.",
-    },
-  ],
-  SQLite: [
-    {
-      key: "full",
-      name: "Export the full SQLite Database",
-      icon: Icons.Database,
-      description: "Complete database backup with WAL/SHM files - choose your backup location",
-    },
-  ],
-};
-
 export const ExportForm = () => {
+  const { t } = useTranslation("settings");
   const [selectedFormat, setSelectedFormat] = useState<string | undefined>();
 
   const { exportData, isExporting, exportingFormat, exportingData } = useExportData();
+
+  const dataFormats = [
+    {
+      name: "CSV",
+      icon: Icons.FileCsv,
+      description: t("exports.dataExport.formats.csv.description"),
+    },
+    {
+      name: "JSON",
+      icon: Icons.FileJson,
+      description: t("exports.dataExport.formats.json.description"),
+    },
+    {
+      name: "SQLite",
+      icon: Icons.Database,
+      description: t("exports.dataExport.formats.sqlite.description"),
+    },
+  ];
+
+  const dataTypes = {
+    CSV: [
+      {
+        key: "accounts",
+        name: t("exports.dataExport.dataTypes.accounts.name"),
+        icon: Icons.Holdings,
+        description: t("exports.dataExport.dataTypes.accounts.description"),
+      },
+      {
+        key: "activities",
+        name: t("exports.dataExport.dataTypes.activities.name"),
+        icon: Icons.Activity,
+        description: t("exports.dataExport.dataTypes.activities.description"),
+      },
+      {
+        key: "goals",
+        name: t("exports.dataExport.dataTypes.goals.name"),
+        icon: Icons.Goals,
+        description: t("exports.dataExport.dataTypes.goals.description"),
+      },
+      {
+        key: "portfolio-history",
+        name: t("exports.dataExport.dataTypes.portfolioHistory.name"),
+        icon: Icons.Files,
+        description: t("exports.dataExport.dataTypes.portfolioHistory.description"),
+      },
+    ],
+    JSON: [
+      {
+        key: "accounts",
+        name: t("exports.dataExport.dataTypes.accounts.name"),
+        icon: Icons.Holdings,
+        description: t("exports.dataExport.dataTypes.accounts.description"),
+      },
+      {
+        key: "activities",
+        name: t("exports.dataExport.dataTypes.activities.name"),
+        icon: Icons.Activity,
+        description: t("exports.dataExport.dataTypes.activities.description"),
+      },
+      {
+        key: "goals",
+        name: t("exports.dataExport.dataTypes.goals.name"),
+        icon: Icons.Goals,
+        description: t("exports.dataExport.dataTypes.goals.description"),
+      },
+      {
+        key: "portfolio-history",
+        name: t("exports.dataExport.dataTypes.portfolioHistory.name"),
+        icon: Icons.Files,
+        description: t("exports.dataExport.dataTypes.portfolioHistory.description"),
+      },
+    ],
+    SQLite: [
+      {
+        key: "full",
+        name: t("exports.dataExport.dataTypes.full.name"),
+        icon: Icons.Database,
+        description: t("exports.dataExport.dataTypes.full.description"),
+      },
+    ],
+  };
 
   const handleExport = (item: (typeof dataTypes)[ExportedFileFormat][number]) => {
     if (!selectedFormat) return;
@@ -107,7 +107,7 @@ export const ExportForm = () => {
   return (
     <>
       <div className="mt-8 px-2">
-        <h3 className="pt-5 pb-3 font-semibold">Choose Your Preferred Format</h3>
+        <h3 className="pt-5 pb-3 font-semibold">{t("exports.dataExport.formatTitle")}</h3>
         <RadioGroup
           onValueChange={setSelectedFormat}
           className="grid grid-cols-1 gap-4 md:grid-cols-3"
@@ -132,7 +132,7 @@ export const ExportForm = () => {
 
       {selectedFormat && (
         <div className="px-2 pt-4">
-          <h3 className="pt-5 pb-3 font-semibold">Customize Your Export</h3>
+          <h3 className="pt-5 pb-3 font-semibold">{t("exports.dataExport.customizeTitle")}</h3>
           {dataTypes[selectedFormat as keyof typeof dataTypes].map((item) => (
             <Card key={item.key} className="mb-4">
               <CardContent className="flex items-center justify-between p-4">
@@ -154,12 +154,16 @@ export const ExportForm = () => {
                   exportingData === item.key ? (
                     <>
                       <Icons.Spinner className="h-4 w-4 animate-spin" />
-                      <span className="sr-only">Exporting {item.name}...</span>
+                      <span className="sr-only">
+                        {t("exports.dataExport.exportingButton", { name: item.name })}
+                      </span>
                     </>
                   ) : (
                     <>
                       <Icons.Download className="h-4 w-4" />
-                      <span className="sr-only">Export {item.name}</span>
+                      <span className="sr-only">
+                        {t("exports.dataExport.exportButton", { name: item.name })}
+                      </span>
                     </>
                   )}
                 </Button>

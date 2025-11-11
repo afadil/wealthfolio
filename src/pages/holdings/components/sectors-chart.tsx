@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Holding, Sector } from "@/lib/types";
 import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 function getSectorsData(holdings: Holding[]) {
   if (!holdings) return [];
@@ -43,6 +44,7 @@ interface SectorsChartProps {
 }
 
 export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: SectorsChartProps) {
+  const { t } = useTranslation("holdings");
   const sectors = useMemo(() => getSectorsData(holdings), [holdings]);
   const total = sectors.reduce((sum, s) => sum + s.value, 0);
 
@@ -51,7 +53,7 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Sector Allocation
+            {t("charts.sectorAllocation")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -70,8 +72,8 @@ export function SectorsChart({ holdings, isLoading, onSectorSectionClick }: Sect
             <div className="flex h-[330px] items-center justify-center">
               <EmptyPlaceholder
                 icon={<Icons.BarChart className="h-10 w-10" />}
-                title="No sectors data"
-                description="There is no sector data available for your holdings."
+                title={t("charts.noSectorsData")}
+                description={t("charts.noSectorDataAvailable")}
               />
             </div>
           ) : (

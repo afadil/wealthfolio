@@ -1,18 +1,20 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@wealthfolio/ui";
 import React, { useState } from "react";
-
-const checklistItems = [
-  { id: "create-account", label: "Create your first account" },
-  { id: "import-activities", label: "Add or import your transactions" },
-  { id: "explore-dashboard", label: "Explore the application dashboards" },
-  { id: "create-goals", label: "Create saving goals" },
-  { id: "set-limits", label: "Set contribution limits" },
-  { id: "install-addons", label: "Explore and install Addons" },
-];
+import { useTranslation } from "react-i18next";
 
 export const OnboardingStep3: React.FC = () => {
+  const { t } = useTranslation("onboarding");
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+
+  const checklistItems = [
+    { id: "create-account", label: t("step3.checklist.createAccount") },
+    { id: "import-activities", label: t("step3.checklist.importActivities") },
+    { id: "explore-dashboard", label: t("step3.checklist.exploreDashboard") },
+    { id: "create-goals", label: t("step3.checklist.createGoals") },
+    { id: "set-limits", label: t("step3.checklist.setLimits") },
+    { id: "install-addons", label: t("step3.checklist.installAddons") },
+  ];
 
   const toggleChecklistItem = (id: string) => {
     setCheckedItems((prev) => ({
@@ -24,9 +26,7 @@ export const OnboardingStep3: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="text-center">
-        <p className="text-muted-foreground text-sm sm:text-base">
-          Here are a few things you can do to get the most out of Wealthfolio
-        </p>
+        <p className="text-muted-foreground text-sm sm:text-base">{t("step3.subtitle")}</p>
       </div>
       <Card className="border-none bg-transparent">
         <CardContent className="px-0 py-4">
@@ -67,9 +67,7 @@ export const OnboardingStep3: React.FC = () => {
             ))}
           </div>
           <div className="mt-6 rounded-lg border p-4">
-            <p className="text-muted-foreground text-center text-sm">
-              💡 Tip: You can complete these steps at your own pace after onboarding
-            </p>
+            <p className="text-muted-foreground text-center text-sm">{t("step3.tip")}</p>
           </div>
         </CardContent>
       </Card>

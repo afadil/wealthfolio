@@ -14,6 +14,7 @@ import { Icons } from "@wealthfolio/ui";
 import { worldCurrencies } from "@wealthfolio/ui/lib/currencies";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
 const onboardingSettingsSchema = z.object({
@@ -22,6 +23,8 @@ const onboardingSettingsSchema = z.object({
     .min(1, "Please select a base currency."),
   theme: z.enum(["light", "dark", "system"], { required_error: "Please select a theme." }),
 });
+
+type OnboardingSettingsValues = z.infer<typeof onboardingSettingsSchema>;
 
 function detectDefaultCurrency(): string | undefined {
   if (typeof navigator === "undefined") return undefined; // Default SSR/Node
@@ -45,12 +48,13 @@ function detectDefaultCurrency(): string | undefined {
   if (lang.startsWith("tr")) return "EUR";
   if (lang.startsWith("ar")) return "USD";
   if (lang.startsWith("hi")) return "INR";
+  if (lang.startsWith("vi")) return "VND";
+  if (lang.startsWith("th")) return "THB";
+
   return undefined;
 }
 
-const popularCurrencies = ["USD", "CAD", "EUR", "GBP", "AUD", "CHF", "JPY"];
-
-type OnboardingSettingsValues = z.infer<typeof onboardingSettingsSchema>;
+const popularCurrencies = ["VND", "USD", "CAD", "EUR", "GBP", "AUD", "CHF", "JPY"];
 
 export interface OnboardingStep2Handle {
   submitForm: () => void;
@@ -59,10 +63,12 @@ export interface OnboardingStep2Handle {
 interface OnboardingStep2Props {
   onNext: () => void;
   onValidityChange: (isValid: boolean) => void;
+  selectedLanguage?: string;
 }
 
 export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2Props>(
-  ({ onNext, onValidityChange }, ref) => {
+  ({ onNext, onValidityChange, selectedLanguage }, ref) => {
+    const { t } = useTranslation("onboarding");
     const { settings, updateSettings } = useSettingsContext();
     const [initialValuesSet, setInitialValuesSet] = useState(false);
     const [showCurrencySearch, setShowCurrencySearch] = useState(false);
@@ -108,7 +114,11 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     async function onSubmit(data: OnboardingSettingsValues) {
       try {
-        await updateSettings({ baseCurrency: data.baseCurrency, theme: data.theme });
+        await updateSettings({
+          baseCurrency: data.baseCurrency,
+          theme: data.theme,
+          language: selectedLanguage, // Save language when onboarding completes
+        });
         await updateSettings({ onboardingCompleted: true });
         onNext();
       } catch (error) {
@@ -120,9 +130,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       <>
         <div className="space-y-3 sm:space-y-4">
           <div className="text-center">
-            <p className="text-muted-foreground text-sm sm:text-base">
-              Just a couple preferences to get you started
-            </p>
+            <p className="text-muted-foreground text-sm sm:text-base">{t("step2.subtitle")}</p>
           </div>
           <Card className="border-none bg-transparent">
             <CardContent>
@@ -137,7 +145,9 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                           <div className="bg-muted rounded-lg p-2">
                             <Icons.DollarSign className="text-muted-foreground h-5 w-5" />
                           </div>
-                          <FormLabel className="text-xl font-semibold">Currency</FormLabel>
+                          <FormLabel className="text-xl font-semibold">
+                            {t("step2.currency.label")}
+                          </FormLabel>
                         </div>
                         <FormControl>
                           <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
@@ -161,7 +171,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                               className="border-border hover:border-primary/50 hover:bg-accent ring-offset-background focus-visible:ring-ring inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
                             >
                               <Icons.Search className="size-5" />
-                              Other
+                              {t("step2.currency.other")}
                             </button>
                           </div>
                         </FormControl>
@@ -179,7 +189,9 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                           <div className="bg-muted rounded-lg p-2">
                             <Icons.Palette className="text-muted-foreground h-5 w-5" />
                           </div>
-                          <FormLabel className="text-xl font-semibold">Theme</FormLabel>
+                          <FormLabel className="text-xl font-semibold">
+                            {t("step2.theme.label")}
+                          </FormLabel>
                         </div>
                         <FormControl>
                           <div className="grid grid-cols-3 gap-4">
@@ -202,7 +214,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                                 >
                                   <Icons.Moon className="h-6 w-6" />
                                 </div>
-                                <span className="font-semibold">Dark</span>
+                                <span className="font-semibold">{t("step2.theme.dark")}</span>
                               </div>
                             </button>
                             <button
@@ -224,7 +236,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                                 >
                                   <Icons.Sun className="h-6 w-6" />
                                 </div>
-                                <span className="font-semibold">Light</span>
+                                <span className="font-semibold">{t("step2.theme.light")}</span>
                               </div>
                             </button>
                             <button
@@ -246,7 +258,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                                 >
                                   <Icons.Monitor className="h-6 w-6" />
                                 </div>
-                                <span className="font-semibold">System</span>
+                                <span className="font-semibold">{t("step2.theme.system")}</span>
                               </div>
                             </button>
                           </div>
@@ -266,7 +278,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
             <Card className="w-full max-w-md border shadow-lg">
               <div className="p-6">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-xl font-bold">Select Currency</h3>
+                  <h3 className="text-xl font-bold">{t("step2.currency.selectTitle")}</h3>
                   <button
                     onClick={() => {
                       setShowCurrencySearch(false);
@@ -282,7 +294,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                   <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
                   <Input
                     type="text"
-                    placeholder="Search currencies..."
+                    placeholder={t("step2.currency.searchPlaceholder")}
                     value={currencySearch}
                     onChange={(e) => setCurrencySearch(e.target.value)}
                     className="pl-10"
@@ -312,7 +324,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                   ))}
                   {filteredCurrencies.length === 0 && (
                     <div className="text-muted-foreground py-8 text-center">
-                      No currencies found
+                      {t("step2.currency.noResults")}
                     </div>
                   )}
                 </div>

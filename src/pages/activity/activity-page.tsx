@@ -20,6 +20,7 @@ import {
 } from "@wealthfolio/ui";
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { ActivityDatagrid } from "./components/activity-datagrid/activity-datagrid";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
@@ -35,6 +36,7 @@ import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch } from "./hooks/use-activity-search";
 
 const ActivityPage = () => {
+  const { t } = useTranslation("activity");
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -143,25 +145,25 @@ const ActivityPage = () => {
           <DropdownMenuTrigger asChild>
             <Button size="sm">
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Activities
+              {t("page.addActivities")}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem asChild>
               <Link to={"/import"} className="flex cursor-pointer items-center py-2.5">
                 <Icons.Import className="mr-2 h-4 w-4" />
-                Import from CSV
+                {t("page.importFromCsv")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
               <Icons.Holdings className="mr-2 h-4 w-4" />
-              Add Holdings
+              {t("page.addHoldings")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
               <Icons.Activity className="mr-2 h-4 w-4" />
-              Add Transaction
+              {t("page.addTransaction")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -169,12 +171,12 @@ const ActivityPage = () => {
 
       {/* Mobile add button */}
       <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title="Import" variant="outline" asChild>
+        <Button size="icon" title={t("page.import")} variant="outline" asChild>
           <Link to={"/import"}>
             <Icons.Import className="size-4" />
           </Link>
         </Button>
-        <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
+        <Button size="icon" title={t("page.add")} onClick={() => handleEdit(undefined)}>
           <Icons.Plus className="size-4" />
         </Button>
       </div>
@@ -183,7 +185,7 @@ const ActivityPage = () => {
 
   return (
     <Page>
-      <PageHeader heading="Activity" actions={headerActions} />
+      <PageHeader heading={t("page.title")} actions={headerActions} />
       <PageContent>
         <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
           {/* Unified Controls */}

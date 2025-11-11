@@ -1,0 +1,246 @@
+{
+  "activitySelector": {
+    "heading": "Chọn Giao Dịch",
+    "description": "Chọn các hoạt động giao dịch để đưa vào danh mục phân tích và theo dõi hiệu suất giao dịch của bạn",
+    "backToDashboard": "Quay Lại",
+    "saveSelection": "Lưu Lựa Chọn",
+    "savingSettings": "Đang lưu cài đặt...",
+    "manualSelection": {
+      "title": "Chọn Thủ Công",
+      "selectedCount": "{{filtered}} trong {{total}} được chọn",
+      "totalSelected": "Tổng {{count}} được chọn",
+      "searchPlaceholder": "Tìm theo mã hoặc tên...",
+      "allAccounts": "Tất Cả Tài Khoản",
+      "allTypes": "Tất Cả Loại",
+      "selectAllFiltered": "Chọn Tất Cả Đã Lọc",
+      "deselectAllFiltered": "Bỏ Chọn Tất Cả Đã Lọc"
+    },
+    "table": {
+      "date": "Ngày",
+      "type": "Loại",
+      "symbol": "Mã",
+      "quantity": "Số Lượng",
+      "price": "Giá",
+      "account": "Tài Khoản",
+      "tags": "Thẻ",
+      "tagSwing": "Swing",
+      "tagSelected": "Đã Chọn"
+    },
+    "types": {
+      "buy": "Mua",
+      "sell": "Bán"
+    },
+    "emptyState": "Không có hoạt động nào khớp với bộ lọc của bạn",
+    "error": {
+      "heading": "Không thể tải hoạt động",
+      "message": "Không thể tải các hoạt động giao dịch",
+      "backButton": "Quay Lại Bảng Điều Khiển"
+    }
+  },
+  "dashboard": {
+    "heading": "Tổng quan Giao Dịch",
+    "description": "Theo dõi hiệu suất và phân tích giao dịch của bạn",
+    "selectActivities": "Chọn Giao Dịch",
+    "settings": "Cài Đặt",
+    "tryAgain": "Thử Lại",
+    "periods": {
+      "1M": "1T",
+      "3M": "3T",
+      "6M": "6T",
+      "YTD": "ĐTN",
+      "1Y": "1N",
+      "ALL": "TẤT CẢ"
+    },
+    "chartPeriod": {
+      "daily": "Hàng Ngày",
+      "weekly": "Hàng Tuần",
+      "monthly": "Hàng Tháng",
+      "dailyDescription": "Lãi/lỗ hàng ngày và hiệu suất vốn tích lũy",
+      "weeklyDescription": "Lãi/lỗ hàng tuần và hiệu suất vốn tích lũy",
+      "monthlyDescription": "Lãi/lỗ hàng tháng và hiệu suất vốn tích lũy"
+    },
+    "kpi": {
+      "pl": {
+        "title": "Lãi/Lỗ",
+        "realized": "Đã Chốt ({{count}} giao dịch)",
+        "unrealized": "Chưa Chốt ({{count}} đang mở)"
+      },
+      "corePerformance": {
+        "title": "Hiệu Suất Cốt Lõi",
+        "winRate": "Tỷ Lệ Thắng",
+        "avgWin": "Lãi Trung Bình",
+        "avgLoss": "Lỗ Trung Bình",
+        "totalTrades": "Tổng Giao Dịch"
+      },
+      "analytics": {
+        "title": "Phân Tích & Tỷ Số",
+        "expectancy": "Kỳ Vọng",
+        "profitFactor": "Hệ Số Lợi Nhuận",
+        "avgHoldTime": "Thời Gian Giữ TB",
+        "daysUnit": "ngày"
+      }
+    },
+    "charts": {
+      "equityCurve": {
+        "title": "Biểu đồ vốn {{period}}",
+        "periodDisplay": "{{selectedPeriod}} → {{periodType}}"
+      }
+    },
+    "openPositions": {
+      "title": "Vị Thế Đang Mở",
+      "position": "vị thế",
+      "positions": "vị thế"
+    },
+    "emptyState": {
+      "heading": "Chưa Chọn Hoạt Động Giao Dịch",
+      "message": "Chọn các hoạt động MUA và BÁN để bắt đầu theo dõi hiệu suất giao dịch của bạn",
+      "button": "Chọn Giao Dịch"
+    },
+    "error": {
+      "heading": "Không thể tải bảng điều khiển",
+      "message": "Không thể tải dữ liệu giao dịch"
+    }
+  },
+  "settings": {
+    "heading": "Cài Đặt Giao Dịch",
+    "description": "Cấu hình tùy chọn phân tích giao dịch của bạn",
+    "backToDashboard": "Quay Lại Bảng Điều Khiển",
+    "savingSettings": "Đang lưu cài đặt...",
+    "close": "Đóng",
+    "autoSelection": {
+      "title": "Tùy Chọn Tự Động",
+      "includeSwingTag": "Tự động bao gồm các hoạt động được gắn thẻ \"swing\"",
+      "tagDescription": "Các hoạt động có \"swing\" trong bình luận sẽ được tự động bao gồm"
+    },
+    "tradeMatching": {
+      "title": "Khớp Lệnh Giao Dịch",
+      "lotMethod": "Phương Pháp Khớp Lô",
+      "fifo": "FIFO (Vào Trước, Ra Trước)",
+      "lifo": "LIFO (Vào Sau, Ra Trước)",
+      "average": "Giá Vốn Trung Bình",
+      "description": "Phương pháp dùng để khớp lệnh mua và bán cho tính toán lãi/lỗ:",
+      "fifoDesc": "• FIFO: Khớp lô mua cũ nhất trước",
+      "lifoDesc": "• LIFO: Khớp lô mua mới nhất trước",
+      "averageDesc": "• Giá Vốn Trung Bình: Sử dụng giá trung bình gia quyền của tất cả lô mua"
+    },
+    "displaySettings": {
+      "title": "Cài Đặt Hiển Thị",
+      "defaultRange": "Khoảng Thời Gian Mặc Định",
+      "1M": "1 Tháng",
+      "3M": "3 Tháng",
+      "6M": "6 Tháng",
+      "YTD": "Đầu Năm Đến Nay",
+      "1Y": "1 Năm",
+      "ALL": "Toàn Bộ",
+      "description": "Khoảng thời gian mặc định khi mở bảng điều khiển"
+    },
+    "calculationSettings": {
+      "title": "Cài Đặt Tính Toán",
+      "includeFees": "Bao gồm phí trong tính toán lãi/lỗ",
+      "feesDescription": "Khi bật, phí giao dịch sẽ được trừ khỏi lãi/lỗ đã chốt",
+      "includeDividends": "Bao gồm cổ tức trong hiệu suất",
+      "dividendsDescription": "Khi bật, các khoản thanh toán cổ tức sẽ được bao gồm trong tổng lợi nhuận"
+    }
+  },
+  "components": {
+    "calendar": {
+      "daily": {
+        "title": "Lịch Giao Dịch Hàng Ngày",
+        "monthlyPL": "Lãi/Lỗ Tháng:",
+        "trades": "giao dịch",
+        "days": {
+          "sun": "CN",
+          "mon": "T2",
+          "tue": "T3",
+          "wed": "T4",
+          "thu": "T5",
+          "fri": "T6",
+          "sat": "T7"
+        }
+      },
+      "yearly": {
+        "title": "Lịch Giao Dịch Hàng Năm",
+        "yearlyPL": "Lãi/Lỗ Năm:",
+        "noTrades": "Không có giao dịch",
+        "trade": "giao dịch",
+        "trades": "giao dịch",
+        "months": {
+          "jan": "Th1",
+          "feb": "Th2",
+          "mar": "Th3",
+          "apr": "Th4",
+          "may": "Th5",
+          "jun": "Th6",
+          "jul": "Th7",
+          "aug": "Th8",
+          "sep": "Th9",
+          "oct": "Th10",
+          "nov": "Th11",
+          "dec": "Th12"
+        }
+      }
+    },
+    "distribution": {
+      "plBySymbol": {
+        "title": "Lãi/Lỗ Theo Mã",
+        "emptyTitle": "Không Có Dữ Liệu Mã",
+        "emptyDescription": "Không có giao dịch hoàn thành trong khoảng thời gian này để phân tích lãi/lỗ theo mã. Hoàn thành một số giao dịch để xem phân bổ."
+      },
+      "plByPeriod": {
+        "title": "Lãi/Lỗ Theo Thời Gian Nắm Giữ",
+        "emptyTitle": "Không Có Dữ Liệu Thời Gian Nắm Giữ",
+        "emptyDescription": "Không có giao dịch hoàn thành trong khoảng thời gian này để phân tích lãi/lỗ theo thời gian nắm giữ. Hoàn thành một số giao dịch để xem phân bổ."
+      },
+      "labels": {
+        "pl": "Lãi/Lỗ",
+        "symbol": "Mã",
+        "period": "Khoảng"
+      }
+    },
+    "equityCurve": {
+      "labels": {
+        "dailyPL": "Lãi/Lỗ Hàng Ngày",
+        "monthlyPL": "Lãi/Lỗ Hàng Tháng",
+        "cumulativeEquity": "Vốn Tích Lũy",
+        "daily": "Hàng Ngày",
+        "monthly": "Hàng Tháng"
+      },
+      "emptyState": {
+        "title": "Không có dữ liệu",
+        "description": "Không có dữ liệu đường cong vốn cho khoảng thời gian đã chọn. Hoàn thành một số giao dịch để xem hiệu suất của bạn."
+      }
+    },
+    "openTrades": {
+      "table": {
+        "symbol": "Mã",
+        "account": "Tài Khoản",
+        "quantity": "Số Lượng",
+        "avgCost": "Giá Vốn TB",
+        "current": "Hiện Tại",
+        "pl": "Lãi/Lỗ",
+        "returnPercent": "% Lợi Nhuận",
+        "days": "Ngày"
+      },
+      "search": {
+        "placeholder": "Tìm mã hoặc tên...",
+        "clear": "Xóa tìm kiếm"
+      },
+      "filter": {
+        "account": "Tài Khoản",
+        "reset": "Đặt Lại"
+      },
+      "showing": "Hiển thị {{count}} trong {{total}}",
+      "noResults": "Không tìm thấy kết quả.",
+      "pagination": {
+        "info": "{{from}}-{{to}} trong {{total}}",
+        "previous": "Trước",
+        "page": "Trang {{current}} / {{total}}",
+        "next": "Sau"
+      },
+      "emptyState": {
+        "title": "Không Có Vị Thế Đang Mở",
+        "description": "Bạn không có vị thế giao dịch đang mở. Mua một số chứng khoán để bắt đầu theo dõi."
+      }
+    }
+  }
+}

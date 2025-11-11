@@ -345,6 +345,7 @@ export interface Settings {
   menuBarVisible: boolean;
   isPro: boolean;
   syncEnabled: boolean;
+  language: string;
 }
 
 export interface SettingsContextType {

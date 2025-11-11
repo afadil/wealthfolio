@@ -4,12 +4,14 @@ import type { Account } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
 
 const SettingsAccountsPage = () => {
+  const { t } = useTranslation("settings");
   const { data: accounts, isLoading } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
@@ -46,20 +48,20 @@ const SettingsAccountsPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <SettingsHeader heading="Accounts" text=" Manage your investment and saving accounts.">
+        <SettingsHeader heading={t("accounts.title")} text={t("accounts.description")}>
           {/* Mobile: icon button; Desktop: full button */}
           <>
             <Button
               size="icon"
               className="sm:hidden"
               onClick={() => handleAddAccount()}
-              aria-label="Add account"
+              aria-label={t("accounts.addButton")}
             >
               <Icons.Plus className="h-4 w-4" />
             </Button>
             <Button size="sm" className="hidden sm:inline-flex" onClick={() => handleAddAccount()}>
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add account
+              {t("accounts.addButton")}
             </Button>
           </>
         </SettingsHeader>
@@ -79,13 +81,13 @@ const SettingsAccountsPage = () => {
           ) : (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="Wallet" />
-              <EmptyPlaceholder.Title>No account added!</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Title>{t("accounts.empty.title")}</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any account yet. Start adding your investment accounts.
+                {t("accounts.empty.description")}
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddAccount()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
-                Add an account
+                {t("accounts.addAccountButton")}
               </Button>
             </EmptyPlaceholder>
           )}

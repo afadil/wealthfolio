@@ -61,6 +61,8 @@ Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 - **🧩 Extensible** - Powerful addon system for custom functionality
 - **🌍 Multi-Currency** - Support for multiple currencies with exchange rate
   management
+- **🌐 Multi-Language** - Full internationalization support (English,
+  Vietnamese)
 - **📱 Cross-Platform** - Available on Windows, macOS, and Linux
 
 ### 🧩 Addon System
@@ -95,6 +97,10 @@ See [ROADMAP.md](./ROADMAP.md).
 
 - **[Activity Types](docs/activities/activity-types.md)** - Complete guide to
   all supported activity types and their required fields
+- **[Internationalization Guide](docs/i18n-guide.md)** - Developer guide for
+  multi-language support and translations
+- **[Translation Guide](docs/translation-guide.md)** - How to contribute
+  translations for new languages
 - **[Roadmap](ROADMAP.md)** - Future plans and development roadmap
 
 ### Addon Development
@@ -346,6 +352,39 @@ Check out the [addons/](addons/) directory for sample addons including:
   permissions guide
 - **[Examples & Tutorials](docs/addons/addon-examples.md)** - Step-by-step
   tutorials
+
+## Language Support
+
+Wealthfolio is available in multiple languages with full internationalization
+support.
+
+### Supported Languages
+
+- **English** (en) 🇬🇧
+- **Tiếng Việt** (vi) 🇻🇳
+
+### Switching Languages
+
+To change the application language:
+
+1. Open **Settings** from the sidebar
+2. Navigate to **General Settings**
+3. Select your preferred language from the **Language** dropdown
+4. The interface will update immediately
+
+All UI elements, including menus, buttons, forms, and messages, will be
+displayed in your selected language.
+
+### Contributing Translations
+
+We welcome contributions for new languages! If you'd like to help translate
+Wealthfolio:
+
+- See the **[Translation Guide](docs/translation-guide.md)** for step-by-step
+  instructions
+- Check the **[i18n Developer Guide](docs/i18n-guide.md)** for technical details
+- Join our [Discord](https://discord.gg/WDMCY6aPWK) to coordinate with other
+  translators
 
 ## Technologies Used
 

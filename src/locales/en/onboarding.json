@@ -1,0 +1,58 @@
+{
+  "step1": {
+    "subtitle": "Two ways to track your portfolio.",
+    "simpleTracking": {
+      "title": "Simple Tracking",
+      "subtitle": "No transaction history needed",
+      "feature1": "Add/remove holdings instantly",
+      "feature2": "Simple cash deposits/withdrawals",
+      "feature3": "Perfect for portfolio snapshots",
+      "note": "Holdings don't affect cash balance"
+    },
+    "completeTracking": {
+      "title": "Complete Tracking",
+      "subtitle": "Full transaction history",
+      "feature1": "Track every buy and sell",
+      "feature2": "Deposits, withdrawals, transfers",
+      "feature3": "Precise performance analytics",
+      "note": "Trades update cash balance automatically"
+    },
+    "footer": "Mix both types as needed.",
+    "learnMore": "Learn more"
+  },
+  "step2": {
+    "subtitle": "Just a couple preferences to get you started",
+    "currency": {
+      "label": "Currency",
+      "other": "Other",
+      "selectTitle": "Select Currency",
+      "searchPlaceholder": "Search currencies...",
+      "noResults": "No currencies found",
+      "validation": "Please select a base currency."
+    },
+    "theme": {
+      "label": "Theme",
+      "dark": "Dark",
+      "light": "Light",
+      "system": "System",
+      "validation": "Please select a theme."
+    }
+  },
+  "step3": {
+    "subtitle": "Here are a few things you can do to get the most out of Wealthfolio",
+    "checklist": {
+      "createAccount": "Create your first account",
+      "importActivities": "Add or import your transactions",
+      "exploreDashboard": "Explore the application dashboards",
+      "createGoals": "Create saving goals",
+      "setLimits": "Set contribution limits",
+      "installAddons": "Explore and install Addons"
+    },
+    "tip": "💡 Tip: You can complete these steps at your own pace after onboarding"
+  },
+  "navigation": {
+    "back": "Back",
+    "continue": "Continue",
+    "getStarted": "Get Started"
+  }
+}

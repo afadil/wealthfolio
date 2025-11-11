@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Country, Holding } from "@/lib/types";
 import { DonutChart, EmptyPlaceholder, Skeleton } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface CountryChartProps {
   holdings?: Holding[];
@@ -10,6 +11,7 @@ interface CountryChartProps {
 }
 
 export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: CountryChartProps) => {
+  const { t } = useTranslation("holdings");
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => {
@@ -75,7 +77,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Country Allocation
+            {t("charts.countryAllocation")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -90,10 +92,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
             displayTooltip={false}
           />
         ) : (
-          <EmptyPlaceholder
-            description="There is no country data available for your holdings."
-            className="max-h-[160px]"
-          />
+          <EmptyPlaceholder description={t("charts.noCountryData")} className="max-h-[160px]" />
         )}
       </CardContent>
     </Card>

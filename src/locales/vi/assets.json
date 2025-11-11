@@ -1,0 +1,105 @@
+{
+  "title": "Tài sản",
+  "search": "Tìm kiếm tài sản...",
+  "profile": {
+    "tabs": {
+      "overview": "Tổng quan",
+      "lots": "Lô giao dịch",
+      "quotes": "Giá"
+    },
+    "about": "Thông tin",
+    "placeholders": {
+      "assetClass": "Nhập loại tài sản",
+      "subClass": "Nhập phân loại phụ",
+      "sector": "lĩnh vực:tỷ trọng",
+      "country": "quốc gia:tỷ trọng",
+      "description": "Mô tả mã/công ty",
+      "assetName": "Nhập tên tài sản"
+    },
+    "noDescription": "Không có mô tả.",
+    "quoteHistory": "Lịch sử giá",
+    "errorLoading": "Lỗi khi tải dữ liệu cho",
+    "errorMessage": "Không thể tải thông tin cần thiết cho mã này. Vui lòng kiểm tra mã hoặc thử lại sau.",
+    "errors": {
+      "holding": "Lỗi khi tải thông tin nắm giữ.",
+      "quote": "Lỗi khi tải thông tin giá.",
+      "profile": "Lỗi khi tải hồ sơ tài sản."
+    }
+  },
+  "detailCard": {
+    "shares": "cổ phiếu",
+    "bookValue": "Giá trị sổ sách",
+    "averageCost": "Giá mua trung bình",
+    "portfolioPercent": "% trong danh mục",
+    "todaysReturn": "Lợi nhuận hôm nay",
+    "totalReturn": "Tổng lợi nhuận",
+    "adjClose": "Đóng cửa điều chỉnh"
+  },
+  "historyCard": {
+    "asOf": "Tính đến:",
+    "refreshing": "Đang làm mới giá...",
+    "refresh": "Làm mới giá"
+  },
+  "lotsTable": {
+    "acquiredDate": "Ngày mua",
+    "quantity": "Số lượng",
+    "acquisitionPrice": "Giá mua",
+    "fees": "Phí",
+    "costBasis": "Giá vốn",
+    "marketValue": "Giá trị thị trường",
+    "gainLoss": "Lãi/Lỗ"
+  },
+  "quotesTable": {
+    "date": "Ngày",
+    "open": "Mở cửa",
+    "high": "Cao nhất",
+    "low": "Thấp nhất",
+    "close": "Đóng cửa",
+    "volume": "Khối lượng",
+    "actions": "Hành động",
+    "manualTracking": "Nhập thủ công",
+    "addQuote": "Thêm giá",
+    "deleteQuote": "Xóa giá",
+    "deleteConfirmation": "Bạn có chắc chắn muốn xóa giá lịch sử này? Hành động này không thể hoàn tác.",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "previous": "Trước",
+    "next": "Sau",
+    "page": "Trang",
+    "of": "trên",
+    "changeMode": {
+      "title": "Thay đổi chế độ theo dõi",
+      "toAutomatic": "Chuyển sang theo dõi tự động sẽ bật tính năng tải dữ liệu từ Nhà cung cấp dữ liệu thị trường. Lưu ý rằng điều này sẽ ghi đè lên bất kỳ giá nhập thủ công nào trong lần đồng bộ tiếp theo.",
+      "toManual": "Chuyển sang theo dõi thủ công sẽ dừng tải dữ liệu tự động từ Nhà cung cấp dữ liệu thị trường. Bạn sẽ cần nhập và duy trì dữ liệu giá thủ công.",
+      "warningAutomatic": "⚠️ Dữ liệu lịch sử nhập thủ công của bạn có thể bị mất.",
+      "warningManual": "⚠️ Cập nhật giá tự động sẽ bị tắt.",
+      "confirm": "Xác nhận thay đổi"
+    }
+  },
+  "details": {
+    "overview": "Tổng quan",
+    "price": "Giá",
+    "change": "Thay đổi",
+    "volume": "Khối lượng",
+    "marketCap": "Vốn hóa thị trường",
+    "high": "Cao nhất",
+    "low": "Thấp nhất",
+    "open": "Mở cửa",
+    "close": "Đóng cửa"
+  },
+  "chart": {
+    "title": "Biểu đồ giá",
+    "period": {
+      "1D": "1 Ngày",
+      "1W": "1 Tuần",
+      "1M": "1 Tháng",
+      "3M": "3 Tháng",
+      "1Y": "1 Năm",
+      "ALL": "Tất cả"
+    }
+  },
+  "empty": {
+    "title": "Không tìm thấy tài sản",
+    "description": "Không thể tìm thấy tài sản được yêu cầu"
+  }
+}

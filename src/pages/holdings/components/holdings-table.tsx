@@ -15,6 +15,7 @@ import { QuantityDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { useTranslation } from "react-i18next";
 
 // Helper function to get display value and currency based on toggle state
 const getDisplayValueAndCurrency = (
@@ -47,6 +48,7 @@ export const HoldingsTable = ({
   holdings: Holding[];
   isLoading: boolean;
 }) => {
+  const { t } = useTranslation("holdings");
   const { isBalanceHidden } = useBalancePrivacy();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
 
@@ -77,16 +79,18 @@ export const HoldingsTable = ({
   const filters = [
     {
       id: "holdingType",
-      title: "Type",
+      title: t("table.type"),
       options: assetsTypes,
     },
   ];
+
+  const columns = getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues, t);
 
   return (
     <div className="flex h-full flex-col">
       <DataTable
         data={holdings}
-        columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
+        columns={columns}
         searchBy="symbol"
         filters={filters}
         showColumnToggle={true}
@@ -109,13 +113,14 @@ const getColumns = (
   isHidden: boolean,
   showConvertedValues: boolean,
   setShowConvertedValues: (value: boolean) => void,
+  t: any,
 ): ColumnDef<Holding>[] => [
   {
     id: "symbol",
     accessorKey: "instrument.symbol",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Position" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("table.position")} />,
     meta: {
-      label: "Position",
+      label: t("table.position"),
     },
     cell: ({ row }) => {
       const navigate = useNavigate();
@@ -174,7 +179,7 @@ const getColumns = (
     id: "symbolName",
     accessorFn: (row) => row.instrument?.name || row.id,
     meta: {
-      label: "Symbol Name",
+      label: t("table.symbolName"),
     },
     enableHiding: false,
   },
@@ -183,10 +188,14 @@ const getColumns = (
     accessorKey: "quantity",
     enableHiding: true,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
+      <DataTableColumnHeader
+        className="justify-end text-right"
+        column={column}
+        title={t("table.shares")}
+      />
     ),
     meta: {
-      label: "Shares",
+      label: t("table.shares"),
     },
     cell: ({ row }) => (
       <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
@@ -205,11 +214,11 @@ const getColumns = (
       <DataTableColumnHeader
         className="justify-end text-right"
         column={column}
-        title="Today's Price"
+        title={t("table.todayPrice")}
       />
     ),
     meta: {
-      label: "Today's Price",
+      label: t("table.todayPrice"),
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -228,10 +237,10 @@ const getColumns = (
     accessorFn: (row) => row.costBasis?.local ?? 0,
     enableHiding: true,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Book Cost" />
+      <DataTableColumnHeader className="justify-end" column={column} title={t("table.bookCost")} />
     ),
     meta: {
-      label: "Book Cost",
+      label: t("table.bookCost"),
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -256,10 +265,14 @@ const getColumns = (
     accessorFn: (row) => row.marketValue.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Total Value" />
+      <DataTableColumnHeader
+        className="justify-end"
+        column={column}
+        title={t("table.totalValue")}
+      />
     ),
     meta: {
-      label: "Total Value",
+      label: t("table.totalValue"),
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -292,10 +305,14 @@ const getColumns = (
     accessorFn: (row) => row.totalGain?.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Total Gain/Loss" />
+      <DataTableColumnHeader
+        className="justify-end"
+        column={column}
+        title={t("table.totalGainLoss")}
+      />
     ),
     meta: {
-      label: "Total Gain/Loss",
+      label: t("table.totalGainLoss"),
     },
     cell: ({ row }) => {
       const holding = row.original;
@@ -327,17 +344,17 @@ const getColumns = (
     id: "holdingType",
     accessorFn: (row) => row.instrument?.assetSubclass,
     meta: {
-      label: "Asset Type",
+      label: t("table.assetType"),
     },
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Asset Type" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("table.assetType")} />,
     filterFn: "arrIncludesSome",
   },
   {
     id: "currency",
     accessorKey: "localCurrency",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("table.currency")} />,
     meta: {
-      label: "Currency",
+      label: t("table.currency"),
     },
     cell: ({ row }) => <div className="text-muted-foreground">{row.original.localCurrency}</div>,
     filterFn: (row, id, value) => {
@@ -366,7 +383,11 @@ const getColumns = (
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>Show values in {showConvertedValues ? "Asset Currency" : "Base Currency"}</p>
+              <p>
+                {showConvertedValues
+                  ? t("table.showInAssetCurrency")
+                  : t("table.showInBaseCurrency")}
+              </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

@@ -9,6 +9,7 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 function getClassData(holdings: Holding[]) {
   if (!holdings?.length) return [];
@@ -41,6 +42,7 @@ interface ClassesChartProps {
 }
 
 export function ClassesChart({ holdings, isLoading, onClassSectionClick }: ClassesChartProps) {
+  const { t } = useTranslation("holdings");
   const [activeIndex, setActiveIndex] = useState(0);
 
   const data = useMemo(() => getClassData(holdings ?? []), [holdings]);
@@ -82,7 +84,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Asset Allocation
+            {t("charts.assetAllocation")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -96,7 +98,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description="There is no class data available for your holdings." />
+          <EmptyPlaceholder description={t("charts.noDataAvailable")} />
         )}
       </CardContent>
     </Card>

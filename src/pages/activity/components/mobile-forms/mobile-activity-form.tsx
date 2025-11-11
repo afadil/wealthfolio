@@ -15,6 +15,7 @@ import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import type { AccountSelectOption } from "../activity-form";
 import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
@@ -28,6 +29,7 @@ interface MobileActivityFormProps {
 }
 
 export function MobileActivityForm({ accounts, activity, open, onClose }: MobileActivityFormProps) {
+  const { t } = useTranslation("activity");
   const [currentStep, setCurrentStep] = useState(activity?.id ? 2 : 1);
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
 
@@ -176,7 +178,9 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       <SheetContent side="bottom" className="flex h-[90vh] flex-col p-0">
         <SheetHeader className="border-b px-6 py-4">
           <div className="flex flex-col items-center space-y-2">
-            <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>
+            <SheetTitle>
+              {activity?.id ? t("mobile.updateActivity") : t("mobile.addActivity")}
+            </SheetTitle>
             {!activity?.id && (
               <div className="flex gap-1.5">
                 {[1, 2].map((step) => (
@@ -193,7 +197,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 ))}
               </div>
             )}
-            {activity?.id && <SheetDescription>Update transaction details</SheetDescription>}
+            {activity?.id && <SheetDescription>{t("form.updateDescription")}</SheetDescription>}
           </div>
         </SheetHeader>
 
@@ -222,7 +226,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 className="flex-1"
               >
                 <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+                {t("mobile.back")}
               </Button>
             )}
 
@@ -234,7 +238,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 className="flex-1 font-medium"
                 disabled={!form.watch("activityType") && currentStep === 1}
               >
-                Next
+                {t("mobile.next")}
                 <Icons.ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
@@ -250,7 +254,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 ) : (
                   <Icons.Check className="mr-2 h-4 w-4" />
                 )}
-                {activity?.id ? "Update" : "Add"} Activity
+                {activity?.id ? t("mobile.update") : t("mobile.add")} {t("title")}
               </Button>
             )}
           </div>

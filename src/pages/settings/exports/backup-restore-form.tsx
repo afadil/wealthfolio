@@ -1,18 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
+import { useTranslation } from "react-i18next";
 import { useBackupRestore } from "./use-backup-restore";
 
 export const BackupRestoreForm = () => {
+  const { t } = useTranslation("settings");
   const { performBackup, performRestore, isBackingUp, isRestoring } = useBackupRestore();
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold">Database Backup & Restore</h3>
-        <p className="text-muted-foreground text-sm">
-          Create complete database backups and restore from previous backups.
-        </p>
+        <h3 className="text-lg font-semibold">{t("exports.backup.title")}</h3>
+        <p className="text-muted-foreground text-sm">{t("exports.backup.description")}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -20,12 +20,9 @@ export const BackupRestoreForm = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Icons.Database className="h-5 w-5" />
-              Create Backup
+              {t("exports.backup.create.title")}
             </CardTitle>
-            <CardDescription>
-              Create a complete backup of your database including WAL and SHM files. Choose your
-              backup location.
-            </CardDescription>
+            <CardDescription>{t("exports.backup.create.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
@@ -36,12 +33,12 @@ export const BackupRestoreForm = () => {
               {isBackingUp ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Backup...
+                  {t("exports.backup.create.buttonLoading")}
                 </>
               ) : (
                 <>
                   <Icons.Download className="mr-2 h-4 w-4" />
-                  Backup Database
+                  {t("exports.backup.create.button")}
                 </>
               )}
             </Button>
@@ -52,12 +49,9 @@ export const BackupRestoreForm = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Icons.Activity className="h-5 w-5" />
-              Restore Backup
+              {t("exports.backup.restore.title")}
             </CardTitle>
-            <CardDescription>
-              Restore your database from a previous backup file. This will replace all current data.
-              Then restart the application to apply changes.
-            </CardDescription>
+            <CardDescription>{t("exports.backup.restore.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
@@ -69,12 +63,12 @@ export const BackupRestoreForm = () => {
               {isRestoring ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Restoring...
+                  {t("exports.backup.restore.buttonLoading")}
                 </>
               ) : (
                 <>
                   <Icons.Import className="mr-2 h-4 w-4" />
-                  Restore Database
+                  {t("exports.backup.restore.button")}
                 </>
               )}
             </Button>
@@ -87,12 +81,14 @@ export const BackupRestoreForm = () => {
           <div className="flex items-start gap-3">
             <Icons.AlertTriangle className="mt-0.5 h-5 w-5 text-orange-600" />
             <div className="text-sm">
-              <p className="font-medium text-orange-800 dark:text-orange-200">Important Notes:</p>
+              <p className="font-medium text-orange-800 dark:text-orange-200">
+                {t("exports.backup.importantNotes.title")}
+              </p>
               <ul className="mt-2 list-inside list-disc space-y-1 text-orange-700 dark:text-orange-300">
-                <li>Backup includes WAL and SHM files for complete data integrity</li>
-                <li>Restore will replace ALL current data with backup data</li>
-                <li>A pre-restore backup is automatically created before restoration</li>
-                <li>You will be prompted to restart the application after restoration</li>
+                <li>{t("exports.backup.importantNotes.note1")}</li>
+                <li>{t("exports.backup.importantNotes.note2")}</li>
+                <li>{t("exports.backup.importantNotes.note3")}</li>
+                <li>{t("exports.backup.importantNotes.note4")}</li>
               </ul>
             </div>
           </div>

@@ -1,0 +1,60 @@
+{
+  "title": "Tài khoản",
+  "addAccount": "Thêm tài khoản",
+  "types": {
+    "SECURITIES": "Chứng khoán",
+    "BANK": "Ngân hàng",
+    "CRYPTO": "Tiền điện tử"
+  },
+  "form": {
+    "name": "Tên tài khoản",
+    "type": "Loại tài khoản",
+    "currency": "Tiền tệ",
+    "balance": "Số dư",
+    "group": "Nhóm",
+    "isDefault": "Đặt làm mặc định"
+  },
+  "table": {
+    "name": "Tên",
+    "type": "Loại",
+    "balance": "Số dư",
+    "currency": "Tiền tệ",
+    "performance": "Hiệu suất"
+  },
+  "empty": {
+    "title": "Chưa có tài khoản nào",
+    "description": "Tạo tài khoản để bắt đầu theo dõi đầu tư của bạn"
+  },
+  "page": {
+    "accountFallback": "Tài khoản",
+    "switchAccount": "Chuyển tài khoản",
+    "searchPlaceholder": "Tìm kiếm tài khoản...",
+    "noAccountsFound": "Không tìm thấy tài khoản.",
+    "switchAccountTitle": "Chuyển tài khoản",
+    "chooseAccountDescription": "Chọn một tài khoản để xem"
+  },
+  "metrics": {
+    "clickToUpdate": "Nhấp để cập nhật số dư tiền mặt",
+    "cashBalance": "Số dư tiền mặt",
+    "investments": "Đầu tư",
+    "netContribution": "Đóng góp ròng",
+    "costBasis": "Giá vốn",
+    "dateRange": "từ {{startDate}} đến {{endDate}}"
+  },
+  "holdings": {
+    "title": "Nắm giữ"
+  },
+  "contributionLimit": {
+    "contributedSoFar": "Bạn đã đóng góp",
+    "soFarIn": "cho đến nay trong năm",
+    "noLimitSet": "Không có giới hạn đóng góp nào được thiết lập cho tài khoản này.",
+    "youHaveContributed": "Bạn đã đóng góp",
+    "toThisAccountIn": "vào tài khoản này trong năm",
+    "yourTotalIs": "Tổng của bạn là",
+    "whichIsOverThe": "vượt quá mức",
+    "limit": "giới hạn.",
+    "yourTotalContribution": "Tổng đóng góp của bạn cho mức",
+    "limitIs": "giới hạn là",
+    "youHaveExceeded": "Bạn đã vượt quá giới hạn"
+  }
+}

@@ -12,8 +12,10 @@ import { Goal, GoalAllocation } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 export function SavingGoals() {
+  const { t } = useTranslation("dashboard");
   const { isBalanceHidden } = useBalancePrivacy();
 
   const { accounts, isLoading: isLoadingAccounts, isError: isErrorAccounts } = useAccounts();
@@ -59,7 +61,7 @@ export function SavingGoals() {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">
         <CardHeader className="py-2">
-          <CardTitle className="text-md">Saving Goals</CardTitle>
+          <CardTitle className="text-md">{t("goals.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Card className="w-full shadow-sm">
@@ -81,15 +83,15 @@ export function SavingGoals() {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">
         <CardHeader className="py-2">
-          <CardTitle className="text-md">Saving Goals</CardTitle>
+          <CardTitle className="text-md">{t("goals.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Card className="w-full shadow-sm">
             <CardContent className="pt-6">
               <div className="text-destructive flex flex-col items-center justify-center py-6 text-center">
                 <Icons.AlertCircle className="mb-2 h-12 w-12" />
-                <p className="text-sm">Could not load saving goals data.</p>
-                <p className="text-xs">Please try again later.</p>
+                <p className="text-sm">{t("goals.errorLoading")}</p>
+                <p className="text-xs">{t("goals.tryAgain")}</p>
               </div>
             </CardContent>
           </Card>
@@ -102,7 +104,7 @@ export function SavingGoals() {
     return (
       <Card className="w-full border-0 bg-transparent pb-4 shadow-none">
         <CardHeader className="py-2">
-          <CardTitle className="text-md">Saving Goals</CardTitle>
+          <CardTitle className="text-md">{t("goals.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Card className="w-full shadow-xs">
@@ -110,14 +112,12 @@ export function SavingGoals() {
               {goals && goals.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Icons.Goal className="text-muted-foreground mb-2 h-12 w-12" />
-                  <p className="text-muted-foreground text-sm">No saving goals set</p>
-                  <p className="text-muted-foreground text-xs">
-                    Create a goal to start tracking your progress
-                  </p>
+                  <p className="text-muted-foreground text-sm">{t("goals.noGoalsSet")}</p>
+                  <p className="text-muted-foreground text-xs">{t("goals.createGoalPrompt")}</p>
                 </div>
               ) : (
                 <div className="text-muted-foreground flex flex-col items-center justify-center py-6 text-center">
-                  <p className="text-sm">Goal data not yet available.</p>
+                  <p className="text-sm">{t("goals.goalDataNotAvailable")}</p>
                 </div>
               )}
             </CardContent>
@@ -129,7 +129,7 @@ export function SavingGoals() {
 
   return (
     <div className="flex flex-wrap gap-4 pb-4">
-      <h2 className="text-md font-semibold">Saving Goals</h2>
+      <h2 className="text-md font-semibold">{t("goals.title")}</h2>
       <Card className="w-full shadow-xs">
         <CardContent className="px-4 pt-6">
           {goals && goals.length > 0 ? (
@@ -164,10 +164,10 @@ export function SavingGoals() {
                       <h3 className="text-md text-muted-foreground font-bold">{goal.title}</h3>
                       <ul className="list-inside list-disc text-xs">
                         <li>
-                          Progress: <b>{formatPercent(currentProgress)}</b>
+                          {t("goals.progress")}: <b>{formatPercent(currentProgress)}</b>
                         </li>
                         <li>
-                          Current Value:{" "}
+                          {t("goals.currentValue")}:{" "}
                           <b>
                             <AmountDisplay
                               value={currentValue}
@@ -177,7 +177,7 @@ export function SavingGoals() {
                           </b>
                         </li>
                         <li>
-                          Target Value:{" "}
+                          {t("goals.targetValue")}:{" "}
                           <b>
                             <AmountDisplay
                               value={goal.targetAmount}
@@ -189,7 +189,7 @@ export function SavingGoals() {
                       </ul>
                       {!progressData && (
                         <p className="text-muted-foreground text-xs italic">
-                          Progress calculation pending or not applicable.
+                          {t("goals.progressPending")}
                         </p>
                       )}
                     </TooltipContent>
@@ -199,10 +199,8 @@ export function SavingGoals() {
           ) : (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <Icons.Goal className="text-muted-foreground mb-2 h-12 w-12" />
-              <p className="text-muted-foreground text-sm">No saving goals set</p>
-              <p className="text-muted-foreground text-xs">
-                Create a goal to start tracking your progress
-              </p>
+              <p className="text-muted-foreground text-sm">{t("goals.noGoalsSet")}</p>
+              <p className="text-muted-foreground text-xs">{t("goals.createGoalPrompt")}</p>
             </div>
           )}
         </CardContent>

@@ -5,6 +5,7 @@ import type { Holding } from "@/lib/types";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { motion } from "motion/react";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 // Using theme chart colors
 const INDICATOR_COLORS = ["var(--chart-1)", "var(--chart-5)", "var(--chart-7)", "var(--chart-9)"];
@@ -82,6 +83,7 @@ export function HoldingCurrencyChart({
   isLoading = false,
   onCurrencySectionClick,
 }: HoldingCurrencyChartProps) {
+  const { t } = useTranslation("holdings");
   const { data, totalBase } = useMemo(
     () => getCurrencyData(holdings, baseCurrency),
     [holdings, baseCurrency],
@@ -99,7 +101,7 @@ export function HoldingCurrencyChart({
           {/* Title */}
           <div className="flex items-center justify-between">
             <h3 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-              Currency Allocation
+              {t("charts.currencyAllocation")}
             </h3>
           </div>
 
@@ -151,7 +153,7 @@ export function HoldingCurrencyChart({
 
             {data.length === 0 && (
               <div className="bg-muted/20 text-muted-foreground rounded-md py-4 text-center text-sm">
-                No currency data available
+                {t("charts.noCurrencyData")}
               </div>
             )}
           </div>

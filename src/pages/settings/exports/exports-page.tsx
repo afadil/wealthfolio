@@ -1,22 +1,22 @@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { BackupRestoreForm } from "./backup-restore-form";
 import { ExportForm } from "./exports-form";
 
 const ExportSettingsPage = () => {
+  const { t } = useTranslation("settings");
+
   return (
     <div className="space-y-6">
-      <SettingsHeader
-        heading="Data Export & Backup"
-        text="Export your financial data and manage database backups with advanced options."
-      />
+      <SettingsHeader heading={t("exports.page.title")} text={t("exports.page.description")} />
       <Separator />
 
       <Tabs defaultValue="backup" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="backup">Backup & Restore</TabsTrigger>
-          <TabsTrigger value="export">Data Export</TabsTrigger>
+          <TabsTrigger value="backup">{t("exports.page.tabs.backup")}</TabsTrigger>
+          <TabsTrigger value="export">{t("exports.page.tabs.export")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="backup" className="mt-6">
@@ -26,9 +26,9 @@ const ExportSettingsPage = () => {
         <TabsContent value="export" className="mt-6">
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold">Data Export</h3>
+              <h3 className="text-lg font-semibold">{t("exports.page.dataExportTitle")}</h3>
               <p className="text-muted-foreground text-sm">
-                Export specific data types in various formats for analysis or external use.
+                {t("exports.page.dataExportDescription")}
               </p>
             </div>
             <ExportForm />

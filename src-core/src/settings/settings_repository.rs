@@ -62,6 +62,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "sync_enabled" => {
                     settings.sync_enabled = value.parse().unwrap_or(true);
                 }
+                "language" => settings.language = value,
                 _ => {} // Ignore unknown settings
             }
         }
@@ -146,6 +147,15 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         .execute(conn)?;
                 }
 
+                if let Some(ref language) = settings.language {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSetting {
+                            setting_key: "language".to_string(),
+                            setting_value: language.clone(),
+                        })
+                        .execute(conn)?;
+                }
+
                 Ok(())
             })
             .await
@@ -169,6 +179,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                     "auto_update_check_enabled" => "true",
                     "menu_bar_visible" => "true",
                     "sync_enabled" => "true",
+                    "language" => "en",
                     _ => return Err(Error::from(diesel::result::Error::NotFound)),
                 };
                 Ok(default_value.to_string())

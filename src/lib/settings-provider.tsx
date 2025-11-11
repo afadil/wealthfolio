@@ -1,6 +1,7 @@
 import { getRunEnv, logger, RUN_ENV } from "@/adapters";
 import { getCurrentWindow, Theme } from "@tauri-apps/api/window";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
@@ -11,7 +12,13 @@ interface ExtendedSettingsContextType extends SettingsContextType {
     updates: Partial<
       Pick<
         Settings,
-        "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible" | "syncEnabled"
+        | "theme"
+        | "font"
+        | "baseCurrency"
+        | "onboardingCompleted"
+        | "menuBarVisible"
+        | "syncEnabled"
+        | "language"
       >
     >,
   ) => Promise<void>;
@@ -24,6 +31,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { data, isLoading, isError, refetch } = useSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
+  const { i18n } = useTranslation();
 
   const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument);
 
@@ -37,7 +45,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     updates: Partial<
       Pick<
         Settings,
-        "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible" | "syncEnabled"
+        | "theme"
+        | "font"
+        | "baseCurrency"
+        | "onboardingCompleted"
+        | "menuBarVisible"
+        | "syncEnabled"
+        | "language"
       >
     >,
   ) => {
@@ -49,8 +63,25 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (data) {
       setSettings(data);
       applySettingsToDocument(data);
+      // Sync language with i18n
+      if (data.language && i18n.language !== data.language) {
+        console.log(
+          "[SettingsProvider] Changing language from",
+          i18n.language,
+          "to",
+          data.language,
+        );
+        i18n.changeLanguage(data.language);
+      } else {
+        console.log(
+          "[SettingsProvider] Current language:",
+          i18n.language,
+          "Data language:",
+          data.language,
+        );
+      }
     }
-  }, [data]);
+  }, [data, i18n]);
 
   // Cleanup any lingering listeners when provider unmounts
   useEffect(() => {

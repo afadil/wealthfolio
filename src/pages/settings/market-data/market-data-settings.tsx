@@ -3,6 +3,7 @@ import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { SettingsHeader } from "../settings-header";
@@ -31,7 +32,8 @@ import {
 
 const useApiKeyStatus = (providerId: string, isOpen: boolean) => {
   const queryClient = useQueryClient();
-  const needsApiKey = providerId !== "YAHOO" && providerId !== "MANUAL";
+  const needsApiKey =
+    providerId !== "YAHOO" && providerId !== "MANUAL" && providerId !== "VN_MARKET";
 
   const { data: apiKey, isLoading } = useQuery({
     queryKey: QueryKeys.secrets.apiKey(providerId),
@@ -64,9 +66,13 @@ function ProviderSettings({
   onPriorityChange,
   onPrioritySave,
 }: ProviderSettingsProps) {
+  const { t } = useTranslation("settings");
   const [isOpen, setIsOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus } = useApiKeyStatus(provider.id, isOpen);
+  const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus } = useApiKeyStatus(
+    provider.id,
+    isOpen,
+  );
   const { mutate: setApiKey } = useSetApiKey();
   const { mutate: deleteApiKey } = useDeleteApiKey();
 
@@ -135,15 +141,12 @@ function ProviderSettings({
                   className="border-warning/20 bg-warning/10 text-warning shrink-0 text-xs"
                 >
                   <Icons.AlertCircle className="mr-1 h-3 w-3" />
-                  Disabled
+                  {t("marketData.providers.disabled")}
                 </Badge>
               )}
               {needsApiKey && provider.enabled && (
-                <Badge
-                  variant="outline"
-                  className="shrink-0 text-xs"
-                >
-                  API Key Required
+                <Badge variant="outline" className="shrink-0 text-xs">
+                  {t("marketData.providers.apiKeyRequired")}
                 </Badge>
               )}
             </div>
@@ -196,7 +199,9 @@ function ProviderSettings({
             disabled={!provider.enabled}
           >
             <span className="text-sm font-medium">
-              {provider.enabled ? "Configure Settings" : "Enable provider to configure"}
+              {provider.enabled
+                ? t("marketData.providers.configure")
+                : t("marketData.providers.enableToConfigure")}
             </span>
             {provider.enabled &&
               (isOpen ? (
@@ -209,22 +214,32 @@ function ProviderSettings({
         <CollapsibleContent>
           <CardContent className="bg-muted/20 space-y-6 pt-6 pb-6">
             {needsApiKey && (
-                <div className="space-y-2">
-                  <Label htmlFor={`apikey-${provider.id}`}>API Key</Label>
-                  <div className="flex items-center space-x-2">
+              <div className="space-y-2">
+                <Label htmlFor={`apikey-${provider.id}`}>
+                  {t("marketData.providers.apiKey.label")}
+                </Label>
+                <div className="flex items-center space-x-2">
                   <Input
                     id={`apikey-${provider.id}`}
                     type={showApiKey ? "text" : "password"}
                     value={apiKeyValue ?? ""}
                     onChange={(e) => setApiKeyValue(e.target.value)}
-                    placeholder={isSecretSet && !apiKeyValue ? "API Key is Set" : "Enter API Key"}
+                    placeholder={
+                      isSecretSet && !apiKeyValue
+                        ? t("marketData.providers.apiKey.placeholderSet")
+                        : t("marketData.providers.apiKey.placeholder")
+                    }
                     className="grow"
                   />
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => setShowApiKey(!showApiKey)}
-                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                    aria-label={
+                      showApiKey
+                        ? t("marketData.providers.apiKey.hideKey")
+                        : t("marketData.providers.apiKey.showKey")
+                    }
                   >
                     {showApiKey ? (
                       <Icons.EyeOff className="h-4 w-4" />
@@ -233,25 +248,26 @@ function ProviderSettings({
                     )}
                   </Button>
                   <Button onClick={handleSaveApiKey} size="sm">
-                    <Icons.Save className="mr-2 h-4 w-4" /> Save Key
+                    <Icons.Save className="mr-2 h-4 w-4" /> {t("marketData.buttons.saveKey")}
                   </Button>
                 </div>
                 {isSecretSet && !apiKeyValue && (
                   <p className="text-muted-foreground text-xs">
-                    An API key is set. Enter a new key to update, or leave blank and save to clear
-                    the key.
+                    {t("marketData.providers.apiKey.hintSet")}
                   </p>
                 )}
                 {!isSecretSet && !apiKeyValue && (
                   <p className="text-muted-foreground text-xs">
-                    No API key set. Enter a key and save.
+                    {t("marketData.providers.apiKey.hintNotSet")}
                   </p>
                 )}
-                </div>
+              </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor={`priority-${provider.id}`}>Priority</Label>
+              <Label htmlFor={`priority-${provider.id}`}>
+                {t("marketData.providers.priority.label")}
+              </Label>
               <div className="flex items-center space-x-2">
                 <Input
                   id={`priority-${provider.id}`}
@@ -259,12 +275,12 @@ function ProviderSettings({
                   value={priorityValue ?? 0}
                   onChange={(e) => onPriorityChange(e.target.value)}
                   onBlur={onPrioritySave}
-                  placeholder="e.g., 1 or 2"
+                  placeholder={t("marketData.providers.priority.placeholder")}
                   className="w-32"
                 />
               </div>
               <p className="text-muted-foreground text-xs">
-                Lower number means higher priority (e.g., 1 is higher than 10).
+                {t("marketData.providers.priority.hint")}
               </p>
             </div>
           </CardContent>
@@ -275,6 +291,7 @@ function ProviderSettings({
 }
 
 export default function MarketDataSettingsPage() {
+  const { t } = useTranslation("settings");
   const { data: providers, isLoading, error } = useMarketDataProviderSettings();
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
   const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
@@ -320,12 +337,17 @@ export default function MarketDataSettingsPage() {
     }
   };
 
-  if (isLoading) return <p>Loading provider settings...</p>;
-  if (error) return <p className="text-destructive">Error loading settings: {error.message}</p>;
+  if (isLoading) return <p>{t("marketData.loading")}</p>;
+  if (error)
+    return (
+      <p className="text-destructive">
+        {t("marketData.error")}: {error.message}
+      </p>
+    );
 
   return (
     <div className="text-foreground space-y-6">
-      <SettingsHeader heading="Market Data" text="Manage settings for your market data providers.">
+      <SettingsHeader heading={t("marketData.title")} text={t("marketData.description")}>
         <div className="flex items-center gap-2">
           <Button
             asChild
@@ -347,18 +369,18 @@ export default function MarketDataSettingsPage() {
           >
             <Link to="/settings/market-data/import">
               <Icons.Import className="mr-2 h-4 w-4" />
-              Import
+              {t("marketData.buttons.import")}
             </Link>
           </Button>
           {/* Mobile icon-only actions */}
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
-            confirmTitle="Are you sure?"
-            confirmMessage="This will refetch all market data history and recalculate the portfolio."
-            confirmButtonText="Refetch"
-            pendingText="Refetching..."
-            cancelButtonText="Cancel"
+            confirmTitle={t("marketData.confirm.title")}
+            confirmMessage={t("marketData.confirm.message")}
+            confirmButtonText={t("marketData.confirm.refetch")}
+            pendingText={t("marketData.buttons.refetching")}
+            cancelButtonText={t("marketData.confirm.cancel")}
             confirmButtonVariant="destructive"
             button={
               <Button
@@ -394,11 +416,11 @@ export default function MarketDataSettingsPage() {
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
-            confirmTitle="Are you sure?"
-            confirmMessage="This will refetch all market data history and recalculate the portfolio."
-            confirmButtonText="Refetch"
-            pendingText="Refetching..."
-            cancelButtonText="Cancel"
+            confirmTitle={t("marketData.confirm.title")}
+            confirmMessage={t("marketData.confirm.message")}
+            confirmButtonText={t("marketData.confirm.refetch")}
+            pendingText={t("marketData.buttons.refetching")}
+            cancelButtonText={t("marketData.confirm.cancel")}
             confirmButtonVariant="destructive"
             button={
               <Button
@@ -412,7 +434,7 @@ export default function MarketDataSettingsPage() {
                 ) : (
                   <Icons.Clock className="mr-2 h-4 w-4" />
                 )}
-                Refetch all
+                {t("marketData.buttons.refetchAll")}
               </Button>
             }
           />
@@ -427,14 +449,14 @@ export default function MarketDataSettingsPage() {
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
-            Update
+            {t("marketData.buttons.update")}
           </Button>
         </div>
       </SettingsHeader>
       <Separator />
       <div>
         {providers?.length === 0 ? (
-          <p>No market data providers configured. This might be an initialization issue.</p>
+          <p>{t("marketData.noProviders")}</p>
         ) : (
           <div className="space-y-6">
             {providers
