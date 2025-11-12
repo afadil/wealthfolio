@@ -14,6 +14,7 @@ import {
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
 import { FormProvider, useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { useActivityImportMutations } from "../../import/hooks/use-activity-import-mutations";
 import { BulkHoldingsForm } from "./bulk-holdings-form";
@@ -28,6 +29,7 @@ interface BulkHoldingsModalProps {
 }
 
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
+  const { t } = useTranslation("activity");
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   const form = useForm<BulkHoldingsFormValues>({
@@ -90,8 +92,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: () => {
       toast({
-        title: "Import successful",
-        description: "Holdings have been imported successfully.",
+        title: t("import_successful"),
+        description: t("holdings_imported_successfully"),
         variant: "default",
       });
       form.reset();
@@ -113,9 +115,8 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
       if (!validHoldings.length) {
         toast({
-          title: "No valid holdings",
-          description:
-            "Please add at least one valid holding with ticker, shares, and average cost.",
+          title: t("no_valid_holdings"),
+          description: t("no_valid_holdings_desc"),
           variant: "destructive",
         });
         return;
@@ -147,7 +148,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     const errorMessage = firstError?.message || "Please check the form for errors.";
 
     toast({
-      title: "Form validation failed",
+      title: t("form_validation_failed"),
       description: errorMessage,
       variant: "destructive",
     });
@@ -163,10 +164,9 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Portfolio</DialogTitle>
+          <DialogTitle>{t("portfolio")}</DialogTitle>
           <DialogDescription>
-            Quickly add multiple holdings to your portfolio. Enter your current positions with
-            ticker symbols, quantities, and average costs.
+            {t("bulk_holdings_desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -181,7 +181,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
               {Object.keys(form.formState.errors).length > 0 && (
                 <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
                   <h4 className="text-destructive mb-2 text-sm font-medium">
-                    Please fix the following errors:
+                    {t("fix_errors")}:
                   </h4>
                   <ul className="text-destructive/80 space-y-1 text-sm">
                     {form.formState.errors.accountId && (
@@ -199,10 +199,10 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>
-                  Cancel
+                  {t("cancel")}
                 </Button>
                 <Button type="submit" disabled={isSubmitDisabled}>
-                  {confirmImportMutation.isPending ? "Importing..." : "Confirm"}
+                  {confirmImportMutation.isPending ? t("importing") : t("confirm")}
                 </Button>
               </DialogFooter>
             </form>

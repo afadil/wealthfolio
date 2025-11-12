@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { useTranslation } from "react-i18next";
 
 import { FontSelector } from "@/components/font-selector";
 import { ThemeSelector } from "@/components/theme-selector";
@@ -17,29 +18,33 @@ import { Switch } from "@/components/ui/switch";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
 
-const appearanceFormSchema = z.object({
-  theme: z.enum(["light", "dark", "system"], {
-    required_error: "Please select a theme.",
-  }),
-  font: z.enum(["font-mono", "font-sans", "font-serif"], {
-    invalid_type_error: "Select a font",
-    required_error: "Please select a font.",
-  }),
-  menuBarVisible: z.boolean(),
-});
+type TranslateFn = ReturnType<typeof useTranslation<"settings">>["t"];
 
-type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
+const createAppearanceFormSchema = (t: TranslateFn) =>
+  z.object({
+    theme: z.enum(["light", "dark", "system"], {
+      required_error: t("appearance_theme_required"),
+    }),
+    font: z.enum(["font-mono", "font-sans", "font-serif"], {
+      invalid_type_error: t("appearance_font_error"),
+      required_error: t("appearance_font_required"),
+    }),
+    menuBarVisible: z.boolean(),
+  });
+
+type AppearanceFormValues = z.infer<ReturnType<typeof createAppearanceFormSchema>>;
 
 export function AppearanceForm() {
   const { settings, updateSettings } = useSettingsContext();
   const { isMobile } = usePlatform();
+  const { t } = useTranslation("settings");
   const defaultValues: Partial<AppearanceFormValues> = {
     theme: settings?.theme as AppearanceFormValues["theme"],
     font: settings?.font as AppearanceFormValues["font"],
     menuBarVisible: settings?.menuBarVisible ?? true,
   };
   const form = useForm<AppearanceFormValues>({
-    resolver: zodResolver(appearanceFormSchema),
+    resolver: zodResolver(createAppearanceFormSchema(t)),
     defaultValues,
   });
 
@@ -58,9 +63,9 @@ export function AppearanceForm() {
           render={({ field }) => (
             <FormItem className="space-y-3">
               <div className="space-y-1">
-                <FormLabel className="text-base font-medium">Font Family</FormLabel>
+                <FormLabel className="text-base font-medium">{t("appearance_font_title")}</FormLabel>
                 <FormDescription className="text-sm">
-                  Choose the font family used throughout the interface.
+                  {t("appearance_font_description")}
                 </FormDescription>
               </div>
               <FormControl>
@@ -82,9 +87,9 @@ export function AppearanceForm() {
           render={({ field }) => (
             <FormItem className="space-y-3">
               <div className="space-y-1">
-                <FormLabel className="text-base font-medium">Theme</FormLabel>
+                <FormLabel className="text-base font-medium">{t("appearance_theme_title")}</FormLabel>
                 <FormDescription className="text-sm">
-                  Select your preferred theme for the application.
+                  {t("appearance_theme_description")}
                 </FormDescription>
               </div>
               <FormMessage />
@@ -109,8 +114,8 @@ export function AppearanceForm() {
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                 <div className="space-y-0.5">
-                  <FormLabel>Show menu bar</FormLabel>
-                  <FormDescription>Toggle to display the application menu bar.</FormDescription>
+                  <FormLabel>{t("appearance_menu_bar")}</FormLabel>
+                  <FormDescription>{t("appearance_menu_bar_description")}</FormDescription>
                 </div>
                 <FormControl>
                   <Switch

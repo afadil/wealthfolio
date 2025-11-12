@@ -43,15 +43,17 @@ import {
 } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AccountSelector } from "../../components/account-selector";
 import { AccountSelectorMobile } from "../../components/account-selector-mobile";
 import { BenchmarkSymbolSelectorMobile } from "../../components/benchmark-symbol-selector-mobile";
 import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 
-const PORTFOLIO_TOTAL: TrackedItem = {
+// Note: This constant will be translated in the component using useTranslation
+const PORTFOLIO_TOTAL_ID: TrackedItem = {
   id: PORTFOLIO_ACCOUNT_ID,
   type: "account",
-  name: "All Portfolio",
+  name: "All Portfolio", // This will be replaced with translation in component
 };
 
 // Define the type expected by the chart
@@ -80,6 +82,8 @@ function PerformanceContent({
   errorMessages: string[];
   isMobile: boolean;
 }) {
+  const { t } = useTranslation("performance");
+
   return (
     <div className="relative flex h-full w-full flex-col">
       {chartData && chartData.length > 0 && (
@@ -96,8 +100,8 @@ function PerformanceContent({
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<Icons.BarChart className="h-10 w-10" />}
-          title="No performance data"
-          description="Select accounts to compare their performance over time."
+          title={t("no_performance_data")}
+          description={t("no_performance_data_desc")}
         />
       )}
 
@@ -111,7 +115,7 @@ function PerformanceContent({
             <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
               <p className="text-muted-foreground flex items-center text-xs font-medium">
                 <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
-                Calculating...
+                {t("calculating")}
               </p>
             </div>
           </div>
@@ -121,7 +125,7 @@ function PerformanceContent({
       {/* Error display using AlertFeedback component */}
       {hasErrors && (
         <div className="w-full">
-          <AlertFeedback title="Error calculating performance data" variant="error">
+          <AlertFeedback title={t("error_calculating")} variant="error">
             <div>
               {errorMessages.map((error, index) => (
                 <p key={index} className="text-sm">
@@ -131,7 +135,7 @@ function PerformanceContent({
             </div>
             <div className="mt-4 flex justify-end">
               <Button size="sm" onClick={() => window.location.reload()} variant="default">
-                Retry
+                {t("retry")}
               </Button>
             </div>
           </AlertFeedback>
@@ -208,7 +212,16 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
+  const { t } = useTranslation("performance");
   const isMobile = useIsMobileViewport();
+
+  // Create the portfolio total item with translation
+  const PORTFOLIO_TOTAL: TrackedItem = {
+    id: PORTFOLIO_TOTAL_ID.id,
+    type: PORTFOLIO_TOTAL_ID.type,
+    name: t("all_portfolio"),
+  };
+
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
     "performance:selectedItems",
     [PORTFOLIO_TOTAL],
@@ -352,7 +365,7 @@ export default function PerformancePage() {
   return (
     <Page>
       <PageHeader
-        heading="Performance"
+        heading={t("performance")}
         actions={<DateRangeSelector value={dateRange} onChange={setDateRange} />}
       />
       <PageContent>
@@ -398,14 +411,14 @@ export default function PerformancePage() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
                 <Icons.Briefcase className="mr-2 h-4 w-4" />
-                Add Account
+                {t("add_account")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => setBenchmarkSheetOpen(true)}
                 className="py-4 md:py-2"
               >
                 <Icons.TrendingUp className="mr-2 h-4 w-4" />
-                Add Benchmark
+                {t("add_benchmark")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -448,7 +461,7 @@ export default function PerformancePage() {
             <AccountSelector
               setSelectedAccount={handleAccountSelect}
               variant="button"
-              buttonText="Add account"
+              buttonText={t("add_account")}
               includePortfolio={true}
             />
             <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
@@ -483,7 +496,7 @@ export default function PerformancePage() {
                 <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                   <div>
                     <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
-                      Performance
+                      {t("performance")}
                     </CardTitle>
                     <CardDescription
                       className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
@@ -506,7 +519,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  Total Return
+                                  {t("total_return")}
                                 </span>
                                 <span
                                   className={cn(
@@ -528,7 +541,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  Annualized
+                                  {t("annualized_return")}
                                 </span>
                                 <span
                                   className={cn(
@@ -550,7 +563,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  Volatility
+                                  {t("volatility")}
                                 </span>
                                 <span className="text-foreground text-base font-bold">
                                   <NumberFlow
@@ -568,7 +581,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  Max Drawdown
+                                  {t("max_drawdown")}
                                 </span>
                                 <span className="text-destructive text-base font-bold">
                                   <NumberFlow
@@ -588,7 +601,7 @@ export default function PerformancePage() {
                         /* Desktop metrics */
                         <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                            <MetricLabelWithInfo label={t("total_return")} infoText={totalReturnInfo} />
                             <div className="flex items-baseline justify-center">
                               <span
                                 className={`text-base sm:text-lg ${
@@ -608,7 +621,7 @@ export default function PerformancePage() {
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
-                              label="Annualized Return"
+                              label={t("annualized_return")}
                               infoText={annualizedReturnInfo}
                             />
                             <div className="flex items-baseline justify-center">
@@ -629,7 +642,7 @@ export default function PerformancePage() {
                           </div>
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                            <MetricLabelWithInfo label={t("volatility")} infoText={volatilityInfo} />
                             <div className="flex items-baseline justify-center">
                               <span className="text-foreground text-base sm:text-lg">
                                 <NumberFlow
@@ -645,7 +658,7 @@ export default function PerformancePage() {
                           </div>
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                            <MetricLabelWithInfo label={t("max_drawdown")} infoText={maxDrawdownInfo} />
                             <div className="flex items-baseline justify-center">
                               <span className="text-destructive text-base sm:text-lg">
                                 <NumberFlow

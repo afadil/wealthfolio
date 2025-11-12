@@ -23,6 +23,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import { AccountSelector } from "@/components/account-selector";
+import { useTranslation } from "react-i18next";
 
 const SKIP_FIELD_VALUE = "__skip__";
 
@@ -179,7 +180,7 @@ function ActivityTypeDisplayCell({
         onValueChange={(newType) =>
           handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
         }
-        placeholder="Map to..."
+        placeholder={useTranslation("common").t("map_to")}
         value=""
       />
     </div>

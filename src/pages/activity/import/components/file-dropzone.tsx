@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface FileDropzoneProps {
   file: File | null;
@@ -20,6 +21,7 @@ export const FileDropzone = ({
   isValid = true,
   error = null,
 }: FileDropzoneProps) => {
+  const { t } = useTranslation("activity");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,7 +151,7 @@ export const FileDropzone = ({
           <div className="flex flex-col items-center gap-3">
             <Button size="sm" onClick={handleRemoveFile} className="flex items-center gap-1.5 px-3">
               <Icons.Trash className="h-4 w-4" />
-              <span>Remove File</span>
+              <span>{t("delete")}</span>
             </Button>
           </div>
         </div>
@@ -227,7 +229,7 @@ export const FileDropzone = ({
                 transition={{ duration: 0.2 }}
                 className="text-xs font-medium"
               >
-                Processing file...
+                {t("loading")}
               </motion.p>
             ) : file && (!isValid || error) ? (
               <motion.div
@@ -264,9 +266,8 @@ export const FileDropzone = ({
                 transition={{ duration: 0.2 }}
               >
                 <p className="text-xs font-medium">
-                  <span className="text-primary">Click to upload</span> or drop
+                  {t("import_drag_drop")}
                 </p>
-                <p className="text-muted-foreground text-xs">CSV only</p>
               </motion.div>
             )}
           </AnimatePresence>

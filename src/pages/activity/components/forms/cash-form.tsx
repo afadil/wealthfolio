@@ -10,6 +10,7 @@ import {
   MoneyInput,
 } from "@wealthfolio/ui";
 import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { AccountSelectOption } from "../activity-form";
 import {
   ActivityTypeSelector,
@@ -21,34 +22,33 @@ import { cashActivitySchema } from "./schemas";
 export type CashFormValues = z.infer<typeof cashActivitySchema>;
 
 export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+  const { t } = useTranslation("activity");
   const { control } = useFormContext();
 
   const cashTypes: ActivityTypeUI[] = [
     {
       value: "DEPOSIT",
-      label: "Deposit",
+      label: t("type_deposit"),
       icon: "ArrowDown",
-      description: "Increase your account balance by adding funds.",
+      description: t("type_deposit_desc"),
     },
     {
       value: "WITHDRAWAL",
-      label: "Withdrawal",
+      label: t("type_withdrawal"),
       icon: "ArrowUp",
-      description: "Decrease your account balance by taking out funds.",
+      description: t("type_withdrawal_desc"),
     },
     {
       value: "TRANSFER_IN",
-      label: "Transfer In",
+      label: t("type_transfer_in"),
       icon: "ArrowDown",
-      description:
-        "Move funds into this account from another of your existing accounts. Note: This type of transfer typically doesn't count towards contribution limits.",
+      description: t("type_transfer_in_desc"),
     },
     {
       value: "TRANSFER_OUT",
-      label: "Transfer Out",
+      label: t("type_transfer_out"),
       icon: "ArrowUp",
-      description:
-        "Move funds from this account to another of your existing accounts. Note: This type of transfer typically doesn't count towards contribution limits.",
+      description: t("type_transfer_out_desc"),
     },
   ];
 
@@ -69,7 +69,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount</FormLabel>
+                  <FormLabel>{t("field_amount")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>
@@ -82,7 +82,7 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
               name="fee"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fee</FormLabel>
+                  <FormLabel>{t("field_fee")}</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>

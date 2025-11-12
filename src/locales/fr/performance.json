@@ -1,0 +1,56 @@
+{
+  "performance": "Performance",
+  "portfolio_performance": "Performance du portefeuille",
+  "performance_summary": "Résumé de performance",
+  "all_portfolio": "Tous les portefeuilles",
+  "add_account": "Ajouter un compte",
+  "add_benchmark": "Ajouter un indice de référence",
+  "calculating": "Calcul en cours...",
+  "retry": "Réessayer",
+  "error_calculating": "Erreur lors du calcul des données de performance",
+
+  "time_period": "Période",
+  "custom_period": "Période personnalisée",
+  "start_date": "Date de début",
+  "end_date": "Date de fin",
+
+  "total_return": "Rendement total",
+  "total_return_percent": "Rendement total %",
+  "annualized_return": "Rendement annualisé",
+  "time_weighted_return": "Rendement pondéré dans le temps",
+  "money_weighted_return": "Rendement pondéré par l'argent",
+
+  "net_deposits": "Dépôts nets",
+  "net_withdrawals": "Retraits nets",
+  "net_contributions": "Contributions nettes",
+  "dividends_received": "Dividendes reçus",
+  "interest_received": "Intérêts reçus",
+
+  "cumulative_returns": "Rendements cumulés",
+  "periodic_returns": "Rendements périodiques",
+  "daily_returns": "Rendements quotidiens",
+  "monthly_returns": "Rendements mensuels",
+  "yearly_returns": "Rendements annuels",
+
+  "benchmark": "Indice de référence",
+  "compare_to_benchmark": "Comparer à l'indice",
+  "select_benchmark": "Sélectionner un indice",
+  "no_benchmark": "Aucun indice",
+
+  "volatility": "Volatilité",
+  "sharpe_ratio": "Ratio de Sharpe",
+  "max_drawdown": "Perte maximale",
+  "best_day": "Meilleur jour",
+  "worst_day": "Pire jour",
+
+  "chart_value": "Valeur du portefeuille",
+  "chart_returns": "Rendements",
+  "chart_contributions": "Contributions",
+  "chart_allocation": "Allocation",
+
+  "export_performance": "Exporter la performance",
+  "print_report": "Imprimer le rapport",
+
+  "no_performance_data": "Aucune donnée de performance disponible",
+  "no_performance_data_desc": "Ajoutez des activités à votre portefeuille pour voir les métriques de performance."
+}

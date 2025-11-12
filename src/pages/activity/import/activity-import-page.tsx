@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { StepIndicator } from "./components/step-indicator";
 import { useCsvParser } from "./hooks/use-csv-parser";
@@ -18,21 +19,22 @@ import { DataPreviewStep } from "./steps/preview-step";
 import { ResultStep } from "./steps/result-step";
 import { validateActivityImport } from "./utils/validation-utils";
 
-// Define the steps in the wizard
-const STEPS = [
-  { id: 1, title: "Select Account & File" },
-  { id: 2, title: "Configure Mappings" },
-  { id: 3, title: "Preview & Import" },
-  { id: 4, title: "Import Results" },
-];
-
 const ActivityImportPage = () => {
+  const { t } = useTranslation("activity");
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [activities, setActivities] = useState<ActivityImport[]>([]);
   const [processedActivities, setProcessedActivities] = useState<ActivityImport[]>([]);
+
+  // Define the steps in the wizard
+  const STEPS = [
+    { id: 1, title: t("import_step_1_title") },
+    { id: 2, title: t("import_step_2_title") },
+    { id: 3, title: t("import_step_3_title") },
+    { id: 4, title: t("import_step_4_title") },
+  ];
 
   const { data: accountsData } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
@@ -175,7 +177,7 @@ const ActivityImportPage = () => {
   return (
     <Page>
       <PageHeader
-        heading="Import Activities"
+        heading={t("import_activities")}
         onBack={isMobile ? () => navigate("/activities") : undefined}
         actions={
           <>
@@ -213,7 +215,10 @@ const ActivityImportPage = () => {
   );
 };
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
   override state = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error) {
@@ -226,7 +231,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
 
   override render() {
     if (this.state.hasError) {
-      return <AlertFeedback variant="error" title="Something went wrong." />;
+      return <AlertFeedback variant="error" title="Error: Something went wrong importing activities." />;
     }
 
     return this.props.children;

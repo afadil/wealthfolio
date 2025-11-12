@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -8,20 +9,28 @@ import { CurrencyInput } from "@wealthfolio/ui";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+type TranslateFn = ReturnType<typeof useTranslation<"settings">>["t"];
+
 const baseCurrencyFormSchema = z.object({
-  baseCurrency: z.string({ required_error: "Please select a base currency." }),
+  baseCurrency: z.string(),
 });
 
 type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
 
+const createBaseCurrencyFormSchema = (t: TranslateFn) =>
+  z.object({
+    baseCurrency: z.string({ required_error: t("currency_select_error") }),
+  });
+
 // Extracted form component
 export function BaseCurrencyForm() {
   const { settings, updateBaseCurrency } = useSettingsContext();
+  const { t, i18n } = useTranslation("settings");
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || "USD",
   };
   const form = useForm<BaseCurrencyFormValues>({
-    resolver: zodResolver(baseCurrencyFormSchema),
+    resolver: zodResolver(createBaseCurrencyFormSchema(t)),
     defaultValues,
     // Reset form when settings change from external source
     values: { baseCurrency: settings?.baseCurrency || "USD" },
@@ -44,13 +53,13 @@ export function BaseCurrencyForm() {
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormControl className="w-[300px]">
-                <CurrencyInput value={field.value} onChange={field.onChange} />
+                <CurrencyInput value={field.value} onChange={field.onChange} language={i18n.language} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit">Save Currency</Button> {/* Changed button text slightly */}
+        <Button type="submit">{t("currency_save_button")}</Button>
       </form>
     </Form>
   );
@@ -58,12 +67,13 @@ export function BaseCurrencyForm() {
 
 // Original component now uses the extracted form inside a Card
 export function BaseCurrencySettings() {
+  const { t } = useTranslation("settings");
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="text-lg">Base Currency</CardTitle>
-          <CardDescription>Select your portfolio base currency.</CardDescription>
+          <CardTitle className="text-lg">{t("currency_title")}</CardTitle>
+          <CardDescription>{t("currency_description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>

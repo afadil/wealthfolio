@@ -13,6 +13,7 @@ import { formatAmount } from "@wealthfolio/ui";
 import { format, parseISO } from "date-fns";
 import React from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import { useTranslation } from "react-i18next";
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
@@ -29,6 +30,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   currency,
   isBalanceHidden,
 }) => {
+  const { t } = useTranslation("income");
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -58,15 +60,15 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
 
   const periodDescription =
     selectedPeriod === "TOTAL"
-      ? "All Time"
+      ? t("all_time")
       : selectedPeriod === "YTD"
-        ? "Year to Date"
-        : "Last Year";
+        ? t("year_to_date")
+        : t("last_year");
 
   return (
     <Card className="md:col-span-2">
       <CardHeader className="pb-4 md:pb-6">
-        <CardTitle className="text-sm font-medium">Income History</CardTitle>
+        <CardTitle className="text-sm font-medium">{t("income_history")}</CardTitle>
         <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
       </CardHeader>
       <CardContent className="px-4 pt-0 md:px-6">
@@ -74,18 +76,18 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
           <EmptyPlaceholder
             className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
             icon={<Icons.Activity className="h-8 w-8 md:h-10 md:w-10" />}
-            title="No income history available"
-            description="There is no income history for the selected period. Try selecting a different time range or check back later."
+            title={t("no_income_history")}
+            description={t("no_income_history_desc")}
           />
         ) : (
           <ChartContainer
             config={{
               income: {
-                label: "Monthly Income",
+                label: t("chart_monthly"),
                 color: "var(--chart-1)",
               },
               cumulative: {
-                label: "Cumulative Income",
+                label: t("chart_cumulative"),
                 color: "var(--chart-5)",
               },
               previousIncome: {

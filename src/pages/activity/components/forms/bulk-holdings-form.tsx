@@ -19,6 +19,7 @@ import {
 } from "@wealthfolio/ui";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 
 export interface BulkHoldingRow {
   id: string;
@@ -57,6 +58,7 @@ const HoldingRow = memo(
     setFocus: (name: string) => void;
     canRemove: boolean;
   }) => {
+    const { t } = useTranslation("activity");
     const { control } = useFormContext();
 
     // Use useWatch for specific fields instead of watch() in parent
@@ -153,7 +155,7 @@ const HoldingRow = memo(
                       handleTickerSelect(symbol);
                     }}
                     value={tickerField.value}
-                    placeholder="Search ticker..."
+                    placeholder={t("search_ticker_placeholder")}
                     className="focus:border-input focus:bg-background h-9 truncate border-none bg-transparent text-sm focus:border"
                   />
                 )}
@@ -170,7 +172,7 @@ const HoldingRow = memo(
             render={({ field: sharesField }) => (
               <QuantityInput
                 {...sharesField}
-                placeholder="Shares"
+                placeholder={t("field_shares")}
                 className="focus:border-input focus:bg-background h-9 border-none bg-transparent text-sm focus:border"
                 onKeyDown={handleSharesKeyDown}
               />
@@ -186,7 +188,7 @@ const HoldingRow = memo(
             render={({ field: priceField }) => (
               <MoneyInput
                 {...priceField}
-                placeholder="Average cost"
+                placeholder={t("field_average_cost")}
                 className="focus:border-input focus:bg-background h-9 border-none bg-transparent text-sm focus:border"
                 onKeyDown={handleCostKeyDown}
               />
@@ -228,6 +230,7 @@ const HoldingRow = memo(
 HoldingRow.displayName = "HoldingRow";
 
 export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => {
+  const { t } = useTranslation("activity");
   const { control, setFocus } = useFormContext();
   const { fields, append, remove } = useFieldArray({
     control,
@@ -301,7 +304,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
               name="accountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Account</FormLabel>
+                  <FormLabel>{t("field_account")}</FormLabel>
                   <FormControl>
                     <AccountSelector
                       ref={field.ref}
@@ -324,7 +327,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
               name="activityDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Start Date</FormLabel>
+                  <FormLabel>{t("field_start_date")}</FormLabel>
                   <FormControl>
                     <DatePickerInput value={field.value} onChange={field.onChange} />
                   </FormControl>
@@ -336,10 +339,10 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
 
           {/* Table Header */}
           <div className="text-muted-foreground grid grid-cols-12 gap-3 border-b pb-3 text-sm">
-            <div className="col-span-6">Tickers</div>
-            <div className="col-span-1 text-right">Shares</div>
-            <div className="col-span-2 text-right">Average cost</div>
-            <div className="col-span-2 text-right whitespace-nowrap">Total value</div>
+            <div className="col-span-6">{t("tickers")}</div>
+            <div className="col-span-1 text-right">{t("field_shares")}</div>
+            <div className="col-span-2 text-right">{t("field_average_cost")}</div>
+            <div className="col-span-2 text-right whitespace-nowrap">{t("total_value")}</div>
             <div className="col-span-1 text-right"></div>
           </div>
 
@@ -371,7 +374,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
               className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
             >
               <Icons.PlusCircle className="mr-2 h-4 w-4" />
-              Add Another Holding
+              {t("add_another_holding")}
             </Button>
           </div>
         </CardContent>

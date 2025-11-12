@@ -6,6 +6,7 @@ import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@wealthfolio/ui";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface ActivityMobileFilterSheetProps {
   open: boolean;
@@ -26,6 +27,7 @@ export const ActivityMobileFilterSheet = ({
   selectedActivityTypes,
   setSelectedActivityTypes,
 }: ActivityMobileFilterSheetProps) => {
+  const { t } = useTranslation("activity");
   // Local state for temporary selections
   const [localAccounts, setLocalAccounts] = useState<string[]>(selectedAccounts);
   const [localActivityTypes, setLocalActivityTypes] =
@@ -54,13 +56,13 @@ export const ActivityMobileFilterSheet = ({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="flex h-[80vh] flex-col rounded-t-3xl">
         <SheetHeader className="text-left">
-          <SheetTitle>Filter Activities</SheetTitle>
+          <SheetTitle>{t("filter_activities")}</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 py-4">
           <div className="space-y-6 pr-4">
             {/* Account Filter Section */}
             <div>
-              <h4 className="mb-3 font-medium">Account</h4>
+              <h4 className="mb-3 font-medium">{t("filter_account")}</h4>
               <ul className="space-y-1">
                 <li
                   className={cn(
@@ -71,7 +73,7 @@ export const ActivityMobileFilterSheet = ({
                     setLocalAccounts([]);
                   }}
                 >
-                  <span>All Accounts</span>
+                  <span>{t("all_accounts")}</span>
                   {localAccounts.length === 0 && <Icons.Check className="h-4 w-4" />}
                 </li>
                 {accounts
@@ -101,7 +103,7 @@ export const ActivityMobileFilterSheet = ({
 
             {/* Activity Type Filter Section */}
             <div>
-              <h4 className="mb-3 font-medium">Activity Type</h4>
+              <h4 className="mb-3 font-medium">{t("activity_type")}</h4>
               <ul className="space-y-1">
                 <li
                   className={cn(
@@ -112,7 +114,7 @@ export const ActivityMobileFilterSheet = ({
                     setLocalActivityTypes([]);
                   }}
                 >
-                  <span>All Types</span>
+                  <span>{t("all_types")}</span>
                   {localActivityTypes.length === 0 && <Icons.Check className="h-4 w-4" />}
                 </li>
                 {activityTypeOptions.map((type) => (
@@ -139,7 +141,7 @@ export const ActivityMobileFilterSheet = ({
         </ScrollArea>
         <SheetFooter className="mt-auto">
           <Button className="w-full" onClick={handleApply}>
-            Done
+            {t("done")}
           </Button>
         </SheetFooter>
       </SheetContent>

@@ -18,6 +18,7 @@ import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../hooks/use-activity-mutations";
 import { CashForm } from "./forms/cash-form";
 import { HoldingsForm } from "./forms/holdings-form";
@@ -56,6 +57,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
 };
 
 export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
+  const { t } = useTranslation("activity");
   const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
 
   const isValidActivityType = (
@@ -155,7 +157,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
       <SheetContent className="space-y-8 overflow-y-auto sm:max-w-[625px]">
         <SheetHeader>
           <div className="flex items-center gap-2">
-            <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>
+            <SheetTitle>{activity?.id ? t("edit_activity") : t("add_activity")}</SheetTitle>
             {Object.keys(form.formState.errors).length > 0 && (
               <HoverCard>
                 <HoverCardTrigger>
@@ -163,13 +165,13 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                 </HoverCardTrigger>
                 <HoverCardContent className="border-destructive/50 bg-destructive text-destructive-foreground dark:border-destructive [&>svg]:text-destructive w-[600px]">
                   <div className="space-y-2">
-                    <h4 className="font-medium">Please Review Your Entry</h4>
+                    <h4 className="font-medium">{t("review_entry")}</h4>
                     <ul className="list-disc space-y-1 pl-4 text-sm">
                       {Object.entries(form.formState.errors).map(([field, error]) => (
                         <li key={field}>
-                          {field === "activityType" ? "Transaction Type" : field}
+                          {field === "activityType" ? t("activity_type") : field}
                           {": "}
-                          {error?.message?.toString() || "Invalid value"}
+                          {error?.message?.toString() || t("invalid_value")}
                         </li>
                       ))}
                     </ul>
@@ -179,9 +181,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             )}
           </div>
           <SheetDescription>
-            {activity?.id
-              ? "Update the details of your transaction"
-              : "Record a new transaction in your account."}
+            {activity?.id ? t("update_transaction_desc") : t("record_transaction_desc")}
             {"→ "}
             <a
               href="https://wealthfolio.app/docs/concepts/activity-types"
@@ -189,7 +189,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
               rel="noopener noreferrer"
               className="underline"
             >
-              Learn more
+              {t("learn_more")}
             </a>
           </SheetDescription>
         </SheetHeader>
@@ -198,23 +198,23 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             <TabsList className="mb-6 grid grid-cols-5">
               <TabsTrigger value="trade" className="flex items-center gap-2">
                 <Icons.ArrowRightLeft className="h-4 w-4" />
-                Trade
+                {t("tab_trade")}
               </TabsTrigger>
               <TabsTrigger value="holdings" className="flex items-center gap-2">
                 <Icons.Wallet className="h-4 w-4" />
-                Holdings
+                {t("tab_holdings")}
               </TabsTrigger>
               <TabsTrigger value="cash" className="flex items-center gap-2">
                 <Icons.DollarSign className="h-4 w-4" />
-                Cash
+                {t("tab_cash")}
               </TabsTrigger>
               <TabsTrigger value="income" className="flex items-center gap-2">
                 <Icons.Income className="h-4 w-4" />
-                Income
+                {t("tab_income")}
               </TabsTrigger>
               <TabsTrigger value="other" className="flex items-center gap-2">
                 <Icons.FileText className="h-4 w-4" />
-                Other
+                {t("tab_other")}
               </TabsTrigger>
             </TabsList>
           )}
@@ -242,7 +242,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
               <SheetFooter>
                 <SheetTrigger asChild>
                   <Button variant="outline" disabled={isLoading}>
-                    Cancel
+                    {t("cancel")}
                   </Button>
                 </SheetTrigger>
                 <Button type="submit" disabled={isLoading}>
@@ -254,7 +254,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
                     <Icons.Plus className="h-4 w-4" />
                   )}
                   <span className="hidden sm:ml-2 sm:inline">
-                    {activity?.id ? "Update Activity" : "Add Activity"}
+                    {activity?.id ? t("edit_activity") : t("add_activity")}
                   </span>
                 </Button>
               </SheetFooter>

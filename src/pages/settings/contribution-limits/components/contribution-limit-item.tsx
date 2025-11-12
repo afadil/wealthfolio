@@ -11,6 +11,7 @@ import {
   formatAmount,
 } from "@wealthfolio/ui";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useContributionLimitProgress } from "../use-contribution-limit-mutations";
 import { AccountSelection } from "./account-selection";
 import { ContributionLimitOperations } from "./contribution-limit-operations";
@@ -28,6 +29,7 @@ export function ContributionLimitItem({
   onEdit,
   onDelete,
 }: ContributionLimitItemProps) {
+  const { t } = useTranslation("settings");
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export function ContributionLimitItem({
                         : "bg-blue-50 text-blue-700"
                     }`}
                   >
-                    {daysRemaining} days left
+                    {t("limits_days_left", { days: daysRemaining })}
                   </span>
                 )}
               </div>
@@ -113,10 +115,10 @@ export function ContributionLimitItem({
                 </div>
                 <span className="text-muted-foreground text-right text-xs">
                   {isComplete
-                    ? "completed"
+                    ? t("limits_completed")
                     : isOverLimit
-                      ? `+${formatAmount(overLimitAmount, baseCurrency)} over limit`
-                      : `${limit.contributionYear}`}
+                      ? t("limits_over_limit", { amount: formatAmount(overLimitAmount, baseCurrency) })
+                      : t("limits_remaining", { amount: formatAmount(remainingAmount, baseCurrency) })}
                 </span>
               </div>
             )}

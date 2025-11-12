@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { SettingsHeader } from "../settings-header";
 
@@ -65,6 +66,7 @@ function ProviderSettings({
   onPriorityChange,
   onPrioritySave,
 }: ProviderSettingsProps) {
+  const { t } = useTranslation("settings");
   const [isOpen, setIsOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const { apiKey, isSecretSet, needsApiKey, invalidateApiKeyStatus } = useApiKeyStatus(provider.id);
@@ -138,7 +140,7 @@ function ProviderSettings({
                   className="border-warning/20 bg-warning/10 text-warning shrink-0 text-xs"
                 >
                   <Icons.AlertCircle className="mr-1 h-3 w-3" />
-                  Disabled
+                  {t("market_data_provider_disabled")}
                 </Badge>
               )}
               {!isConfigured && provider.enabled && (
@@ -157,11 +159,10 @@ function ProviderSettings({
                       <div className="space-y-2">
                         <h4 className="flex items-center gap-2 font-medium">
                           <Icons.AlertTriangle className="h-4 w-4 text-amber-500" />
-                          Configuration Required
+                          {t("market_data_provider_config_required")}
                         </h4>
                         <p className="text-muted-foreground text-sm">
-                          This provider requires an API key to function properly. Configure the API
-                          key in the settings below to start fetching market data.
+                          {t("market_data_provider_config_required_message")}
                         </p>
                       </div>
                     </div>
@@ -218,7 +219,7 @@ function ProviderSettings({
             disabled={!provider.enabled}
           >
             <span className="text-sm font-medium">
-              {provider.enabled ? "Configure Settings" : "Enable provider to configure"}
+              {provider.enabled ? t("market_data_provider_configure") : t("market_data_provider_enable_to_configure")}
             </span>
             {provider.enabled &&
               (isOpen ? (
@@ -232,21 +233,21 @@ function ProviderSettings({
           <CardContent className="bg-muted/20 space-y-6 pt-6 pb-6">
             {needsApiKey && (
               <div className="space-y-2">
-                <Label htmlFor={`apikey-${provider.id}`}>API Key</Label>
+                <Label htmlFor={`apikey-${provider.id}`}>{t("market_data_provider_api_key")}</Label>
                 <div className="flex items-center space-x-2">
                   <Input
                     id={`apikey-${provider.id}`}
                     type={showApiKey ? "text" : "password"}
                     value={apiKeyValue ?? ""}
                     onChange={(e) => setApiKeyValue(e.target.value)}
-                    placeholder={isSecretSet && !apiKeyValue ? "API Key is Set" : "Enter API Key"}
+                    placeholder={isSecretSet && !apiKeyValue ? t("market_data_provider_api_key_set") : t("market_data_provider_api_key_placeholder")}
                     className="grow"
                   />
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => setShowApiKey(!showApiKey)}
-                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                    aria-label={showApiKey ? t("market_data_provider_hide_key") : t("market_data_provider_show_key")}
                   >
                     {showApiKey ? (
                       <Icons.EyeOff className="h-4 w-4" />
@@ -255,25 +256,24 @@ function ProviderSettings({
                     )}
                   </Button>
                   <Button onClick={handleSaveApiKey} size="sm">
-                    <Icons.Save className="mr-2 h-4 w-4" /> Save Key
+                    <Icons.Save className="mr-2 h-4 w-4" /> {t("market_data_provider_save_key")}
                   </Button>
                 </div>
                 {isSecretSet && !apiKeyValue && (
                   <p className="text-muted-foreground text-xs">
-                    An API key is set. Enter a new key to update, or leave blank and save to clear
-                    the key.
+                    {t("market_data_provider_key_set_message")}
                   </p>
                 )}
                 {!isSecretSet && !apiKeyValue && (
                   <p className="text-muted-foreground text-xs">
-                    No API key set. Enter a key and save.
+                    {t("market_data_provider_key_not_set_message")}
                   </p>
                 )}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor={`priority-${provider.id}`}>Priority</Label>
+              <Label htmlFor={`priority-${provider.id}`}>{t("market_data_provider_priority")}</Label>
               <div className="flex items-center space-x-2">
                 <Input
                   id={`priority-${provider.id}`}
@@ -281,12 +281,12 @@ function ProviderSettings({
                   value={priorityValue ?? 0}
                   onChange={(e) => onPriorityChange(e.target.value)}
                   onBlur={onPrioritySave}
-                  placeholder="e.g., 1 or 2"
+                  placeholder={t("market_data_provider_priority_placeholder")}
                   className="w-32"
                 />
               </div>
               <p className="text-muted-foreground text-xs">
-                Lower number means higher priority (e.g., 1 is higher than 10).
+                {t("market_data_provider_priority_description")}
               </p>
             </div>
           </CardContent>
@@ -297,6 +297,7 @@ function ProviderSettings({
 }
 
 export default function MarketDataSettingsPage() {
+  const { t } = useTranslation("settings");
   const { data: providers, isLoading, error } = useMarketDataProviderSettings();
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
   const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
@@ -342,19 +343,19 @@ export default function MarketDataSettingsPage() {
     }
   };
 
-  if (isLoading) return <p>Loading provider settings...</p>;
-  if (error) return <p className="text-destructive">Error loading settings: {error.message}</p>;
+  if (isLoading) return <p>{t("market_data_loading")}</p>;
+  if (error) return <p className="text-destructive">{t("market_data_error", { error: error.message })}</p>;
 
   return (
     <div className="text-foreground space-y-6">
-      <SettingsHeader heading="Market Data" text="Manage settings for your market data providers.">
+      <SettingsHeader heading={t("market_data_title")} text={t("market_data_description")}>
         <div className="flex items-center gap-2">
           <Button
             asChild
             variant="outline"
             size="icon"
             className="sm:hidden"
-            aria-label="Import quotes"
+            aria-label={t("market_data_import_aria")}
           >
             <Link to="/settings/market-data/import">
               <Icons.Import className="h-4 w-4" />
@@ -365,22 +366,22 @@ export default function MarketDataSettingsPage() {
             variant="outline"
             size="sm"
             className="hidden sm:inline-flex"
-            aria-label="Import historical quotes"
+            aria-label={t("market_data_import_aria")}
           >
             <Link to="/settings/market-data/import">
               <Icons.Import className="mr-2 h-4 w-4" />
-              Import
+              {t("market_data_import_button")}
             </Link>
           </Button>
           {/* Mobile icon-only actions */}
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
-            confirmTitle="Are you sure?"
-            confirmMessage="This will refetch all market data history and recalculate the portfolio."
-            confirmButtonText="Refetch"
-            pendingText="Refetching..."
-            cancelButtonText="Cancel"
+            confirmTitle={t("market_data_refetch_confirm_title")}
+            confirmMessage={t("market_data_refetch_confirm_message")}
+            confirmButtonText={t("market_data_refetch_confirm_button")}
+            pendingText={t("market_data_refetch_pending")}
+            cancelButtonText={t("common_cancel")}
             confirmButtonVariant="destructive"
             button={
               <Button
@@ -403,7 +404,7 @@ export default function MarketDataSettingsPage() {
             className="sm:hidden"
             disabled={isUpdating}
             onClick={() => updatePortfolio()}
-            aria-label="Update"
+            aria-label={t("market_data_update_button")}
           >
             {isUpdating ? (
               <Icons.Spinner className="h-4 w-4 animate-spin" />
@@ -416,11 +417,11 @@ export default function MarketDataSettingsPage() {
           <ActionConfirm
             handleConfirm={() => recalculatePortfolio()}
             isPending={isRecalculating}
-            confirmTitle="Are you sure?"
-            confirmMessage="This will refetch all market data history and recalculate the portfolio."
-            confirmButtonText="Refetch"
-            pendingText="Refetching..."
-            cancelButtonText="Cancel"
+            confirmTitle={t("market_data_refetch_confirm_title")}
+            confirmMessage={t("market_data_refetch_confirm_message")}
+            confirmButtonText={t("market_data_refetch_confirm_button")}
+            pendingText={t("market_data_refetch_pending")}
+            cancelButtonText={t("common_cancel")}
             confirmButtonVariant="destructive"
             button={
               <Button
@@ -434,7 +435,7 @@ export default function MarketDataSettingsPage() {
                 ) : (
                   <Icons.Clock className="mr-2 h-4 w-4" />
                 )}
-                Refetch all
+                {t("market_data_refetch_button")}
               </Button>
             }
           />
@@ -449,14 +450,14 @@ export default function MarketDataSettingsPage() {
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
-            Update
+            {t("market_data_update_button")}
           </Button>
         </div>
       </SettingsHeader>
       <Separator />
       <div>
         {providers?.length === 0 ? (
-          <p>No market data providers configured. This might be an initialization issue.</p>
+          <p>{t("market_data_no_providers")}</p>
         ) : (
           <div className="space-y-6">
             {providers

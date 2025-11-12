@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PrivacyAmount } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 
 interface AccountContributionLimitProps {
   accountId: string;
 }
 
 export function AccountContributionLimit({ accountId }: AccountContributionLimitProps) {
+  const { t } = useTranslation("account");
   const currentYear = new Date().getFullYear();
 
   const { data: allLimits, isLoading: isLimitsLoading } = useQuery<ContributionLimit[], Error>({
@@ -40,14 +42,14 @@ export function AccountContributionLimit({ accountId }: AccountContributionLimit
       <Card className="dark:border-primary/20 dark:bg-primary/20 border-none bg-indigo-100 p-6 shadow-sm">
         <div className="flex items-center justify-between text-sm">
           <span>
-            You&apos;ve contributed{" "}
+            {t("contributed_amount")}{" "}
             <span className="font-semibold">
               <PrivacyAmount
                 value={accountDeposit?.convertedAmount ?? 0}
                 currency={deposits?.baseCurrency ?? "USD"}
               />
             </span>{" "}
-            so far in {currentYear}. There&apos;s no contribution limit set for this account.
+            {t("so_far_in")} {currentYear}. {t("no_limit_set")}
           </span>
         </div>
       </Card>
@@ -78,6 +80,7 @@ function AccountContributionLimitItem({
   totalDeposits: number;
   baseCurrency: string;
 }) {
+  const { t } = useTranslation("account");
   const progressValue = totalDeposits ? totalDeposits : 0;
   const progressPercentageNumber =
     limit.limitAmount > 0 ? (progressValue / limit.limitAmount) * 100 : 0;
@@ -95,31 +98,31 @@ function AccountContributionLimitItem({
           <div className="text-sm">
             {isOverLimit ? (
               <span>
-                You&apos;ve contributed{" "}
+                {t("contributed_amount")}{" "}
                 <span className="font-semibold">
                   <PrivacyAmount value={deposit?.convertedAmount ?? 0} currency={baseCurrency} />
                 </span>{" "}
-                to this account in {limit.contributionYear}. Your total is{" "}
+                {t("to_this_account_in")} {limit.contributionYear}. {t("your_total_is")}{" "}
                 <span className="text-destructive font-semibold">
                   <PrivacyAmount value={totalDeposits} currency={baseCurrency} />
                 </span>{" "}
-                which is over the{" "}
+                {t("over_limit")}{" "}
                 <span className="font-semibold">
                   <PrivacyAmount value={limit.limitAmount} currency={baseCurrency} />
                 </span>{" "}
-                limit.
+                {t("limit")}.
               </span>
             ) : (
               <span>
-                You&apos;ve contributed{" "}
+                {t("contributed_amount")}{" "}
                 <span className="font-semibold">
                   <PrivacyAmount value={deposit?.convertedAmount ?? 0} currency={baseCurrency} />
                 </span>{" "}
-                to this account in {limit.contributionYear}. Your total contribution towards the{" "}
+                {t("to_this_account_in")} {limit.contributionYear}. {t("total_contribution")}{" "}
                 <span className="font-semibold">
                   <PrivacyAmount value={limit.limitAmount} currency={baseCurrency} />
                 </span>{" "}
-                {limit.groupName} limit is{" "}
+                {limit.groupName} {t("limit_is")}{" "}
                 <span className="font-semibold">
                   <PrivacyAmount value={totalDeposits} currency={baseCurrency} />
                 </span>

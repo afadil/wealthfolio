@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Command as CommandPrimitive } from "cmdk";
 import { debounce } from "lodash";
 import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SearchProps {
   selectedResult?: QuoteSummary;
@@ -78,12 +79,13 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       selectedResult,
       defaultValue,
       value,
-      placeholder = "Select symbol...",
+      placeholder,
       onSelectResult,
       className,
     },
     ref,
   ) => {
+    const { t } = useTranslation("common");
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState(defaultValue ?? value ?? "");
     const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -149,7 +151,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     }, [data]);
 
     // Calculate display name for the button
-    const displayName = selected || placeholder;
+    const displayName = selected || placeholder || t("search_symbol");
 
     // Handle popover open
     const handleOpenChange = useCallback(
@@ -207,7 +209,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               ref={inputRef}
               value={searchQuery}
               onValueChange={handleSearchChange}
-              placeholder="Search for symbol"
+              placeholder={t("search_symbol")}
             />
 
             <SearchResults

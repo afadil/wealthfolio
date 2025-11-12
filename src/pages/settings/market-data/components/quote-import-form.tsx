@@ -13,6 +13,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface QuoteImportFormProps {
   file: File | null;
@@ -33,6 +34,7 @@ export function QuoteImportForm({
   onValidate,
   onOverwriteChange,
 }: QuoteImportFormProps) {
+  const { t } = useTranslation("settings");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -140,9 +142,9 @@ export function QuoteImportForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">Select CSV File</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-lg">{t("quote_import_form_title")}</CardTitle>
         <CardDescription>
-          Choose a CSV file containing historical quote data to import
+          {t("quote_import_form_description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -166,7 +168,7 @@ export function QuoteImportForm({
                   className="flex items-center gap-1.5 px-3"
                 >
                   <Icons.Trash className="h-4 w-4" />
-                  <span>Remove File</span>
+                  <span>{t("quote_import_remove_file")}</span>
                 </Button>
               </div>
             </div>
@@ -240,7 +242,7 @@ export function QuoteImportForm({
                     transition={{ duration: 0.2 }}
                     className="text-xs font-medium"
                   >
-                    Processing file...
+                    {t("quote_import_processing")}
                   </motion.p>
                 ) : file && error ? (
                   <motion.div
@@ -279,9 +281,9 @@ export function QuoteImportForm({
                     transition={{ duration: 0.2 }}
                   >
                     <p className="text-xs font-medium">
-                      <span className="text-primary">Click to upload</span> or drop
+                      <span className="text-primary">{t("quote_import_click_upload")}</span> {t("quote_import_or_drop")}
                     </p>
-                    <p className="text-muted-foreground text-xs">CSV only</p>
+                    <p className="text-muted-foreground text-xs">{t("quote_import_csv_only")}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -316,14 +318,14 @@ export function QuoteImportForm({
               className="h-6 w-6"
             />
             <Label htmlFor="overwrite" className="text-sm">
-              Overwrite existing quotes with the same symbol and date
+              {t("quote_import_overwrite")}
             </Label>
           </div>
         </div>
 
         {/* Validate Button */}
         <Button onClick={onValidate} disabled={!file || isValidating} className="w-full">
-          {isValidating ? "Validating..." : "Validate File"}
+          {isValidating ? t("quote_import_validating") : t("quote_import_validate")}
         </Button>
       </CardContent>
     </Card>

@@ -1,0 +1,84 @@
+{
+  "account": "Compte",
+  "accounts": "Comptes",
+  "add_account": "Ajouter un compte",
+  "edit_account": "Modifier le compte",
+  "delete_account": "Supprimer le compte",
+  "account_details": "Détails du compte",
+
+  "account_name": "Nom du compte",
+  "account_name_placeholder": "Entrez le nom du compte",
+  "account_type": "Type de compte",
+  "account_number": "Numéro de compte",
+  "account_group": "Groupe de compte",
+  "is_default": "Compte par défaut",
+  "is_active": "Actif",
+
+  "type_securities": "Titres",
+  "type_bank": "Banque",
+  "type_cryptocurrency": "Cryptomonnaie",
+  "type_other": "Autre",
+
+  "group_taxable": "Imposable",
+  "group_tax_deferred": "À impôt différé",
+  "group_tax_free": "Libre d'impôt",
+
+  "balance": "Solde",
+  "cash_balance": "Solde de trésorerie",
+  "total_value": "Valeur totale",
+  "performance": "Performance",
+
+  "save_account": "Enregistrer le compte",
+  "cancel": "Annuler",
+
+  "delete_confirm_title": "Supprimer le compte",
+  "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer ce compte ? Cette action est irréversible.",
+  "delete_with_activities": "Ce compte contient {count} activités. Toutes les activités seront supprimées.",
+
+  "account_saved": "Compte enregistré avec succès",
+  "account_deleted": "Compte supprimé avec succès",
+  "account_error": "Erreur lors de l'enregistrement du compte",
+
+  "no_accounts": "Aucun compte trouvé",
+  "no_accounts_desc": "Créez un compte pour commencer à suivre vos investissements.",
+
+  "account_required": "Le nom du compte est obligatoire",
+  "account_type_required": "Le type de compte est obligatoire",
+
+  "platform": "Plateforme",
+  "platform_placeholder": "Entrez le nom de la plateforme",
+  "institution": "Institution",
+  "institution_placeholder": "Entrez le nom de l'institution",
+
+  "account_settings": "Paramètres du compte",
+  "account_info": "Informations du compte",
+  "danger_zone": "Zone dangereuse",
+
+  "switch_account": "Changer de compte",
+  "choose_account_to_view": "Choisissez un compte à afficher",
+  "search_accounts": "Rechercher des comptes...",
+  "no_accounts_found": "Aucun compte trouvé.",
+  "holdings": "Positions",
+
+  "click_to_update_cash_balance": "Cliquez pour mettre à jour le solde de trésorerie",
+  "investments": "Investissements",
+  "net_contribution": "Contribution nette",
+  "cost_basis": "Coût de base",
+  "from": "du",
+  "to": "au",
+
+  "contributed_amount": "Vous avez contribué",
+  "so_far_in": "jusqu'à présent en",
+  "no_limit_set": "Aucune limite de contribution n'est définie pour ce compte.",
+  "total_contribution": "Votre contribution totale envers la limite de",
+  "limit_is": "est",
+  "over_limit": "ce qui dépasse la limite de",
+  "limit": "limite",
+  "to_this_account_in": "à ce compte en",
+  "your_total_is": "Votre total est",
+
+  "time_weighted_return": "Rendement pondéré dans le temps",
+  "money_weighted_return": "Rendement pondéré en argent",
+  "volatility": "Volatilité",
+  "max_drawdown": "Perte maximale"
+}

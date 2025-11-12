@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { AmountDisplay, AnimatedToggleGroup } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { AccountSelector } from "@/components/account-selector";
 import type { SwipablePageView } from "@/components/page";
@@ -38,9 +39,10 @@ import { SectorsChart } from "./components/sectors-chart";
 type SheetFilterType = "class" | "sector" | "country" | "currency" | "account" | "composition";
 
 export const HoldingsPage = () => {
+  const { t } = useTranslation("holdings");
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
+    name: t("all_portfolio"),
     accountType: "PORTFOLIO" as unknown as Account["accountType"],
     balance: 0,
     currency: "USD",
@@ -78,7 +80,7 @@ export const HoldingsPage = () => {
   ) => {
     setSheetFilterType(type);
     setSheetFilterName(name);
-    setSheetTitle(title ?? `Details for ${name}`);
+    setSheetTitle(title ?? t("details_for", { name }));
     if (type === "composition" && compositionId) {
       setSheetCompositionFilter(compositionId);
     } else {
@@ -98,7 +100,7 @@ export const HoldingsPage = () => {
       case "class":
         filteredHoldings = holdings.filter((h) => {
           const isCash = h.holdingType === HoldingType.CASH;
-          const assetSubClass = isCash ? "Cash" : (h.instrument?.assetSubclass ?? "Other");
+          const assetSubClass = isCash ? t("cash") : (h.instrument?.assetSubclass ?? t("other"));
           return assetSubClass === sheetFilterName;
         });
         break;
@@ -199,7 +201,7 @@ export const HoldingsPage = () => {
           baseCurrency={settings?.baseCurrency ?? "USD"}
           isLoading={isLoading}
           onCurrencySectionClick={(currencyName) =>
-            handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
+            handleChartSectionClick("currency", currencyName, t("holdings_in_currency", { currency: currencyName }))
           }
         />
 
@@ -209,7 +211,7 @@ export const HoldingsPage = () => {
           holdings={[...cashHoldings, ...filteredNonCashHoldings]}
           isLoading={isLoading}
           onClassSectionClick={(className) =>
-            handleChartSectionClick("class", className, `Asset Class: ${className}`)
+            handleChartSectionClick("class", className, t("asset_class_filter", { className }))
           }
         />
 
@@ -217,7 +219,7 @@ export const HoldingsPage = () => {
           holdings={filteredNonCashHoldings}
           isLoading={isLoading}
           onCountrySectionClick={(countryName) =>
-            handleChartSectionClick("country", countryName, `Holdings in ${countryName}`)
+            handleChartSectionClick("country", countryName, t("holdings_in_country", { country: countryName }))
           }
         />
       </div>
@@ -234,7 +236,7 @@ export const HoldingsPage = () => {
             holdings={filteredNonCashHoldings}
             isLoading={isLoading}
             onSectorSectionClick={(sectorName) =>
-              handleChartSectionClick("sector", sectorName, `Holdings in Sector: ${sectorName}`)
+              handleChartSectionClick("sector", sectorName, t("holdings_in_sector", { sector: sectorName }))
             }
           />
         </div>
@@ -243,8 +245,8 @@ export const HoldingsPage = () => {
   );
 
   const views: SwipablePageView[] = [
-    { value: "holdings", label: "Holdings", content: renderHoldingsView() },
-    { value: "analytics", label: "Insights", content: renderAnalyticsView() },
+    { value: "holdings", label: t("holdings"), content: renderHoldingsView() },
+    { value: "analytics", label: t("insights"), content: renderAnalyticsView() },
   ];
 
   const filterButton = (
@@ -289,7 +291,7 @@ export const HoldingsPage = () => {
     <>
       <SwipablePage
         views={views}
-        heading="Holdings"
+        heading={t("holdings")}
         defaultView="holdings"
         isMobile={isMobilePlatform}
         actions={renderActions}
@@ -327,12 +329,12 @@ export const HoldingsPage = () => {
                   let symbol = "-";
                   if (holding.holdingType === HoldingType.CASH) {
                     displayName = holding.localCurrency
-                      ? `Cash (${holding.localCurrency})`
-                      : "Cash";
+                      ? `${t("cash")} (${holding.localCurrency})`
+                      : t("cash");
                     symbol = `$CASH-${holding.localCurrency}`;
                   } else if (holding.instrument) {
                     displayName =
-                      holding.instrument.name ?? holding.instrument.symbol ?? "Unnamed Security";
+                      holding.instrument.name ?? holding.instrument.symbol ?? t("unnamed_security");
                     symbol = holding.instrument.symbol ?? "-";
                   }
 
@@ -359,12 +361,12 @@ export const HoldingsPage = () => {
                 })}
               </ul>
             ) : (
-              <p>No holdings found for this selection.</p>
+              <p>{t("no_holdings_selection")}</p>
             )}
           </div>
           <SheetFooter>
             <SheetClose asChild>
-              <Button variant="outline">Close</Button>
+              <Button variant="outline">{t("close")}</Button>
             </SheetClose>
           </SheetFooter>
         </SheetContent>
