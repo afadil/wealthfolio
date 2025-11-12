@@ -1,6 +1,7 @@
 pub mod api;
 pub mod config;
 pub mod error;
+pub mod events;
 mod main_lib;
 pub mod models;
 pub mod secrets;

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use crate::{config::Config, secrets::build_secret_store};
+use crate::{config::Config, events::EventBus, secrets::build_secret_store};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_core::{
@@ -53,6 +53,7 @@ pub struct AppState {
     pub data_root: String,
     pub instance_id: String,
     pub secret_store: Arc<dyn SecretStore>,
+    pub event_bus: EventBus,
 }
 
 pub fn init_tracing() {
@@ -204,6 +205,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     // Determine data root directory (parent of DB path)
     let data_root = data_root_path.to_string_lossy().to_string();
 
+    let event_bus = EventBus::new(256);
+
     Ok(Arc::new(AppState {
         account_service,
         settings_service,
@@ -223,5 +226,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         data_root,
         instance_id: settings.instance_id,
         secret_store,
+        event_bus,
     }))
 }

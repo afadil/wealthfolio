@@ -8,6 +8,11 @@ import {
   logger,
   listenMarketSyncCompleteTauri,
   listenMarketSyncStartTauri,
+  listenPortfolioUpdateStartWeb,
+  listenPortfolioUpdateCompleteWeb,
+  listenPortfolioUpdateErrorWeb,
+  listenMarketSyncStartWeb,
+  listenMarketSyncCompleteWeb,
 } from "@/adapters";
 
 // listenPortfolioUpdateStart
@@ -19,7 +24,7 @@ export const listenPortfolioUpdateStart = async <T>(
       case RUN_ENV.DESKTOP:
         return listenPortfolioUpdateStartTauri<T>(handler);
       case RUN_ENV.WEB:
-        throw new Error(`Unsupported`);
+        return listenPortfolioUpdateStartWeb<T>(handler);
       default:
         throw new Error(`Unsupported`);
     }
@@ -38,7 +43,7 @@ export const listenPortfolioUpdateComplete = async <T>(
       case RUN_ENV.DESKTOP:
         return listenPortfolioUpdateCompleteTauri<T>(handler);
       case RUN_ENV.WEB:
-        throw new Error(`Unsupported`);
+        return listenPortfolioUpdateCompleteWeb<T>(handler);
       default:
         throw new Error(`Unsupported`);
     }
@@ -57,7 +62,7 @@ export const listenPortfolioUpdateError = async <T>(
       case RUN_ENV.DESKTOP:
         return listenPortfolioUpdateErrorTauri<T>(handler);
       case RUN_ENV.WEB:
-        throw new Error(`Unsupported`);
+        return listenPortfolioUpdateErrorWeb<T>(handler);
       default:
         throw new Error(`Unsupported`);
     }
@@ -74,7 +79,7 @@ export const listenMarketSyncStart = async <T>(handler: EventCallback<T>): Promi
       case RUN_ENV.DESKTOP:
         return listenMarketSyncStartTauri<T>(handler);
       case RUN_ENV.WEB:
-        throw new Error(`Unsupported`);
+        return listenMarketSyncStartWeb<T>(handler);
       default:
         throw new Error(`Unsupported`);
     }
@@ -93,7 +98,7 @@ export const listenMarketSyncComplete = async <T>(
       case RUN_ENV.DESKTOP:
         return listenMarketSyncCompleteTauri<T>(handler);
       case RUN_ENV.WEB:
-        throw new Error(`Unsupported`);
+        return listenMarketSyncCompleteWeb<T>(handler);
       default:
         throw new Error(`Unsupported`);
     }

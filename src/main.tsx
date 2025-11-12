@@ -4,15 +4,15 @@ import ReactDOM from "react-dom/client";
 import { debugAddonState, loadAllAddons } from "./addons/addons-loader";
 import "./addons/addons-runtime-context";
 import App from "./App";
-import { installLockdown } from "./lockdown";
+// import { installLockdown } from "./lockdown";
 import "./styles.css";
 
 // Initialize development mode only in development
-if (import.meta.env.DEV) {
-  import("./addons/addons-dev-mode");
-} else {
-  installLockdown();
-}
+// if (import.meta.env.DEV) {
+//   import("./addons/addons-dev-mode");
+// } else {
+//   installLockdown();
+// }
 
 // Expose React and ReactDOM globally for addons
 // ReactDOM/client only has createRoot/hydrateRoot, but addons need createPortal from react-dom

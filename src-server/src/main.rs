@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod error;
+mod events;
 mod main_lib;
 mod models;
 mod secrets;
