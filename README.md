@@ -208,7 +208,7 @@ Run the web UI with a local Axum server with one command.
 
 All configuration is done via environment variables in `.env.web`.
 
-**Server Configuration (WF_\* variables)**:
+**Server Configuration (WF\_\* variables)**:
 
 - `WF_LISTEN_ADDR` - Server bind address (default: `0.0.0.0:8080`)
 - `WF_DB_PATH` - SQLite database path or directory (default: `./db/app.db`)
@@ -262,13 +262,19 @@ environment variables.
 
 ### Building the Image
 
-Build the Docker image with both frontend and backend:
+Build the Docker image directly from source (no pre-build required):
 
 ```bash
 docker build -t wealthfolio-web .
 ```
 
-The image includes:
+The build process:
+
+1. Builds frontend assets from source (`pnpm install` + `pnpm vite build`)
+2. Compiles Rust backend from source (`cargo build --release`)
+3. Creates minimal Alpine-based image with only the runtime artifacts
+
+The final image includes:
 
 - Compiled frontend assets in `/app/dist`
 - `wealthfolio-server` binary at `/usr/local/bin/wealthfolio-server`
@@ -352,8 +358,8 @@ docker run --rm -d \
 
 ### Environment Variables
 
-The container supports all `WF_*` environment variables documented in the [Web
-Mode Configuration](#configuration) section. Key variables:
+The container supports all `WF_*` environment variables documented in the
+[Web Mode Configuration](#configuration) section. Key variables:
 
 - `WF_LISTEN_ADDR` - Bind address (use `0.0.0.0:8080` for Docker)
 - `WF_DB_PATH` - Database path (typically `/data/wealthfolio.db`)
