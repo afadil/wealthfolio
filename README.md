@@ -180,59 +180,155 @@ pnpm tauri build
 
 ### Web Mode (Browser + REST API server)
 
-Run the web UI with a local Axum server, with one command.
+Run the web UI with a local Axum server with one command.
 
-1. Optional: create `.env.web` for web dev overrides (copy from
-   `.env.web.example`):
+#### Quick Start
 
-```
-WF_LISTEN_ADDR=127.0.0.1:8080
-WF_DB_PATH=./db/web-dev.db
-WF_CORS_ALLOW_ORIGINS=http://localhost:1420
-WF_REQUEST_TIMEOUT_MS=30000
-WF_STATIC_DIR=dist
-VITE_API_TARGET=http://127.0.0.1:8080
-```
+1. **Setup environment** (optional but recommended):
 
-2. Start both backend and Vite:
+   Copy the example environment file and customize it for your setup:
 
-```
-pnpm run dev:web
-```
+   ```bash
+   cp .env.web.example .env.web
+   ```
 
-Vite runs at `http://localhost:1420` and proxies API calls to the backend.
+   Edit `.env.web` to configure database path, ports, and other settings as
+   needed.
 
-Notes
+2. **Start both backend and Vite dev server**:
 
-- The server logs the effective database path on startup.
-- Stop either process (Ctrl+C) to shut everything down.
+   ```bash
+   pnpm run dev:web
+   ```
+
+   The Vite dev server runs at `http://localhost:1420` and proxies API calls to
+   the Axum backend server.
+
+#### Configuration
+
+All configuration is done via environment variables in `.env.web`.
+
+**Server Configuration (WF_\* variables)**:
+
+- `WF_LISTEN_ADDR` - Server bind address (default: `0.0.0.0:8080`)
+- `WF_DB_PATH` - SQLite database path or directory (default: `./db/app.db`)
+  - If a directory is provided, `app.db` will be used inside it
+- `WF_CORS_ALLOW_ORIGINS` - Comma-separated list of allowed CORS origins
+  (default: `*`)
+  - Example: `http://localhost:1420,http://localhost:3000`
+- `WF_REQUEST_TIMEOUT_MS` - Request timeout in milliseconds (default: `30000`)
+- `WF_STATIC_DIR` - Directory for serving static frontend assets (default:
+  `dist`)
+- `WF_SECRET_KEY` - **Optional** 32-byte encryption key for secrets at rest
+  - Generate with: `openssl rand -base64 32`
+  - When unset, secrets are stored unencrypted
+- `WF_SECRET_FILE` - **Optional** path to secrets storage file (default:
+  `<data-root>/secrets.json`)
+- `WF_ADDONS_DIR` - **Optional** path to addons directory (default: derived from
+  database path)
+
+**Vite Configuration**:
+
+- `VITE_API_TARGET` - Backend API URL for Vite proxy (default:
+  `http://127.0.0.1:8080`)
+
+#### Notes
+
+- The server logs the effective database path on startup
+- Environment variables from `.env.web` are loaded automatically by the
+  `dev:web` script
+- Stop with Ctrl+C to shut down both processes gracefully
 
 ### Server Only
 
-Run just the HTTP server (from repo root):
+Run just the HTTP server without the Vite dev server (from repo root):
 
-```
+```bash
 cargo run --manifest-path src-server/Cargo.toml
 ```
 
-Common env vars:
+The server accepts the same `WF_*` environment variables as documented in the
+[Web Mode Configuration](#configuration) section above. You can set them inline
+or via `.env.web`:
 
-- `WF_LISTEN_ADDR` (e.g., `0.0.0.0:8080`)
-- `WF_DB_PATH` (e.g., `./db/app.db`)
-- `WF_CORS_ALLOW_ORIGINS` (e.g., `http://localhost:1420`)
-- `WF_STATIC_DIR` (defaults to `dist`)
+```bash
+WF_LISTEN_ADDR=127.0.0.1:8080 WF_DB_PATH=./db/app.db cargo run --manifest-path src-server/Cargo.toml
+```
+
+See [Web Mode Configuration](#configuration) for a complete list of supported
+environment variables.
 
 ## Docker
 
-Build image
+### Building the Image
 
-```
+Build the Docker image with both frontend and backend:
+
+```bash
 docker build -t wealthfolio-web .
 ```
 
-Run container (with data volume and CORS for Vite)
+The image includes:
 
+- Compiled frontend assets in `/app/dist`
+- `wealthfolio-server` binary at `/usr/local/bin/wealthfolio-server`
+- Alpine Linux base (small footprint)
+
+### Configuration
+
+You can configure the container using either:
+
+1. **Environment variables** (inline with `-e` flag)
+2. **Environment file** (using `--env-file` flag)
+
+**Option 1: Create an environment file** (recommended for production):
+
+```bash
+# Create a Docker-specific environment file
+cat > .env.docker << 'EOF'
+WF_LISTEN_ADDR=0.0.0.0:8080
+WF_DB_PATH=/data/wealthfolio.db
+WF_SECRET_KEY=<generate-with-openssl-rand>
+WF_CORS_ALLOW_ORIGINS=*
+EOF
 ```
+
+Generate and add your secret key:
+
+```bash
+echo "WF_SECRET_KEY=$(openssl rand -base64 32)" >> .env.docker
+```
+
+**Option 2: Use inline environment variables** (simpler for testing):
+
+See examples below for inline configuration.
+
+### Running the Container
+
+**Using environment file** (recommended):
+
+```bash
+docker run --rm -d \
+  --env-file .env.docker \
+  -p 8080:8080 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  wealthfolio-web
+```
+
+**Basic usage** (inline environment variables):
+
+```bash
+docker run --rm -d \
+  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  -e WF_DB_PATH=/data/wealthfolio.db \
+  -p 8080:8080 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  wealthfolio-web
+```
+
+**Development mode** (with CORS for local Vite dev server):
+
+```bash
 docker run --rm -it \
   -e WF_LISTEN_ADDR=0.0.0.0:8080 \
   -e WF_DB_PATH=/data/wealthfolio.db \
@@ -242,8 +338,39 @@ docker run --rm -it \
   wealthfolio-web
 ```
 
-The image contains the compiled frontend in `/app/dist` and the
-`wealthfolio-server` binary.
+**Production with encryption** (recommended):
+
+```bash
+docker run --rm -d \
+  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  -e WF_DB_PATH=/data/wealthfolio.db \
+  -e WF_SECRET_KEY=$(openssl rand -base64 32) \
+  -p 8080:8080 \
+  -v "$(pwd)/wealthfolio-data:/data" \
+  wealthfolio-web
+```
+
+### Environment Variables
+
+The container supports all `WF_*` environment variables documented in the [Web
+Mode Configuration](#configuration) section. Key variables:
+
+- `WF_LISTEN_ADDR` - Bind address (use `0.0.0.0:8080` for Docker)
+- `WF_DB_PATH` - Database path (typically `/data/wealthfolio.db`)
+- `WF_CORS_ALLOW_ORIGINS` - CORS origins (set for dev/frontend access)
+- `WF_SECRET_KEY` - Encryption key for secrets (recommended)
+
+### Volumes
+
+- `/data` - Persistent storage for database and secrets
+  - Database: `/data/wealthfolio.db`
+  - Secrets: `/data/secrets.json` (encrypted if `WF_SECRET_KEY` is set)
+
+### Ports
+
+- `8080` - HTTP server (serves both API and static frontend)
+
+Access the application at `http://localhost:8080` after starting the container.
 
 ### Development with DevContainer
 

@@ -815,9 +815,9 @@ async fn load_goals_allocations(
 async fn update_goal_allocations(
     State(state): State<Arc<AppState>>,
     Json(allocs): Json<Vec<GoalsAllocation>>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let _ = state.goal_service.upsert_goal_allocations(allocs).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // Exchange rates endpoints

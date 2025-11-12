@@ -29,6 +29,7 @@ src-core/tests/output/
 .env
 .env.*
 !.env.example
+!.env.web.example
 
 # Editor directories and files
 .vscode/*
@@ -72,3 +73,10 @@ Cargo.lock
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
