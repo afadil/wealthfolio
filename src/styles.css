@@ -418,22 +418,22 @@
   --mobile-nav-ui-height: 64px; /* nav bar height */
   --mobile-nav-gap: 12px; /* space between nav and bottom */
 
-  /* Sonner toast overrides - matching Alert component style */
+  /* Sonner toast overrides - solid backgrounds for better readability */
   --toast-bg: hsl(var(--flexoki-bg-2));
   --toast-fg: hsl(var(--flexoki-tx));
-  --toast-border: hsl(var(--flexoki-ui));
-  --toast-success-bg: color-mix(in srgb, var(--color-green-100) 30%, transparent);
-  --toast-success-fg: var(--color-green-500);
-  --toast-success-border: color-mix(in srgb, var(--color-green-100) 40%, transparent);
-  --toast-error-bg: color-mix(in srgb, var(--color-red-100) 30%, transparent);
-  --toast-error-fg: var(--color-red-500);
-  --toast-error-border: color-mix(in srgb, var(--color-red-100) 40%, transparent);
-  --toast-warning-bg: color-mix(in srgb, var(--color-orange-100) 30%, transparent);
-  --toast-warning-fg: var(--color-orange-500);
-  --toast-warning-border: color-mix(in srgb, var(--color-orange-100) 40%, transparent);
-  --toast-info-bg: color-mix(in srgb, var(--color-blue-100) 30%, transparent);
-  --toast-info-fg: var(--color-blue-500);
-  --toast-info-border: color-mix(in srgb, var(--color-blue-100) 40%, transparent);
+  --toast-border: hsl(var(--flexoki-ui-2));
+  --toast-success-bg: var(--color-green-50);
+  --toast-success-fg: var(--color-green-700);
+  --toast-success-border: var(--color-green-200);
+  --toast-error-bg: var(--color-red-50);
+  --toast-error-fg: var(--color-red-700);
+  --toast-error-border: var(--color-red-200);
+  --toast-warning-bg: var(--color-orange-50);
+  --toast-warning-fg: var(--color-orange-700);
+  --toast-warning-border: var(--color-orange-200);
+  --toast-info-bg: var(--color-blue-50);
+  --toast-info-fg: var(--color-blue-700);
+  --toast-info-border: var(--color-blue-200);
 }
 
 .dark {
@@ -461,22 +461,22 @@
   --chart-8: hsl(22 75% 20%);
   --chart-9: hsl(22 70% 15%);
 
-  /* Sonner toast overrides for dark mode - matching Alert component style */
+  /* Sonner toast overrides for dark mode - solid backgrounds for better readability */
   --toast-bg: hsl(var(--flexoki-bg-2));
   --toast-fg: hsl(var(--flexoki-tx));
-  --toast-border: hsl(var(--flexoki-ui));
-  --toast-success-bg: color-mix(in srgb, var(--color-green-100) 20%, transparent);
+  --toast-border: hsl(var(--flexoki-ui-2));
+  --toast-success-bg: var(--color-green-950);
   --toast-success-fg: var(--color-green-200);
-  --toast-success-border: color-mix(in srgb, var(--color-green-100) 20%, transparent);
-  --toast-error-bg: color-mix(in srgb, var(--color-red-100) 20%, transparent);
-  --toast-error-fg: var(--color-red-300);
-  --toast-error-border: color-mix(in srgb, var(--color-red-100) 20%, transparent);
-  --toast-warning-bg: color-mix(in srgb, var(--color-orange-100) 20%, transparent);
+  --toast-success-border: var(--color-green-800);
+  --toast-error-bg: var(--color-red-950);
+  --toast-error-fg: var(--color-red-200);
+  --toast-error-border: var(--color-red-800);
+  --toast-warning-bg: var(--color-orange-950);
   --toast-warning-fg: var(--color-orange-200);
-  --toast-warning-border: color-mix(in srgb, var(--color-orange-100) 20%, transparent);
-  --toast-info-bg: color-mix(in srgb, var(--color-blue-100) 20%, transparent);
+  --toast-warning-border: var(--color-orange-800);
+  --toast-info-bg: var(--color-blue-950);
   --toast-info-fg: var(--color-blue-200);
-  --toast-info-border: color-mix(in srgb, var(--color-blue-100) 20%, transparent);
+  --toast-info-border: var(--color-blue-800);
 }
 
 @layer base {
