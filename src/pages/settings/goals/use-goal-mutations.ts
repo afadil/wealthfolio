@@ -58,6 +58,7 @@ export const useGoalMutations = () => {
       ]),
     onError: (e) => {
       logger.error(`Error saving allocations: ${e}`);
+      console.error("Error saving allocations:", e);
       handleError("saving the allocations");
     },
   });

@@ -19,6 +19,7 @@ use crate::assets::assets_constants::CASH_ASSET_TYPE;
 use crate::assets::assets_traits::AssetRepositoryTrait;
 use crate::errors::Result;
 use crate::market_data::providers::ProviderRegistry;
+use crate::secrets::SecretStore;
 use crate::utils::time_utils;
 
 const QUOTE_LOOKBACK_DAYS: i64 = 7;
@@ -34,6 +35,7 @@ pub struct MarketDataService {
     provider_registry: Arc<RwLock<ProviderRegistry>>,
     repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
     asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+    secret_store: Arc<dyn SecretStore>,
 }
 
 #[async_trait]
@@ -429,11 +431,12 @@ impl MarketDataService {
     pub async fn new(
         repository: Arc<dyn MarketDataRepositoryTrait + Send + Sync>,
         asset_repository: Arc<dyn AssetRepositoryTrait + Send + Sync>,
+        secret_store: Arc<dyn SecretStore>,
     ) -> Result<Self> {
         let provider_settings = repository.get_all_providers()?;
         // Be resilient on platforms where certain providers cannot initialize (e.g., mobile TLS differences).
         // Fall back to an empty registry (Manual provider only) instead of aborting app initialization.
-        let registry = match ProviderRegistry::new(provider_settings).await {
+        let registry = match ProviderRegistry::new(provider_settings, secret_store.clone()).await {
             Ok(reg) => reg,
             Err(e) => {
                 log::warn!(
@@ -441,7 +444,7 @@ impl MarketDataService {
                     e
                 );
                 // Safe fallback: no external providers enabled
-                ProviderRegistry::new(Vec::new()).await?
+                ProviderRegistry::new(Vec::new(), secret_store.clone()).await?
             }
         };
         let provider_registry = Arc::new(RwLock::new(registry));
@@ -450,6 +453,7 @@ impl MarketDataService {
             provider_registry,
             repository,
             asset_repository,
+            secret_store,
         })
     }
 
@@ -457,7 +461,8 @@ impl MarketDataService {
     async fn refresh_provider_registry(&self) -> Result<()> {
         debug!("Refreshing provider registry with latest settings");
         let provider_settings = self.repository.get_all_providers()?;
-        let new_registry = ProviderRegistry::new(provider_settings).await?;
+        let new_registry =
+            ProviderRegistry::new(provider_settings, self.secret_store.clone()).await?;
 
         // Replace the registry with the new one
         *self.provider_registry.write().await = new_registry;

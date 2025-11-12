@@ -29,6 +29,7 @@ src-core/tests/output/
 .env
 .env.*
 !.env.example
+!.env.web.example
 
 # Editor directories and files
 .vscode/*
@@ -58,10 +59,11 @@ tsconfig.node.tsbuildinfo
 # Database
 db/*
 
-# Rust/Cargo (since you have Rust files)
+# Rust/Cargo
 target/
 **/*.rs.bk
-Cargo.lock
+# Ignore Cargo.lock for library crates only (keep for binaries like src-server and src-tauri)
+src-core/**/Cargo.lock
 
 
 # OS generated files
@@ -72,3 +74,10 @@ Cargo.lock
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

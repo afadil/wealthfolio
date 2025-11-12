@@ -1,43 +1,21 @@
-use crate::errors::{Error, Result};
-use keyring::Entry;
+use crate::errors::Result;
 
-const USERNAME: &str = "default";
-const SERVICE_PREFIX: &str = "wealthfolio_";
+/// Prefix applied to all secret identifiers to avoid collisions with other
+/// applications that may share the same underlying credential store.
+pub const SERVICE_PREFIX: &str = "wealthfolio_";
 
-/// Provides simple secret storage using the operating system keyring.
-pub struct SecretManager;
+/// Format a service identifier into the canonical form expected by the
+/// platform-specific secret stores.
+pub fn format_service_id(service: &str) -> String {
+    format!("{}{}", SERVICE_PREFIX, service.to_lowercase())
+}
 
-impl SecretManager {
-    fn format_service_id(service: &str) -> String {
-        format!("{}{}", SERVICE_PREFIX, service.to_lowercase())
-    }
-
-    /// Store a secret for the given service.
-    pub fn set_secret(service: &str, secret: &str) -> Result<()> {
-        let service_id = Self::format_service_id(service);
-        let entry = Entry::new(&service_id, USERNAME).map_err(Error::from)?;
-        entry.set_password(secret).map_err(Error::from)
-    }
-
-    /// Retrieve a secret for the given service.
-    pub fn get_secret(service: &str) -> Result<Option<String>> {
-        let service_id = Self::format_service_id(service);
-        let entry = Entry::new(&service_id, USERNAME).map_err(Error::from)?;
-        match entry.get_password() {
-            Ok(value) => Ok(Some(value)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(Error::from(e)),
-        }
-    }
-
-    /// Delete a secret for the given service.
-    pub fn delete_secret(service: &str) -> Result<()> {
-        let service_id = Self::format_service_id(service);
-        let entry = Entry::new(&service_id, USERNAME).map_err(Error::from)?;
-        match entry.delete_password() {
-            Ok(_) => Ok(()),
-            Err(keyring::Error::NoEntry) => Ok(()), // If no entry, it's already "deleted"
-            Err(e) => Err(Error::from(e)),
-        }
-    }
+/// Platform-agnostic contract for storing provider secrets. Concrete
+/// implementations live in the platform crates (e.g. the Tauri desktop app or
+/// the self-hosted web server) so the core crate remains focused on business
+/// logic.
+pub trait SecretStore: Send + Sync {
+    fn set_secret(&self, service: &str, secret: &str) -> Result<()>;
+    fn get_secret(&self, service: &str) -> Result<Option<String>>;
+    fn delete_secret(&self, service: &str) -> Result<()>;
 }

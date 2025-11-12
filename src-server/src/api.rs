@@ -1,20 +1,31 @@
-use std::{path::Path as StdPath, sync::Arc};
+use std::{
+    collections::HashSet, convert::Infallible, path::Path as StdPath, sync::Arc, time::Duration,
+};
 
 use crate::{
     config::Config,
     error::{ApiError, ApiResult},
+    events::{
+        ServerEvent, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START,
+        PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START,
+    },
     main_lib::AppState,
     models::{Account, AccountUpdate, NewAccount},
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use axum::http::StatusCode;
 use axum::{
     extract::{Path, Query, RawQuery, State},
+    response::sse::{Event as SseEvent, KeepAlive, Sse},
     routing::{delete, get, post, put},
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use futures_core::stream::Stream;
+use serde::Deserialize;
+use serde_json::json;
 use tokio::{fs, task};
+use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 use tower_http::{
     cors::{Any, CorsLayer},
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
@@ -23,13 +34,17 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use wealthfolio_core::{
-    addons::{self, AddonManifest, AddonUpdateCheckResult, AddonUpdateInfo, ExtractedAddon, InstalledAddon},
     accounts::AccountServiceTrait,
     activities::{
-        ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
+        Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
         ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
     },
+    addons::{
+        self, AddonManifest, AddonUpdateCheckResult, AddonUpdateInfo, ExtractedAddon,
+        InstalledAddon,
+    },
     assets::{Asset as CoreAsset, UpdateAssetProfile},
+    constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
     db,
     fx::fx_model::{ExchangeRate, NewExchangeRate},
     goals::goals_model::{Goal, GoalsAllocation, NewGoal},
@@ -41,7 +56,6 @@ use wealthfolio_core::{
         performance::{PerformanceMetrics, SimplePerformanceMetrics},
         valuation::valuation_model::DailyAccountValuation,
     },
-    secrets::SecretManager,
     settings::{Settings, SettingsServiceTrait, SettingsUpdate},
 };
 
@@ -373,77 +387,295 @@ async fn get_latest_valuations(
     Ok(Json(vals))
 }
 
-// Portfolio update endpoints for web
-async fn update_portfolio(State(state): State<Arc<AppState>>) -> ApiResult<StatusCode> {
-    // Incremental update: calculate holdings snapshots and append valuations for active accounts and TOTAL
-    let active = state.account_service.get_active_accounts()?;
-    let ids: Vec<String> = active.into_iter().map(|a| a.id).collect();
-    if let Err(e) = state
-        .snapshot_service
-        .calculate_holdings_snapshots(Some(&ids))
-        .await
-    {
-        tracing::warn!("calculate_holdings_snapshots failed: {}", e);
-    }
-    // Also refresh TOTAL
-    if let Err(e) = state
-        .snapshot_service
-        .calculate_total_portfolio_snapshots()
-        .await
-    {
-        tracing::warn!("calculate_total_portfolio_snapshots failed: {}", e);
-    }
-    // Update valuations (incremental)
-    for id in ids.iter().chain(std::iter::once(&"TOTAL".to_string())) {
-        if let Err(e) = state
-            .valuation_service
-            .calculate_valuation_history(id, false)
-            .await
-        {
-            tracing::warn!(
-                "calculate_valuation_history (incremental) failed for {}: {}",
-                id,
-                e
-            );
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PortfolioRequestBody {
+    account_ids: Option<Vec<String>>,
+    symbols: Option<Vec<String>>,
+    #[serde(default)]
+    refetch_all_market_data: bool,
+}
+
+impl PortfolioRequestBody {
+    fn into_config(self, force_full_recalculation: bool) -> PortfolioJobConfig {
+        PortfolioJobConfig {
+            account_ids: self.account_ids,
+            symbols: self.symbols,
+            refetch_all_market_data: force_full_recalculation || self.refetch_all_market_data,
+            force_full_recalculation,
         }
     }
+}
+
+struct PortfolioJobConfig {
+    account_ids: Option<Vec<String>>,
+    symbols: Option<Vec<String>>,
+    refetch_all_market_data: bool,
+    force_full_recalculation: bool,
+}
+
+#[derive(Clone)]
+struct ActivityImpact {
+    account_id: String,
+    currency: Option<String>,
+    asset_id: Option<String>,
+}
+
+impl ActivityImpact {
+    fn from_activity(activity: &Activity) -> Self {
+        Self {
+            account_id: activity.account_id.clone(),
+            currency: Some(activity.currency.clone()),
+            asset_id: Some(activity.asset_id.clone()),
+        }
+    }
+
+    fn from_parts(account_id: String, currency: Option<String>, asset_id: Option<String>) -> Self {
+        Self {
+            account_id,
+            currency,
+            asset_id,
+        }
+    }
+}
+
+// Portfolio update endpoints for web
+async fn update_portfolio(
+    State(state): State<Arc<AppState>>,
+    body: Option<Json<PortfolioRequestBody>>,
+) -> ApiResult<StatusCode> {
+    let cfg = body
+        .map(|Json(inner)| inner)
+        .unwrap_or_default()
+        .into_config(false);
+    process_portfolio_job(state, cfg).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn recalculate_portfolio(State(state): State<Arc<AppState>>) -> ApiResult<StatusCode> {
-    // Full recalculation of holdings snapshots for all accounts and TOTAL, then full valuation recompute
-    if let Err(e) = state
-        .snapshot_service
-        .force_recalculate_holdings_snapshots(None)
-        .await
-    {
-        tracing::warn!("force_recalculate_holdings_snapshots failed: {}", e);
+async fn recalculate_portfolio(
+    State(state): State<Arc<AppState>>,
+    body: Option<Json<PortfolioRequestBody>>,
+) -> ApiResult<StatusCode> {
+    let cfg = body
+        .map(|Json(inner)| inner)
+        .unwrap_or_default()
+        .into_config(true);
+    process_portfolio_job(state, cfg).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn process_portfolio_job(state: Arc<AppState>, config: PortfolioJobConfig) -> ApiResult<()> {
+    let event_bus = state.event_bus.clone();
+    event_bus.publish(ServerEvent::new(MARKET_SYNC_START));
+
+    let sync_start = std::time::Instant::now();
+    let sync_result = if config.refetch_all_market_data {
+        state
+            .market_data_service
+            .resync_market_data(config.symbols.clone())
+            .await
+    } else {
+        state.market_data_service.sync_market_data().await
+    };
+
+    match sync_result {
+        Ok((_, failed_syncs)) => {
+            event_bus.publish(ServerEvent::with_payload(
+                MARKET_SYNC_COMPLETE,
+                json!({ "failed_syncs": failed_syncs }),
+            ));
+            tracing::info!("Market data sync completed in {:?}", sync_start.elapsed());
+            if let Err(err) = state.fx_service.initialize() {
+                tracing::warn!(
+                    "Failed to initialize FxService after market data sync: {}",
+                    err
+                );
+            }
+        }
+        Err(err) => {
+            let err_msg = err.to_string();
+            tracing::error!("Market data sync failed: {}", err_msg);
+            event_bus.publish(ServerEvent::with_payload(MARKET_SYNC_ERROR, json!(err_msg)));
+            return Err(ApiError::Anyhow(anyhow!(err_msg)));
+        }
     }
-    if let Err(e) = state
+
+    event_bus.publish(ServerEvent::new(PORTFOLIO_UPDATE_START));
+
+    let active_accounts = state
+        .account_service
+        .list_accounts(Some(true), config.account_ids.as_deref())
+        .map_err(|err| {
+            let err_msg = format!("Failed to list active accounts: {}", err);
+            event_bus.publish(ServerEvent::with_payload(
+                PORTFOLIO_UPDATE_ERROR,
+                json!(err_msg),
+            ));
+            ApiError::Anyhow(anyhow!(err_msg))
+        })?;
+
+    let mut account_ids: Vec<String> = active_accounts.into_iter().map(|a| a.id).collect();
+
+    if !account_ids.is_empty() {
+        let ids_slice = account_ids.as_slice();
+        let snapshot_result = if config.force_full_recalculation {
+            state
+                .snapshot_service
+                .force_recalculate_holdings_snapshots(Some(ids_slice))
+                .await
+        } else {
+            state
+                .snapshot_service
+                .calculate_holdings_snapshots(Some(ids_slice))
+                .await
+        };
+
+        if let Err(err) = snapshot_result {
+            let err_msg = format!(
+                "Holdings snapshot calculation failed for targeted accounts: {}",
+                err
+            );
+            tracing::warn!("{}", err_msg);
+            event_bus.publish(ServerEvent::with_payload(
+                PORTFOLIO_UPDATE_ERROR,
+                json!(err_msg),
+            ));
+        }
+    }
+
+    if let Err(err) = state
         .snapshot_service
         .calculate_total_portfolio_snapshots()
         .await
     {
-        tracing::warn!("calculate_total_portfolio_snapshots failed: {}", e);
+        let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
+        tracing::error!("{}", err_msg);
+        event_bus.publish(ServerEvent::with_payload(
+            PORTFOLIO_UPDATE_ERROR,
+            json!(err_msg),
+        ));
+        return Err(ApiError::Anyhow(anyhow!(err_msg)));
     }
-    // Recompute valuations for all accounts (including TOTAL)
-    let active = state.account_service.get_active_accounts()?;
-    let mut ids: Vec<String> = active.into_iter().map(|a| a.id).collect();
-    ids.push("TOTAL".to_string());
-    for id in ids {
-        if let Err(e) = state
+
+    if !account_ids
+        .iter()
+        .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID)
+    {
+        account_ids.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
+    }
+
+    for account_id in account_ids {
+        if let Err(err) = state
             .valuation_service
-            .calculate_valuation_history(&id, true)
+            .calculate_valuation_history(&account_id, config.force_full_recalculation)
             .await
         {
-            tracing::warn!(
-                "calculate_valuation_history (full) failed for {}: {}",
-                id,
-                e
+            let err_msg = format!(
+                "Valuation history calculation failed for {}: {}",
+                account_id, err
             );
+            tracing::warn!("{}", err_msg);
+            event_bus.publish(ServerEvent::with_payload(
+                PORTFOLIO_UPDATE_ERROR,
+                json!(err_msg),
+            ));
         }
     }
-    Ok(StatusCode::NO_CONTENT)
+
+    event_bus.publish(ServerEvent::new(PORTFOLIO_UPDATE_COMPLETE));
+    Ok(())
+}
+
+fn trigger_activity_portfolio_job(state: Arc<AppState>, impacts: Vec<ActivityImpact>) {
+    if impacts.is_empty() {
+        return;
+    }
+
+    let mut account_ids: HashSet<String> = HashSet::new();
+    let mut symbols: HashSet<String> = HashSet::new();
+
+    for impact in impacts {
+        if impact.account_id.is_empty() {
+            continue;
+        }
+        account_ids.insert(impact.account_id.clone());
+
+        if let Some(asset_id) = impact.asset_id.as_deref() {
+            if !asset_id.is_empty() {
+                symbols.insert(asset_id.to_string());
+            }
+        }
+
+        if let Some(currency) = impact.currency.as_deref() {
+            match state.account_service.get_account(&impact.account_id) {
+                Ok(account) => {
+                    if currency != account.currency {
+                        symbols.insert(format!("{}{}=X", account.currency, currency));
+                    }
+                }
+                Err(err) => tracing::warn!(
+                    "Unable to resolve account {} for activity-triggered recalculation: {}",
+                    impact.account_id,
+                    err
+                ),
+            }
+        }
+    }
+
+    let config = PortfolioJobConfig {
+        account_ids: if account_ids.is_empty() {
+            None
+        } else {
+            Some(account_ids.into_iter().collect())
+        },
+        symbols: if symbols.is_empty() {
+            None
+        } else {
+            Some(symbols.into_iter().collect())
+        },
+        refetch_all_market_data: true,
+        force_full_recalculation: true,
+    };
+
+    tokio::spawn(async move {
+        if let Err(err) = process_portfolio_job(state, config).await {
+            tracing::error!("Activity-triggered portfolio update failed: {}", err);
+        }
+    });
+}
+
+async fn stream_events(
+    State(state): State<Arc<AppState>>,
+) -> Sse<impl Stream<Item = Result<SseEvent, Infallible>>> {
+    let receiver = BroadcastStream::new(state.event_bus.subscribe());
+    let stream = tokio_stream::StreamExt::filter_map(receiver, |event| match event {
+        Ok(evt) => {
+            let sse_event = SseEvent::default().event(evt.name);
+            let sse_event = if let Some(payload) = evt.payload {
+                match sse_event.json_data(payload) {
+                    Ok(ev) => ev,
+                    Err(err) => {
+                        tracing::error!(
+                            "Failed to serialize SSE payload for {}: {}",
+                            evt.name,
+                            err
+                        );
+                        return None;
+                    }
+                }
+            } else {
+                sse_event.data("null")
+            };
+            Some(Ok(sse_event))
+        }
+        Err(BroadcastStreamRecvError::Lagged(_)) => None,
+    });
+
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("keep-alive"),
+    )
 }
 
 // Performance endpoints
@@ -583,9 +815,9 @@ async fn load_goals_allocations(
 async fn update_goal_allocations(
     State(state): State<Arc<AppState>>,
     Json(allocs): Json<Vec<GoalsAllocation>>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let _ = state.goal_service.upsert_goal_allocations(allocs).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // Exchange rates endpoints
@@ -689,6 +921,7 @@ async fn create_activity(
     Json(activity): Json<NewActivity>,
 ) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
     let created = state.activity_service.create_activity(activity).await?;
+    trigger_activity_portfolio_job(state, vec![ActivityImpact::from_activity(&created)]);
     Ok(Json(created))
 }
 
@@ -696,7 +929,15 @@ async fn update_activity(
     State(state): State<Arc<AppState>>,
     Json(activity): Json<ActivityUpdate>,
 ) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
+    let previous = state.activity_service.get_activity(&activity.id)?;
     let updated = state.activity_service.update_activity(activity).await?;
+    trigger_activity_portfolio_job(
+        state,
+        vec![
+            ActivityImpact::from_activity(&updated),
+            ActivityImpact::from_activity(&previous),
+        ],
+    );
     Ok(Json(updated))
 }
 
@@ -708,6 +949,11 @@ async fn save_activities(
         .activity_service
         .bulk_mutate_activities(request)
         .await?;
+    let mut impacts: Vec<ActivityImpact> = Vec::new();
+    impacts.extend(result.created.iter().map(ActivityImpact::from_activity));
+    impacts.extend(result.updated.iter().map(ActivityImpact::from_activity));
+    impacts.extend(result.deleted.iter().map(ActivityImpact::from_activity));
+    trigger_activity_portfolio_job(state, impacts);
     Ok(Json(result))
 }
 
@@ -716,6 +962,7 @@ async fn delete_activity(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<wealthfolio_core::activities::Activity>> {
     let deleted = state.activity_service.delete_activity(id).await?;
+    trigger_activity_portfolio_job(state, vec![ActivityImpact::from_activity(&deleted)]);
     Ok(Json(deleted))
 }
 
@@ -753,6 +1000,18 @@ async fn import_activities(
         .activity_service
         .import_activities(body.account_id, body.activities)
         .await?;
+    trigger_activity_portfolio_job(
+        state,
+        res.iter()
+            .map(|item| {
+                ActivityImpact::from_parts(
+                    item.account_id.clone().unwrap_or_default(),
+                    Some(item.currency.clone()),
+                    Some(item.symbol.clone()),
+                )
+            })
+            .collect(),
+    );
     Ok(Json(res))
 }
 
@@ -1007,8 +1266,13 @@ struct SecretSetBody {
     secret: String,
 }
 
-async fn set_secret(Json(body): Json<SecretSetBody>) -> ApiResult<()> {
-    SecretManager::set_secret(&body.provider_id, &body.secret)?;
+async fn set_secret(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SecretSetBody>,
+) -> ApiResult<()> {
+    state
+        .secret_store
+        .set_secret(&body.provider_id, &body.secret)?;
     Ok(())
 }
 
@@ -1018,13 +1282,19 @@ struct SecretQuery {
     provider_id: String,
 }
 
-async fn get_secret(Query(q): Query<SecretQuery>) -> ApiResult<Json<Option<String>>> {
-    let val = SecretManager::get_secret(&q.provider_id)?;
+async fn get_secret(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<SecretQuery>,
+) -> ApiResult<Json<Option<String>>> {
+    let val = state.secret_store.get_secret(&q.provider_id)?;
     Ok(Json(val))
 }
 
-async fn delete_secret(Query(q): Query<SecretQuery>) -> ApiResult<()> {
-    SecretManager::delete_secret(&q.provider_id)?;
+async fn delete_secret(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<SecretQuery>,
+) -> ApiResult<()> {
+    state.secret_store.delete_secret(&q.provider_id)?;
     Ok(())
 }
 
@@ -1072,6 +1342,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/valuations/latest", get(get_latest_valuations))
         .route("/portfolio/update", post(update_portfolio))
         .route("/portfolio/recalculate", post(recalculate_portfolio))
+        .route("/events/stream", get(stream_events))
         .route(
             "/performance/accounts/simple",
             post(calculate_accounts_simple_performance),
@@ -1562,10 +1833,9 @@ async fn update_addon_from_store_by_id_web(
         .and_then(|m| m.enabled)
         .unwrap_or(false);
 
-    let zip_data =
-        addons::download_addon_from_store(&body.addon_id, state.instance_id.as_str())
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
+    let zip_data = addons::download_addon_from_store(&body.addon_id, state.instance_id.as_str())
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
     let extracted = addons::extract_addon_zip_internal(zip_data).map_err(|e| anyhow::anyhow!(e))?;
 
     if addon_dir.exists() {
@@ -1607,7 +1877,8 @@ async fn install_addon_from_staging_web(
         .map_err(|e: String| anyhow::anyhow!(e))?;
     let extracted = addons::extract_addon_zip_internal(zip).map_err(|e| anyhow::anyhow!(e))?;
     let addon_id = extracted.metadata.id.clone();
-    let addon_dir = addons::get_addon_path(addons_root, &addon_id).map_err(|e| anyhow::anyhow!(e))?;
+    let addon_dir =
+        addons::get_addon_path(addons_root, &addon_id).map_err(|e| anyhow::anyhow!(e))?;
     if addon_dir.exists() {
         std::fs::remove_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?;
     }

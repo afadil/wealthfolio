@@ -12,7 +12,7 @@ use crate::market_data::providers::market_data_provider::{AssetProfiler, MarketD
 use crate::market_data::providers::marketdata_app_provider::MarketDataAppProvider;
 use crate::market_data::providers::metal_price_api_provider::MetalPriceApiProvider;
 use crate::market_data::providers::yahoo_provider::YahooProvider;
-use crate::secrets::SecretManager;
+use crate::secrets::SecretStore;
 use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -28,6 +28,7 @@ pub struct ProviderRegistry {
 impl ProviderRegistry {
     pub async fn new(
         provider_settings: Vec<MarketDataProviderSetting>,
+        secret_store: Arc<dyn SecretStore>,
     ) -> Result<Self, MarketDataError> {
         let mut active_providers_with_priority: Vec<(
             i32,
@@ -48,7 +49,7 @@ impl ProviderRegistry {
             let provider_id_str = &setting.id;
 
             let api_key = if provider_id_str != DATA_SOURCE_YAHOO {
-                match SecretManager::get_secret(provider_id_str) {
+                match secret_store.get_secret(provider_id_str) {
                     Ok(key_opt) => key_opt,
                     Err(e) => {
                         warn!(

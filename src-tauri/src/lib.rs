@@ -5,6 +5,7 @@ mod commands;
 mod context;
 mod events;
 mod listeners;
+mod secret_store;
 #[cfg(feature = "wealthfolio-pro")]
 mod sync_identity;
 

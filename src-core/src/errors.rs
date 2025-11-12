@@ -193,12 +193,6 @@ impl From<diesel::ConnectionError> for Error {
     }
 }
 
-impl From<keyring::Error> for Error {
-    fn from(err: keyring::Error) -> Self {
-        Error::Secret(err.to_string())
-    }
-}
-
 // Add From implementation for FxError
 // impl From<FxError> for Error {
 //     fn from(err: FxError) -> Self {

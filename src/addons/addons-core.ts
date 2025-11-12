@@ -7,7 +7,7 @@ import {
 } from "@/addons/addons-runtime-context";
 import { getInstalledAddons, loadAddon as loadAddonRuntime } from "@/commands/addon";
 import type { AddonContext, AddonManifest } from "@wealthfolio/addon-sdk";
-import { ReactVersion } from "@wealthfolio/addon-sdk";
+import { ReactVersion, SDK_VERSION } from "@wealthfolio/addon-sdk";
 
 interface AddonFile {
   path: string;
@@ -50,9 +50,9 @@ async function discoverAddons(): Promise<AddonFile[]> {
 function validateAddonCompatibility(manifest: AddonManifest): boolean {
   // Be lenient in web mode: warn on mismatch but allow load.
   // Future: implement proper semver compatibility if needed.
-  if (manifest.sdkVersion && manifest.sdkVersion !== "1.0.0") {
+  if (manifest.sdkVersion && manifest.sdkVersion !== SDK_VERSION) {
     logger.warn(
-      `Addon ${manifest.id} declares SDK ${manifest.sdkVersion}; host is 1.0.0. Proceeding with caution.`,
+      `Addon ${manifest.id} declares SDK ${manifest.sdkVersion}; host is ${SDK_VERSION}. Proceeding with caution.`,
     );
   }
   return true;

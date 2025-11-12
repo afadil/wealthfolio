@@ -6488,7 +6488,6 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "futures",
- "keyring",
  "lazy_static",
  "log",
  "num-traits",

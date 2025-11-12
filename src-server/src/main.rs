@@ -1,8 +1,10 @@
 mod api;
 mod config;
 mod error;
+mod events;
 mod main_lib;
 mod models;
+mod secrets;
 
 use api::app_router;
 use config::Config;
