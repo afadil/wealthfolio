@@ -9,9 +9,10 @@ import {
 import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
-import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
+import { differenceInDays, differenceInMonths, parseISO } from "date-fns";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 
 interface PerformanceChartMobileProps {
   data: {
@@ -22,6 +23,8 @@ interface PerformanceChartMobileProps {
 }
 
 export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
+  const { formatChartDateMobile, formatChartTooltipMobile } = useDateFormatter();
+
   const formattedData = data[0]?.returns?.map((item) => {
     const dataPoint: Record<string, number | string> = { date: item.date };
     data.forEach((series) => {
@@ -58,22 +61,9 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     const date = parseISO(dateStr);
     const firstDate = parseISO(String(formattedData[0].date));
     const lastDate = parseISO(String(formattedData[formattedData.length - 1].date));
-    const monthsDiff = differenceInMonths(lastDate, firstDate);
-    const daysDiff = differenceInDays(lastDate, firstDate);
 
-    if (daysDiff <= 7) {
-      return format(date, "MMM d"); // e.g., "Sep 15"
-    }
-    if (daysDiff <= 31) {
-      return format(date, "MMM d"); // e.g., "Sep 15"
-    }
-    if (monthsDiff <= 12) {
-      return format(date, "MMM"); // e.g., "Sep"
-    }
-    if (monthsDiff <= 36) {
-      return format(date, "MMM yy"); // e.g., "Sep 23"
-    }
-    return format(date, "yyyy"); // e.g., "2023"
+    const dateRange = { from: firstDate, to: lastDate };
+    return formatChartDateMobile(date, dateRange);
   };
 
   const chartConfig = data.reduce((config, series, index) => {
@@ -92,7 +82,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     return [formattedValue + " - ", name.toString()];
   };
 
-  const tooltipLabelFormatter = (label: string) => format(parseISO(label), "MMM d, yyyy");
+  const tooltipLabelFormatter = (label: string) => formatChartTooltipMobile(parseISO(label));
 
   return (
     <div className="h-full w-full">

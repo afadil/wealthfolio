@@ -20,8 +20,8 @@
     "WITHDRAWAL": "Rút tiền",
     "ADD_HOLDING": "Thêm tài sản",
     "REMOVE_HOLDING": "Xóa tài sản",
-    "TRANSFER_IN": "Chuyển đến",
-    "TRANSFER_OUT": "Chuyển đi",
+    "TRANSFER_IN": "Tiền vào",
+    "TRANSFER_OUT": "Tiền ra",
     "TRANSFER": "Chuyển khoản",
     "CONVERSION_IN": "Chuyển đổi vào",
     "CONVERSION_OUT": "Chuyển đổi ra",
@@ -289,7 +289,10 @@
     "searchSymbol": "Tìm kiếm mã hoặc công ty...",
     "loading": "Đang tải...",
     "loadFailed": "Không thể tải mã chứng khoán.",
+    "loadFailedHint": "Thử lại hoặc kiểm tra cài đặt nhà cung cấp dữ liệu thị trường.",
     "noSymbolsFound": "Không tìm thấy mã chứng khoán.",
+    "addManualAsset": "Thêm tài sản thủ công mới",
+    "createManualHolding": "Tạo \"{{symbol}}\" dưới dạng tài sản thủ công",
     "saveSuccess": {
       "title": "Đã lưu hoạt động",
       "description": "Các thay đổi đang chờ của bạn đã được đồng bộ."

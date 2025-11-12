@@ -24,16 +24,16 @@ interface SearchProps {
 
 interface SearchResultsProps {
   results?: QuoteSummary[];
-  query: string;
   isLoading: boolean;
   isError?: boolean;
   selectedResult: SearchProps["selectedResult"];
   onSelect: (symbol: QuoteSummary) => void;
+  t: (key: string) => string;
 }
 
 // Memoize search results component
 const SearchResults = memo(
-  ({ results, isLoading, isError, selectedResult, onSelect }: SearchResultsProps) => {
+  ({ results, isLoading, isError, selectedResult, onSelect, t }: SearchResultsProps) => {
     return (
       <CommandList>
         {isLoading ? (
@@ -46,9 +46,9 @@ const SearchResults = memo(
           </CommandPrimitive.Loading>
         ) : null}
         {!isError && !isLoading && selectedResult && !results?.length && (
-          <div className="p-4 text-sm">No symbols found</div>
+          <div className="p-4 text-sm">{t("datagrid.noSymbolsFound")}</div>
         )}
-        {isError && <div className="text-destructive p-4 text-sm">Something went wrong</div>}
+        {isError && <div className="text-destructive p-4 text-sm">{t("datagrid.loadFailed")}</div>}
 
         {results?.map((ticker) => {
           return (
@@ -269,7 +269,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               {!isError && !isLoading && data?.length === 0 && searchQuery && (
                 <>
                   <div className="border-border border-b p-2">
-                    <div className="text-muted-foreground mb-2 px-2 text-xs">No results found</div>
+                    <div className="text-muted-foreground mb-2 px-2 text-xs">
+                      {t("datagrid.noSymbolsFound")}
+                    </div>
                     {allowFreeText && (
                       <CommandItem
                         onSelect={() => {
@@ -280,15 +282,19 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                       >
                         <Icons.Plus className="mr-2 h-4 w-4" />
                         <div className="flex flex-col items-start">
-                          <span className="font-medium">Add new manual asset</span>
+                          <span className="font-medium">{t("datagrid.addManualAsset")}</span>
                           <span className="text-muted-foreground text-xs">
-                            Create "{searchQuery.toUpperCase().trim()}" as manual holding
+                            {t("datagrid.createManualHolding", {
+                              symbol: searchQuery.toUpperCase().trim(),
+                            })}
                           </span>
                         </div>
                       </CommandItem>
                     )}
                   </div>
-                  {!allowFreeText && <div className="p-4 text-sm">No symbols found</div>}
+                  {!allowFreeText && (
+                    <div className="p-4 text-sm">{t("datagrid.noSymbolsFound")}</div>
+                  )}
                 </>
               )}
 
@@ -304,17 +310,15 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 text-sm">No symbols found</div>
+                    <div className="p-4 text-sm">{t("datagrid.noSymbolsFound")}</div>
                   )}
                 </>
               )}
 
               {isError && (
                 <div className="text-destructive p-4 text-sm">
-                  <div>Something went wrong</div>
-                  <div className="mt-1 text-xs opacity-70">
-                    Try again or check your market data provider settings.
-                  </div>
+                  <div>{t("datagrid.loadFailed")}</div>
+                  <div className="mt-1 text-xs opacity-70">{t("datagrid.loadFailedHint")}</div>
                 </div>
               )}
 

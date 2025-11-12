@@ -10,7 +10,7 @@ import {
 } from "@/lib/activity-utils";
 import { getActivityTypeName } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 import { formatAmount, Separator } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
 import { ActivityOperations } from "../activity-operations";
@@ -32,6 +32,7 @@ export const ActivityTableMobile = ({
   onDuplicate,
 }: ActivityTableMobileProps) => {
   const { t } = useTranslation(["activity"]);
+  const { formatDateTimeDisplay } = useDateFormatter();
 
   if (activities.length === 0) {
     return (
@@ -49,8 +50,7 @@ export const ActivityTableMobile = ({
         const displaySymbol = symbol.startsWith("$CASH") ? symbol.split("-")[0] : symbol;
         const avatarSymbol = symbol.startsWith("$CASH") ? "$CASH" : symbol;
         const isCash = symbol.startsWith("$CASH");
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const formattedDate = formatDateTime(activity.date, userTimezone);
+        const formattedDateTime = formatDateTimeDisplay(activity.date);
         const displayValue = calculateActivityValue(activity);
 
         // Compact View
@@ -71,7 +71,7 @@ export const ActivityTableMobile = ({
                   </div>
                   <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
                   <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
-                    <span>{formattedDate.date}</span>
+                    <span>{formattedDateTime}</span>
                     {!isCashActivity(activity.activityType) &&
                       !isIncomeActivity(activity.activityType) &&
                       !isSplitActivity(activity.activityType) &&
@@ -127,8 +127,7 @@ export const ActivityTableMobile = ({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{t("activity:table.date")}</span>
                   <div className="text-right">
-                    <p>{formattedDate.date}</p>
-                    <p className="text-muted-foreground text-xs">{formattedDate.time}</p>
+                    <p>{formattedDateTime}</p>
                   </div>
                 </div>
 

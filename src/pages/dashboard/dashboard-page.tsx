@@ -13,6 +13,7 @@ import { GainAmount, GainPercent, IntervalSelector, Page } from "@wealthfolio/ui
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useEffect } from "react";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
@@ -41,7 +42,7 @@ const getInitialDateRange = (): DateRange => ({
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 export default function DashboardPage() {
-  const { t } = useTranslation("dashboard");
+  const { t: tCommon } = useTranslation("common");
   const [intervalCode, setIntervalCode] = usePersistentState<TimePeriod>(
     "dashboard:intervalCode",
     INITIAL_INTERVAL_CODE,
@@ -52,9 +53,42 @@ export default function DashboardPage() {
   );
   const [selectedIntervalDescription, setSelectedIntervalDescription] = usePersistentState<string>(
     "dashboard:selectedIntervalDescription",
-    t("intervalDescriptions.last3Months"),
+    tCommon("intervals.3M"),
   );
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
+
+  // Get description for current interval
+  const getIntervalDescription = (code: TimePeriod) => {
+    switch (code) {
+      case "1D":
+        return tCommon("intervals.1D");
+      case "1W":
+        return tCommon("intervals.1W");
+      case "1M":
+        return tCommon("intervals.1M");
+      case "3M":
+        return tCommon("intervals.3M");
+      case "6M":
+        return tCommon("intervals.6M");
+      case "YTD":
+        return tCommon("intervals.YTD");
+      case "1Y":
+        return tCommon("intervals.1Y");
+      case "3Y":
+        return tCommon("intervals.3Y");
+      case "5Y":
+        return tCommon("intervals.5Y");
+      case "ALL":
+        return tCommon("intervals.ALL");
+      default:
+        return tCommon("intervals.3M");
+    }
+  };
+
+  // Update interval description when interval or language changes
+  useEffect(() => {
+    setSelectedIntervalDescription(getIntervalDescription(intervalCode));
+  }, [intervalCode, tCommon]);
 
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
 

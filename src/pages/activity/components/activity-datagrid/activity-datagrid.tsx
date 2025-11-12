@@ -12,7 +12,7 @@ import {
   ActivityDetails,
   ActivityUpdate,
 } from "@/lib/types";
-import { cn, formatDateTimeDisplay, formatDateTimeLocal } from "@/lib/utils";
+import { cn, formatDateTimeLocal } from "@/lib/utils";
 import {
   Button,
   Checkbox,
@@ -30,6 +30,7 @@ import {
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -777,6 +778,7 @@ const TransactionRow = memo(
     onNavigate,
     setFocusedCell,
   }: TransactionRowProps) {
+    const { formatDateTimeDisplay } = useDateFormatter();
     const handleFocus = useCallback(
       (field: EditableField) => {
         setFocusedCell({ rowId: transaction.id, field });

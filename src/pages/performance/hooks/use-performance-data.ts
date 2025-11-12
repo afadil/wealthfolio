@@ -1,10 +1,10 @@
 import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { calculatePerformanceHistory } from "@/commands/portfolio";
 import { useRef } from "react";
-import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { QueryKeys } from "@/lib/query-keys";
 import { TrackedItem } from "@/lib/types";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 
 /**
  * Hook to calculate cumulative returns for a list of comparison items.
@@ -28,7 +28,9 @@ export function useCalculatePerformanceHistory({
   selectedItems: TrackedItem[];
   dateRange: DateRange | undefined;
 }) {
-  // Use a ref to track the effective start date without causing re-renders
+  const { formatActivityDate } = useDateFormatter();
+
+  // Use a ref to track effective start date without causing re-renders
   const effectiveStartDateRef = useRef<string | null>(null);
 
   // Use a ref to track if we've already processed the data for the current selection
@@ -43,8 +45,8 @@ export function useCalculatePerformanceHistory({
   });
 
   // Get the formatted date range for API calls, keep as undefined if not present
-  const startDate = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
-  const endDate = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
+  const startDate = dateRange?.from ? dateRange.from.toISOString().split("T")[0] : undefined;
+  const endDate = dateRange?.to ? dateRange.to.toISOString().split("T")[0] : undefined;
 
   // Check if we need to update our tracking refs
   const currentSelectionKey = selectedItems.map((item) => item.id).join(",");
@@ -129,12 +131,12 @@ export function useCalculatePerformanceHistory({
 
   // Format the effective date for display
   const displayStartDate = effectiveStartDateRef.current
-    ? format(new Date(effectiveStartDateRef.current + "T00:00:00"), "MMM d, yyyy") // Add time part for correct Date parsing
+    ? formatActivityDate(new Date(effectiveStartDateRef.current + "T00:00:00")) // Add time part for correct Date parsing
     : dateRange?.from
-      ? format(dateRange.from, "MMM d, yyyy")
+      ? formatActivityDate(dateRange.from)
       : "";
 
-  const displayEndDate = dateRange?.to ? format(dateRange.to, "MMM d, yyyy") : "";
+  const displayEndDate = dateRange?.to ? formatActivityDate(dateRange.to) : "";
 
   const displayDateRange =
     displayStartDate && displayEndDate

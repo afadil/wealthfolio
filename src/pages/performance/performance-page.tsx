@@ -1,11 +1,5 @@
 import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
-import {
-  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
-  MAX_DRAWDOWN_INFO as maxDrawdownInfo,
-  MetricLabelWithInfo,
-  TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
-  VOLATILITY_INFO as volatilityInfo,
-} from "@/components/metric-display";
+import { MetricLabelWithInfo } from "@/components/metric-display";
 import { PerformanceChart } from "@/components/performance-chart";
 import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 
@@ -594,7 +588,7 @@ export default function PerformancePage() {
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
                               label={t("metrics.totalReturn")}
-                              infoText={totalReturnInfo}
+                              infoText={t("infoTexts.timeWeightedReturn")}
                             />
                             <div className="flex items-baseline justify-center">
                               <span
@@ -616,7 +610,7 @@ export default function PerformancePage() {
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
                               label={t("metrics.annualizedReturn")}
-                              infoText={annualizedReturnInfo}
+                              infoText={t("infoTexts.annualizedReturn")}
                             />
                             <div className="flex items-baseline justify-center">
                               <span
@@ -638,7 +632,7 @@ export default function PerformancePage() {
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
                               label={t("metrics.volatility")}
-                              infoText={volatilityInfo}
+                              infoText={t("infoTexts.volatility")}
                             />
                             <div className="flex items-baseline justify-center">
                               <span className="text-foreground text-base sm:text-lg">
@@ -657,7 +651,7 @@ export default function PerformancePage() {
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
                               label={t("metrics.maxDrawdown")}
-                              infoText={maxDrawdownInfo}
+                              infoText={t("infoTexts.maxDrawdown")}
                             />
                             <div className="flex items-baseline justify-center">
                               <span className="text-destructive text-base sm:text-lg">

@@ -287,7 +287,10 @@
     "searchSymbol": "Search symbol or company...",
     "loading": "Loading...",
     "loadFailed": "Failed to load symbols.",
+    "loadFailedHint": "Try again or check your market data provider settings.",
     "noSymbolsFound": "No symbols found.",
+    "addManualAsset": "Add new manual asset",
+    "createManualHolding": "Create \"{{symbol}}\" as manual holding",
     "saveSuccess": {
       "title": "Activities saved",
       "description": "Your pending changes are now synced."

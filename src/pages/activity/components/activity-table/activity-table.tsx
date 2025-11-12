@@ -28,7 +28,7 @@ import {
 } from "@/lib/activity-utils";
 import { ActivityType } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 import {
   type OnChangeFn,
   type VisibilityState,
@@ -63,6 +63,7 @@ export const ActivityTable = ({
   handleDelete,
 }: ActivityTableProps) => {
   const { t } = useTranslation(["activity"]);
+  const { formatDateTimeDisplay } = useDateFormatter();
   const { duplicateActivityMutation } = useActivityMutations();
 
   const handleDuplicate = React.useCallback(
@@ -114,16 +115,13 @@ export const ActivityTable = ({
           <DataTableColumnHeader column={column} title={t("activity:table.date")} />
         ),
         cell: ({ row }) => {
-          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const dateVal = row.getValue("date");
-          const formattedDate =
-            typeof dateVal === "string" || dateVal instanceof Date
-              ? formatDateTime(dateVal, userTimezone)
-              : formatDateTime(String(dateVal), userTimezone);
+          const formattedDateTime = formatDateTimeDisplay(
+            typeof dateVal === "string" || dateVal instanceof Date ? dateVal : String(dateVal),
+          );
           return (
             <div className="ml-2 flex flex-col">
-              <span>{formattedDate.date}</span>
-              <span className="text-muted-foreground text-xs font-light">{formattedDate.time}</span>
+              <span>{formattedDateTime}</span>
             </div>
           );
         },

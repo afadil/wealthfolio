@@ -10,10 +10,11 @@ import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { formatAmount } from "@wealthfolio/ui";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
@@ -31,6 +32,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   isBalanceHidden,
 }) => {
   const { t } = useTranslation(["income"]);
+  const { formatIncomeChartDate } = useDateFormatter();
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -115,7 +117,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 tick={{ fontSize: isMobile ? 11 : 12 }}
                 tickFormatter={(value) => {
                   const date = parseISO(`${value}-01`);
-                  return isMobile ? format(date, "MMM") : format(date, "MMM yy");
+                  return formatIncomeChartDate(date, isMobile);
                 }}
               />
               <YAxis
@@ -173,7 +175,8 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                       );
                     }}
                     labelFormatter={(label) => {
-                      return format(parseISO(`${label}-01`), isMobile ? "MMM yyyy" : "MMMM yyyy");
+                      const date = parseISO(`${label}-01`);
+                      return formatIncomeChartDate(date, isMobile);
                     }}
                   />
                 }

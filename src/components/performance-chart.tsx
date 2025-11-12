@@ -1,3 +1,4 @@
+import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import {
   ChartConfig,
   ChartContainer,
@@ -6,10 +7,10 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
-import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
+import { differenceInDays, differenceInMonths, parseISO } from "date-fns";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
@@ -22,6 +23,8 @@ interface PerformanceChartProps {
 }
 
 export function PerformanceChart({ data }: PerformanceChartProps) {
+  const { formatChartDate, formatChartTooltip } = useDateFormatter();
+
   const formattedData = data[0]?.returns?.map((item) => {
     const dataPoint: Record<string, number | string> = { date: item.date };
     data.forEach((series) => {
@@ -58,16 +61,9 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     const date = parseISO(dateStr);
     const firstDate = parseISO(String(formattedData[0].date));
     const lastDate = parseISO(String(formattedData[formattedData.length - 1].date));
-    const monthsDiff = differenceInMonths(lastDate, firstDate);
-    const daysDiff = differenceInDays(lastDate, firstDate);
 
-    if (daysDiff <= 31) {
-      return format(date, "MMM d"); // e.g., "Sep 15"
-    }
-    if (monthsDiff <= 36) {
-      return format(date, "MMM yyyy"); // e.g., "Sep 2023"
-    }
-    return format(date, "yyyy"); // e.g., "2023"
+    const dateRange = { from: firstDate, to: lastDate };
+    return formatChartDate(date, dateRange);
   };
 
   // Update the chartConfig and Line components to use PERFORMANCE_CHART_COLORS
@@ -84,10 +80,10 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     name,
   ) => {
     const formattedValue = formatPercent(Number(value));
-    return [formattedValue + " - ", name.toString()];
+    return [`${name.toString()}: `, formattedValue];
   };
 
-  const tooltipLabelFormatter = (label: string) => format(parseISO(label), "PPP");
+  const tooltipLabelFormatter = (label: string) => formatChartTooltip(parseISO(label));
 
   return (
     <div className="h-full w-full">

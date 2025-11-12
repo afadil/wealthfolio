@@ -3,7 +3,7 @@
   "allPortfolio": "Toàn bộ Danh mục",
   "actions": {
     "addAccount": "Thêm tài khoản",
-    "addBenchmark": "Thêm Điểm chuẩn",
+    "addBenchmark": "Chỉ số khác",
     "addItem": "Thêm mục",
     "retry": "Thử lại",
     "remove": "Xóa {{name}}"
@@ -12,6 +12,8 @@
     "totalReturn": "Lợi nhuận Tổng",
     "annualizedReturn": "Lợi nhuận Hàng năm",
     "annualized": "Hàng năm",
+    "timeWeightedReturn": "Lợi nhuận theo thời gian",
+    "moneyWeightedReturn": "Lợi nhuận theo tiền",
     "volatility": "Biến động",
     "maxDrawdown": "Sụt giảm Tối đa"
   },
@@ -23,13 +25,20 @@
     "title": "Lỗi khi tính toán dữ liệu hiệu suất"
   },
   "calculating": "Đang tính toán...",
+  "infoTexts": {
+    "timeWeightedReturn": "Lợi nhuận theo thời gian (TWR) đo lường tốc độ tăng trưởng kép của danh mục đầu tư, bỏ qua tác động của dòng tiền (gửi/rút). Nó cô lập hiệu suất của các khoản đầu tư cơ bản.",
+    "moneyWeightedReturn": "Lợi nhuận theo tiền (MWR) đo lường hiệu suất của danh mục đầu tư có tính đến quy mô và thời điểm của dòng tiền. Nó đại diện cho tỷ suất hoàn vốn nội bộ (IRR) của danh mục.",
+    "annualizedReturn": "Lợi nhuận hàng năm cho thấy số tiền trung bình hình học kiếm được bởi một khoản đầu tư mỗi năm trong khoảng thời gian đã chọn, như thể lợi nhuận được gộp hàng năm.",
+    "volatility": "Biến động đo lường sự phân tán của lợi nhuận đối với một khoản đầu tư nhất định. Biến động cao hơn có nghĩa là giá của khoản đầu tư có thể thay đổi đáng kể trong một khoảng thời gian ngắn theo cả hai hướng.",
+    "maxDrawdown": "Sụt giảm tối đa đại diện cho tỷ lệ phần trăm giảm lớn nhất từ đỉnh đến đáy tiếp theo trong giá trị danh mục đầu tư trong khoảng thời gian đã chỉ định. Nó chỉ ra rủi ro giảm giá."
+  },
   "benchmarkSelector": {
-    "title": "Thêm Điểm chuẩn",
-    "selectTitle": "Chọn Điểm chuẩn",
-    "description": "Chọn điểm chuẩn hoặc tìm kiếm bất kỳ mã nào",
-    "searchPlaceholder": "Tìm kiếm điểm chuẩn hoặc bất kỳ mã nào...",
+    "title": "Thêm chỉ số",
+    "selectTitle": "Chọn Chỉ số",
+    "description": "Chọn chỉ số hoặc tìm kiếm bất kỳ mã nào",
+    "searchPlaceholder": "Tìm kiếm chỉ số hoặc bất kỳ mã nào...",
     "searching": "Đang tìm kiếm...",
-    "noResults": "Không tìm thấy điểm chuẩn hoặc mã nào.",
+    "noResults": "Không tìm thấy chỉ số hoặc mã nào.",
     "errorSearching": "Lỗi khi tìm kiếm mã. Vui lòng thử lại.",
     "groups": {
       "searchResults": "Kết quả Tìm kiếm"

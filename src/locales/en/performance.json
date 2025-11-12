@@ -12,6 +12,8 @@
     "totalReturn": "Total Return",
     "annualizedReturn": "Annualized Return",
     "annualized": "Annualized",
+    "timeWeightedReturn": "Time Weighted Return",
+    "moneyWeightedReturn": "Money Weighted Return",
     "volatility": "Volatility",
     "maxDrawdown": "Max Drawdown"
   },
@@ -23,6 +25,13 @@
     "title": "Error calculating performance data"
   },
   "calculating": "Calculating...",
+  "infoTexts": {
+    "timeWeightedReturn": "Time-Weighted Return (TWR) measures the compound growth rate of a portfolio, ignoring the impact of cash flows (deposits/withdrawals). It isolates the performance of the underlying investments.",
+    "moneyWeightedReturn": "Money-Weighted Return (MWR) measures the performance of a portfolio taking into account the size and timing of cash flows. It represents the internal rate of return (IRR) of the portfolio.",
+    "annualizedReturn": "Annualized Return shows the geometric average amount of money earned by an investment each year over the selected period, as if the returns were compounded annually.",
+    "volatility": "Volatility measures the dispersion of returns for a given investment. Higher volatility means the price of the investment can change dramatically over a short time period in either direction.",
+    "maxDrawdown": "Maximum Drawdown represents the largest percentage decline from a peak to a subsequent trough in portfolio value during the specified period. It indicates downside risk."
+  },
   "benchmarkSelector": {
     "title": "Add Benchmark",
     "selectTitle": "Select Benchmark",

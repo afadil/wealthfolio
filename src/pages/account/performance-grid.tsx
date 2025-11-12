@@ -1,14 +1,9 @@
-import {
-  MAX_DRAWDOWN_INFO,
-  MetricDisplay,
-  MONEY_WEIGHTED_RETURN_INFO,
-  TIME_WEIGHTED_RETURN_INFO,
-  VOLATILITY_INFO,
-} from "@/components/metric-display";
+import { MetricDisplay } from "@/components/metric-display";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PerformanceMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import React from "react";
 
 export interface PerformanceGridProps {
@@ -22,6 +17,7 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
   isLoading,
   className,
 }) => {
+  const { t } = useTranslation("performance");
   if (isLoading || !performance) {
     return (
       <div className={cn("w-full", className)}>
@@ -61,32 +57,32 @@ export const PerformanceGrid: React.FC<PerformanceGridProps> = ({
         <CardContent className="p-0">
           <div className="grid grid-cols-2 gap-5">
             <MetricDisplay
-              label="Time Weighted Return"
+              label={t("metrics.timeWeightedReturn")}
               value={cumulativeTwr}
               annualizedValue={annualizedTwr}
-              infoText={TIME_WEIGHTED_RETURN_INFO}
+              infoText={t("infoTexts.timeWeightedReturn")}
               isPercentage={true}
               className="border-muted/30 bg-muted/30 rounded-md border"
             />
             <MetricDisplay
-              label="Money Weighted Return"
+              label={t("metrics.moneyWeightedReturn")}
               value={cumulativeMwr}
               annualizedValue={annualizedMwr}
-              infoText={MONEY_WEIGHTED_RETURN_INFO}
+              infoText={t("infoTexts.moneyWeightedReturn")}
               isPercentage={true}
               className="border-muted/30 bg-muted/30 rounded-md border"
             />
             <MetricDisplay
-              label="Volatility"
+              label={t("metrics.volatility")}
               value={volatility}
-              infoText={VOLATILITY_INFO}
+              infoText={t("infoTexts.volatility")}
               isPercentage={false}
               className="border-muted/30 bg-muted/30 rounded-md border"
             />
             <MetricDisplay
-              label="Max Drawdown"
+              label={t("metrics.maxDrawdown")}
               value={maxDrawdown * -1}
-              infoText={MAX_DRAWDOWN_INFO}
+              infoText={t("infoTexts.maxDrawdown")}
               isPercentage={true}
               className="border-muted/30 bg-muted/30 rounded-md border"
             />

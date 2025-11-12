@@ -12,6 +12,7 @@ import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Icons, type Icon } from "@wealthfolio/ui";
 import { forwardRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -107,7 +108,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       selectedAccount,
       setSelectedAccount,
       variant = "card",
-      buttonText = "Select Account",
+      buttonText,
       filterActive = true,
       includePortfolio = false,
       className,
@@ -115,9 +116,13 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const { accounts, isLoading: isLoadingAccounts } = useAccounts(filterActive);
     const { data: settings, isLoading: isLoadingSettings } = useSettings();
+
+    // Use translated default button text if not provided
+    const translatedButtonText = buttonText || t("accounts.selectAccount");
 
     const isLoading = isLoadingAccounts || isLoadingSettings;
 
@@ -202,7 +207,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              aria-label="Select an account"
+              aria-label={t("accounts.selectAnAccount")}
               className={`h-full w-full justify-center rounded-lg border border-dashed p-2 transition-colors ${
                 open
                   ? "border-primary bg-primary/5"
@@ -346,7 +351,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              aria-label={iconOnly ? "Add account" : undefined}
+              aria-label={iconOnly ? t("accounts.addAccount") : undefined}
               className={cn(
                 "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
                 iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -355,7 +360,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               size={iconOnly ? "icon" : "sm"}
             >
               <Icons.Briefcase className="h-4 w-4" />
-              {!iconOnly && buttonText}
+              {!iconOnly && translatedButtonText}
             </Button>
           );
 
@@ -376,7 +381,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
           }}
         >
           <Command className="w-full">
-            <CommandInput placeholder="Search accounts..." />
+            <CommandInput placeholder={t("accounts.searchAccounts")} />
             <CommandList>
               {isLoading ? (
                 <div className="px-2 py-6 text-center">

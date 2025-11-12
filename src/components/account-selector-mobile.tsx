@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -8,14 +7,16 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useAccounts } from "@/hooks/use-accounts";
-import { useSettings } from "@/hooks/use-settings";
-import { AccountType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Icons, type Icon } from "@wealthfolio/ui";
 import { forwardRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useSettings } from "@/hooks/use-settings";
+import { AccountType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -42,22 +43,6 @@ interface UIAccount extends Omit<Account, "accountType"> {
   accountType: UIAccountType;
 }
 
-// Create a portfolio account for UI purposes
-function createPortfolioAccount(baseCurrency: string): UIAccount {
-  return {
-    id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
-    accountType: PORTFOLIO_ACCOUNT_ID,
-    currency: baseCurrency,
-    group: undefined,
-    isActive: true,
-    isDefault: false,
-    balance: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-}
-
 export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelectorMobileProps>(
   (
     {
@@ -70,6 +55,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen ?? internalOpen;
     const setOpen = onOpenChange ?? setInternalOpen;
@@ -78,6 +64,20 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
     const { data: settings, isLoading: isLoadingSettings } = useSettings();
 
     const isLoading = isLoadingAccounts || isLoadingSettings;
+
+    // Create a portfolio account for UI purposes
+    const createPortfolioAccount = (baseCurrency: string): UIAccount => ({
+      id: PORTFOLIO_ACCOUNT_ID,
+      name: t("accounts.allPortfolio"),
+      accountType: PORTFOLIO_ACCOUNT_ID,
+      currency: baseCurrency,
+      group: undefined,
+      isActive: true,
+      isDefault: false,
+      balance: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
     // Add portfolio account if requested
     const allAccounts: UIAccount[] = includePortfolio
@@ -105,15 +105,15 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
     const getAccountTypeLabel = (type: string): string => {
       switch (type) {
         case PORTFOLIO_ACCOUNT_ID:
-          return "Portfolio";
+          return t("accounts.portfolio");
         case "SECURITIES":
-          return "Securities Accounts";
+          return t("accounts.securitiesAccounts");
         case "CASH":
-          return "Cash Accounts";
+          return t("accounts.cashAccounts");
         case "CRYPTOCURRENCY":
-          return "Cryptocurrency Accounts";
+          return t("accounts.cryptocurrencyAccounts");
         default:
-          return "Other Accounts";
+          return t("accounts.otherAccounts");
       }
     };
 
@@ -131,7 +131,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
           <Button
             ref={ref}
             variant="outline"
-            aria-label={iconOnly ? "Add account" : undefined}
+            aria-label={iconOnly ? t("accounts.addAccount") : undefined}
             className={cn(
               "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-[1.5px] border-none text-sm font-medium",
               iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -140,13 +140,13 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
             size={iconOnly ? "icon" : "sm"}
           >
             <Icons.Briefcase className="h-4 w-4" />
-            {!iconOnly && "Add account"}
+            {!iconOnly && t("accounts.addAccount")}
           </Button>
         </SheetTrigger>
         <SheetContent side="bottom" className="h-[80vh] p-0">
           <SheetHeader className="border-border border-b px-6 py-4">
-            <SheetTitle>Select Account</SheetTitle>
-            <SheetDescription>Choose an account to add to the comparison</SheetDescription>
+            <SheetTitle>{t("accounts.selectAccount")}</SheetTitle>
+            <SheetDescription>{t("accounts.chooseAccountToAdd")}</SheetDescription>
           </SheetHeader>
           <ScrollArea className="h-[calc(80vh-5rem)] px-6 py-4">
             <div className="space-y-6">

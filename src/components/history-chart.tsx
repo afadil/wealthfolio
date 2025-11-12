@@ -1,10 +1,12 @@
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { formatDate } from "@/lib/utils";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
+import { useTranslation } from "react-i18next";
+import { parseISO } from "date-fns";
 
 interface HistoryChartData {
   date: string;
@@ -34,6 +36,8 @@ const CustomTooltip = ({
   isBalanceHidden,
   isChartHovered,
 }: CustomTooltipProps) => {
+  const { t } = useTranslation();
+  const { formatChartTooltip } = useDateFormatter();
   if (!active || !payload?.length) {
     return null;
   }
@@ -56,12 +60,14 @@ const CustomTooltip = ({
 
   return (
     <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
-      <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
+      <p className="text-muted-foreground text-xs">
+        {formatChartTooltip(parseISO(tvPayload.date))}
+      </p>
 
       <div className="flex items-center justify-between space-x-2">
         <div className="flex items-center space-x-1.5">
           <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
-          <span className="text-muted-foreground text-xs">Total Value:</span>
+          <span className="text-muted-foreground text-xs">{t("charts.totalValue")}:</span>
         </div>
         <AmountDisplay
           value={tvPayload.totalValue}
@@ -77,7 +83,7 @@ const CustomTooltip = ({
               className="block h-0 w-3 border-b-2 border-dashed"
               style={{ borderColor: "var(--muted-foreground)" }}
             />
-            <span className="text-muted-foreground text-xs">Net Deposit:</span>
+            <span className="text-muted-foreground text-xs">{t("charts.netContribution")}:</span>
           </div>
           <AmountDisplay
             value={ncPayload.netContribution}
@@ -98,15 +104,16 @@ export function HistoryChart({
   data: HistoryChartData[];
   isLoading?: boolean;
 }) {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
 
   const chartConfig = {
     totalValue: {
-      label: "Total Value",
+      label: t("charts.totalValue"),
     },
     netContribution: {
-      label: "Net Contribution",
+      label: t("charts.netContribution"),
     },
   } satisfies ChartConfig;
 

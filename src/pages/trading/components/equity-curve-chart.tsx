@@ -9,9 +9,10 @@ import {
   formatAmount,
 } from "@wealthfolio/ui";
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from "@wealthfolio/ui/chart";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import type { EquityPoint } from "../types";
 import { useTranslation } from "react-i18next";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 
 interface EquityCurveChartProps {
   data: EquityPoint[];
@@ -26,19 +27,17 @@ export function EquityCurveChart({
   periodType = "monthly",
 }: EquityCurveChartProps) {
   const { t } = useTranslation("trading");
+  const { formatChartDate } = useDateFormatter();
   // Transform data for chart - calculate period P/L from cumulative values
   const chartData = data.map((point, index) => {
     const prevCumulative = index > 0 ? data[index - 1].cumulativeRealizedPL : 0;
     const periodPL = point.cumulativeRealizedPL - prevCumulative;
 
-    // Format date based on period type
-    const dateFormat = periodType === "daily" ? "MMM dd" : "MMM yy";
-
     return {
       date: point.date,
       periodPL: periodPL,
       cumulativeRealizedPL: point.cumulativeRealizedPL,
-      formattedDate: format(parseISO(point.date), dateFormat),
+      formattedDate: formatChartDate(parseISO(point.date)),
     };
   });
 
@@ -54,9 +53,6 @@ export function EquityCurveChart({
       </div>
     );
   }
-
-  const dateFormat = periodType === "daily" ? "MMM dd" : "MMM yy";
-  const tooltipDateFormat = periodType === "daily" ? "MMMM dd, yyyy" : "MMMM yyyy";
 
   return (
     <div className="flex h-full min-h-[300px] w-full items-center justify-center py-12">
@@ -83,7 +79,7 @@ export function EquityCurveChart({
             tickLine={false}
             tickMargin={10}
             axisLine={false}
-            tickFormatter={(value) => format(parseISO(value), dateFormat)}
+            tickFormatter={(value) => formatChartDate(parseISO(value))}
           />
           <YAxis yAxisId="left" />
           <YAxis yAxisId="right" orientation="right" />
@@ -121,7 +117,7 @@ export function EquityCurveChart({
                   );
                 }}
                 labelFormatter={(label) => {
-                  return format(parseISO(label), tooltipDateFormat);
+                  return formatChartDate(parseISO(label));
                 }}
               />
             }

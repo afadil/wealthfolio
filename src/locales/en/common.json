@@ -52,6 +52,41 @@
     "change": "Change",
     "percent": "Percent",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "moreInfoAbout": "More info about {{label}}",
+    "annualized": "Annualized:"
+  },
+  "accounts": {
+    "allPortfolio": "All Portfolio",
+    "portfolio": "Portfolio",
+    "securitiesAccounts": "Securities Accounts",
+    "cashAccounts": "Cash Accounts",
+    "cryptocurrencyAccounts": "Cryptocurrency Accounts",
+    "otherAccounts": "Other Accounts",
+    "selectAccount": "Select Account",
+    "addAccount": "Add account",
+    "selectAnAccount": "Select an account",
+    "searchAccounts": "Search accounts...",
+    "chooseAccountToAdd": "Choose an account to add to comparison"
+  },
+  "search": {
+    "noSymbolsFound": "No symbols found",
+    "somethingWentWrong": "Something went wrong"
+  },
+  "charts": {
+    "totalValue": "Total Value",
+    "netContribution": "Net Contribution"
+  },
+  "intervals": {
+    "1D": "Past day",
+    "1W": "Past week",
+    "1M": "Past month",
+    "3M": "Past 3 months",
+    "6M": "Past 6 months",
+    "YTD": "Year to date",
+    "1Y": "Past year",
+    "3Y": "Past 3 years",
+    "5Y": "Past 5 years",
+    "ALL": "All Time"
   }
 }

@@ -1,7 +1,6 @@
 import { Button, Icons, GainAmount } from "@wealthfolio/ui";
 import type { CalendarMonth, CalendarDay } from "../types";
 import {
-  format,
   addYears,
   subYears,
   addMonths,
@@ -154,7 +153,9 @@ function DailyCalendarView({
           >
             <Icons.ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-3 text-sm font-medium">{format(selectedYear, "MMM yyyy")}</span>
+          <span className="px-3 text-sm font-medium">
+            {selectedYear.toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+          </span>
           <Button variant="outline" size="sm" onClick={handleNextMonth} className="rounded-full">
             <Icons.ChevronRight className="h-4 w-4" />
           </Button>
@@ -212,7 +213,7 @@ function DailyCalendarView({
                         );
                       }
 
-                      const dateStr = format(date, "yyyy-MM-dd");
+                      const dateStr = date.toISOString().split("T")[0]; // yyyy-MM-dd format
                       const dayData = tradingDataMap.get(dateStr);
                       const isCurrentDay = isToday(date);
                       const isCurrentMonthDay = isSameMonth(date, selectedYear);
@@ -241,7 +242,7 @@ function DailyCalendarView({
                                 !isCurrentMonthDay && "text-muted-foreground/50",
                               )}
                             >
-                              {format(date, "d")}
+                              {date.getDate()}
                             </div>
 
                             {/* Trading data - only show for current month */}
@@ -329,7 +330,7 @@ function YearlyCalendarView({
           <Button variant="outline" size="sm" onClick={handlePreviousYear} className="rounded-full">
             <Icons.ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-3 text-sm font-medium">{format(selectedYear, "yyyy")}</span>
+          <span className="px-3 text-sm font-medium">{selectedYear.getFullYear()}</span>
           <Button variant="outline" size="sm" onClick={handleNextYear} className="rounded-full">
             <Icons.ChevronRight className="h-4 w-4" />
           </Button>

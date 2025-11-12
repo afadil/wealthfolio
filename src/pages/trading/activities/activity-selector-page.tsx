@@ -20,13 +20,14 @@ import {
   SelectValue,
   Skeleton,
 } from "@wealthfolio/ui";
-import { format } from "date-fns";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useDateFormatter } from "@/hooks/use-date-formatter";
 
 export default function ActivitySelectorPage() {
   const { t } = useTranslation("trading");
+  const { formatActivityDate } = useDateFormatter();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
@@ -270,7 +271,7 @@ export default function ActivitySelectorPage() {
                           />
                         </td>
                         <td className="p-3 text-sm">
-                          {format(new Date(activity.date), "MMM dd, yyyy")}
+                          {formatActivityDate(new Date(activity.date))}
                         </td>
                         <td className="p-3">
                           <Badge

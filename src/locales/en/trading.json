@@ -3,7 +3,7 @@
     "heading": "Select Activities",
     "description": "Choose which trading activities to include in your trading portfolio analysis",
     "backToDashboard": "Back to Tradings",
-    "saveSelection": "Save Selection",
+    "saveSelection": "Save",
     "savingSettings": "Saving settings...",
     "manualSelection": {
       "title": "Manual Selection",

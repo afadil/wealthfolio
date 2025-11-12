@@ -16,4 +16,4 @@ VALUES
     ('YAHOO', 'Yahoo Finance', 'Yahoo Finance is a leading financial data provider for many markets. It provides historical and real-time stock data.', 'https://finance.yahoo.com/', 1, TRUE, 'yahoo-finance.png', NULL, NULL, NULL),
     ('MARKETDATA_APP', 'MarketData.app', 'MarketData.app provides real-time and historical data for U.S. stocks, options, ETFs, mutual funds, and more.', 'https://www.marketdata.app/', 2, FALSE, 'marketdata-app.png', NULL, NULL, NULL),
     ('ALPHA_VANTAGE', 'Alpha Vantage', 'Alpha Vantage provides free APIs for real-time and historical data on stocks, forex, and cryptocurrencies.', 'https://www.alphavantage.co/', 3, FALSE, 'alpha-vantage.png', NULL, NULL, NULL),
-    ('VN_MARKET', 'Vietnam Market', 'Vietnam Market Data Provider for stocks on HOSE, HNX, and UPCOM exchanges. Fund from Fmarket Vietnam, and Viet Nam gold price...', 'http://localhost:8765', 0, TRUE, 'vn-market.png', NULL, NULL, NULL);
+    ('VN_MARKET', 'Vietnam Market', 'Vietnam Market Data Provider for stocks on HOSE, HNX, and UPCOM exchanges. Fund from Fmarket Vietnam, and Viet Nam gold price...', NULL, 0, TRUE, 'vn-market.png', NULL, NULL, NULL);

@@ -206,19 +206,7 @@ export function formatDateTimeLocal(date: Date | string | undefined): string {
   return format(value, "yyyy-MM-dd'T'HH:mm");
 }
 
-/**
- * Formats a date for display in the UI.
- * Returns format: "YYYY/MM/DD HH:mm" in local timezone.
- * @param date Date string, Date object, or undefined
- * @returns Formatted string for display, or empty string if invalid
- */
-export function formatDateTimeDisplay(date: Date | string | undefined): string {
-  if (!date) return "";
-  const value = typeof date === "string" ? new Date(date) : date;
-  if (!isValid(value)) return "";
-  // Display format: YYYY/MM/DD HH:mm
-  return format(value, "yyyy/MM/dd HH:mm");
-}
+
 export function formatAmount(amount: number, currency: string, displayCurrency = true) {
   // Handle pence (GBp) specially
   if (currency === "GBp" || currency === "GBX") {

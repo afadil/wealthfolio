@@ -3,7 +3,7 @@
     "heading": "Chọn Giao Dịch",
     "description": "Chọn các hoạt động giao dịch để đưa vào danh mục phân tích và theo dõi hiệu suất giao dịch của bạn",
     "backToDashboard": "Quay Lại",
-    "saveSelection": "Lưu Lựa Chọn",
+    "saveSelection": "Lưu",
     "savingSettings": "Đang lưu cài đặt...",
     "manualSelection": {
       "title": "Chọn Thủ Công",
@@ -44,12 +44,12 @@
     "settings": "Cài Đặt",
     "tryAgain": "Thử Lại",
     "periods": {
-      "1M": "1T",
-      "3M": "3T",
-      "6M": "6T",
-      "YTD": "ĐTN",
-      "1Y": "1N",
-      "ALL": "TẤT CẢ"
+      "1M": "1M",
+      "3M": "3M",
+      "6M": "6M",
+      "YTD": "YTD",
+      "1Y": "1Y",
+      "ALL": "ALL"
     },
     "chartPeriod": {
       "daily": "Hàng Ngày",
@@ -165,18 +165,18 @@
         "trade": "giao dịch",
         "trades": "giao dịch",
         "months": {
-          "jan": "Th1",
-          "feb": "Th2",
-          "mar": "Th3",
-          "apr": "Th4",
-          "may": "Th5",
-          "jun": "Th6",
-          "jul": "Th7",
-          "aug": "Th8",
-          "sep": "Th9",
-          "oct": "Th10",
-          "nov": "Th11",
-          "dec": "Th12"
+          "jan": "Tháng 1",
+          "feb": "Tháng 2",
+          "mar": "Tháng 3",
+          "apr": "Tháng 4",
+          "may": "Tháng 5",
+          "jun": "Tháng 6",
+          "jul": "Tháng 7",
+          "aug": "Tháng 8",
+          "sep": "Tháng 9",
+          "oct": "Tháng 10",
+          "nov": "Tháng 11",
+          "dec": "Tháng 12"
         }
       }
     },
