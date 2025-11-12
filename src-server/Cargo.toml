@@ -23,6 +23,8 @@ chrono = { version = "0.4", features = ["serde"] }
 serde_urlencoded = "0.7"
 reqwest = { version = "0.11", features = ["json"] }
 base64 = "0.21"
+chacha20poly1305 = { version = "0.10", features = ["std"] }
+rand = "0.8"
 
 # path dependency to core
 wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }

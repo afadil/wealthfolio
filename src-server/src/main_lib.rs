@@ -1,6 +1,7 @@
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use crate::config::Config;
+use crate::{config::Config, secrets::build_secret_store};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_core::{
@@ -25,6 +26,7 @@ use wealthfolio_core::{
         snapshot::{SnapshotRepository, SnapshotService, SnapshotServiceTrait},
         valuation::{ValuationRepository, ValuationService, ValuationServiceTrait},
     },
+    secrets::SecretStore,
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
 };
 
@@ -50,6 +52,7 @@ pub struct AppState {
     pub addons_root: String,
     pub data_root: String,
     pub instance_id: String,
+    pub secret_store: Arc<dyn SecretStore>,
 }
 
 pub fn init_tracing() {
@@ -66,6 +69,27 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     std::env::set_var("DATABASE_URL", &config.db_path);
     let db_path = db::init(&config.db_path)?;
     tracing::info!("Database path in use: {}", db_path);
+    let data_root_path = std::path::Path::new(&db_path)
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+
+    let resolved_secret_path = std::env::var("WF_SECRET_FILE")
+        .ok()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_root_path.join("secrets.json"));
+    let secret_key = std::env::var("WF_SECRET_KEY").ok();
+    if secret_key.is_none() {
+        tracing::warn!("WF_SECRET_KEY is not set; secrets will be stored unencrypted at rest.");
+    }
+    let file_store = build_secret_store(resolved_secret_path.clone(), secret_key.as_deref())
+        .map_err(anyhow::Error::new)?;
+    let secret_store: Arc<dyn SecretStore> = Arc::new(file_store);
+    std::env::set_var(
+        "WF_SECRET_FILE",
+        resolved_secret_path.to_string_lossy().to_string(),
+    );
+
     let pool = db::create_pool(&db_path)?;
     db::run_migrations(&pool)?;
     let writer = write_actor::spawn_writer((*pool).clone());
@@ -100,7 +124,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
     let market_data_repository = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
     let market_data_service = Arc::new(
-        MarketDataService::new(market_data_repository.clone(), asset_repository.clone()).await?,
+        MarketDataService::new(
+            market_data_repository.clone(),
+            asset_repository.clone(),
+            secret_store.clone(),
+        )
+        .await?,
     );
 
     let asset_service = Arc::new(AssetService::new(
@@ -173,11 +202,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         ));
 
     // Determine data root directory (parent of DB path)
-    let data_root = std::path::Path::new(&db_path)
-        .parent()
-        .unwrap_or(std::path::Path::new("."))
-        .to_string_lossy()
-        .to_string();
+    let data_root = data_root_path.to_string_lossy().to_string();
 
     Ok(Arc::new(AppState {
         account_service,
@@ -197,5 +222,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         addons_root: config.addons_root.clone(),
         data_root,
         instance_id: settings.instance_id,
+        secret_store,
     }))
 }

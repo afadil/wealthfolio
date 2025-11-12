@@ -23,11 +23,14 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use wealthfolio_core::{
-    addons::{self, AddonManifest, AddonUpdateCheckResult, AddonUpdateInfo, ExtractedAddon, InstalledAddon},
     accounts::AccountServiceTrait,
     activities::{
         ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
         ActivitySearchResponse, ActivityUpdate, ImportMappingData, NewActivity,
+    },
+    addons::{
+        self, AddonManifest, AddonUpdateCheckResult, AddonUpdateInfo, ExtractedAddon,
+        InstalledAddon,
     },
     assets::{Asset as CoreAsset, UpdateAssetProfile},
     db,
@@ -41,7 +44,6 @@ use wealthfolio_core::{
         performance::{PerformanceMetrics, SimplePerformanceMetrics},
         valuation::valuation_model::DailyAccountValuation,
     },
-    secrets::SecretManager,
     settings::{Settings, SettingsServiceTrait, SettingsUpdate},
 };
 
@@ -1007,8 +1009,13 @@ struct SecretSetBody {
     secret: String,
 }
 
-async fn set_secret(Json(body): Json<SecretSetBody>) -> ApiResult<()> {
-    SecretManager::set_secret(&body.provider_id, &body.secret)?;
+async fn set_secret(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SecretSetBody>,
+) -> ApiResult<()> {
+    state
+        .secret_store
+        .set_secret(&body.provider_id, &body.secret)?;
     Ok(())
 }
 
@@ -1018,13 +1025,19 @@ struct SecretQuery {
     provider_id: String,
 }
 
-async fn get_secret(Query(q): Query<SecretQuery>) -> ApiResult<Json<Option<String>>> {
-    let val = SecretManager::get_secret(&q.provider_id)?;
+async fn get_secret(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<SecretQuery>,
+) -> ApiResult<Json<Option<String>>> {
+    let val = state.secret_store.get_secret(&q.provider_id)?;
     Ok(Json(val))
 }
 
-async fn delete_secret(Query(q): Query<SecretQuery>) -> ApiResult<()> {
-    SecretManager::delete_secret(&q.provider_id)?;
+async fn delete_secret(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<SecretQuery>,
+) -> ApiResult<()> {
+    state.secret_store.delete_secret(&q.provider_id)?;
     Ok(())
 }
 
@@ -1562,10 +1575,9 @@ async fn update_addon_from_store_by_id_web(
         .and_then(|m| m.enabled)
         .unwrap_or(false);
 
-    let zip_data =
-        addons::download_addon_from_store(&body.addon_id, state.instance_id.as_str())
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
+    let zip_data = addons::download_addon_from_store(&body.addon_id, state.instance_id.as_str())
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
     let extracted = addons::extract_addon_zip_internal(zip_data).map_err(|e| anyhow::anyhow!(e))?;
 
     if addon_dir.exists() {
@@ -1607,7 +1619,8 @@ async fn install_addon_from_staging_web(
         .map_err(|e: String| anyhow::anyhow!(e))?;
     let extracted = addons::extract_addon_zip_internal(zip).map_err(|e| anyhow::anyhow!(e))?;
     let addon_id = extracted.metadata.id.clone();
-    let addon_dir = addons::get_addon_path(addons_root, &addon_id).map_err(|e| anyhow::anyhow!(e))?;
+    let addon_dir =
+        addons::get_addon_path(addons_root, &addon_id).map_err(|e| anyhow::anyhow!(e))?;
     if addon_dir.exists() {
         std::fs::remove_dir_all(&addon_dir).map_err(|e| anyhow::anyhow!("{}", e))?;
     }

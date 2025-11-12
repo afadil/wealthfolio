@@ -34,7 +34,6 @@ rust_decimal = { version = "1.37", features = ["maths","serde-float"] }
 num-traits = "0.2"
 rust_decimal_macros = "1.37"
 serde_with = "3.4"
-keyring = "2"
 urlencoding = "2"
 csv = "1.4.0"
 zip = "2.2.0"
@@ -50,3 +49,4 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 
 
 [dev-dependencies]
+tempfile = "3"
