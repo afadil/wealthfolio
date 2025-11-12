@@ -6,6 +6,7 @@ import {
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
+  XIcon,
 } from "lucide-react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
@@ -31,11 +32,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
       expand={true}
       richColors
       icons={{
-        success: <CircleCheckIcon className="text-success size-4" />,
-        info: <InfoIcon className="size-4 text-blue-500" />,
-        warning: <TriangleAlertIcon className="text-warning size-4" />,
-        error: <OctagonXIcon className="text-destructive size-4" />,
-        loading: <Loader2Icon className="text-muted-foreground size-4 animate-spin" />,
+        success: <CircleCheckIcon className="size-4" />,
+        info: <InfoIcon className="size-4" />,
+        warning: <TriangleAlertIcon className="size-4" />,
+        error: <OctagonXIcon className="size-4" />,
+        loading: <Loader2Icon className="size-4 animate-spin" />,
+        close: <XIcon className="size-4" />,
+      }}
+      toastOptions={{
+        classNames: {
+          closeButton: "!absolute !top-2 !right-2 !left-auto !transform-none !border-none",
+        },
       }}
       style={
         {
