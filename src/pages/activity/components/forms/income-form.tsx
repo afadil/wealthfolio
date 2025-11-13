@@ -72,6 +72,9 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                             : "Enter interest amount"
                         }
                         {...field}
+                        aria-label={
+                          activityType === "DIVIDEND" ? "Dividend Amount" : "Interest Amount"
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -86,7 +89,7 @@ export const IncomeForm = ({ accounts }: { accounts: AccountSelectOption[] }) =>
                     <FormItem>
                       <FormLabel>Fee</FormLabel>
                       <FormControl>
-                        <MoneyInput {...field} />
+                        <MoneyInput {...field} aria-label="Fee" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

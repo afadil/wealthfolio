@@ -104,7 +104,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
             <FormLabel>Account</FormLabel>
             <FormControl>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Account">
                   <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[500px] overflow-y-auto">
@@ -166,6 +166,7 @@ export const CommonFields = ({ accounts }: { accounts: AccountSelectOption[] }) 
                 rows={3}
                 {...field}
                 value={field.value || ""}
+                aria-label="Description"
               />
             </FormControl>
             <FormMessage />
@@ -193,9 +194,10 @@ export function AssetSymbolInput({
             className="h-10"
             {...field}
             onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+            aria-label="Symbol"
           />
         ) : (
-          <TickerSearchInput onSelectResult={field.onChange} {...field} />
+          <TickerSearchInput onSelectResult={field.onChange} {...field} aria-label="Symbol" />
         )}
       </FormControl>
       <FormMessage className="text-xs" />

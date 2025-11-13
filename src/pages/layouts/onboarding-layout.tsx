@@ -15,7 +15,7 @@ const OnboardingLayout = () => {
           </main>
         </ErrorBoundary>
       </div>
-      <Toaster mobileOffset={{ top: "68px" }} />
+      <Toaster mobileOffset={{ top: "68px" }} closeButton expand={false} />
     </div>
   );
 };
