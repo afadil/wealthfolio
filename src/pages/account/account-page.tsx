@@ -39,11 +39,18 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { AccountType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { Account, AccountValuation, DateRange, Holding, HoldingType, TimePeriod, TrackedItem } from "@/lib/types";
+import {
+  Account,
+  AccountValuation,
+  DateRange,
+  Holding,
+  TimePeriod,
+  TrackedItem,
+} from "@/lib/types";
 import { calculatePerformanceMetrics, cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
+import { useQuery } from "@tanstack/react-query";
 import { Icons, type Icon } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
