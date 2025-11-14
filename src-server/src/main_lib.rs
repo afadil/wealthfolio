@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use crate::{config::Config, events::EventBus, secrets::build_secret_store};
+use crate::{auth::AuthManager, config::Config, events::EventBus, secrets::build_secret_store};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_core::{
@@ -54,6 +54,7 @@ pub struct AppState {
     pub instance_id: String,
     pub secret_store: Arc<dyn SecretStore>,
     pub event_bus: EventBus,
+    pub auth: Option<Arc<AuthManager>>,
 }
 
 pub fn init_tracing() {
@@ -79,12 +80,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .ok()
         .map(PathBuf::from)
         .unwrap_or_else(|| data_root_path.join("secrets.json"));
-    let secret_key = std::env::var("WF_SECRET_KEY").ok();
-    if secret_key.is_none() {
-        tracing::warn!("WF_SECRET_KEY is not set; secrets will be stored unencrypted at rest.");
-    }
-    let file_store = build_secret_store(resolved_secret_path.clone(), secret_key.as_deref())
-        .map_err(anyhow::Error::new)?;
+    let file_store =
+        build_secret_store(resolved_secret_path.clone(), Some(config.secret_key.as_str()))
+            .map_err(anyhow::Error::new)?;
     let secret_store: Arc<dyn SecretStore> = Arc::new(file_store);
     std::env::set_var(
         "WF_SECRET_FILE",
@@ -207,6 +205,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     let event_bus = EventBus::new(256);
 
+    let auth_manager = config
+        .auth
+        .as_ref()
+        .map(AuthManager::new)
+        .transpose()?
+        .map(Arc::new);
+
     Ok(Arc::new(AppState {
         account_service,
         settings_service,
@@ -227,5 +232,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         instance_id: settings.instance_id,
         secret_store,
         event_bus,
+        auth: auth_manager,
     }))
 }

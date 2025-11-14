@@ -63,7 +63,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
                 <FormItem>
                   <FormLabel>Shares</FormLabel>
                   <FormControl>
-                    <QuantityInput {...field} />
+                    <QuantityInput {...field} aria-label="Shares" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -76,7 +76,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
                 <FormItem>
                   <FormLabel>Price</FormLabel>
                   <FormControl>
-                    <MoneyInput {...field} />
+                    <MoneyInput {...field} aria-label="Price" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -89,7 +89,7 @@ export const TradeForm = ({ accounts }: { accounts: AccountSelectOption[] }) => 
                 <FormItem>
                   <FormLabel>Fee</FormLabel>
                   <FormControl>
-                    <MoneyInput {...field} />
+                    <MoneyInput {...field} aria-label="Fee" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

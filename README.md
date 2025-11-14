@@ -170,6 +170,16 @@ Build and run the desktop application using Tauri:
 pnpm tauri dev
 ```
 
+#### Addon Development Mode
+
+Addon hot reload servers now start only when you explicitly opt in. Use the dedicated Vite mode:
+
+```bash
+pnpm dev:addons
+```
+
+Alternatively, set `VITE_ENABLE_ADDON_DEV_MODE=true` in your environment before running any dev script.
+
 5. **Build for Production**:
 
 Build the application for production:
@@ -219,9 +229,13 @@ All configuration is done via environment variables in `.env.web`.
 - `WF_REQUEST_TIMEOUT_MS` - Request timeout in milliseconds (default: `30000`)
 - `WF_STATIC_DIR` - Directory for serving static frontend assets (default:
   `dist`)
-- `WF_SECRET_KEY` - **Optional** 32-byte encryption key for secrets at rest
+- `WF_SECRET_KEY` - **Required** 32-byte key used for secrets encryption and JWT
+  signing
+- `WF_AUTH_PASSWORD_HASH` - Argon2id PHC string enabling password-only
+  authentication for web mode
+- `WF_AUTH_TOKEN_TTL_MINUTES` - Optional JWT access token expiry in minutes
+  (default `60`)
   - Generate with: `openssl rand -base64 32`
-  - When unset, secrets are stored unencrypted
 - `WF_SECRET_FILE` - **Optional** path to secrets storage file (default:
   `<data-root>/secrets.json`)
 - `WF_ADDONS_DIR` - **Optional** path to addons directory (default: derived from
@@ -231,6 +245,24 @@ All configuration is done via environment variables in `.env.web`.
 
 - `VITE_API_TARGET` - Backend API URL for Vite proxy (default:
   `http://127.0.0.1:8080`)
+
+#### Authentication (Web Mode)
+
+- Set `WF_AUTH_PASSWORD_HASH` to an Argon2id PHC string to require a password
+  before accessing the Web App.
+
+  You can generate the hash with online tools like
+  [Coderstool](https://www.coderstool.com/argon2-hash-generator) or the
+  following command:
+
+  ```bash
+  argon2 "your-password" -id -e
+  ```
+
+  Copy the full output (starting with `$argon2id$...`) into `.env.web`.
+
+- Tokens are short-lived (default 60 minutes) and stored in memory on the
+  client; refresh the page to re-authenticate.
 
 #### Notes
 
@@ -364,13 +396,14 @@ The container supports all `WF_*` environment variables documented in the
 - `WF_LISTEN_ADDR` - Bind address (use `0.0.0.0:8080` for Docker)
 - `WF_DB_PATH` - Database path (typically `/data/wealthfolio.db`)
 - `WF_CORS_ALLOW_ORIGINS` - CORS origins (set for dev/frontend access)
-- `WF_SECRET_KEY` - Encryption key for secrets (recommended)
+- `WF_SECRET_KEY` - Required 32-byte key used for secrets encryption and JWT
+  signing
 
 ### Volumes
 
 - `/data` - Persistent storage for database and secrets
   - Database: `/data/wealthfolio.db`
-  - Secrets: `/data/secrets.json` (encrypted if `WF_SECRET_KEY` is set)
+  - Secrets: `/data/secrets.json` (encrypted with `WF_SECRET_KEY`)
 
 ### Ports
 

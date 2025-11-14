@@ -1,21 +1,21 @@
-import { useFormContext } from "react-hook-form";
 import {
   Card,
   CardContent,
-  MoneyInput,
-  QuantityInput,
+  FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormControl,
   FormMessage,
+  MoneyInput,
+  QuantityInput,
 } from "@wealthfolio/ui";
-import { ConfigurationCheckbox, CommonFields, AssetSymbolInput } from "./common";
+import { useFormContext } from "react-hook-form";
 import { AccountSelectOption } from "../activity-form";
 import {
   ActivityTypeSelector,
   type ActivityType as ActivityTypeUI,
 } from "../activity-type-selector";
+import { AssetSymbolInput, CommonFields, ConfigurationCheckbox } from "./common";
 
 export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   const { control, watch } = useFormContext();
@@ -61,7 +61,7 @@ export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) 
                 <FormItem>
                   <FormLabel>Shares</FormLabel>
                   <FormControl>
-                    <QuantityInput {...field} />
+                    <QuantityInput {...field} aria-label="Shares" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -74,7 +74,7 @@ export const HoldingsForm = ({ accounts }: { accounts: AccountSelectOption[] }) 
                 <FormItem>
                   <FormLabel>Average Cost</FormLabel>
                   <FormControl>
-                    <MoneyInput {...field} />
+                    <MoneyInput {...field} aria-label="Average Cost" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

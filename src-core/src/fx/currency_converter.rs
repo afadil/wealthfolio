@@ -31,18 +31,12 @@ impl CurrencyConverter {
             HashMap::new();
 
         for rate in rates {
-            // No longer mutable, no normalization
-            // Preserve original case
-            // let from_currency = rate.from_currency.clone();
-            // let to_currency = rate.to_currency.clone();
-
             // Ignore self-referential rates
             if rate.from_currency == rate.to_currency {
                 continue;
             }
 
             let date = rate.timestamp.date_naive(); // Group by NaiveDate
-                                                    // Use original case for the pair key
             let pair = (rate.from_currency.clone(), rate.to_currency.clone());
 
             let date_map = latest_rates_by_date.entry(date).or_default();
@@ -182,18 +176,22 @@ impl CurrencyConverter {
             return Ok(Decimal::ONE);
         }
 
-        self.historical_rates
-            .get(&date)
-            .and_then(|rate_map| {
-                rate_map.get(&(from_currency.to_string(), to_currency.to_string()))
-            })
-            .cloned()
-            .ok_or_else(|| {
-                FxError::RateNotFound(format!(
-                    "No exchange rate found for {}/{} on {}",
-                    from_currency, to_currency, date
-                ))
-            })
+        match self.historical_rates.get(&date) {
+            Some(rate_map) => {
+                let lookup_key = (from_currency.to_string(), to_currency.to_string());
+                match rate_map.get(&lookup_key).cloned() {
+                    Some(rate) => Ok(rate),
+                    None => Err(FxError::RateNotFound(format!(
+                        "No exchange rate found for {}/{} on {}",
+                        from_currency, to_currency, date
+                    ))),
+                }
+            }
+            None => Err(FxError::RateNotFound(format!(
+                "No exchange rate found for {}/{} on {}",
+                from_currency, to_currency, date
+            ))),
+        }
     }
 
     /// Gets the exchange rate between two currencies on the nearest available date.
@@ -209,6 +207,11 @@ impl CurrencyConverter {
 
         // Check if we have any dates at all
         if self.sorted_dates.is_empty() {
+            log::warn!(
+                "Converter has no dates available for {}/{}",
+                from_currency,
+                to_currency
+            );
             return Err(FxError::RateNotFound(format!(
                 "No exchange rates available for any date for {}/{}",
                 from_currency, to_currency
@@ -217,7 +220,7 @@ impl CurrencyConverter {
 
         // Use binary search to find the closest date
         let closest_date = match self.sorted_dates.binary_search(&date) {
-            Ok(index) => self.sorted_dates[index], // Exact match
+            Ok(index) => self.sorted_dates[index],
             Err(index) => {
                 // No exact match. `index` is where it *would* be inserted.
                 // Check the dates before and after.
@@ -231,7 +234,6 @@ impl CurrencyConverter {
                     // Requested date is between two dates.
                     let prev_date = self.sorted_dates[index - 1];
                     let next_date = self.sorted_dates[index];
-                    // Compare differences in days
                     if (date - prev_date).num_days() < (next_date - date).num_days() {
                         prev_date
                     } else {
@@ -242,7 +244,71 @@ impl CurrencyConverter {
         };
 
         // Use the existing get_rate function with the closest date
-        self.get_rate(from_currency, to_currency, closest_date)
+        match self.get_rate(from_currency, to_currency, closest_date) {
+            Ok(rate) => Ok(rate),
+            Err(_) => {
+                // The nearest date doesn't have this currency pair.
+                // Search backward and forward from the closest_date to find a date that does.
+                let index = match self.sorted_dates.binary_search(&closest_date) {
+                    Ok(i) => i,
+                    Err(i) => i,
+                };
+
+                // Search strategy: alternate between before and after the closest date
+                let mut found_rate: Option<Decimal> = None;
+                let mut found_date: Option<NaiveDate> = None;
+
+                for offset in 1..=self.sorted_dates.len() {
+                    // Try before
+                    if let Some(check_index) = index.checked_sub(offset) {
+                        if check_index < self.sorted_dates.len() {
+                            let check_date = self.sorted_dates[check_index];
+                            if let Ok(rate) = self.get_rate(from_currency, to_currency, check_date)
+                            {
+                                found_rate = Some(rate);
+                                found_date = Some(check_date);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Try after
+                    let check_index = index + offset;
+                    if check_index < self.sorted_dates.len() {
+                        let check_date = self.sorted_dates[check_index];
+                        if let Ok(rate) = self.get_rate(from_currency, to_currency, check_date) {
+                            // Only use "after" date if "before" wasn't found or this is closer
+                            if found_rate.is_none()
+                                || (check_date - closest_date).num_days().abs()
+                                    < (found_date.unwrap() - closest_date).num_days().abs()
+                            {
+                                found_rate = Some(rate);
+                                found_date = Some(check_date);
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                match found_rate {
+                    Some(rate) => {
+                        let fallback_date = found_date.unwrap();
+                        log::warn!(
+                            "No exchange rate found for {}/{} on {}. Using fallback rate from {}",
+                            from_currency,
+                            to_currency,
+                            date,
+                            fallback_date
+                        );
+                        Ok(rate)
+                    }
+                    None => Err(FxError::RateNotFound(format!(
+                        "No exchange rate found for {}/{} on or near {}",
+                        from_currency, to_currency, date
+                    ))),
+                }
+            }
+        }
     }
 
     /// Converts an amount from one currency to another on a specific date.

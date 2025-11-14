@@ -10,6 +10,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { InputTags } from "@/components/ui/tag-input";
 import { useHapticFeedback } from "@/hooks";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
+import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
@@ -114,6 +115,7 @@ export const AssetProfilePage = () => {
 
   const { updateAssetProfileMutation, updateAssetDataSourceMutation } = useAssetProfileMutations();
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(symbol);
+  const syncMarketDataMutation = useSyncMarketDataMutation();
 
   useEffect(() => {
     setFormData({
@@ -500,6 +502,11 @@ export const AssetProfilePage = () => {
 
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
 
+  const handleRefreshQuotes = useCallback(() => {
+    triggerHaptic();
+    syncMarketDataMutation.mutate([symbol]);
+  }, [symbol, syncMarketDataMutation, triggerHaptic]);
+
   if (isLoading)
     return (
       <Page>
@@ -513,7 +520,24 @@ export const AssetProfilePage = () => {
   if (assetProfile?.assetType === "FOREX") {
     return (
       <Page>
-        <PageHeader heading="Quote History" text={symbol} onBack={() => navigate(backTarget)} />
+        <PageHeader
+          heading="Quote History"
+          text={symbol}
+          onBack={() => navigate(backTarget)}
+          actions={
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              onClick={handleRefreshQuotes}
+              disabled={syncMarketDataMutation.isPending}
+              title="Refresh Quote"
+            >
+              <Icons.Refresh
+                className={`size-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
+              />
+            </Button>
+          }
+        />
         <PageContent>
           <QuoteHistoryTable
             data={quoteHistory ?? []}
@@ -645,7 +669,18 @@ export const AssetProfilePage = () => {
               </div>
             )}
           </div>
-          <div className="hidden md:flex">
+          <div className="hidden md:flex md:items-center md:gap-2">
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              onClick={handleRefreshQuotes}
+              disabled={syncMarketDataMutation.isPending}
+              title="Refresh Quote"
+            >
+              <Icons.Refresh
+                className={`size-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
+              />
+            </Button>
             <AnimatedToggleGroup
               items={toggleItems}
               value={activeTab}
@@ -776,7 +811,7 @@ export const AssetProfilePage = () => {
                         <Badge
                           variant="secondary"
                           key={sector.name}
-                          className="dark:text-primary-foreground m-1 cursor-help bg-indigo-100 uppercase"
+                          className="dark:text-primary-foreground m-1 cursor-help bg-blue-100 uppercase"
                           title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
                         >
                           {sector.name}

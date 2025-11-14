@@ -169,14 +169,8 @@ impl FxServiceTrait for FxService {
                 let today = Utc::now().naive_utc().date();
                 match converter.get_rate_nearest(from_currency, to_currency, today) {
                     Ok(rate) => return Ok(rate),
-                    Err(e) => {
-                        log::warn!(
-                            "Converter failed to get rate for {}/{}: {}",
-                            from_currency,
-                            to_currency,
-                            e
-                        );
-                        // Fall through to direct repository access
+                    Err(_) => {
+                        // Fall through to direct repository access (no log here to avoid duplication)
                     }
                 }
             }
@@ -187,10 +181,9 @@ impl FxServiceTrait for FxService {
             Ok(rate) => Ok(rate.rate),
             Err(e) => {
                 log::error!(
-                    "Failed to get exchange rate for {}/{}: {}",
+                    "Exchange rate not available for {}/{}",
                     from_currency,
-                    to_currency,
-                    e
+                    to_currency
                 );
                 Err(e)
             }
@@ -205,7 +198,6 @@ impl FxServiceTrait for FxService {
     ) -> Result<Decimal> {
         // Check for valid currency codes
         if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
-            // log::error!("Invalid from_currency code: {}", from_currency);
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}",
                 from_currency
@@ -231,14 +223,7 @@ impl FxServiceTrait for FxService {
                 // Use the converter to get the rate for the specific date
                 match converter.get_rate_nearest(from_currency, to_currency, date) {
                     Ok(rate) => return Ok(rate),
-                    Err(e) => {
-                        log::warn!(
-                            "Converter failed to get rate for {}/{} on {}: {}",
-                            from_currency,
-                            to_currency,
-                            date,
-                            e
-                        );
+                    Err(_) => {
                         // Fall through to fallback
                     }
                 }
@@ -246,13 +231,18 @@ impl FxServiceTrait for FxService {
         }
 
         // Fallback to latest rate if converter not available or failed
+        let latest_rate = self.load_latest_exchange_rate(from_currency, to_currency)?;
+        let fallback_date = latest_rate.timestamp.date_naive();
+
         log::warn!(
-            "Falling back to latest rate for {}/{} on {}",
+            "No exchange rate found for {}/{} on {}. Using fallback rate from {}",
             from_currency,
             to_currency,
-            date
+            date,
+            fallback_date
         );
-        self.get_latest_exchange_rate(from_currency, to_currency)
+
+        Ok(latest_rate.rate)
     }
 
     fn convert_currency(
@@ -270,16 +260,9 @@ impl FxServiceTrait for FxService {
             if let Some(converter) = &*converter_lock {
                 // Use the converter to convert the amount
                 let today = Utc::now().naive_utc().date();
-                match converter.convert_amount(amount.clone(), from_currency, to_currency, today) {
+                match converter.convert_amount(amount, from_currency, to_currency, today) {
                     Ok(converted) => return Ok(converted),
-                    Err(e) => {
-                        log::warn!(
-                            "Converter failed to convert {}{} to {}: {}",
-                            amount.clone(),
-                            from_currency,
-                            to_currency,
-                            e
-                        );
+                    Err(_) => {
                         // Fall through to fallback
                     }
                 }
@@ -287,12 +270,6 @@ impl FxServiceTrait for FxService {
         }
 
         // Fallback to direct rate lookup
-        log::info!(
-            "Falling back to direct rate lookup for converting {}{} to {}",
-            amount.clone(),
-            from_currency,
-            to_currency
-        );
         let rate = self.get_latest_exchange_rate(from_currency, to_currency)?;
         Ok(amount * rate)
     }
@@ -312,36 +289,16 @@ impl FxServiceTrait for FxService {
         if let Ok(converter_lock) = self.converter.read() {
             if let Some(converter) = &*converter_lock {
                 // Use the converter to convert the amount for the specific date
-                match converter.convert_amount_nearest(
-                    amount.clone(),
-                    from_currency,
-                    to_currency,
-                    date,
-                ) {
+                match converter.convert_amount_nearest(amount, from_currency, to_currency, date) {
                     Ok(converted) => return Ok(converted),
-                    Err(e) => {
-                        log::warn!(
-                            "Converter failed to convert {}{} to {} on {}: {}",
-                            amount.clone(),
-                            from_currency,
-                            to_currency,
-                            date,
-                            e
-                        );
+                    Err(_) => {
                         // Fall through to fallback
                     }
                 }
             }
         }
 
-        // Fallback to direct rate lookup
-        log::info!(
-            "Falling back to direct rate lookup for converting {}{} to {} on {}",
-            amount,
-            from_currency,
-            to_currency,
-            date
-        );
+        // Fallback to direct rate lookup - logging happens in get_exchange_rate_for_date
         let rate = self.get_exchange_rate_for_date(from_currency, to_currency, date)?;
         Ok(amount * rate)
     }

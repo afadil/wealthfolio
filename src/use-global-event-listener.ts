@@ -34,10 +34,6 @@ function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, str
       id: `market-sync-error-${failedSymbols || "unknown"}`,
       description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
       duration: 15000,
-      cancel: {
-        label: "Dismiss",
-        onClick: () => {},
-      },
     });
   } else {
     toast.dismiss(TOAST_IDS.marketSyncStart);

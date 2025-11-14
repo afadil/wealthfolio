@@ -1,3 +1,4 @@
+import AppLauncher from "@/components/app-launcher";
 import { Toaster } from "@/components/sonner";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
 import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
@@ -57,7 +58,8 @@ const AppLayout = () => {
 
       {shouldUseMobileNavigation && <MobileNavBar navigation={navigation} />}
 
-      <Toaster mobileOffset={{ top: "68px" }} />
+      <Toaster mobileOffset={{ top: "68px" }} closeButton expand={false} />
+      <AppLauncher />
     </ApplicationShell>
   );
 };

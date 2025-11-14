@@ -1,8 +1,11 @@
+import { RUN_ENV, getRunEnv } from "@/adapters";
+import { AuthGate, AuthProvider } from "@/context/auth-context";
 import { SettingsProvider } from "@/lib/settings-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@wealthfolio/ui";
 import { useState } from "react";
 import { PrivacyProvider } from "./context/privacy-context";
+import { LoginPage } from "./pages/auth/login-page";
 import { AppRoutes } from "./routes";
 
 function App() {
@@ -19,18 +22,28 @@ function App() {
       }),
   );
 
+  const isWeb = getRunEnv() === RUN_ENV.WEB;
+
   // Make QueryClient available globally for addons
   window.__wealthfolio_query_client__ = queryClient;
 
+  const routedContent = isWeb ? (
+    <AuthGate fallback={<LoginPage />}>
+      <AppRoutes />
+    </AuthGate>
+  ) : (
+    <AppRoutes />
+  );
+
   return (
     <QueryClientProvider client={queryClient}>
-      <PrivacyProvider>
-        <SettingsProvider>
-          <TooltipProvider>
-            <AppRoutes />
-          </TooltipProvider>
-        </SettingsProvider>
-      </PrivacyProvider>
+      <AuthProvider>
+        <PrivacyProvider>
+          <SettingsProvider>
+            <TooltipProvider>{routedContent}</TooltipProvider>
+          </SettingsProvider>
+        </PrivacyProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

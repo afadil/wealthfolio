@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "vite",
+    "dev:addons": "vite --mode addon-dev",
     "dev:web": "node scripts/dev-web.mjs",
     "build": "pnpm run build:types && tsc && vite build && pnpm -r build",
     "build:types": "pnpm -r run build:types",
@@ -74,6 +75,7 @@
   "devDependencies": {
     "@eslint/compat": "^1.3.2",
     "@eslint/js": "^9.35.0",
+    "@playwright/test": "^1.56.1",
     "@tanstack/eslint-plugin-query": "^5.89.0",
     "@tauri-apps/cli": "^2.8.4",
     "@testing-library/jest-dom": "^6.8.0",

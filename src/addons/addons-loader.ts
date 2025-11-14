@@ -1,13 +1,17 @@
 import { logger } from "@/adapters";
 import { loadInstalledAddons, unloadAllAddons } from "@/addons/addons-core";
 
+export const isAddonDevModeEnabled =
+  import.meta.env.DEV &&
+  (import.meta.env.MODE === "addon-dev" || import.meta.env.VITE_ENABLE_ADDON_DEV_MODE === "true");
+
 /**
  * Loads all discovered addons with development mode support
  */
 export async function loadAllAddons(): Promise<void> {
   try {
-    // Check if we're in development mode and have dev servers
-    if (import.meta.env.DEV) {
+    // Check if we're in the dedicated addon development mode
+    if (isAddonDevModeEnabled) {
       logger.info("🔧 Development mode detected, checking for dev servers...");
 
       // Dynamic import for development mode
@@ -36,6 +40,10 @@ export async function loadAllAddons(): Promise<void> {
       } else {
         logger.info("🔍 No development servers found, falling back to installed addons");
       }
+    } else if (import.meta.env.DEV) {
+      logger.info(
+        "ℹ️ Addon development mode skipped. Run `pnpm dev:addons` or set VITE_ENABLE_ADDON_DEV_MODE=true to enable it.",
+      );
     }
 
     // Standard production loading
@@ -54,4 +62,4 @@ export async function reloadAllAddons(): Promise<void> {
 }
 
 // Re-export functions from core for backward compatibility
-export { unloadAllAddons, getLoadedAddons, debugAddonState } from "@/addons/addons-core";
+export { debugAddonState, getLoadedAddons, unloadAllAddons } from "@/addons/addons-core";

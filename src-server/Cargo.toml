@@ -23,6 +23,8 @@ chrono = { version = "0.4", features = ["serde"] }
 serde_urlencoded = "0.7"
 reqwest = { version = "0.11", features = ["json"] }
 base64 = "0.21"
+argon2 = { version = "0.5", features = ["std"] }
+jsonwebtoken = "9"
 chacha20poly1305 = { version = "0.10", features = ["std"] }
 rand = "0.8"
 tokio-stream = { version = "0.1", features = ["sync"] }

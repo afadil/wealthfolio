@@ -7,6 +7,7 @@ import SettingsLayout from "@/pages/settings/settings-layout";
 
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
@@ -67,6 +68,7 @@ export function AppRoutes() {
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="activities" element={<ActivityPage />} />
+          <Route path="activities/manage" element={<ActivityManagerPage />} />
           <Route path="holdings" element={<HoldingsPage />} />
           <Route path="holdings/:symbol" element={<AssetProfilePage />} />
           <Route path="import" element={<ActivityImportPage />} />
