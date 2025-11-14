@@ -1,0 +1,56 @@
+use std::sync::Arc;
+
+use crate::{
+    error::ApiResult,
+    main_lib::AppState,
+};
+use axum::{
+    extract::{Path, State},
+    routing::{delete, get, put},
+    Json, Router,
+};
+use wealthfolio_core::fx::fx_model::{ExchangeRate, NewExchangeRate};
+
+async fn get_latest_exchange_rates(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<ExchangeRate>>> {
+    let rates = state.fx_service.get_latest_exchange_rates()?;
+    Ok(Json(rates))
+}
+
+async fn update_exchange_rate(
+    State(state): State<Arc<AppState>>,
+    Json(rate): Json<ExchangeRate>,
+) -> ApiResult<Json<ExchangeRate>> {
+    let updated = state
+        .fx_service
+        .update_exchange_rate(&rate.from_currency, &rate.to_currency, rate.rate)
+        .await?;
+    Ok(Json(updated))
+}
+
+async fn add_exchange_rate(
+    State(state): State<Arc<AppState>>,
+    Json(new_rate): Json<NewExchangeRate>,
+) -> ApiResult<Json<ExchangeRate>> {
+    let added = state.fx_service.add_exchange_rate(new_rate).await?;
+    Ok(Json(added))
+}
+
+async fn delete_exchange_rate(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<()> {
+    state.fx_service.delete_exchange_rate(&id).await?;
+    Ok(())
+}
+
+pub fn router() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/exchange-rates/latest", get(get_latest_exchange_rates))
+        .route(
+            "/exchange-rates",
+            put(update_exchange_rate).post(add_exchange_rate),
+        )
+        .route("/exchange-rates/:id", delete(delete_exchange_rate))
+}
