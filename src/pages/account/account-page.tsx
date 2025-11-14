@@ -1,3 +1,4 @@
+import { getHoldings } from "@/commands/portfolio";
 import { HistoryChart } from "@/components/history-chart";
 import {
   Card,
@@ -37,8 +38,10 @@ import {
 import { useAccounts } from "@/hooks/use-accounts";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { AccountType } from "@/lib/constants";
-import { Account, AccountValuation, DateRange, TimePeriod, TrackedItem } from "@/lib/types";
+import { QueryKeys } from "@/lib/query-keys";
+import { Account, AccountValuation, DateRange, Holding, HoldingType, TimePeriod, TrackedItem } from "@/lib/types";
 import { calculatePerformanceMetrics, cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { Icons, type Icon } from "@wealthfolio/ui";
@@ -82,6 +85,18 @@ const AccountPage = () => {
 
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
+
+  // Query holdings to check if account has any assets
+  const { data: holdings, isLoading: isHoldingsLoading } = useQuery<Holding[], Error>({
+    queryKey: [QueryKeys.HOLDINGS, id],
+    queryFn: () => getHoldings(id),
+  });
+
+  // Check if account has any holdings (including cash)
+  const hasHoldings = useMemo(() => {
+    if (!holdings) return false;
+    return holdings.length > 0;
+  }, [holdings]);
 
   // Group accounts by type for the selector
   const accountsByType = useMemo(() => {
@@ -289,68 +304,74 @@ const AccountPage = () => {
         }
       />
       <PageContent>
-        <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
-          <Card className="col-span-1 md:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-md">
-                <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
-                  <div className="flex items-start gap-2">
-                    <div>
-                      <p className="pt-3 text-xl font-bold">
-                        <PrivacyAmount
-                          value={currentValuation?.totalValue ?? 0}
-                          currency={account?.currency ?? "USD"}
-                        />
-                      </p>
-                      <div className="flex space-x-3 text-sm">
-                        <GainAmount
-                          className="text-sm font-light"
-                          value={frontendGainLossAmount}
-                          currency={account?.currency ?? "USD"}
-                          displayCurrency={false}
-                        />
-                        <div className="border-muted-foreground my-1 border-r pr-2" />
-                        <GainPercent
-                          className="text-sm font-light"
-                          value={percentageToDisplay}
-                          animated={true}
+        {hasHoldings && !isHoldingsLoading ? (
+          <>
+            <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
+              <Card className="col-span-1 md:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-md">
+                    <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
+                      <div className="flex items-start gap-2">
+                        <div>
+                          <p className="pt-3 text-xl font-bold">
+                            <PrivacyAmount
+                              value={currentValuation?.totalValue ?? 0}
+                              currency={account?.currency ?? "USD"}
+                            />
+                          </p>
+                          <div className="flex space-x-3 text-sm">
+                            <GainAmount
+                              className="text-sm font-light"
+                              value={frontendGainLossAmount}
+                              currency={account?.currency ?? "USD"}
+                              displayCurrency={false}
+                            />
+                            <div className="border-muted-foreground my-1 border-r pr-2" />
+                            <GainPercent
+                              className="text-sm font-light"
+                              value={percentageToDisplay}
+                              animated={true}
+                            />
+                          </div>
+                        </div>
+                        <PrivacyToggle className="mt-3" />
+                      </div>
+                    </PortfolioUpdateTrigger>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="w-full p-0">
+                    <div className="flex w-full flex-col">
+                      <div className="h-[480px] w-full">
+                        <HistoryChart data={chartData} isLoading={false} />
+                        <IntervalSelector
+                          className="relative right-0 bottom-10 left-0 z-10"
+                          onIntervalSelect={handleIntervalSelect}
+                          isLoading={isValuationHistoryLoading}
+                          initialSelection={INITIAL_INTERVAL_CODE}
                         />
                       </div>
                     </div>
-                    <PrivacyToggle className="mt-3" />
                   </div>
-                </PortfolioUpdateTrigger>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="w-full p-0">
-                <div className="flex w-full flex-col">
-                  <div className="h-[480px] w-full">
-                    <HistoryChart data={chartData} isLoading={false} />
-                    <IntervalSelector
-                      className="relative right-0 bottom-10 left-0 z-10"
-                      onIntervalSelect={handleIntervalSelect}
-                      isLoading={isValuationHistoryLoading}
-                      initialSelection={INITIAL_INTERVAL_CODE}
-                    />
-                  </div>
-                </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex flex-col space-y-4">
+                <AccountMetrics
+                  valuation={currentValuation}
+                  performance={accountPerformance}
+                  className="grow"
+                  isLoading={isDetailsLoading || isPerformanceHistoryLoading}
+                />
+                <AccountContributionLimit accountId={id} />
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <div className="flex flex-col space-y-4">
-            <AccountMetrics
-              valuation={currentValuation}
-              performance={accountPerformance}
-              className="grow"
-              isLoading={isDetailsLoading || isPerformanceHistoryLoading}
-            />
-            <AccountContributionLimit accountId={id} />
-          </div>
-        </div>
-
-        <AccountHoldings accountId={id} />
+            <AccountHoldings accountId={id} />
+          </>
+        ) : (
+          <AccountHoldings accountId={id} showEmptyState={true} />
+        )}
       </PageContent>
     </Page>
   );

@@ -1,6 +1,8 @@
 import { useAccounts } from "@/hooks/use-accounts";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useHoldings } from "@/hooks/use-holdings";
 import { AccountType, HoldingType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { Account } from "@/lib/types";
 import { useNavigation } from "@/pages/layouts/navigation/app-navigation";
 import {
@@ -41,6 +43,8 @@ export function AppLauncher() {
   const navigation = useNavigation();
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const { holdings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+  const { isBalanceHidden, toggleBalanceVisibility } = useBalancePrivacy();
+  const { updateSettings } = useSettingsContext();
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -83,20 +87,136 @@ export function AppLauncher() {
 
   // Combine navigation items with additional quick actions
   const actionItems = useMemo(() => {
+    // Build smart URL with context awareness and optional activity type
+    const buildTransactionUrl = (activityType?: string) => {
+      const path = location.pathname;
+      const params = new URLSearchParams();
+
+      // Add activity type if provided
+      if (activityType) {
+        params.set("type", activityType);
+      }
+
+      // Check if on account page: /accounts/:id
+      const accountRegex = /^\/accounts\/([^/]+)$/;
+      const accountMatch = accountRegex.exec(path);
+      if (accountMatch) {
+        const accountId = accountMatch[1];
+        params.set("account", accountId);
+        params.set("redirect-to", path);
+      }
+
+      // Check if on asset profile page: /holdings/:symbol (only for trade activities)
+      if (!activityType || ["BUY", "SELL"].includes(activityType)) {
+        const assetRegex = /^\/holdings\/([^/]+)$/;
+        const assetMatch = assetRegex.exec(path);
+        if (assetMatch) {
+          const symbol = decodeURIComponent(assetMatch[1]);
+          params.set("symbol", symbol);
+          if (!params.has("redirect-to")) {
+            params.set("redirect-to", path);
+          }
+        }
+      }
+
+      return `/activities/manage${params.toString() ? `?${params.toString()}` : ""}`;
+    };
+
     // Additional quick actions not in main navigation
     const quickActions = [
       {
-        title: "Add Activity",
-        href: "/activities",
+        title: isBalanceHidden ? "Show Balance" : "Hide Balance",
+        href: "#toggle-privacy",
+        icon: isBalanceHidden ? (
+          <Icons.Eye className="size-6" />
+        ) : (
+          <Icons.EyeOff className="size-6" />
+        ),
+        keywords: ["privacy", "hide", "show", "balance", "toggle", "visibility"],
+        label: isBalanceHidden ? "Show Balance" : "Hide Balance",
+      },
+      {
+        title: "Theme → Light",
+        href: "#theme-light",
+        icon: <Icons.Sun className="size-6" />,
+        keywords: ["theme", "light", "appearance", "mode"],
+        label: "Theme → Light",
+      },
+      {
+        title: "Theme → Dark",
+        href: "#theme-dark",
+        icon: <Icons.Moon className="size-6" />,
+        keywords: ["theme", "dark", "appearance", "mode"],
+        label: "Theme → Dark",
+      },
+      {
+        title: "Theme → System",
+        href: "#theme-system",
+        icon: <Icons.Monitor className="size-6" />,
+        keywords: ["theme", "system", "appearance", "mode", "auto"],
+        label: "Theme → System",
+      },
+      {
+        title: "Record Buy",
+        href: buildTransactionUrl("BUY"),
         icon: <Icons.Plus className="size-6" />,
-        keywords: ["add", "new", "create", "transaction", "trade"],
-        label: "Add Activity",
+        keywords: ["buy", "purchase", "trade", "stock", "shares", "record"],
+        label: "Record Buy",
+      },
+      {
+        title: "Record Sell",
+        href: buildTransactionUrl("SELL"),
+        icon: <Icons.TrendingDown className="size-6" />,
+        keywords: ["sell", "sale", "trade", "stock", "shares", "record"],
+        label: "Record Sell",
+      },
+      {
+        title: "Record Dividend",
+        href: buildTransactionUrl("DIVIDEND"),
+        icon: <Icons.Income className="size-6" />,
+        keywords: ["dividend", "income", "payout", "distribution", "record"],
+        label: "Record Dividend",
+      },
+      {
+        title: "Record Deposit",
+        href: buildTransactionUrl("DEPOSIT"),
+        icon: <Icons.DollarSign className="size-6" />,
+        keywords: ["deposit", "add", "money", "cash", "fund", "record"],
+        label: "Record Deposit",
+      },
+      {
+        title: "Record Withdrawal",
+        href: buildTransactionUrl("WITHDRAWAL"),
+        icon: <Icons.ArrowDown className="size-6" />,
+        keywords: ["withdrawal", "withdraw", "money", "cash", "take out", "record"],
+        label: "Record Withdrawal",
+      },
+      {
+        title: "Add Holding",
+        href: buildTransactionUrl("ADD_HOLDING"),
+        icon: <Icons.Wallet className="size-6" />,
+        keywords: ["holding", "add", "position", "import", "record"],
+        label: "Add Holding",
+      },
+      {
+        title: "Record Interest",
+        href: buildTransactionUrl("INTEREST"),
+        icon: <Icons.Percent className="size-6" />,
+        keywords: ["interest", "income", "earned", "bank", "record"],
+        label: "Record Interest",
+      },
+      {
+        title: "Add Transaction",
+        href: buildTransactionUrl(),
+        icon: <Icons.Activity className="size-6" />,
+        keywords: ["add", "new", "create", "transaction", "activity", "any"],
+        label: "Add Transaction",
       },
       {
         title: "Import Activities",
         href: "/import",
         icon: <Icons.Import className="size-6" />,
-        keywords: ["import", "csv", "upload", "file"],
+        keywords: ["import", "csv", "upload", "file", "bulk"],
         label: "Import Activities",
       },
     ];
@@ -108,7 +228,7 @@ export function AppLauncher() {
     ];
 
     return [...quickActions, ...navItems];
-  }, [navigation]);
+  }, [navigation, location.pathname, isBalanceHidden]);
 
   const holdingOptions = useMemo<LauncherHoldingItem[]>(() => {
     if (!holdings?.length) {
@@ -148,6 +268,7 @@ export function AppLauncher() {
     if (!symbol) {
       return;
     }
+    setSearch("");
     setOpen(false);
     navigate(`/holdings/${encodeURIComponent(symbol)}`);
   };
@@ -155,6 +276,7 @@ export function AppLauncher() {
     if (!accountId) {
       return;
     }
+    setSearch("");
     setOpen(false);
     navigate(`/accounts/${accountId}`);
   };
@@ -163,6 +285,37 @@ export function AppLauncher() {
     if (!path) {
       return;
     }
+
+    // Handle special toggle actions
+    if (path === "#toggle-privacy") {
+      toggleBalanceVisibility();
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    if (path === "#theme-light") {
+      updateSettings({ theme: "light" });
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    if (path === "#theme-dark") {
+      updateSettings({ theme: "dark" });
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    if (path === "#theme-system") {
+      updateSettings({ theme: "system" });
+      setSearch("");
+      setOpen(false);
+      return;
+    }
+
+    setSearch("");
     setOpen(false);
     navigate(path);
   };
