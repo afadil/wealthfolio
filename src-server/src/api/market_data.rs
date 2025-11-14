@@ -83,16 +83,19 @@ async fn update_quote(
     Path(symbol): Path<String>,
     State(state): State<Arc<AppState>>,
     Json(mut quote): Json<Quote>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     // Ensure symbol matches body
     quote.symbol = symbol;
     state.market_data_service.update_quote(quote).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
-async fn delete_quote(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<()> {
+async fn delete_quote(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<StatusCode> {
     state.market_data_service.delete_quote(&id).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn sync_history_quotes(State(state): State<Arc<AppState>>) -> ApiResult<StatusCode> {
@@ -113,7 +116,7 @@ struct SyncBody {
 async fn sync_market_data(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SyncBody>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     // Prefer targeted resync when symbols provided; otherwise do global sync/resync based on refetch_all
     if let Some(symbols) = body.symbols.clone() {
         let _ = state
@@ -125,7 +128,7 @@ async fn sync_market_data(
     } else {
         let _ = state.market_data_service.sync_market_data().await?;
     }
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub fn router() -> Router<Arc<AppState>> {

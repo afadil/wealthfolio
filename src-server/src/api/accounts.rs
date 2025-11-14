@@ -7,6 +7,7 @@ use crate::{
 };
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::{get, put},
     Json, Router,
 };
@@ -43,9 +44,9 @@ async fn update_account(
 async fn delete_account(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     state.account_service.delete_account(&id).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub fn router() -> Router<Arc<AppState>> {

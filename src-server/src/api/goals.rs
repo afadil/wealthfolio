@@ -33,9 +33,12 @@ async fn update_goal(
     Ok(Json(g))
 }
 
-async fn delete_goal(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> ApiResult<()> {
+async fn delete_goal(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<StatusCode> {
     let _ = state.goal_service.delete_goal(id).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn load_goals_allocations(

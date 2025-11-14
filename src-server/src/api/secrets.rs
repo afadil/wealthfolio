@@ -6,6 +6,7 @@ use crate::{
 };
 use axum::{
     extract::{Query, State},
+    http::StatusCode,
     routing::post,
     Json, Router,
 };
@@ -20,11 +21,11 @@ struct SecretSetBody {
 async fn set_secret(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SecretSetBody>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     state
         .secret_store
         .set_secret(&body.provider_id, &body.secret)?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(serde::Deserialize)]
@@ -44,9 +45,9 @@ async fn get_secret(
 async fn delete_secret(
     State(state): State<Arc<AppState>>,
     Query(q): Query<SecretQuery>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     state.secret_store.delete_secret(&q.provider_id)?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub fn router() -> Router<Arc<AppState>> {

@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::{get, put},
     Json, Router,
 };
@@ -44,9 +42,9 @@ async fn update_contribution_limit(
 async fn delete_contribution_limit(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     state.limits_service.delete_contribution_limit(&id).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn calculate_deposits_for_contribution_limit(

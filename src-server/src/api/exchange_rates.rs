@@ -6,6 +6,7 @@ use crate::{
 };
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::{delete, get, put},
     Json, Router,
 };
@@ -40,9 +41,9 @@ async fn add_exchange_rate(
 async fn delete_exchange_rate(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     state.fx_service.delete_exchange_rate(&id).await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub fn router() -> Router<Arc<AppState>> {
