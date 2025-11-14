@@ -172,13 +172,15 @@ pnpm tauri dev
 
 #### Addon Development Mode
 
-Addon hot reload servers now start only when you explicitly opt in. Use the dedicated Vite mode:
+Addon hot reload servers now start only when you explicitly opt in. Use the
+dedicated Vite mode:
 
 ```bash
 pnpm dev:addons
 ```
 
-Alternatively, set `VITE_ENABLE_ADDON_DEV_MODE=true` in your environment before running any dev script.
+Alternatively, set `VITE_ENABLE_ADDON_DEV_MODE=true` in your environment before
+running any dev script.
 
 5. **Build for Production**:
 
@@ -297,7 +299,7 @@ environment variables.
 Build the Docker image directly from source (no pre-build required):
 
 ```bash
-docker build -t wealthfolio-web .
+docker build -t wealthfolio .
 ```
 
 The build process:
@@ -324,10 +326,12 @@ You can configure the container using either:
 ```bash
 # Create a Docker-specific environment file
 cat > .env.docker << 'EOF'
-WF_LISTEN_ADDR=0.0.0.0:8080
+WF_LISTEN_ADDR=0.0.0.0:8088
 WF_DB_PATH=/data/wealthfolio.db
 WF_SECRET_KEY=<generate-with-openssl-rand>
 WF_CORS_ALLOW_ORIGINS=*
+WF_REQUEST_TIMEOUT_MS=30000
+WF_STATIC_DIR=dist
 EOF
 ```
 
@@ -347,45 +351,49 @@ See examples below for inline configuration.
 
 ```bash
 docker run --rm -d \
+  --name wealthfolio \
   --env-file .env.docker \
-  -p 8080:8080 \
+  -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio-web
+  wealthfolio
 ```
 
 **Basic usage** (inline environment variables):
 
 ```bash
 docker run --rm -d \
-  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  --name wealthfolio \
+  -e WF_LISTEN_ADDR=0.0.0.0:8088 \
   -e WF_DB_PATH=/data/wealthfolio.db \
-  -p 8080:8080 \
+  -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio-web
+  wealthfolio
 ```
 
 **Development mode** (with CORS for local Vite dev server):
 
 ```bash
 docker run --rm -it \
-  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  --name wealthfolio \
+  -e WF_LISTEN_ADDR=0.0.0.0:8088 \
   -e WF_DB_PATH=/data/wealthfolio.db \
   -e WF_CORS_ALLOW_ORIGINS=http://localhost:1420 \
-  -p 8080:8080 \
+  -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio-web
+  wealthfolio
 ```
 
 **Production with encryption** (recommended):
 
 ```bash
 docker run --rm -d \
-  -e WF_LISTEN_ADDR=0.0.0.0:8080 \
+  --name wealthfolio \
+  -e WF_LISTEN_ADDR=0.0.0.0:8088 \
   -e WF_DB_PATH=/data/wealthfolio.db \
   -e WF_SECRET_KEY=$(openssl rand -base64 32) \
-  -p 8080:8080 \
+  -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio-web
+  wealthfolio
 ```
 
 ### Environment Variables
@@ -393,7 +401,8 @@ docker run --rm -d \
 The container supports all `WF_*` environment variables documented in the
 [Web Mode Configuration](#configuration) section. Key variables:
 
-- `WF_LISTEN_ADDR` - Bind address (use `0.0.0.0:8080` for Docker)
+- `WF_LISTEN_ADDR` - Bind address (**must use `0.0.0.0:PORT` for Docker**, not
+  `127.0.0.1`)
 - `WF_DB_PATH` - Database path (typically `/data/wealthfolio.db`)
 - `WF_CORS_ALLOW_ORIGINS` - CORS origins (set for dev/frontend access)
 - `WF_SECRET_KEY` - Required 32-byte key used for secrets encryption and JWT
@@ -407,9 +416,13 @@ The container supports all `WF_*` environment variables documented in the
 
 ### Ports
 
-- `8080` - HTTP server (serves both API and static frontend)
+- `8088` - HTTP server (serves both API and static frontend)
 
-Access the application at `http://localhost:8080` after starting the container.
+Access the application at `http://localhost:8088` after starting the container.
+
+**Important:** The server must bind to `0.0.0.0` (all interfaces) inside the
+container to be accessible from your host machine. Binding to `127.0.0.1` will
+make the app only accessible from within the container.
 
 ### Development with DevContainer
 
