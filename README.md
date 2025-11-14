@@ -170,6 +170,16 @@ Build and run the desktop application using Tauri:
 pnpm tauri dev
 ```
 
+#### Addon Development Mode
+
+Addon hot reload servers now start only when you explicitly opt in. Use the dedicated Vite mode:
+
+```bash
+pnpm dev:addons
+```
+
+Alternatively, set `VITE_ENABLE_ADDON_DEV_MODE=true` in your environment before running any dev script.
+
 5. **Build for Production**:
 
 Build the application for production:

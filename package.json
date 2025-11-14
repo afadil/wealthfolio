@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "vite",
+    "dev:addons": "vite --mode addon-dev",
     "dev:web": "node scripts/dev-web.mjs",
     "build": "pnpm run build:types && tsc && vite build && pnpm -r build",
     "build:types": "pnpm -r run build:types",

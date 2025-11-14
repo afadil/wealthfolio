@@ -1,18 +1,21 @@
+import { RUN_ENV, getRunEnv } from "@/adapters";
 import React from "react";
 import * as ReactDOMLegacy from "react-dom";
 import ReactDOM from "react-dom/client";
-import { debugAddonState, loadAllAddons } from "./addons/addons-loader";
+import { debugAddonState, isAddonDevModeEnabled, loadAllAddons } from "./addons/addons-loader";
 import "./addons/addons-runtime-context";
 import App from "./App";
-// import { installLockdown } from "./lockdown";
 import "./styles.css";
 
-// Initialize development mode only in development
-// if (import.meta.env.DEV) {
-//   import("./addons/addons-dev-mode");
-// } else {
-//   installLockdown();
-// }
+const runEnv = getRunEnv();
+
+if (isAddonDevModeEnabled) {
+  void import("./addons/addons-dev-mode");
+} else if (runEnv === RUN_ENV.DESKTOP && !import.meta.env.DEV) {
+  void import("./lockdown").then(({ installLockdown }) => {
+    installLockdown();
+  });
+}
 
 // Expose React and ReactDOM globally for addons
 // ReactDOM/client only has createRoot/hydrateRoot, but addons need createPortal from react-dom
