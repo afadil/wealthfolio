@@ -6,6 +6,8 @@ export interface NavLink {
   title: string;
   href: string;
   icon?: React.ReactNode;
+  keywords?: string[];
+  label?: string; // Optional descriptive label for launcher/search
 }
 
 export interface NavigationProps {
@@ -20,26 +22,36 @@ const staticNavigation: NavigationProps = {
       icon: <Icons.Dashboard className="size-6" />,
       title: "Dashboard",
       href: "/dashboard",
+      keywords: ["home", "overview", "summary"],
+      label: "View Dashboard",
     },
     {
       icon: <Icons.Holdings className="size-6" />,
       title: "Holdings",
       href: "/holdings",
+      keywords: ["portfolio", "assets", "positions", "stocks"],
+      label: "View Holdings",
     },
     {
       icon: <Icons.Performance className="size-6" />,
       title: "Performance",
       href: "/performance",
+      keywords: ["returns", "metrics", "gains", "losses"],
+      label: "View Performance",
     },
     {
       icon: <Icons.Income className="size-6" />,
       title: "Income",
       href: "/income",
+      keywords: ["dividends", "interest", "earnings"],
+      label: "View Income",
     },
     {
       icon: <Icons.Activity className="size-6" />,
       title: "Activities",
       href: "/activities",
+      keywords: ["transactions", "trades", "history"],
+      label: "View Activities",
     },
   ],
   secondary: [
@@ -47,6 +59,7 @@ const staticNavigation: NavigationProps = {
       icon: <Icons.Settings className="size-6" />,
       title: "Settings",
       href: "/settings",
+      keywords: ["preferences", "config", "configuration"],
     },
   ],
 };
