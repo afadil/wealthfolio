@@ -3,6 +3,7 @@ use std::{
 };
 
 use crate::{
+    auth,
     config::Config,
     error::{ApiError, ApiResult},
     events::{
@@ -14,6 +15,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context};
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::{
     extract::{Path, Query, RawQuery, State},
     response::sse::{Event as SseEvent, KeepAlive, Sse},
@@ -1319,10 +1321,9 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
     };
 
     let openapi = ApiDoc::openapi();
+    let requires_auth = state.auth.is_some();
 
-    let api = Router::new()
-        .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz))
+    let protected_api = Router::new()
         .route("/accounts", get(list_accounts).post(create_account))
         .route("/accounts/:id", put(update_account).delete(delete_account))
         .route("/settings", get(get_settings).put(update_settings))
@@ -1412,9 +1413,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
             "/addons/enabled-on-startup",
             get(get_enabled_addons_on_startup_web),
         )
-        .route("/addons/extract", post(extract_addon_zip_web));
-    // Store + staging
-    let api = api
+        .route("/addons/extract", post(extract_addon_zip_web))
         .route(
             "/addons/store/listings",
             get(fetch_addon_store_listings_web),
@@ -1451,6 +1450,23 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
             post(initialize_sync_for_existing_data_web),
         )
         .route("/sync/probe", post(probe_local_network_access_web));
+
+    let protected_api = if requires_auth {
+        protected_api.layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_jwt,
+        ))
+    } else {
+        protected_api
+    };
+
+    let api = Router::new()
+        .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
+        .route("/auth/status", get(auth::auth_status))
+        .route("/auth/login", post(auth::login))
+        .merge(protected_api)
+        .with_state(state.clone());
 
     Router::new()
         .nest("/api/v1", api)

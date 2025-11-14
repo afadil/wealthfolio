@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/use-toast";
 import {
   calculateActivityValue,
   isCashActivity,
@@ -26,7 +27,6 @@ import {
   formatAmount,
   worldCurrencies,
 } from "@wealthfolio/ui";
-import { toast } from "@/components/ui/use-toast";
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
@@ -364,8 +364,7 @@ export function ActivityDatagrid({
             if (!isCashActivity(updated.activityType)) {
               return;
             }
-            const derivedCurrency =
-              updated.currency ?? updated.accountCurrency ?? fallbackCurrency;
+            const derivedCurrency = updated.currency ?? updated.accountCurrency ?? fallbackCurrency;
             const cashSymbol = `$CASH-${derivedCurrency.toUpperCase()}`;
             updated.assetSymbol = cashSymbol;
             updated.assetId = cashSymbol;
@@ -611,7 +610,7 @@ export function ActivityDatagrid({
 
       toast({
         title: "Activities saved",
-        description: "Your pending changes are now synced.",
+        description: "Your pending changes are now saved.",
         variant: "success",
       });
 
@@ -847,10 +846,10 @@ const TransactionRow = memo(
     onEditTransaction,
     onDuplicate,
     onDelete,
-  onNavigate,
-  setFocusedCell,
-  fallbackCurrency,
-}: TransactionRowProps) {
+    onNavigate,
+    setFocusedCell,
+    fallbackCurrency,
+  }: TransactionRowProps) {
     const isCash = isCashActivity(transaction.activityType);
     const isSplit = transaction.activityType === ActivityType.SPLIT;
     const handleFocus = useCallback(
@@ -867,7 +866,7 @@ const TransactionRow = memo(
     const normalizedCurrency = currency.toUpperCase();
     const assetSymbolDisplay =
       transaction.assetSymbol ??
-      (isCash ? `$CASH-${normalizedCurrency}` : transaction.assetSymbol ?? "");
+      (isCash ? `$CASH-${normalizedCurrency}` : (transaction.assetSymbol ?? ""));
     const assetSymbol = transaction.assetSymbol ?? "";
     const unitPriceDisplay = (() => {
       if (transaction.activityType === ActivityType.FEE) {

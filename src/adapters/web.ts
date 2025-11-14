@@ -1,3 +1,4 @@
+import { getAuthToken, notifyUnauthorized } from "@/lib/auth-token";
 import type { EventCallback, UnlistenFn } from "./tauri";
 
 const API_PREFIX = "/api/v1";
@@ -479,11 +480,20 @@ export const invokeWeb = async <T>(
       break;
   }
 
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method: config.method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body,
   });
+  if (res.status === 401) {
+    notifyUnauthorized();
+  }
   if (!res.ok) {
     let msg = res.statusText;
     try {
