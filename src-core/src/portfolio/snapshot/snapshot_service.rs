@@ -56,8 +56,8 @@ pub trait SnapshotServiceTrait: Send + Sync {
     ) -> Result<Vec<AccountStateSnapshot>>;
 
     /// Retrieves the most recent calculated **holdings** snapshot for a specific account.
-    /// Valuation fields will be zero or default.
-    fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<AccountStateSnapshot>;
+    /// Returns `Ok(None)` when no snapshot exists yet. Valuation fields will be zero or default.
+    fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<Option<AccountStateSnapshot>>;
 
     /// Calculates and stores aggregated "TOTAL" portfolio snapshots based on individual account holdings.
     /// This should typically be run after `calculate_holdings_snapshots` has processed individual accounts.
@@ -1088,7 +1088,7 @@ impl SnapshotServiceTrait for SnapshotService {
         Ok(reconstructed_snapshots)
     }
 
-    fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<AccountStateSnapshot> {
+    fn get_latest_holdings_snapshot(&self, account_id: &str) -> Result<Option<AccountStateSnapshot>> {
         let today = Utc::now().naive_utc().date();
         // The date passed to get_latest_snapshot_before_date is exclusive, so use tomorrow to include today.
         let tomorrow = today.succ_opt().unwrap_or(today);
@@ -1096,7 +1096,7 @@ impl SnapshotServiceTrait for SnapshotService {
             .snapshot_repository
             .get_latest_snapshot_before_date(account_id, tomorrow)?
         {
-            Some(snapshot) => Ok(snapshot),
+            Some(snapshot) => Ok(Some(snapshot)),
             None => {
                 // It's possible no snapshot exists yet, which is not necessarily an error,
                 // but we should inform the caller.
@@ -1104,10 +1104,7 @@ impl SnapshotServiceTrait for SnapshotService {
                     "No snapshot found for account {} on or before {}",
                     account_id, today
                 );
-                Err(Error::Repository(format!(
-                    "No holdings snapshot found for account {}",
-                    account_id
-                )))
+                Ok(None)
             }
         }
     }

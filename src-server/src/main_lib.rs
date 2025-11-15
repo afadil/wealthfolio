@@ -51,6 +51,7 @@ pub struct AppState {
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub addons_root: String,
     pub data_root: String,
+    pub db_path: String,
     pub instance_id: String,
     pub secret_store: Arc<dyn SecretStore>,
     pub event_bus: EventBus,
@@ -58,12 +59,19 @@ pub struct AppState {
 }
 
 pub fn init_tracing() {
-    let fmt_layer = fmt::layer().json().with_current_span(false);
+    let log_format = std::env::var("WF_LOG_FORMAT").unwrap_or_else(|_| "text".to_string());
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .init();
+    let registry = tracing_subscriber::registry().with(filter);
+
+    if log_format.eq_ignore_ascii_case("json") {
+        registry
+            .with(fmt::layer().json().with_current_span(false))
+            .init();
+    } else {
+        registry
+            .with(fmt::layer().with_target(true).with_line_number(true))
+            .init();
+    }
 }
 
 pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
@@ -229,6 +237,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         asset_service,
         addons_root: config.addons_root.clone(),
         data_root,
+        db_path,
         instance_id: settings.instance_id,
         secret_store,
         event_bus,

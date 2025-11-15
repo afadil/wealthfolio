@@ -208,7 +208,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/activities/search", post(search_activities))
         .route("/activities", post(create_activity).put(update_activity))
         .route("/activities/bulk", post(save_activities))
-        .route("/activities/:id", delete(delete_activity))
+        .route("/activities/{id}", delete(delete_activity))
         .route("/activities/import/check", post(check_activities_import))
         .route("/activities/import", post(import_activities))
         .route(

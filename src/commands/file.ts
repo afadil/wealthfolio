@@ -59,17 +59,48 @@ export const openDatabaseFileDialog = async (): Promise<string | null> => {
   }
 };
 
+const saveFileInBrowser = (fileContent: Uint8Array | Blob | string, fileName: string) => {
+  if (typeof window === "undefined") {
+    throw new Error("File download requires a window context");
+  }
+
+  let blob: Blob;
+  if (fileContent instanceof Blob) {
+    blob = fileContent;
+  } else if (fileContent instanceof Uint8Array) {
+    const buffer = new Uint8Array(fileContent); // ensure ArrayBuffer
+    blob = new Blob([buffer], { type: "application/octet-stream" });
+  } else {
+    blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 // Function for downloading file content
 export async function openFileSaveDialog(
   fileContent: Uint8Array | Blob | string,
   fileName: string,
 ) {
-  switch (getRunEnv()) {
-    case RUN_ENV.DESKTOP:
-      return openFileSaveDialogTauri(fileContent, fileName);
-    case RUN_ENV.WEB:
-      throw new Error(`Unsupported environment for file download`);
-    default:
-      throw new Error(`Unsupported environment for file download`);
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return openFileSaveDialogTauri(fileContent, fileName);
+      case RUN_ENV.WEB:
+        saveFileInBrowser(fileContent, fileName);
+        return true;
+      default:
+        throw new Error(`Unsupported environment for file download`);
+    }
+  } catch (error) {
+    logger.error("Error saving file.");
+    throw error;
   }
 }

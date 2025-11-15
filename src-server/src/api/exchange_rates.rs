@@ -53,5 +53,5 @@ pub fn router() -> Router<Arc<AppState>> {
             "/exchange-rates",
             put(update_exchange_rate).post(add_exchange_rate),
         )
-        .route("/exchange-rates/:id", delete(delete_exchange_rate))
+        .route("/exchange-rates/{id}", delete(delete_exchange_rate))
 }

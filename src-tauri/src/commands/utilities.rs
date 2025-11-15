@@ -1,4 +1,5 @@
 use chrono;
+use serde::Serialize;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -13,6 +14,45 @@ fn normalize_file_path(path: &str) -> String {
     } else {
         path.to_string()
     }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppInfo {
+    version: String,
+    db_path: String,
+    logs_dir: String,
+}
+
+#[tauri::command]
+pub async fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, String> {
+    let version = app_handle.package_info().version.to_string();
+
+    let app_data_dir_path = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .to_path_buf();
+
+    let app_data_dir = app_data_dir_path
+        .to_str()
+        .ok_or_else(|| "Failed to convert app data dir path to string".to_string())?
+        .to_string();
+
+    let db_path = db::get_db_path(&app_data_dir);
+    let logs_dir = app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get app log dir: {}", e))?
+        .to_str()
+        .ok_or_else(|| "Failed to convert app log dir path to string".to_string())?
+        .to_string();
+
+    Ok(AppInfo {
+        version,
+        db_path,
+        logs_dir,
+    })
 }
 
 #[tauri::command]

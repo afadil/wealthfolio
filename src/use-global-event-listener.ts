@@ -19,10 +19,10 @@ const TOAST_IDS = {
 } as const;
 
 function handleMarketSyncStart() {
-  // toast.loading("Syncing market data...", {
-  //   id: TOAST_IDS.marketSyncStart,
-  //   duration: 3000,
-  // });
+  toast.loading("Syncing market data...", {
+    id: TOAST_IDS.marketSyncStart,
+    duration: 3000,
+  });
 }
 
 function handleMarketSyncComplete(event: { payload: { failed_syncs: [string, string][] } }) {

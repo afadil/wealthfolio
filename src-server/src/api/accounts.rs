@@ -52,5 +52,5 @@ async fn delete_account(
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/accounts", get(list_accounts).post(create_account))
-        .route("/accounts/:id", put(update_account).delete(delete_account))
+        .route("/accounts/{id}", put(update_account).delete(delete_account))
 }

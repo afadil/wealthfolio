@@ -1,8 +1,7 @@
-import { getVersion } from "@tauri-apps/api/app";
-import { appDataDir, appLogDir } from "@tauri-apps/api/path";
 import { check } from "@tauri-apps/plugin-updater";
 import { useEffect, useState } from "react";
 
+import { getAppInfo } from "@/commands/app";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
@@ -13,32 +12,24 @@ import { SettingsHeader } from "../settings-header";
 
 export default function AboutSettingsPage() {
   const [version, setVersion] = useState<string>("");
-  const [dbDir, setDbDir] = useState<string>("");
+  const [dbPath, setDbPath] = useState<string>("");
   const [logsDir, setLogsDir] = useState<string>("");
   const { isMobile } = usePlatform();
 
   useEffect(() => {
-    // Load version
-    getVersion()
-      .then(setVersion)
-      .catch(() => setVersion("")); // ignore errors
-
-    // Resolve directories (OS-specific via Tauri path API) - only on desktop
+    // Use unified command for both desktop and web
     if (!isMobile) {
-      (async () => {
-        try {
-          const dataDir = await appDataDir();
-          setDbDir(dataDir);
-        } catch {
-          setDbDir("");
-        }
-        try {
-          const logDir = await appLogDir();
-          setLogsDir(logDir);
-        } catch {
-          setLogsDir("");
-        }
-      })();
+      getAppInfo().then((info) => {
+        setVersion(info.version);
+        setDbPath(info.dbPath || "");
+        setLogsDir(info.logsDir);
+      });
+    } else {
+      // On mobile, only get version
+      getAppInfo().then((info) => {
+        setVersion(info.version);
+        setDbPath(info.dbPath || "");
+      });
     }
   }, [isMobile]);
 
@@ -77,10 +68,6 @@ export default function AboutSettingsPage() {
     }
   };
 
-  const handleOpenLink = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
   return (
     <div className="space-y-6">
       <SettingsHeader heading="About" text="Application information" />
@@ -100,31 +87,52 @@ export default function AboutSettingsPage() {
               A beautiful, simple, and secure personal finance and investment tracker that helps you
               take control of your wealth.
             </p>
-            <div className="flex flex-wrap items-center gap-3">
-              {!isMobile && <Button onClick={handleCheckForUpdates}>Check for Update</Button>}
+            <div className="flex flex-wrap items-center gap-2">
+              {!isMobile && (
+                <Button size="sm" onClick={handleCheckForUpdates}>
+                  Check for Update
+                </Button>
+              )}
               <Button
+                asChild
                 variant="outline"
-                onClick={() => handleOpenLink("https://wealthfolio.app")}
+                size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <Icons.Globe className="h-4 w-4" />
-                Website
+                <a href="https://wealthfolio.app" target="_blank" rel="noreferrer noopener">
+                  <Icons.Globe className="h-4 w-4" />
+                  Website
+                </a>
               </Button>
               <Button
+                asChild
                 variant="outline"
-                onClick={() => handleOpenLink("https://wealthfolio.app/docs/introduction/")}
+                size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <Icons.FileText className="h-4 w-4" />
-                Docs
+                <a
+                  href="https://wealthfolio.app/docs/introduction/"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <Icons.FileText className="h-4 w-4" />
+                  Docs
+                </a>
               </Button>
               <Button
+                asChild
                 variant="outline"
-                onClick={() => handleOpenLink("https://github.com/afadil/wealthfolio")}
+                size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <Icons.ExternalLink className="h-4 w-4" />
-                GitHub
+                <a
+                  href="https://github.com/afadil/wealthfolio"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <Icons.ExternalLink className="h-4 w-4" />
+                  GitHub
+                </a>
               </Button>
             </div>
           </div>
@@ -136,25 +144,22 @@ export default function AboutSettingsPage() {
               <div className="grid gap-4">
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    Database directory
+                    Database path
                   </p>
                   <div className="flex items-center gap-2">
                     <p className="bg-muted text-muted-foreground flex-1 truncate rounded-md px-3 py-2 font-mono text-xs">
-                      {dbDir || "Unavailable"}
+                      {dbPath || "Unavailable"}
                     </p>
                     <Button
                       variant="ghost"
                       size="icon"
-                      disabled={!dbDir}
-                      onClick={() => dbDir && handleCopy(dbDir, "Database directory")}
+                      disabled={!dbPath}
+                      onClick={() => dbPath && handleCopy(dbPath, "Database path")}
                     >
                       <Icons.Copy className="h-4 w-4" />
-                      <span className="sr-only">Copy database directory</span>
+                      <span className="sr-only">Copy database path</span>
                     </Button>
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    Database file: <span className="font-mono">app.db</span>
-                  </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
@@ -188,22 +193,30 @@ export default function AboutSettingsPage() {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
+                asChild
                 variant="outline"
                 size="sm"
-                onClick={() => handleOpenLink("mailto:wealthfolio@teymz.com")}
                 className="inline-flex items-center gap-2"
               >
-                <Icons.ExternalLink className="h-4 w-4" />
-                Email Us
+                <a href="mailto:wealthfolio@teymz.com">
+                  <Icons.ExternalLink className="h-4 w-4" />
+                  Email Us
+                </a>
               </Button>
               <Button
+                asChild
                 variant="outline"
                 size="sm"
-                onClick={() => handleOpenLink("https://github.com/afadil/wealthfolio/issues")}
                 className="inline-flex items-center gap-2"
               >
-                <Icons.AlertCircle className="h-4 w-4" />
-                Report Issue
+                <a
+                  href="https://github.com/afadil/wealthfolio/issues"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <Icons.AlertCircle className="h-4 w-4" />
+                  Report Issue
+                </a>
               </Button>
             </div>
 

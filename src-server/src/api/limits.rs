@@ -65,11 +65,11 @@ pub fn router() -> Router<Arc<AppState>> {
             get(get_contribution_limits).post(create_contribution_limit),
         )
         .route(
-            "/limits/:id",
+            "/limits/{id}",
             put(update_contribution_limit).delete(delete_contribution_limit),
         )
         .route(
-            "/limits/:id/deposits",
+            "/limits/{id}/deposits",
             get(calculate_deposits_for_contribution_limit),
         )
 }
