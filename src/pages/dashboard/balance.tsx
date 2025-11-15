@@ -34,30 +34,46 @@ const Balance: React.FC<BalanceProps> = ({
     return symbolPart?.value ?? currency;
   }, [currency]);
 
+  const formattedValue = useMemo(() => {
+    const formatter = new Intl.NumberFormat(undefined, {
+      currency,
+      style: displayCurrency ? "currency" : "decimal",
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: displayDecimal ? 2 : 0,
+      maximumFractionDigits: displayDecimal ? 2 : 0,
+    });
+    return formatter.format(targetValue);
+  }, [currency, displayCurrency, displayDecimal, targetValue]);
+
   if (isLoading) {
     return <Skeleton className="h-9 w-48" />;
   }
 
   return (
-    <h1 className="font-heading text-3xl font-bold tracking-tight">
+    <h1 className="font-heading text-3xl font-bold tracking-tight" data-testid="portfolio-balance">
       {isBalanceHidden ? (
         <span>
           {displayCurrency ? currencySymbol : ""}
           ••••••
         </span>
       ) : (
-        <NumberFlow
-          className="muted-fraction"
-          value={targetValue}
-          isolate={false}
-          format={{
-            currency: currency,
-            style: displayCurrency ? "currency" : "decimal",
-            currencyDisplay: "narrowSymbol",
-            minimumFractionDigits: displayDecimal ? 2 : 0,
-            maximumFractionDigits: displayDecimal ? 2 : 0,
-          }}
-        />
+        <>
+          <NumberFlow
+            className="muted-fraction"
+            value={targetValue}
+            isolate={false}
+            format={{
+              currency: currency,
+              style: displayCurrency ? "currency" : "decimal",
+              currencyDisplay: "narrowSymbol",
+              minimumFractionDigits: displayDecimal ? 2 : 0,
+              maximumFractionDigits: displayDecimal ? 2 : 0,
+            }}
+          />
+          <span className="sr-only" data-testid="portfolio-balance-value">
+            {formattedValue}
+          </span>
+        </>
       )}
     </h1>
   );

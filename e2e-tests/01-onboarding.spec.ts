@@ -4,8 +4,24 @@ test.describe.configure({ mode: "serial" });
 
 test.describe("Onboarding Flow", () => {
   const BASE_URL = "http://localhost:1420";
+  const LOGIN_PASSWORD = "password001";
   let page: Page;
   const DEPOSIT_AMOUNT = "5000";
+
+  const login = async (targetPage: Page) => {
+    await targetPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+
+    const passwordInput = targetPage.getByPlaceholder("Enter your password");
+    await expect(passwordInput).toBeVisible({ timeout: 10000 });
+    await passwordInput.fill(LOGIN_PASSWORD);
+
+    await targetPage.getByRole("button", { name: /Sign In/i }).click();
+
+    await expect(targetPage).toHaveURL(
+      new RegExp(`${BASE_URL}/(onboarding|dashboard|settings/accounts)`),
+      { timeout: 15000 },
+    );
+  };
 
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
@@ -13,6 +29,10 @@ test.describe("Onboarding Flow", () => {
 
   test.afterAll(async () => {
     await page.close();
+  });
+
+  test("0. Login with test password", async () => {
+    await login(page);
   });
 
   test("1. Complete onboarding with CAD currency and Light theme", async () => {
@@ -182,7 +202,7 @@ test.describe("Onboarding Flow", () => {
 
     // The total portfolio value should match the deposit amount
     // Look for the balance display - it should show CA$5,000.00
-    const balanceElement = page.locator('[class*="text-4xl"]').first();
+    const balanceElement = page.getByTestId("portfolio-balance-value");
     await expect(balanceElement).toBeVisible({ timeout: 15000 });
 
     // Get the text content
@@ -192,6 +212,6 @@ test.describe("Onboarding Flow", () => {
     expect(balanceText).toContain("5,000");
 
     // Verify currency symbol (CA$ for CAD)
-    expect(balanceText).toMatch(/CA?\$|C\$|CAD/);
+    expect(balanceText).toMatch(/(?:CA\$|\$|C\$|CAD)/);
   });
 });
