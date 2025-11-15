@@ -219,31 +219,51 @@ export function formatDateTimeDisplay(date: Date | string | undefined): string {
   // Display format: YYYY/MM/DD HH:mm
   return format(value, "yyyy/MM/dd HH:mm");
 }
-export function formatAmount(amount: number, currency: string, displayCurrency = true) {
-  // Handle pence (GBp) specially
-  if (currency === "GBp" || currency === "GBX") {
-    if (!displayCurrency) {
-      return new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount);
-    }
+const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+};
 
-    // For pence, format as "123.45p" or "1,234.56p"
-    const formattedNumber = new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
+const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
 
-    return `${formattedNumber}p`;
+const getCurrencyFormatter = (currency: string) => {
+  const normalizedCurrency = currency?.toUpperCase?.() ?? "USD";
+  const cacheKey = normalizedCurrency;
+
+  if (currencyFormatterCache.has(cacheKey)) {
+    return currencyFormatterCache.get(cacheKey)!;
   }
 
-  return new Intl.NumberFormat("en-US", {
-    style: displayCurrency ? "currency" : undefined,
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  let formatter: Intl.NumberFormat;
+  try {
+    formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: normalizedCurrency,
+      ...DECIMAL_FORMAT_OPTIONS,
+    });
+  } catch {
+    formatter = decimalFormatter;
+  }
+
+  currencyFormatterCache.set(cacheKey, formatter);
+  return formatter;
+};
+
+export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+  const rawCurrency = currency ?? "USD";
+  const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
+
+  if (isPenceCurrency) {
+    const formattedNumber = decimalFormatter.format(amount);
+    return displayCurrency ? `${formattedNumber}p` : formattedNumber;
+  }
+
+  if (!displayCurrency) {
+    return decimalFormatter.format(amount);
+  }
+
+  return getCurrencyFormatter(rawCurrency).format(amount);
 }
 
 export function formatPercent(value: number | null | undefined) {
