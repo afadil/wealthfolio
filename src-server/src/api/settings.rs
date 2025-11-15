@@ -1,7 +1,7 @@
 use std::{path::Path as StdPath, sync::Arc};
 
 use crate::{
-    api::shared::normalize_file_path,
+    api::shared::{normalize_file_path, process_portfolio_job, PortfolioJobConfig},
     error::ApiResult,
     main_lib::AppState,
 };
@@ -25,9 +25,29 @@ async fn update_settings(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<SettingsUpdate>,
 ) -> ApiResult<Json<Settings>> {
+    let previous_base_currency = state.base_currency.read().unwrap().clone();
     state.settings_service.update_settings(&payload).await?;
-    let s = state.settings_service.get_settings()?;
-    Ok(Json(s))
+    let updated_settings = state.settings_service.get_settings()?;
+
+    if updated_settings.base_currency != previous_base_currency {
+        *state.base_currency.write().unwrap() = updated_settings.base_currency.clone();
+
+        let state_for_job = state.clone();
+        tokio::spawn(async move {
+            let job_config = PortfolioJobConfig {
+                account_ids: None,
+                symbols: None,
+                refetch_all_market_data: true,
+                force_full_recalculation: true,
+            };
+
+            if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
+                tracing::warn!("Base currency change recalculation failed: {}", err);
+            }
+        });
+    }
+
+    Ok(Json(updated_settings))
 }
 
 async fn is_auto_update_check_enabled(State(state): State<Arc<AppState>>) -> ApiResult<Json<bool>> {

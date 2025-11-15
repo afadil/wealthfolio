@@ -63,22 +63,20 @@ impl HoldingsServiceTrait for HoldingsService {
             .snapshot_service
             .get_latest_holdings_snapshot(account_id)
         {
-            Ok(snap) => snap,
+            Ok(Some(snap)) => snap,
+            Ok(None) => {
+                warn!(
+                    "No calculated holdings found for account {}. Returning empty holdings list.",
+                    account_id
+                );
+                return Ok(Vec::new());
+            }
             Err(core_error) => {
-                if matches!(core_error, CoreError::Repository(ref msg) if msg.contains("No snapshot found"))
-                {
-                    warn!(
-                        "No calculated holdings found for account {}. Returning empty holdings list.",
-                        account_id
-                    );
-                    return Ok(Vec::new());
-                } else {
-                    error!(
-                        "Failed to get latest snapshot for account {}: {}",
-                        account_id, core_error
-                    );
-                    return Err(core_error);
-                }
+                error!(
+                    "Failed to get latest snapshot for account {}: {}",
+                    account_id, core_error
+                );
+                return Err(core_error);
             }
         };
 
@@ -311,8 +309,8 @@ impl HoldingsServiceTrait for HoldingsService {
             .snapshot_service
             .get_latest_holdings_snapshot(account_id)
         {
-            Ok(snap) => snap,
-            Err(CoreError::Repository(ref msg)) if msg.contains("No snapshot found") => {
+            Ok(Some(snap)) => snap,
+            Ok(None) => {
                 warn!(
                     "No snapshot found for account {}. Cannot get holding for asset {}.",
                     account_id, asset_id

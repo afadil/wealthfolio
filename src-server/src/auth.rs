@@ -209,26 +209,47 @@ pub async fn require_jwt(
         return Ok(next.run(request).await);
     };
 
-    let header = request
+    let token = extract_token(&request)?;
+    auth.validate_token(&token)?;
+    Ok(next.run(request).await)
+}
+
+fn extract_token(request: &Request<Body>) -> Result<String, AuthError> {
+    if let Some(header_value) = request
         .headers()
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
-        .ok_or(AuthError::Unauthorized)?;
+    {
+        let mut parts = header_value.splitn(2, ' ');
+        let (Some(scheme), Some(token)) = (parts.next(), parts.next()) else {
+            return Err(AuthError::Unauthorized);
+        };
 
-    let mut parts = header.splitn(2, ' ');
-    let (Some(scheme), Some(token)) = (parts.next(), parts.next()) else {
-        return Err(AuthError::Unauthorized);
-    };
+        if !scheme.eq_ignore_ascii_case("Bearer") {
+            return Err(AuthError::Unauthorized);
+        }
 
-    if !scheme.eq_ignore_ascii_case("Bearer") {
-        return Err(AuthError::Unauthorized);
+        let token = token.trim();
+        if token.is_empty() {
+            return Err(AuthError::Unauthorized);
+        }
+
+        return Ok(token.to_string());
     }
 
-    let token = token.trim();
-    if token.is_empty() {
-        return Err(AuthError::Unauthorized);
+    if let Some(query) = request.uri().query() {
+        if let Ok(params) = serde_urlencoded::from_str::<Vec<(String, String)>>(query) {
+            if let Some((_, token)) = params
+                .into_iter()
+                .find(|(key, _)| key == "access_token" || key == "token")
+            {
+                let trimmed = token.trim().to_string();
+                if !trimmed.is_empty() {
+                    return Ok(trimmed);
+                }
+            }
+        }
     }
 
-    auth.validate_token(token)?;
-    Ok(next.run(request).await)
+    Err(AuthError::Unauthorized)
 }

@@ -553,10 +553,21 @@ class ServerEventBridge {
     if (this.eventSource) {
       return;
     }
-    this.eventSource = new EventSource(this.url);
+    const eventUrl = this.buildEventUrl();
+    this.eventSource = new EventSource(eventUrl);
     this.eventSource.onerror = (error) => {
       logger.warn("Portfolio event stream error", error);
     };
+  }
+
+  private buildEventUrl(): string {
+    const token = getAuthToken();
+    if (!token) {
+      return this.url;
+    }
+
+    const separator = this.url.includes("?") ? "&" : "?";
+    return `${this.url}${separator}access_token=${encodeURIComponent(token)}`;
   }
 
   private addListener(eventName: string, handler: EventCallback<unknown>) {
