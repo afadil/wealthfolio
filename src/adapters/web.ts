@@ -14,6 +14,7 @@ const COMMANDS: CommandMap = {
   get_settings: { method: "GET", path: "/settings" },
   update_settings: { method: "PUT", path: "/settings" },
   is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },
+  get_app_info: { method: "GET", path: "/app/info" },
   backup_database: { method: "POST", path: "/utilities/database/backup" },
   backup_database_to_path: { method: "POST", path: "/utilities/database/backup-to-path" },
   restore_database: { method: "POST", path: "/utilities/database/restore" },

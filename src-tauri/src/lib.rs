@@ -330,6 +330,7 @@ pub fn run() {
             commands::limits::update_contribution_limit,
             commands::limits::delete_contribution_limit,
             commands::limits::calculate_deposits_for_contribution_limit,
+            commands::utilities::get_app_info,
             commands::utilities::backup_database,
             commands::utilities::backup_database_to_path,
             commands::utilities::restore_database,
