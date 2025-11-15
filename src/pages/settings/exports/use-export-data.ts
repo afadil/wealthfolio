@@ -1,10 +1,10 @@
-import { logger } from "@/adapters";
+import { getRunEnv, logger, RUN_ENV } from "@/adapters";
 import { getAccounts } from "@/commands/account";
 import { getActivities } from "@/commands/activity";
 import { openFileSaveDialog, openFolderDialog } from "@/commands/file";
 import { getGoals } from "@/commands/goal";
 import { getHistoricalValuations } from "@/commands/portfolio";
-import { backupDatabaseToPath } from "@/commands/settings";
+import { backupDatabase, backupDatabaseToPath } from "@/commands/settings";
 import { toast } from "@/components/ui/use-toast";
 import { formatData } from "@/lib/export-utils";
 import { QueryKeys } from "@/lib/query-keys";
@@ -23,7 +23,18 @@ interface ExportParams {
   data: ExportDataType;
 }
 
+interface SQLiteBackupResult {
+  mode: "sqlite";
+  target: "local" | "server";
+  value: string;
+}
+
+type ExportMutationResult = SQLiteBackupResult | boolean | null;
+
 export function useExportData() {
+  const runEnv = getRunEnv();
+  const isDesktop = runEnv === RUN_ENV.DESKTOP;
+
   const { refetch: fetchAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: getAccounts,
@@ -49,21 +60,26 @@ export function useExportData() {
     mutateAsync: exportDataMutation,
     isPending: isExporting,
     variables: mutationVariables,
-  } = useMutation({
+  } = useMutation<ExportMutationResult, Error, ExportParams>({
     mutationFn: async (params: ExportParams) => {
       const { format, data: desiredData } = params;
       if (format === "SQLite") {
-        // Open folder dialog to let user choose backup location
-        const selectedDir = await openFolderDialog();
+        if (isDesktop) {
+          // Open folder dialog to let user choose backup location
+          const selectedDir = await openFolderDialog();
 
-        if (!selectedDir) {
-          // User cancelled the dialog, return null to indicate cancellation
-          return null;
+          if (!selectedDir) {
+            // User cancelled the dialog, return null to indicate cancellation
+            return null;
+          }
+
+          // Create backup in selected directory
+          const backupPath = await backupDatabaseToPath(selectedDir);
+          return { mode: "sqlite", target: "local" as const, value: backupPath };
         }
 
-        // Create backup in selected directory
-        const backupPath = await backupDatabaseToPath(selectedDir);
-        return { success: true, path: backupPath };
+        const { filename } = await backupDatabase();
+        return { mode: "sqlite", target: "server" as const, value: filename };
       } else {
         let exportedData: string | undefined;
         let fileName: string;
@@ -113,11 +129,15 @@ export function useExportData() {
         return;
       }
 
-      if (result && typeof result === "object" && "path" in result) {
-        // SQLite backup success
+      if (result && typeof result === "object" && "mode" in result && result.mode === "sqlite") {
+        const description =
+          result.target === "server"
+            ? `Backup created on the server as ${result.value}`
+            : `Backup saved to: ${result.value}`;
+
         toast({
           title: "Database backup completed successfully.",
-          description: `Backup saved to: ${result.path}`,
+          description,
           variant: "success",
         });
       } else {
