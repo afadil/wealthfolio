@@ -352,7 +352,7 @@ async fn submit_addon_rating_web(
 #[derive(serde::Deserialize)]
 struct RatingsQuery {
     #[serde(rename = "addonId")]
-    addon_id: String,
+    addon_id: Option<String>,
 }
 
 async fn get_addon_ratings_web(_q: Query<RatingsQuery>) -> ApiResult<Json<Vec<serde_json::Value>>> {
@@ -476,11 +476,11 @@ async fn install_addon_from_staging_web(
 
 async fn clear_addon_staging_web(
     State(state): State<Arc<AppState>>,
-    q: Option<Query<RatingsQuery>>,
+    Query(rq): Query<RatingsQuery>,
 ) -> ApiResult<StatusCode> {
     let addons_root = StdPath::new(&state.addons_root);
-    if let Some(Query(rq)) = q {
-        addons::remove_addon_from_staging(&rq.addon_id, addons_root)
+    if let Some(addon_id) = rq.addon_id {
+        addons::remove_addon_from_staging(&addon_id, addons_root)
             .map_err(|e| anyhow::anyhow!(e))?;
     } else {
         addons::clear_staging_directory(addons_root).map_err(|e| anyhow::anyhow!(e))?;
@@ -493,8 +493,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/addons/installed", get(list_installed_addons_web))
         .route("/addons/install-zip", post(install_addon_zip_web))
         .route("/addons/toggle", post(toggle_addon_web))
-        .route("/addons/:id", delete(uninstall_addon_web))
-        .route("/addons/runtime/:id", get(load_addon_for_runtime_web))
+        .route("/addons/{id}", delete(uninstall_addon_web))
+        .route("/addons/runtime/{id}", get(load_addon_for_runtime_web))
         .route(
             "/addons/enabled-on-startup",
             get(get_enabled_addons_on_startup_web),

@@ -63,5 +63,5 @@ pub fn router() -> Router<Arc<AppState>> {
             get(load_goals_allocations).post(update_goal_allocations),
         )
         .route("/goals", get(get_goals).post(create_goal).put(update_goal))
-        .route("/goals/:id", delete(delete_goal))
+        .route("/goals/{id}", delete(delete_goal))
 }

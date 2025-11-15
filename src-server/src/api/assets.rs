@@ -58,6 +58,6 @@ async fn update_asset_data_source(
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/assets/profile", get(get_asset_profile))
-        .route("/assets/profile/:id", put(update_asset_profile))
-        .route("/assets/data-source/:id", put(update_asset_data_source))
+        .route("/assets/profile/{id}", put(update_asset_profile))
+        .route("/assets/data-source/{id}", put(update_asset_data_source))
 }

@@ -1,13 +1,13 @@
 [package]
 name = "wealthfolio-server"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7", features = ["json", "macros"] }
+axum = { version = "0.8", features = ["json", "macros"] }
 tokio = { version = "1", features = ["full"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "timeout", "request-id", "fs"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-full", "timeout", "request-id", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
@@ -21,10 +21,10 @@ utoipa-swagger-ui = { version = "4", features = ["axum"] }
 serde_with = "3"
 chrono = { version = "0.4", features = ["serde"] }
 serde_urlencoded = "0.7"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.21"
 argon2 = { version = "0.5", features = ["std"] }
-jsonwebtoken = "9"
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 chacha20poly1305 = { version = "0.10", features = ["std"] }
 rand = "0.8"
 tokio-stream = { version = "0.1", features = ["sync"] }
@@ -40,5 +40,5 @@ default = []
 wealthfolio-pro = ["wealthfolio_core/wealthfolio-pro"]
 
 [dev-dependencies]
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 tempfile = "3"

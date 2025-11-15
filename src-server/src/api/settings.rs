@@ -14,7 +14,10 @@ use axum::{
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use tokio::{fs, task};
-use wealthfolio_core::{db, settings::{Settings, SettingsServiceTrait, SettingsUpdate}};
+use wealthfolio_core::{
+    db,
+    settings::{Settings, SettingsServiceTrait, SettingsUpdate},
+};
 
 async fn get_settings(State(state): State<Arc<AppState>>) -> ApiResult<Json<Settings>> {
     let s = state.settings_service.get_settings()?;
@@ -56,6 +59,36 @@ async fn is_auto_update_check_enabled(State(state): State<Arc<AppState>>) -> Api
         .is_auto_update_check_enabled()
         .unwrap_or(true);
     Ok(Json(enabled))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppInfoResponse {
+    version: String,
+    db_path: String,
+    logs_dir: String,
+}
+
+async fn get_app_info(State(state): State<Arc<AppState>>) -> ApiResult<Json<AppInfoResponse>> {
+    let version = env!("CARGO_PKG_VERSION").to_string();
+
+    let db_path = state.db_path.clone();
+
+    // For web mode, logs typically go to the same directory or a subdirectory
+    // In production, this would typically be configured via environment variables
+    let logs_dir = std::env::var("WF_LOGS_DIR").unwrap_or_else(|_| {
+        StdPath::new(&state.data_root)
+            .join("logs")
+            .to_str()
+            .unwrap_or("")
+            .to_string()
+    });
+
+    Ok(Json(AppInfoResponse {
+        version,
+        db_path,
+        logs_dir,
+    }))
 }
 
 #[derive(serde::Serialize)]
@@ -193,6 +226,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/settings/auto-update-enabled",
             get(is_auto_update_check_enabled),
         )
+        .route("/app/info", get(get_app_info))
         .route("/utilities/database/backup", post(backup_database_route))
         .route(
             "/utilities/database/backup-to-path",

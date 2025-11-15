@@ -140,8 +140,8 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/market-data/search", get(search_symbol))
         .route("/market-data/quotes/history", get(get_quote_history))
-        .route("/market-data/quotes/:symbol", put(update_quote))
-        .route("/market-data/quotes/id/:id", delete(delete_quote))
+        .route("/market-data/quotes/{symbol}", put(update_quote))
+        .route("/market-data/quotes/id/{id}", delete(delete_quote))
         .route("/market-data/sync/history", post(sync_history_quotes))
         .route("/market-data/sync", post(sync_market_data))
 }
