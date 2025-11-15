@@ -58,12 +58,19 @@ pub struct AppState {
 }
 
 pub fn init_tracing() {
-    let fmt_layer = fmt::layer().json().with_current_span(false);
+    let log_format = std::env::var("WF_LOG_FORMAT").unwrap_or_else(|_| "text".to_string());
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .init();
+    let registry = tracing_subscriber::registry().with(filter);
+
+    if log_format.eq_ignore_ascii_case("json") {
+        registry
+            .with(fmt::layer().json().with_current_span(false))
+            .init();
+    } else {
+        registry
+            .with(fmt::layer().with_target(true).with_line_number(true))
+            .init();
+    }
 }
 
 pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
