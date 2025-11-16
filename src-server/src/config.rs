@@ -17,7 +17,7 @@ impl Config {
     pub fn from_env() -> Self {
         dotenvy::dotenv().ok();
         let listen_addr: SocketAddr = std::env::var("WF_LISTEN_ADDR")
-            .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
+            .unwrap_or_else(|_| "0.0.0.0:8088".to_string())
             .parse()
             .expect("Invalid WF_LISTEN_ADDR");
         let db_path = std::env::var("WF_DB_PATH").unwrap_or_else(|_| "./db/app.db".into());

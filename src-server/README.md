@@ -8,6 +8,10 @@ Run locally (Rust only)
 - From the repo root:
   - `cargo run --manifest-path src-server/Cargo.toml`
 
+Docker image
+- Pull the latest published server image with `docker pull afadil/wealthfolio:latest`.
+- Use that tag (or your locally built image) in the Docker run examples inside the root `README.md`.
+
 Key environment variables
 - `WF_LISTEN_ADDR`: Bind address, default `127.0.0.1:8080`.
 - `WF_DB_PATH`: Path to the SQLite database file (or a directory; if a directory is provided, `app.db` is used inside it). Example: `./db/app.db`.
@@ -20,7 +24,7 @@ Key environment variables
   - 32-byte ASCII string: Must be exactly 32 characters (less secure if contains only printable characters)
   Example: `WF_SECRET_KEY=$(openssl rand -base64 32)`.
 - `WF_AUTH_PASSWORD_HASH`: Enables password-only authentication for web mode when set to an Argon2id PHC string.
-  Generate via online tools like [Coderstool](https://www.coderstool.com/argon2-hash-generator) or the following command:
+  Generate via online tools like [argon2.online](https://argon2.online/) or the following command:
   ```bash
   argon2 "your-password" -id -e
   ```

@@ -254,8 +254,7 @@ All configuration is done via environment variables in `.env.web`.
   before accessing the Web App.
 
   You can generate the hash with online tools like
-  [Coderstool](https://www.coderstool.com/argon2-hash-generator) or the
-  following command:
+  [argon2.online](argon2.online) or the following command:
 
   ```bash
   argon2 "your-password" -id -e
@@ -293,6 +292,19 @@ See [Web Mode Configuration](#configuration) for a complete list of supported
 environment variables.
 
 ## Docker
+
+You can either pull the official Docker image or build it yourself locally.
+
+### Using the Pre-built Image
+
+The latest server build is published to Docker Hub.
+
+```bash
+docker pull afadil/wealthfolio:latest
+```
+
+After pulling, use `afadil/wealthfolio:latest` in the run commands below. If
+you build the image locally, swap the image name back to `wealthfolio`.
 
 ### Building the Image
 
@@ -347,6 +359,9 @@ See examples below for inline configuration.
 
 ### Running the Container
 
+All examples below use the published image (`afadil/wealthfolio:latest`). If you
+built locally, substitute your local tag (e.g., `wealthfolio`).
+
 **Using environment file** (recommended):
 
 ```bash
@@ -355,7 +370,7 @@ docker run --rm -d \
   --env-file .env.docker \
   -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio
+  afadil/wealthfolio:latest
 ```
 
 **Basic usage** (inline environment variables):
@@ -367,7 +382,7 @@ docker run --rm -d \
   -e WF_DB_PATH=/data/wealthfolio.db \
   -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio
+  afadil/wealthfolio:latest
 ```
 
 **Development mode** (with CORS for local Vite dev server):
@@ -380,7 +395,7 @@ docker run --rm -it \
   -e WF_CORS_ALLOW_ORIGINS=http://localhost:1420 \
   -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio
+  afadil/wealthfolio:latest
 ```
 
 **Production with encryption** (recommended):
@@ -393,7 +408,7 @@ docker run --rm -d \
   -e WF_SECRET_KEY=$(openssl rand -base64 32) \
   -p 8088:8088 \
   -v "$(pwd)/wealthfolio-data:/data" \
-  wealthfolio
+  afadil/wealthfolio:latest
 ```
 
 ### Environment Variables
