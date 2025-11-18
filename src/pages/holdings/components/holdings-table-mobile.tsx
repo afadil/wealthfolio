@@ -50,7 +50,7 @@ export const HoldingsTableMobile = ({
   }, [selectedAccount, selectedTypes, showAccountFilter]);
 
   const filteredHoldings = useMemo(() => {
-    let result = holdings;
+    let result = [...holdings];
 
     if (selectedTypes.length > 0) {
       result = result.filter(
@@ -70,7 +70,20 @@ export const HoldingsTableMobile = ({
       });
     }
 
-    return result;
+    return result.sort((a, b) => {
+      const symbolA = a.instrument?.symbol?.toLowerCase() ?? "";
+      const symbolB = b.instrument?.symbol?.toLowerCase() ?? "";
+      if (symbolA && symbolB) {
+        return symbolA.localeCompare(symbolB);
+      }
+      if (symbolA) {
+        return -1;
+      }
+      if (symbolB) {
+        return 1;
+      }
+      return 0;
+    });
   }, [holdings, selectedTypes, searchQuery]);
 
   const handleNavigate = (holding: Holding) => {
