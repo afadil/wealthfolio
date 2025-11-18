@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    api::shared::{trigger_account_portfolio_job, AccountPortfolioImpact},
     error::ApiResult,
     main_lib::AppState,
     models::{Account, AccountUpdate, NewAccount},
@@ -26,6 +27,13 @@ async fn create_account(
 ) -> ApiResult<Json<Account>> {
     let core_new = payload.into();
     let created = state.account_service.create_account(core_new).await?;
+    trigger_account_portfolio_job(
+        state.clone(),
+        AccountPortfolioImpact::CreatedOrUpdated {
+            account_id: created.id.clone(),
+            currency: created.currency.clone(),
+        },
+    );
     Ok(Json(Account::from(created)))
 }
 
@@ -37,6 +45,13 @@ async fn update_account(
 ) -> ApiResult<Json<Account>> {
     payload.id = Some(id);
     let updated = state.account_service.update_account(payload.into()).await?;
+    trigger_account_portfolio_job(
+        state.clone(),
+        AccountPortfolioImpact::CreatedOrUpdated {
+            account_id: updated.id.clone(),
+            currency: updated.currency.clone(),
+        },
+    );
     Ok(Json(Account::from(updated)))
 }
 
@@ -46,6 +61,7 @@ async fn delete_account(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.account_service.delete_account(&id).await?;
+    trigger_account_portfolio_job(state, AccountPortfolioImpact::Deleted);
     Ok(StatusCode::NO_CONTENT)
 }
 

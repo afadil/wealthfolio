@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    api::shared::{enqueue_portfolio_job, PortfolioJobConfig},
     error::ApiResult,
     main_lib::AppState,
 };
@@ -52,6 +53,15 @@ async fn update_asset_data_source(
         .asset_service
         .update_asset_data_source(&id, body.data_source)
         .await?;
+    enqueue_portfolio_job(
+        state.clone(),
+        PortfolioJobConfig {
+            account_ids: None,
+            symbols: Some(vec![id]),
+            refetch_all_market_data: true,
+            force_full_recalculation: true,
+        },
+    );
     Ok(Json(asset))
 }
 

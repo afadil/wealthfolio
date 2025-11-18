@@ -1,9 +1,6 @@
 use std::{path::Path as StdPath, sync::Arc};
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use anyhow::Context;
 use axum::{
     extract::{Path, Query, State},

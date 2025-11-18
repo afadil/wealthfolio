@@ -1,14 +1,7 @@
 use std::sync::Arc;
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
-use axum::{
-    extract::State,
-    routing::post,
-    Json, Router,
-};
+use crate::{error::ApiResult, main_lib::AppState};
+use axum::{extract::State, routing::post, Json, Router};
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
     portfolio::{

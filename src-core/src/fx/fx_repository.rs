@@ -5,7 +5,7 @@ use crate::assets::assets_model::AssetDB;
 use crate::db::get_connection;
 use crate::db::WriteHandle;
 use crate::errors::{DatabaseError, Error, Result, ValidationError};
-use crate::market_data::market_data_model::{Quote, QuoteDb};
+use crate::market_data::market_data_model::{DataSource, Quote, QuoteDb};
 use crate::schema::{assets, quotes};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
@@ -90,22 +90,56 @@ impl FxRepository {
         let latest_quotes = sql_query(
             r#"SELECT
                 q.id, q.symbol, q.timestamp, q.open, q.high, q.low, q.close, q.adjclose, q.volume,
-                a.currency, a.data_source, q.created_at
+                q.currency, q.data_source, q.created_at
              FROM quotes q
-             INNER JOIN assets a ON q.symbol = a.id AND a.asset_type = 'FOREX'
-             INNER JOIN (
+             WHERE q.symbol IN (
+                 SELECT id
+                 FROM assets
+                 WHERE asset_type = 'FOREX'
+             )
+             AND (q.symbol, q.timestamp) IN (
                  SELECT symbol, MAX(timestamp) as max_timestamp
                  FROM quotes
                  GROUP BY symbol
-             ) latest ON q.symbol = latest.symbol AND q.timestamp = latest.max_timestamp
+             )
              ORDER BY q.symbol"#,
         )
         .load::<QuoteDb>(&mut conn)?;
 
-        Ok(latest_quotes
+        let latest_rates_by_symbol: HashMap<String, ExchangeRate> = latest_quotes
             .into_iter()
-            .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
-            .collect())
+            .map(|quote_db| {
+                let quote = Quote::from(quote_db);
+                let symbol = quote.symbol.clone();
+                (symbol, ExchangeRate::from_quote(&quote))
+            })
+            .collect();
+
+        let forex_assets = assets::table
+            .filter(assets::asset_type.eq(FOREX_ASSET_TYPE))
+            .order_by(assets::symbol.asc())
+            .load::<AssetDB>(&mut conn)?;
+
+        let mut exchange_rates = Vec::with_capacity(forex_assets.len());
+
+        for asset in forex_assets {
+            if let Some(rate) = latest_rates_by_symbol.get(&asset.symbol) {
+                exchange_rates.push(rate.clone());
+            } else {
+                let (from_currency, to_currency) = ExchangeRate::parse_fx_symbol(&asset.symbol);
+                let timestamp = Utc.from_utc_datetime(&asset.updated_at);
+                exchange_rates.push(ExchangeRate {
+                    id: asset.id.clone(),
+                    from_currency,
+                    to_currency,
+                    rate: Decimal::ZERO,
+                    source: DataSource::from(asset.data_source.as_str()),
+                    timestamp,
+                });
+            }
+        }
+
+        Ok(exchange_rates)
     }
 
     /// Fetches all historical exchange rates (quotes) for FOREX assets.

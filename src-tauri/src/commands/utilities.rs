@@ -171,24 +171,27 @@ pub async fn restore_database(
         .emit("database-restored", ())
         .map_err(|e| format!("Failed to emit database-restored event: {}", e))?;
 
-    // Show restart dialog similar to update process
-    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    // On desktop builds prompt for restart, but skip showing dialogs on iOS/Android
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
-    let should_restart = app_handle
-        .dialog()
-        .message(
-            "Database restored successfully!\n\n\
-             For the best experience, it's recommended to restart the application \
-             to ensure all data is properly refreshed.\n\n\
-             Would you like to restart now?",
-        )
-        .title("Database Restored - Restart Required")
-        .buttons(MessageDialogButtons::OkCancel)
-        .kind(MessageDialogKind::Info)
-        .blocking_show();
+        let should_restart = app_handle
+            .dialog()
+            .message(
+                "Database restored successfully!\n\n\
+                 For the best experience, it's recommended to restart the application \
+                 to ensure all data is properly refreshed.\n\n\
+                 Would you like to restart now?",
+            )
+            .title("Database Restored - Restart Required")
+            .buttons(MessageDialogButtons::OkCancel)
+            .kind(MessageDialogKind::Info)
+            .blocking_show();
 
-    if should_restart {
-        app_handle.restart();
+        if should_restart {
+            app_handle.restart();
+        }
     }
 
     Ok(())

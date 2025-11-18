@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::{error::ApiResult, main_lib::AppState};
+use crate::{
+    api::shared::trigger_lightweight_portfolio_update, error::ApiResult, main_lib::AppState,
+};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -24,6 +26,7 @@ async fn create_contribution_limit(
         .limits_service
         .create_contribution_limit(new_limit)
         .await?;
+    trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(created))
 }
 
@@ -36,6 +39,7 @@ async fn update_contribution_limit(
         .limits_service
         .update_contribution_limit(&id, updated)
         .await?;
+    trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(updated))
 }
 
@@ -44,6 +48,7 @@ async fn delete_contribution_limit(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.limits_service.delete_contribution_limit(&id).await?;
+    trigger_lightweight_portfolio_update(state);
     Ok(StatusCode::NO_CONTENT)
 }
 
