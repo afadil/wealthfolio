@@ -1,6 +1,7 @@
 {
   "title": "Tài khoản",
   "addAccount": "Thêm tài khoản",
+  "allPortfolio": "Toàn bộ Danh mục",
   "types": {
     "SECURITIES": "Chứng khoán",
     "BANK": "Ngân hàng",

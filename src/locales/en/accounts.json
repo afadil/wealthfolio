@@ -1,6 +1,7 @@
 {
   "title": "Accounts",
   "addAccount": "Add Account",
+  "allPortfolio": "All Portfolio",
   "types": {
     "SECURITIES": "Securities",
     "BANK": "Bank",

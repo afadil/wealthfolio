@@ -48,10 +48,10 @@ interface UIAccount extends Omit<Account, "accountType"> {
 }
 
 // Create a portfolio account for UI purposes
-function createPortfolioAccount(baseCurrency: string): UIAccount {
+function createPortfolioAccount(baseCurrency: string, t: (key: string) => string): UIAccount {
   return {
     id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
+    name: t("accounts.allPortfolio"),
     accountType: PORTFOLIO_ACCOUNT_ID as UIAccountType,
     balance: 0,
     currency: baseCurrency,
@@ -131,7 +131,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
     if (includePortfolio) {
       const baseCurrency = settings?.baseCurrency ?? "USD"; // Default to USD if settings not loaded
-      const portfolioAccount = createPortfolioAccount(baseCurrency);
+      const portfolioAccount = createPortfolioAccount(baseCurrency, t);
       // Check if portfolio account already exists to avoid duplication
       const portfolioExists = accounts.some((account) => account.id === PORTFOLIO_ACCOUNT_ID);
 

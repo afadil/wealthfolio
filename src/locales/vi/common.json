@@ -23,8 +23,8 @@
     "view": "Xem"
   },
   "navigation": {
-    "dashboard": "Bảng tổng quan",
-    "holdings": "Danh mục tài sản",
+    "dashboard": "Tổng quan",
+    "holdings": "Danh mục",
     "performance": "Hiệu suất",
     "income": "Thu nhập",
     "activities": "Hoạt động",

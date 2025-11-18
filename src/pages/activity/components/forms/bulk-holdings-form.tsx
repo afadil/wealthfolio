@@ -181,7 +181,7 @@ const HoldingRow = memo(
         </div>
 
         {/* Shares Input */}
-        <div className="col-span-1 text-right">
+        <div className="col-span-2 text-right">
           <FormField
             control={control}
             name={`holdings.${index}.sharesOwned`}
@@ -189,7 +189,7 @@ const HoldingRow = memo(
               <QuantityInput
                 {...sharesField}
                 placeholder={t("activity:form.sharesPlaceholder")}
-                className="focus:border-input focus:bg-background h-9 border-none bg-transparent text-sm focus:border"
+                className="focus:border-input focus:bg-background h-9 border-none bg-transparent text-left text-sm focus:border"
                 onKeyDown={handleSharesKeyDown}
               />
             )}
@@ -205,7 +205,7 @@ const HoldingRow = memo(
               <MoneyInput
                 {...priceField}
                 placeholder={t("activity:form.averageCostPlaceholder")}
-                className="focus:border-input focus:bg-background h-9 border-none bg-transparent text-sm focus:border"
+                className="focus:border-input focus:bg-background h-9 border-none bg-transparent text-left text-sm focus:border"
                 onKeyDown={handleCostKeyDown}
               />
             )}
@@ -366,8 +366,8 @@ export const BulkHoldingsForm = ({
 
           {/* Table Header */}
           <div className="text-muted-foreground grid grid-cols-12 gap-3 border-b pb-3 text-sm">
-            <div className="col-span-6">{t("activity:form.tickers")}</div>
-            <div className="col-span-1 text-right">{t("activity:form.shares")}</div>
+            <div className="col-span-5">{t("activity:form.tickers")}</div>
+            <div className="col-span-2 text-right">{t("activity:form.shares")}</div>
             <div className="col-span-2 text-right">{t("activity:form.averageCost")}</div>
             <div className="col-span-2 text-right whitespace-nowrap">
               {t("activity:form.totalValueHeader")}
