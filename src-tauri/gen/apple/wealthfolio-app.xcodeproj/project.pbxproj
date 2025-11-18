@@ -14,6 +14,7 @@
 		509DA50038B1C6CE9B547344 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 34D6F0F66577621761735308 /* main.mm */; };
 		69D0BB23A47919691E829AAB /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B3B5B182F7455DC93E262A9A /* QuartzCore.framework */; };
 		6A7385546F92FC2526B5CF2F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A231B49AA86F1147F323663A /* Assets.xcassets */; };
+		8FCE15102ECA617C00951B8A /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 8FCE150F2ECA617C00951B8A /* AppIcon.icon */; };
 		98C6DA3DCF39206667DD49E6 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8905B7E2ADB3E21EACFCF0CD /* Metal.framework */; };
 		A2632B4F7F108BAC76D7F0B9 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CCCD4C76AFC9679E4F218D1C /* UIKit.framework */; };
 		B6271E8A01A21C366FA90C6D /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CC8C0818B9EDAAF523F498 /* libapp.a */; };
@@ -44,6 +45,7 @@
 		8905B7E2ADB3E21EACFCF0CD /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		8E0C8F9840DC77C88F80537F /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		8F24E4B1F8CB332DC173FE56 /* error.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = error.rs; sourceTree = "<group>"; };
+		8FCE150F2ECA617C00951B8A /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9BF465D90BBF87E1B04B6CA3 /* updater.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = updater.rs; sourceTree = "<group>"; };
 		9F1E79FCCDAFEC22158BCA9B /* providers.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = providers.rs; sourceTree = "<group>"; };
 		9FE2BEDCC259D9EB1FC5F8B4 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -152,6 +154,7 @@
 				8ED0337378087918CD725562 /* wealthfolio-app_iOS */,
 				9C3FA7595796B9D7249E62F2 /* Frameworks */,
 				03C7D315EBF6F91E47A9AC32 /* Products */,
+				8FCE150F2ECA617C00951B8A /* AppIcon.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -284,6 +287,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6A7385546F92FC2526B5CF2F /* Assets.xcassets in Resources */,
+				8FCE15102ECA617C00951B8A /* AppIcon.icon in Resources */,
 				14402780B74F35B7053DB363 /* LaunchScreen.storyboard in Resources */,
 				C47A6D725B810C306186ECE5 /* assets in Resources */,
 			);
