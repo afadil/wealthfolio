@@ -22,8 +22,6 @@ export function useBackupRestore() {
       unlistenFn = await listenDatabaseRestoredTauri(() => {
         // Invalidate all queries to force a complete refresh
         queryClient.invalidateQueries();
-
-        // Note: The restart dialog is now handled by the backend
         toast({
           title: "Database restored successfully",
           description: "Application data has been restored.",
@@ -41,9 +39,10 @@ export function useBackupRestore() {
     };
   }, [isDesktop, queryClient]);
 
-  const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation<
-    { location: "local" | "server"; value: string } | null
-  >({
+  const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation<{
+    location: "local" | "server";
+    value: string;
+  } | null>({
     mutationFn: async () => {
       if (isDesktop) {
         // Open folder dialog to let user choose backup location

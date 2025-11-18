@@ -17,7 +17,7 @@ import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import AssetDetailCard from "./asset-detail-card";
 import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
@@ -63,7 +63,6 @@ export const AssetProfilePage = () => {
   const symbol = decodeURIComponent(encodedSymbol);
   const location = useLocation();
   const navigate = useNavigate();
-  const backTarget = location.state?.from ?? "/holdings?tab=holdings";
   const queryParams = new URLSearchParams(location.search);
   const defaultTab = (queryParams.get("tab") as AssetTab) ?? "overview";
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
@@ -507,6 +506,10 @@ export const AssetProfilePage = () => {
     syncMarketDataMutation.mutate([symbol]);
   }, [symbol, syncMarketDataMutation, triggerHaptic]);
 
+  const handleBack = useCallback(() => {
+    navigate(-1);
+  }, [navigate]);
+
   if (isLoading)
     return (
       <Page>
@@ -523,7 +526,7 @@ export const AssetProfilePage = () => {
         <PageHeader
           heading="Quote History"
           text={symbol}
-          onBack={() => navigate(backTarget)}
+          onBack={handleBack}
           actions={
             <Button
               variant="secondary"
@@ -583,7 +586,7 @@ export const AssetProfilePage = () => {
         <PageHeader
           heading={symbol}
           text={`Error loading data for ${symbol}`}
-          onBack={() => navigate(backTarget)}
+          onBack={handleBack}
         />
         <PageContent>
           <p>
@@ -605,11 +608,9 @@ export const AssetProfilePage = () => {
       <PageHeader>
         <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-1">
-            <Link to={location.state?.from ?? "/holdings?tab=holdings"}>
-              <Button variant="ghost" size="icon">
-                <Icons.ArrowLeft className="h-8 w-8 md:h-9 md:w-9" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" onClick={handleBack}>
+              <Icons.ArrowLeft className="h-8 w-8 md:h-9 md:w-9" />
+            </Button>
             {(profile?.symbol ?? holding?.instrument?.symbol) && (
               <TickerAvatar
                 symbol={profile?.symbol ?? holding?.instrument?.symbol ?? symbol}

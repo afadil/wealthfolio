@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -51,9 +48,8 @@ async fn delete_secret(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route(
-            "/secrets",
-            post(set_secret).get(get_secret).delete(delete_secret),
-        )
+    Router::new().route(
+        "/secrets",
+        post(set_secret).get(get_secret).delete(delete_secret),
+    )
 }

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    error::ApiResult,
-    main_lib::AppState,
+    api::shared::trigger_lightweight_portfolio_update, error::ApiResult, main_lib::AppState,
 };
 use axum::{
     extract::{Path, State},
@@ -22,6 +21,7 @@ async fn create_goal(
     Json(goal): Json<NewGoal>,
 ) -> ApiResult<Json<Goal>> {
     let g = state.goal_service.create_goal(goal).await?;
+    trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(g))
 }
 
@@ -30,6 +30,7 @@ async fn update_goal(
     Json(goal): Json<Goal>,
 ) -> ApiResult<Json<Goal>> {
     let g = state.goal_service.update_goal(goal).await?;
+    trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(g))
 }
 
@@ -38,6 +39,7 @@ async fn delete_goal(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     let _ = state.goal_service.delete_goal(id).await?;
+    trigger_lightweight_portfolio_update(state);
     Ok(StatusCode::NO_CONTENT)
 }
 

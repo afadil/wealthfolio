@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    api::shared::{enqueue_portfolio_job, PortfolioJobConfig},
     error::ApiResult,
     main_lib::AppState,
 };
@@ -86,7 +87,17 @@ async fn update_quote(
 ) -> ApiResult<StatusCode> {
     // Ensure symbol matches body
     quote.symbol = symbol;
+    let target_symbol = quote.symbol.clone();
     state.market_data_service.update_quote(quote).await?;
+    enqueue_portfolio_job(
+        state.clone(),
+        PortfolioJobConfig {
+            account_ids: None,
+            symbols: Some(vec![target_symbol]),
+            refetch_all_market_data: true,
+            force_full_recalculation: false,
+        },
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -95,6 +106,15 @@ async fn delete_quote(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.market_data_service.delete_quote(&id).await?;
+    enqueue_portfolio_job(
+        state,
+        PortfolioJobConfig {
+            account_ids: None,
+            symbols: None,
+            refetch_all_market_data: false,
+            force_full_recalculation: false,
+        },
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -117,17 +137,15 @@ async fn sync_market_data(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SyncBody>,
 ) -> ApiResult<StatusCode> {
-    // Prefer targeted resync when symbols provided; otherwise do global sync/resync based on refetch_all
-    if let Some(symbols) = body.symbols.clone() {
-        let _ = state
-            .market_data_service
-            .resync_market_data(Some(symbols))
-            .await?;
-    } else if body.refetch_all {
-        let _ = state.market_data_service.resync_market_data(None).await?;
-    } else {
-        let _ = state.market_data_service.sync_market_data().await?;
-    }
+    enqueue_portfolio_job(
+        state,
+        PortfolioJobConfig {
+            account_ids: None,
+            symbols: body.symbols,
+            refetch_all_market_data: body.refetch_all,
+            force_full_recalculation: false,
+        },
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 

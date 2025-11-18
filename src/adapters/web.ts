@@ -481,7 +481,10 @@ export const invokeWeb = async <T>(
       break;
   }
 
-  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const headers: HeadersInit = {};
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
   const token = getAuthToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;

@@ -17,7 +17,10 @@
     ],
     "copyright": "2025 Teymz Inc.",
   "category": "Finance",
-  "createUpdaterArtifacts": "v1Compatible"
+  "createUpdaterArtifacts": "v1Compatible",
+  "iOS": {
+    "developmentTeam": "DYDJ2RNL5H"
+  }
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",

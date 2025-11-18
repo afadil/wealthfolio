@@ -6,6 +6,23 @@ import tailwindcss from "@tailwindcss/vite";
 const host = process.env.TAURI_DEV_HOST;
 const apiTarget =
   process.env.VITE_API_TARGET || process.env.WF_API_TARGET || "http://127.0.0.1:8080";
+const enableProxy = process.env.WF_ENABLE_VITE_PROXY === "true";
+const serverProxy = enableProxy
+  ? {
+      "/api": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/openapi.json": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/docs": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+    }
+  : undefined;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -35,21 +52,7 @@ export default defineConfig({
           port: 1421,
         }
       : undefined,
-    proxy: {
-      // Proxy API calls to the Rust backend in dev
-      "/api": {
-        target: apiTarget,
-        changeOrigin: true,
-      },
-      "/openapi.json": {
-        target: apiTarget,
-        changeOrigin: true,
-      },
-      "/docs": {
-        target: apiTarget,
-        changeOrigin: true,
-      },
-    },
+    proxy: serverProxy,
     watch: {
       // 3. tell vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],

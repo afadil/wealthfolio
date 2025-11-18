@@ -209,7 +209,6 @@ pub fn run() {
             #[cfg(any(target_os = "android", target_os = "ios"))]
             {
                 let handle = app.handle();
-                let _ = handle.plugin(tauri_plugin_barcode_scanner::init());
                 let _ = handle.plugin(tauri_plugin_haptics::init());
             }
 

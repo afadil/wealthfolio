@@ -1,17 +1,13 @@
 use std::sync::Arc;
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Query, State},
     routing::get,
     Json, Router,
 };
 use wealthfolio_core::portfolio::{
-    holdings::holdings_model::Holding,
-    valuation::valuation_model::DailyAccountValuation,
+    holdings::holdings_model::Holding, valuation::valuation_model::DailyAccountValuation,
 };
 
 #[derive(serde::Deserialize)]

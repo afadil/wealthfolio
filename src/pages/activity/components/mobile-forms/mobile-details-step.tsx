@@ -40,9 +40,17 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
   const [symbolSheetOpen, setSymbolSheetOpen] = useState(false);
 
-  const needsAssetSymbol = ["BUY", "SELL", "ADD_HOLDING", "REMOVE_HOLDING", "DIVIDEND"].includes(
-    activityType,
-  );
+  const isFeeActivity = activityType === "FEE";
+  const isTaxActivity = activityType === "TAX";
+  const needsAssetSymbol = [
+    "BUY",
+    "SELL",
+    "ADD_HOLDING",
+    "REMOVE_HOLDING",
+    "DIVIDEND",
+    "INTEREST",
+    "SPLIT",
+  ].includes(activityType);
   const needsQuantity = ["BUY", "SELL", "ADD_HOLDING", "REMOVE_HOLDING"].includes(activityType);
   const needsUnitPrice = ["BUY", "SELL", "ADD_HOLDING", "REMOVE_HOLDING"].includes(activityType);
   const needsAmount = [
@@ -52,7 +60,6 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
     "TRANSFER_OUT",
     "DIVIDEND",
     "INTEREST",
-    "FEE",
     "TAX",
   ].includes(activityType);
   const needsFee = [
@@ -65,7 +72,8 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
     "INTEREST",
   ].includes(activityType);
 
-  const showSkipSymbolLookup = needsAssetSymbol;
+  const needsSplitRatio = activityType === "SPLIT";
+  const showSkipSymbolLookup = needsAssetSymbol && activityType !== "INTEREST";
   const showCurrencyOption = true;
 
   const selectedAccount = accounts.find((acc) => acc.value === accountId);
@@ -254,7 +262,9 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                       ? "Dividend Amount"
                       : activityType === "INTEREST"
                         ? "Interest Amount"
-                        : "Amount"}
+                        : isTaxActivity
+                          ? "Tax Amount"
+                          : "Amount"}
                   </FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
@@ -265,14 +275,49 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
             />
           )}
 
+          {/* Split Ratio */}
+          {needsSplitRatio && (
+            <FormField
+              control={control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-medium">Split Ratio</FormLabel>
+                  <FormControl>
+                    <QuantityInput
+                      placeholder="Ex. 2 for 2:1 split, 0.5 for 1:2 split"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           {/* Fee */}
-          {needsFee && (
+          {!isFeeActivity && needsFee && (
             <FormField
               control={control}
               name="fee"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-base font-medium">Fee (Optional)</FormLabel>
+                  <FormControl>
+                    <MoneyInput {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          {isFeeActivity && (
+            <FormField
+              control={control}
+              name="fee"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-medium">Fee Amount</FormLabel>
                   <FormControl>
                     <MoneyInput {...field} />
                   </FormControl>

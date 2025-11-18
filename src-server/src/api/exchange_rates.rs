@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{api::shared::trigger_full_portfolio_recalc, error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -27,6 +24,7 @@ async fn update_exchange_rate(
         .fx_service
         .update_exchange_rate(&rate.from_currency, &rate.to_currency, rate.rate)
         .await?;
+    trigger_full_portfolio_recalc(state.clone());
     Ok(Json(updated))
 }
 
@@ -35,6 +33,7 @@ async fn add_exchange_rate(
     Json(new_rate): Json<NewExchangeRate>,
 ) -> ApiResult<Json<ExchangeRate>> {
     let added = state.fx_service.add_exchange_rate(new_rate).await?;
+    trigger_full_portfolio_recalc(state.clone());
     Ok(Json(added))
 }
 
@@ -43,6 +42,7 @@ async fn delete_exchange_rate(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.fx_service.delete_exchange_rate(&id).await?;
+    trigger_full_portfolio_recalc(state);
     Ok(StatusCode::NO_CONTENT)
 }
 

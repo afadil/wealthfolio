@@ -108,8 +108,11 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     async function onSubmit(data: OnboardingSettingsValues) {
       try {
-        await updateSettings({ baseCurrency: data.baseCurrency, theme: data.theme });
-        await updateSettings({ onboardingCompleted: true });
+        await updateSettings({
+          baseCurrency: data.baseCurrency,
+          theme: data.theme,
+          onboardingCompleted: true,
+        });
         onNext();
       } catch (error) {
         console.error("Failed to save onboarding settings:", error);
