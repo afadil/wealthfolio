@@ -1,20 +1,21 @@
-import { Icons } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header";
+import { Icons } from "@/components/ui/icons";
 import { safeDivide } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import { GainPercent } from "@wealthfolio/ui";
 
-import { Skeleton } from "@/components/ui/skeleton";
-import { Holding } from "@/lib/types";
-import { useNavigate } from "react-router-dom";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { AmountDisplay } from "@wealthfolio/ui";
-import { QuantityDisplay } from "@wealthfolio/ui";
-import { useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { Holding } from "@/lib/types";
+import { AmountDisplay, QuantityDisplay } from "@wealthfolio/ui";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { AnimatedToggleGroup } from "@wealthfolio/ui";
 
 // Helper function to get display value and currency based on toggle state
 const getDisplayValueAndCurrency = (
@@ -43,9 +44,13 @@ const getDisplayValueAndCurrency = (
 export const HoldingsTable = ({
   holdings,
   isLoading,
+  showTotalReturn = true,
+  setShowTotalReturn,
 }: {
   holdings: Holding[];
   isLoading: boolean;
+  showTotalReturn?: boolean;
+  setShowTotalReturn?: (value: boolean) => void;
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
@@ -86,7 +91,7 @@ export const HoldingsTable = ({
     <div className="flex h-full flex-col">
       <DataTable
         data={holdings}
-        columns={getColumns(isBalanceHidden, showConvertedValues, setShowConvertedValues)}
+        columns={getColumns(isBalanceHidden, showConvertedValues, showTotalReturn)}
         searchBy="symbol"
         filters={filters}
         showColumnToggle={true}
@@ -98,6 +103,41 @@ export const HoldingsTable = ({
         }}
         defaultSorting={[{ id: "symbol", desc: false }]}
         scrollable={true}
+        toolbarActions={
+          <div className="mr-2 flex items-center gap-2">
+            {setShowTotalReturn && (
+              <AnimatedToggleGroup
+                value={showTotalReturn ? "total" : "daily"}
+                onValueChange={(value) => setShowTotalReturn(value === "total")}
+                items={[
+                  { value: "total", label: "Total" },
+                  { value: "daily", label: "Daily" },
+                ]}
+                size="xs"
+                rounded="md"
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowConvertedValues(!showConvertedValues)}
+                  className="h-8 w-8 rounded-lg"
+                >
+                  {showConvertedValues ? (
+                    <Icons.Globe className="h-4 w-4" />
+                  ) : (
+                    <Icons.DollarSign className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Show values in {showConvertedValues ? "Asset Currency" : "Base Currency"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        }
       />
     </div>
   );
@@ -108,7 +148,7 @@ export default HoldingsTable;
 const getColumns = (
   isHidden: boolean,
   showConvertedValues: boolean,
-  setShowConvertedValues: (value: boolean) => void,
+  showTotalReturn: boolean,
 ): ColumnDef<Holding>[] => [
   {
     id: "symbol",
@@ -292,23 +332,30 @@ const getColumns = (
     accessorFn: (row) => row.totalGain?.base ?? 0,
     enableHiding: false,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end" column={column} title="Total Gain/Loss" />
+      <DataTableColumnHeader
+        className="justify-end"
+        column={column}
+        title={showTotalReturn ? "Total Gain/Loss" : "Day Change"}
+      />
     ),
     meta: {
       label: "Total Gain/Loss",
     },
     cell: ({ row }) => {
       const holding = row.original;
+      const valueBase = showTotalReturn ? holding.totalGain?.base : holding.dayChange?.base;
+      const pct = showTotalReturn ? holding.totalGainPct : holding.dayChangePct;
+
       const { value, currency } = getDisplayValueAndCurrency(
         holding,
-        holding.totalGain?.base,
+        valueBase,
         showConvertedValues,
       );
 
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
-          <GainPercent className="text-xs" value={holding.totalGainPct || 0} />
+          <GainPercent className="text-xs" value={pct || 0} />
         </div>
       );
     },
@@ -317,8 +364,8 @@ const getColumns = (
       const holdingB = rowB.original;
 
       // Always sort by base currency value for consistency
-      const valueA = holdingA.totalGain?.base ?? 0;
-      const valueB = holdingB.totalGain?.base ?? 0;
+      const valueA = (showTotalReturn ? holdingA.totalGain?.base : holdingA.dayChange?.base) ?? 0;
+      const valueB = (showTotalReturn ? holdingB.totalGain?.base : holdingB.dayChange?.base) ?? 0;
 
       return valueA - valueB;
     },
@@ -347,31 +394,7 @@ const getColumns = (
   {
     id: "actions",
     enableHiding: false,
-    header: () => (
-      <div className="flex items-center">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowConvertedValues(!showConvertedValues)}
-                className="h-8 w-8"
-              >
-                {showConvertedValues ? (
-                  <Icons.Globe className="h-4 w-4" />
-                ) : (
-                  <Icons.DollarSign className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>Show values in {showConvertedValues ? "Asset Currency" : "Base Currency"}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-    ),
+    header: () => null,
     cell: ({ row }) => {
       const navigate = useNavigate();
       const handleNavigate = () => {

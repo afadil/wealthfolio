@@ -11,7 +11,7 @@ import {
 import { ASSET_SUBCLASS_TYPES, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@wealthfolio/ui";
+import { AnimatedToggleGroup, ScrollArea, Separator } from "@wealthfolio/ui";
 
 interface HoldingsMobileFilterSheetProps {
   open: boolean;
@@ -22,6 +22,10 @@ interface HoldingsMobileFilterSheetProps {
   selectedTypes: string[];
   setSelectedTypes: (types: string[]) => void;
   showAccountFilter?: boolean;
+  sortBy: "symbol" | "marketValue";
+  setSortBy: (value: "symbol" | "marketValue") => void;
+  showTotalReturn: boolean;
+  setShowTotalReturn: (value: boolean) => void;
 }
 
 export const HoldingsMobileFilterSheet = ({
@@ -33,26 +37,69 @@ export const HoldingsMobileFilterSheet = ({
   selectedTypes,
   setSelectedTypes,
   showAccountFilter = true,
+  sortBy,
+  setSortBy,
+  showTotalReturn,
+  setShowTotalReturn,
 }: HoldingsMobileFilterSheetProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex h-[80vh] flex-col rounded-t-xl">
+      <SheetContent side="bottom" className="flex h-[85vh] flex-col rounded-t-xl">
         <SheetHeader className="text-left">
-          <SheetTitle>Filter Holdings</SheetTitle>
+          <SheetTitle>Display Options</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 py-4">
-          <div className="space-y-6 pr-4">
+          <div className="space-y-6">
+            {/* View Settings */}
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-3">
+                <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  Sort By
+                </h4>
+                <AnimatedToggleGroup
+                  value={sortBy}
+                  onValueChange={(value) => setSortBy(value as "symbol" | "marketValue")}
+                  items={[
+                    { value: "marketValue", label: "Market Value" },
+                    { value: "symbol", label: "Symbol" },
+                  ]}
+                  size="sm"
+                  className="inline-flex w-auto"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  Return View
+                </h4>
+                <AnimatedToggleGroup
+                  value={showTotalReturn ? "total" : "daily"}
+                  onValueChange={(value) => setShowTotalReturn(value === "total")}
+                  items={[
+                    { value: "total", label: "Total Return" },
+                    { value: "daily", label: "Daily Return" },
+                  ]}
+                  size="sm"
+                  className="inline-flex w-auto"
+                />
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Account Filter Section */}
             {showAccountFilter && (
-              <div>
-                <h4 className="mb-3 font-medium">Account</h4>
-                <ul className="space-y-1">
-                  <li
+              <div className="space-y-3">
+                <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  Account
+                </h4>
+                <div className="overflow-hidden rounded-lg border">
+                  <div
                     className={cn(
-                      "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
+                      "flex cursor-pointer items-center justify-between p-3 text-sm transition-colors",
                       selectedAccount?.id === PORTFOLIO_ACCOUNT_ID
-                        ? "bg-accent"
-                        : "hover:bg-accent/50",
+                        ? "bg-accent/50 font-medium"
+                        : "hover:bg-muted/50",
                     )}
                     onClick={() => {
                       onAccountChange({
@@ -69,39 +116,51 @@ export const HoldingsMobileFilterSheet = ({
                       onOpenChange(false);
                     }}
                   >
-                    <span>All Portfolio</span>
+                    <span className="flex items-center gap-2">
+                      <Icons.LayoutDashboard className="text-muted-foreground h-4 w-4" />
+                      All Portfolio
+                    </span>
                     {selectedAccount?.id === PORTFOLIO_ACCOUNT_ID && (
-                      <Icons.Check className="h-4 w-4" />
+                      <Icons.Check className="text-primary h-4 w-4" />
                     )}
-                  </li>
+                  </div>
                   {accounts.map((account) => (
-                    <li
+                    <div
                       key={account.id}
                       className={cn(
-                        "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
-                        selectedAccount?.id === account.id ? "bg-accent" : "hover:bg-accent/50",
+                        "flex cursor-pointer items-center justify-between border-t p-3 text-sm transition-colors",
+                        selectedAccount?.id === account.id
+                          ? "bg-accent/50 font-medium"
+                          : "hover:bg-muted/50",
                       )}
                       onClick={() => {
                         onAccountChange(account);
                         onOpenChange(false);
                       }}
                     >
-                      <span>{account.name}</span>
-                      {selectedAccount?.id === account.id && <Icons.Check className="h-4 w-4" />}
-                    </li>
+                      <span className="flex items-center gap-2">
+                        <Icons.Wallet className="text-muted-foreground h-4 w-4" />
+                        {account.name}
+                      </span>
+                      {selectedAccount?.id === account.id && (
+                        <Icons.Check className="text-primary h-4 w-4" />
+                      )}
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 
             {/* Asset Type Filter Section */}
-            <div>
-              <h4 className="mb-3 font-medium">Asset Type</h4>
-              <ul className="space-y-1">
-                <li
+            <div className="space-y-3">
+              <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                Asset Type
+              </h4>
+              <div className="overflow-hidden rounded-lg border">
+                <div
                   className={cn(
-                    "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
-                    selectedTypes.length === 0 ? "bg-accent" : "hover:bg-accent/50",
+                    "flex cursor-pointer items-center justify-between p-3 text-sm transition-colors",
+                    selectedTypes.length === 0 ? "bg-accent/50 font-medium" : "hover:bg-muted/50",
                   )}
                   onClick={() => {
                     setSelectedTypes([]);
@@ -109,14 +168,16 @@ export const HoldingsMobileFilterSheet = ({
                   }}
                 >
                   <span>All Types</span>
-                  {selectedTypes.length === 0 && <Icons.Check className="h-4 w-4" />}
-                </li>
+                  {selectedTypes.length === 0 && <Icons.Check className="text-primary h-4 w-4" />}
+                </div>
                 {ASSET_SUBCLASS_TYPES.map((type) => (
-                  <li
+                  <div
                     key={type.value}
                     className={cn(
-                      "flex cursor-pointer items-center justify-between rounded-md p-2 text-sm",
-                      selectedTypes.includes(type.value) ? "bg-accent" : "hover:bg-accent/50",
+                      "flex cursor-pointer items-center justify-between border-t p-3 text-sm transition-colors",
+                      selectedTypes.includes(type.value)
+                        ? "bg-accent/50 font-medium"
+                        : "hover:bg-muted/50",
                     )}
                     onClick={() => {
                       const newTypes = selectedTypes.includes(type.value)
@@ -126,10 +187,12 @@ export const HoldingsMobileFilterSheet = ({
                     }}
                   >
                     <span>{type.label}</span>
-                    {selectedTypes.includes(type.value) && <Icons.Check className="h-4 w-4" />}
-                  </li>
+                    {selectedTypes.includes(type.value) && (
+                      <Icons.Check className="text-primary h-4 w-4" />
+                    )}
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
         </ScrollArea>

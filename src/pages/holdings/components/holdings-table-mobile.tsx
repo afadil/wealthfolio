@@ -24,6 +24,10 @@ interface HoldingsTableMobileProps {
   showAccountFilter?: boolean;
   showSearch?: boolean;
   showFilterButton?: boolean;
+  sortBy?: "symbol" | "marketValue";
+  setSortBy?: (value: "symbol" | "marketValue") => void;
+  showTotalReturn?: boolean;
+  setShowTotalReturn?: (value: boolean) => void;
 }
 
 export const HoldingsTableMobile = ({
@@ -37,11 +41,24 @@ export const HoldingsTableMobile = ({
   showAccountFilter = true,
   showSearch = true,
   showFilterButton = true,
+  sortBy: controlledSortBy,
+  setSortBy: controlledSetSortBy,
+  showTotalReturn: controlledShowTotalReturn,
+  setShowTotalReturn: controlledSetShowTotalReturn,
 }: HoldingsTableMobileProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  // Internal state for uncontrolled mode
+  const [internalSortBy, setInternalSortBy] = useState<"symbol" | "marketValue">("marketValue");
+  const [internalShowTotalReturn, setInternalShowTotalReturn] = useState(true);
+
+  const sortBy = controlledSortBy ?? internalSortBy;
+  const setSortBy = controlledSetSortBy ?? setInternalSortBy;
+  const showTotalReturn = controlledShowTotalReturn ?? internalShowTotalReturn;
+  const setShowTotalReturn = controlledSetShowTotalReturn ?? setInternalShowTotalReturn;
 
   const hasActiveFilters = useMemo(() => {
     const hasAccountFilter = showAccountFilter && selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID;
@@ -71,6 +88,12 @@ export const HoldingsTableMobile = ({
     }
 
     return result.sort((a, b) => {
+      if (sortBy === "marketValue") {
+        const valA = a.marketValue?.base ?? 0;
+        const valB = b.marketValue?.base ?? 0;
+        return valB - valA; // Descending
+      }
+
       const symbolA = a.instrument?.symbol?.toLowerCase() ?? "";
       const symbolB = b.instrument?.symbol?.toLowerCase() ?? "";
       if (symbolA && symbolB) {
@@ -84,7 +107,7 @@ export const HoldingsTableMobile = ({
       }
       return 0;
     });
-  }, [holdings, selectedTypes, searchQuery]);
+  }, [holdings, selectedTypes, searchQuery, sortBy]);
 
   const handleNavigate = (holding: Holding) => {
     const symbol = holding.instrument?.symbol;
@@ -168,14 +191,25 @@ export const HoldingsTableMobile = ({
                     />
                     <div className="flex items-center justify-end gap-1">
                       <AmountDisplay
-                        value={holding.totalGain?.local ?? 0}
+                        value={
+                          showTotalReturn
+                            ? (holding.totalGain?.local ?? 0)
+                            : (holding.dayChange?.local ?? 0)
+                        }
                         currency={holding.localCurrency}
                         isHidden={isBalanceHidden}
                         colorFormat
                         className="text-xs"
                       />
                       <Separator orientation="vertical" className="mx-1 h-4" />
-                      <GainPercent value={holding.totalGainPct ?? 0} className="text-xs" />
+                      <GainPercent
+                        value={
+                          showTotalReturn
+                            ? (holding.totalGainPct ?? 0)
+                            : (holding.dayChangePct ?? 0)
+                        }
+                        className="text-xs"
+                      />
                     </div>
                   </div>
                 </div>
@@ -204,6 +238,10 @@ export const HoldingsTableMobile = ({
         selectedTypes={selectedTypes}
         setSelectedTypes={setSelectedTypes}
         showAccountFilter={showAccountFilter}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        showTotalReturn={showTotalReturn}
+        setShowTotalReturn={setShowTotalReturn}
       />
     </div>
   );

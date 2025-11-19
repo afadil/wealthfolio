@@ -19,6 +19,7 @@ import { SwipablePage } from "@/components/page";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useHapticFeedback } from "@/hooks/use-haptic-feedback";
 import { useHoldings } from "@/hooks/use-holdings";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { usePlatform } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -68,6 +69,14 @@ export const HoldingsPage = () => {
   // Mobile filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [sortBy, setSortBy] = usePersistentState<"symbol" | "marketValue">(
+    "holdings-sort-by",
+    "marketValue",
+  );
+  const [showTotalReturn, setShowTotalReturn] = usePersistentState<boolean>(
+    "holdings-show-total-return",
+    true,
+  );
 
   const handleChartSectionClick = (
     type: SheetFilterType,
@@ -169,7 +178,12 @@ export const HoldingsPage = () => {
   const renderHoldingsView = () => (
     <div className="space-y-4 p-2 lg:p-4">
       <div className="hidden md:block">
-        <HoldingsTable holdings={filteredNonCashHoldings ?? []} isLoading={isLoading} />
+        <HoldingsTable
+          holdings={filteredNonCashHoldings ?? []}
+          isLoading={isLoading}
+          showTotalReturn={showTotalReturn}
+          setShowTotalReturn={setShowTotalReturn}
+        />
       </div>
       <div className="block md:hidden">
         <HoldingsTableMobile
@@ -182,6 +196,8 @@ export const HoldingsPage = () => {
           onAccountChange={handleAccountSelect}
           showSearch={true}
           showFilterButton={false}
+          sortBy={sortBy}
+          showTotalReturn={showTotalReturn}
         />
       </div>
     </div>
@@ -306,6 +322,10 @@ export const HoldingsPage = () => {
         onAccountChange={handleAccountSelect}
         selectedTypes={selectedTypes}
         setSelectedTypes={setSelectedTypes}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        showTotalReturn={showTotalReturn}
+        setShowTotalReturn={setShowTotalReturn}
       />
 
       {/* Details Sheet */}
