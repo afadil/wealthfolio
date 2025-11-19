@@ -24,7 +24,7 @@ export function useBackupRestore() {
         queryClient.invalidateQueries();
         toast({
           title: "Database restored successfully",
-          description: "Application data has been restored.",
+          description: "Please restart the application to ensure all data is properly refreshed.",
           variant: "success",
         });
       });
@@ -111,12 +111,6 @@ export function useBackupRestore() {
         // User cancelled the operation, don't show any message
         return;
       }
-
-      toast({
-        title: "Database restore initiated",
-        description: `Restoring from: ${filePath}`,
-        variant: "success",
-      });
     },
     onError: (error) => {
       logger.error(`Error during restore: ${String(error)}`);
