@@ -370,6 +370,7 @@ export function AppLauncher() {
                 <CommandItem
                   key={action.href ?? index}
                   value={displayText}
+                  keywords={action.keywords ?? []}
                   onSelect={() => handleSelectAction(action.href)}
                 >
                   {resizedIcon}
@@ -388,6 +389,13 @@ export function AppLauncher() {
                 <CommandItem
                   key={holding.id}
                   value={holding.symbol}
+                  keywords={[
+                    holding.symbol,
+                    holding.name ?? "",
+                    "holding",
+                    "asset",
+                    "stock",
+                  ].filter((keyword): keyword is string => Boolean(keyword))}
                   onSelect={() => handleSelectHolding(holding.symbol)}
                 >
                   <Icons.TrendingUp className="text-muted-foreground mr-2 h-4 w-4" />
@@ -411,6 +419,11 @@ export function AppLauncher() {
                   <CommandItem
                     key={account.id}
                     value={account.name}
+                    keywords={[
+                      account.name,
+                      account.accountType,
+                      "account",
+                    ].filter((keyword): keyword is string => Boolean(keyword))}
                     onSelect={() => handleSelectAccount(account.id)}
                   >
                     <IconComponent className="text-muted-foreground mr-2 h-4 w-4" />
