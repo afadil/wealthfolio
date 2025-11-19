@@ -20,6 +20,7 @@ export function useSettingsMutation(
         title: "Settings updated",
         description: "Your settings have been updated successfully.",
         variant: "success",
+        duration: 1000,
       });
     },
     onError: (error) => {
