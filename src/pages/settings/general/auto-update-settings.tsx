@@ -1,11 +1,11 @@
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSettingsContext } from "@/lib/settings-provider";
 import { updateSettings } from "@/commands/settings";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { QueryKeys } from "@/lib/query-keys";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
+import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export function AutoUpdateSettings() {
   const { settings } = useSettingsContext();
@@ -15,10 +15,6 @@ export function AutoUpdateSettings() {
     mutationFn: updateSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
-      toast({
-        title: "Settings updated",
-        description: "Auto-update settings have been saved successfully.",
-      });
     },
     onError: (error) => {
       toast({
