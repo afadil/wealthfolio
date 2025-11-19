@@ -12,6 +12,7 @@ import { ActivityTypeNames } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { formatAmount, Separator } from "@wealthfolio/ui";
+import { Link } from "react-router-dom";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
 
@@ -58,30 +59,64 @@ export const ActivityTableMobile = ({
           return (
             <Card key={activity.id} className="p-3">
               <div className="flex items-center gap-3">
-                <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate font-semibold">{displaySymbol}</p>
-                    {activity.activityType !== "SPLIT" && (
-                      <span className="shrink-0 text-sm font-semibold">
-                        {formatAmount(displayValue, activity.currency)}
-                      </span>
-                    )}
+                {isCash ? (
+                  <div className="flex flex-1 items-center gap-3 min-w-0">
+                    <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate font-semibold">{displaySymbol}</p>
+                        {activity.activityType !== "SPLIT" && (
+                          <span className="shrink-0 text-sm font-semibold">
+                            {formatAmount(displayValue, activity.currency)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
+                      <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
+                        <span>{formattedDate.date}</span>
+                        {!isCashActivity(activity.activityType) &&
+                          !isIncomeActivity(activity.activityType) &&
+                          !isSplitActivity(activity.activityType) &&
+                          !isFeeActivity(activity.activityType) && (
+                            <>
+                              <span>•</span>
+                              <span>{activity.quantity} shares</span>
+                            </>
+                          )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
-                  <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
-                    <span>{formattedDate.date}</span>
-                    {!isCashActivity(activity.activityType) &&
-                      !isIncomeActivity(activity.activityType) &&
-                      !isSplitActivity(activity.activityType) &&
-                      !isFeeActivity(activity.activityType) && (
-                        <>
-                          <span>•</span>
-                          <span>{activity.quantity} shares</span>
-                        </>
-                      )}
-                  </div>
-                </div>
+                ) : (
+                  <Link
+                    to={`/holdings/${encodeURIComponent(symbol)}`}
+                    className="flex flex-1 items-center gap-3 min-w-0"
+                  >
+                    <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate font-semibold">{displaySymbol}</p>
+                        {activity.activityType !== "SPLIT" && (
+                          <span className="shrink-0 text-sm font-semibold">
+                            {formatAmount(displayValue, activity.currency)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
+                      <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
+                        <span>{formattedDate.date}</span>
+                        {!isCashActivity(activity.activityType) &&
+                          !isIncomeActivity(activity.activityType) &&
+                          !isSplitActivity(activity.activityType) &&
+                          !isFeeActivity(activity.activityType) && (
+                            <>
+                              <span>•</span>
+                              <span>{activity.quantity} shares</span>
+                            </>
+                          )}
+                      </div>
+                    </div>
+                  </Link>
+                )}
                 <ActivityOperations
                   activity={activity}
                   onEdit={handleEdit}
@@ -99,15 +134,30 @@ export const ActivityTableMobile = ({
             <div className="space-y-2">
               {/* Header: Symbol and Date */}
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
-                  <div>
-                    <p className="font-semibold">{displaySymbol}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {isCash ? activity.currency : activity.assetName}
-                    </p>
+                {isCash ? (
+                  <div className="flex items-center gap-2">
+                    <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
+                    <div>
+                      <p className="font-semibold">{displaySymbol}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {isCash ? activity.currency : activity.assetName}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <Link
+                    to={`/holdings/${encodeURIComponent(symbol)}`}
+                    className="flex items-center gap-2"
+                  >
+                    <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
+                    <div>
+                      <p className="font-semibold">{displaySymbol}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {isCash ? activity.currency : activity.assetName}
+                      </p>
+                    </div>
+                  </Link>
+                )}
                 <ActivityOperations
                   activity={activity}
                   onEdit={handleEdit}

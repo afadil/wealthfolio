@@ -22,6 +22,7 @@ interface DataTableToolbarProps<TData> {
   searchBy?: string;
   filters?: DataTableFacetedFilterProps<TData, unknown>[];
   showColumnToggle?: boolean;
+  actions?: React.ReactNode;
 }
 
 export function DataTableToolbar<TData>({
@@ -29,6 +30,7 @@ export function DataTableToolbar<TData>({
   searchBy,
   filters,
   showColumnToggle = false,
+  actions,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0 || table.getState().globalFilter;
   const hideableColumns = table.getAllColumns().filter((column) => column.getCanHide());
@@ -67,34 +69,37 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      {showColumnToggle && hideableColumns.length > 0 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
-            >
-              Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {hideableColumns.map((column) => {
-              const meta = column.columnDef.meta as ColumnMeta | undefined;
-              return (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {meta?.label ?? column.id}
-                </DropdownMenuCheckboxItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      <div className="flex items-center gap-2">
+        {actions}
+        {showColumnToggle && hideableColumns.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
+              >
+                Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {hideableColumns.map((column) => {
+                const meta = column.columnDef.meta as ColumnMeta | undefined;
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {meta?.label ?? column.id}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
     </div>
   );
 }
