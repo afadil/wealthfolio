@@ -23,7 +23,8 @@ WORKDIR /app
 
 # Install build tools for the HOST (to run cargo, build scripts)
 # clang/lld are needed for cross-linking
-RUN apk add --no-cache clang lld build-base git file
+# pkgconfig is required for openssl-sys to find the target libraries
+RUN apk add --no-cache clang lld build-base git file pkgconfig
 
 # Install TARGET dependencies
 # xx-apk installs into /$(xx-info triple)/...
