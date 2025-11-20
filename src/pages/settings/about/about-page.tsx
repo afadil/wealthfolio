@@ -1,7 +1,7 @@
-import { check } from "@tauri-apps/plugin-updater";
 import { useEffect, useState } from "react";
 
-import { getAppInfo } from "@/commands/app";
+import { getRunEnv, RUN_ENV } from "@/adapters";
+import { checkForUpdates, getAppInfo } from "@/commands/app";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
@@ -14,6 +14,7 @@ export default function AboutSettingsPage() {
   const [version, setVersion] = useState<string>("");
   const [dbPath, setDbPath] = useState<string>("");
   const [logsDir, setLogsDir] = useState<string>("");
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const { isMobile } = usePlatform();
 
   useEffect(() => {
@@ -34,12 +35,44 @@ export default function AboutSettingsPage() {
   }, [isMobile]);
 
   const handleCheckForUpdates = async () => {
+    setIsCheckingUpdate(true);
     try {
-      const update = await check();
-      if (update) {
+      const runEnv = getRunEnv();
+      if (runEnv === RUN_ENV.DESKTOP) {
+        const { check } = await import("@tauri-apps/plugin-updater");
+        const update = await check();
+
+        if (update) {
+          toast({
+            title: "Update available",
+            description: [
+              `Version ${update.version} is available.`,
+              update.body ? update.body : null,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
+          });
+        } else {
+          toast({ title: "Up to date", description: "You have the latest version." });
+        }
+        return;
+      }
+
+      const update = await checkForUpdates();
+
+      if (!update) {
+        throw new Error("Update check unavailable");
+      }
+
+      if (update.updateAvailable) {
         toast({
           title: "Update available",
-          description: `Version ${update.version} is available.`,
+          description: [
+            `Version ${update.latestVersion} is available.`,
+            update.notes ? update.notes : null,
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
         });
       } else {
         toast({ title: "Up to date", description: "You have the latest version." });
@@ -51,6 +84,8 @@ export default function AboutSettingsPage() {
         variant: "destructive",
       });
       console.error("Failed to check for updates:", error);
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -89,7 +124,7 @@ export default function AboutSettingsPage() {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {!isMobile && (
-                <Button size="sm" onClick={handleCheckForUpdates}>
+                <Button size="sm" onClick={handleCheckForUpdates} disabled={isCheckingUpdate}>
                   Check for Update
                 </Button>
               )}

@@ -15,6 +15,7 @@ const COMMANDS: CommandMap = {
   update_settings: { method: "PUT", path: "/settings" },
   is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },
   get_app_info: { method: "GET", path: "/app/info" },
+  check_update: { method: "GET", path: "/app/check-update" },
   backup_database: { method: "POST", path: "/utilities/database/backup" },
   backup_database_to_path: { method: "POST", path: "/utilities/database/backup-to-path" },
   restore_database: { method: "POST", path: "/utilities/database/restore" },
@@ -204,6 +205,20 @@ export const invokeWeb = async <T>(
         endDate?: string;
       };
       body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      break;
+    }
+    case "check_update": {
+      const { currentVersion, target, arch } = (payload ?? {}) as {
+        currentVersion?: string;
+        target?: string;
+        arch?: string;
+      };
+      const params = new URLSearchParams();
+      if (currentVersion) params.set("currentVersion", currentVersion);
+      if (target) params.set("target", target);
+      if (arch) params.set("arch", arch);
+      const qs = params.toString();
+      if (qs) url += `?${qs}`;
       break;
     }
     case "get_income_summary":

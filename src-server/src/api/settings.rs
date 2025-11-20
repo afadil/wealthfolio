@@ -1,4 +1,4 @@
-use std::{path::Path as StdPath, sync::Arc};
+use std::{collections::HashMap, path::Path as StdPath, sync::Arc};
 
 use crate::{
     api::shared::{normalize_file_path, process_portfolio_job, PortfolioJobConfig},
@@ -13,6 +13,9 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use reqwest::StatusCode as HttpStatusCode;
+use semver::Version;
+use serde::Deserialize;
 use tokio::{fs, task};
 use wealthfolio_core::{
     db,
@@ -61,6 +64,8 @@ async fn is_auto_update_check_enabled(State(state): State<Arc<AppState>>) -> Api
     Ok(Json(enabled))
 }
 
+const WEB_RUNTIME_TARGET: &str = "web-docker";
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AppInfoResponse {
@@ -88,6 +93,113 @@ async fn get_app_info(State(state): State<Arc<AppState>>) -> ApiResult<Json<AppI
         version,
         db_path,
         logs_dir,
+    }))
+}
+
+#[derive(Deserialize)]
+struct UpdatePlatformInfo {
+    url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct UpdateCheckResponseRaw {
+    version: String,
+    notes: Option<String>,
+    pub_date: Option<String>,
+    platforms: HashMap<String, UpdatePlatformInfo>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateCheckResponse {
+    update_available: bool,
+    latest_version: String,
+    notes: Option<String>,
+    pub_date: Option<String>,
+    download_url: Option<String>,
+}
+
+fn normalize_target(target: Option<String>) -> String {
+    match target
+        .or_else(|| Some(WEB_RUNTIME_TARGET.to_string()))
+        .unwrap_or_else(|| WEB_RUNTIME_TARGET.to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "macos" | "darwin" => "darwin".to_string(),
+        "windows" | "win32" => "windows".to_string(),
+        "linux" => "linux".to_string(),
+        "web-docker" => WEB_RUNTIME_TARGET.to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn normalize_arch(arch: Option<String>) -> String {
+    match arch
+        .or_else(|| Some(std::env::consts::ARCH.to_string()))
+        .unwrap_or_else(|| "x86_64".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "arm64" | "aarch64" => "aarch64".to_string(),
+        "x86_64" | "x64" | "amd64" => "x86_64".to_string(),
+        other => other.to_string(),
+    }
+}
+
+async fn check_update(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<UpdateCheckResponse>> {
+    let current_version_str = env!("CARGO_PKG_VERSION").to_string();
+    let target = normalize_target(None);
+    let arch = normalize_arch(None);
+    let request_url = format!(
+        "https://wealthfolio.app/releases/{}/{}/{}",
+        target, arch, current_version_str
+    );
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&request_url)
+        .header("X-Instance-Id", state.instance_id.clone())
+        .header("X-Client-Runtime", WEB_RUNTIME_TARGET)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to query update endpoint: {e}"))?;
+
+    if response.status() == HttpStatusCode::NOT_FOUND {
+        return Ok(Json(UpdateCheckResponse {
+            update_available: false,
+            latest_version: current_version_str,
+            notes: None,
+            pub_date: None,
+            download_url: None,
+        }));
+    }
+
+    let payload: UpdateCheckResponseRaw = response
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse update response: {e}"))?;
+
+    let current_version =
+        Version::parse(&current_version_str).unwrap_or_else(|_| Version::new(0, 0, 0));
+    let latest_version =
+        Version::parse(&payload.version).unwrap_or_else(|_| current_version.clone());
+    let update_available = latest_version > current_version;
+
+    let platform_key = format!("{}-{}", target, arch);
+    let download_url = payload
+        .platforms
+        .get(&platform_key)
+        .and_then(|p| p.url.clone());
+
+    Ok(Json(UpdateCheckResponse {
+        update_available,
+        latest_version: payload.version,
+        notes: payload.notes,
+        pub_date: payload.pub_date,
+        download_url,
     }))
 }
 
@@ -227,6 +339,7 @@ pub fn router() -> Router<Arc<AppState>> {
             get(is_auto_update_check_enabled),
         )
         .route("/app/info", get(get_app_info))
+        .route("/app/check-update", get(check_update))
         .route("/utilities/database/backup", post(backup_database_route))
         .route(
             "/utilities/database/backup-to-path",

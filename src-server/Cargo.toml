@@ -29,6 +29,7 @@ chacha20poly1305 = { version = "0.10", features = ["std"] }
 rand = "0.8"
 tokio-stream = { version = "0.1", features = ["sync"] }
 futures-core = "0.3"
+semver = "1"
 
 # path dependency to core
 wealthfolio_core = { path = "../src-core", package = "wealthfolio_core" }
